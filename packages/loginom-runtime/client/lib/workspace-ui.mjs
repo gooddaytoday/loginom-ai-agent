@@ -2918,7 +2918,7 @@ function readRenderedInputMapping(observation) {
           const buttons=tids.get(base+'btnTypeChange')??[],menus=tids.get(base+'btnTypeChange;mn')??[];
           const button=buttons.length===1?globalThis.Ext?.getCmp?.(buttons[0].id):null;
           if(button?.el?.dom===buttons[0]&&menus.length===1&&button.menu?.el?.dom===menus[0]&&visible(menus[0])){
-            for(const suffix of ['Str','Int','Float','DTime']){
+            for(const suffix of ['Str','Int','Float','DTime','Boolean']){
               const items=tids.get(base+'itmTypeChange'+suffix)??[],item=items.length===1?globalThis.Ext?.getCmp?.(items[0].id):null;
               if(items.length===1&&item?.el?.dom===items[0]&&item.ownerCt===button.menu&&menus[0].contains(items[0])&&visible(items[0])&&!sensitive(items[0]))
                 replacementCells.set(refOf(items[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'result_type',wizard_root_ref:wizard.root_ref});
@@ -2927,7 +2927,7 @@ function readRenderedInputMapping(observation) {
         }
         const grids=tids.get(base+'grdReplaceItems')??[],editors=tids.get(base+'ReplaceEditor')??[];
         if(grids.length===1&&editors.length===1&&grids[0].contains(editors[0])&&visible(editors[0])){
-          for(const tid of ['roweditorbuttons;update','roweditorbuttons;cancel',...['ReplaceEditor','ReplaceEditor-1'].flatMap(side=>['txt','num','Int64Field','datetimefield'].map(kind=>base+side+';fldVariant;ValueContainer;'+kind+';trg_SetNullTrigger'))]){
+          for(const tid of ['roweditorbuttons;update','roweditorbuttons;cancel',...['ReplaceEditor','ReplaceEditor-1'].flatMap(side=>['txt','num','Int64Field','datetimefield','cbx'].map(kind=>base+side+';fldVariant;ValueContainer;'+kind+';trg_SetNullTrigger'))]){
             const es=(tids.get(tid)??[]).filter(e=>grids[0].contains(e)&&visible(e)&&!sensitive(e));
             if(es.length===1)replacementCells.set(refOf(es[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:tid.endsWith('update')?'update':tid.endsWith('cancel')?'cancel':'set_null',wizard_root_ref:wizard.root_ref});
           }

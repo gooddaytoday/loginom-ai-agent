@@ -48,3 +48,31 @@ test('both colliding partial requests are cancelled before rule or policy change
   assert.equal(native.pairs[0].from.value,'old');assert.equal(native.input_fields.find(f=>f.name===selected).mode,'manual');
  }
 });
+
+test('Boolean and mixed configuration use owned editors and reexecution preserves both groups',async()=>{
+ const {configureReplacement}=await import('../lib/replacement-procedure.mjs');
+ const value=(value,type='string')=>({type,value});
+ for(const mode of ['exact','mixed']){
+  const rule={field:{kind:'input_field',name:'Code'},type:'string',case_sensitive:true,pairs:mode==='exact'?[{from:value('yes'),to:value(true,'boolean')},{from:value('no'),to:value(false,'boolean')}]:[{from:value('AB-12'),to:value('EXACT-FIRST')}],other:{mode:mode==='exact'?'null':'keep'},...(mode==='exact'?{result_type:'boolean'}:{regex_pairs:[{from:value('AB-([0-9]{2})'),to:value('REGEX')}]})};
+  const n={verified:true,inventory_complete:true,input_fields:[{record_id:'field',name:'Code',label:'Code',type:'string',mode:'manual'}],selected:'Code',result_type:'string',mode:null,pairs:[],other:{mode:'keep'},case_sensitive:true,precision:0,editor_open:false};
+  const controls=['btnTypeChange','itmTypeChangeBoolean','ReplaceEditor;fldVariant;ValueContainer;txt','ReplaceEditor-1;fldVariant;ValueContainer;txt','ReplaceEditor-1;fldVariant;ValueContainer;cbx','ReplaceEditor-1;fldVariant;ValueContainer;cbx;boundlist;true','ReplaceEditor-1;fldVariant;ValueContainer;cbx;boundlist;false','cbxReplaceOther;trg_picker','cbxReplaceOther;boundlist;На_пропущенное',...[0,1].map(i=>'grdReplaceItems;tbl;GroupHeader;'+i+';AddButton')];
+  const s={wizard:{stage:'replacement',root_tid:'w'},node_replacement:n,ui:{elements:[]}},actions=[];let serial=0,editing=null;
+  const sync=()=>{s.ui.elements=controls.map(t=>({...(t.endsWith('ValueContainer;cbx')?{tid:null,identity:{anchor_tid:'w;ReplaceColumnsWizard;'+t}}:{tid:'w;ReplaceColumnsWizard;'+t}),ref:t,allowed_actions:['click','fill','press']})).concat([{tid:'roweditorbuttons;update',ref:'update',allowed_actions:['click']}],n.pairs.flatMap(p=>['from','delete'].map(part=>({ref:part+':'+p.record_id,replacement_field:{field_key:'Code',role:'pair',part,record_id:p.record_id},allowed_actions:['click','double_click']}))));};sync();
+  const channel={observe:async o=>{sync();assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
+   sync();const a=o.resolve(s);actions.push(a);const tid=a.ref;
+   if(tid==='itmTypeChangeBoolean')n.result_type='boolean';
+   if(tid.startsWith('grdReplaceItems;tbl;GroupHeader;')){const group=Number(tid.split(';')[3]);n.pairs.push({record_id:'p'+serial++,collection_id:group,index:n.pairs.filter(p=>p.collection_id===group).length,from:value(''),to:value(n.result_type==='boolean'?null:'',n.result_type)});}
+   if(tid.startsWith('from:')){editing=n.pairs.find(p=>p.record_id===tid.slice(5));n.editor_open=true;}
+   if(tid.startsWith('delete:'))n.pairs=n.pairs.filter(p=>p.record_id!==tid.slice(7));
+   if(a.verb==='fill')editing[tid.startsWith('ReplaceEditor-1')?'to':'from']=value(a.text);
+   if(tid.includes(';cbx;boundlist;'))editing.to=value(tid.endsWith(';true'),'boolean');
+   if(tid==='update'){n.editor_open=false;n.mode=n.pairs.some(p=>p.collection_id===1)?n.pairs.some(p=>p.collection_id===0)?'mixed':'regex':'exact';}
+   if(tid==='cbxReplaceOther;boundlist;На_пропущенное')n.other={mode:'null'};
+  }};
+  const result=await configureReplacement(channel,{rules:[rule],output_mode:'replace'},{mode});
+  assert.equal(result.verified,true);assert.deepEqual(result.configuration.rules,[rule]);
+  if(mode==='exact'){assert.deepEqual(n.pairs.map(p=>p.to.value),[true,false]);assert.equal(actions.filter(a=>a.ref==='ReplaceEditor-1;fldVariant;ValueContainer;cbx'&&a.verb==='press'&&a.key==='ArrowDown').length,2);}
+  else assert.deepEqual(n.pairs.map(p=>p.collection_id),[0,1]);
+  actions.length=0;assert.deepEqual((await configureReplacement(channel,{}, {mode})).configuration.rules,[rule]);assert.equal(actions.length,0);
+ }
+});

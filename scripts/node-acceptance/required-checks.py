@@ -36,7 +36,7 @@ RULES = (
     ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite')),
     ((C + 'join-*.mjs', 'docs/node-development/nodes/join/acceptance/**'), ('live-ui',), ('join-right', 'join-full', 'join-difference', 'join-full-no-keys', 'join-cross')),
     ((C + 'reform-*.mjs', 'docs/node-development/nodes/field-parameters/acceptance/v040/**'), ('live-ui',), ('s3', 'reform-rename-lossy')),
-    ((C + 'replacement-*.mjs',), ('live-ui',), ('regex-add', 'regex-replace', 's3')),
+    ((C + 'replacement-*.mjs',), ('live-ui',), ('replace-boolean', 'replace-mixed', 'regex-add', 'regex-replace', 's3')),
     ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**'), ('live-ui',), ('union-auto-match', 's4')),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'variables-replace-*.mjs', 'scripts/node-acceptance/variables-replace.mjs', 'docs/node-development/nodes/variables-replace/acceptance/**'), ('live-ui',), ('variables-replace-exact',)),
