@@ -107,7 +107,7 @@ test("bundled ripgrep is appended to PATH once and never shadows a system rg", (
     ["/usr/bin", "/bin", bundled].join(delimiter),
   )
   expect(withBundledRipgrep({ PATH: bundled }, resources).PATH).toBe(bundled)
-  expect(withBundledRipgrep({}, resources).PATH).toBe(bundled)
+  expect(withBundledRipgrep<Record<string, string | undefined>>({}, resources).PATH).toBe(bundled)
   // Windows environments copied into plain objects keep the original key casing.
   const windows = withBundledRipgrep({ Path: "C:\\Windows" }, resources)
   expect(windows).toEqual({ Path: ["C:\\Windows", bundled].join(delimiter) })
