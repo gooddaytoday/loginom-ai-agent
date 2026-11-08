@@ -59,7 +59,7 @@ Spearman 0,753702346348183, tau-b 0,5520524474738834. Text не имеет
 экстремума; для пустого входа — доказанная свежесть или понятный отказ.
 Численный expected не провозглашает эти открытые соглашения установленными.
 
-Обработчик на базе: `client/lib/corr-analysis-{node,parameters,procedure,
+Обработчик на базе c317bf89 (до #867): `client/lib/corr-analysis-{node,parameters,procedure,
 context,readback,output}.mjs`. Сейчас validator разрешает только pearson,
 resolveCorrAnalysisSets — только integer/real, procedure включает один Пирсон
 и снимает остальные флаги; output требует ровно пять Pearson-полей.
