@@ -5,7 +5,7 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeTreeOutputPortSchema} from '../lib/node-result-schema.mjs';
 
-function fixture({count=4,depth=0,precision=false,duplicate=false,nativeContainers=false,absentContainer=false}={}){
+function fixture({count=4,depth=0,precision=false,duplicate=false,nativeContainers=false,absentContainer=false,rows=1,noteType=5}={}){
  const released=[],nodes=[];
  const node=(name,type,children=[],array=false)=>{
   const index=nodes.length,def={index,name,type,children,array,
@@ -14,24 +14,25 @@ function fixture({count=4,depth=0,precision=false,duplicate=false,nativeContaine
    dispose:async()=>released.push(index)};
   nodes.push(def);return def;
  };
- const id=node('id',4),flag=node('active',1),sku=node('sku',5),qty=node('qty',4),price=node('price',3),note=node('note',5);
+ const id=node('id',4),flag=node('active',1),sku=node('sku',5),qty=node('qty',4),price=node('price',3),note=node('note',noteType);
  if(duplicate)note.get_Name=async()=> 'sku';
  const items=node('items',0,[sku,qty,price,note],true);
  let root=node('Root',0,absentContainer?[node('meta',0,[id,flag]),items]:[id,flag,items]);
  for(let i=0;i<depth;i++)root=node('Root',0,[root]);
  class Int64{toString(){return '9007199254740993';}}
- const reader={GetRowCount:async()=>1,GetContainerExists:async(index,row)=>{
+ const reader={GetRowCount:async()=>rows,GetContainerExists:async(index,row)=>{
   if(nativeContainers&&(index===0||reader.definitions[index].array))throw Error('Native container query is not applicable to root or array rows');
   return !(absentContainer&&reader.definitions[index].name==='meta');
  },
-  GetRowRange:async(index,parent,start,size)=>{assert.equal(parent,0);start.$=0;size.$=count;},
+  GetRowRange:async(index,parent,start,size)=>{assert.ok(parent>=0&&parent<rows);start.$=parent*count;size.$=count;},
   AsVariant:async(index,row)=>{
    const name=reader.definitions[index].name;
-   if(name==='id')return precision?9007199254740992:new Int64();
+   if(name==='id')return rows>1?[7,8][row]:precision?9007199254740992:new Int64();
+   if(name==='note'&&noteType===2)return new Date(2024,1,29,13,45,6,789);
    if(name==='active')return false;
-   if(name==='sku')return ['A','B','C','D'][row];
-   if(name==='qty')return [2,0,3,1][row];
-   if(name==='price')return [1.25,.5,2,.5][row];
+   if(name==='sku')return ['A','B','C','D','E','F','G','H'][row];
+   if(name==='qty')return [2,0,3,1,5,6,7,8][row];
+   if(name==='price')return [1.25,.5,2,.5,1,1,1,1][row];
    return [null,'','x',undefined][row];
   },dispose:async()=>released.push('reader')};
  const source={get_RootNodeDef:async()=>root,GetReader:async definitions=>{reader.definitions=definitions;return reader;}};
@@ -76,4 +77,21 @@ test('tree_io public schema and compaction preserve the complete schema and inst
   output:{output:{status:'complete',execution_id:'exec',evidence_ref:'receipt',ports:[port]}}}});
  assert.deepEqual(result.output.ports,[port]);
  const bad=structuredClone(port);bad.tree.complete=false;assert.equal(validate(bad).valid,false);
+});
+test('tree_io reads datetime leaves as civil milliseconds and still refuses Variant leaves',async()=>{
+ // Temporal-based datetime decoding is covered in the browser integration test;
+ // here the tree reader must admit the type and keep the decoded civil cell.
+ const f=fixture({noteType:2}),civil=(raw,type)=>type==='datetime'&&raw instanceof Date
+  ?{cell:{type,is_null:false,value:'2024-02-29T13:45:06.789',representation:'local_datetime',precision:'millisecond',timezone:'unspecified'},limitations:[]}:decodePortCell(raw,type);
+ const result=await readTreePortSource(f.source,f.call,f.track,civil);
+ const note=result.instances.find(n=>n.path==='/items/0/note');
+ assert.equal(result.schema.find(n=>n.path==='/items/note').type,'datetime');
+ assert.equal(note.value,'2024-02-29T13:45:06.789');assert.equal(note.precision,'millisecond');
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
+ assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree:result,sample_complete:true}).valid,true);
+ await assert.rejects(read({noteType:6}),/tree_scalar_type/);
+});
+test('tree_io still reads exactly one native document: several root rows and an empty tree refuse',async()=>{
+ await assert.rejects(read({rows:2,count:2}),/tree_document_count/);
+ await assert.rejects(read({rows:0}),/tree_document_count/);
 });

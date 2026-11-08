@@ -318,6 +318,46 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
             self.assertNotIn('expected', case['prompt'].read_text())
 
+    def test_datatovar_cycle1_cases_bind_independent_oracle_and_typed_csv_inputs(self):
+        oracle = runner.read(runner.REPO / 'docs/node-development/nodes/variables-datatovar/acceptance/aggregate-types/expected.json')
+        for name, section, files, source in [('variables-from-table-aggregates', 'numeric', ['aggregate-numeric.csv'], 'imports.text'),
+                                             ('variables-from-table-scalars', 'scalar_types', ['aggregate-types.csv'], 'imports.text')]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/aggregate.lgp')
+            self.assertEqual((case['variable_audit'], case['input_files'], expected['package_path']), (name, files, '/own/aggregate.lgp'))
+            self.assertEqual(expected['nodes'], [{'type': source}, {'type': 'variables.from_table'}])
+            output = expected['variable_inventory']['outputs'][0]
+            self.assertEqual((output['node'], output['port'], output['ordered']), ({'type': 'variables.from_table'}, 0, True))
+            self.assertEqual(output['variables'], oracle[section]['variables'])
+            self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
+            self.assertNotIn('expected', case['prompt'].read_text())
+        scalars = runner.scenario('variables-from-table-scalars')
+        self.assertNotIn('source_package', scalars)
+        self.assertTrue((scalars['data'] / 'aggregate-types.csv').is_file())
+
+    def test_datatovar_scalars_prompt_imports_typed_csv_and_saves_run_package(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
+            for path in [folder, profile, workspace]: path.mkdir()
+            runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True, 'unsaved_changes_discarded': False})
+            runner.write(profile / 'runtime-close-1.json', {'closed_ack': True})
+            event = {'type': 'tool_use', 'sessionID': 'own-session', 'part': {'tool': 'loginom_dock_action_run', 'state': {
+                'status': 'completed', 'output': json.dumps({'status': 'SUCCEEDED', 'action_key': 'package.save_checkpoint', 'output': {'save_completed': True}})}}}
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+            def phase(name, command, *args, **kwargs):
+                if name == 'model': (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                elif name != 'variable-oracle': self.fail('Unexpected phase ' + name)
+            with patch.object(instance, 'phase', side_effect=phase):
+                instance.model('variables-from-table-scalars', folder, profile, workspace, '/test/run-x.lgp', {'package_directory': '/test'}, root / 'build')
+            task = (folder / 'task.md').read_text()
+            self.assertIn('Импортируй aggregate-types.csv', task)
+            self.assertNotIn('JavaScript', task)
+            self.assertTrue(task.rstrip().endswith('Сохрани пакет как /test/run-x.lgp.'))
+            self.assertNotIn('{{PACKAGE_PATH}}', task)
+            self.assertEqual(runner.read(folder / 'expected.json')['package_path'], '/test/run-x.lgp')
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')

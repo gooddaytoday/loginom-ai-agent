@@ -91,6 +91,12 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['duplicates-typed', 'duplicates-empty', 'duplicates-singleton']:
+        root = REPO / 'docs/node-development/nodes/duplicates'
+        kind = 'keys' if name == 'duplicates-typed' else name.removeprefix('duplicates-')
+        return dict(source=root / 'acceptance', prompt=root / 'acceptance' / ('task-typed-keys.md' if kind == 'keys' else 'task-' + kind + '.md'),
+                    data=root / 'fixtures', input_files=['typed-' + kind + '.csv'], base=None, oracle=root / 'acceptance/modes/oracle.py',
+                    expected_name='modes/expected.json' if kind == 'keys' else 'modes/expected-' + kind + '.json')
     if name == 'import-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
@@ -341,6 +347,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
+    if name == 'trees-to-table-indices':
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
+                    base=None, external=True, expected_name='expected-indices-run.json')
 
     if name in ['coarse-classes-train', 'coarse-classes-apply']:
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
@@ -565,6 +575,13 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
                     expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
                     variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name in ['variables-from-table-aggregates', 'variables-from-table-scalars']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        scalars = name == 'variables-from-table-scalars'
+        expected = 'expected-scalar-types-run.json' if scalars else 'expected-aggregates-run.json'
+        return dict(source=src, prompt=src / ('task-scalar-types.md' if scalars else 'task-aggregates.md'), data=src.parent / 'fixtures',
+                    input_files=['aggregate-types.csv' if scalars else 'aggregate-numeric.csv'], base=None, expected_name=expected, variable_initial_name=expected,
+                    variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
