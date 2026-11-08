@@ -494,12 +494,13 @@ export interface UngroupConfigurationReadback extends Omit<JoinConfigurationRead
 }
 
 export interface UserVariablesParameters {
- variables:Array<{name:string;type:'integer';value:number|null}|{name:string;type:'boolean';value:boolean|null}|{name:string;type:'string';value:string|null}>;
+ remove?:string[];
+ variables?:Array<{name:string;type:'integer';value:number|null}|{name:string;type:'boolean';value:boolean|null}|{name:string;type:'string';value:string|null}>;
 }
 
 export interface UserVariablesConfigurationReadback {
  kind:'user_variables'; mode:'values'; scope:'observed_after_verified_finish'; values_are:'independent_owned_user_variables';
- node:NodeRef; receipt_ids:string[]; variables:NodeVariableOutput['variables']; changed:string[]; package_persistence_verified:false;
+ node:NodeRef; receipt_ids:string[]; variables:NodeVariableOutput['variables']; changed:string[]; removed?:string[]; package_persistence_verified:false;
 }
 
 export interface VariableMappingReadback {

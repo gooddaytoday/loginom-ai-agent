@@ -14,7 +14,7 @@ export function createUserVariablesNodeSupport(config){
   configurationReadback({node,phases,operation_id}){
    const value=phases.find(p=>p.phase==='configure')?.value;if(value?.independent_readback!==true)throw Error('Independent user variable readback required');
    return {kind:'user_variables',mode:'values',scope:'observed_after_verified_finish',values_are:'independent_owned_user_variables',node,
-    receipt_ids:[operation_id+':configure',operation_id+':finish'],variables:value.variables,changed:value.changed,package_persistence_verified:false};
+    receipt_ids:[operation_id+':configure',operation_id+':finish'],variables:value.variables,changed:value.changed,...(value.removed?.length?{removed:value.removed}:{}),package_persistence_verified:false};
   }}]]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now=Date.now,receiptOptions}=options,request=operation.parameters;let channel,signal;
@@ -35,7 +35,7 @@ export function createUserVariablesNodeSupport(config){
     const r=error.receipt;if(r?.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true)error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
    }},
    mapPorts:async(mappings,ctx)=>{if(mappings.length)throw Error('Builtin user mappings are unsupported');return quiet(ctx);},openWizard:quiet,
-   async configureValues(p,ctx){enter(ctx);return channel.configureUserVariables(p.variables,request.finish);},
+   async configureValues(p,ctx){enter(ctx);return channel.configureUserVariables(p.variables??[],request.finish,p.remove);},
    async finish(mode,ctx){return {...await quiet(ctx),mode,execution_id:null,execution_started:false,settings_applied:mode==='done',draft_discarded:mode==='close'};},
    async finishGraph(mode,ctx){if(mode!=='done')throw Error('Builtin snapshot never executes');return {...await quiet(ctx),mode,execution_id:null,execution_started:false,settings_applied:false};},
    async waitExecution(){throw Error('Builtin user variables cannot execute');},
@@ -50,14 +50,23 @@ export function createUserVariablesNodeSupport(config){
 
 export function makeUserVariablesSnapshotCode(binding,options){
  validatePreparedNodeContext(binding);
- if(Object.hasOwn(options,'variables'))throw Error('A snapshot cannot edit variables');
+ if(Object.hasOwn(options,'variables')||Object.hasOwn(options,'remove'))throw Error('A snapshot cannot edit variables');
  return `async page=>(${readUserVariablesSnapshot.toString()})(page,${JSON.stringify({binding,...options})},${readPreparedNodeContext.toString()},${openPreparedOutputPort.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
 }
 
 export function validateUserVariablesParameters(parameters,mode,request){
  const need=(ok,message)=>{if(!ok)throw Error('User variables: '+message);};
- need(parameters&&Object.keys(parameters).join(',')==='variables'&&Array.isArray(parameters.variables)&&parameters.variables.length<=128,'bounded variables patch required');
+ const keys=parameters&&typeof parameters==='object'?Object.keys(parameters):[];
+ need(keys.length>0&&keys.every(k=>['variables','remove'].includes(k))&&(keys.includes('variables')||keys.includes('remove')),'variables and/or remove required');
+ if(parameters.variables===undefined)parameters={...parameters,variables:[]};
+ need(Array.isArray(parameters.variables)&&parameters.variables.length<=128,'bounded variables patch required');
  need(new Set(parameters.variables.map(v=>v?.name)).size===parameters.variables.length,'duplicate variable name');
+ if(parameters.remove!==undefined){
+  const r=parameters.remove;
+  need(Array.isArray(r)&&r.length>=1&&r.length<=128&&r.every(n=>typeof n==='string'&&/^[_A-Za-z][_A-Za-z0-9]{0,127}$/.test(n)),'remove must list 1-128 exact variable names');
+  need(new Set(r).size===r.length,'duplicate name in remove');
+  need(!r.some(n=>parameters.variables.some(v=>v?.name===n)),'remove overlaps variables');
+ }
  const civil=value=>{
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.000)?$/.test(value))return false;
   const date=new Date(value.slice(0,19)+'.000Z');
@@ -73,7 +82,7 @@ export function validateUserVariablesParameters(parameters,mode,request){
 }
 
 export function makeUserVariablesConfigureCode(binding,options){
- validatePreparedNodeContext(binding);validateUserVariablesParameters({variables:options.variables});
+ validatePreparedNodeContext(binding);validateUserVariablesParameters({variables:options.variables,...(options.remove?{remove:options.remove}:{})});
  return `async page=>{
   const run=${readUserVariablesSnapshot.toString()},readNode=${readPreparedNodeContext.toString()},openPort=${openPreparedOutputPort.toString()},records=${readVariableRecords.toString()},decode=${decodePortCell.toString()};
   const task=${JSON.stringify({binding,...options})};
@@ -128,6 +137,22 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
    const es=exact(b.workflow_ref.prefix+';WizrdMCF;VariablesEditValuesWizard;'+extra.name).filter(visible),c=es.length===1&&Ext.getCmp(es[0].id);
    if(es.length!==1||!roots[0].contains(es[0])||c?.el.dom!==es[0]||c.disabled)throw Error('Owned user variable button required');return point(es[0]);
   }
+  if(mode==='delete'){
+   const matches=grid.getStore().getData().items.filter(v=>v.data.ID===extra.id&&v.data.Name===extra.name),view=grid.getView();
+   if(matches.length!==1)throw Error('Exact user variable row required');const rowEl=view.getNode(matches[0]);
+   if(!rowEl||view.getRecord(rowEl)!==matches[0])throw Error('Bound variable row required');
+   const base=b.workflow_ref.prefix+';WizrdMCF;VariablesEditValuesWizard;',short=e=>(e.getAttribute('data-tid')||'').replace(base,'');
+   const cells=[...rowEl.querySelectorAll('[data-tid]')],imgs=cells.filter(e=>/colTargetDelete/.test(e.getAttribute('data-tid'))).flatMap(c=>[...c.querySelectorAll('img')]).filter(e=>visible(e)&&!e.classList.contains('x-item-disabled'));
+   if(imgs.length===1)return point(imgs[0]);
+   const bars=['btnDeleteMappingColumn','btnRemoveMappingColumn'].flatMap(n=>exact(base+n).filter(visible)).filter(e=>Ext.getCmp(e.id)?.disabled===false);
+   if(bars.length===1)return point(bars[0]);
+   throw Error('Native user variable delete control unresolved; row='+cells.map(short).join('|').slice(0,160)+'; buttons='+[...roots[0].querySelectorAll('[data-tid]')].map(short).filter(t=>/^btn|Delete|Remove/.test(t)).join('|').slice(0,200));
+  }
+  if(mode==='confirm'){
+   const gone=!grid.getStore().getData().items.some(v=>v.data.ID===extra.id),ds=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible),yes=exact('msgbox;tlb;yes').filter(visible);
+   if(ds.length>1)throw Error('Several dialogs after user variable delete');
+   return {gone,present:ds.length===1,text:ds.length?ds[0].innerText.replace(/\s+/g,' ').trim().slice(0,200):'',yes:ds.length===1&&yes.length===1&&ds[0].contains(yes[0])};
+  }
   const ds=exact('EditVariableForm').filter(visible),dialogs=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible);
   const cmp=t=>{const es=exact('EditVariableForm;'+t);return es.length===1&&Ext.getCmp(es[0].id)?.el.dom===es[0]?Ext.getCmp(es[0].id):null;};
   if(ds.length!==1||dialogs.length!==1||dialogs[0]!==ds[0]||Ext.getCmp(ds[0].id)?.$className!=='bg.wizards.variables.view.EditVariableForm'
@@ -157,8 +182,26 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
   await page.waitForFunction(t=>{const e=document.querySelector('[data-tid='+JSON.stringify(t)+']'),g=e&&Ext.getCmp(e.id);return typeof g?.getStore==='function'&&g.getStore().isLoading()===false;},root+';VariablesEditValuesWizard;grdTargetColumns',{timeout:remaining()});
   inventory=await inspect('inventory');portGuid=inventory.port_guid;
   baseline=inventory.variables;
+  const removals=task.remove??[],removed=[];
   if(writing){
+   for(const n of removals)if(!baseline.some(x=>x.name===n))throw Error('User variable to remove not found; no edits applied: '+n);
+   if(removals.some(n=>task.variables.some(v=>v.name===n)))throw Error('remove overlaps variables; no edits applied');
    for(const v of task.variables){const old=baseline.find(x=>x.name===v.name);if(old&&old.type!==v.type)throw Error('Existing user variable type differs; no edits applied');}
+   for(const n of removals){
+    const old=inventory.variables.find(x=>x.name===n),row=await inspect('row',{id:old.id,name:old.name});await page.mouse.click(row.x,row.y);
+    const control=await inspect('delete',{id:old.id,name:old.name});await page.mouse.click(control.x,control.y);
+    for(let confirmed=false;;){
+     const state=await inspect('confirm',{id:old.id});
+     if(state.gone&&!state.present)break;
+     if(state.present&&!confirmed){
+      if(!state.yes||!/удал/i.test(state.text))throw Error('Unexpected user variable delete dialog: '+state.text);
+      await at('msgbox;tlb;yes').click({timeout:remaining()});confirmed=true;continue;
+     }
+     await page.waitForTimeout(Math.min(100,remaining()));
+    }
+    await page.waitForFunction(t=>{const e=document.querySelector('[data-tid='+JSON.stringify(t)+']'),grid=e&&Ext.getCmp(e.id);return typeof grid?.getStore==='function'&&grid.getStore().isLoading()===false;},root+';VariablesEditValuesWizard;grdTargetColumns',{timeout:remaining()});
+    inventory=await inspect('inventory');if(inventory.variables.some(v=>v.id===old.id||v.name===n))throw Error('User variable delete readback differs');removed.push(n);
+   }
    const equal=(v,a)=>a&&a.type===v.type&&a.cell.is_null===(v.value===null)&&(v.value===null?a.cell.value===null:
     Object.is(a.cell.value,v.type==='integer'?String(v.value):v.type==='datetime'?v.value.slice(0,19)+'.000':v.value));
    for(const v of task.variables){
@@ -185,7 +228,9 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
     await page.waitForFunction(t=>{const e=document.querySelector('[data-tid='+JSON.stringify(t)+']'),grid=e&&Ext.getCmp(e.id);return typeof grid?.getStore==='function'&&grid.getStore().isLoading()===false;},root+';VariablesEditValuesWizard;grdTargetColumns',{timeout:remaining()});
     inventory=await inspect('inventory');const now=inventory.variables.find(a=>a.name===v.name);if(!equal(v,now)||old&&(old.id!==now.id||old.label!==now.label||old.index!==now.index))throw Error('User variable exact value/ID/label/order readback differs');changed.push(v.name);
    }
-   for(const old of baseline.filter(v=>!task.variables.some(x=>x.name===v.name)))if(JSON.stringify(inventory.variables.find(v=>v.id===old.id))!==JSON.stringify(old))throw Error('Unrequested user variable changed');
+   const kept=baseline.filter(v=>!task.variables.some(x=>x.name===v.name)&&!removals.includes(v.name)),same=v=>JSON.stringify(removals.length?{...v,index:undefined}:v);
+   for(const old of kept)if(same(inventory.variables.find(v=>v.id===old.id)??{})!==same(old))throw Error('Unrequested user variable changed');
+   if(removals.length&&JSON.stringify(inventory.variables.filter(v=>kept.some(k=>k.id===v.id)).map(v=>v.id))!==JSON.stringify(kept.map(v=>v.id)))throw Error('Unrequested user variable order changed');
   }
   const done=writing&&task.finish==='done';await at(root+(done?';btnDone':';btnClose')).click({timeout:remaining()});
   await page.waitForFunction(t=>!document.querySelector('[data-tid='+JSON.stringify(t)+']')?.checkVisibility({checkVisibilityCSS:true})
@@ -201,7 +246,7 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
   opened=false;let after=await readNode(page,b);
   while(after.surface_pending||after.verified&&after.surface==='graph'&&after.locked){await page.waitForTimeout(Math.min(80,remaining()));after=await readNode(page,b);}
   if(!after.verified||after.surface!=='graph')throw Error('User snapshot graph return unconfirmed: '+JSON.stringify(after));
-  if(writing)return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:after,variables:inventory.variables,before_variables:baseline,changed,settings_applied:done,draft_discarded:!done};
+  if(writing)return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:after,variables:inventory.variables,before_variables:baseline,changed,removed,settings_applied:done,draft_discarded:!done};
   if(await inspect('dirty'))return {status:'NOT_APPLIED',verified:false,effect_possible:true,cleanup_complete:true,node_context:after,error:'USER_SNAPSHOT_MARKED_PACKAGE_MODIFIED: untouched VariablesEditValuesWizard changed the clean package'};
   return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:after,output:{...inventory,port:4,kind:'variables',port_guid:portGuid,
    read_id:task.operation_id,execution_id:null,source:'snapshot',native_source:'VariablesEditValuesWizard',fresh:true,package_modified:false}};

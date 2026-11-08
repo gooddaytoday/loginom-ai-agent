@@ -85,3 +85,39 @@ test('equal real/date patches retain millisecond neighbours; mixed type changes 
   else {assert.equal(result.status,'SUCCEEDED');assert.deepEqual(result.changed,[]);assert.deepEqual(result.variables,variables);assert.equal(calls.length,1);}
  }
 });
+
+const removeInventory=()=>[{id:1,index:0,name:'amount',label:'amount',type:'integer',cell:{type:'integer',is_null:false,value:'7'}},
+ {id:2,index:1,name:'empty',label:'empty',type:'string',cell:{type:'string',is_null:false,value:''}},
+ {id:3,index:2,name:'enabled',label:'enabled',type:'boolean',cell:{type:'boolean',is_null:false,value:false}}];
+test('remove is additive: calls without it validate as before; bad remove refuses before the UI driver',()=>{
+ const ok=r=>assert.doesNotThrow(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers));
+ ok(request());
+ let r=request();r.parameters={variables:[],remove:['empty']};ok(r);
+ r=request();r.parameters={remove:['empty']};ok(r);
+ r=request();r.parameters={variables:[{name:'limit',type:'integer',value:3}],remove:['empty','skip']};ok(r);
+ for(const remove of [[],'empty',['empty','empty'],['limit'],['1bad'],[''],['a'.repeat(129)],Array(129).fill('x').map((x,i)=>x+i),[7],[{name:'empty'}]]){
+  r=request();r.parameters={variables:[{name:'limit',type:'integer',value:3}],remove};assert.throws(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers),/User variables|remove/,JSON.stringify(remove).slice(0,40));
+ }
+ r=request();r.parameters={variables:[],remove:['empty'],extra:1};assert.throws(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers));
+ assert.throws(()=>validateUserVariablesParameters({}));
+});
+test('remove of an unknown name refuses before any gesture; known name is deleted once with exact readback',async()=>{
+ for(const known of [false,true]){
+  let inventory=removeInventory();const calls=[];
+  const page={locator:s=>({count:async()=>0,click:async()=>calls.push(s)}),waitForFunction:async()=>{},mouse:{click:async(x,y)=>calls.push('mouse:'+x+','+y)},
+   evaluate:async(_fn,{mode,extra})=>{
+    if(mode==='dirty')return false;
+    if(mode==='inventory')return {port_guid:'port',variables:structuredClone(inventory)};
+    if(mode==='row')return {x:1,y:2};
+    if(mode==='delete'){assert.equal(extra.name,'empty');assert.equal(extra.id,2);return {x:10,y:20};}
+    if(mode==='confirm')return {present:false,gone:!inventory.some(v=>v.id===2)};
+    throw Error('unexpected '+mode);
+   }};
+  const mouse=page.mouse.click;page.mouse.click=async(x,y)=>{await mouse(x,y);if(x===10)inventory=inventory.filter(v=>v.id!==2).map((v,index)=>({...v,index}));};
+  const result=await readUserVariablesSnapshot(page,{binding,deadline:Date.now()+5000,operation_id:'rm',finish:'done',variables:[],remove:[known?'empty':'ghost']},
+   async()=>({verified:true,surface:'graph',locked:false}),async()=>({status:'SUCCEEDED',effect_possible:true}),()=>{},()=>{});
+  if(!known){assert.match(result.error,/no edits applied/);assert.equal(calls.length,0);}
+  else {assert.equal(result.status,'SUCCEEDED');assert.deepEqual(result.removed,['empty']);assert.deepEqual(result.changed,[]);
+   assert.deepEqual(result.variables.map(v=>[v.id,v.name,v.index]),[[1,'amount',0],[3,'enabled',1]]);assert.deepEqual(calls.filter(c=>c.startsWith('mouse')),['mouse:1,2','mouse:10,20']);}
+ }
+});
