@@ -1,4 +1,55 @@
-Предложение LAB-1046, **checkpoint, этап 0 не завершён**. Runtime/skill не менялись,
+LAB-1055: **checkpoint / blocked после второго разрыва**, 07.11.2026, mas3.
+Живые опыты остановлены по лимиту карточки; критерии ниже остаются предложением.
+Непроверенные случаи не считаются отсутствующими в 7.4.2.
+
+Продолжение LAB-1055: шесть ненулевых filter-case ниже численно исследованы на
+7.4.2. Это предложения критериев, не PASS обработчика; runtime/skill не менялись.
+Haar depth 1/2, утверждённые назначением, повторно не принимаются.
+
+| Новое задание в acceptance/ | Expected здесь | Полный preview-cache, max abs |
+|---|---|---:|
+| task-db2-symmetric.md | expected-db2-symmetric.json | 3.56e-15 |
+| task-db2-depth2.md | expected-db2-depth2.json | 3.56e-15 |
+| task-db2-zero.md | expected-db2-zero.json | 1.12e-16 |
+| task-coif1-symmetric.md | expected-coif1-symmetric.json | 2.41e-12 |
+| task-cdf97-symmetric.md | expected-cdf97-symmetric.json | 1.60e-14 |
+| task-cdf97-reflect.md | expected-cdf97-reflect.json | 1.96e-14 |
+
+Вход всех шести — существующий маленький `fixtures/wavelet.csv`, 8 строк
+непостоянного ряда. `oracle-filters.py --write --check` воспроизводит JSON с зависимостями
+из `requirements-filters.txt` (на mas3 Python 3.14). Oracle получает только CSV и
+явные математические параметры. Loginom, runtime и actual-файлы он не читает.
+RowID/X/Tag сверяются точно, X_S — прежним Real abs=1e-8/rel=1e-10.
+Задания требуют RowID,X,Tag,X_S: естественный UI-порядок RowID,X,X_S,Tag надо
+изменить штатным output mapping. Нового verifier или допуска не требуется.
+
+Добеши/Койфлеты — multilevel DWT, все детали нулевые, обратное восстановление.
+CDF — независимые четыре lifting-шага и обратные шаги после удаления деталей;
+низкочастотные отсчёты на нечётных исходных индексах (от нуля), до преобразования
+полное symmetric/reflect продолжение. Это существенная конвенция: обычный
+нерасширенный `pywt.wavedec(...,'bior4.4')` расходится с UI до 0.521 и не является
+предлагаемым CDF-oracle. Второй filter-bank расчёт с той же явной фазой проверяет
+lifting-вариант независимо от Loginom. Длина 8 намеренно затрагивает границы;
+предупреждение PyWavelets о boundary effects ожидаемо. Другие длины,
+CDF depth>1 и остальные порядки остаются `not_checked`.
+
+Определения: [DWT PyWavelets](https://pywavelets.readthedocs.io/en/latest/ref/dwt-discrete-wavelet-transform.html),
+[продолжения](https://pywavelets.readthedocs.io/en/latest/ref/signal-extension-modes.html),
+[lifting CDF 9/7, Pascal Getreuer](https://getreuer.info/posts/waveletcdf97/index.html).
+Источники задают математику; соответствие фазовой конвенции Loginom — вывод
+из наблюдения этого входа, не утверждение о всех параметрах.
+
+**NULL остаётся в карантине.** На wavelet-null.csv/db1/depth1 исходный NULL
+сохранён; первые шесть X_S конечны, последние два — NaN в preview-cache.
+Конечная линейная интерполяция не наблюдается. Native NULL против nonfinite,
+CSV и cold этого случая — `not_checked`; expected-null.json из LAB-1046 нельзя
+использовать как критерий PASS или обещать модели интерполяцию.
+Нулевой CDF-case остаётся только smoke и не заменяет шесть случаев выше.
+
+Модели передаются только выбранный task и CSV. Oracle, expected, schema и
+карточки ей не передаются. Новые run-check до утверждения не зарегистрированы.
+
+Историческое предложение LAB-1046, **checkpoint, этап 0 не завершён**. Runtime/skill не менялись,
 новые run-check не зарегистрированы. Это не приёмка обработчика.
 
 | Задание в acceptance/ | Вход из fixtures/ | Expected здесь | Статус |

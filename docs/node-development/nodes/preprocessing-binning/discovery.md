@@ -1,5 +1,9 @@
 # Квантование: этап 0, LAB-645
 
+Актуальное продолжение — [LAB-1055 ниже](#lab-1055-tiescurrent-и-остановка-на-mas3).
+Старые численные лимиты full schema в конце исторического отчёта отменены
+назначением LAB-1055: model apply ≤20000 Б, full schema только измеряется.
+
 31.10.2026, mas, Linux x64. База `v039@3377e6b164bcf509a050fb1536bae8dbf8bece39`.
 Живой стенд только `https://app.loginom.ai/app/?testable=true`, worker назначенной
 пары `~/.config/loginom-multica/cards/01a124e5-1623-7a32-93c7-a3754c7dbdd7/`.
@@ -239,3 +243,57 @@ s.properties.parameters.properties.binning=JSON.parse(readFileSync(
 console.log({before,after:bytes(s),growth:bytes(s)-before});
 JS
 ```
+
+## LAB-1055: ties=current и остановка на mas3
+
+07.11.2026, Loginom 7.4.2, Chromium 1246, только назначенный worker пары
+01a124e5-1e74-70ef-b9ea-b289e04cf35c и testable URL из задания.
+Ветка начата от открытого #851 (`coverage-binning-modes@266c9a0ab`), затем
+включена назначенная база `v040@3ff0d88e486057228eea87935cf5aed11e9f46be`.
+Runtime не изменён, CLI не собирался, модельных запусков нет.
+Ранее утверждённые DateTime/manual/auto/SD повторно не принимались.
+
+Связан проверенный источник ties-modes.csv: X Integer/continuous,
+значения 0,2,2,6,8,10,12,14, RowID integer и Tag string, 8 строк.
+`WizrdMCF;MethodSettingsWizard-1;grdColumns;colDisplayName_1` связан с X.
+`colMethodType_1` → inline `celleditor;cbx` → «Плитка»;
+`btnEditMethodSettings` открывает самостоятельный MethodSettingFrame.
+У `cbbTileCount;ValueControl` установлено 4, у
+`cbbMatchingObservationsMode;ValueControl` выбран индекс 1 «Сохранять в текущем».
+В boundlist наблюдены все пять пунктов: «Добавлять в следующий»,
+«Сохранять в текущем», «Назначать случайно», «Оставить как есть»,
+«Одинаковые плитки». Наличие enum не доказывает численный контракт.
+Readback подтвердил `chkSummTile=false`, `chkRoundingLevel=false`,
+`chkLowerLimitOpen=false`, `chkUpperLimitOpen=false`.
+В этом tile-draft округление Integer исходно false: старое наблюдение true
+для count нельзя обобщать на все методы. Новых портов нет: основной вход0,
+строки0 и диапазоны1; дополнительные входы не использовались.
+
+После Done и Train статус успешный. Свежие видимые DataSetForm, связанные
+с собственным узлом и текущим preview-port, дали полные таблицы:
+строки 8×13 и диапазоны 4×13. Все 156 ячеек, порядок и типы совпали точно
+с независимым rank-oracle. Интервалы [0..2], (2..6], (6..10], (10..14];
+номера 0,0,0,1,2,2,3,3. Оба повторения 2 остаются в первом классе.
+Диапазоны: BoundsDataType=4, LowBoundQuota=1,0,0,0,
+UppBoundQuota=1,1,1,1, BinQuota=NULL, LowDev/UppDev равны пределам,
+оба флага открытости false. Порядок строкового выхода — RowID,X,
+десять производных полей X,Tag. Это численное discovery из полного локального
+native preview-cache, не PASS точного production-reader/CSV/cold.
+
+Первый разрыв связи восстановлен штатной кнопкой. После чтения current-строк
+второй разрыв закрыл доступ к Preview; его закрытие перехватывала модальная
+маска. В `msgbox;cnt;cnt;cmp`: «Обнаружен разрыв связи. Восстановить сессию?»;
+`msgbox;tlb;yes` — «Восстановить». Второе восстановление использовано только
+для Save/закрытия собственного пакета/logout, дальнейшее исследование остановлено.
+Сырые доказательства сохранены вне Git; это checkpoint по ограничению карточки,
+а не объявление дефекта модели или обработчика.
+
+Sums/unchanged/equal_tiles/округление/открытые края — **not_checked** из-за
+лимита переподключений. UI controls доступны, утверждения «нет в 7.4.2» нет.
+Для сумм подготовлен task и отдельная гипотеза weighted-CDF на положительном
+входе (целевые суммы 28/26); live-сверки нет. Для округления сначала нужен
+различающий дробный вход и проверка всех зависимых controls; целочисленные
+границы current не подтверждают округление. Для открытых краёв нужен holdout
+снаружи обоих конечных пределов и проверка меток/NULL/флагов обоих портов.
+Random исключён до утверждения критерия; seed не наблюдён. Не дополнять oracle
+из actual-значений и не ослаблять стандартный verifier.

@@ -18,6 +18,56 @@ BASE = runpy.run_path(str(ROOT / "acceptance" / "oracle.py"))
 
 def expected(case):
     result = BASE["expected"]()
+    if case in ("frozen-zero", "external"):
+        # Explicit proposal for the observed N=4 case, not a general claim
+        # about Loginom's correction at arbitrary sample sizes. The frozen
+        # model retains the independent training model's numbering B=0/A=1.
+        rows = BASE["source"]("zero-frequency")
+        if case == "external":
+            with (ROOT / "fixtures" / "external-classes.csv").open(newline="", encoding="utf-8") as source:
+                definitions = list(csv.DictReader(source))
+            assert {r["ColumnName"] for r in definitions} == {"Segment"}
+            assert {r["UniqueValue"] for r in definitions} == {r["Segment"] for r in rows}
+            numbers = {r["UniqueValue"]: int(r["ClassNumber"]) for r in definitions}
+            assert len(numbers) == len(definitions) and set(numbers.values()) == {0, 1}
+            for item in result["outputs"][1]["rows"]:
+                item["ClassNumber"] = numbers[item["UniqueValue"]]
+            result["outputs"][1]["rows"].sort(key=lambda r: r["ClassNumber"])
+            result["nodes"].insert(0, {"type": "imports.text"})
+        events = sum(r["Target"] == "yes" for r in rows)
+        non_events = len(rows) - events
+        with localcontext() as context:
+            context.prec = 50
+            epsilon = Decimal(1) / (2 * len(rows))
+            assert len(rows) == 4 and events == non_events == 2
+            for item in result["outputs"][1]["rows"]:
+                group = [r for r in rows if r["Segment"] == item["UniqueValue"]]
+                e = sum(r["Target"] == "yes" for r in group)
+                n = len(group) - e
+                pe = Decimal(e) / events if e else epsilon
+                pn = Decimal(n) / non_events if n else epsilon
+                woe = (pn / pe).ln()
+                item.update(EventsCount=e, NonEventsCount=n,
+                            EventRate=e / len(group), NonEventRate=n / len(group),
+                            WoE=float(woe), IV=float((pn - pe) * woe),
+                            Weight=len(group) / len(rows))
+        if case == "external":
+            # Input numbers define membership, not a promised output identity.
+            # In this distinct-WoE case the native output is normalized in
+            # increasing WoE order. Equal-WoE ordering is outside the proposal.
+            result["outputs"][1]["rows"].sort(key=lambda r: r["WoE"])
+            for number, item in enumerate(result["outputs"][1]["rows"]):
+                item["ClassNumber"] = number
+        classes = {item["UniqueValue"]: item for item in result["outputs"][1]["rows"]}
+        result["outputs"][0]["rows"] = [r | {
+            "Segment_ClassNum": classes[r["Segment"]]["ClassNumber"],
+            "Segment_ClassMark": classes[r["Segment"]]["ClassMark"],
+            "Segment_ClassSignificant": classes[r["Segment"]]["IV"]} for r in rows]
+        result["outputs"][2]["rows"] = [dict(ColumnName="Segment", ColumnDisplayName="Segment",
+            EventsCount=events, NonEventsCount=non_events, EventRate=events / len(rows),
+            NonEventRate=non_events / len(rows), TotalEventsCount=len(rows),
+            IV=sum(c["IV"] for c in classes.values()), Significance="Высокая")]
+        return result
     if case == "unseen":
         known = {r["Segment"]: r for r in result["outputs"][0]["rows"]}
         with (ROOT / "fixtures" / "unseen.csv").open(newline="", encoding="utf-8") as source:
@@ -84,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    for case in ("continuous", "unseen", "zero-frequency"):
+    for case in ("continuous", "unseen", "zero-frequency", "frozen-zero", "external"):
         result = expected(case)
         path = Path(__file__).parent / ("expected.json" if case == "continuous" else "expected-" + case + ".json")
         if args.write:
@@ -93,4 +143,6 @@ if __name__ == "__main__":
             assert json.loads(path.read_text(encoding="utf-8")) == result, path.name
     assert abs(expected("continuous")["outputs"][2]["rows"][0]["IV"] - float(Decimal(3).ln())) < 1e-14
     assert all(r["Segment_ClassNum"] is None for r in expected("unseen")["outputs"][0]["rows"][1:])
-    print("Continuous proposal reproduced; unseen/zero-frequency remain quarantined hypotheses.")
+    assert expected("frozen-zero")["outputs"][1]["rows"][0]["ClassNumber"] == 0
+    assert expected("frozen-zero")["outputs"][1]["rows"][0]["UniqueValue"] == "B"
+    print("Continuous and frozen N=4 proposals reproduced; unseen/additive alpha=0.5 remain quarantined.")
