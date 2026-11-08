@@ -162,3 +162,25 @@ test('the installed catalog and request validator admit Enter with both tabular 
  assert.equal(validateNodeApplyRequest({...request,mode:'lasso',parameters:{...request.parameters,linear_regression:{lambda_l1:1}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
  assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l1.minimum,0);
 });
+
+test('LASSO freezes prediction field order before training so cold activation cannot move pass-through fields',async()=>{
+ const c={...configuration,mode:'lasso'},predicted=linRegressionOutputColumns(c,0);
+ const prediction={verified:true,inventory_complete:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
+  target_fields:predicted.map((f,index)=>({...f,index,record_id:'p'+index,required:false,inherited:false,excluded:false})),source_fields:[]};
+ const coefficient=configuredCoefficients(),finished=[],actions=[];let port;
+ const channel={async openOutputPort(value){port=value;},async observe(options){
+  const mapping=port===0?prediction:coefficient,offset=options.outputColumnPage?.offset??0;
+  const fields=mapping.target_fields.slice(offset,offset+8).map(f=>({...f,status:'observed'}));
+  const s={node_mapping:structuredClone(mapping),wizard:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'port-'+port,
+   output_columns:{auto_sync:{status:'observed',value:mapping.autosync,ref:'auto'},fields,
+    page:{status:'complete_definition_page',schema_id:'schema-'+port,offset,limit:8,total_columns:mapping.target_fields.length,returned:fields.length,next_offset:offset+fields.length===mapping.target_fields.length?null:offset+fields.length}}},
+   ui:{elements:[{tid:'W;DerivedDataSourceOutputSocketWizard;btnAutoSyncThroughColumns',ref:'auto',allowed_actions:['click']}]}};
+  assert.ok(options.ready(s),options.condition);return s;
+ },async perform(options){
+  const s=options.initialObservation;assert.ok(options.ready(s));const action=options.resolve(s);actions.push(action);
+  assert.equal(port,0);assert.deepEqual(action,{verb:'click',ref:'auto'});prediction.autosync=false;
+ }};
+ await configureLinRegressionOutputs(channel,c,{},[],async()=>{finished.push(port);});
+ assert.deepEqual(finished,[0,1]);assert.equal(prediction.autosync,false);assert.equal(actions.length,1);
+ assert.deepEqual(prediction.target_fields.map(f=>f.name),predicted.map(f=>f.name));
+});

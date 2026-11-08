@@ -1,4 +1,5 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 const need=(v,m)=>{if(!v)throw Error('Linear regression output: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -13,6 +14,23 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
  // verify the actual prediction/coefficient schemas after native Execute.
  if(configuration.mode==='apply')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
   ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
+ // Native autosync regenerates pass-through fields in role order after cold
+ // activation. Pin only LASSO's approved prediction layout before training.
+ if(configuration.mode==='lasso'){
+  await channel.openOutputPort(0);
+  const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
+  let state=await observe('complete LASSO prediction mapping');const expected=linRegressionOutputColumns(configuration,0);
+  need(state.node_mapping.target_fields.length===expected.length&&expected.every(e=>state.node_mapping.target_fields.filter(f=>!f.excluded&&['name','label','type'].every(k=>f[k]===e[k])).length===1),'prediction mapping differs from configured fields');
+  await configureOutputAutosync(channel,false);
+  state=await observe('LASSO prediction mapping before ordering');
+  if(state.node_mapping.target_fields.some((f,i)=>f.name!==expected[i].name))
+   await reorderOutputFields(channel,expected.map(e=>state.node_mapping.target_fields.find(f=>f.name===e.name).record_id));
+  state=await observe('stable LASSO prediction layout');
+  need(state.node_mapping.autosync===false&&state.node_mapping.target_fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'prediction order was not retained');
+  const definition=await readOutputDefinitionPages(channel,{expectedCount:expected.length});
+  need(definition.fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'rendered prediction order differs');
+  await finishWizard('done',true,definition);
+ }
  await channel.openOutputPort(1);
  const ready=s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
  const observe=condition=>channel.observe({condition,readMappings:true,ready});
