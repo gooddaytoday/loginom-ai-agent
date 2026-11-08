@@ -56,3 +56,10 @@ test('public enrich schema accepts four lookups and rejects a fifteenth',async()
  for(const n of [3,4,14])assert.doesNotThrow(()=>validateActionParameters(handler.parameter_schema,params(n)));
  assert.throws(()=>validateActionParameters(handler.parameter_schema,params(15)));
 });
+
+test('enrich type card describes one to fourteen contiguous lookups like the schema',()=>{
+ const support=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+ const card=describeNodeTypes(['transform.enrich_data'],{},new Map(),support.nodeApplyHandlers)[0];
+ assert.match(card.semantics,/1–14 independent lookups on inputs 1\.\.14 \(contiguous\)/);
+ assert.doesNotMatch(card.semantics,/one or two independent lookups|third lookup/);
+});

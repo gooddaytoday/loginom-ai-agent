@@ -484,7 +484,7 @@ export interface EnrichConfigurationReadback {
   receipt_ids:string[];values_are:'observed_ui_values';package_persistence_verified:false;mode:'left';
   prefixes:{enabled:boolean;name:string;label:string};
   tables:Array<{port:number;native_index:number;keys:Array<{main:string;lookup:string}>}>;
-  input_mappings:Array<{port:0|1|2;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
+  input_mappings:Array<{port:number;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
     autosync:boolean;fields:JoinConfigurationReadback['input_mappings'][number]['fields']}>;
   output_mapping:GroupingConfigurationReadback['output_mapping'];
 }
