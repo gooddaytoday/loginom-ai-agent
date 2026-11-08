@@ -10,7 +10,7 @@ const parameters={factor_analysis:{features:['X','Y','Z'],factors:2,rotation:'no
 const fields=['RowID','X','Y','Z','Tag'].map((name,i)=>({name,label:name,type:i===0?'integer':i===4?'string':'real',data_kind:i===4?'Дискретный':'Непрерывный',usage_type:i>0&&i<4?3:0}));
 test('factor analysis is registered with separate parameters and two outputs',()=>{
  const h=createCandidateNodeSupport({}).nodeApplyHandlers.get('research.factor_analysis');
- assert.deepEqual(h.modes,['pca_fixed']);
+ assert.deepEqual(h.modes,['pca_fixed','pca_eigenvalue','pca_variance']);
  assert.equal(NODE_TYPES['research.factor_analysis'].tabular_outputs,2);
  assert.ok(nodeApplyInputSchema.properties.parameters.properties.factor_analysis);
  h.validate(parameters,'pca_fixed',request);

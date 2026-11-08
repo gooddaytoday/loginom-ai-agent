@@ -2,7 +2,8 @@ import {configureOutputAutosync,reorderOutputFields} from './port-mapping-proced
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 const need=(v,m)=>{if(!v)throw Error('Factor analysis output: '+m);};
 export function factorAnalysisOutputColumns(c,port){
- const factors=c.fields.filter(f=>f.usage_type===3).map((_,i)=>({name:'Factor'+(i+1),label:'Фактор'+(i+1),type:'real',data_kind:'Непрерывный'}));
+ const features=c.fields.filter(f=>f.usage_type===3);
+ const factors=features.slice(0,c.output_cap?c.output_factors:features.length).map((_,i)=>({name:'Factor'+(i+1),label:'Фактор'+(i+1),type:'real',data_kind:'Непрерывный'}));
  return port===0?[...factors,...c.fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind}))]
   :[{name:'ColumnName',label:'Имя',type:'string',data_kind:'Дискретный'},{name:'ColumnDisplayName',label:'Метка',type:'string',data_kind:'Дискретный'},...factors];
 }

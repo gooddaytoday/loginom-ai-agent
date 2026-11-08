@@ -46,7 +46,7 @@ export async function configureFactorAnalysisRoles(channel,p,inputMapping){
  return {verified:true,cleanup_complete:true,effect_possible:edits>0,baseline_configuration:baseline,configuration,applied_editors:edits,settings_applied:false};
 }
 
-export async function configureFactorAnalysis(channel,p,{inputMapping}){
+export async function configureFactorAnalysis(channel,p,{inputMapping,request}){
  const roles=await configureFactorAnalysisRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'factor analysis '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -59,25 +59,41 @@ export async function configureFactorAnalysis(channel,p,{inputMapping}){
  const control=(s,key,verb)=>one(s,e=>(e.tid===s.wizard.root_tid+';FactorAnalysisWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';FactorAnalysisWizard;'+key)&&e.allowed_actions.includes(verb),'PCA control unavailable: '+key);
  const act=async(s,key,action)=>channel.perform({condition:'set PCA '+key,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,parameters:s.node_factor_analysis}),resolve:s=>({...action,ref:control(s,key,action.verb).ref})});
  const a=p.factor_analysis??{},features=roles.configuration.fields.filter(f=>f.usage_type===3);
- const factors=a.factors??old.factors;
- need(factors>=1&&factors<=features.length,'factor count exceeds selected feature count');
- // Native radio order was observed in discovery: fixed count is option 2,
- // no rotation option 0. Existing omission only preserves supported settings.
- need(a.factors!==undefined||old.criterion===2,'existing automatic criterion unsupported; provide factors');
+ const mode=request?.mode??'pca_fixed';
+ const selection={pca_fixed:['fixed',2,'factors','pedNFactors'],pca_eigenvalue:['eigenvalue',0,'eigenvalue','pedEigenValuesThreshold'],pca_variance:['variance',1,'variance_percent','pedCumDispersion']}[mode];
+ need(selection,'unsupported PCA mode');
+ const [criterion,radio,parameter,key]=selection;
+ const value=a[parameter]??(key==='pedNFactors'?old.factors:old.values[key]);
+ need(a[parameter]!==undefined||old.criterion===radio,'criterion switch requires an explicit threshold/count');
+ need(radio!==2||Number.isSafeInteger(value)&&value>=1&&value<=features.length,'factor count exceeds selected feature count');
+ need(radio!==0||Number.isFinite(value)&&value>=0.1&&value<=1.5,'eigenvalue must be 0.1..1.5');
+ need(radio!==1||Number.isFinite(value)&&value>=1&&value<=100,'variance_percent must be 1..100');
  need(a.rotation!==undefined||old.rotation===0,'existing rotation unsupported; provide rotation none');
- for(const [name,value,key] of [['criterion',2,'pedSignificanceCriterion;ValueControl;radiofield-2;DisplayEl'],['rotation',0,'pedRotationType;ValueControl;radiofield;DisplayEl']]){
-  state=await observe('PCA '+name+' before edit');if(state.node_factor_analysis[name]===value)continue;
-  await act(state,key,{verb:'set_checked',checked:true});state=await observe('PCA '+name+' readback');need(state.node_factor_analysis[name]===value,'PCA '+name+' differs');
+ for(const [name,wanted,controlKey] of [['criterion',radio,'pedSignificanceCriterion;ValueControl;radiofield'+(radio?'-'+radio:'')+';DisplayEl'],['rotation',0,'pedRotationType;ValueControl;radiofield;DisplayEl']]){
+  state=await observe('PCA '+name+' before edit');if(state.node_factor_analysis[name]===wanted)continue;
+  await act(state,controlKey,{verb:'set_checked',checked:true});state=await observe('PCA '+name+' readback');need(state.node_factor_analysis[name]===wanted,'PCA '+name+' differs');
  }
- state=await observe('PCA factor count before edit');
- if(state.node_factor_analysis.factors!==factors){
-  await act(state,'pedNFactors;ValueControl',{verb:'fill',text:String(factors)});state=await observe('PCA factors before commit');
-  await act(state,'pedNFactors;ValueControl',{verb:'press',key:'Tab'});
- }
- state=await observe('PCA output cap');if(state.node_factor_analysis.output_cap)await act(state,'cntOutFactorsMax;cnt;chb;InputEl',{verb:'set_checked',checked:false});
- const after=(await observe('complete fixed PCA readback')).node_factor_analysis;
- need(after.criterion===2&&after.rotation===0&&after.factors===factors&&after.output_cap===false,'PCA settings differ');
- need(['pedEigenValuesThreshold','pedCumDispersion','pedNOutFactorsMax'].every(k=>same(after.values[k],old.values[k])),'unrequested PCA settings changed');
+ const setNumber=async(key,value)=>{
+  state=await observe('PCA '+key+' before edit');
+  const current=key==='pedNFactors'?state.node_factor_analysis.factors:state.node_factor_analysis.values[key];
+  if(current===value)return;
+  await act(state,key+';ValueControl',{verb:'fill',text:String(value)});state=await observe('PCA '+key+' before commit');
+  await act(state,key+';ValueControl',{verb:'press',key:'Tab'});
+  state=await observe('PCA '+key+' committed');
+  need((key==='pedNFactors'?state.node_factor_analysis.factors:state.node_factor_analysis.values[key])===value,'PCA '+key+' differs');
+ };
+ await setNumber(key,value);
+ const output_cap=a.output_factors!==undefined?a.output_factors!==false:request?.target.kind==='new'?false:old.output_cap;
+ const output_factors=typeof a.output_factors==='number'?a.output_factors:old.values.pedNOutFactorsMax;
+ need(!output_cap||Number.isSafeInteger(output_factors)&&output_factors>=1&&output_factors<=128,'invalid output factor limit');
+ state=await observe('PCA output cap');
+ if(state.node_factor_analysis.output_cap!==output_cap)await act(state,'cntOutFactorsMax;cnt;chb;InputEl',{verb:'set_checked',checked:output_cap});
+ if(output_cap)await setNumber('pedNOutFactorsMax',output_factors);
+ const after=(await observe('complete PCA readback')).node_factor_analysis;
+ need(after.criterion===radio&&after.rotation===0&&after.output_cap===output_cap,'PCA settings differ');
+ need((key==='pedNFactors'?after.factors:after.values[key])===value&&(!output_cap||after.values.pedNOutFactorsMax===output_factors),'PCA threshold/count or output limit differs');
+ const changed=new Set([key,...(typeof a.output_factors==='number'?['pedNOutFactorsMax']:[])]);
+ need(['pedNFactors','pedEigenValuesThreshold','pedCumDispersion','pedNOutFactorsMax'].filter(k=>!changed.has(k)).every(k=>same(k==='pedNFactors'?after.factors:after.values[k],k==='pedNFactors'?old.factors:old.values[k])),'unrequested PCA settings changed');
  await next('factor_analysis','done');const done=await channel.observe({condition:'PCA accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,factors,rotation:'none',criterion:'fixed',output_cap:false,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,mode,factors:after.factors,rotation:'none',criterion,...(radio!==2?{[parameter]:value}:{}),output_cap,output_factors:output_cap?output_factors:false,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
