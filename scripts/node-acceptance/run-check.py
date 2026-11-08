@@ -672,9 +672,10 @@ def text_update_stages(case):
             ['expected-auto-update-string.json', 'expected-auto-update.json']]
 
 
-def check_text_update_ports(replies, destinations, stages):
+def check_text_update_ports(replies, destinations, stages, node_binary='node'):
     assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
     previous, node = -1, None
+    tables = []
     for destination, stage in zip(destinations, stages):
         exports = [n for n, reply in replies if reply.get('status') == 'SUCCEEDED'
                    and reply.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'
@@ -692,7 +693,19 @@ def check_text_update_ports(replies, destinations, stages):
         assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
         assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
             (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
+        tables.append(dict(actual=dict(node=identity, type='imports.text', output_port=0, data=port), expected=stage))
         previous = exports[-1]
+    # Use the same typed full-table matcher as cold, including exact numeric and
+    # datetime evidence. Each stage has its own snapshot of the same node.
+    result = subprocess.run([str(node_binary), '--input-type=module', '-e', """
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {matchExpectedOutputs}=await import(pathToFileURL(process.argv[1]));
+for(const stage of JSON.parse(readFileSync(0,'utf8')))
+    matchExpectedOutputs([stage.actual],[stage.expected]);
+""", str(REPO / 'scripts/node-acceptance/expected-outputs.mjs')],
+        input=json.dumps(tables), text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, 'TEXT_UPDATE_PORT_VALUES: ' + result.stderr[:2000]
 
 
 def expected_for(case, package, cold=False):
@@ -1995,7 +2008,7 @@ class Runner:
             expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
         if spec.get('text_update'):
-            check_text_update_ports(replies, destinations, text_update_stages(spec))
+            check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)
         sampling_csvs = []

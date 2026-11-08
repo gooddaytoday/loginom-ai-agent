@@ -37,20 +37,28 @@ class RunCheckTests(unittest.TestCase):
         stages = runner.text_update_stages(runner.scenario('text-auto-update'))
         replies = []
         for i, stage in enumerate(stages):
-            port = dict(port=0, schema=copy.deepcopy(stage['columns']), sample=[],
+            def cell(column, row):
+                kind = column['type']
+                return dict(type=kind, is_null=False, value=str(row[column['name']]) if kind == 'integer' else row[column['name']],
+                            precision='millisecond' if kind == 'datetime' else '17_significant_digits' if kind == 'real' else 'exact_integer',
+                            representation='local_datetime' if kind == 'datetime' else 'binary64',
+                            timezone='unspecified', decimal=str(row[column['name']]))
+            port = dict(port=0, schema=copy.deepcopy(stage['columns']),
+                        sample=[[cell(c, row) for c in stage['columns']] for row in stage['rows']], precision=dict(numbers_verified=True),
                         row_count=2, sample_complete=True, freshness_basis='completed_execution_port_source')
             reply = dict(status='SUCCEEDED', cleanup_complete=True, node=dict(node_id='same-import'),
                          configuration=dict(readback=dict(kind='text_import')), output=dict(ports=[port]))
             replies += [(i * 2, reply), (i * 2 + 1, dict(status='SUCCEEDED', configuration=dict(
                 readback=dict(kind='text_export', destination=f'/own/stage-{i}.csv'))))]
         runner.check_text_update_ports(replies, ['/own/stage-0.csv', '/own/stage-1.csv'], stages)
-        for fault in ['missing-final', 'wrong-order', 'wrong-type', 'other-node', 'stale']:
+        for fault in ['missing-final', 'wrong-order', 'wrong-type', 'other-node', 'stale', 'wrong-value']:
             bad = copy.deepcopy(replies)
             if fault == 'missing-final': bad.pop()
             if fault == 'wrong-order': bad[2][1]['output']['ports'][0]['schema'].reverse()
             if fault == 'wrong-type': bad[0][1]['output']['ports'][0]['schema'][1]['type'] = 'real'
             if fault == 'other-node': bad[2][1]['node']['node_id'] = 'another-import'
             if fault == 'stale': bad[2][1]['output']['ports'][0]['sample_complete'] = False
+            if fault == 'wrong-value': bad[2][1]['output']['ports'][0]['sample'][0][1]['value'] = 999
             with self.subTest(fault=fault), self.assertRaisesRegex(AssertionError, 'TEXT_UPDATE'):
                 runner.check_text_update_ports(bad, ['/own/stage-0.csv', '/own/stage-1.csv'], stages)
 
