@@ -42,7 +42,9 @@ export async function prepareVariablesColumnUnionSource(root,configPath,fixture,
  process.umask(0o077);await mkdir(output,{recursive:true,mode:0o700});
  const config=JSON.parse(await readFile(configPath,'utf8')),load=name=>import(pathToFileURL(root+'/runtime/'+name).href);
  const {verifyResources}=await load('src/resources.mjs'),resources=await verifyResources(root);
- const {loginBrowser}=await load('src/connection-check.mjs');
+ const {loginBrowser,loginomAddress}=await load('src/connection-check.mjs');
+ // Prepare compares the exact page path: a pair URL of the public root lands on /app/.
+ const app=loginomAddress(config.login.url);
  const {makeWorkspacePrepareCode}=await load('client/lib/workspace.mjs');
  const {makePackageCleanupCode}=await load('client/lib/package-cleanup.mjs');
  const {createActionRuntime}=await load('client/lib/executor.mjs');
@@ -55,7 +57,7 @@ export async function prepareVariablesColumnUnionSource(root,configPath,fixture,
  const execute=code=>new Function('page',`return (${code})(page)`)(page);
  const compatibility={loginom_build:'7.4.2',platform:'linux',browser:'chromium'};
  try{
-  const identity=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility,sessionId,operationId:'source-workspace',intent:'new_draft'}));
+  const identity=await execute(makeWorkspacePrepareCode({loginomUrl:app,compatibility,sessionId,operationId:'source-workspace',intent:'new_draft'}));
   if(identity.status!=='READY')throw Error('VARIABLES_SOURCE_WORKSPACE');
   const directory=config.package.substring(0,config.package.lastIndexOf('/'));
   let binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:identity.document_id,account:identity.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
@@ -71,20 +73,20 @@ export async function prepareVariablesColumnUnionSource(root,configPath,fixture,
   if(delivered.outcome?.status!=='SUCCEEDED')throw Error('VARIABLES_SOURCE_UPLOAD:'+JSON.stringify(delivered));
   // Leave only the uploaded source package for the existing single-package
   // Save/cleanup proof. The bootstrap draft has no authored edits to discard.
-  const bootstrapCleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
+  const bootstrapCleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,packagePath:null,unsavedDraft:true,loginomUrl:app,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
   await record({phase:'variables_column_union_bootstrap_cleanup',cleanup:bootstrapCleanup});
   await writeFile(output+'/bootstrap-cleanup.json',JSON.stringify(bootstrapCleanup));
   if(bootstrapCleanup.package_closed!==true||bootstrapCleanup.logged_out!==true)throw Error('VARIABLES_SOURCE_BOOTSTRAP_CLEANUP');
   await context.close();
   ({context}=await loginBrowser({browserPath:resources.browserPath,profile:output+'/source-browser',candidate:config.login,keepOpen:true,headless:true}));
   page=context.pages()[0];
-  const prepared=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility,sessionId,operationId:'source-open',intent:'open_package',packagePath:config.package}));
+  const prepared=await execute(makeWorkspacePrepareCode({loginomUrl:app,compatibility,sessionId,operationId:'source-open',intent:'open_package',packagePath:config.package}));
   if(prepared.status!=='READY')throw Error('VARIABLES_SOURCE_OPEN');
   binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:prepared.document_id,account:prepared.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
   runtime=createActionRuntime(runtimeOptions);
   const saved=await saveVariablesColumnUnionSource(runtime,config.package,delivered.outcome);
   await writeFile(output+'/source-save.json',JSON.stringify(saved));
-  const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:prepared.document_id,account:config.login.username,packagePath:config.package,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:prepared.workflow_ref.tab_tid}));
+  const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:prepared.document_id,account:config.login.username,packagePath:config.package,loginomUrl:app,loginomBuild:'7.4.2',tabTid:prepared.workflow_ref.tab_tid}));
   await record({phase:'variables_column_union_source_cleanup',cleanup});
   await writeFile(output+'/result.json',JSON.stringify({delivered:delivered.outcome,saved,cleanup}));
   if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('VARIABLES_SOURCE_CLEANUP');
