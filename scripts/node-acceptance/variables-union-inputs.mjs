@@ -21,6 +21,11 @@ export function auditVariablesUnionInputs(events,connected,disconnected){
  need(unions.filter(e=>e.r.target.kind==='new').length===1,'ONE_UNION_CREATION');
  need(unions.some(e=>e.index>initial.index&&e.index<a.index&&e.r.target.kind==='existing'&&e.r.variable_inputs?.length===3),'THIRD_ADDED_TO_EXISTING_NODE');
  need(unions.some(e=>e.index>a.index&&e.index<b.index&&e.r.target.kind==='existing'&&e.r.parameters?.column_union?.disconnect_input===2&&e.r.variable_inputs?.length===0),'EXPLICIT_THIRD_DISCONNECTION');
+ for(const {r} of unions.filter(e=>e.r.target.kind==='existing'&&(e.r.variable_inputs?.some(i=>i.input===2)||e.r.parameters?.column_union?.disconnect_input===2))){
+  const proofs=events.filter(e=>e.phase==='node_variables_union_topology_verified'&&e.operation_id===r.operation_id);
+  need(typeof r.operation_id==='string'&&r.operation_id.length>0&&proofs.length===1
+   &&proofs[0].verified===true&&proofs[0].node_id===r.target.ref?.node_id,'EXACTLY_ONE_TOPOLOGY_VERIFICATION_PER_INPUT_CHANGE');
+ }
  need(!requests.some(e=>['programming.javascript','transform.calculator'].includes(e.r.target?.type)||e.r.variable_inputs?.some(i=>i.kind==='control')),'NO_SUBSTITUTION_OR_CONTROL');
  const target=events.filter(e=>e.phase==='node_target_checkpoint'&&e.target_state?.completed&&e.target_state.final_graph?.nodes?.some(n=>n.ref.node_id===b.r.node.node_id));
  const last=target.at(-1)?.target_state.final_graph;

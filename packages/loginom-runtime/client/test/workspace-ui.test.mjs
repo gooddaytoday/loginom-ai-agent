@@ -5847,7 +5847,7 @@ test('union input-change Next deletes only the exact owned lost-links question o
  }
 });
 test('union continues the observed unmapped-variable warning with one fresh Next after its only Yes',async()=>{
- for(const fault of ['none','no-policy','other-warning','missing-error','wrong-next-tip','foreign-owner','foreign-node','changed-epoch','second-question','still-warning','lost-next-reply']){
+ for(const fault of ['none','no-policy','warning-without-yes','other-warning','missing-error','wrong-next-tip','foreign-owner','foreign-node','changed-epoch','second-question','still-warning','lost-next-reply']){
   const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=wizardStepFixture(page);
   c.form.box={x:48,y:71,width:1232,height:729};c.button.box={x:1208,y:380,width:64,height:64};
   page.app.Version='7.4.2';page.context.innerWidth=1280;page.context.innerHeight=800;page.viewportSize=()=>({width:1280,height:800});
@@ -5863,15 +5863,20 @@ test('union continues the observed unmapped-variable warning with one fresh Next
   const snapshot=(await execute({mode:'observe'})).output,next=snapshot.ui.elements.find(e=>e.wizard_step);
   page.context.Ext={getCmp:id=>{const element=page.document.all().find(e=>e.id===id);return element?{el:{dom:element}}:undefined;}};
   c.button.id='union-native-next';c.form.checkVisibility=()=>true;c.button.checkVisibility=()=>true;
-  const click=page.mouse.click;page.mouse.click=async(...args)=>{
-   await click(...args);clicks++;
-   if(clicks===1){prompt=lostLinksPrompt(page);prompt.children[0].ownText='Loginom 7.4.2';c.form.attrs.class='bg-mask-message';}
-   else if(clicks===2){const yes=page.document.querySelectorAll('[data-tid="msgbox;tlb;yes"]')[0];assert.ok(args[0]>=yes.box.x&&args[0]<=yes.box.x+yes.box.width);
-    answered=true;prompt.remove();c.form.attrs.class='';
+  const showWarning=()=>{
     if(fault!=='missing-error'){error=page.add('button',c.base+';btnError','',{x:52,y:71,width:66,height:64},c.form);error.id='union-native-error';
      error.checkVisibility=()=>true;error.attrs['data-qtip']=fault==='other-warning'?'Не удалось соединиться с сервером':'1. Выходной переменной amount не сопоставлена входная переменная\n2. Выходной переменной Ноль не сопоставлена входная переменная';}
     c.button.attrs['data-qtip']=fault==='wrong-next-tip'?'Далее':'Всё равно далее';
     if(fault==='foreign-owner')panel.children.at(-2).ownText='Other';
+  };
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);clicks++;
+   if(clicks===1){
+    if(fault==='warning-without-yes'){showWarning();return;}
+    prompt=lostLinksPrompt(page);prompt.children[0].ownText='Loginom 7.4.2';c.form.attrs.class='bg-mask-message';
+   }else if(clicks===2&&fault!=='warning-without-yes'){
+    const yes=page.document.querySelectorAll('[data-tid="msgbox;tlb;yes"]')[0];assert.ok(args[0]>=yes.box.x&&args[0]<=yes.box.x+yes.box.width);
+    answered=true;prompt.remove();c.form.attrs.class='';showWarning();
    }else{
     assert.ok(args[0]>=c.button.box.x&&args[0]<=c.button.box.x+c.button.box.width,'repeat only the same native Next');
     if(fault==='lost-next-reply')throw Error('Lost second Next reply');
@@ -5885,8 +5890,8 @@ test('union continues the observed unmapped-variable warning with one fresh Next
   const result=await execute({mode:'act',operation_id:'union-warning-next',snapshot,action:{verb:'wizard_step',ref:next.ref,expected_stage:'done'},...(fault==='no-policy'?{}:{variables_union_input_change:true})});
   const repeated=['none','second-question','still-warning','lost-next-reply'].includes(fault);
   assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
-  assert.equal(clicks,repeated?3:fault==='no-policy'?1:2,fault);
-  assert.equal(result.trace.filter(e=>e.event==='wizard_lost_links_deleted').length,fault==='no-policy'?0:1,fault);
+  assert.equal(clicks,repeated?3:['no-policy','warning-without-yes'].includes(fault)?1:2,fault);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_lost_links_deleted').length,['no-policy','warning-without-yes'].includes(fault)?0:1,fault);
   assert.equal(result.trace.filter(e=>e.event==='variables_union_next_repeated_after_lost_links').length,repeated&&fault!=='lost-next-reply'?1:0,fault);
  }
 });
