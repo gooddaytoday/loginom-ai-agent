@@ -62,6 +62,12 @@ and Quality update. Five final CSVs retain explicit port order 0…4; Save/cold
 reexecutes the saved node without configuration. Only Moda/variant uses the
 bounded native decoder; ordinary scalar reading and other node limits are unchanged.
 
+`quality-types` uses the approved `research-quality/acceptance/task-types.md`
+and only `fixtures/types.csv`. The single-round Quality audit and stock typed
+matcher check all five outputs, Boolean Moda, datetime, discrete numeric fields,
+field order and NULL. Five CSVs, Save, cold without configuration and cleanup
+remain required; `oracle-types.py` and `expected-types.json` stay private.
+
 `lgd-import`, `lgd-properties`, `lgd-corrupt`, `lgd-export` используют
 утверждённые задания LGD и бинарные fixtures этапа 0. Ожидания `expected-*-run.json`
 переносят независимые CSV/manifest-значения в штатную форму полного CSV/cold reader.

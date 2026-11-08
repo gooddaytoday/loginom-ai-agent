@@ -24,6 +24,10 @@ export function checkQualityMain(initial,updated,events){
   need(new Set(r.output.ports.map(p=>p.port)).size===5,'PORT_IDENTITIES');rounds.push(r);
  }
  const matches=(r,want)=>want.outputs.every(o=>{const port=r.output.ports.find(p=>p.port===o.output_port);return port&&matchesExpectedOutput(port,o);});
+ if(initial===null){
+  const result=rounds.find(r=>matches(r,updated));need(result,'VALUES');
+  return {node_id:id,execution_ids:[result.execution.execution_id],ports:[0,1,2,3,4],status:'PASS'};
+ }
  const first=rounds.findIndex(r=>matches(r,initial));need(first>=0,'INITIAL_VALUES');
  const last=rounds.findIndex((r,i)=>i>first&&matches(r,updated));need(last>first,'UPDATED_VALUES');
  // Done commits the source without executing the import. A subsequent Quality
@@ -35,6 +39,7 @@ export function checkQualityMain(initial,updated,events){
  return {node_id:id,execution_ids:[rounds[first].execution.execution_id,rounds[last].execution.execution_id],ports:[0,1,2,3,4],status:'PASS'};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- const [initial,updated,events]=await Promise.all(process.argv.slice(2).map(p=>readFile(p,'utf8').then(JSON.parse)));
+ const args=process.argv.slice(2),single=args[0]==='--single';
+ const [initial,updated,events]=await Promise.all((single?[null,...args.slice(1)]:args).map(p=>p===null?null:readFile(p,'utf8').then(JSON.parse)));
  console.log(JSON.stringify(checkQualityMain(initial,updated,events)));
 }
