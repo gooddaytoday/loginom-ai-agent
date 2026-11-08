@@ -111,7 +111,15 @@ Stratified and biased are registered as `sampling-stratified`, `sampling-biased`
 `partition-stratified`, `partition-biased`. Stratified additionally checks exact
 size, Class quotas and combined/train/test relations. Biased checks repeats and
 exact typed membership without sizes or quotas. Both require saved native field
-order; uniform remains unsupported.
+order; uniform is registered below.
+`sampling-uniform`, `partition-uniform` and `partition-test-priority` use the
+approved v040 task/expected/source fixtures. Uniform checks typed membership,
+unique RowID, unchanged executions, separate native group row sizes and every
+CSV. Partition additionally checks disjoint train/test and combined IsTestSet.
+The priority task checks beginning then end on the same node; cold compares
+the final end result. Cold inspects saved method, sizes, seed and priority
+through the production reader and verified Cancel without applying settings.
+No PRNG formula or Class quotas are asserted for uniform.
 Stock expected parsing, exact matching and existing scenarios are unchanged.
 
 ```sh

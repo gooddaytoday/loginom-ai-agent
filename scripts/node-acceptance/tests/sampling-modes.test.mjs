@@ -201,3 +201,27 @@ for(const partition of [false,true])test('uniform complete membership, repeat, g
   assert.throws(()=>checkSamplingMain(f.expected,overlap,f.csvs),/TRAIN_TEST_OVERLAP/);
  }
 });
+
+test('uniform priority checks beginning and end on one node and retains final cold baseline',()=>{
+ const f=fixture(true,'stratified'),source=f.expected.sampling_modes.source;
+ Object.assign(f.expected.sampling_modes,{mode:'uniform',group_size_rows:[1,1],test_priority:true,test_priority_position:'both'});
+ for(const [index,reply] of f.replies.entries()){
+  const test= index===0?source.slice(0,4):source.slice(-4),train=source.slice(4,12);
+  const tables=[[...train.map(r=>({IsTestSet:false,...r})),...test.map(r=>({IsTestSet:true,...r}))],train,test];
+  Object.assign(reply.configuration.readback,{mode:'uniform',group_size_rows:[1,1],test_priority:true,test_priority_position:index===0?'beginning':'end'});
+  for(const [port,data] of reply.output.ports.entries()){
+   data.row_count=tables[port].length;
+   data.sample=tables[port].map(row=>f.expected.outputs[port].columns.map(c=>({type:c.type,value:c.type==='integer'?String(row[c.name]):row[c.name],is_null:false})));
+  }
+ }
+ const csvs=f.replies.flatMap(reply=>reply.output.ports.map(data=>[data.schema.map(c=>c.name),...data.sample.map(row=>row.map(c=>String(c.value)))]));
+ const baseline=checkSamplingMain(f.expected,f.replies,csvs);
+ const cold=['cold1','cold2'].flatMap(execution_id=>f.actual.slice(3).map(r=>({...r,execution:{status:'completed',execution_id},data:{...f.replies[1].output.ports[r.output_port],execution_id}})));
+ assert.equal(checkSamplingCold(f.expected,cold,baseline).evidence.membership,true);
+ const wrong=structuredClone(f.replies);wrong[0].configuration.readback.test_priority_position='end';
+ assert.throws(()=>checkSamplingMain(f.expected,wrong,csvs));
+ const recreated=structuredClone(f.replies);recreated[1].node.node_id='different';
+ assert.throws(()=>checkSamplingMain(f.expected,recreated,csvs));
+ const missing=structuredClone(f.replies);missing[0].output.ports.pop();
+ assert.throws(()=>checkSamplingMain(f.expected,missing,csvs),/PORTS_INCOMPLETE/);
+});
