@@ -42,47 +42,47 @@
         {
           "RowID": 1,
           "X": 0.0,
-          "Note": "zero"
+          "Note": "a"
         },
         {
           "RowID": 2,
           "X": 2.0,
-          "Note": "a"
+          "Note": "b"
         },
         {
           "RowID": 3,
           "X": 2.0,
-          "Note": "b"
+          "Note": "c"
         },
         {
           "RowID": 4,
           "X": 2.0,
-          "Note": "c"
+          "Note": "d"
         },
         {
           "RowID": 5,
           "X": 3.0,
-          "Note": "d"
+          "Note": "e"
         },
         {
           "RowID": 6,
           "X": 4.0,
-          "Note": "e"
+          "Note": "f"
         },
         {
           "RowID": 7,
           "X": 6.0,
-          "Note": "f"
+          "Note": "g"
         },
         {
           "RowID": 8,
           "X": 2.7142857142857144,
-          "Note": "spike"
+          "Note": "h"
         },
         {
           "RowID": 9,
           "X": null,
-          "Note": "missing"
+          "Note": "i"
         }
       ]
     },
@@ -144,7 +144,7 @@
         {
           "RowID": 8,
           "X": 60.0,
-          "Note": "spike"
+          "Note": "h"
         }
       ]
     }
