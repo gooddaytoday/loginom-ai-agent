@@ -705,3 +705,11 @@ Only task and matrix.csv reach the model.
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
+
+`text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
+задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
+Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
+oracle и expected — нет. Проверяются все значения, типы, порядок полей, Save, cold и
+cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
+сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
+выгрузке run-check не различает — его подтверждает журнал вызова узла.
