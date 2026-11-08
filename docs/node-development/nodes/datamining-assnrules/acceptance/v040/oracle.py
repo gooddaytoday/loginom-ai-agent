@@ -85,7 +85,8 @@ def expected():
                   if set(r['antecedent']) <= b and not set(r['consequent']) & b]
     assert candidates == [dict(transaction='H1', item='B', support=.75, confidence=.75, lift=1.)]
     # Retraining on recommend-holdout would yield no rules at all: any rule in the output proves the saved model was used.
-    assert rules(rec_holdout, Fraction(0), 1, max_items=2) == []
+    holdout_retraining = rules(rec_holdout, Fraction(0), 1, max_items=2)
+    assert holdout_retraining == []
     return dict(status='proposal_not_stock_expected', columns='technical schema to bind from live UI',
                 thresholds=dict(min_support_pct=50, min_confidence_pct=60, max_items=3),
                 single_consequent=base, two_consequents=extended, min_lift_1_2=filtered,
@@ -93,7 +94,7 @@ def expected():
                 selected_item_B=dict(sets=selected_sets, rules=selected_rules),
                 selected_item_B_then_exclude_support_above_90=dict(sets=excluded_sets, rules=excluded_rules),
                 recommendations=dict(max_items=2, max_consequents=1, source='recommend-train.csv', holdout_source='recommend-holdout.csv', rules=rec_rules, holdout=candidates,
-                                     retraining_on_holdout_rules=[],
+                                     retraining_on_holdout_rules=holdout_retraining,
                                      rule_metrics='from saved train model; never from holdout'),
                 holdout_retraining_would_change_rules=rules(holdout, Fraction(0), 2) != extended,
                 unresolved=['native RuleID order', 'numerical effect of restrictive auxiliary item values',
