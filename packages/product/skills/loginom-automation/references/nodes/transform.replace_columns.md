@@ -1,9 +1,8 @@
 # Замена (`transform.replace_columns`)
 
 <!-- mode: exact regex mixed -->
-Для словаря соответствий, в том числе логического результата, и замены по
-регулярному выражению выбирай `dock_node_apply`,
-`target.type="transform.replace_columns"`. Вычисляемая формула и разбор
+Для словаря соответствий (и логического результата) и regex-замены выбирай
+`dock_node_apply`, `target.type="transform.replace_columns"`. Вычисляемая формула и разбор
 произвольного текста относятся к Калькулятору.
 <!-- /mode -->
 
@@ -25,10 +24,11 @@
 `to:{type:"boolean",value:true}` и `to:{type:"boolean",value:false}`,
 `other:{mode:"null"}`. Boolean допускает true/false/NULL, а не строки и не 0/1.
 Boolean: `other` null или keep (Variant: совпавшие логические, прочие с
-исходным типом/NULL); другой тип с keep отклоняется. Datetime: other.null,
-локальный ISO `YYYY-MM-DDTHH:mm:ss`.
-Это словарь, а не автоматическое преобразование текста: незаданный ключ
-подчиняется `other`. При other.null исходный NULL тоже даёт NULL и флаг true.
+исходным типом/NULL); другой тип с keep отклоняется. Читай его с
+`read.require_exact_numbers:true`: value с `cell_type`.
+Datetime: other.null, локальный ISO `YYYY-MM-DDTHH:mm:ss`.
+Текст не преобразуется автоматически: незаданный ключ подчиняется `other`.
+При other.null исходный NULL тоже даёт NULL и флаг true.
 <!-- /mode -->
 
 <!-- mode: regex mixed -->

@@ -264,7 +264,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     now,
     async readOutputPort(request) {
       checkBudget();
-      if(['variables.to_table','imports.lgd'].includes((operation.nodeApply?.request??operation.parameters)?.target?.type))request={...request,typedVariants:true};
+      const readType=(operation.nodeApply?.request??operation.parameters)?.target?.type;
+      if(['variables.to_table','imports.lgd'].includes(readType))request={...request,typedVariants:true};
+      // Exact reads of these ports refused Variant cells as unverified_precision; ordinary reads keep their envelope.
+      if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns'].includes(readType))
+        request={...request,typedVariants:true,...(readType==='transform.replace_columns'?{variantEmptyIsNull:true}:{})};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;
