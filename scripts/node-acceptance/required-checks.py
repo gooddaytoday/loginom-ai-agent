@@ -46,7 +46,7 @@ RULES = (
      ('live-ui',), ('union-auto-match', 's4', 'union-two-stage', 'union-auto-label')),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
     ((C + 'variables-replace-*.mjs', 'scripts/node-acceptance/variables-replace.mjs', 'docs/node-development/nodes/variables-replace/acceptance/**'), ('live-ui',), ('variables-replace-exact', 'variables-replace-match')),
-    ((C + 'variables-coluniondatavar-*.mjs', 'docs/node-development/nodes/variables-coluniondatavar/acceptance/**', 'scripts/node-acceptance/variables-column-union.mjs'), ('live-ui',), ('variables-column-union',)),
+    ((C + 'variables-coluniondatavar-*.mjs', 'docs/node-development/nodes/variables-coluniondatavar/acceptance/**', 'scripts/node-acceptance/variables-column-union.mjs'), ('live-ui',), ('variables-column-union', 'variables-union-inputs', 'variables-union-manual', 'variables-union-type-refusal')),
     ((C + 'variables-calculator-*.mjs', 'docs/node-development/nodes/variables-calculator/acceptance/**', 'scripts/node-acceptance/variables-calculator.mjs'),
      ('live-ui',), ('variables-calculator', 'variables-calculator-modes')),
     ((C + 'crosstable-variables.mjs', 'docs/node-development/nodes/variables-user/acceptance/**', 'scripts/node-acceptance/variables-user-real-date.mjs'), ('live-ui',), ('variables-user-real-date',)),

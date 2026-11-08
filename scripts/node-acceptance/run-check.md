@@ -738,6 +738,14 @@ CSV в порядке задания, cold Execute проверяет после
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
 
+`variables-union-inputs`: на одном native Соединении сначала два входа, затем
+третий, затем удаление только третьей связи. Три независимых Variables Calculator
+берут точные имена/метки/типы/значения из modes.json. Полный ordered variable
+output 0 после каждого шага; тот же GUID и первые две GUID-пары сохраняются.
+Control не подменяется обычным входом. Только task-inputs.md и modes.json
+передаются модели; oracle/expected приватны. Save, stock typed cold с точными
+сохранёнными связями и проверкой GUID узла, Close/logout обязательны.
+
 `text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
 задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
 Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
