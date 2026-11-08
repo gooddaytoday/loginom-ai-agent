@@ -514,12 +514,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'replace-nearest':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['replace-boolean', 'replace-mixed']:
+    if name in ['replace-boolean', 'replace-mixed', 'replace-keep-variant']:
         node = REPO / 'docs/node-development/nodes/replacement'
-        return dict(source=node / 'acceptance/extended',
-                    prompt=node / 'acceptance' / ('task-boolean.md' if name == 'replace-boolean' else 'task-mixed.md'),
-                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None,
-                    expected_name='expected.json' if name == 'replace-boolean' else 'expected-mixed.json')
+        task, expected = {'replace-boolean': ('task-boolean.md', 'expected.json'), 'replace-mixed': ('task-mixed.md', 'expected-mixed.json'),
+                          'replace-keep-variant': ('task-result-keep.md', 'expected-result-keep.json')}[name]
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / task,
+                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None, expected_name=expected)
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

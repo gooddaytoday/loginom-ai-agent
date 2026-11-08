@@ -456,7 +456,8 @@ class RunCheckTests(unittest.TestCase):
 
     def test_replacement_boolean_and_mixed_use_only_approved_task_and_input(self):
         for name, task, expected_name in [('replace-boolean', 'task-boolean.md', 'expected.json'),
-                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json')]:
+                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json'),
+                                          ('replace-keep-variant', 'task-result-keep.md', 'expected-result-keep.json')]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['expected_name'], expected_name)

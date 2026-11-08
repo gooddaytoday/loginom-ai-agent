@@ -34,8 +34,8 @@ export function validateReplacementParameters(p,mode,r){
    const resultType=rule.result_type??rule.type;
    need(['string','integer','real','datetime','boolean'].includes(resultType),'Replacement result_type unsupported');
    need(mode==='exact'||resultType===rule.type,'Regex replacement result_type must remain string');
-   need(resultType===rule.type||rule.other?.mode!=='keep','Different replacement result_type with other.keep produces Variant; choose other.null or other.value');
-   need(resultType!=='boolean'||rule.other?.mode==='null','Boolean replacement requires other.null');
+   need(resultType===rule.type||resultType==='boolean'||rule.other?.mode!=='keep','Different replacement result_type with other.keep produces Variant; only Boolean may use it, otherwise choose other.null or other.value');
+   need(resultType!=='boolean'||['null','keep'].includes(rule.other?.mode),'Boolean replacement requires other.null or other.keep (Variant)');
    need(resultType!=='datetime'||rule.other?.mode==='null','Datetime replacement requires other.null');
    if(mode==='regex')need(rule.type==='string'&&rule.case_sensitive===undefined&&rule.precision===undefined,'Regex requires string rules; omit case_sensitive and precision, use inline (?i)');
    if(mode!=='regex')need(rule.type==='string'?typeof rule.case_sensitive==='boolean'&&rule.precision===undefined:typeof rule.precision==='number'&&Number.isFinite(rule.precision)&&rule.precision>=0&&Number(rule.precision.toFixed(2))===rule.precision&&rule.case_sensitive===undefined,

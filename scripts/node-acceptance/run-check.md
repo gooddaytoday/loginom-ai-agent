@@ -697,3 +697,8 @@ Only task and matrix.csv reach the model.
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
+
+`replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
+на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
+прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
+typed matcher native reader, порядок, CSV/Save/cold/cleanup.

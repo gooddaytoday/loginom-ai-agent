@@ -20,6 +20,13 @@ test('replacement result type changes only the derived value, retaining source a
   assert.deepEqual(replacementSources(converted,'replace').map(f=>[f.name,f.type]),[['A',result_type],['A_Replaced','boolean'],['B','integer']]);
  }
 });
+test('Boolean result with other.keep generates a Variant value column and Boolean flag',()=>{
+ const kept={...config,rules:[{field:{name:'A'},result_type:'boolean',other:{mode:'keep'}}]};
+ assert.deepEqual(replacementSources(kept,'replace').map(f=>[f.name,f.type]),[['A','variant'],['A_Replaced','boolean'],['B','integer']]);
+ assert.deepEqual(replacementSources(kept,'add').map(f=>[f.name,f.type]),[['A','string'],['A_Replace','variant'],['A_Replaced','boolean'],['B','integer']]);
+ const nulled={...config,rules:[{field:{name:'A'},result_type:'boolean',other:{mode:'null'}}]};
+ assert.equal(replacementSources(nulled,'replace')[0].type,'boolean');
+});
 test('generated fields retain original names and disambiguate duplicate labels',()=>{assert.deepEqual(replacementSources(config,'add').map(f=>[f.name,f.type]),[['A','string'],['A_Replace','string'],['A_Replaced','boolean'],['B','integer']]);assert.deepEqual(replacementSources(config,'replace').map(f=>f.name),['A','A_Replaced','B']);assert.deepEqual(validateReplacementSources(config,native()),[]);});
 test('output proof refuses duplicated names, wrong types, wrong policy and incomplete sources',()=>{for(const edit of [n=>n.source_fields[1]=n.source_fields[0],n=>n.source_fields[2].type='string',n=>n.produce_mode='replace',n=>n.source_identity_verified=false,n=>n.source_fields.pop()]){const n=native();edit(n);assert.throws(()=>validateReplacementSources(config,n));}});
 
