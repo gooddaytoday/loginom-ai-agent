@@ -39,14 +39,13 @@ test('enrich supports one lookup with composite keys and different technical nam
  assert.equal(mappings[0].pairs.length,2);
 });
 
-test('enrich rejects unsupported modes, missing keys, third lookup and ambiguous declarations before effects',()=>{
+test('enrich rejects unsupported modes, missing keys, non-contiguous lookups and ambiguous declarations before effects',()=>{
  for(const edit of [
   p=>delete p.enrichment,p=>p.extra=true,p=>p.enrichment.extra=true,
   p=>p.enrichment.tables=[],p=>p.enrichment.tables[0].keys=[],
   p=>p.enrichment.tables[0].keys.push({main:'Key',lookup:'Name'}),
   p=>p.enrichment.tables[0].keys.push({main:'RowID',lookup:'Key'}),
   p=>p.enrichment.tables[0].port=2,
-  p=>p.enrichment.tables.push({port:3,keys:[{main:'Key',lookup:'Key'}]}),
   p=>delete p.enrichment.prefixes.enabled,p=>p.enrichment.prefixes.name='9bad',
   p=>p.enrichment.tables[0].keys[0].lookup='',
   p=>p.enrichment.tables[0].keys[0].expression='Key',
@@ -55,6 +54,13 @@ test('enrich rejects unsupported modes, missing keys, third lookup and ambiguous
  assert.throws(()=>validateEnrichParameters(valid(),'left',{...request,inputs:[{input:0},{input:1}]}));
  assert.throws(()=>validateEnrichParameters(valid(),'left',{...request,read:{ports:[1]}}));
  assert.throws(()=>validateEnrichParameters(valid(),'left',{...request,mappings:[{direction:'output',port:0,changes:[]}]}));
+});
+
+test('enrich accepts fourteen lookups and rejects a fifteenth before effects',()=>{
+ const lookups=n=>({enrichment:{prefixes:{enabled:false,name:'',label:''},tables:Array.from({length:n},(_,i)=>({port:i+1,keys:[{main:'Key',lookup:'Key'}]}))}});
+ const inputs=n=>({...request,inputs:Array.from({length:n+1},(_,input)=>({input}))});
+ assert.doesNotThrow(()=>validateEnrichParameters(lookups(14),'left',inputs(14)));
+ assert.throws(()=>validateEnrichParameters(lookups(15),'left',inputs(15)),/one to 14 lookups/);
 });
 
 test('enrich requires exact names and matching key types, never implicit conversion',()=>{
