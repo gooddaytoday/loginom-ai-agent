@@ -1,7 +1,7 @@
 {
   "base_sha": "ecb11c0e2dce6972aaa00978050680145fd12b04",
   "current_max_guided_card_bytes": 10876,
-  "proposed_all_modes_guided_card_bytes": 7898,
+  "proposed_all_modes_guided_card_bytes": 12619,
   "card_limit": 12000,
   "current_model_tool_bytes": 8051,
   "proposed_model_tool_bytes": 8051,
@@ -14,6 +14,7 @@
   "current_routing_bytes": 172,
   "routing_bytes": 133,
   "current_node_reference_bytes": 5996,
-  "proposed_node_reference_bytes": 3309,
+  "proposal_fragment_bytes": 2067,
+  "proposed_node_reference_bytes": 8064,
   "node_reference_limit": 6000
 }
