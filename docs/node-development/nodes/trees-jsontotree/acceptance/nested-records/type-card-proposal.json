@@ -1,0 +1,89 @@
+{
+  "type": "trees.from_json",
+  "title": "JSON в дерево",
+  "palette_group": "Дерево_данных",
+  "icon_class": "bg-vendor-icon-jsontotree",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 0,
+  "tree_outputs": 1,
+  "output_kinds": [
+    "tree"
+  ],
+  "additional_tabular_inputs": false,
+  "modes": [
+    "auto_structure"
+  ],
+  "semantics": "One JSON object in one table row, auto structure/root. Nested objects and object arrays in repeated records, empty containers and typed NULL. Mixed/NULL-only leaves require exact Variant readback. Preserve schema order, array boundaries and exact Int64. No manual schema, dates, forced root, sibling/nonempty scalar arrays or multiple root rows. Bounds 256 instances/depth 16/1 MiB unchanged.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "tree-stage1-v1",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/trees/json-to-tree.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "auto_structure"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "json_field": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Exact input string column containing one JSON object, including nested object records."
+      },
+      "root_mode": {
+        "type": "string",
+        "enum": [
+          "auto"
+        ],
+        "description": "Automatic root; nested object arrays allowed. One root row only."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  },
+  "guidance": "# JSON в дерево (`trees.from_json`)\n\n## JSON в дерево и дерево в таблицу\n\nДля ответа REST → таблица используй Калькулятор → Свёртка → Кросс-таблица; при отказе деревьев вернись к этому пути. `trees.from_json` / `auto_structure` → `trees.to_table` / `selected_nodes` выбирай по просьбе о дереве или для ровных записей без вложенных контейнеров. Сначала прочитай [параметры и ограничения](trees.from_json.md).\n\n## JSON в дерево и дерево в таблицу\n\nЕсли нужен табличный результат REST, разбирай фактический `Response` выхода 0\nчерез Калькулятор, Свёртку и Кросс-таблицу. Сохраняй служебный `RequestID`\nдля соединения с выходом 1 REST: фактический `HttpStatusCode` берётся оттуда.\nЗначения извлекай из ответа сервера, не подставляй исходные поля запроса или\nконстанты. Формулы выбирай по справке и наблюдённой структуре ответа.\nНе упаковывай несколько REST-ответов в один документ ради ограничения деревьев.\n\nДеревья выбирай, когда пользователь просит дерево, либо JSON содержит\nповторяющуюся ветвь записей. Внутри записей допустимы объекты и массивы\nобъектов: пустой массив имеет ноль экземпляров, пустой объект сохраняет\nконтейнер. Отсутствующий scalar становится типизированным NULL, включая поля\nпустого объекта, выведенные по соседним записям. NULL отличается от пустой\nстроки, false и нуля. Смешанный лист — Variant с точным типом каждой ячейки;\nне преобразуй его в строку. Табличное разворачивание вложенного дерева через\n`trees.to_table` этим не обещано.\nЕсли разбор REST уже получил отказ области поддержки деревьев,\nне останавливай табличный сценарий:\nпри неизвестном эффекте сначала выполни выданный recovery через `operation.recover`,\nзатем продолжи табличным путём от выхода REST. Не повторяй неподдерживаемое дерево.\n\nДля одного JSON object в одной строке строкового поля сначала выполни и полностью\nпрочитай источник. Используй `trees.from_json`, `mode:\"auto_structure\"`,\n`parameters:{json_field:\"Document\",root_mode:\"auto\"}`, `finish:\"execute\"` и\n`read:{ports:[0],sample_rows:100,require_exact_numbers:true}`. Выход 0 — типизированное\nдерево: `tree.schema` хранит порядок, имена, типы, контейнеры и массивы;\n`tree.instances` — все экземпляры, их пути, порядок, значения и NULL. Большие\nцелые передаются десятичными строками. Не восстанавливай дерево из текста задачи.\n\nПодключай этот же порт к `trees.to_table`, `mode:\"selected_nodes\"`.\nНа новом узле обязательны `selected_paths` (пути листьев схемы в её порядке,\nнапример `/id`, `/items/sku`, без индексов массива), `repeat_parents`,\n`composite_names:false`, `composite_labels:false`, `label_separator:\".\"`.\n`repeat_parents:true` повторяет выбранных родителей для каждой позиции;\n`false` оставляет их только в первой строке, далее NULL. Выход 0 — таблица.\nПолностью прочитай её, проверь типы и порядок, затем экспортируй и сохрани пакет.\nПустая строка, ноль и false сохраняются; missing scalar и JSON null дают NULL.\nДля экспорта таблицы с NULL и пустыми строками явно выбери непустой маркер NULL.\n\nПервый этап поддерживает одну непустую повторяющуюся ветвь объектов с уникальными\nименами листьев, до 64 выбранных полей. Нет ручной схемы, XSD, forced root,\nдат, нескольких корневых строк, sibling arrays, непустых scalar arrays,\nиндексных и составных колонок; Variant — только для листьев дерева выше.\nДерево ограничено 256 экземплярами, глубиной 16 и 1 MiB; превышение — отказ,\nбез обрезания. На существующем узле `parameters:{}` сохраняет настройки,\nявный `selected_paths` заменяет весь выбор. Если пользователь просил именно дерево,\nпри отказе сообщи ограничение; не подменяй запрошенное дерево JavaScript или\nвычислениями по вложению. Для табличного результата REST действует путь выше.",
+  "guidance_modes": [
+    "auto_structure"
+  ]
+}

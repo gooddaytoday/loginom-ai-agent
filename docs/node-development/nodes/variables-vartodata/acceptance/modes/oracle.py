@@ -33,6 +33,32 @@ def expected():
             'disconnected_input': {'status': 'not_equivalent_to_connected_empty_source'}}
 
 
+def matcher(items, mode):
+    """Same tables in the production matcher format (typed Variant cells, NULL as null)."""
+    def cell(v):
+        return v['value'] if v['value'] is None or v['type'] != 'variant' else {'cell_type': v['cell_type'], 'value': v['value']}
+    if mode == 'rows':
+        columns = [{'name': 'Name', 'label': 'Имя', 'type': 'string'}, {'name': 'DisplayName', 'label': 'Метка', 'type': 'string'},
+                   {'name': 'Value', 'label': 'Значение', 'type': 'variant'}]
+        rows = [{'Name': v['name'], 'DisplayName': v['label'],
+                 'Value': None if v['value'] is None else {'cell_type': v.get('cell_type', v['type']), 'value': v['value']}} for v in items]
+    else:
+        columns = [dict({k: v[k] for k in ('name', 'label', 'type')}, **({'tolerance': {'abs': 0, 'rel': 0}} if v['type'] == 'real' else {})) for v in items]
+        rows = [{v['name']: cell(v) for v in items}]
+    return {'output_node_type': 'variables.to_table', 'output_port': 0, 'ordered': True, 'column_order': 'exact',
+            'columns': columns, 'rows': rows}
+
+
+def run_files():
+    """expected-phases.json: ordered live checkpoints; expected-run.json: final cold state."""
+    source = json.loads((HERE.parents[1] / 'fixtures/modes.json').read_text())
+    phases = {'switch_rows': matcher(source['initial'], 'rows'), 'changed_rows': matcher(source['changed'], 'rows'),
+              'switch_back_columns': matcher(source['changed'], 'columns')}
+    final = {'package_path': '{{PACKAGE_PATH}}', 'nodes': [{'type': 'variables.user'}, {'type': 'variables.to_table'}],
+             'outputs': [phases['switch_back_columns']]}
+    return {'expected-phases.json': phases, 'expected-run.json': final}
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--write', action='store_true')
@@ -41,8 +67,12 @@ if __name__ == '__main__':
     path = HERE / 'expected.json'
     if args.write:
         path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
+        for name, value in run_files().items():
+            (HERE / name).write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
     else:
         assert json.loads(path.read_text()) == result
+        for name, value in run_files().items():
+            assert json.loads((HERE / name).read_text()) == value, name
         assert len(result['switch_rows']['rows']) == 4
         assert result['changed_rows']['rows'][-1]['Value']['value'] == 0.125
         assert result['empty_rows']['rows'] == []

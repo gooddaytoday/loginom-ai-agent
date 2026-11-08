@@ -372,6 +372,8 @@ in `D87` only after LAB-413 provides the XLSX switching path and validate it liv
 (median/most_probable, previous при ordered, delete). Модель получает только
 `acceptance/task-*.md` и CSV из `fixtures/` (statistics, ordered, delete); ожидания —
 `acceptance/modes/expected*.json` (воспроизводит `oracle.py --check`). CSV, Save, cold и cleanup — штатная оснастка.
+Цикл 2: `missing-linear` (linear при ordered, ordered.csv) и `missing-random` (random, random-single-value.csv,
+единственное известное значение — результат детерминирован) по тем же правилам.
 
 `grouping-median`: цикл 1 «Группировка: медиана» (LAB-998): `task-median.md` и
 `fixtures/modes.csv` модели; ожидания берутся из независимого
@@ -705,6 +707,14 @@ on the same node, physically one Factor field on both ports. The cap oracle
 and stock CSV/cold matcher retain exact types, NULL and field order.
 Only task and matrix.csv reach the model.
 
+`grouping-first`, `grouping-last`, `grouping-only`, `grouping-concat`: цикл 3
+Группировки из `nodes/grouping/acceptance/modes`. Модель получает только
+соответствующий task и modes.csv; независимый oracle остаётся в проверке.
+Для concat три последовательных результата одного узла сверяются с тремя
+CSV в порядке задания, cold Execute проверяет последнее состояние.
+Первое/последнее включают крайний NULL; единственное допускает повторы;
+список исключает NULL, сохраняет пустую строку, сортировку и уникальность.
+Типы/порядок полей, Save и cleanup проверяются штатными reader/matcher.
 
 `replace-boolean` и `replace-mixed` используют утверждённые task-boolean.md/task-mixed.md
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
@@ -726,7 +736,6 @@ oracle и expected — нет. Проверяются все значения, �
 cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
 сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
 выгрузке run-check не различает — его подтверждает журнал вызова узла.
-
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
 Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,
@@ -739,3 +748,21 @@ Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
 Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
 нативное восстановление ставит используемые поля перед сохранёнными ID.
 Оба порядка проверяются явно; остальные перестановки запрещены.
+
+`replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
+на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
+прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
+typed matcher native reader, порядок, CSV/Save/cold/cleanup.
+
+`clustering-apply`: обучение k=3/none/seed 42 на train.csv, замена источника
+того же импорта на holdout.csv, Activate сохранённого узла без Teach.
+Оба typed-порта, центры (2,2)/(20,2)/(2,20) из stage-0 oracle, расстояния
+2/2/2/80, два CSV, Save/cold без настройки, cleanup. Только task-apply.md
+и два исходных CSV передаются модели; oracle/expected остаются в оснастке.
+
+`variables-totable-switch` (LAB-1095, «Переменные в таблицу», цикл 1): модель получает `task-switch-run.md`
+и `modes.json` (initial/changed; метки равны именам), сама собирает источник и преобразователь columns,
+затем переключает тот же узел columns→rows, правит источник, повторяет выполнение и возвращает columns.
+Ожидания — `acceptance/modes/oracle.py --write` (`expected-phases.json`, `expected-run.json`); типизированный
+аудит журнала `variables-totable-switch.mjs` (тот же GUID узла, связь сохранена, один преобразователь,
+свежие выполнения, Variant-подтипы строк). Save, cold без настройки и cleanup — штатные.

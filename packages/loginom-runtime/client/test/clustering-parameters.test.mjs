@@ -19,7 +19,7 @@ test('g-means requires automatic bounds, rejects fixed k and validates partial e
  const automatic={features:p.features,min_clusters:2,max_clusters:4,threshold:1,seed:42};
  validateClusteringParameters(automatic,'g_means',request);
  validateClusteringParameters({threshold:0.5},'g_means',{...request,target:{kind:'existing'},inputs:[]});
- for(const patch of [{min_clusters:0},{max_clusters:1001},{min_clusters:5},{threshold:0},{threshold:Infinity},{clusters:3},{max_clusters:undefined}])
+ for(const patch of [{min_clusters:0},{max_clusters:1001},{min_clusters:5},{threshold:0},{threshold:0.099},{threshold:5.001},{threshold:Infinity},{clusters:3},{max_clusters:undefined}])
   assert.throws(()=>validateClusteringParameters({...automatic,...patch},'g_means',request),/Clustering:/);
  assert.throws(()=>validateClusteringParameters({...p,min_clusters:2},'k_means',request),/Clustering:/);
 });
@@ -33,4 +33,17 @@ test('identifiers, strings, unknown and discrete numeric fields cannot become fe
 
 for(const normalization of ['scale_minus_one_one','scale_zero_one','absolute_scale'])test('native scaling enters the production validator: '+normalization,()=>{
  validateClusteringParameters({...p,normalization},'k_means',request);
+});
+
+test('apply requires an existing saved model and refuses all setting or connection edits',()=>{
+ const r={...request,target:{kind:'existing'},inputs:[],finish:'execute'};
+ validateClusteringParameters({},'apply',r);
+ for(const patch of [{clusters:3},{features:p.features},{seed:42},{normalization:'none'}])
+  assert.throws(()=>validateClusteringParameters(patch,'apply',r),/apply/);
+ for(const change of [{target:{kind:'new'}},{inputs:[{input:0}]},{mappings:[{direction:'output',port:0}]},{finish:'done'},{finish:'close'}])
+  assert.throws(()=>validateClusteringParameters({},'apply',{...r,...change}),/apply/);
+});
+
+test('native threshold endpoints are inclusive',()=>{
+ for(const threshold of [0.1,5])validateClusteringParameters({threshold},'g_means',{...request,target:{kind:'existing'},inputs:[]});
 });

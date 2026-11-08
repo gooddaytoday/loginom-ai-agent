@@ -130,7 +130,14 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'variables-columns':
         src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    input_files=[], expected_name='expected.json')
+                    source_package=src.parent / 'fixtures/source.lgp', input_files=[], expected_name='expected.json')
+    if name == 'variables-totable-switch':
+        node = REPO / 'docs/node-development/nodes/variables-vartodata'
+        src = node / 'acceptance'
+        return dict(source=src, prompt=src / 'task-switch-run.md', data=node / 'fixtures', base=None, input_files=['modes.json'],
+                    expected_name='modes/expected-run.json', variable_only=True, variable_audit='variables-totable-switch',
+                    variable_initial='modes/expected-phases.json', variable_read_path='port',
+                    oracle=REPO / 'scripts/node-acceptance/variables-totable-switch.mjs')
     if name in ['quality-default', 'quality-spikes']:
         src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
         case = src / 'probe' if name == 'quality-spikes' else src
@@ -172,6 +179,10 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] + (['typed-update.csv'] if export_case == 'overwrite' else []) if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
                     expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=None if edges or name == 'lgd-export-compression' else export_case, lgd_empty_variant=edges, export_count=2 if edges else 1, lgd_export_compression=name == 'lgd-export-compression',
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
+    if name == 'clustering-apply':
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
+        return dict(source=src, prompt=src / 'task-apply.md', data=src.parent.parent / 'fixtures/v040', base=None,
+                    input_files=['train.csv', 'holdout.csv'], export_count=2, expected_name='expected-apply-run.json')
     if name == 'clustering-gmeans':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
         return dict(source=src, prompt=src / 'task-g-means.md', data=src.parent.parent / 'fixtures/v040', base=None,
@@ -232,10 +243,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
                     expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
-    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count']:
+    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
-                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None, export_count=3 if name == 'grouping-concat' else 1, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -249,12 +260,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance' / name
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=[filename], external=True)
-    if name in ['missing-median-mode', 'missing-previous', 'missing-delete']:
+    if name in ['missing-median-mode', 'missing-previous', 'missing-delete', 'missing-linear', 'missing-random']:
         # v0.4.0 cycle 1: only the task and its CSV go to the model; expected tables are static oracle output.
         root = REPO / 'docs/node-development/nodes/missing-values'
         task, csv_name, expected = {'missing-median-mode': ('task-median-mode.md', 'statistics.csv', 'expected.json'),
                                     'missing-previous': ('task-previous.md', 'ordered.csv', 'expected-previous.json'),
-                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json')}[name]
+                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json'),
+                                    'missing-linear': ('task-linear.md', 'ordered.csv', 'expected-linear.json'),
+                                    'missing-random': ('task-random.md', 'random-single-value.csv', 'expected-random.json')}[name]
         return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance' / task, data=root / 'fixtures',
                     input_files=[csv_name], base=None, expected_name=expected)
     if name in ['missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean']:
@@ -554,12 +567,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'replace-nearest':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['replace-boolean', 'replace-mixed']:
+    if name in ['replace-boolean', 'replace-mixed', 'replace-keep-variant']:
         node = REPO / 'docs/node-development/nodes/replacement'
-        return dict(source=node / 'acceptance/extended',
-                    prompt=node / 'acceptance' / ('task-boolean.md' if name == 'replace-boolean' else 'task-mixed.md'),
-                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None,
-                    expected_name='expected.json' if name == 'replace-boolean' else 'expected-mixed.json')
+        task, expected = {'replace-boolean': ('task-boolean.md', 'expected.json'), 'replace-mixed': ('task-mixed.md', 'expected-mixed.json'),
+                          'replace-keep-variant': ('task-result-keep.md', 'expected-result-keep.json')}[name]
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / task,
+                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None, expected_name=expected)
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -698,7 +711,7 @@ def expected_for(case, package, cold=False):
     if case.get('grouping_mode'):
         cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py')]))['cases']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
-                    outputs=cases[case['grouping_mode']]['stages'])
+                    outputs=cases[case['grouping_mode']]['stages'][-1:] if cold else cases[case['grouping_mode']]['stages'])
     if case.get('corr_ranks'):
         expected = read(src / 'expected.json')['cases']['kendall']
         expected['package_path'] = package
@@ -1500,7 +1513,7 @@ class Runner:
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
             if spec.get('sampling_uniform'):
                 prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
-            if spec.get('export_count') == 3 and not spec.get('sampling_uniform'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and spec.get('grouping_mode') != 'concat': prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
@@ -1912,6 +1925,12 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if expected.get('clustering_apply'):
+            write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
+            self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
+                folder / 'expected.json', folder / 'clustering-apply-replies.json', folder / 'clustering-apply-resolved.json'], folder, timeout=60)
+            expected = read(folder / 'clustering-apply-resolved.json')
+            write(folder / 'expected.json', expected)
         if expected.get('clustering_gmeans'):
             write(folder / 'clustering-gmeans-replies.json', [o for _, o in replies])
             self.phase('clustering-gmeans-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-gmeans.mjs',
@@ -2047,7 +2066,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
-                        if spec.get('cold_expected_name'):
+                        if spec.get('cold_expected_name') or spec.get('grouping_mode') == 'concat':
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, expected_for(spec, r['package'], cold=True))
                         if spec.get('variable_audit') == 'variables-union-inputs':

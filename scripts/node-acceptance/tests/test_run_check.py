@@ -386,6 +386,20 @@ class RunCheckTests(unittest.TestCase):
             if kind == 'threshold':
                 self.assertIn('для I выбери замену средним', case['prompt'].read_text())
 
+    def test_variables_totable_switch_catalog_isolates_task_and_typed_phases(self):
+        case = runner.scenario('variables-totable-switch')
+        self.assertEqual(case['prompt'].name, 'task-switch-run.md')
+        self.assertEqual(case['input_files'], ['modes.json'])
+        self.assertTrue((case['data'] / 'modes.json').is_file() and case['variable_only'])
+        self.assertNotIn('oracle', case['prompt'].read_text().lower())
+        expected = runner.expected_for(case, '/test/switch.lgp')
+        self.assertEqual(expected['package_path'], '/test/switch.lgp')
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['amount', 'enabled', 'missing', 'rate'])
+        phases = json.loads((case['source'] / case['variable_initial']).read_text())
+        self.assertEqual(expected['outputs'][0], phases['switch_back_columns'])
+        self.assertEqual([c['name'] for c in phases['changed_rows']['columns']], ['Name', 'DisplayName', 'Value'])
+        self.assertEqual(expected['nodes'], [{'type': 'variables.user'}, {'type': 'variables.to_table'}])
+
     def test_variables_columns_catalog_uses_original_fixture_and_exact_typed_oracle(self):
         case = runner.scenario('variables-columns')
         self.assertEqual(case['source'].name, 'acceptance')
@@ -393,6 +407,7 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(case['prompt'].name, 'task.md')
         self.assertIsNone(case['base'])
         self.assertEqual(case['input_files'], [])
+        self.assertTrue(case['source_package'].is_file())  # the task opens a prepared package
         expected = runner.expected_for(case, '/test/variables-columns.lgp')
         self.assertEqual(expected['package_path'], '/test/variables-columns.lgp')
         output = expected['outputs'][0]
@@ -474,7 +489,8 @@ class RunCheckTests(unittest.TestCase):
 
     def test_replacement_boolean_and_mixed_use_only_approved_task_and_input(self):
         for name, task, expected_name in [('replace-boolean', 'task-boolean.md', 'expected.json'),
-                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json')]:
+                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json'),
+                                          ('replace-keep-variant', 'task-result-keep.md', 'expected-result-keep.json')]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['expected_name'], expected_name)
@@ -504,7 +520,9 @@ class RunCheckTests(unittest.TestCase):
                        check=True, capture_output=True)
         for name, task, csv_name, rows, nodes in [('missing-median-mode', 'task-median-mode.md', 'statistics.csv', 4, 3),
                                                   ('missing-previous', 'task-previous.md', 'ordered.csv', 5, 3),
-                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3)]:
+                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3),
+                                                  ('missing-linear', 'task-linear.md', 'ordered.csv', 5, 3),
+                                                  ('missing-random', 'task-random.md', 'random-single-value.csv', 4, 3)]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['input_files'], [csv_name])
@@ -545,6 +563,19 @@ class RunCheckTests(unittest.TestCase):
                 self.assertEqual(expected['outputs'], json.loads(subprocess.check_output([
                     sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages'])
                 self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], types)
+
+    def test_grouping_cycle_three_uses_approved_tasks_and_exact_stages(self):
+        for mode in ['first', 'last', 'only', 'concat']:
+            case = runner.scenario('grouping-' + mode)
+            self.assertEqual(case['prompt'].name, 'task-' + mode + '.md')
+            self.assertEqual(case['input_files'], ['modes.csv'])
+            expected = runner.expected_for(case, '/test/lists.lgp')
+            stages = json.loads(subprocess.check_output([
+                sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages']
+            self.assertEqual(expected['outputs'], stages)
+            self.assertEqual(len(stages), 3 if mode == 'concat' else 1)
+            cold = runner.expected_for(case, '/test/lists.lgp', cold=True)
+            self.assertEqual(cold['outputs'], [stages[-1]])
 
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')

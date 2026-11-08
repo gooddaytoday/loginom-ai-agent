@@ -108,8 +108,14 @@ test('uniform configures group editors, seed and test priority on the same node'
   assert.deepEqual(r.configuration.counts,partition?[6,4]:[6]);assert.deepEqual(r.configuration.group_units.map(u=>u.absolute_size),partition?[1,1]:[1]);
   assert.equal(r.configuration.seed,42);assert.equal(r.configuration.mode,'uniform');
   f.state.stage=partition?'data_partition':'sampling';
-  const again=await f.run(partition?{test_priority_position:'end'}:{},'execute','uniform');
+  const again=await f.run(partition?{test_priority:true,test_priority_position:'end'}:{},'execute','uniform');
   assert.deepEqual(again.configuration.group_units.map(u=>u.absolute_size),partition?[1,1]:[1]);
-  if(partition){assert.equal(again.configuration.test_priority,true);assert.equal(again.configuration.test_priority_position,'end');}
+  if(partition){
+   assert.equal(again.configuration.test_priority,true);assert.equal(again.configuration.test_priority_position,'end');
+   f.state.stage='data_partition';const before=f.actions.length;
+   const same=await f.run({test_priority:true,test_priority_position:'end'},'execute','uniform');
+   assert.equal(same.configuration.test_priority_position,'end');
+   assert.deepEqual(f.actions.slice(before).filter(a=>['priority','priority-picker','beginning','end'].includes(a.ref)),[],'equal priority position is not reselected');
+  }
  }
 });

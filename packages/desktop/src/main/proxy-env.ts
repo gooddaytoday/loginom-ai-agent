@@ -1,3 +1,5 @@
+import { withBundledRipgrep } from "@loginom-ai-agent/loginom-host/bundled-ripgrep"
+
 const LOOPBACK = ["127.0.0.1", "localhost", "::1", "[::1]"]
 
 export function loopbackNoProxy(current: string | undefined) {
@@ -78,6 +80,9 @@ export function sidecarEnvironment(base: NodeJS.ProcessEnv, proxy?: Record<strin
   delete env.DEBUG
   if (process.platform === "linux") delete env.LD_PRELOAD
   Object.assign(env, proxy)
-  if (resources) env.LOGINOM_AI_AGENT_RESOURCES = resources
+  if (resources) {
+    env.LOGINOM_AI_AGENT_RESOURCES = resources
+    withBundledRipgrep(env, resources)
+  }
   return env
 }

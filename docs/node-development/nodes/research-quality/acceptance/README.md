@@ -123,3 +123,29 @@ python3 -B docs/node-development/nodes/research-quality/acceptance/oracle.py
 [Предложение и незавершённые проверки](../modes-stage0.md). Старые expected выше
 сохраняются; новые файлы LAB-1018 не утверждают native/runtime поддержку.
 После двух разрывов связи исследование остановлено по карточке.
+
+## Дополнение LAB-1103
+
+`task-types.md` + `../fixtures/types.csv` → `expected-types.json`.
+Воспроизведение: `python3 -I oracle-types.py > expected-types.json`, сверка
+с закоммиченным файлом — `python3 -I oracle-types.py --check` из этого каталога.
+Это независимый proposed expected всех пяти портов. Native rounded preflight
+и ограничения описаны в [modes-lab1103.md](../modes-lab1103.md).
+Скрытые настройки и frozen-fit apply через UI не найдены; для них
+нет выдуманного expected. Модели передавать только task/CSV.
+
+Статус model-contract: `modes-skill-node.proposal.md` и
+`modes-type-card.proposal.json` — предложение LAB-1103, не реализовано и не
+утверждено владельцем. Справка-предложение дописывает действующую
+`references/nodes/research.quality.md` (принятые правила сохранены), а не
+заменяет её. Поддержку boolean Moda добавлять в собственном quality-moda
+декодере, не в общем decoder; бюджет декодера не увеличивается.
+
+**Условие старта цикла этапа 1 — native typed-read preflight подтипов Moda.**
+На этапе 0 нативные теги Moda для boolean (Flag) и datetime (Stamp) не
+прочитаны: `oracle-types.py` предполагает `boolean` для Flag и `real`
+(серийные дни) для Stamp. До первого модельного прогона разработчик читает
+точный native subtype/value Moda порта 4 на `types.csv` ограниченным reader
+и записывает журнал:строку. Если подтип иной, `expected-types.json` правится
+только по этому наблюдению с пометкой в README, до прогонов; после FAIL
+обработчика expected не подгоняется.

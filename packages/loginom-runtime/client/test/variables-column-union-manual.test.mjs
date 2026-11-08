@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {validateVariablesColumnUnionParameters,validateVariablesColumnUnionFields} from '../lib/variables-coluniondatavar-parameters.mjs';
 import {variablesColumnUnionSourceExecution} from '../lib/variables-coluniondatavar-preflight.mjs';
-import {readVariablesColumnUnionMapping,readVariablesColumnUnionSourceEditor} from '../lib/variables-column-union-procedure.mjs';
+import {configureVariablesColumnUnion,readVariablesColumnUnionMapping,readVariablesColumnUnionSourceEditor} from '../lib/variables-column-union-procedure.mjs';
 import {variablesColumnUnionConfigurationReadback} from '../lib/variables-coluniondatavar-readback.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
+import {applyNode} from '../lib/node-apply.mjs';
+import {createVariablesColumnUnionNodeSupport} from '../lib/variables-coluniondatavar-node.mjs';
 
 const parameters=()=>({column_union:{mapping:'manual',fields:[
  {input:1,source:'amount',name:'right_amount',label:'Правая сумма',type:'integer'},
@@ -26,6 +28,57 @@ test('manual preflight refuses integer to string with a clear platform reason be
  validateVariablesColumnUnionFields(parameters(),outputs);
  const p=parameters();p.column_union.fields[1].type='string';
  assert.throws(()=>validateVariablesColumnUnionFields(p,outputs),e=>/Loginom 7.4.2.*integer.*string/.test(e.message)&&/Калькулятор переменных после Соединения/.test(e.message));
+});
+test('other type mismatches describe the handler restriction without attributing it to Loginom 7.4.2',()=>{
+ const p=parameters();p.column_union.fields[1].type='real';
+ assert.throws(()=>validateVariablesColumnUnionFields(p,[0,1].map(()=>({variables:[{name:'amount',type:'integer'}]}))),e=>!/Loginom 7.4.2/.test(e.message)&&/ручное соответствие этого узла не меняет тип/.test(e.message));
+});
+test('new manual close is refused during parameter validation before any browser effect',()=>{
+ const r={target:{kind:'new'},finish:'close',inputs:[],mappings:[],read:{ports:[],variable_ports:[]},variable_inputs:[0,1].map(input=>({kind:'variables',input,source:{node_id:'s'+input}}))};
+ assert.throws(()=>validateVariablesColumnUnionParameters(parameters(),'append_variables',r),/new.*manual.*close/);
+ r.target.kind='existing';validateVariablesColumnUnionParameters(parameters(),'append_variables',r);
+ r.target.kind='new';r.finish='execute';validateVariablesColumnUnionParameters(parameters(),'append_variables',r);
+});
+test('the production apply entry rejects new manual close before invoking any driver or journal',async()=>{
+ const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+ const request={operation_id:'close-new',contract_revision:'1.0.0',document_id:'doc',workflow_ref,
+  target:{kind:'new',type:'variables.column_union',position:{x:96,y:80}},inputs:[],variable_inputs:[0,1].map(input=>({kind:'variables',input,output:0,source:{document_id:'doc',workflow_id:'wf',node_id:'s'+input}})),
+  mode:'append_variables',parameters:parameters(),mappings:[],finish:'close',read:{ports:[],variable_ports:[],sample_rows:0,require_exact_numbers:true},budgets:{configure_ms:1000,execute_ms:1000,total_ms:10000}};
+ const support=createVariablesColumnUnionNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:'7.4.2'});
+ await assert.rejects(()=>applyNode({request,operation:{id:request.operation_id},handlers:support.nodeApplyHandlers,drivers:{},record:()=>assert.fail('pre-mutation refusal must not start a phase')}),/new.*manual.*close/);
+});
+
+function configureFixture(){
+ const state={verified:true,inventory_complete:true,mapping:'manual',table:true,sources:[{name:'amount',label:'amount',type:'integer'},{name:'amount',label:'amount',type:'integer'}],fields:[]};
+ const source_fields=state.sources.map((s,input)=>({...s,input})),effects=[],metadata={};let selected,serial=0;
+ const readNode=async()=>({verified:true,surface:'wizard',node_id:'union'}),readMapping=()=>structuredClone(state);
+ const click=tid=>{effects.push(tid);
+  if(tid.endsWith('colTargetDelete_'))state.fields=state.fields.filter(f=>f.record_id!==selected.record);
+  if(tid==='EditVariableForm;btnApply')state.fields.push({...metadata,record_id:'r'+serial++,source_index:null});
+  if(tid==='option')state.fields.at(-1).source_index=state.fields.length===1?1:0;
+ };
+ const locator=tid=>({locator:()=>({count:async()=>1,fill:async value=>{metadata[tid.endsWith('edtName')?'name':'label']=value;},press:async()=>{}}),waitFor:async()=>{},click:async()=>click(tid)});
+ const page={evaluate:async(fn,arg)=>{
+  if(fn===readMapping)return readMapping();
+  if(fn===readVariablesColumnUnionSourceEditor)return {verified:true,tid:arg.source_index===undefined?'editor':'option',expanded:true,index:arg.source_index};
+  if(arg?.tid&&arg.value===undefined){selected=arg;return {x:0,y:0};}
+  metadata.type=({4:'integer',3:'real',5:'string',1:'boolean'})[arg.value];return 'type-option';
+ },waitForTimeout:async()=>{},mouse:{click:async()=>click(selected.tid)},locator:q=>locator(q.includes('type-option')?'type-option':q.includes('option')?'option':q.includes('EditVariableForm;edtName')?'EditVariableForm;edtName':q.includes('EditVariableForm;edtDisplayName')?'EditVariableForm;edtDisplayName':'other')};
+ const task={binding:{workflow_ref:{prefix:'MF;TF'}},parameters:parameters(),source_fields,deadline:Date.now()+10000,finish:'done'};
+ return {state,effects,task,run:()=>configureVariablesColumnUnion(page,task,readNode,readMapping)};
+}
+test('manual configuration compares five field values independently of request key order',async()=>{
+ const f=configureFixture();f.task.parameters.column_union.fields=f.task.parameters.column_union.fields.map(({source,input,name,label,type})=>({source,input,name,label,type}));
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(result.configuration.fields,parameters().column_union.fields);
+ assert.ok(f.effects.some(t=>t.endsWith('btnNext')));
+});
+test('close of a saved manual mapping needs no preflight source inventory and makes no configuration gesture',async()=>{
+ const f=configureFixture();f.state.fields=parameters().column_union.fields.map((v,i)=>({...v,source_index:1-i,record_id:'saved'+i}));
+ f.task.parameters={};f.task.source_fields=[];f.task.finish='close';
+ const before=structuredClone(f.state),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(result.effect_possible,false);
+ assert.deepEqual(f.effects,[]);assert.deepEqual(f.state,before);assert.equal(result.configuration.mapping,'manual');
 });
 test('manual source read binds the latest completed native-owned process without executing the source',()=>{
  const node={document_id:'d',workflow_id:'w',node_id:'left'};
