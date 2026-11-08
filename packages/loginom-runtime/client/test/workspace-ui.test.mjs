@@ -1196,6 +1196,26 @@ for(const mode of ['fresh','owner','mask','persistent'])test('Files scroll 4000-
  }
 });
 
+// LAB-1188 Chromium profile (Files after reopen, 5277 document elements): the
+// global guard query, 568 selector parts over the whole document, took 114 of
+// 306 ms per read. A selector engine checks every part against each element it
+// is asked about, so count part checks per element.
+test('Files read checks the global guard list on candidates, not on every document element',async()=>{
+ const {page,table,prefix}=storageScrollCostFixture();
+ const other=page.add('div',null,'',{x:0,y:0,width:0,height:0});other.style.display='none';
+ for(let i=0;i<4200;i++)page.add('div','Other;n'+i,'',{x:0,y:0,width:0,height:0},other);
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const match=Element.prototype.matches;let checks=0,guardParts=0;
+ Element.prototype.matches=function(selector){const parts=selector.split(',').length;checks+=parts;guardParts=Math.max(guardParts,parts);return match.call(this,selector);};
+ let read;
+ try{read=await page.execute({mode:'observe',root_ref:root.ref});}finally{Element.prototype.matches=match;}
+ assert.equal(read.status,'SUCCEEDED');assert.ok(guardParts>=500,String(guardParts));
+ assert.ok(read.output.scan.visited_elements>=1092);assert.equal(read.output.file_storage.directory,'/user');
+ assert.equal(read.output.ui.elements.filter(e=>e.tid?.startsWith(prefix+'colName_')).length,48);
+ assert.ok(checks<page.document.all().length*guardParts/4,JSON.stringify({checks,elements:page.document.all().length,guardParts}));
+});
+
 test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
   for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
     const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;

@@ -411,7 +411,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Native fixed queries discover global blockers/context without walking
       // every unrelated subtree in JavaScript. Their synchronous browser cost
       // cannot be preempted; charge immediately after each native operation.
-      const guards=document.querySelectorAll(wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]');
+      const guardSelector=wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]';
+      // Checking all ~570 parts against every document element took 114 of
+      // 306 ms per Files read (LAB-1188 profile). A part led by a WizrdMCF tid
+      // matches only that element or its descendant: prefilter those once,
+      // keep other parts verbatim, then apply the full list to candidates.
+      // Same elements, same document order.
+      const guardParts=guardSelector.split(','),plain=value=>value.replace(/"[^"]*"/g,'');
+      const owned=part=>/^\[data-tid[\^$*]?="[^"]*WizrdMCF[^"]*"\]/.test(part)&&!/[>+~:]/.test(plain(part));
+      const guards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0)
+        ? [...document.querySelectorAll(['[data-tid*="WizrdMCF"]','[data-tid*="WizrdMCF"] *',...guardParts.filter(part=>!owned(part))].join(','))]
+          .filter(element=>element.matches(guardSelector))
+        : document.querySelectorAll(guardSelector);
       charge();for (const element of guards)if(addressedImportField(element))include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
