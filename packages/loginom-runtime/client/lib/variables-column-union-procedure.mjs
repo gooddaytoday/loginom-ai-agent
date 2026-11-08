@@ -2,7 +2,27 @@ import {readPreparedNodeContext,validatePreparedNodeContext} from './node-contex
 
 export function makeVariablesColumnUnionConfigureCode(binding,options){
  validatePreparedNodeContext(binding);
- return `async page=>(${configureVariablesColumnUnion.toString()})(page,${JSON.stringify({binding,...options})},${readPreparedNodeContext.toString()},${readVariablesColumnUnionMapping.toString()})`;
+ return `async page=>(${configureVariablesColumnUnion.toString()})(page,${JSON.stringify({binding,...options})},${readPreparedNodeContext.toString()},${readVariablesColumnUnionMapping.toString()},${readVariablesColumnUnionSourceEditor.toString()})`;
+}
+
+export function readVariablesColumnUnionSourceEditor({base,record,source_index}){
+ const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
+ const gs=exact(base+';grdTargetColumns'),g=gs.length===1&&Ext.getCmp(gs[0].id),plugin=g?.findPlugin?.('cellediting'),context=plugin?.context;
+ if(g?.el?.dom!==gs[0]||context?.record&&String(context.record.internalId)!==record)throw Error('Source editor record owner changed');
+ if(!context||context.column?.dataIndex!=='SourceDisplayName'||!plugin.activeEditor?.field)return {verified:false,reason:'source_editor_pending'};
+ const combos=[...document.querySelectorAll('[data-tid]')].filter(e=>e.checkVisibility({checkVisibilityCSS:true})&&e.getAttribute('data-tid').startsWith(base+';')
+  &&Ext.getCmp(e.id)?.el?.dom===e&&Ext.getCmp(e.id)?.isXType?.('combobox')===true&&plugin.activeEditor.field===Ext.getCmp(e.id));
+ if(combos.length!==1)return {verified:false,reason:'source_editor_pending'};
+ const c=Ext.getCmp(combos[0].id),tid=combos[0].getAttribute('data-tid');
+ if(source_index===undefined)return {verified:true,tid,expanded:c.isExpanded===true};
+ const picker=c.picker,store=picker?.getStore?.(),rows=store?.getData?.()?.items;
+ if(!picker?.el?.dom?.checkVisibility({checkVisibilityCSS:true})||!Array.isArray(rows)||store.isLoading?.())return {verified:false,reason:'source_picker_pending'};
+ const sources=exact(base+';grdSourceColumns'),sourceGrid=sources.length===1&&Ext.getCmp(sources[0].id),source=sourceGrid?.getStore?.().getData?.()?.items?.[source_index];
+ if(sourceGrid?.el?.dom!==sources[0]||!source?.isModel)throw Error('Owned source picker inventory');
+ const matches=rows.filter(r=>r.data.Value===source);if(matches.length!==1)throw Error('Unique source picker record');
+ const node=picker.getNode(matches[0]),index=rows.indexOf(matches[0]);
+ if(!node||picker.getRecord(node)!==matches[0]||!node.getAttribute('data-tid')||Number(node.getAttribute('data-recordindex'))!==index)throw Error('Source picker option identity');
+ return {verified:true,tid:node.getAttribute('data-tid'),index};
 }
 
 // Only materialized local records are read. Never traverse $self, variables or
@@ -30,7 +50,7 @@ export function readVariablesColumnUnionMapping(prefix){
   fields:targets.map((r,index)=>({...field(r,index),required:r.data.Required===true,source_index:r.data.ConnectedRecord==null?null:sources.indexOf(r.data.ConnectedRecord)}))};
 }
 
-export async function configureVariablesColumnUnion(page,task,readNode=readPreparedNodeContext,readMapping=readVariablesColumnUnionMapping){
+export async function configureVariablesColumnUnion(page,task,readNode=readPreparedNodeContext,readMapping=readVariablesColumnUnionMapping,readSourceEditor=readVariablesColumnUnionSourceEditor){
  const b=task.binding,root=b.workflow_ref.prefix+';WizrdMCF',base=root+';DerivedVariablesMappingEngineOutputPortWizard';
  const need=(v,m)=>{if(!v)throw Error('Variables union '+m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']:visible');
@@ -110,18 +130,9 @@ export async function configureVariablesColumnUnion(page,task,readNode=readPrepa
     await click('EditVariableForm;btnApply',{dialog:true});
     state=await inventory(s=>s.fields.length===wanted.indexOf(f)+1&&s.fields.at(-1)?.name===f.name&&s.fields.at(-1)?.type===f.type);
     const added=state.fields.at(-1);await click(base+';colSourceDisplayName_',{record:added.record_id,cell:'colSourceDisplayName_'});
-    const combo=await page.evaluate(base=>{
-     const es=[...document.querySelectorAll('[data-tid]')].filter(e=>e.checkVisibility({checkVisibilityCSS:true})&&e.getAttribute('data-tid').startsWith(base+';')&&Ext.getCmp(e.id)?.isComboBox===true);
-     if(es.length!==1)throw Error('Unique source cell editor');return es[0].getAttribute('data-tid');
-    },base);
-    await click(combo+';trg_picker',{editor_record:added.record_id});
-    const selected=await page.evaluate(({base,index})=>{
-     const combos=[...document.querySelectorAll('[data-tid]')].filter(e=>e.checkVisibility({checkVisibilityCSS:true})&&e.getAttribute('data-tid').startsWith(base+';')&&Ext.getCmp(e.id)?.isComboBox===true);
-     for(const el of combos){const c=Ext.getCmp(el.id),picker=c.picker,rows=picker?.getStore?.()?.getData?.()?.items;if(!picker?.el?.dom?.checkVisibility({checkVisibilityCSS:true})||!Array.isArray(rows))continue;
-      const sources=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';grdSourceColumns')+']')],source=sources.length===1&&Ext.getCmp(sources[0].id)?.getStore?.().getData?.()?.items?.[index];
-      const matches=rows.filter(r=>r.data.Value===source);if(matches.length!==1)throw Error('Unique source picker record');const node=picker.getNode(matches[0]);if(!node||picker.getRecord(node)!==matches[0]||!node.getAttribute('data-tid')||Number(node.getAttribute('data-recordindex'))!==rows.indexOf(matches[0]))throw Error('Source picker option identity');return {tid:node.getAttribute('data-tid'),index:rows.indexOf(matches[0])};
-     }throw Error('Owned source combo unavailable');
-    },{base,index:f.source_index});
+    const editor=async source_index=>{const end=Math.min(task.deadline,Date.now()+15000);for(;;){await owned();const value=await page.evaluate(readSourceEditor,{base,record:added.record_id,source_index});if(value.verified)return value;need(Date.now()<end,'owned source editor did not settle');await page.waitForTimeout(Math.min(100,remaining()));}};
+    const combo=await editor();if(!combo.expanded)await click(combo.tid+';trg_picker',{editor_record:added.record_id});
+    const selected=await editor(f.source_index);
     await owned();effect=true;await page.locator('[data-tid='+JSON.stringify(selected.tid)+'][data-recordindex="'+selected.index+'"]:visible').click({timeout:remaining()});
     state=await inventory(s=>s.fields.at(-1)?.source_index===f.source_index);
    }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {validateVariablesColumnUnionParameters} from '../lib/variables-coluniondatavar-parameters.mjs';
-import {readVariablesColumnUnionMapping} from '../lib/variables-column-union-procedure.mjs';
+import {readVariablesColumnUnionMapping,readVariablesColumnUnionSourceEditor} from '../lib/variables-column-union-procedure.mjs';
 import {variablesColumnUnionConfigurationReadback} from '../lib/variables-coluniondatavar-readback.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
@@ -56,6 +56,20 @@ test('manual mapping refuses filtered, loading, unsupported and nonreciprocal re
   f=>f.stores[0].getData=()=>({items:f.sources,getSource:()=>({items:[...f.sources,{}]})})]){
   const f=mappingFixture();change(f);assert.equal(f.read().verified,false);
  }
+});
+test('source editor uses native isXType, binds its active record and selects duplicate labels by native identity',()=>{
+ const base='MF;TF;WizrdMCF;DerivedVariablesMappingEngineOutputPortWizard',elements=new Map(),components=new Map();
+ const add=(suffix,properties)=>{const tid=base+';'+suffix,el={id:tid,checkVisibility:()=>true,getAttribute:key=>key==='data-tid'?tid:null};elements.set(tid,el);const cmp={el:{dom:el},...properties};components.set(tid,cmp);return cmp;};
+ const sources=[0,1].map(i=>({isModel:true,internalId:'s'+i,data:{Name:'amount',ID:i}}));
+ const options=sources.map(source=>({data:{Value:source,DisplayName:'amount'}}));
+ const option={getAttribute:key=>key==='data-tid'?base+';editor;boundlist;amount':key==='data-recordindex'?'1':null};
+ const combo=add('editor',{isXType:type=>type==='combobox',isExpanded:true,picker:{el:{dom:{checkVisibility:()=>true}},getStore:()=>({getData:()=>({items:options})}),getNode:r=>r===options[1]?option:null,getRecord:()=>options[1]}});
+ const plugin={context:{record:{internalId:'target'},column:{dataIndex:'SourceDisplayName'}},activeEditor:{field:combo}};
+ add('grdTargetColumns',{findPlugin:()=>plugin});add('grdSourceColumns',{getStore:()=>({getData:()=>({items:sources})})});
+ const document={querySelectorAll:q=>q==='[data-tid]'?[...elements.values()]:(()=>{const t=JSON.parse(q.slice(10,-1));return elements.has(t)?[elements.get(t)]:[];})()};
+ const read=source_index=>vm.runInNewContext('('+readVariablesColumnUnionSourceEditor.toString()+')(task)',{document,Ext:{getCmp:id=>components.get(id)},task:{base,record:'target',source_index}});
+ assert.equal(combo.isComboBox,undefined);assert.equal(read().verified,true);assert.equal(read().expanded,true);
+ assert.equal(read(1).index,1);plugin.context.record.internalId='foreign';assert.throws(()=>read(1),/owner changed/);
 });
 test('manual union refuses ambiguous sources, duplicate names, unsupported types and incomplete fields before mutation',()=>{
  for(const change of [p=>p.column_union.fields=[],p=>p.column_union.fields[0].input=2,
