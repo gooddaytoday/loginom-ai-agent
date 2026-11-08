@@ -3,10 +3,10 @@
 <!-- mode: pca_fixed -->
 Заданное число факторов
 Для `mode:"pca_fixed"` задай `parameters.factor_analysis.factors`.
-Для ограничения выдачи сохрани `factors`, меняй только `output_factors`.
+`output_factors` — только по просьбе ограничить выдачу; «N факторов» — это `factors`.
 Используй `dock_action_describe` и `dock_node_apply` типа
 `research.factor_analysis`, `read.ports:[0,1]`, `mappings:[]`.
-Новый узел: полный `factor_analysis.features` в порядке входа и `rotation:"none"`.
+Новый узел: полный `factor_analysis.features` в порядке входа и явное `rotation`: `none`, `varimax` или `quartimax`.
 Признаки — непрерывные Integer/Real без NULL, констант и дефицита ранга;
 RowID/текст оставь без роли. `finish:"execute"` обучает текущий вход и выполняет.
 Существующий узел меняй на месте; пропущенные настройки сохраняются.
@@ -15,7 +15,9 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 нагрузки 0. Cap физически убирает лишние поля обоих портов. Читай полные порты:
 0 — факторы и исходные поля, 1 — ColumnName/ColumnDisplayName и нагрузки.
 Порядок закрепляет обработчик. Выгрузи нужные CSV и сохрани пакет.
-Вращения и apply старой модели пока недоступны.
+Для Варимакс/Квартимакс задай `rotation:"varimax"`/`"quartimax"` (Kaiser).
+Пропуск `rotation` на existing сохраняет значение; readback показывает фактическое.
+Apply недоступен.
 <!-- /mode -->
 
 <!-- mode: pca_eigenvalue -->
@@ -25,7 +27,7 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 При смене критерия явно передай его порог; новый узел не нужен.
 Используй `dock_action_describe` и `dock_node_apply` типа
 `research.factor_analysis`, `read.ports:[0,1]`, `mappings:[]`.
-Новый узел: полный `factor_analysis.features` в порядке входа и `rotation:"none"`.
+Новый узел: полный `factor_analysis.features` в порядке входа и явное `rotation`: `none`, `varimax` или `quartimax`.
 Признаки — непрерывные Integer/Real без NULL, констант и дефицита ранга;
 RowID/текст оставь без роли. `finish:"execute"` обучает текущий вход и выполняет.
 Существующий узел меняй на месте; пропущенные настройки сохраняются.
@@ -34,7 +36,9 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 нагрузки 0. Cap физически убирает лишние поля обоих портов. Читай полные порты:
 0 — факторы и исходные поля, 1 — ColumnName/ColumnDisplayName и нагрузки.
 Порядок закрепляет обработчик. Выгрузи нужные CSV и сохрани пакет.
-Вращения и apply старой модели пока недоступны.
+Для Варимакс/Квартимакс задай `rotation:"varimax"`/`"quartimax"` (Kaiser).
+Пропуск `rotation` на existing сохраняет значение; readback показывает фактическое.
+Apply недоступен.
 <!-- /mode -->
 
 <!-- mode: pca_variance -->
@@ -44,7 +48,7 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 При смене критерия явно передай его порог; используй тот же узел.
 Используй `dock_action_describe` и `dock_node_apply` типа
 `research.factor_analysis`, `read.ports:[0,1]`, `mappings:[]`.
-Новый узел: полный `factor_analysis.features` в порядке входа и `rotation:"none"`.
+Новый узел: полный `factor_analysis.features` в порядке входа и явное `rotation`: `none`, `varimax` или `quartimax`.
 Признаки — непрерывные Integer/Real без NULL, констант и дефицита ранга;
 RowID/текст оставь без роли. `finish:"execute"` обучает текущий вход и выполняет.
 Существующий узел меняй на месте; пропущенные настройки сохраняются.
@@ -53,5 +57,7 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 нагрузки 0. Cap физически убирает лишние поля обоих портов. Читай полные порты:
 0 — факторы и исходные поля, 1 — ColumnName/ColumnDisplayName и нагрузки.
 Порядок закрепляет обработчик. Выгрузи нужные CSV и сохрани пакет.
-Вращения и apply старой модели пока недоступны.
+Для Варимакс/Квартимакс задай `rotation:"varimax"`/`"quartimax"` (Kaiser).
+Пропуск `rotation` на existing сохраняет значение; readback показывает фактическое.
+Apply недоступен.
 <!-- /mode -->

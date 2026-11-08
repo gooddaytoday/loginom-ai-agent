@@ -54,7 +54,8 @@ if __name__ == '__main__':
         assert result['manual'][1]['value'] == 7 and result['manual'][1]['type'] == 'integer'
         assert result['manual_updated'][0]['value'] == 23
         assert len(result['three_inputs']) == 5 and len(result['third_removed']) == 4
-        for phase,key in [('initial','manual'),('updated','manual_updated')]:
-            run = json.loads((HERE.parent / ('expected-manual-'+phase+'-run.json')).read_text())
+        for fixture,key in [('manual-initial','manual'),('manual-updated','manual_updated'),
+                            ('inputs-connected','three_inputs'),('inputs-disconnected','third_removed')]:
+            run = json.loads((HERE.parent / ('expected-'+fixture+'-run.json')).read_text())
             assert run['variable_inventory']['outputs'][0]['variables'] == result[key]
         print('PASS: proposed manual, update, third/control input expectations')

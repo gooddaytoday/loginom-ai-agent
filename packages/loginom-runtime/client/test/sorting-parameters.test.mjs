@@ -78,3 +78,9 @@ test('sorting never substitutes an exclusion link or a foreign source for an inp
   assert.throws(()=>validateSortingInputParameters({},f.resolve({}),f.native),/Sorting input source is missing or changed: RevenueAlias/);
  }
 });
+
+test('sorting accepts only native literal maximums including zero-auto',()=>{
+ for(const max_threads of [0,1,2,4,8,16,32])assert.doesNotThrow(()=>validateSortingParameters({...valid(),max_threads},'keys',req));
+ for(const max_threads of [-1,3,64,1.5,'2',null,true])assert.throws(()=>validateSortingParameters({...valid(),max_threads},'keys',req),/max_threads/);
+ assert.doesNotThrow(()=>validateSortingParameters({max_threads:0},'keys',{...req,target:{kind:'existing'},inputs:[]}));
+});

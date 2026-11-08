@@ -382,6 +382,14 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const body=await inspect('body');await ensureContext();await page.mouse.click(body.x,body.y,{button:'right'});transient=true;
       await find('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});
       const command=await inspect('menu');await ensureContext();await page.mouse.click(command.x,command.y);transient=false;
+    }else if(kind==='add_variable_input'){
+      const owner=before.nodes.filter(n=>n.ref.node_id===p.ref.node_id);
+      if(owner.length!==1||owner[0].type!=='variables.column_union'||p.input!==2||owner[0].variable_inputs?.length!==2)throw Error('Only the third union variable input may be added');
+      const tid=await targetTid(p.ref),add=find(tid+';Input_Add');await point(add);effectPossible=true;await add.click({timeout:remaining()});
+      await wait('third_union_variable_input',async()=>{
+        const graph=await read(page,task),node=graph.nodes.find(n=>n.ref.node_id===p.ref.node_id);
+        return node?.variable_inputs?.length===3&&node.variable_inputs[2].kind==='variables'&&node.variable_inputs[2].port===2;
+      });
     }else if(kind==='add_input'){
       const tid=await targetTid(p.ref);const add=find(tid+';Input_Add');await point(add);effectPossible=true;await add.click({timeout:remaining()});
       const ownLabel=before.nodes.find(n=>n.ref.node_id===p.ref.node_id)?.type==='transform.col_union_data';

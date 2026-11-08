@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {validateDataToVarParameters,resolveDataToVarParameters,dataToVarParametersSchema} from '../lib/variables-datatovar-parameters.mjs';
+import {validateDataToVarParameters,resolveDataToVarParameters,dataToVarParametersSchema,DATA_TO_VAR_FUNCTIONS} from '../lib/variables-datatovar-parameters.mjs';
 
 const fields=[{name:'X',label:'X',type:'integer',record_id:'x'},{name:'Category',label:'X',type:'string',record_id:'c'}];
 const specification=(name='X',aggregations=['sum','count','min','max','avg'])=>({fields:[{field:{kind:'input_field',name},aggregations}]});
@@ -22,7 +22,7 @@ test('DataToVar resolves the approved aggregate set without inventing variable n
 test('DataToVar rejects invalid requests before graph mutation',()=>{
  for(const [p,mode,change] of [
   [{},'aggregate',()=>{}], [{fields:[]},'aggregate',()=>{}], [specification(),'first_row',()=>{}],
-  [specification('X',['sum','sum']),'aggregate',()=>{}], [specification('X',['median']),'aggregate',()=>{}],
+  [specification('X',['sum','sum']),'aggregate',()=>{}], [specification('X',['variance']),'aggregate',()=>{}],
   [specification('X',[]),'aggregate',()=>{}], [specification('bad;tid'),'aggregate',()=>{}],
   [{...specification(),formula:'X'},'aggregate',()=>{}],
   [{fields:[...specification().fields,...specification('x').fields]},'aggregate',()=>{}],
@@ -38,9 +38,25 @@ test('DataToVar rejects invalid requests before graph mutation',()=>{
 
 test('DataToVar resolves exact technical names and numeric types, with canonical native function order',()=>{
  assert.throws(()=>resolveDataToVarParameters(specification('missing'),fields),/missing/);
- assert.throws(()=>resolveDataToVarParameters(specification('Category'),fields),/numeric/);
+ assert.throws(()=>resolveDataToVarParameters(specification('Category'),fields),/does not support sum,avg/);
  assert.throws(()=>resolveDataToVarParameters(specification(),[...fields,{...fields[0],record_id:'other'}]),/unique/);
  assert.throws(()=>resolveDataToVarParameters(specification(),[...fields,{name:'x',type:'real',record_id:'other'}]),/unique/);
  assert.deepEqual(resolveDataToVarParameters(specification('X',['avg','min','sum']),fields).fields[0].aggregations,['sum','min','avg']);
  assert.equal(resolveDataToVarParameters(specification(),[{...fields[0],type:'real'}]).fields[0].input.type,'real');
+});
+
+test('DataToVar admits the native per-type function matrix and refuses Variant',()=>{
+ const all=Object.keys(DATA_TO_VAR_FUNCTIONS),scalar=['count','min','max','mode','unique_count','null_count','first','last','only'];
+ const typed=type=>[{name:'F',label:'F',type,record_id:'f'}];
+ assert.equal(resolveDataToVarParameters(specification('F',[...all].reverse()),typed('real')).fields[0].mask,16383);
+ assert.deepEqual(resolveDataToVarParameters(specification('F',all),typed('integer')).fields[0].aggregations,all);
+ assert.equal(resolveDataToVarParameters(specification('F',[...scalar,'concat']),typed('string')).fields[0].mask,16382&~(1|16|32|128));
+ for(const type of ['boolean','datetime']){
+  assert.equal(resolveDataToVarParameters(specification('F',scalar),typed(type)).fields[0].mask,8014);
+  assert.throws(()=>resolveDataToVarParameters(specification('F',['first','concat']),typed(type)),/does not support concat/);
+ }
+ for(const a of ['sum','avg','median','standard_deviation'])assert.throws(()=>resolveDataToVarParameters(specification('F',[a]),typed('string')),new RegExp('does not support '+a));
+ assert.throws(()=>resolveDataToVarParameters(specification('F',['count']),typed('variant')),/integer, real, string, boolean or datetime/);
+ assert.equal(dataToVarParametersSchema.properties.fields.items.properties.aggregations.maxItems,14);
+ assert.deepEqual(dataToVarParametersSchema.properties.fields.items.properties.aggregations.items.enum,all);
 });

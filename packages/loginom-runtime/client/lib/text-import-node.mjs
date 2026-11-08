@@ -64,6 +64,9 @@ export function validateTextImportNodeParameters(p,mode,request) {
     'Invalid parameters.parameters.settings.columns: new imports require a nonempty list of source columns with their selected names and types');
   (existing?validateTextImportPatch:validateTextImportFieldsRequest)(p.settings);
   if(!existing)resolveTextImportEncoding(p.settings.source.encoding);
+  // Same refusal as deferredImportOutput, but before the format is applied.
+  requireValue(!(p.settings.format?.auto_detect_columns==='all'&&request.mappings?.length),
+    'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
   if(p.source)validateImportSource(p.source);
   if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&(request.finish==='done'&&request.read.ports.length===0
     ||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
@@ -536,7 +539,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         // «Только новые» adds source fields, but their outputs appear only through native synchronization;
         // requested mappings are then resolved against the synchronized native mapping.
         if(shouldResyncNewOutputs(configured,native)) {
-          const resync=await resyncOutputFields(channel,native);
+          const resync=await resyncOutputFields(channel,native,{previousColumns:configured.preservation?.columns_before?.map(c=>c.name),
+            restoreOutputs:changes=>configureOutputFields(channel,{direction:'output',port:0,changes},configured.columns)});
           changes.push(resync);native=resync.native_mapping;
         }
         if(mappings.length) {

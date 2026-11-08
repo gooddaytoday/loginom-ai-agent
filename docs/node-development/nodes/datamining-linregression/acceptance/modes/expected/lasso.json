@@ -1,4 +1,7 @@
 {
+  "status": "obsolete_invalid_do_not_use",
+  "reason": "LAB-972 penalty/intercept assumptions are invalid; not an acceptance oracle.",
+  "replacement": "../../penalty/expected.json: cases[shifted-lasso].expected",
   "package_path": "{{PACKAGE_PATH}}",
   "nodes": [
     {

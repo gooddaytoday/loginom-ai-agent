@@ -1,0 +1,93 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.from_table"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.from_table"
+        },
+        "port": 0,
+        "ordered": true,
+        "variables": [
+          {
+            "name": "N_Median",
+            "label": "N|Медиана",
+            "type": "real",
+            "value": 4.0,
+            "tolerance": {
+              "abs": 1e-12,
+              "rel": 1e-12
+            }
+          },
+          {
+            "name": "N_Mode",
+            "label": "N|Мода",
+            "type": "integer",
+            "value": 4
+          },
+          {
+            "name": "N_Std",
+            "label": "N|Стандартное откл.",
+            "type": "real",
+            "value": 2.516611478423583,
+            "tolerance": {
+              "abs": 1e-12,
+              "rel": 1e-12
+            }
+          },
+          {
+            "name": "N_Uniq",
+            "label": "N|Кол-во уникальных",
+            "type": "integer",
+            "value": 3
+          },
+          {
+            "name": "N_Null",
+            "label": "N|Кол-во пропусков",
+            "type": "integer",
+            "value": 1
+          },
+          {
+            "name": "N_First",
+            "label": "N|Первый",
+            "type": "integer",
+            "value": 2
+          },
+          {
+            "name": "N_Last",
+            "label": "N|Последний",
+            "type": "integer",
+            "value": 8
+          },
+          {
+            "name": "N_Only",
+            "label": "N|Единственный",
+            "type": "integer",
+            "value": null
+          },
+          {
+            "name": "N_Concat",
+            "label": "N|Список",
+            "type": "string",
+            "value": "2,4,8"
+          },
+          {
+            "name": "K",
+            "label": "K|Единственный",
+            "type": "integer",
+            "value": 7
+          }
+        ]
+      }
+    ]
+  }
+}
