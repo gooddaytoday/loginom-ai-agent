@@ -1,0 +1,4 @@
+RowID,Document
+1,"{""batch"":""Бета"",""items"":[{""code"":""x"",""qty"":2},{""code"":""y"",""qty"":0}]}"
+2,"{""group"":""A"",""items"":[{""code"":""x""},{""code"":""z""}]}"
+3,"{""group"":""B"",""items"":[{""code"":""y""}]}"

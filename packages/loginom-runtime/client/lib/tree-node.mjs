@@ -20,7 +20,8 @@ export function treeConfigurationReadback({node,phases,operation_id}){
   node:structuredClone(node),receipt_ids:[incoming,configured,saved,mapped,finished].map(p=>p.receipt_id),package_persistence_verified:false};
  return c.kind==='json_to_tree'?{...common,json_field:c.json_field,root_mode:c.root_mode,auto_structure:c.auto_structure,strict:c.strict,exclude_root:c.exclude_root}:
   {...common,selected_paths:c.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.path),repeat_parents:c.repeat_parents,
-   composite_names:c.composite_names,composite_labels:c.composite_labels,label_separator:c.label_separator};
+   composite_names:c.composite_names,composite_labels:c.composite_labels,label_separator:c.label_separator,
+   global_index_paths:c.nodes.filter(n=>n.is_array&&n.selected_global_index).map(n=>n.path)};
 }
 
 export function createTreeNodeSupport(config,{json}){
@@ -48,12 +49,14 @@ export function createTreeNodeSupport(config,{json}){
    const previous=request.target.kind==='existing'?history.filter(h=>same(h.outcome?.output?.node,request.target.ref)).at(-1)?.outcome?.output?.configuration?.readback:null;
    if(json){
     const field=request.parameters.json_field??previous?.json_field,index=port.schema?.findIndex(c=>c.name===field&&c.type==='string');
-    need(port.port_kind!=='tree'&&port.row_count===1&&port.sample?.length===1&&index>=0&&port.sample[0][index]?.is_null===false
-     &&typeof port.sample[0][index].value==='string','Tree stage 1 needs one non-NULL JSON string row in the exact input field');
-    validateTreeJsonScope(port.sample[0][index].value);
+    // Each JSON row becomes one native root row; the whole tree keeps the 256-node bound.
+    need(port.port_kind!=='tree'&&Number.isSafeInteger(port.row_count)&&port.row_count>=1&&port.row_count<=100&&port.sample?.length===port.row_count&&index>=0
+     &&port.sample.every(row=>row[index]?.is_null===false&&typeof row[index].value==='string'),'Tree stage 1 needs non-NULL JSON string rows in the exact input field');
+    let nodes=0;for(const row of port.sample)nodes+=validateTreeJsonScope(row[index].value).node_count;
+    need(nodes<=256,'Tree JSON exceeds 256 nodes or depth 16');
    }else{
     need(port.port_kind==='tree'&&port.tree?.complete===true,'Tree-to-table needs the actual complete typed tree port');
-    validateSelectedTreePaths(port.tree.schema,request.parameters.selected_paths??previous?.selected_paths);
+    validateSelectedTreePaths(port.tree.schema,request.parameters.selected_paths??previous?.selected_paths,request.parameters.global_index_paths??previous?.global_index_paths);
    }
    const event={phase:'tree_source_scope_verified',operation_id:options.operation.id,node:input.source,port:input.output,port_guid:port.port_guid,
     source_execution_id:source.execution.execution_id,source_kind:json?'table':'tree'};
@@ -107,11 +110,18 @@ export function createTreeNodeSupport(config,{json}){
      for(const path of p.selected_paths){s=await observe('tree path '+path);const node=s.node_tree.nodes.find(n=>n.path===path&&!n.is_container);
       need(node?.checkbox_tid,'Selected schema leaf is not rendered');if(!node.selected)await click(node.checkbox_tid,'select tree leaf '+path);}
     }
+    // Native «Глобальный индекс узла» is one Node-less leaf per array; new nodes have none unless requested.
+    const indexed=s=>s.node_tree.nodes.filter(n=>n.is_array&&n.selected_global_index).map(n=>n.path);
+    const wantIndex=p.global_index_paths??(request.target.kind==='new'?[]:undefined);
+    if(wantIndex)for(const path of s.node_tree.nodes.filter(n=>n.is_array).map(n=>n.path)){
+     s=await observe('tree global index '+path);const node=s.node_tree.nodes.find(n=>n.path===path);
+     if(node.selected_global_index!==wantIndex.includes(path)){need(node.global_index_tid,'Tree global index leaf is not rendered');await click(node.global_index_tid,'toggle tree global index '+path);}
+    }
     await setBool('pedRepeatParentNodeValues',p.repeat_parents);await setBool('pedCompositeColumnNames',p.composite_names);
     await setBool('pedCompositeColumnDisplayNames',p.composite_labels);
     s=await observe('complete tree-to-table settings');
     need(!s.node_tree.composite_names&&!s.node_tree.composite_labels&&s.node_tree.label_separator==='.'
-     &&s.node_tree.nodes.every(n=>!n.selected_global_index)&&s.node_tree.nodes.some(n=>!n.is_container&&n.selected),'Tree table stage 1 settings differ');
+     &&(wantIndex===undefined||same(indexed(s),wantIndex))&&s.node_tree.nodes.some(n=>!n.is_container&&n.selected),'Tree table stage 1 settings differ');
     if(p.selected_paths)need(same(s.node_tree.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.path),p.selected_paths),'Tree leaf selection did not settle');
    }
    const configuration=structuredClone(s.node_tree);
@@ -128,7 +138,10 @@ export function createTreeNodeSupport(config,{json}){
    else{
     need(output.port_kind!=='tree'&&output.sample_complete===true,'Tree table must be read completely');
     const names=mapped.configuration.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.name);
-    need(same(output.schema.map(n=>n.name),names),'Native tree table field names or order differ');
+    // A selected global index adds one native integer column; its generated name and position are read, not assumed.
+    const indexes=mapped.configuration.nodes.filter(n=>n.is_array&&n.selected_global_index).length,extra=output.schema.filter(n=>!names.includes(n.name));
+    need(output.schema.length===names.length+indexes&&extra.length===indexes&&extra.every(n=>n.type==='integer')
+     &&same(output.schema.filter(n=>names.includes(n.name)).map(n=>n.name),names),'Native tree table field names or order differ');
    }
    return {verified:true,cleanup_complete:true,effect_possible:true,status:'complete',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]};
   },

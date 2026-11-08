@@ -93,7 +93,7 @@ RULES = (
     ((C + 'date-time-*.mjs',), ('live-ui',), ('n17', 'date-time-iso', 'date-time-iso-empty', 'date-time-minsec')),
     ((C + 'smoothing-*.mjs',), ('live-ui',), ('smoothing-hp',)),
     ((C + 'sliding-window-*.mjs',), ('live-ui',), ('n21',)),
-    ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat')),
+    ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**'), ('live-ui',), ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat', 'trees-to-table-indices')),
     ((C + 'exports-excel-*.mjs', 'scripts/node-acceptance/exports-excel*.mjs'), ('live-ui',), ('exports-excel', 'excel-export-xls', 'excel-export-numeric', 'excel-export-replace')),
     ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named')),
     ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',

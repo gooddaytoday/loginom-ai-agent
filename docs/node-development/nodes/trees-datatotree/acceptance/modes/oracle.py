@@ -150,13 +150,14 @@ def proposals(slug):
     wide_names = ['f' + str(i).zfill(2) for i in range(f['wide_fields'])]
     wide = {k:i for i,k in enumerate(wide_names)}
     local_rows = [(g['group'],item['code'],i) for g in f['grouped_document']['groups'] for i,item in enumerate(g['items'],start=f['index_base_proposal'])]
-    global_rows = [dict(group=g,code=code,item_index=i,global_index=global_i)
-                   for global_i,(g,code,i) in enumerate(local_rows,start=f['index_base_proposal'])]
+    # Native TreeToData has one global index leaf per array and no per-parent index (wizard observation, LAB-1112).
+    global_rows = [dict(group=g,code=code,global_index=global_i)
+                   for global_i,(g,code,_i) in enumerate(local_rows,start=f['index_base_proposal'])]
     return [
         case('indices', table([dict(name='item_index',name_any=True,label_any=True,type='integer'),*columns], indexed),
              global_index_paths=['/items'], index_base=f['index_base_proposal'], global_index_proposal='zero-based across all items, not reset for a new parent',
              global_output=table([dict(name='group',label_any=True,type='string'),dict(name='code',label_any=True,type='string'),
-                                  dict(name='item_index',name_any=True,label_any=True,type='integer'),dict(name='global_index',name_any=True,label_any=True,type='integer')],global_rows),
+                                  dict(name='global_index',name_any=True,label_any=True,type='integer')],global_rows),
              index_metadata='native generated names need readback; no UI row index substitution'),
         case('composite', table([dict(name='items_code',label='Позиции.Код',type='string'),dict(name='items_qty',label='Позиции.Количество',type='integer')], composite),
              composite_names=True, composite_labels=True, label_separator='.',

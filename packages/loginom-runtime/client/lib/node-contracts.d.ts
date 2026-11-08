@@ -421,14 +421,14 @@ export interface TreeConfigurationReadback {
   scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; package_persistence_verified: false;
   json_field?: string; root_mode?: 'auto'; auto_structure?: true; strict?: true; exclude_root?: false;
-  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.';
+  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.'; global_index_paths?: string[];
 }
 export interface TreeNodeOutputPort {
   port: number; port_guid: string; port_kind: 'tree'; fresh: true; execution_id: string;
   freshness_basis: 'completed_execution_port_source'; sample_complete: true;
-  tree: {complete: true; node_count: number; max_depth: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
+  tree: {complete: true; node_count: number; max_depth: number; root_rows?: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
     schema: Array<{index: number; parent: number | null; path: string; name: string; label: string; type: string; is_container: boolean; is_array: boolean; children: number[]}>;
-    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string}>};
+    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string; timezone?: string; root_row?: number}>};
 }
 export interface AutoCorrelationConfigurationReadback {
  kind: 'auto_correlation'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';

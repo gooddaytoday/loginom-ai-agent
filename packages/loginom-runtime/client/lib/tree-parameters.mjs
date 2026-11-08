@@ -5,14 +5,16 @@ export const treeToTableParametersSchema={type:'object',properties:{
  selected_paths:{type:'array',minItems:1,maxItems:64,items:text('JSON Pointer schema leaf path, without array indexes.',512),description:'Replace the complete leaf selection in native schema order.'},
  repeat_parents:{type:'boolean',description:'Repeat selected ancestors on every child row.'},
  composite_names:{type:'boolean',const:false,description:'Short leaf names only.'},composite_labels:{type:'boolean',const:false,description:'Short leaf labels only.'},
- label_separator:{type:'string',enum:['.'],description:'Preserve native dot separator.'}},required:[],additionalProperties:false};
+ label_separator:{type:'string',enum:['.'],description:'Preserve native dot separator.'},
+ global_index_paths:{type:'array',maxItems:1,items:text('JSON Pointer of the repeated array schema node.',512),description:'Optional: arrays whose native global index integer column is added; [] removes it. Read the generated name.'}},required:[],additionalProperties:false};
+const optionalOnNew=new Set(['global_index_paths']);
 export function validateTreeParameters(parameters,mode,request){
  const json=request.target.type==='trees.from_json',schema=json?jsonToTreeParametersSchema:treeToTableParametersSchema;
  if(mode!==(json?'auto_structure':'selected_nodes')||!parameters||typeof parameters!=='object'||Array.isArray(parameters)
   ||Object.keys(parameters).some(k=>!Object.hasOwn(schema.properties,k))||request.mappings.length)
   throw Error('Tree stage 1 requires its documented mode, parameters and mappings:[]');
  if(request.inputs.length>1||request.inputs.some(i=>i.input!==0)||request.target.kind==='new'&&request.inputs.length!==1)throw Error('Tree stage 1 requires one input 0');
- if(request.target.kind==='new'&&Object.keys(schema.properties).some(k=>!Object.hasOwn(parameters,k)))throw Error('New tree node requires every documented parameter');
+ if(request.target.kind==='new'&&Object.keys(schema.properties).some(k=>!optionalOnNew.has(k)&&!Object.hasOwn(parameters,k)))throw Error('New tree node requires every documented parameter');
  if(json){
   if(parameters.json_field!==undefined&&(typeof parameters.json_field!=='string'||!parameters.json_field||parameters.json_field.length>128))throw Error('Invalid parameters.json_field');
   if(parameters.root_mode!==undefined&&parameters.root_mode!=='auto')throw Error('Invalid parameters.root_mode: only auto is supported');
@@ -24,6 +26,9 @@ export function validateTreeParameters(parameters,mode,request){
  if(parameters.repeat_parents!==undefined&&typeof parameters.repeat_parents!=='boolean')throw Error('Invalid parameters.repeat_parents');
  for(const k of ['composite_names','composite_labels'])if(parameters[k]!==undefined&&parameters[k]!==false)throw Error('Invalid parameters.'+k+': only false is supported');
  if(parameters.label_separator!==undefined&&parameters.label_separator!=='.')throw Error('Invalid parameters.label_separator: only dot is supported');
+ if(parameters.global_index_paths!==undefined&&(!Array.isArray(parameters.global_index_paths)||parameters.global_index_paths.length>1
+  ||parameters.global_index_paths.some(p=>typeof p!=='string'||p.length>512||!/^\/(?:[^~]|~[01])+$/.test(p))))
+  throw Error('Invalid parameters.global_index_paths: at most one JSON Pointer array path');
 }
 
 // Inspect only the admitted JSON shape. Numeric lexemes are retained as text;
@@ -76,11 +81,12 @@ export function validateTreeJsonScope(text){
  return {verified:true,node_count:nodes};
 }
 
-export function validateSelectedTreePaths(schema,paths){
+export function validateSelectedTreePaths(schema,paths,indexPaths){
  if(!Array.isArray(schema)||!schema.length||schema.length>256||schema[0].is_array||schema.filter(n=>n.is_array).length!==1)throw Error('Tree stage 1 requires one object and one repeated branch');
  const leaves=schema.filter(n=>!n.is_container);
  if(new Set(leaves.map(n=>n.name)).size!==leaves.length||leaves.some(n=>!['integer','real','string','boolean'].includes(n.type)))throw Error('Tree stage 1 requires distinct scalar leaf names and supported types');
  if(paths){const selected=leaves.filter(n=>paths.includes(n.path)).map(n=>n.path);
   if(JSON.stringify(selected)!==JSON.stringify(paths))throw Error('Invalid parameters.selected_paths: choose existing leaves in native schema order');}
+ if(indexPaths?.some(p=>!schema.some(n=>n.path===p&&n.is_array)))throw Error('Invalid parameters.global_index_paths: choose the repeated array path');
  return true;
 }

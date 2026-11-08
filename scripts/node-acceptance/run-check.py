@@ -309,6 +309,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
+    if name == 'trees-to-table-indices':
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
+                    base=None, external=True, expected_name='expected-indices-run.json')
 
     if name in ['coarse-classes-train', 'coarse-classes-apply']:
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'

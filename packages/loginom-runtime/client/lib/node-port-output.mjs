@@ -107,7 +107,7 @@ export async function readTreePortSource(source,call,track,decode) {
   need(typeof name==='string'&&name.length<=512&&typeof label==='string'&&label.length<=16384
    &&typeof container==='boolean'&&typeof array==='boolean'&&(!array||container),'tree_schema_metadata');
   const type=container?'object':types[await rpc('schema_type',()=>def.get_DataType())];
-  need(type&&(!['variant','datetime'].includes(type)),'tree_scalar_type');
+  need(type&&type!=='variant','tree_scalar_type');
   const item={index,parent,path,name,label,type,is_container:container,is_array:array,children:[]};
   schema.push(item);definitions.push(def);
   if(container){
@@ -150,14 +150,15 @@ export async function readTreePortSource(source,call,track,decode) {
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
- const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});need(rows===1,'tree_document_count');
- const document=await instance(0,0,'',0);
+ // Each native root row is one document; a single row keeps the original shape.
+ const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});need(Number.isSafeInteger(rows)&&rows>=1&&rows<=256,'tree_document_count');
+ const documents=[];for(let row=0;row<rows;row++)documents.push(await instance(0,row,'',0));
  const instances=[];
- const flatten=(node,parent)=>{
-  const {children,...value}=node,index=instances.length,record={index,parent,...value,...(children?{children:[]}: {})};
+ const flatten=(node,parent,row)=>{
+  const {children,...value}=node,index=instances.length,record={index,parent,...value,...(rows>1&&parent===null?{root_row:row}:{}),...(children?{children:[]}: {})};
   instances.push(record);if(children)for(const child of children)record.children.push(flatten(child,index));return index;
- };flatten(document,null);
- const result={schema,instances,complete:true,node_count:nodeCount,max_depth:maxDepth,
+ };documents.forEach((document,row)=>flatten(document,null,row));
+ const result={schema,instances,complete:true,node_count:nodeCount,max_depth:maxDepth,...(rows>1?{root_rows:rows}:{}),
   limits:{max_nodes:256,max_depth:16,max_bytes:1024*1024}};
  bytes(result);return result;
 }

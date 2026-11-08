@@ -68,7 +68,14 @@ export function readTreeWizardBrowser(prefix){
    const names=new Set();
    for(const child of record.childNodes){
     need(child.parentNode===record,'tree_record_parent');
-    if(!child.data.Node){need(child.data.checked!==true,'tree_index_selected');continue;}
+    // The only Node-less child is the array's native global index leaf.
+    if(!child.data.Node){
+     need(d.IsArray&&!Object.hasOwn(nodes[index],'global_index_record_id'),'tree_index_record');
+     const ids=[...element.querySelectorAll('[data-recordid]')].filter(e=>e.getAttribute('data-recordid')===String(child.internalId))
+      .flatMap(e=>[...e.querySelectorAll('[data-tid]')].map(n=>n.getAttribute('data-tid'))).filter(t=>t.endsWith(';TreeCheckbox'));
+     Object.assign(nodes[index],{selected_global_index:child.data.checked===true,global_index_record_id:String(child.internalId),...(ids.length===1?{global_index_tid:ids[0]}:{})});
+     continue;
+    }
     need(!names.has(child.data.Name),'tree_schema_names');names.add(child.data.Name);walk(child,index,next,depth+1);
    }
   };

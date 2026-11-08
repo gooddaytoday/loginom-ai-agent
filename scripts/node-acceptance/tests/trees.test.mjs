@@ -92,3 +92,37 @@ print(json.dumps(results))
  assert.equal(r.status,0,r.stdout+r.stderr);
  for(const expected of JSON.parse(r.stdout))assert.doesNotThrow(()=>parseExpectedOutputs(expected));
 });
+
+test('trees-to-table-indices binds the approved task, documents.csv and expected derived from the independent oracle',()=>{
+ const r=spawnSync('python3',['-B','-c',`import csv,importlib.util,io,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+c=r.scenario('trees-to-table-indices');e=r.expected_for(c,'/owned/tree.lgp')
+assert c['external'] and c['base'] is None
+assert [p.name for p in c['data'].glob('*.csv')]==['documents.csv']
+task=c['prompt'].read_text()
+assert c['prompt'].name=='task-indices.md' and 'documents.csv' in task and 'oracle' not in task and 'input.json' not in task
+oracle=json.loads((c['source']/'expected.json').read_text())
+case=next(x for x in oracle['cases'] if x['id']=='indices')
+assert [o['export_destination'] for o in e['outputs']]==['indices.csv','global-index.csv']
+for out,want in zip(e['outputs'],[case['output'],case['settings_proposal']['global_output']]):
+ assert out['output_node_type']=='trees.to_table' and out['column_order']=='exact' and out['ordered']
+ assert out['columns']==want['columns'] and out['rows']==want['rows']
+assert [c['name'] for c in e['outputs'][1]['columns']]==['group','code','global_index']
+source=json.loads((c['data']/'input.json').read_text())
+rows=list(csv.DictReader(io.StringIO((c['data']/'documents.csv').read_text())))
+assert [int(x['RowID']) for x in rows]==[1,2,3]
+assert json.loads(rows[0]['Document'])=={'batch':source['document']['batch'],'items':source['document']['items']}
+assert [json.loads(x['Document']) for x in rows[1:]]==source['grouped_document']['groups']
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+ const e=JSON.parse(spawnSync('python3',['-B','-c',`import importlib.util,json
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+e=r.expected_for(r.scenario('trees-to-table-indices'),'/owned/tree.lgp')
+for o in e['outputs']:o.pop('export_destination')
+print(json.dumps(e))`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'}).stdout);
+ assert.doesNotThrow(()=>parseExpectedOutputs(e));
+});

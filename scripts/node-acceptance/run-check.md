@@ -416,6 +416,12 @@ With `--cold`, the saved Tree-to-Table node is freshly executed and its complete
 table is read with the existing completed-port reader. Repeat on/off run in
 separate chats, profiles and packages; no oracle content reaches the model.
 
+`trees-to-table-indices` uses `trees-treetodata/acceptance/modes/task-indices.md`
+and only `fixtures/modes/documents.csv` (row 1 — document, rows 2–3 — groups A/B,
+one tree with two root rows). `expected-indices-run.json` is derived from the
+independent `expected.json` case `indices`: two Tree-to-Table tables with one
+native global index column each (`name_any`, exact position), CSV, Save, cold.
+
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
    column types, rows and order policy. Keep oracle values out of the prompt.

@@ -33,12 +33,6 @@
               "type": "string"
             },
             {
-              "name": "item_index",
-              "name_any": true,
-              "label_any": true,
-              "type": "integer"
-            },
-            {
               "name": "global_index",
               "name_any": true,
               "label_any": true,
@@ -49,19 +43,16 @@
             {
               "group": "A",
               "code": "x",
-              "item_index": 0,
               "global_index": 0
             },
             {
               "group": "A",
               "code": "z",
-              "item_index": 1,
               "global_index": 1
             },
             {
               "group": "B",
               "code": "y",
-              "item_index": 0,
               "global_index": 2
             }
           ],
