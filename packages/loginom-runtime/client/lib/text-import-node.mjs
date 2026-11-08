@@ -17,6 +17,7 @@ import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import {isUnchangedTextImportExecution} from './node-read-contract.mjs';
+import {makeNodeProcessContextCode} from './node-process-context.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
@@ -143,7 +144,7 @@ function fullImportSourceReason(profileId,receipt,source) {
 export async function verifyDeferredTextImportSources(request,history,resolveStorageSource) {
   if(request.finish!=='execute')return [];
   const latest=new Map();
-  for(const entry of history??[])if(entry.request?.target?.type==='imports.text'
+  for(const entry of history??[])if(['imports.text','imports.excel'].includes(entry.request?.target?.type)
     &&entry.request.document_id===request.document_id&&entry.request.workflow_ref?.workflow_id===request.workflow_ref?.workflow_id
     &&entry.outcome?.status==='SUCCEEDED'&&entry.cleanup_confirmed===true&&entry.outcome.output?.node?.node_id
     &&entry.source)latest.set(entry.outcome.output.node.node_id,entry);
@@ -158,12 +159,76 @@ export async function verifyDeferredTextImportSources(request,history,resolveSto
         &&(before.kind!=='storage'||current.sha256===before.sha256)
         &&!fullImportSourceReason(entry.request.parameters.source_switch.profile_id,entry.scan_receipt,before.kind==='storage'?current:before),
         'LOGINOM_FILE_CHANGED: switched source identity, size or exact-scan digest changed; chain execution refused');
-      checked.push({node:entry.outcome.output.node,source:current,profile_id:entry.request.parameters.source_switch.profile_id});
+      checked.push({node:entry.outcome.output.node,source:before.kind==='storage'?current:before,
+        profile_id:entry.request.parameters.source_switch.profile_id,scan_receipt:entry.scan_receipt,
+        type:entry.request.target.type,configuration:entry.outcome.output.configuration?.readback});
     }catch(error){
       error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
     }
   }
   return checked;
+}
+
+// Done deliberately does not execute. The downstream launch is the first point
+// at which its import's completed port can establish full N without reexecution.
+export async function readDeferredImportCounts(options,ctx,config) {
+  const {operation,execute,onRecord,now}=options;
+  const sources=operation.nodeApply?.phases.find(p=>p.phase==='source')?.value?.switched_sources??[];
+  const results=[];
+  for(const switched of sources){
+    if(switched.node.node_id===ctx.node?.node_id)continue;
+    const base={node:switched.node,profile_id:switched.profile_id,expected_records:switched.scan_receipt?.records,
+      actual_records:null,matches_scan:null,execution_id:ctx.execution.execution_id,chain_execution_id:ctx.execution.execution_id};
+    const unavailable=reason=>({...base,status:'not_verified',message:'N не сверено',reason});
+    const binding={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:switched.node};
+    operation.deadline=ctx.deadline;
+    let processes;
+    // Execution verification closes the console before output reads. Reuse the
+    // existing read-only hidden-cache allowance: no rendered controls or UI
+    // actions are taken from this inventory. The port reader rechecks ownership.
+    try{processes=await execute(makeNodeProcessContextCode(binding,{errorToast:true}),{timeout:Math.max(5000,ctx.deadline-now()+5000)});}
+    catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+    const group=ctx.execution.execution_id.split(':').at(-1);
+    const candidates=processes.processes?.filter(p=>p.owner?.verified===true&&p.owner.node_id===switched.node.node_id
+      &&p.owner.source==='native_process_model_identity'&&p.parent_id===p.process_id.split('.')[0]
+      &&BigInt(p.parent_id)<=BigInt(group)
+      &&p.state==='completed'&&p.error===false)??[];
+    // A later Export can consume the still-active import without rerunning it.
+    // Use its latest completed group; the existing reader rejects any newer
+    // native import process and rechecks the same active port/source identity.
+    const latest=candidates.reduce((latest,p)=>BigInt(p.parent_id)>BigInt(latest)?p.parent_id:latest,'0');
+    const own=candidates.filter(p=>p.parent_id===latest);
+    let result=unavailable(processes.verified!==true?'Completed import process inventory unavailable: '+processes.reason
+      :'Import has '+own.length+' completed processes in its latest execution group; expected one');
+    if(processes.verified===true&&processes.inventory_complete===true
+      &&ctx.execution.execution_id===ctx.document_id+':'+processes.root_id+':'+group&&own.length===1){
+      const execution={verified:true,owner_verified:true,status:'completed',execution_id:ctx.document_id+':'+processes.root_id+':'+latest,
+        process_id:own[0].process_id,process_record_id:own[0].record_id};
+      const channel=createNodeProcedure({operation,execute,record:onRecord,now,signal:ctx.signal,
+        targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,preparedNodeContext:binding});
+      let output;
+      try{
+        // The existing reader independently checks native process/port identity,
+        // freshness and cleanup. Zero sample rows avoids reading the full data.
+        ({output}=await channel.readOutputPort({port:0,execution,sampleRows:0,requireExactNumbers:false}));
+        const proof=switched.type==='imports.excel'
+          ?await (await import('./imports-excel-node.mjs')).verifyExcelFullCount(switched.profile_id,switched.scan_receipt,
+            switched.source,switched.configuration??{},output,execution)
+          :verifyFullImportCount(switched.profile_id,switched.scan_receipt,switched.source,output,execution);
+        result={...base,...proof,actual_records:output.row_count,matches_scan:proof.status==='verified'?true:null};
+      }catch(error){
+        if(operation.transportUncertain===true||operation.cleanupConfirmed===false)throw error;
+        result={...unavailable(String(error.message)),actual_records:output?.row_count??null,
+          matches_scan:String(error.message).startsWith('LOGINOM_ROW_COUNT_MISMATCH:')?false:null};
+      }
+    }
+    await onRecord({operation_id:operation.id,action_key:'node.apply',phase:'node_deferred_import_count',result,
+      process_inventory:{verified:processes.verified,reason:processes.reason,root_id:processes.root_id,
+        processes:processes.processes?.map(p=>({process_id:p.process_id,record_id:p.record_id,parent_id:p.parent_id,
+          state:p.state,error:p.error,owner:p.owner}))}});
+    results.push(result);
+  }
+  return results;
 }
 
 export function importSchemaSnapshot({source,format,columns,mapping}) {

@@ -109,7 +109,7 @@ export async function readNativeVariant(page,b,decode,options={}) {
    let graphLink,sourcePort,inputPort,chainFingerprint='';
    if(b.static_chain){
     const c=b.static_chain;
-    need(c.kind==='crosstable_static_1'&&node.FIconCls==='bg-vendor-icon-crosstab'&&Array.isArray(c.nodes)
+    need((c.kind==='crosstable_static_1'&&node.FIconCls==='bg-vendor-icon-crosstab'||c.kind==='collapse_static_1'&&node.FIconCls==='bg-vendor-icon-columnflipping'&&c.nodes?.length===2)&&Array.isArray(c.nodes)
      &&[1,2].includes(c.nodes.length)&&Array.isArray(c.edges)&&c.edges.length===c.nodes.length,'bounded static CrossTable chain required');
     need(c.nodes[0].node_id===sourceNode.FGuid&&c.nodes[0].icon==='bg-vendor-icon-importtextfile'
      &&c.nodes[0].execution_id===b.static_source.execution_id&&new Set([...c.nodes.map(n=>n.node_id),node.FGuid]).size===c.nodes.length+1,'complete unique chain provenance');

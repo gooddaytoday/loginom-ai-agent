@@ -7,5 +7,5 @@ test('Calculator node reference fits its budget, names the option parameters and
  const reference=await readFile(new URL('references/nodes/transform.calculator.md',root),'utf8');
  assert.ok(Buffer.byteLength(reference)<=6000);
  assert.doesNotMatch(reference,/\$(?:[1-9][0-9]*|ARGUMENTS)\b/);
- for(const text of ['intermediate','cached','Expr.','order','cached:false'])assert.ok(reference.includes(text),text);
+ for(const text of ['intermediate','cached','Expr.','order','cached:false','parameters.syntax','"javascript"','this.Expr.','return','programming.javascript'])assert.ok(reference.includes(text),text);
 });

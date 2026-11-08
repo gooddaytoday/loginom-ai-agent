@@ -23,8 +23,9 @@ export function validateCollapseParameters(p,mode,r){
 }
 export function resolveCollapseParameters(p,fields){
  need(Array.isArray(fields)&&fields.length<=1000&&new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Complete unique collapse input required');
- const resolve=list=>list.map(k=>{const found=fields.filter(f=>f.name===k.name);need(found.length===1,'Collapse input field missing: '+k.name);need(['integer','real','string','boolean','datetime'].includes(found[0].type),'Input variant and unsupported scalar types are deferred');return found[0];});
- const information=resolve(p.information),transposed=resolve(p.transposed);
+ const scalar=['integer','real','string','boolean','datetime'];
+ const resolve=(list,types)=>list.map(k=>{const found=fields.filter(f=>f.name===k.name);need(found.length===1,'Collapse input field missing: '+k.name);need(types.includes(found[0].type),'Information variant and unsupported scalar types are deferred');return found[0];});
+ const information=resolve(p.information,scalar),transposed=resolve(p.transposed,[...scalar,'variant']);
  need(information.every(f=>!['names','displaynames','values','datatypes'].includes(f.name.toLowerCase())),'Information field conflicts with a native collapse output name');
  return {information,transposed};
 }

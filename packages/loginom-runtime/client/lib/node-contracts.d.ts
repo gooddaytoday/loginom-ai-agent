@@ -157,15 +157,25 @@ export interface RegexReplacementRule {
   pairs: Array<{from: {type: 'string'; value: string}; to: {type: 'string'; value: string}}>;
   other: {mode: 'keep' | 'null'};
 }
+export interface ExtendedReplacementRule {
+  field: {kind: 'input_field'; name: string};
+  type: 'string' | 'integer' | 'real';
+  result_type?: 'string' | 'integer' | 'real' | 'datetime' | 'boolean';
+  pairs: Array<{from: ReplacementValue; to: ReplacementValue | {type: 'datetime'; value: string | null} | {type: 'boolean'; value: boolean | null}}>;
+  regex_pairs?: RegexReplacementRule['pairs'];
+  other: {mode: 'keep' | 'null'} | {mode: 'value'; value: ReplacementValue | {type: 'datetime'; value: string | null}};
+  case_sensitive?: boolean;
+  precision?: number;
+}
 export interface ReplacementParameters {
   /** Each listed field replaces its entire table; unlisted fields are preserved. */
-  rules?: Array<ReplacementRule | RegexReplacementRule>;
+  rules?: Array<ReplacementRule | RegexReplacementRule | ExtendedReplacementRule>;
   output_mode?: 'replace' | 'add';
 }
 export interface ReplacementConfigurationReadback {
   kind: 'replacement'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
-  mode: 'exact' | 'regex'; rules: Array<ReplacementRule | RegexReplacementRule>; output_mode: 'replace' | 'add';
+  mode: 'exact' | 'regex' | 'mixed'; rules: Array<ReplacementRule | RegexReplacementRule | ExtendedReplacementRule>; output_mode: 'replace' | 'add';
   input_mapping: GroupingConfigurationReadback['input_mapping'];
   output_mapping: GroupingConfigurationReadback['output_mapping'];
 }
@@ -287,6 +297,15 @@ export interface MissingValuesConfigurationReadback {
   options:Record<string,{value:boolean|number|string;switch_pressed:boolean}>;
   input_mapping:SortingConfigurationReadback['input_mapping'];
   output_mapping:SortingConfigurationReadback['output_mapping'];
+}
+
+export interface MissingValuesModesParameters {
+  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
+  max_nulls_percent:number; ordered:boolean;
+}
+export interface MissingValuesModesConfigurationReadback extends Omit<MissingValuesConfigurationReadback,'ordered'|'fields'> {
+  ordered:boolean;
+  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete';value?:string}>;
 }
 
 export interface CollapseParameters {

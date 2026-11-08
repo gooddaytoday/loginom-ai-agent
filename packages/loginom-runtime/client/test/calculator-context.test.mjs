@@ -66,3 +66,11 @@ test('calculator observation refuses changed owner even if the UI data itself is
  assert.equal((await readCalculatorContext(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',node_id:String(++calls)}))).verified,false);
  assert.equal((await readCalculatorContext(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',output_port:{}}))).reason,'calculator_node_surface');
 });
+
+test('calculator reports the node-wide language and refuses an unreadable or ambiguous one',()=>{
+ const f=fixture(),r=f.read();assert.equal(r.mode,'expression');assert.equal(r.syntax,'expression');
+ f.mode.querySelector=q=>q==='.bg-TBGCalcMode-cmJavaScript'?{}:null;
+ const js=f.read();assert.equal(js.verified,true);assert.equal(js.syntax,'javascript');assert.equal(js.mode,'expression');
+ f.mode.querySelector=()=>({});assert.equal(f.read().reason,'calculator_mode');
+ f.mode.querySelector=()=>null;assert.equal(f.read().reason,'calculator_mode');
+});
