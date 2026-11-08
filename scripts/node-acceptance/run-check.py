@@ -446,6 +446,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     input_files=['variables.json', 'rules.json'], variable_only=True, variable_audit='variables-replace', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
+    if name == 'variables-union-manual':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-manual.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None, expected_name='expected-manual-updated-run.json',
+                    variable_only=True, variable_audit='variables-union-manual', variable_initial='expected-manual-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-manual.mjs')
     if name == 'variables-column-union':
         src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['inputs.json'], base=None, expected_name='expected-updated-run.json',

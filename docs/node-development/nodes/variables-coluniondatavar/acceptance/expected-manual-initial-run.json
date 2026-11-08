@@ -1,0 +1,59 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.column_union"
+    }
+  ],
+  "outputs": [],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.column_union"
+        },
+        "port": 0,
+        "variables": [
+          {
+            "name": "right_amount",
+            "label": "Правая сумма",
+            "type": "integer",
+            "value": 19
+          },
+          {
+            "name": "left_text",
+            "label": "Левая сумма текстом",
+            "type": "string",
+            "value": "7"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.calculator",
+          "label": "Left"
+        },
+        "output": 0,
+        "target": {
+          "type": "variables.column_union"
+        },
+        "input": 0,
+        "kind": "variables"
+      },
+      {
+        "source": {
+          "type": "variables.calculator",
+          "label": "Right"
+        },
+        "output": 0,
+        "target": {
+          "type": "variables.column_union"
+        },
+        "input": 1,
+        "kind": "variables"
+      }
+    ]
+  }
+}

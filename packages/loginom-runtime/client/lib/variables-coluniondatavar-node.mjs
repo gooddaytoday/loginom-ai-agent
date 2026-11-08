@@ -10,10 +10,10 @@ export function createVariablesColumnUnionNodeSupport(config){
   configureInputs:async()=>verified({not_applicable:true,mappings:[]}),
   configureAllOutputs:async(_channel,configuration)=>verified({not_applicable:true,node_context:configuration.node_context}),
   configurationObservation:{condition:'owned variables union automatic mapping',readVariablesColumnUnion:true,ready:s=>s.wizard?.stage==='variables_column_union'&&s.node_variables_column_union?.verified===true},
-  async configure(channel,_parameters,{request}){
+  async configure(channel,parameters,{request}){
    const state=await channel.observe({condition:'variables union mapping before native Next',readVariablesColumnUnion:true,ready:s=>s.node_variables_column_union?.verified===true});
    const configuration=state.node_variables_column_union;
-   if(configuration.mapping!=='automatic')throw Error('Variables column union: custom mapping unsupported');
+   if(parameters.column_union?.mapping==='manual'||configuration.mapping!=='automatic')return channel.configureVariablesColumnUnion({parameters,finish:request.finish});
    if(request.finish==='close')return verified({configuration});
    await channel.perform({condition:'accept variables union automatic mapping',initialObservation:state,ready:s=>s.wizard?.stage==='variables_column_union',identity:()=>configuration.node_context,
     resolve:s=>{const controls=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));if(controls.length!==1)throw Error('Variables union Next unavailable');return {verb:'wizard_step',ref:controls[0].ref,expected_stage:'done'};}});

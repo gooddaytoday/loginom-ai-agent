@@ -18,7 +18,6 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
   await selectPreparedGraphNode(channel,state,'select union for read-only mapping preflight');await openPreparedWizard(channel);
   const observed=await channel.observe({condition:'saved union automatic mapping',readVariablesColumnUnion:true,ready:s=>s.node_variables_column_union?.verified===true});
   await closePreparedWizard(channel);
-  if(observed.node_variables_column_union.mapping!=='automatic')throw Error('Variables column union: saved custom mapping is unsupported; unchanged draft cancelled');
  }
  if(request.finish==='close')return {verified:true,inputs,outputs,not_applicable:true};
  for(const input of inputs){
@@ -28,6 +27,10 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
   const read=await channel.readVariablePort({port:input.output,execution});outputs.push(read.output);
  }
  validateVariablesColumnUnionInventory(outputs);
+ for(const field of request.parameters.column_union?.fields??[]){
+  const found=outputs[field.input].variables.filter(v=>v.name===field.source);
+  if(found.length!==1||!(found[0].type===field.type||found[0].type==='integer'&&field.type==='string'))throw Error('Variables column union: unique source and unchanged type or integer to string required');
+ }
  operation.variablesColumnUnionPreflight={inputs,outputs};
  return {verified:true,cleanup_complete:true,effect_possible:true,inputs,outputs};
 }

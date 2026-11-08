@@ -33,25 +33,25 @@
   "three_inputs": [
     {
       "name": "amount",
-      "label": "Сумма",
+      "label": "amount",
       "type": "integer",
       "value": 7
     },
     {
       "name": "empty",
-      "label": "Пустая строка",
+      "label": "empty",
       "type": "string",
       "value": ""
     },
     {
       "name": "amount_1",
-      "label": "Сумма",
+      "label": "amount",
       "type": "integer",
       "value": 19
     },
     {
       "name": "enabled",
-      "label": "Включён",
+      "label": "enabled",
       "type": "boolean",
       "value": false
     },
@@ -68,25 +68,25 @@
   "third_removed": [
     {
       "name": "amount",
-      "label": "Сумма",
+      "label": "amount",
       "type": "integer",
       "value": 7
     },
     {
       "name": "empty",
-      "label": "Пустая строка",
+      "label": "empty",
       "type": "string",
       "value": ""
     },
     {
       "name": "amount_1",
-      "label": "Сумма",
+      "label": "amount",
       "type": "integer",
       "value": 19
     },
     {
       "name": "enabled",
-      "label": "Включён",
+      "label": "enabled",
       "type": "boolean",
       "value": false
     }

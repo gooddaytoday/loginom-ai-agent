@@ -10,11 +10,27 @@ export function variablesColumnUnionTargetRequest(request,graph){
  const label=Array.from({length:201},(_,i)=>base+(i?' '+(i+1):'')).find(name=>!labels.has(name));
  need(label,'no unique union caption available');return {...request,target:{...request.target,label}};
 }
-export const variablesColumnUnionParametersSchema={type:'object',additionalProperties:false,properties:{column_union:{type:'object',additionalProperties:false,properties:{mapping:{type:'string',enum:['automatic'],description:'Preserve all variables and native generated names in input order. Custom mappings and conversions are unsupported.'}},required:['mapping']}},description:'Two initial variable inputs only. Empty parameters preserve native automatic mapping.'};
+export const variablesColumnUnionParametersSchema={type:'object',additionalProperties:false,properties:{column_union:{type:'object',additionalProperties:false,properties:{mapping:{type:'string',enum:['automatic','manual'],description:'automatic retains every input variable. manual uses fields as the complete ordered output selection.'},fields:{type:'array',minItems:1,maxItems:128,items:{type:'object',additionalProperties:false,properties:{input:{type:'integer',enum:[0,1]},source:{type:'string',minLength:1,maxLength:128},name:{type:'string',minLength:1,maxLength:128},label:{type:'string',maxLength:240},type:{type:'string',enum:['integer','real','string','boolean']}},required:['input','source','name','label','type']}}},required:['mapping']}},description:'Two fixed variable inputs. Omitted settings preserve the saved automatic or manual mapping. Manual supports unchanged types and integer to string.'};
 export function validateVariablesColumnUnionParameters(p,mode,r){
  need(mode==='append_variables','use append_variables mode');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='column_union'),'only column_union settings supported');
- if(p.column_union!==undefined)need(p.column_union&&Object.keys(p.column_union).join(',')==='mapping'&&p.column_union.mapping==='automatic','only automatic mapping supported');
+ if(p.column_union!==undefined){
+  const c=p.column_union;
+  need(c&&['automatic','manual'].includes(c.mapping)&&Object.keys(c).every(k=>['mapping','fields'].includes(k)),'automatic or manual mapping required');
+  if(c.mapping==='automatic')need(Object.keys(c).join(',')==='mapping','automatic mapping takes no fields');
+  if(c.mapping==='manual'){
+   need(Array.isArray(c.fields)&&c.fields.length>0&&c.fields.length<=128,'manual requires the complete ordered fields');
+   const names=new Set(),sources=new Set();
+   for(const f of c.fields){
+    need(f&&Object.keys(f).length===5&&Object.keys(f).every(k=>['input','source','name','label','type'].includes(k))
+     &&[0,1].includes(f.input)&&typeof f.source==='string'&&f.source.length>0&&f.source.length<=128
+     &&typeof f.name==='string'&&/^[A-Za-z_][A-Za-z_0-9]*$/.test(f.name)&&f.name.length<=128
+     &&typeof f.label==='string'&&f.label.length<=240&&['integer','real','string','boolean'].includes(f.type),'invalid manual field');
+    const source=JSON.stringify([f.input,f.source]);
+    need(!names.has(f.name.toLowerCase())&&!sources.has(source),'duplicate output name or source');names.add(f.name.toLowerCase());sources.add(source);
+   }
+  }
+ }
  if(!r)return;
  need(r.inputs.length===0&&r.mappings.length===0,'table inputs and custom mappings are unsupported');
  need(r.read.ports.length===0&&(r.read.variable_ports??[]).every(p=>p===0),'read variable output zero, no table ports');
