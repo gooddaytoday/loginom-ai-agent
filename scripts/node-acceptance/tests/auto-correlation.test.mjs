@@ -23,7 +23,7 @@ print('PASS')`;
  const result=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
-test('ACF edge catalog keeps count12 and replacement singleton expectations private and exact',()=>{
+test('ACF edge catalog keeps count12 private and excludes withdrawn singleton acceptance',()=>{
  const script=`import importlib.util, json
 from pathlib import Path
 p=Path('scripts/node-acceptance/run-check.py')
@@ -31,8 +31,7 @@ s=importlib.util.spec_from_file_location('run_check',p); m=importlib.util.module
 src=Path('docs/node-development/nodes/research-autocorrelation/acceptance/edges')
 oracle=json.loads((src/'expected.json').read_text())
 for name,task,inputs,output in [
- ('acf-nonzero','task-nonzero.md',['lab1144-series.csv'],oracle['series']['count12']),
- ('acf-singleton','task-one.md',['lab1144-series.csv','lab1144-one.csv'],oracle['native_conventions']['one'])]:
+ ('acf-nonzero','task-nonzero.md',['lab1144-series.csv'],oracle['series']['count12'])]:
  c=m.scenario(name); e=m.expected_for(c,'/own/edge.lgp')
  assert c['prompt']==m.REPO/src/task and c['input_files']==inputs
  assert e['package_path']=='/own/edge.lgp' and e['outputs']==[output]
@@ -40,6 +39,11 @@ for name,task,inputs,output in [
  assert all((c['data']/n).is_file() for n in inputs)
  assert 'expected.json' not in inputs and 'oracle.py' not in inputs
  assert e['outputs'][0]['ordered'] and e['outputs'][0]['column_order']=='exact'
+try: m.scenario('acf-singleton')
+except ValueError: pass
+else: raise AssertionError('Withdrawn singleton must not be registered')
+assert oracle['observations_not_claimed']['one']['accepted_output'] is False
+assert 'one' not in oracle['native_conventions']
 print('PASS')`;
  const result=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);

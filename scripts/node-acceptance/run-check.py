@@ -354,12 +354,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
         return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
                     expected_name='expected.json', input_files=['reform.csv'], oracle=src / 'oracle.py')
-    if name in ['acf-nonzero', 'acf-singleton']:
+    if name == 'acf-nonzero':
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance/edges'
-        singleton = name == 'acf-singleton'
-        return dict(source=src, prompt=src / ('task-one.md' if singleton else 'task-nonzero.md'),
-                    data=src / 'fixtures', base=None, autocorrelation_edge='one' if singleton else 'count12',
-                    input_files=['lab1144-series.csv', 'lab1144-one.csv'] if singleton else ['lab1144-series.csv'])
+        return dict(source=src, prompt=src / 'task-nonzero.md',
+                    data=src / 'fixtures', base=None, autocorrelation_edge=True,
+                    input_files=['lab1144-series.csv'])
     if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
         task, expected, inputs = {
@@ -653,8 +652,7 @@ def expected_for(case, package, cold=False):
     src = case['source']
     if case.get('autocorrelation_edge'):
         approved = read(src / 'expected.json')
-        output = (approved['native_conventions']['one'] if case['autocorrelation_edge'] == 'one'
-                  else approved['series']['count12'])
+        output = approved['series']['count12']
         return dict(package_path=package, nodes=[{'type': t} for t in
                     ['imports.text', 'research.auto_correlation', 'exports.text']], outputs=[output])
     if cold and case.get('cold_expected_name'):
