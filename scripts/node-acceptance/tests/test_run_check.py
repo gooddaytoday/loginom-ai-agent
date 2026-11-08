@@ -407,6 +407,7 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(case['prompt'].name, 'task.md')
         self.assertIsNone(case['base'])
         self.assertEqual(case['input_files'], [])
+        self.assertTrue(case['source_package'].is_file())  # the task opens a prepared package
         expected = runner.expected_for(case, '/test/variables-columns.lgp')
         self.assertEqual(expected['package_path'], '/test/variables-columns.lgp')
         output = expected['outputs'][0]

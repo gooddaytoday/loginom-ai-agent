@@ -123,7 +123,7 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'variables-columns':
         src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    input_files=[], expected_name='expected.json')
+                    source_package=src.parent / 'fixtures/source.lgp', input_files=[], expected_name='expected.json')
     if name == 'variables-totable-switch':
         node = REPO / 'docs/node-development/nodes/variables-vartodata'
         src = node / 'acceptance'
