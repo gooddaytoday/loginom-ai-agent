@@ -938,7 +938,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // components to this graph GUID; verify that exact component still
       // belongs to the active workflow before retaining its overflow caption.
       const pending=component?._node?.data?.node;
-      if(wizard.status==='absent'&&icons[0].classList.contains('bg-vendor-icon-calcvariables')
+      if(wizard.status==='absent'&&['bg-vendor-icon-calcvariables','bg-vendor-icon-importtextfile'].some(c=>icons[0].classList.contains(c))
         &&preparedPendingWizardNode?.tid===getTid(element)&&preparedPendingWizardNode.label===element.textContent.trim()
         &&app?.ModelNodeTreeNode&&pending instanceof app.ModelNodeTreeNode&&pending.FGuid===preparedNodeId
         &&component?.el?.dom===element&&node&&pending.ParentNode===node)return true;
