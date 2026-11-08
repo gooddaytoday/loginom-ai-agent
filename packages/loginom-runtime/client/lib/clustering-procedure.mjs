@@ -97,15 +97,18 @@ export async function configureClustering(channel,p,{request,inputMapping}){
  need(Object.values(old.switches).every(v=>v===false),'variable-driven clustering parameters are unsupported');
  const control=(s,key,verb)=>one(s,e=>(e.tid===s.wizard.root_tid+';ClusterizationWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';ClusterizationWizard;'+key)&&e.allowed_actions.includes(verb),'Clustering control unavailable: '+key);
  const act=async(s,condition,key,action)=>channel.perform({condition,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,parameters:s.node_clustering}),resolve:s=>({...action,ref:control(s,key,action.verb).ref})});
- if(old.auto){await act(state,'disable automatic cluster selection','pedAutoClusters;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('fixed cluster count enabled');need(state.node_clustering.auto===false,'automatic cluster selection is still enabled');}
- const wanted={clusters:p.clusters??old.clusters,seed:p.seed??(request.target.kind==='new'?42:old.seed)};
- for(const [name,key] of [['clusters','pedClusters;ValueControl'],['seed','RandSeedEdit;edtRandSeed;ValueControl']]){
-  state=await observe('k-means '+name+' before edit');if(state.node_clustering[name]===wanted[name])continue;
-  await act(state,'set k-means '+name,key,{verb:'fill',text:String(wanted[name])});state=await observe('k-means '+name+' before commit');
-  await act(state,'commit k-means '+name,key,{verb:'press',key:'Tab'});state=await observe('k-means '+name+' readback');need(state.node_clustering[name]===wanted[name],'k-means '+name+' differs');
+ const automatic=request.mode==='g_means';
+ const wanted=automatic?{min_clusters:p.min_clusters??old.min_clusters,max_clusters:p.max_clusters??old.max_clusters,threshold:p.threshold??old.threshold,seed:p.seed??(request.target.kind==='new'?42:old.seed)}:{clusters:p.clusters??old.clusters,seed:p.seed??(request.target.kind==='new'?42:old.seed)};
+ need(!automatic||Number.isSafeInteger(wanted.min_clusters)&&Number.isSafeInteger(wanted.max_clusters)&&wanted.min_clusters>=1&&wanted.min_clusters<=wanted.max_clusters&&wanted.max_clusters<=1000&&Number.isFinite(wanted.threshold)&&wanted.threshold>0,'automatic cluster bounds or threshold are invalid');
+ if(old.auto!==automatic){await act(state,'set automatic cluster selection','pedAutoClusters;ValueControl;DisplayEl',{verb:'set_checked',checked:automatic});state=await observe('cluster count mode readback');need(state.node_clustering.auto===automatic,'automatic cluster selection differs');}
+ const bounds=automatic?(wanted.min_clusters>old.max_clusters?[['max_clusters','pedClustersMax;ValueControl'],['min_clusters','pedClustersMin;ValueControl']]:[['min_clusters','pedClustersMin;ValueControl'],['max_clusters','pedClustersMax;ValueControl']]):[['clusters','pedClusters;ValueControl']];
+ for(const [name,key] of [...bounds,...(automatic?[['threshold','pedThreshold;ValueControl']]:[]),['seed','RandSeedEdit;edtRandSeed;ValueControl']]){
+  state=await observe('clustering '+name+' before edit');if(state.node_clustering[name]===wanted[name])continue;
+  await act(state,'set clustering '+name,key,{verb:'fill',text:String(wanted[name])});state=await observe('clustering '+name+' before commit');
+  await act(state,'commit clustering '+name,key,{verb:'press',key:'Tab'});state=await observe('clustering '+name+' readback');need(state.node_clustering[name]===wanted[name],'clustering '+name+' differs');
  }
- const after=(await observe('complete fixed k-means readback')).node_clustering;
- need(after.auto===false&&['pedClustersMin','pedClustersMax','pedThreshold'].every(k=>same(after.values[k],old.values[k])),'unrequested clustering parameters changed');
+ const after=(await observe('complete clustering readback')).node_clustering;
+ need(after.auto===automatic&&Object.entries(wanted).every(([key,value])=>after[key]===value)&&(automatic?after.clusters===old.clusters:['pedClustersMin','pedClustersMax','pedThreshold'].every(k=>same(after.values[k],old.values[k]))),'unrequested clustering parameters changed');
  await next('clustering','done');const done=await channel.observe({condition:'clustering settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,clusters:after.clusters,seed:after.seed,normalization:normalization.fields,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,mode:automatic?'g_means':'k_means',...(automatic?{min_clusters:after.min_clusters,max_clusters:after.max_clusters,threshold:after.threshold}:{clusters:after.clusters}),seed:after.seed,normalization:normalization.fields,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
