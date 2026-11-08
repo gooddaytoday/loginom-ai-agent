@@ -2,10 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {auditVariablesReplaceHistory,auditVariablesReplaceMatch} from '../variables-replace.mjs';
-import {matchVariableInventoryOutput} from '../expected-outputs.mjs';
+import {matchVariableInventoryOutput,parseExpectedOutputs} from '../expected-outputs.mjs';
 const read=name=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-replace/acceptance/'+name,import.meta.url)));
 const wants=['expected-initial-run.json','expected-updated-run.json','expected-run.json'].map(read);
 const rules=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-replace/fixtures/rules.json',import.meta.url))).initial.map(r=>({variable:{kind:'input_variable',name:r.name},type:r.type,pairs:r.pairs,other:'keep',...(r.type==='string'?{case_sensitive:true}:['integer','real'].includes(r.type)?{precision:0}:{})}));
+test('match fixture is accepted by the stock cold-check expected parser',()=>{
+ const expected=read('modes/expected-run.json');expected.package_path='/own/match.lgp';
+ assert.doesNotThrow(()=>parseExpectedOutputs(expected));
+ assert.deepEqual(expected.nodes.map(n=>n.type),['variables.user','variables.replace']);
+});
 function history(){
  const checkpoint=(phase)=>{const id='run'+phase,vs=wants[phase].variable_inventory.outputs[0].variables,rs=structuredClone(rules);if(phase)rs[0].pairs=[{from:2,to:8}];
   return {phase:'node_checkpoint',result:{operation_id:id,status:'SUCCEEDED',cleanup_complete:true,node:{document_id:'d',workflow_id:'w',node_id:'replacement'},execution:{status:'completed',execution_id:id},

@@ -1,4 +1,13 @@
 {
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "variables.replace"
+    }
+  ],
   "outputs": [],
   "variable_inventory": {
     "outputs": [

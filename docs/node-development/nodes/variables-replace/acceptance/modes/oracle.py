@@ -30,7 +30,7 @@ for variable in variables:
 expected = {'status': 'approved_match_slice',
             'match_modes': {'output_node_type': 'variables.replace', 'output_port': 0,
                             'port_kind': 'variables', 'ordered': True, 'variables': variables}}
-run = {'outputs': [], 'variable_inventory': {'outputs': [{'node': {'type': 'variables.replace'}, 'port': 0, 'ordered': True, 'variables': deepcopy(variables)}]}}
+run = {'package_path': '{{PACKAGE_PATH}}', 'nodes': [{'type': 'variables.user'}, {'type': 'variables.replace'}], 'outputs': [], 'variable_inventory': {'outputs': [{'node': {'type': 'variables.replace'}, 'port': 0, 'ordered': True, 'variables': deepcopy(variables)}]}}
 for variable in run['variable_inventory']['outputs'][0]['variables']:
     if variable['type'] == 'datetime':
         variable['value'] += '.000'  # W1 civil precision representation of whole seconds.
