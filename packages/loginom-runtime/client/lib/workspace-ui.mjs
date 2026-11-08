@@ -5054,6 +5054,7 @@ function readRenderedInputMapping(observation) {
             record('import_column_option_verified',{index:column.index,name:column.name,property:editor.property,
               type:column.type,data_kind:column.data_kind,settings_applied:false});
           } else {
+          const sortingAuto=choice.field.scope==='sorting'&&choice.field.name==='max_threads'&&choice.label==='Автоопределение';
           const parameterKey=choice.field.scope==='expression_parameter'?'expression_parameters':choice.field.scope==='output_column'?'column_parameters':choice.field.scope==='reform_column'?'reform_parameters':null;
           const expressionParameter=parameterKey!==null;
           const sourceOption=choice.field.scope==='import_source';
@@ -5089,7 +5090,7 @@ function readRenderedInputMapping(observation) {
             || observed.wizard.stage!==current.wizard.stage || !same(observed.ui.dialogs,current.ui.dialogs)
             || (expressionParameter?!same(observed.ui.masks,current.ui.masks):observed.ui.masks.length>0)
             || expressionParameter && !same(observed.wizard,expected)
-            || field?.status!=='observed' || field.truncated || field.value!==choice.label
+            || field?.status!=='observed' || field.truncated || field.value!==choice.label&&!(sortingAuto&&field.value==='0')
             || field.input_ref!==choice.field.input_ref || field.owner_ref!==choice.field.owner_ref)
             fail('WIZARD_OPTION_NOT_CONFIRMED','The selected option label was not read back in its original wizard field; inspect before retry');
           record('wizard_option_verified',{field:choice.field.name,label:choice.label,settings_applied:false});

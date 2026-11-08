@@ -52,3 +52,13 @@ test('sorting auto display suffix maps to the exact native Auto option and reads
  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);fields.cbxMaxThreadCount.input.value='Автоопределение';list.remove();};
  const result=await page.act({verb:'select_wizard_option',ref:option.ref},snapshot);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
 });
+
+test('sorting Auto confirms the observed native numeric editor value zero',async()=>{
+ const {page,fields,list}=fixture();fields.cbxMaxThreadCount.input.value='2';
+ list.children[0].attrs['data-tid']=fields.cbxMaxThreadCount.owner.getAttribute('data-tid')+';boundlist;Автоопределение';
+ list.children[0].ownText='Автоопределение (0)';
+ const snapshot=await page.observe(),option=snapshot.ui.elements.find(e=>e.wizard_combo?.kind==='option');assert.ok(option);
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);fields.cbxMaxThreadCount.input.value='0';list.remove();};
+ const result=await page.act({verb:'select_wizard_option',ref:option.ref},snapshot);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(fields.cbxMaxThreadCount.input.value,'0');
+});
