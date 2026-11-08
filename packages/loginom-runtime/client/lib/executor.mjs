@@ -3698,6 +3698,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
             isBoundFileInput:path=>{
+              if(!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))return false;
               try{requireStorageDestination(path,getStorageBinding()?.directories,'inputs');return true;}
               catch{return false;}
             },
