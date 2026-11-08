@@ -1,23 +1,27 @@
 # Группировка (`transform.group_data`)
 
 <!-- mode: aggregate -->
-## Группировка
+В `dock_node_apply` выбирай `transform.group_data`, режим `aggregate`. При изменении `measures` existing узла передай полный `group_by`, `measures` и связь входа 0 в `inputs`. `parameters: {}` сохраняет настройки. Полные дубли: ключи по всем полям, `measures: []`; NULL отличается от пустой строки.
 
-Меняя `measures` existing Группировки, задай полный `group_by` и связь входа 0 в `inputs`.
-Удаление полных дублей = Группировка по всем полям без мер (`measures: []`).
-Если задан порядок выходных полей, до первого Экспорта зафиксируй его в Группировке: `mappings: [{direction: "output", port: 0, autosync: false}]`. Схема должна сохранять порядок после Save/reopen; настройка Экспорта порядок upstream не исправляет.
+Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Прочитай карточку через `dock_action_describe`. Агрегаты выполняй Группировкой, не Калькулятором/JS.
 
-## Медиана
+- `median`: integer → real; без NULL, полностью NULL → NULL.
+- `mode`: integer/string → тот же тип; без NULL, полностью NULL → 0/пустая строка.
+- `stddev`: integer → real; выборочное без NULL, одно значение → 0, полностью NULL → NULL.
+- `null_count`: integer/string → integer; считает NULL, не пустые строки.
+При нескольких функциях native-суффиксы: Mode, Std, Null.
 
-Медиана группы — `function: "median"` в `measures` этого же узла Группировки (не Калькулятор и не JS). Поле-источник — целое (integer); результат вещественный (real). NULL пропускаются, группа только из NULL даёт NULL. Выходное имя и метку задай в `name`/`label` меры. Для пары «исходное поле + медиана» используй две меры на одно поле с разными `name`.
+## Первое, последнее, единственное, список
 
-## Мода, стандартное отклонение, пропуски
+В том же узле `first`/`last` — первое/последнее в исходном порядке, включая крайний NULL; `only` — единственное различное значение (повторы допустимы), иначе NULL; `concat` — список без NULL, пустой текст сохраняется, полностью NULL → пустая строка. Вход integer/string; первые три сохраняют тип, concat → string. Вход перед first/last не сортируй.
 
-В `dock_node_apply` выбирай `type: "transform.group_data"`, `mode: "aggregate"` и `parameters.measures`:
-- мода — `function: "mode"`, вход integer/string, выход того же типа; NULL не участвуют, полностью NULL даёт 0 для integer и пустую строку для string;
-- стандартное отклонение — `function: "stddev"`, вход integer, выход real; выборочное, без NULL; одно непустое значение даёт 0, полностью NULL — NULL;
-- число пропусков — `function: "null_count"`, вход integer/string, выход integer; пустая строка не считается пропуском.
+Только `concat` требует `concat: {separator: "|", wrapper: "\"", unique: false, order: "none"}`. `wrapper`: пустая строка, двойная или одинарная кавычка; для чисел без ограничителя — пустая. `none` сохраняет порядок, `ASC`/`DESC` сортируют значения; `unique:true` удаляет повторы. Настройки одного поля. Для нескольких состояний перенастраивай тот же узел полными ключами, мерами, входом 0; после каждого Execute читай весь результат и отдельный CSV. Save сохраняет финальное состояние.
 
-Эти агрегаты выполняй Группировкой. Для каждой меры укажи `field: {kind: "input_field", name: "имя источника"}`, `function`, выходные `name` и `label`. Перед применением прочитай актуальную карточку через `dock_action_describe`. Для повторной настройки того же узла передай полный `group_by`, полный `measures` и связь входа 0 в `inputs`; `parameters: {}` сохраняет поддержанные настройки. Native-суффиксы нескольких функций — Mode, Std и Null.
-Управление sort_result переменной выполняй этим же узлом, режим `aggregate`. В `dock_node_apply` добавь верхнеуровневый `bindings: [{parameter: "/sort_result", variable: {kind: "control", input: 0, name: "Flag"}}]`, а literal `sort_result` из `parameters` убери. Подключи `variables.user` выход 4 через `variable_inputs` к control input 0. Flag — boolean, не NULL; другой тип → `BINDING_TYPE_MISMATCH`, NULL → `BINDING_NULL_UNSUPPORTED`, literal вместе с binding → `BINDING_CONFLICT`. После изменения только Flag в источнике выполни прежний GUID с `parameters: {}`, `inputs: []`, `mappings: []`, `finish: "execute"`; настройки узла не применяй заново. Проверяй `configuration.bindings`, полный результат, Save и повторное открытие.
+## Кэш и сортировка
+
+`parameters.cache_groups:true/false` кэширует значения групп, не доказывает свежесть источника. `parameters.sort_result:true/false` сортирует по ключам `group_by` по возрастанию, не агрегатам; при false порядок не задан. На existing передай только нужный переключатель: пропуск сохраняет значение, ключи, меры и mapping. С `inputs:[]`, `mappings:[]`, `finish:"execute"` проверь `configuration.readback.options.pedDimCache.value` / `pedSortResult.value` и весь результат. Для сравнения выгрузи оба состояния того же узла. При полной перенастройке сохрани итоговый переключатель. Save и последующий Execute с `{}` используют сохранённое состояние.
+
+## Привязка
+
+Верхний `bindings:[{parameter:"/sort_result",variable:{kind:"control",input:0,name:"Flag"}}]`: `variables.user`/4 через `variable_inputs` control input 0. Flag boolean, не NULL; literal sort_result убери. Проверяй `configuration.bindings`; omit/[] сохраняет привязку. Измени только Flag в источнике, затем тот же GUID с `parameters:{}`, `inputs:[]`, `mappings:[]`, `finish:"execute"`; не перенастраивай узел. Тип/NULL/конфликт: `BINDING_TYPE_MISMATCH`/`BINDING_NULL_UNSUPPORTED`/`BINDING_CONFLICT`. Сверь весь результат, Save/reopen и порядок полей.
 <!-- /mode -->

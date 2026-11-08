@@ -97,11 +97,7 @@ def scenario(name, case_root=None, *, cases=None):
                     data=REPO / ('docs/node-development/nodes/' + node + '/fixtures'), base=None,
                     input_files=['modes.csv'], export_count=3, boolean_binding=node,
                     binding_initial=node + '/expected-initial.json', expected_name=node + '/expected.json', oracle=src / 'oracle.py')
-    if name == 'grouping-sort-result':
-        node = REPO / 'docs/node-development/nodes/grouping'
-        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance/modes/task-sort-result.md',
-                    data=node / 'fixtures', input_files=['modes.csv'], base=None, export_count=2,
-                    grouping_case='sort_result', oracle=node / 'acceptance/modes/oracle.py')
+
     if name == 'import-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
@@ -249,10 +245,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
                     expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
-    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count']:
+    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
-                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None, export_count=3 if name == 'grouping-concat' else 1, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -266,12 +262,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance' / name
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=[filename], external=True)
-    if name in ['missing-median-mode', 'missing-previous', 'missing-delete']:
+    if name in ['missing-median-mode', 'missing-previous', 'missing-delete', 'missing-linear', 'missing-random']:
         # v0.4.0 cycle 1: only the task and its CSV go to the model; expected tables are static oracle output.
         root = REPO / 'docs/node-development/nodes/missing-values'
         task, csv_name, expected = {'missing-median-mode': ('task-median-mode.md', 'statistics.csv', 'expected.json'),
                                     'missing-previous': ('task-previous.md', 'ordered.csv', 'expected-previous.json'),
-                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json')}[name]
+                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json'),
+                                    'missing-linear': ('task-linear.md', 'ordered.csv', 'expected-linear.json'),
+                                    'missing-random': ('task-random.md', 'random-single-value.csv', 'expected-random.json')}[name]
         return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance' / task, data=root / 'fixtures',
                     input_files=[csv_name], base=None, expected_name=expected)
     if name in ['missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean']:
@@ -497,6 +495,16 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     input_files=['variables.json', 'rules.json'], variable_only=True, variable_audit='variables-replace', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
+    if name == 'variables-union-type-refusal':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-type-refusal.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None,
+                    expected_name='expected-type-refusal-run.json', variables_union_refusal=True,
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-manual.mjs')
+    if name == 'variables-union-manual':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-manual.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None, expected_name='expected-manual-updated-run.json',
+                    variable_only=True, variable_audit='variables-union-manual', variable_initial='expected-manual-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-manual.mjs')
     if name == 'variables-column-union':
         src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['inputs.json'], base=None, expected_name='expected-updated-run.json',
@@ -702,7 +710,7 @@ def expected_for(case, package, cold=False):
     if case.get('grouping_mode'):
         cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py')]))['cases']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
-                    outputs=cases[case['grouping_mode']]['stages'])
+                    outputs=cases[case['grouping_mode']]['stages'][-1:] if cold else cases[case['grouping_mode']]['stages'])
     if case.get('corr_ranks'):
         expected = read(src / 'expected.json')['cases']['kendall']
         expected['package_path'] = package
@@ -1476,7 +1484,9 @@ class Runner:
                     and isinstance(refusal['text'], str) and refusal['text'].strip()
                     and expected['outputs'] == [] and not rejection and not execution_error
                     and not spec.get('upload_only') and not lgd_corrupt
-                    and all(n['type'].startswith('imports.') for n in expected['nodes'])), 'INVALID_REFUSAL_ORACLE'
+                    and (all(n['type'].startswith('imports.') for n in expected['nodes'])
+                         or spec.get('variables_union_refusal') and len(expected['nodes']) == 2
+                         and all(n['type'] == 'variables.calculator' for n in expected['nodes']))), 'INVALID_REFUSAL_ORACLE'
         if execution_error is not None:
             assert (set(execution_error) == {'text'} and isinstance(execution_error['text'], str)
                     and execution_error['text'].strip() and expected['outputs'] == []
@@ -1504,7 +1514,7 @@ class Runner:
             if spec.get('import_initial'): prompt += ' Порядок файлов: первый импорт, второй импорт, второй импорт после повторного открытия пакета.'
             if spec.get('sampling_uniform'):
                 prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
-            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and not spec.get('import_initial') and not spec.get('binding_initial'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and not spec.get('import_initial') and not spec.get('binding_initial') and spec.get('grouping_mode') != 'concat': prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
@@ -1678,7 +1688,9 @@ class Runner:
                 if event.get('type') != 'tool_use': continue
                 request = part.get('state', {}).get('input', {})
                 if part.get('tool') == 'loginom_dock_node_apply':
-                    if spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
+                    if spec.get('variables_union_refusal') and request.get('target',{}).get('type')=='variables.column_union':
+                        assert request.get('parameters',{}).get('column_union',{}).get('mapping') == 'manual', 'UNION_REFUSAL_REQUEST'
+                    elif spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
                         state=part.get('state',{})
                         reply=json.JSONDecoder().raw_decode(state.get('output') or state.get('error',''))[0]
                         assert reply.get('status')=='NOT_APPLIED' and reply.get('request_rejected') is True and reply.get('effect_possible') is False and reply.get('cleanup_complete') is True, 'XLS_REFUSAL_EFFECT'
@@ -1851,9 +1863,14 @@ class Runner:
             write(folder / 'variable-events.json', evidence)
             self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
                 src / spec.get('variable_initial', spec.get('variable_initial_name', 'expected-user-initial.json')), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union'] else 'snapshot')})
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union', 'variables-union-manual'] else 'snapshot')})
             return session, expected, None, None
         if refusal:
+            if spec.get('variables_union_refusal'):
+                evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+                evidence.sort(key=lambda event: event.get('recorded_at', ''))
+                write(folder / 'variable-events.json', evidence)
+                self.phase('variable-refusal-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], 'refusal', folder / 'variable-events.json'], folder, timeout=60)
             self.current.update(csv='— (expected refusal)', cold='— (expected refusal)')
             return session, expected, None, None
         if lgd_corrupt:
@@ -2078,7 +2095,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
-                        if spec.get('cold_expected_name'):
+                        if spec.get('cold_expected_name') or spec.get('grouping_mode') == 'concat':
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, expected_for(spec, r['package'], cold=True))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})

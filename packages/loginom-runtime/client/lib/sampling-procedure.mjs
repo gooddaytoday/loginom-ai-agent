@@ -75,10 +75,13 @@ export async function configureSampling(channel,p,{request,inputMapping}){
    if(p.test_priority!==undefined)need(s.node_sampling.test_priority===p.test_priority,'test priority differs');
    if(p.test_priority_position!==undefined){
     need(s.node_sampling.test_priority===true,'enable test priority before choosing position');
-    const label={beginning:'В начале набора',end:'В конце набора'}[p.test_priority_position];
-    await act('open test priority position',tid('pedTestPriorityPosition;ValueControl;trg_picker','click'),{verb:'click'});
-    await act('select test priority position',tid('pedTestPriorityPosition;ValueControl;boundlist;'+label.replaceAll(' ','_'),'click'),{verb:'click'});
-    s=await observe('test priority position committed');need(s.node_sampling.test_priority_position===p.test_priority_position,'test priority position differs');
+    if(s.node_sampling.test_priority_position!==p.test_priority_position){
+     const label={beginning:'В начале набора',end:'В конце набора'}[p.test_priority_position];
+     await act('open test priority position',tid('pedTestPriorityPosition;ValueControl;trg_picker','click'),{verb:'click'});
+     await act('select test priority position',tid('pedTestPriorityPosition;ValueControl;boundlist;'+label.replaceAll(' ','_'),'click'),{verb:'click'});
+     s=await observe('test priority position committed');
+    }
+    need(s.node_sampling.test_priority_position===p.test_priority_position,'test priority position differs');
    }
   }
  }

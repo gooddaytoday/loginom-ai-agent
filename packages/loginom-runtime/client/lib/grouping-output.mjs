@@ -10,7 +10,7 @@ export function groupingOutputDefinitions(configuration){
   const functions=Object.entries(GROUPING_FUNCTIONS).filter(([,v])=>(f.functions&v.bit)!==0);
   need(supportedGroupingMeasure(f),'Unsupported grouping functions');
   for(const [fn,v] of functions)fields.push({name:f.name+(functions.length>1?'_'+v.suffix:''),label:f.label+'|'+v.label,
-   type:['sum','avg','median','stddev'].includes(fn)?'real':['count','unique_count','null_count'].includes(fn)?'integer':f.type,field:f.name,function:fn});
+   type:fn==='concat'?'string':['sum','avg','median','stddev'].includes(fn)?'real':['count','unique_count','null_count'].includes(fn)?'integer':f.type,field:f.name,function:fn});
  }
  return fields;
 }
@@ -69,10 +69,13 @@ export async function configureGroupingOutput(channel,configuration,parameters,m
  let initial=await channel.observe({condition:'grouping output inventory',readMappings:true,ready});
  initial=await ensureGroupingOutputSources(channel,initial);
  const planned=resolveGroupingOutput(configuration,parameters,initial.node_mapping,mapping),changes=[];
- // Auto-sync restores the source order on a fresh execution. Freeze a custom
- // order unless the caller explicitly requests synchronization.
+ // Native regeneration can reorder even an initially matching layout after
+ // reopen (LAB-1100: Region,Metric -> Metric,Region with autosync=true).
+ // Freeze complete layouts for the new option paths, retaining an explicit
+ // autosync choice and every options-only/legacy preservation request.
  const reordered=planned.fields&&!same(planned.fields.map(f=>f.current.record_id),initial.node_mapping.target_fields.map(f=>f.record_id));
- if(mapping.autosync!==undefined||reordered)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
+ const optionLayout=planned.fields&&(parameters.cache_groups!==undefined||parameters.sort_result!==undefined);
+ if(mapping.autosync!==undefined||reordered||optionLayout)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
  if(planned.fields){
   // Finish table edits before exclusion introduces a separate native group.
   // Existing exclusions stay excluded; new exclusions use the same guarded

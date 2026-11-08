@@ -8,13 +8,14 @@
 
 Server text preview: `dock_node_apply` for `imports.text`,
 `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
-`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}` returns
-`output.server_profile` and closes the draft without Execute. Set known
-`settings.source.encoding`, e.g. `CP1251`. If UTF-8 mangles Cyrillic, refresh
-`dock_storage_source` and retry `CP1251`; mojibake is not file data.
-Preview is at most 25 rows, possibly partial: no proof of N or rare types.
-Reuse the ref after download/sampling; a closed empty node needs full sample
-Import settings from the local profile.
+`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`. Мастер вернёт
+`output.server_profile` и закроет черновик без Execute. Известную кодировку задай
+в `settings.source.encoding`, например `CP1251`. При искажении кириллицы с UTF-8
+заново найди путь через `dock_storage_source` и повтори preview с `CP1251`;
+искажённый текст не считай данными файла. Preview (≤25 строк)
+не доказывает N и редкие типы. После скачивания и выборки
+переиспользуй ref: закрытому пустому узлу нужны полные настройки импорта выборки
+из локального профиля.
 
 Если подготовленная таблица — прямой выход текстового Import и нужны лишь
 переименования/типы полей, меняй `settings.columns` этого Import, не добавляй Reform.
@@ -22,13 +23,13 @@ Import settings from the local profile.
 `settings.format`, остальные поля и порядок; запрошенные имена/типы и необходимые
 output mappings меняй на том же Import. Доставь исходное вложение текущей сессии
 с `overwrite=reject`: повтор пути допустим только после сравнения серверных байтов.
-При `UPLOAD_PATH_CONFLICT` не меняй путь или политику перезаписи для обхода.
+При `UPLOAD_PATH_CONFLICT` не меняй путь или политику перезаписи для обхода,
+даже для активации сохранённого узла.
 
 Неизменённый существующий Import выполняй с `mode=delimited`,
 `parameters:{settings:{}}`, `inputs:[]`, `mappings:[]`, `finish=execute`,
 `read:{ports:[0]}`: текущая конфигурация без мастера. Не передавай `source`/старый
 `upload_operation_id`, CSV заново не доставляй.
-`UPLOAD_PATH_CONFLICT` не разрешает перезапись для активации сохранённого узла.
 
 В новом Import после доставки source_path можно опустить: Dock берёт путь по
 upload_operation_id. Defaults: UTF-8, заголовок в первой строке, пропуск 0,
@@ -44,7 +45,8 @@ upload_operation_id. Defaults: UTF-8, заголовок в первой стр�
 Типы «по данным»: `settings.format.auto_detect_columns`
 (`none`/`new`/`all`), `settings.analysis`: `rows`, `refresh` (`all` — поля и типы
 заново, `types` — только типы). Новому узлу `columns` не нужны: схема читается, сверь
-с `output`. `all`: типы задаёт Loginom, `columns` отклоняется. `new`:
+с `output`. `all`: поля появятся лишь после Execute, типы задаёт Loginom;
+не передавай `columns` и output `mappings`, для управления полями — `new`/`none`. `new`:
 ручные типы (отдельным вызовом того же узла) остаются при смене `source_path`.
 `refresh` стирает ручные типы: только по просьбе.
 <!-- /mode -->

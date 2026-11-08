@@ -47,7 +47,8 @@ Target дискретная. Integer-Weight хранится отдельно к
 ## Независимый oracle и expected
 
 `python3 .../acceptance/modes/oracle.py` создаёт 11 JSON из fixtures;
-`--check` сверяет их без записи. Python stdlib, без Loginom, runtime и
+`--check` сверяет их без записи: структуру точно, числа с относительным
+допуском 1e-12 (последний бит `erfc` зависит от libm платформы). Python stdlib, без Loginom, runtime и
 подгонки коэффициентов под наблюдённые результаты. Для воспроизводимости имена
 native полей привязаны по UI, но численные значения получены из математики:
 

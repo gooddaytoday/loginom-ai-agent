@@ -8,8 +8,8 @@ target:{kind:"existing",name:"сохранённое_имя"}; пропущен�
 
 Типы: integer, real, string, boolean, datetime, variant. Формула — язык
 Loginom: TRUE/FALSE, NULL, строки в кавычках. Обращайся к предыдущему
-выражению по имени: base+1; префикс Expr. тоже принимается
-(Expr.limit-Expr.skip). Календарная дата с миллисекундами:
+выражению по имени: base+1 (принято при промежуточном base); форма
+Expr.limit-Expr.skip тоже принята в 7.4.2. Календарная дата с миллисекундами:
 EncodeDateTime(2026,11,7,23,59,58,123). Не добавляй UTC-суффикс к civil datetime.
 variant сохраняет тип значения; объявленный Variant с целым 7 остаётся Variant,
 его значение имеет подтип integer.

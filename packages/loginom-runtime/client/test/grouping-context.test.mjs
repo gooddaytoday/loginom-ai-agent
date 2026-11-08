@@ -10,7 +10,7 @@ function fixture(){
  for(const [i,e] of [available,used].entries())components[e.id]={el:{dom:e},getStore:()=>chains[i],getSelectionModel:()=>({getSelection:()=>selected})};
  for(const k of ['pedDimCache','pedSortResult'])for(const part of ['ValueControl','SwitchButton']){const e=element(base+k+';'+part,root);components[e.id]={el:{dom:e},getValue:()=>true,pressed:false};}
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
- return {root,records,store,chains,components,selected,read:()=>vm.runInNewContext('('+readGroupingBrowser.toString()+')("MF;TF")',context)};
+ return {root,records,store,chains,components,selected,element,base,read:()=>vm.runInNewContext('('+readGroupingBrowser.toString()+')("MF;TF")',context)};
 }
 test('grouping reads complete source identities even when labels coincide',()=>{const r=fixture().read();assert.equal(r.verified,true);assert.equal(r.keys[0].name,'Key');assert.equal(r.measures[0].name,'Amount');assert.equal(r.measures[0].functions,18);assert.equal(r.settings_applied,false);});
 test('grouping accepts observed removal sentinel and only exact empty-section placeholder',()=>{const f=fixture();f.records[0].data.Disposition=0;f.records[0].data.Order=-1;const empty={isModel:true,internalId:'placeholder',data:{DataType:0,DisplayName:'',Disposition:6,Order:0,Index:0,GroupFunctions:0,Separator:'',Wrapper:'',UniqueOnly:false,Sort:false,SortDirection:0}};f.records.push(empty);f.selected.push(empty);assert.equal(f.read().verified,true);assert.equal(f.read().input_fields.length,3);f.records[0].data.Disposition=6;f.records[0].data.Order=0;assert.equal(f.read().verified,false);});
@@ -21,3 +21,19 @@ test('grouping refuses filtered inventories, identity drift and malformed record
  for(const change of mutations){const f=fixture();change(f);assert.equal(f.read().verified,false);}
 });
 test('grouping guards node ownership and refuses a port wizard',async()=>{let i=0;assert.equal((await readGroupingContext({evaluate:async()=>({verified:true})},{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',node_id:++i}))).verified,false);assert.equal((await readGroupingContext({}, {},async()=>({verified:true,surface:'wizard',input_port:{}}))).reason,'grouping_node_surface');});
+
+test('grouping reads concat options only from its owned checked factor dialog and cached stores',()=>{
+ const f=fixture(),base='MF;TF;WizrdMCF;FactorEditDialog';
+ const dialog=f.element(base),check=f.element(base+';grpFactors;chb-13',dialog);
+ check.classList={contains:()=>true};
+ const choices=[{data:{value:',',label:'Запятая (,)'}},{data:{value:'|',label:'Вертикальная черта (|)'}}];
+ for(const suffix of ['cbxConcatSeparator','cbxConcatWrapper','fc;cbxConcatSort']){
+  const e=f.element(base+';cntCheckboxes;fs;'+suffix,dialog);
+  f.components[e.id]={el:{dom:e},valueField:'value',displayField:'label',editable:true,getValue:()=>',',
+   getStore:()=>({getData:()=>({items:choices}),getCount:()=>choices.length,isLoading:()=>false})};
+ }
+ assert.equal(f.read().verified,true);
+ assert.deepEqual(JSON.parse(JSON.stringify(f.read().factor_concat.separator.choices)),[{value:',',label:'Запятая (,)'},{value:'|',label:'Вертикальная черта (|)'}]);
+ choices.push(choices[0]);assert.equal(f.read().reason,'grouping_concat_choices');
+ check.classList.contains=()=>false;assert.equal(f.read().verified,true);assert.equal(f.read().factor_concat,undefined);
+});

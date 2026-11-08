@@ -12,7 +12,7 @@ import {groupingConfigurationReadback} from './grouping-readback.mjs';
 import {groupingParametersSchema} from './node-api.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 export function createGroupingNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.group_data',mode:'aggregate',revision:'grouping-v3-internal-1',readback:groupingConfigurationReadback,parameterSchema:groupingParametersSchema,
+ type:'transform.group_data',mode:'aggregate',revision:'grouping-v4-internal-2',readback:groupingConfigurationReadback,parameterSchema:groupingParametersSchema,
  bindingSchema:booleanBindingSchema('transform.group_data'),validate:validateGroupingParameters,
  async preflight(options,ctx,c){await preflightBooleanBindings(options,ctx,c);return preflightGroupingSource(options,ctx,c);},
  beforeInput:prepareGroupingInput,
