@@ -10,11 +10,13 @@ import argparse
 import csv
 import importlib.util
 import json
+import sys
 from datetime import date
 from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.dont_write_bytecode = True  # No __pycache__ next to the kit.
 _spec = importlib.util.spec_from_file_location('quality_oracle', ROOT / 'oracle.py')
 _oracle = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_oracle)
