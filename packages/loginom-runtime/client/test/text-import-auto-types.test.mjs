@@ -130,3 +130,28 @@ test('a native output mapping timeout names the observed reason and stays a read
  assert.equal(ok.node_mapping.verified,true);
  await assert.rejects(readNativeImportMapping({observe:async()=>{throw new Error('transport');}},'mapping',()=>true),/transport/);
 });
+
+test('an empty native mapping is deferred to execution only for auto-detect all with configured fields',async()=>{
+ const {deferredImportOutput}=await import('../lib/text-import-node.mjs');
+ const {textImportConfigurationReadback}=await import('../lib/text-import-readback.mjs');
+ const configured=mode=>({format:{fields:{auto_detect_columns:{status:'observed',value:mode}}},columns:[col('Id','integer'),col('Amount','real',{used:false}),col('Note','string')]});
+ const empty={verified:true,source_fields:[],target_fields:[]};
+ assert.deepEqual(deferredImportOutput(configured('Все'),empty,[]).map(c=>c.name),['Id','Note']);
+ assert.equal(deferredImportOutput(configured('Нет'),empty,[]),null);
+ assert.equal(deferredImportOutput(configured('Только новые'),empty,[]),null);
+ assert.equal(deferredImportOutput(configured('Все'),{...empty,target_fields:[{}]},[]),null);
+ assert.equal(deferredImportOutput(configured('Все'),{...empty,verified:false},[]),null);
+ assert.throws(()=>deferredImportOutput(configured('Все'),empty,[{direction:'output',port:0}]),/auto_detect_columns=all/);
+ const phase=(name,value)=>({phase:name,status:'verified',receipt_id:'op:'+name,value:{verified:true,cleanup_complete:true,...value}});
+ const fields=(o)=>({fields:Object.fromEntries(Object.entries(o).map(([k,v])=>[k,{status:'observed',value:v}]))});
+ const input={node:{document_id:'d',workflow_id:'w',node_id:'n'},operation_id:'op',phases:[
+  phase('configure',{source:fields({source_path:'/a.csv',connection:'Server',encoding:'UTF-8',rows_to_skip:'0',first_line_as_title:true}),
+   format:fields({delimiter:';',text_qualifier:'"',null_marker:'',decimal_separator:'.',auto_detect_columns:'Все',analysis_rows:'1000'}),
+   columns:[{...col('Id','integer'),status:'observed',index:0},{...col('Note','string'),status:'observed',index:1}]}),
+  phase('output_mapping',{source_identity_verified:true,deferred_output:true,native_mapping:{verified:true,source_identity_verified:true,inventory_complete:true,autosync:true,source_fields:[],target_fields:[]}}),
+  phase('finish',{settings_applied:true,mode:'execute'})]};
+ const readback=textImportConfigurationReadback(input);
+ assert.deepEqual(readback.output_mapping.fields,[]);
+ input.phases[1].value.deferred_output=false;
+ assert.throws(()=>textImportConfigurationReadback(input),/output inventory differs/);
+});

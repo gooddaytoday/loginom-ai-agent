@@ -465,3 +465,16 @@ test('auto-detected text import output mapping admits its native disabled delete
   if(variant!=='import')assert.equal(result.reason,'mapping_mask',variant);
  }
 });
+
+test('text import output mapping may be empty before execution only for the import wizard (auto-detect all)',()=>{
+ for(const variant of ['import','other']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant==='import')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  f.source.length=0;f.target.length=0;for(const row of f.rows)row.row=false;
+  const r=f.read();
+  assert.equal(r.verified,variant==='import',variant+': '+r.reason);
+  if(variant==='import'){assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.source_identity_verified,true);}
+  else assert.equal(r.reason,'mapping_render_bound');
+ }
+});

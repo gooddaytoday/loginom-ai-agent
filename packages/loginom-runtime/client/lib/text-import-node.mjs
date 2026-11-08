@@ -270,6 +270,17 @@ export async function readNativeImportMapping(channel,condition,ready) {
   }
 }
 
+// «Автоопределение: Все» creates the output fields when the node executes, so the
+// cached native mapping is legitimately empty at the mapping stage. Only that exact
+// state is deferred to the executed port read; any other empty mapping stays refused.
+export function deferredImportOutput(configured,native,mappings) {
+  const mode=configured?.format?.fields?.auto_detect_columns?.value;
+  if(mode!=='Все'||native?.verified!==true||native.source_fields?.length!==0||native.target_fields?.length!==0
+    ||!configured.columns.some(c=>c.used))return null;
+  requireValue(mappings.length===0,'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
+  return configured.columns.filter(c=>c.used).map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:true}));
+}
+
 export function bindIdentityOutputColumns(configured,actual) {
   const expected=configured.filter(c=>c.used);
   requireValue(actual.fields.length===expected.length&&actual.total_columns===expected.length
@@ -482,6 +493,12 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         const outputFields=configured.columns.filter(c=>c.used);
         const nativeReady=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
         let native=(await readNativeImportMapping(channel,'configured import native output mapping',nativeReady)).node_mapping;
+        const deferred=deferredImportOutput(configured,native,mappings);
+        if(deferred) {
+          outputColumns=deferred;
+          const done=await next('output_mapping','done');
+          return verified({effect_possible:true,mapping:{fields:[]},native_mapping:native,deferred_output:true,completion:done.wizard.completion,changes:[],source_identity_verified:true});
+        }
         const changes=[];
         if(mappings.length) {
           const mapping=one(mappings,'One import output mapping required');

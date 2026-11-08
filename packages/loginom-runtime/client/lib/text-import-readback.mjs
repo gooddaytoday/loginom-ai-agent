@@ -42,7 +42,8 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
       'mapping source differs');
     return {...pick(f,['index','name','label','type','data_kind']),source_name:f.source.name};
   });
-  requireValue(output.length===c.columns.filter(f=>f.used).length,'output inventory differs');
+  // Auto-detect «Все» materializes output fields only at execution; the mapping stage reports none.
+  requireValue(output.length===(m.deferred_output===true?0:c.columns.filter(f=>f.used).length),'output inventory differs');
   return {kind:'text_import',scope:'observed_before_verified_finish',node:structuredClone(node),
     receipt_ids:[configured.receipt_id,mapped.receipt_id,finished.receipt_id],
     values_are:'observed_ui_values',source,format,

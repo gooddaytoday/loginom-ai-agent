@@ -40,6 +40,7 @@ export function readMappingBrowser(request) {
   if(candidates.length!==1)return fail('mapping_root');
   const {form,root}=candidates[0],input=form==='TuneDataSourceMappingWizard',grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(form);
   const base=prefix+';WizrdMCF;'+form+';';
+  const importMapping=form==='ColumnsMappingEngineOutputPortWizard'&&exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length===1;
   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
   if(masks.some(e=>{
     // The empty output grid disables delete-all with an Ext control mask.
@@ -77,7 +78,6 @@ export function readMappingBrowser(request) {
     // «Автоопределение столбцов: Все» fixes the imported schema, so the same
     // native disabled delete-all column also appears in the text import's own
     // generic output mapping form. Other nodes keep the stricter admission.
-    const importMapping=form==='ColumnsMappingEngineOutputPortWizard'&&exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length===1;
     return !((form==='DataSetOutputSocketWizard'||importMapping)&&e.classList?.contains('x-mask')
       &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
       &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
@@ -202,7 +202,8 @@ export function readMappingBrowser(request) {
   const rows=[...elements[1].querySelectorAll('table.x-grid-item')],rendered=new Set();
   // A cold code-generated output can have two fully empty cached stores.
   // Nonempty inventories still require rendered rows as an independent witness.
-  if(!rows.length&&!(form==='DataSetOutputSocketWizard'&&sources.length===0&&targets.length===0)||rows.length>200)return {...fail('mapping_render_bound'),form,counts:{sources:sources.length,targets:targets.length,rows:rows.length}};
+  // «Все» defines the imported schema only when the node executes: the text import's cached mapping is empty until then.
+  if(!rows.length&&!((form==='DataSetOutputSocketWizard'||importMapping)&&sources.length===0&&targets.length===0)||rows.length>200)return {...fail('mapping_render_bound'),form,counts:{sources:sources.length,targets:targets.length,rows:rows.length}};
   for(const row of rows) {
     const index=Number(row.getAttribute('data-recordindex')),target=targets[index];
     if(!Number.isSafeInteger(index)||index<0||!target||rendered.has(index)
