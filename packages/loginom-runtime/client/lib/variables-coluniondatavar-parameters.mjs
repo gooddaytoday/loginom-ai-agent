@@ -32,6 +32,7 @@ export function validateVariablesColumnUnionParameters(p,mode,r){
   }
  }
  if(!r)return;
+ need(p.column_union?.mapping!=='manual'||r.target.kind!=='new'||r.target.label!=='Соединение (переменные)','omit target.label for a new manual union, or choose a custom caption: Loginom auto-renames its default caption after linking');
  need(r.inputs.length===0&&r.mappings.length===0,'table inputs and custom mappings are unsupported');
  need(r.read.ports.length===0&&(r.read.variable_ports??[]).every(p=>p===0),'read variable output zero, no table ports');
  const inputs=r.variable_inputs??[];

@@ -34,6 +34,8 @@ NULL сохраняет исходный тип и отличается от п�
 
 Для ручного выбора и порядка, переименования с меткой или integer→string
 используй этот же `variables.column_union`, `mode:"append_variables"`:
+При создании опусти `target.label`; стандартная подпись
+«Соединение (переменные)» меняется Loginom после подключения и не подходит.
 `parameters:{column_union:{mapping:"manual",fields:[
 {input:1,source:"amount",name:"right_amount",label:"Правая сумма",type:"integer"},
 {input:0,source:"amount",name:"left_text",label:"Левая сумма текстом",type:"string"}

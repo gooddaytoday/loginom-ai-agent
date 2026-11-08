@@ -14,6 +14,12 @@ const parameters=()=>({column_union:{mapping:'manual',fields:[
 test('manual union accepts an ordered complete selection with names, labels and declared types',()=>{
  validateVariablesColumnUnionParameters(parameters(),'append_variables');
 });
+test('manual creation rejects the native auto-renaming default caption before preparing any graph effect',()=>{
+ const request={target:{kind:'new',label:'Соединение (переменные)'},inputs:[],mappings:[],variable_inputs:[0,1].map(input=>({kind:'variables',input,source:{node_id:'s'+input}})),read:{ports:[],variable_ports:[0]}};
+ assert.throws(()=>validateVariablesColumnUnionParameters(parameters(),'append_variables',request),/omit target.label/);
+ delete request.target.label;validateVariablesColumnUnionParameters(parameters(),'append_variables',request);
+ request.target.label='User union';validateVariablesColumnUnionParameters(parameters(),'append_variables',request);
+});
 test('manual production readback fits the public result and refuses wrong order or conversion metadata',()=>{
  const node={document_id:'d',workflow_id:'w',node_id:'u'},fields=parameters().column_union.fields;
  const phase=(phase,value)=>({phase,status:'verified',receipt_id:'op:'+phase,value:{verified:true,...value}});
