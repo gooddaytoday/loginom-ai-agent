@@ -11,7 +11,7 @@
     "internal",
     "apply"
   ],
-  "semantics": "DateTime/manual intervals; optional automatic limits; population SD; rounding/open tails; frequency tie policies and sums. Train generated bins before manual edits; execute/apply must preserve edited bounds and labels. Random ties are not an admitted acceptance case.",
+  "semantics": "DateTime/manual intervals; optional automatic limits; population SD; frequency ties next (default) or current. Train generated bins before manual edits; execute/apply must preserve edited bounds and labels. Other tie policies are not admitted.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "binning-v1-internal-1",

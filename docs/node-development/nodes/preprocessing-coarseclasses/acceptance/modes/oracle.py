@@ -143,6 +143,8 @@ def external_contrast(result):
     expected depends on neither observation above. Port 1 layout for a
     multi-category class (one row per UniqueValue with class statistics) and
     the class marks are not observed: stand verification, first step of cycle 3.
+    Significance="Высокая" at total IV 0.572 is also a stand reconciliation item:
+    it was observed only at IV 1.66 and 3.64.
     """
     rows = BASE["source"]("external-contrast")
     with (ROOT / "fixtures" / "external-contrast-classes.csv").open(newline="", encoding="utf-8") as source:
