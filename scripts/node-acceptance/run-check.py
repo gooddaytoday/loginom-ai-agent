@@ -90,6 +90,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'filter-bindings':
+        src = REPO / 'docs/node-development/variables/bindings'
+        return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
+                    input_files=['filter.csv'], export_count=6, filter_initial='filter/expected-initial.json',
+                    expected_name='filter/expected.json', oracle=src / 'acceptance/oracle.py')
     if name == 'graph-large-execute':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/graph-large-execute'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -1439,6 +1444,11 @@ class Runner:
         if spec.get('excel_mode') == 'replace':
             write(folder / 'seed-config.json', dict(login=login, books=[dict(fixture=str(spec['data'] / ('existing.'+b['format'])), destination=b['export_destination']) for b in expected['excel_books']]))
             self.phase('excel-seeds', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs', build / 'resources/loginom', folder / 'seed-config.json', folder / 'seeds'], folder, timeout=300)
+        if case == 'filter-bindings':
+            for output in expected['outputs']: output['column_order'] = 'any'
+            expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter='/groups/0/0/value',
+                mode='variable', variable=dict(kind='control', input=0, name='Limit', type='integer', is_null=False),
+                source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -1496,6 +1506,12 @@ class Runner:
             write(folder / 'excel-named-events.json', evidence)
             self.phase('excel-named-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/imports-excel-named.mjs',
                 src / spec['excel_named_initial'], folder / 'expected.json', folder / 'excel-named-events.json'], folder, timeout=60)
+        if case == 'filter-bindings':
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'binding-events.json', evidence)
+            self.phase('filter-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/filter-bindings.mjs',
+                src / spec['filter_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
         if spec.get('variables_real_date'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))

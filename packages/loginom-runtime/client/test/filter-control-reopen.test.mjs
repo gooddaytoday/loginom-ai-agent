@@ -57,3 +57,9 @@ test('literal conditions do not reopen a wizard for unrelated NULL control value
  const f=fixture({allowUnrefreshedEdit:true});const p=structuredClone(parameters);p.groups[0][0].value=10;
  await assert.rejects(configureFilter(f.channel,p,{newNode:true}),/EDIT_AFTER_FRESH_CACHE/);assert.deepEqual(f.actions.map(a=>a.ref),['delete']);
 });
+test('a validated connected source can configure the new variable operand while its engine cache is pending',async()=>{
+ const f=fixture({stillNull:true,allowUnrefreshedEdit:true});
+ await assert.rejects(configureFilter(f.channel,parameters,{newNode:true,controlVariables:[{name:'limit',type:'integer',index:0,value:10,is_null:false}]}),/EDIT_AFTER_FRESH_CACHE/);
+ assert.deepEqual(f.actions.map(a=>a.ref),['delete']);
+ assert.deepEqual(parameters.groups[0][0].value,{kind:'variable',name:'limit'});
+});

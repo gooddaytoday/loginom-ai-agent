@@ -1,6 +1,7 @@
 import {FILTER_OPERATORS,isFilterVariable,resolveFilterConditions,filterGroupsFromNative,validateFilterConditions} from './filter-parameters.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
+import {configureVariableBinding} from './variable-binding-procedure.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const sameField=(a,b)=>a?.kind===b?.kind&&(a?.kind==='row_number'||a?.kind==='input_field'&&a.name===b.name);
@@ -42,7 +43,7 @@ export function filterInputText(value,type,decimalSeparator='.',datetimeCombo=fa
 
 // Complete replacement with observed, identity-bound gestures. A lost reply
 // escapes through the common receipt/reconciliation mechanism; never re-add.
-export async function configureFilter(channel,parameters,{newNode=false}={}){
+export async function configureFilter(channel,parameters,{newNode=false,controlVariables}={}){
  const ready=s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true;
  const observe=(condition,predicate=()=>true)=>channel.observe({condition,readFilter:true,ready:s=>ready(s)&&predicate(s)});
  let s=await observe('complete filter baseline');
@@ -53,7 +54,7 @@ export async function configureFilter(channel,parameters,{newNode=false}={}){
   return {verified:true,cleanup_complete:true,effect_possible:false,baseline,configuration:baseline,groups,preserved:true};
  }
  validateFilterConditions(parameters);
- if(newNode){
+ if(newNode&&!controlVariables){
   const references=parameters.groups.flat().flatMap(c=>isFilterVariable(c.value??c.values)?[{name:(c.value??c.values).name,type:c.values?'string':c.type}]:[]);
   if(references.length){
    resolveFilterConditions(parameters,baseline.input_fields);
@@ -84,7 +85,7 @@ export async function configureFilter(channel,parameters,{newNode=false}={}){
    }
   }
  }
- const groups=resolveFilterConditions(parameters,baseline.input_fields,baseline.control_variables),expected=[];
+ const groups=resolveFilterConditions(parameters,baseline.input_fields,controlVariables??baseline.control_variables),expected=[];
  for(const c of groups.flat())if(c.type==='datetime'){
   const arity=FILTER_OPERATORS[c.operator]?.arity??1,values=arity===1?[c.value]:arity===2?[c.lower,c.upper]:[];
   if(values.some(v=>v.length>19&&!v.endsWith('.000'))){
@@ -206,19 +207,8 @@ export async function configureFilter(channel,parameters,{newNode=false}={}){
    if(isFilterVariable(variable)){
     const editor=arity==='list'?'StringTriggerPropEdit':'VariantPropEdit';
     const base=s.wizard.root_tid+';FilterDataWizard;FilterDataPanel;'+editor;
-    const trigger=e=>e.tid===base+';VariableControl;trg_picker';
-    if(!s.ui.elements.some(trigger)){
-     await click('select variable filter operand mode',s,e=>e.tid===base+';SwitchButton',identity);
-     s=await observe('variable filter operand mode ready',s=>s.ui.elements.some(trigger));
-    }
-    await click('open bound filter variable choices',s,trigger,identity);
     const option=e=>e.filter_cell?.record_id===id&&e.filter_cell.part==='variable_option'&&e.filter_cell.variable_name===variable.name;
-    s=await observe('exact mapped filter variable choice',s=>s.ui.elements.some(option));
-    await click('select exact mapped filter variable',s,option,identity);
-    s=await observe('filter variable selected');
-    const input=e=>e.signature.tag==='input'&&e.identity.anchor_tid===base+';VariableControl'&&e.allowed_actions.includes('press');
-    await action('commit filter variable binding',s,s=>({verb:'press',ref:one(s,input,'Filter variable commit input unavailable').ref,key:'Tab'}),identity);
-    s=await observe('filter variable binding committed',s=>same(current(s)[arity==='list'?'values':'value'],variable));
+    s=await configureVariableBinding({channel,observe,ready,state:s,base,identity,option,committed:s=>same(current(s)[arity==='list'?'values':'value'],variable)});
    }else if(arity===2||arity==='list'){
     s=await observe('filter value dialog trigger',s=>s.ui.elements.some(e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker')&&e.allowed_actions.includes('click')));
     await click('open bound filter value dialog',s,e=>e.tid?.endsWith(';PropTriggerEditor;pickerfield;trg_picker'),identity);

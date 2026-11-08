@@ -1,3 +1,4 @@
+import {variableBindingsSchema} from './variable-binding-parameters.mjs';
 import {variablesReplaceParametersSchema} from './variables-replace-schema.mjs';
 import {variablesColumnUnionParametersSchema} from './variables-coluniondatavar-parameters.mjs';
 import {variablesCalculatorParametersSchema} from './variables-calculator-schema.mjs';
@@ -214,6 +215,7 @@ export const nodeApplyInputSchema=object({
   total_ms:{...integer(1,1800000),description:'Total setup/execution/reads/cleanup; never reset on poll/retry.'}
  }),description:'Prefer defaults; override for task deadline only. total_ms covers all phases.'},
 });
+nodeApplyInputSchema.properties.bindings=variableBindingsSchema;
 nodeApplyInputSchema.required=nodeApplyInputSchema.required.filter(key=>key!=='variable_inputs');
 // Discovery uses the same public parameter shapes. Requirements depending on
 // target.kind remain in the installed handler, before any browser mutation.
