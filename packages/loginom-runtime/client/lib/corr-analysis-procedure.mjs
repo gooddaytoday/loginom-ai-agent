@@ -16,7 +16,9 @@ export async function configureCorrAnalysis(channel,p,{request,inputMapping}){
  need(inputMapping?.verified===true&&same(baseline.fields.map(({name,label,type})=>({name,label,type})),inputMapping.target_fields.map(({name,label,type})=>({name,label,type}))),'assignment fields differ from bound input mapping');
  const expected=resolveCorrAnalysisSets(p,baseline.fields);let current=structuredClone(baseline),edits=0;
  const check=s=>need(same(s.node_corr_analysis.fields,current.fields)&&same(s.node_corr_analysis.coefficients,current.coefficients),'unrequested settings changed');
- for(const [name,key] of [['pearson','cbCorrTypeLinear'],['kendall','cbCorrTypeKendall'],['spearman','cbCorrTypeSpearmen'],['extremum','cbCorrTypeExtremum']]){
+ const controls=[['pearson','cbCorrTypeLinear'],['kendall','cbCorrTypeKendall'],['spearman','cbCorrTypeSpearmen'],['extremum','cbCorrTypeExtremum']];
+ // Keep one coefficient active: clearing Pearson first covered Spearman in the native UI (LAB-1076 journal:344).
+ for(const [name,key] of [...controls.filter(([name])=>name===mode),...controls.filter(([name])=>name!==mode)]){
   const wanted=name===mode;if(current.coefficients[name]===wanted)continue;
   state=await observe('coefficient before edit');check(state);
   await channel.perform({condition:'set correlation coefficient '+name,initialObservation:state,ready,identity:s=>s.prepared_node_context,
