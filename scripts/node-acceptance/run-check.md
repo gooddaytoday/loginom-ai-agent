@@ -6,6 +6,13 @@ Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
 
 Run live acceptance without repeatedly reading live logs:
 
+`acf-nonzero` and `acf-singleton` use the approved LAB-1144 edge tasks and
+fixtures under `research-autocorrelation/acceptance/edges`. Count12 on N8 must
+return all lags 0…7; singleton replaces the same import's 8 rows with one and
+reexecutes the same ACF node. The unchanged Fraction oracle and native singleton
+convention stay private. Exact types/field order/NULL, real abs=1e-8/rel=1e-10,
+CSV, Save, cold execution and cleanup use the stock matchers.
+
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
 Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
 from `fixtures/v040`, and the matching `v040/<case>/expected.json` from the
