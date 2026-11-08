@@ -10,7 +10,7 @@
 | Будущий сценарий | Prompt / входы модели | Ожидания вне модели |
 |---|---|---|
 | factor-pca | task.md / data/matrix.csv | expected.json |
-| factor-update | task-update.md / data/matrix.csv, data/update.csv | expected-update.json |
+| factor-retrain | task-update.md / data/matrix.csv, data/update.csv | expected-update.json |
 
 data/null.csv и data/constant.csv — данные исследования границ; не отправлять
 их в основной сценарий. NULL-обучение/константы не имеют утверждённого oracle.
