@@ -1,3 +1,9 @@
+`corr-ranks` uses the approved `research-corranalysis/acceptance/modes/task-ranks.md`
+and ranks.csv only. The stage-0 oracle stays outside the model workspace. Full
+production checkpoints verify Spearman followed by Kendall tau-b on the same
+node, tied values, exact native types/field order and abs=1e-8/rel=1e-10.
+Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
+
 Run live acceptance without repeatedly reading live logs:
 
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
