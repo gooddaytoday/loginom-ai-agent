@@ -38,6 +38,7 @@ for name,node in [('bindings-grouping-sort','grouping'),('bindings-sorting-local
  assert c['prompt'].name=='task-'+node+'.md' and c['oracle'].is_file()
  assert c['data'].name=='fixtures' and c['data'].parent.name==node
 c=m.scenario('grouping-sort-result')
-assert c['export_count']==2 and len(m.expected_for(c,'/own/package.lgp')['outputs'])==1
+assert c['export_count']==1 and c['grouping_mode']=='sort_result' and c['source'].name=='modes'
+assert len(m.expected_for(c,'/own/package.lgp')['outputs'])==1
 `],{cwd:new URL('../../../',import.meta.url)});
 });
