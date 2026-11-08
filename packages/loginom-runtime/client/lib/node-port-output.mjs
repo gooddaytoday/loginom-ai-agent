@@ -12,7 +12,14 @@ export function makeNodeVariableOutputCode(binding,options){
  if(!Number.isInteger(options?.port)||options.port<0||options.port>99||!Number.isSafeInteger(options.deadline)
   ||typeof options.operation_id!=='string'||options.execution?.verified!==true||options.execution.owner_verified!==true
   ||options.execution.status!=='completed'||['execution_id','process_id','process_record_id'].some(k=>typeof options.execution[k]!=='string'))throw Error('Variable read requires a completed owned execution');
- return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
+ return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options,builtin_snapshot:false})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
+}
+
+// Private preflight snapshot: it never fabricates an execution receipt.
+export function makeBuiltinVariablesPreviewCode(binding,options){
+ validatePreparedNodeContext(binding);
+ if(options?.port!==4||typeof options.port_guid!=='string'||!Number.isSafeInteger(options.deadline)||typeof options.operation_id!=='string')throw Error('Exact builtin source preview required');
+ return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options,builtin_snapshot:true})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
 }
 
 // Executable variable sources use the native VariablesForm after a real Execute.
@@ -29,9 +36,19 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
   const tabs=exact(b.workflow_ref.tab_tid),card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
   if(tabs.length!==1||tabs[0]!==r.tab||!tabs[0].classList.contains('x-tab-active')||!(m instanceof a.ModelForm)||card.Controller.Node.data.node!==r.nodeTargetWorkflowNode)throw Error('Variable output graph owner changed');
   const d=m.FDiagram,g=d.FmxGraph,ns=d.FNodes.FCollection.filter(n=>n.FGuid===b.node.node_id),n=ns[0];
-  if(ns.length!==1||n.FIconCls==='bg-vendor-icon-modelvariables'||n.FStatus!==1||n.FRunning)throw Error('Active executable variable node required');
+  if(ns.length!==1||n.FRunning||(task.builtin_snapshot?n.FIconCls!=='bg-vendor-icon-modelvariables':n.FIconCls==='bg-vendor-icon-modelvariables'||n.FStatus!==1))throw Error('Active executable variable node required');
   const ports=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FGuid===task.port_guid),port=ports[0];
-  if(ports.length!==1||port.parent!==n||port.FCell.parent!==n.FCell||port.FType!==1||port.FSubType!==3||port.FStatus!==1||!port.data)throw Error('Active variable output owner changed');
+  if(ports.length!==1||port.parent!==n||port.FCell.parent!==n.FCell||port.FType!==1||port.FSubType!==3||(!task.builtin_snapshot&&port.FStatus!==1)||!port.data)throw Error('Active variable output owner changed');
+  let cached;
+  if(task.builtin_snapshot){
+   const ordered=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FType===1&&p.FSubType===3);
+   cached=r.nodeTargetPortIdentities?.get(port);
+   if(task.port!==4||ordered.length!==5||ordered[4]!==port||!cached||cached.graph!==g||cached.node!==n||cached.cell!==port.FCell||cached.guid!==port.FGuid
+    ||cached.data!==port.data||cached.type!==1||cached.subtype!==3||cached.nodeTid!==g.view.getState(n.FCell)?.shape?.node?.getAttribute('data-tid')
+    ||cached.tid!==cached.nodeTid+';Output_Var-4')throw Error('Builtin source output identity changed');
+   if(mode==='availability')return {source_active:port.FStatus===1};
+   if(port.FStatus!==1)throw Error('Builtin source deactivated during preview');
+  }else{
   const trees=['ConsoleForm','MF;ConsoleForm'].flatMap(t=>exact(t+';ProgressForm;trpProgress;treepanel;tree'));
   if(trees.length!==1)throw Error('Variable execution tree required');
   const store=Ext.getCmp(trees[0].id)?.getStore(),nativeRoot=store?.getRoot(),prefix=b.document_id+':',id=task.execution.execution_id;
@@ -44,11 +61,12 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
    ||matches.length!==1||matches[0].data.Status!==3||matches[0].data.ErrorDetails!==''||!String(matches[0].data.id).startsWith(parts[1]+'.')
    ||own.some(v=>BigInt(String(v.data.id).split('.')[0])>BigInt(parts[1])))throw Error('Variable execution is stale or incomplete');
   let ancestor=parents.get(matches[0]);while(ancestor&&ancestor!==groups[0])ancestor=parents.get(ancestor);if(ancestor!==groups[0])throw Error('Variable execution process owner differs');
+  }
   const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw Error('Variable read target covered');return {x,y};};
   const root=b.workflow_ref.prefix+';ModelForm;PreviewWindow',pf=m.FPreviewManager?.FPreviewForm,windows=exact(root).filter(visible);
   if(mode==='port'){
    if(windows.length||exact('mn').some(visible))throw Error('A previous preview or menu is open');
-   const es=exact(task.port_tid).filter(e=>g.container.contains(e));if(es.length!==1)throw Error('Unique variable port drawing required');
+   const es=task.builtin_snapshot?[g.view.getState(port.FCell)?.shape?.node].filter(e=>e&&g.container.contains(e)&&(e.getAttribute('data-tid')===null||e.getAttribute('data-tid')===cached.tid)):exact(task.port_tid).filter(e=>g.container.contains(e));if(es.length!==1)throw Error('Unique variable port drawing required');
    const box=es[0].getBoundingClientRect(),gb=g.container.getBoundingClientRect();if(g.getCellAt(box.x-gb.x+g.container.scrollLeft+box.width/2,box.y-gb.y+g.container.scrollTop+box.height/2)!==port.FCell)throw Error('Variable output native hit changed');return point(es[0]);
   }
   if(mode==='menu'){
@@ -67,20 +85,25 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
  },{task,mode,recordsCode:readRecords.toString(),decoderCode:decode.toString()});
  try{
   const before=await readNode(page,b);if(!before.verified||before.surface!=='graph')throw Error('Variable output graph unavailable');
+  if(task.builtin_snapshot){
+   const state=await inspect('availability');
+   if(!state.source_active)return {status:'SUCCEEDED',verified:true,source_active:false,independent_readback:false,effect_possible:false,cleanup_complete:true,node_context:before};
+  }else{
   const inventory=await readOutputs(page,b,readNode),ports=inventory.variable_ports?.filter(p=>p.index===task.port);
   if(!inventory.verified||ports?.length!==1||!ports[0].active)throw Error('Requested active variable output absent');
   task={...task,port_guid:ports[0].port_guid,port_tid:ports[0].tid};
+  }
   const point=await inspect('port');effect=true;await page.mouse.click(point.x,point.y,{button:'right'});
   await at('mn;mniShowDataPreview').waitFor({state:'visible',timeout:remaining()});const command=await inspect('menu');await page.mouse.click(command.x,command.y);opened=true;
   await page.waitForFunction(t=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],grid=es.length===1&&Ext.getCmp(es[0].id);return typeof grid?.getStore==='function'&&grid.getStore().isLoading()===false&&grid.getStore().complete===true&&grid.getStore().loadCount>=1;},root+';PreviewForm;VariablesForm;grdValuePreview',{timeout:remaining()});
   output={...await inspect('inventory'),port:task.port,kind:'variables',port_guid:task.port_guid,read_id:task.operation_id,
-   execution_id:task.execution.execution_id,source:'execution',native_source:'VariablesForm',fresh:true,freshness_basis:'completed_execution_variables_preview'};
+   execution_id:task.builtin_snapshot?null:task.execution.execution_id,source:task.builtin_snapshot?'snapshot':'execution',native_source:'VariablesForm',fresh:!task.builtin_snapshot,freshness_basis:task.builtin_snapshot?'active_builtin_variables_preview':'completed_execution_variables_preview'};
  }catch(cause){error=String(cause.message).slice(0,500);}
  let clean=!effect;
  if(effect)try{if(opened){const point=await inspect('close');await page.mouse.click(point.x,point.y);await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});}
   else await page.keyboard.press('Escape');const after=await readNode(page,b);clean=after.verified===true&&after.surface==='graph';}catch{clean=false;}
  const nodeContext=clean?await readNode(page,b):null;
- return {status:output&&!error&&clean?'SUCCEEDED':effect?'AMBIGUOUS':'NOT_APPLIED',verified:!!output&&!error&&clean,effect_possible:effect,cleanup_complete:clean,node_context:nodeContext,...(output&&!error&&clean?{output}:{}),...(error?{error}:{})};
+ return {status:output&&!error&&clean?'SUCCEEDED':effect?'AMBIGUOUS':'NOT_APPLIED',verified:!!output&&!error&&clean,effect_possible:effect,cleanup_complete:clean,node_context:nodeContext,...(output&&!error&&clean?{output,...(task.builtin_snapshot?{source_active:true,independent_readback:true,variables:output.variables}:{})}:{}),...(error?{error}:{})};
 }
 
 // The native reader indexes the ordered list passed to GetReader; array row

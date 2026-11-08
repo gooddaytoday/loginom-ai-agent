@@ -655,3 +655,39 @@ for(const direction of ['input','output'])for(const fault of ['own','foreign','w
   }else{assert.equal(r.status,'NOT_APPLIED',r.error);assert.deepEqual(clicks,[]);}
  }finally{await browser.close();}
 });
+
+function importVariablesBusy(){
+ const f=fixture('input'),panel=groupingBusy(f);f.node.FIconCls='bg-vendor-icon-importtextfile';
+ f.task.kind='variables';f.port.FType=0;f.port.FSubType=3;
+ f.portDom.tid='MF;TF;Graph;Node;Input_Var-0';f.portDom.getAttribute=()=>f.portDom.tid;
+ return {f,panel};
+}
+for(const stage of ['begin','menu_issued','open_issued'])test('Import variables input waits for its exact native graph mask at '+stage,async()=>{
+ const {f,panel}=importVariablesBusy();let waits=0;
+ if(stage!=='begin')f.flags.graphMasks=[];
+ if(stage==='menu_issued'){
+  let reads=0;const read=f.readNode;
+  f.run=()=>openPreparedOutputPort(f.page,f.task,async(...args)=>{const s=await read(...args);if(++reads===2)f.flags.graphMasks=[panel];return s;});
+ }
+ if(stage==='open_issued'){
+  const locator=f.page.locator;f.page.locator=s=>{const l=locator(s),click=l.click;l.click=async o=>{await click(o);if(o?.trial)f.flags.graphMasks=[panel];};return l;};
+ }
+ f.page.waitForTimeout=async()=>{if(!f.flags.graphMasks.length)return;assert.equal(f.gestures.length,stage==='open_issued'?1:0);if(++waits===3)f.flags.graphMasks=[];};
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(waits,3);assert.equal(f.gestures.length,2);
+ assert.ok(r.trace.some(t=>t.event==='input_port_graph_busy'&&t.mode===stage&&t.samples===3));
+});
+for(const fault of ['data-input','control-input','foreign-tid','foreign-native','foreign-workflow','foreign-node','foreign-mask','duplicate-root','dialog','persistent','changed-owner'])test('Import variable graph wait refuses '+fault,async()=>{
+ const {f,panel}=importVariablesBusy();
+ if(fault==='data-input')delete f.task.kind;
+ if(fault==='control-input')f.task.kind='control';
+ if(fault==='foreign-tid')panel.getAttribute=()=> 'foreign';
+ if(fault==='foreign-native')f.graph.FView.el.dom={};
+ if(fault==='foreign-workflow')f.card.Controller.Node.data.node={};
+ if(fault==='foreign-node')f.node.FGuid='foreign';
+ if(fault==='foreign-mask')f.flags.graphMasks.push({...panel,getAttribute:()=> 'foreign'});
+ if(fault==='duplicate-root')f.el(panel.tid);
+ if(fault==='dialog'){const get=panel.getAttribute;panel.getAttribute=k=>k==='role'?'dialog':get(k);}
+ let waits=0;f.page.waitForTimeout=async()=>{waits++;if(fault==='persistent')f.task.deadline=Date.now()-1;if(fault==='changed-owner')f.graph.FView.el.dom={};};
+ const r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);assert.equal(r.cleanup_complete,true);assert.equal(f.gestures.length,0);
+ assert.equal(waits,['persistent','changed-owner'].includes(fault)?1:0);
+});

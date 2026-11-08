@@ -2,8 +2,9 @@ import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clu
 import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
 import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
-import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
+import {observeImportBindingInventory} from './import-bindings.mjs';
 import {observeFilterBindingInventory} from './filter-bindings.mjs';
+import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
@@ -256,7 +257,7 @@ page = context.pages()[0]
    state.variableInventory={outputs,links};
   }
   // A bound LGD destination needs the saved variable source's fresh value.
-  if(expected.binding_inventory)state.bindingInventory=await observeFilterBindingInventory({load,graph,channelFor,expected,record});
+  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>b.node.type==='imports.text')?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
   // The existing inventory audit executes/reads it without changing settings.
   if(expected.lgd?.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
