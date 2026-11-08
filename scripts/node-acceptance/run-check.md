@@ -657,6 +657,11 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
 
+`logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
+повтор настройки и Teach того же узла; прогноз по независимому штрафному
+score из `datamining-logregression/acceptance/modes/ridge`, CSV/Save/cold.
+Модели передаются только task-ridge.md и train.csv.
+
 `sorting-locale`: импорт modes.csv, сортировка Word и RowID без учёта регистра;
 на одном узле сначала compare_with_locale=false, затем true (русская локаль
 пользователя). Утверждённый `sorting/acceptance/modes/task-locale.md` и

@@ -287,6 +287,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     charge();
     if (discoverRoots) for (const element of regionElements) include(element);
     const omittedRegions=new Set();
+    const logisticCards=preparedNodeWizard&&definitionPrefix
+      ? document.querySelectorAll('[data-tid='+JSON.stringify(definitionPrefix+';WizrdMCF;LogRegressionWizard')+']'):[];
+    charge();
     const importGrid=definitionPrefix?definitionPrefix+';WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;grdSettings;grd-1':null;
     const importFieldBase=importGrid?importGrid+';normalHeaderCt;':null;
     const addressedImportField=element=>{
@@ -299,6 +302,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     };
     const definitionFilter=definitionPrefix?{acceptNode:element=>{
       charge();const tid=element.getAttribute('data-tid')??'',base=definitionPrefix+';WizrdMCF;';
+      // Reopened logistic wizards retain thousands of nodes in prior cards.
+      // Keep the active page and fixed global guards within the same budget.
+      if(logisticCards.length===1&&['TuneDataSourceInputPortWizard','NormTuneWizard','LearnPartitionWizard','LogRegressionWizard','LogRegressionWizard-1','DerivedDataSourceMappingEngineOutputPortWizard']
+        .some(name=>tid===base+name)&&element.classList.contains('x-hidden-offsets')) {
+        omittedRegions.add('inactive_logregression_cards');return 2;
+      }
       if(new RegExp('^'+definitionPrefix+';ViewsForm;BrowseView(?:-[0-9]+)?$').test(tid)
         &&element.classList.contains('x-hidden-offsets')) {
         omittedRegions.add('inactive_table_views');return 2;
@@ -358,7 +367,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
       '[data-tid$=";WizrdMCF;FilterDataWizard;FilterDataPanel"]','[data-tid*=";WizrdMCF;FilterDataWizard;FilterDataPanel;tbl;celleditor"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionName_"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionDisplayName_"]','[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnCalcMode"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnReplaceField"]','span.bg-TBGCalcMode-cmExpression,span.bg-TBGCalcMode-cmJavaScript',
-      ...Object.entries({LinRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'],'LinRegressionWizard-1':['pedEpsilon','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance'],LogRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId'], 'LogRegressionWizard-1':['pedEpsilon','pedThreshold','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']}).flatMap(([card,names])=>names.flatMap(name=>{
+      ...Object.entries({LinRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'],'LinRegressionWizard-1':['pedEpsilon','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance'],LogRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId'], 'LogRegressionWizard-1':['pedEpsilon','pedThreshold','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge']}).flatMap(([card,names])=>names.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input',owner+' [data-tid]', '[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
@@ -3161,7 +3170,7 @@ function readRenderedInputMapping(observation) {
     };
     const binningControl=element=>wizard.stage==='binning'&&((getTid(element)??'').startsWith(wizard.root_tid+';MethodSettingsWizard-1;')&&/;(?:colDisplayName_\d+|colMethodType_\d+|trg_picker|boundlist;[^;]+)$/.test(getTid(element))||(getTid(element)??'').startsWith('MethodSettingFrame;')&&/;(?:DisplayEl|trg_picker|boundlist;[^;]+)$/.test(getTid(element)));
     const coarseClassesControl=element=>wizard.stage==='coarse_classes'&&(getTid(element)??'').startsWith(wizard.root_tid+';CoarseClassesWizard-1;')&&/;(?:colColumnDisplayName_[^;]+|colColumnPurpose_[^;]+|trg_picker|boundlist;[^;]+|DisplayEl)$/.test(getTid(element)??'');
-    const interesting = element => ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
+    const interesting = element => ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
       &&(getTid(element)??'').startsWith(wizard.root_tid+';')
       &&(/;pedSamplingMethod;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
         || /;(?:StratifiedMethodForm;grdStratifiedGrid;headercontainer;UsageFlag_[^;]+|BiasedMethodForm;colDisplayName_[^;]+|BiasedMethodForm;colBiasedValue_[^;]+)$/.test(getTid(element)??'')

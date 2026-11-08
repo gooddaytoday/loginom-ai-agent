@@ -77,7 +77,7 @@ RULES = (
     ((C + 'coarse-classes-*.mjs',), ('live-ui',), ('coarse-classes-train', 'coarse-classes-apply')),
     ((C + 'binning-*.mjs',), ('live-ui',), ('binning-count', 'binning-width', 'binning-frequency', 'binning-apply')),
     (('scripts/node-acceptance/logreg-normalization.mjs', 'docs/node-development/nodes/datamining-logregression/acceptance/modes/normalization/**'), ('live-ui',), ('logreg-normalization',)),
-    ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-normalization', 'logreg-coefficients', 'logreg-apply', 'logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive')),
+    ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-ridge', 'logreg-normalization', 'logreg-coefficients', 'logreg-apply', 'logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive')),
     ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4', 'linreg-forward-f', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
     ((C + 'rest-request*.mjs', C + 'rest-connection.mjs',
