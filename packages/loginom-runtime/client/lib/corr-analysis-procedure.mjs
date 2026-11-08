@@ -2,6 +2,8 @@ import {resolveCorrAnalysisSets} from './corr-analysis-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error('Correlation analysis: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export async function configureCorrAnalysis(channel,p,{request,inputMapping}){
+ const mode=request.mode??'pearson';
+ need(['pearson','spearman','kendall'].includes(mode),'unsupported coefficient');
  const one=(s,tid,verb)=>{const es=s.ui.elements.filter(e=>e.tid===tid&&e.allowed_actions.includes(verb));need(es.length===1,'unique control required: '+tid);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'accept correlation '+stage,ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,s.wizard.root_tid+';btnNext','wizard_step').ref,expected_stage:destination})});
@@ -15,7 +17,7 @@ export async function configureCorrAnalysis(channel,p,{request,inputMapping}){
  const expected=resolveCorrAnalysisSets(p,baseline.fields);let current=structuredClone(baseline),edits=0;
  const check=s=>need(same(s.node_corr_analysis.fields,current.fields)&&same(s.node_corr_analysis.coefficients,current.coefficients),'unrequested settings changed');
  for(const [name,key] of [['pearson','cbCorrTypeLinear'],['kendall','cbCorrTypeKendall'],['spearman','cbCorrTypeSpearmen'],['extremum','cbCorrTypeExtremum']]){
-  const wanted=name==='pearson';if(current.coefficients[name]===wanted)continue;
+  const wanted=name===mode;if(current.coefficients[name]===wanted)continue;
   state=await observe('coefficient before edit');check(state);
   await channel.perform({condition:'set correlation coefficient '+name,initialObservation:state,ready,identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'set_checked',ref:one(s,s.wizard.root_tid+';CorrAnalysisWizard;'+key+';DisplayEl','set_checked').ref,checked:wanted})});
@@ -29,7 +31,7 @@ export async function configureCorrAnalysis(channel,p,{request,inputMapping}){
    resolve:s=>({verb:'click',ref:one(s,tid,'click').ref})});
   old[key]=field[key];state=await observe('complete assignment readback');check(state);edits++;
  }
- const configuration={...state.node_corr_analysis,mode:'pearson'};
+ const configuration={...state.node_corr_analysis,mode};
  need(same(configuration.fields,expected),'final assignments differ');
  await next('corr_analysis','done');
  const done=await channel.observe({condition:'correlation settings accepted',ready:s=>s.wizard?.stage==='done'});
