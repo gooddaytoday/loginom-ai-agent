@@ -21,7 +21,7 @@ function matches(element, selector) {
   selector = selector.trim();
   const breadcrumbLabel=/^(\[data-tid\*=";cnrNaviMode;b\.s"\]) (\.x-btn-inner-default-toolbar-small)$/.exec(selector);
   if(breadcrumbLabel)return matches(element,breadcrumbLabel[2]) && !!element.parentElement?.closest(breadcrumbLabel[1]);
-  const ownedInput=/^((?:\[data-tid[$^*]?="[^"]+"\])+) (input|textarea|\.x-form-error-msg|img\.x-grid-checkcolumn)$/.exec(selector);
+  const ownedInput=/^((?:\[data-tid[$^*]?="[^"]+"\])+) (input|textarea|\.x-form-error-msg|img\.x-grid-checkcolumn|\*)$/.exec(selector);
   if(ownedInput)return matches(element,ownedInput[2]) && !!element.parentElement?.closest(ownedInput[1]);
   const not = [...selector.matchAll(/:not\(([^)]+)\)/g)];
   if (not.some(([, inner]) => matches(element, inner))) return false;

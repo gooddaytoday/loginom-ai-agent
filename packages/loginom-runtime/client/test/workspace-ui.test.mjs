@@ -1115,6 +1115,85 @@ for(const stage of ['controls','data_views'])for(const fault of ['transient','pe
  if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
 });
 
+// LAB-1164 grouping-median :1673: a 1092-element Files region scrolled 4000->5000
+// exhausted 500 ms in both the controls read and its single retry. The fake DOM
+// has no layout engine: after the gesture, charge each native layout/style read
+// (getComputedStyle, scroll extents, getBoundingClientRect, hit test) a fixed cost.
+function storageScrollCostFixture(){
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),prefix='MF;TF-1;FileStorageForm;';
+ page.context.innerWidth=1280;page.context.innerHeight=800;page.waitForTimeout=async ms=>{clock.advance(ms);};
+ let parent=page.document.body;
+ for(let i=0;i<24;i++)parent=page.add('div',null,'',{x:0,y:0,width:1280,height:800},parent);
+ const table=page.add('div',prefix+'pnlFileStorage;tbl','',{x:0,y:80,width:1100,height:600},parent);
+ Object.assign(table,{scrollTop:4000,scrollHeight:10913,clientHeight:600,scrollWidth:1100,clientWidth:1100});table.style.overflowY='auto';
+ const items=page.add('div',null,'',{x:0,y:80,width:1100,height:600},table);
+ for(let r=0;r<48;r++){
+  const y=80+r*23,row=page.add('table',null,'',{x:0,y,width:1100,height:23},items);row.attrs.class='x-grid-item';
+  const tr=page.add('tr',null,'',{x:0,y,width:1100,height:23},page.add('tbody',null,'',{x:0,y,width:1100,height:23},row));
+  for(const [c,col] of ['Name','Size','Date','Type','Owner'].entries()){
+   const td=page.add('td',prefix+(c?'col'+col+'_'+r:'colName_file-'+r+'.csv'),c?'':'file-'+r+'.csv',{x:c*220,y,width:220,height:23},tr);
+   // Ellipsis cells overflow horizontally without being scroll owners.
+   const inner=page.add('div',null,'',{x:c*220,y,width:220,height:23},td);inner.attrs.class='x-grid-cell-inner';
+   Object.assign(inner,{scrollWidth:260,clientWidth:220});inner.style.overflowX='hidden';
+   page.add('span',null,c?'27':'',{x:c*220,y,width:20,height:20},inner);page.add('span',null,'',{x:c*220+20,y,width:20,height:20},inner);
+  }
+ }
+ const bar=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');
+ for(const [i,text] of ['Файлы','user'].entries()){
+  const button=page.add('div','MF;TF-1;cnrNaviMode;b.s_Сервер>Файлы'+(i?'>user':''),'',undefined,bar);
+  page.add('span',null,text,undefined,button).attrs.class='x-btn-inner-default-toolbar-small';
+ }
+ const cost={reads:0,charging:false,extra:0};
+ const read=owner=>{if(cost.charging){cost.reads++;clock.advance(0.12+(owner?cost.extra:0));if(owner)cost.extra=0;}};
+ const style=page.context.getComputedStyle;page.context.getComputedStyle=e=>{read();return style(e);};
+ const hit=page.document.elementFromPoint.bind(page.document);page.document.elementFromPoint=(x,y)=>{read();return hit(x,y);};
+ for(const e of page.document.all()){
+  const box=e.getBoundingClientRect.bind(e);e.getBoundingClientRect=()=>{read();return box();};
+  for(const k of ['scrollHeight','clientHeight','scrollWidth','clientWidth']){let v=e[k];Object.defineProperty(e,k,{get(){read(e===table&&k==='scrollHeight');return v;},set(n){v=n;},configurable:true});}
+ }
+ return {page,table,clock,cost,prefix};
+}
+
+test('Files scroll from a pre-gesture snapshot is not replayed',async()=>{
+ const {page,table,prefix}=storageScrollCostFixture();
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const before=await page.execute({mode:'observe',root_ref:root.ref});
+ const target=before.output.ui.elements.find(e=>e.tid===prefix+'colName_file-10.csv');
+ assert.ok(target.allowed_actions.includes('scroll'));assert.equal(target.scroll.top,4000);
+ const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(table.scrollTop,5000);
+ const replay=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+ assert.notEqual(replay.status,'SUCCEEDED');assert.equal(replay.effect_possible,false);
+ assert.equal(replay.trace.filter(e=>e.event==='ui_scroll_applied').length,0);assert.equal(table.scrollTop,5000);
+});
+
+// LAB-1188 Chromium profile (Files after reopen, 5277 document elements): the
+// global guard query, 568 selector parts over the whole document, took 114 of
+// 306 ms per read. A selector engine checks every part against each element it
+// is asked about, so count part checks per element.
+test('Files read checks the global guard list on candidates, not on every document element',async()=>{
+ const {page,table,prefix}=storageScrollCostFixture();
+ const other=page.add('div',null,'',{x:0,y:0,width:0,height:0});other.style.display='none';
+ for(let i=0;i<4200;i++)page.add('div','Other;n'+i,'',{x:0,y:0,width:0,height:0},other);
+ // A prefilter candidate inside a wizard root that no guard part names.
+ const wizard=page.add('div','MF;TF-1;WizrdMCF','',{x:1150,y:100,width:100,height:100});
+ const stray=page.add('button','MF;TF-1;WizrdMCF;btnNotGuard','Stray',{x:1160,y:110,width:50,height:20},wizard);
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const tids=roots.output.ui.elements.map(e=>e.tid);
+ assert.ok(tids.includes(wizard.attrs['data-tid']));assert.ok(!tids.includes(stray.attrs['data-tid']));
+ const match=Element.prototype.matches;let checks=0,guardParts=0;
+ Element.prototype.matches=function(selector){const parts=selector.split(',').length;checks+=parts;guardParts=Math.max(guardParts,parts);return match.call(this,selector);};
+ let read;
+ try{read=await page.execute({mode:'observe',root_ref:root.ref});}finally{Element.prototype.matches=match;}
+ assert.equal(read.status,'SUCCEEDED');assert.ok(guardParts>=500,String(guardParts));
+ assert.ok(read.output.scan.visited_elements>=1092);assert.equal(read.output.file_storage.directory,'/user');
+ assert.equal(read.output.ui.elements.filter(e=>e.tid?.startsWith(prefix+'colName_')).length,48);
+ assert.ok(!read.output.ui.elements.some(e=>e.tid===stray.attrs['data-tid']));
+ assert.ok(checks<page.document.all().length*guardParts/4,JSON.stringify({checks,elements:page.document.all().length,guardParts}));
+});
+
 test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
   for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
     const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;
