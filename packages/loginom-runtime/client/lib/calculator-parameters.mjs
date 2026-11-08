@@ -7,8 +7,9 @@ const flags=['intermediate','cached'];
 export function validateCalculatorParameters(parameters,mode,request) {
   requireValue(mode==='expression','Only Loginom expression syntax is supported');
   requireValue(parameters&&typeof parameters==='object'&&!Array.isArray(parameters)
-    &&Object.keys(parameters).every(k=>['expressions','order'].includes(k))&&Array.isArray(parameters.expressions)
+    &&Object.keys(parameters).every(k=>['expressions','order','syntax'].includes(k))&&Array.isArray(parameters.expressions)
     &&parameters.expressions.length<=128,'Bounded calculator expressions required');
+  requireValue(parameters.syntax===undefined||['expression','javascript'].includes(parameters.syntax),'Invalid parameters.parameters.syntax: expression or javascript');
   requireValue(request.target.kind==='existing'||parameters.expressions.length>0,'A new calculator requires expressions');
   requireValue(request.target.kind==='existing'||request.inputs.length===1&&request.inputs[0].input===0,
     'Invalid parameters.inputs: a new calculator requires exactly one explicit table connection to input 0');
@@ -67,7 +68,7 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
     'New calculator default expression changed');
   }
   const original=baseline;
-  const resolved=newNode?[]:structuredClone(baseline),changes=[];
+  const resolved=newNode?[]:structuredClone(baseline),changes=[],rewritten=new Set();
   for(const [index,patch] of parameters.expressions.entries()) {
     const existing=patch.target.kind==='existing';
     const matches=existing?original.filter(e=>e.name===patch.target.name):[];
@@ -75,11 +76,15 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
     const before=existing?matches[0]:newNode&&index===0?baseline[0]:null;
     const after=before?structuredClone(before):{intermediate:false,cached:false,description:'',replace:false};
     for(const key of [...properties,...flags])if(patch[key]!==undefined)after[key]=patch[key];
+    if(patch.formula!==undefined)rewritten.add(after);
     // A new expression inherits no stale formula/options from another row.
     if(existing)resolved[resolved.findIndex(e=>e.record_id===before.record_id)]=after;else resolved.push(after);
     changes.push({before,after,reuse_default:newNode&&index===0});
   }
   requireValue(resolved.length>0&&resolved.length<=128,'Calculator expression count outside supported bounds');
+  // Loginom keeps formula text when the language changes and never translates it.
+  if(!newNode&&parameters.syntax!==undefined&&parameters.syntax!==(observed.syntax??'expression'))
+    requireValue(resolved.every(e=>rewritten.has(e)),'Language change does not translate formulas: give every retained expression a new formula');
   const finalNames=resolved.map(e=>e.name.toLowerCase());
   requireValue(new Set(finalNames).size===finalNames.length,'Invalid parameters.parameters.expressions: Expression name collides with an unrequested expression; new adds, existing targets a retained name');
   for(const e of resolved) {

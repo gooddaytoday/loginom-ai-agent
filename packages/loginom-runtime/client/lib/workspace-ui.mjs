@@ -265,7 +265,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
       seenElements.add(element);dom.push(element);
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid$=";ReplaceColumnsWizard;btnTypeChange;mn"],[data-tid="mn"],[data-tid="mnUnionGrid"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid$=";ReplaceColumnsWizard;btnTypeChange;mn"],[data-tid$=";CalcDataWizard;btnCalcMode;mn"],[data-tid="mn"],[data-tid="mnUnionGrid"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -2918,7 +2918,7 @@ function readRenderedInputMapping(observation) {
           const buttons=tids.get(base+'btnTypeChange')??[],menus=tids.get(base+'btnTypeChange;mn')??[];
           const button=buttons.length===1?globalThis.Ext?.getCmp?.(buttons[0].id):null;
           if(button?.el?.dom===buttons[0]&&menus.length===1&&button.menu?.el?.dom===menus[0]&&visible(menus[0])){
-            for(const suffix of ['Str','Int','Float','DTime']){
+            for(const suffix of ['Str','Int','Float','DTime','Boolean']){
               const items=tids.get(base+'itmTypeChange'+suffix)??[],item=items.length===1?globalThis.Ext?.getCmp?.(items[0].id):null;
               if(items.length===1&&item?.el?.dom===items[0]&&item.ownerCt===button.menu&&menus[0].contains(items[0])&&visible(items[0])&&!sensitive(items[0]))
                 replacementCells.set(refOf(items[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'result_type',wizard_root_ref:wizard.root_ref});
@@ -2927,7 +2927,7 @@ function readRenderedInputMapping(observation) {
         }
         const grids=tids.get(base+'grdReplaceItems')??[],editors=tids.get(base+'ReplaceEditor')??[];
         if(grids.length===1&&editors.length===1&&grids[0].contains(editors[0])&&visible(editors[0])){
-          for(const tid of ['roweditorbuttons;update','roweditorbuttons;cancel',...['ReplaceEditor','ReplaceEditor-1'].flatMap(side=>['txt','num','Int64Field','datetimefield'].map(kind=>base+side+';fldVariant;ValueContainer;'+kind+';trg_SetNullTrigger'))]){
+          for(const tid of ['roweditorbuttons;update','roweditorbuttons;cancel',...['ReplaceEditor','ReplaceEditor-1'].flatMap(side=>['txt','num','Int64Field','datetimefield','cbx'].map(kind=>base+side+';fldVariant;ValueContainer;'+kind+';trg_SetNullTrigger'))]){
             const es=(tids.get(tid)??[]).filter(e=>grids[0].contains(e)&&visible(e)&&!sensitive(e));
             if(es.length===1)replacementCells.set(refOf(es[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:tid.endsWith('update')?'update':tid.endsWith('cancel')?'cancel':'set_null',wizard_root_ref:wizard.root_ref});
           }
@@ -3168,7 +3168,7 @@ function readRenderedInputMapping(observation) {
         || /;SizeGridForm;col(?:SizeType|AbsoluteSize)_[^;]+$|;SequenceMethodForm;col[^;]+$/.test(getTid(element)??''))
       || wizard.stage==='col_union'&&/;ColUnionDataWizard;colDisplayText_[01]$/.test(getTid(element)??'') || wizard.stage==='auto_correlation'&&/;AutoCorrelationWizard;pedDomainCalc;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || wizard.stage==='corr_analysis'&&/;CorrAnalysisWizard;colChk(?:First|Second)Set_[^;]+$/.test(getTid(element)??'') || slidingWindowControl(element) || navigationUp.length===1&&element===navigationUp[0] || wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || smoothingCells.has(state.ids.get(element)) || elimOutlierCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || enrichCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || ungroupCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || datatovarCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
       || wizard.calculator_preview?.status==='observed'&&getTid(element)===wizard.calculator_preview.root_tid+';p.h;close'
-      || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$/.test(getTid(element) ?? '')
+      || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$|;CalcDataWizard;btnCalcMode;mn;cm(?:Expression|JavaScript)$/.test(getTid(element) ?? '')
       // Pinned E2E bg/selectors.ts:272,279,286: palette tree labels and
       // expanders are spans without button/treeitem roles in some UI builds.
       || /;ModelForm;colVendors_Компоненты>[^;]+;(?:TreeText|TreeExpander)$/.test(getTid(element) ?? '')
@@ -3505,7 +3505,7 @@ function readRenderedInputMapping(observation) {
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression}:null;
       const expressionCancel=tid===wizard.root_tid+';ExprDataEditForm;btnCancel' && expressionParametersReady
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression,original_row:wizard.expression_selection}:null;
-      const expressionWritable=identity && isEnabled && calculatorEditor?.status==='observed' && calculatorEditor.mode==='expression'
+      const expressionWritable=identity && isEnabled && calculatorEditor?.status==='observed' && ['expression','javascript'].includes(calculatorEditor.mode)
         && calculatorEditor.selected_expression && calculatorEditor.document.full_text_verified && calculatorEditor.document.writable;
       const fullValue = editable && !sensitive(element) ? String(element.value ?? (element.isContentEditable ? element.textContent : '') ?? '') : undefined;
       const value = fullValue?.slice(0, 2048), valueTruncated = fullValue !== undefined && fullValue.length > 2048;
@@ -4488,7 +4488,7 @@ function readRenderedInputMapping(observation) {
             const fresh=await readUi(),found=fresh.ui.elements.find(item=>item.ref===task.action.ref)?.calculator_editor;
             if(!fresh.authenticated || fresh.origin!==current.origin || !same(fresh.workflow_ref,current.workflow_ref)
               || !same(fresh.ui.masks,current.ui.masks) || !same(fresh.ui.dialogs,current.ui.dialogs)
-              || !found || found.mode!=='expression' || found.document.text!==expectedText || !same(found.selected_expression,before.selected_expression)
+              || !found || !['expression','javascript'].includes(found.mode) || found.document.text!==expectedText || !same(found.selected_expression,before.selected_expression)
               || !found.document.full_text_verified || !found.document.writable)return false;
             return first.evaluate((element,expected)=>{
             const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
@@ -5214,7 +5214,7 @@ function readRenderedInputMapping(observation) {
           const before=current.ui.elements.find(item=>item.ref===task.action.ref);
           const after=observed.ui.elements.filter(item=>same(item.identity,before.identity));
           const editor=after.length===1?after[0].calculator_editor:null;
-          if(!editor || editor.mode!=='expression' || !same(editor.selected_expression,before.calculator_editor.selected_expression)
+          if(!editor || !['expression','javascript'].includes(editor.mode) || !same(editor.selected_expression,before.calculator_editor.selected_expression)
             || !editor.document.full_text_verified || editor.document.text!==task.action.text
             || ['wrapper_ref','input_ref','document_ref'].some(key=>editor.document[key]!==before.calculator_editor.document[key]))
             fail('EXPRESSION_TEXT_NOT_CONFIRMED','Replacement text was not confirmed in the same selected expression; inspect before retry');

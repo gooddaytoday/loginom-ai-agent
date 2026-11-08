@@ -72,9 +72,10 @@ test('calculator readback has its own public shape and cannot masquerade as text
  expressions:[{index:0,name:'R',label:'R',type:'real',formula:'A * 2',replace:false,intermediate:false,cached:false,description:''}],
  input_fields:[{name:'A',label:'A',type:'real'}],syntax_validation:'accepted_by_loginom_next',output_mapping:{port:0,autosync:true,fields:[{index:0,name:'R',label:'R',type:'real',data_kind:'Непрерывный',source_name:'R',excluded:false}]},package_persistence_verified:false}};
  assert.equal(validate(r).valid,true);
- for(const change of [v=>v.kind='text_import',v=>v.mode='javascript',v=>v.package_persistence_verified=true,v=>v.receipt_ids.pop(),v=>delete v.expressions[0].formula]){
+ for(const change of [v=>v.kind='text_import',v=>v.mode='javascript',v=>v.package_persistence_verified=true,v=>v.receipt_ids.pop(),v=>delete v.expressions[0].formula,v=>v.syntax='python']){
   const invalid=structuredClone(r);change(invalid.configuration.readback);assert.equal(validate(invalid).valid,false);
  }
+ for(const syntax of ['expression','javascript']){const ok=structuredClone(r);ok.configuration.readback.syntax=syntax;assert.equal(validate(ok).valid,true,syntax);}
 });
 
 test('reform readback has a registered shape with input identities and preservation evidence',()=>{
@@ -97,19 +98,20 @@ test('replacement public readback admits typed Null and exact Int64 without clai
  assert.equal(validate(r).valid,true);
  for(const precision of [0.07,0.25,0.29,1]){const nearest=structuredClone(r);nearest.configuration.readback.rules[0].precision=precision;assert.equal(validate(nearest).valid,true);}
  for(const patch of [{output_mode:'external'},{package_persistence_verified:true},{mode:'regex'}]){const bad=structuredClone(r);Object.assign(bad.configuration.readback,patch);assert.equal(validate(bad).valid,false);}
- for(const [result_type,value] of [['integer','12'],['real',1.25],['datetime','2026-11-01T00:00:00']]){
+ for(const [result_type,value] of [['integer','12'],['real',1.25],['datetime','2026-11-01T00:00:00'],['boolean',false],['boolean',true],['boolean',null]]){
   const converted=structuredClone(r),rule=converted.configuration.readback.rules[0];
   delete rule.precision;Object.assign(rule,{type:'string',result_type,case_sensitive:true,pairs:[{from:{type:'string',value:'12'},to:{type:result_type,value}}],other:{mode:'null'}});
   converted.configuration.readback.input_mapping.fields[0].type='string';
   converted.configuration.readback.output_mapping.fields[0].type=result_type;
   assert.equal(validate(converted).valid,true,result_type);
-  rule.result_type='boolean';assert.equal(validate(converted).valid,false);
+  rule.result_type='variant';assert.equal(validate(converted).valid,false);
  }
 });
 
 test('regex readback admits only string constants, ordered patterns and keep/null policy',()=>{
  const r=result(),field={index:0,name:'Code',label:'Code',type:'string',data_kind:'Дискретный',source_name:'Code'};
  r.configuration={status:'applied',readback:{kind:'replacement',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:{document_id:'d',workflow_id:'w',node_id:'n'},receipt_ids:['i','c','s','m','f'],mode:'regex',output_mode:'add',rules:[{field:{kind:'input_field',name:'Code'},type:'string',pairs:[{from:{type:'string',value:'(?i)AB-([0-9]{2})'},to:{type:'string',value:'SKU-$1'}}],other:{mode:'keep'}}],input_mapping:{port:0,autosync:true,fields:[field]},output_mapping:{port:0,autosync:true,fields:[{...field,excluded:false}]},package_persistence_verified:false}};
+ const mixed=structuredClone(r);mixed.configuration.readback.mode='mixed';const mr=mixed.configuration.readback.rules[0];mr.regex_pairs=structuredClone(mr.pairs);mr.pairs=[{from:{type:'string',value:'AB-12'},to:{type:'string',value:'EXACT-FIRST'}}];mr.case_sensitive=true;assert.equal(validate(mixed).valid,true);
  assert.equal(validate(r).valid,true);
  for(const change of [v=>v.rules[0].case_sensitive=true,v=>v.rules[0].pairs[0].to.value=null,v=>v.rules[0].pairs=[],v=>v.rules[0].type='integer',v=>v.rules[0].other.mode='value']){const bad=structuredClone(r);change(bad.configuration.readback);assert.equal(validate(bad).valid,false);}
 });
