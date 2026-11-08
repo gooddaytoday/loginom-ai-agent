@@ -1,3 +1,9 @@
+`corr-ranks` uses the approved `research-corranalysis/acceptance/modes/task-ranks.md`
+and ranks.csv only. The stage-0 oracle stays outside the model workspace. Full
+production checkpoints verify Spearman followed by Kendall tau-b on the same
+node, tied values, exact native types/field order and abs=1e-8/rel=1e-10.
+Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
+
 Run live acceptance without repeatedly reading live logs:
 
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
@@ -111,7 +117,15 @@ Stratified and biased are registered as `sampling-stratified`, `sampling-biased`
 `partition-stratified`, `partition-biased`. Stratified additionally checks exact
 size, Class quotas and combined/train/test relations. Biased checks repeats and
 exact typed membership without sizes or quotas. Both require saved native field
-order; uniform remains unsupported.
+order; uniform is registered below.
+`sampling-uniform`, `partition-uniform` and `partition-test-priority` use the
+approved v040 task/expected/source fixtures. Uniform checks typed membership,
+unique RowID, unchanged executions, separate native group row sizes and every
+CSV. Partition additionally checks disjoint train/test and combined IsTestSet.
+The priority task checks beginning then end on the same node; cold compares
+the final end result. Cold inspects saved method, sizes, seed and priority
+through the production reader and verified Cancel without applying settings.
+No PRNG formula or Class quotas are asserted for uniform.
 Stock expected parsing, exact matching and existing scenarios are unchanged.
 
 ```sh
@@ -580,6 +594,11 @@ cold обоих портов с независимым Apriori oracle, точн�
 Комплект — `docs/node-development/nodes/transform-enrichdata/acceptance`;
 модели передаются только соответствующее задание и перечисленные CSV.
 
+`enrich-three-lookups`, `enrich-four-lookups`: Дополнение данных, три и четыре
+справочника одного узла (7×6 и 7×7); четвёртый добавляется к тому же узлу после
+выполнения с тремя. Задания `task-three-lookups.md`, `task-four-lookups.md`,
+ожидания `acceptance/extended/`, CSV `fixtures/extended/`.
+
 `ungroup-shares`, `ungroup-null`, `ungroup-empty`, `ungroup-rounding`: Разгруппировка
 по заданным долям, два входа, порт 0. Утверждённые task/expected и независимый
 Decimal oracle — `transform-ungroupdata/acceptance`; только task и выбранные
@@ -677,12 +696,28 @@ order; fixed width supplies the real .txt file without treating it as CSV,
 while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
 the byte oracle for the file passed through --csv. No oracle reaches the model.
 
+`factor-auto` uses the approved `modes/task-auto.md`: eigenvalue 1.1 then
+variance 90% on the same node, both complete typed outputs after each execution.
+Both stages use the unchanged independent `modes/expected.json` and stock
+factor-sign matcher. Final two CSVs, Save, cold and cleanup are required.
+`factor-cap` uses `task-cap.md`: fixed two trained factors, then output cap one
+on the same node, physically one Factor field on both ports. The cap oracle
+and stock CSV/cold matcher retain exact types, NULL and field order.
+Only task and matrix.csv reach the model.
+
 
 `replace-boolean` и `replace-mixed` используют утверждённые task-boolean.md/task-mixed.md
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
 
+`text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
+задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
+Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
+oracle и expected — нет. Проверяются все значения, типы, порядок полей, Save, cold и
+cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
+сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
+выгрузке run-check не различает — его подтверждает журнал вызова узла.
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
 Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,

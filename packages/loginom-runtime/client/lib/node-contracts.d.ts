@@ -10,6 +10,13 @@ export type NodeTarget<T extends NodeType = NodeType> =
   | {kind: 'existing'; type: T; ref: NodeRef; label?: string; position?: Position};
 export interface InputLink { source: NodeRef; output: number; input: number }
 export interface VariableInputLink extends InputLink { kind: 'variables' | 'control' }
+export interface VariableBinding { parameter: string; variable: {kind: 'variables' | 'control'; input: number; name: string} }
+export interface VariableBindingReadback extends VariableBinding {
+  mode: 'variable'; row_id: string;
+  variable: VariableBinding['variable'] & {id: number; type: 'integer' | 'string' | 'boolean'; is_null: false};
+  source: {ref: NodeRef; type: NodeType; output: number; variable_id: number};
+  input_port_guid: string; connected: true; verified: true;
+}
 export interface NodeTargetRequest<T extends NodeType = NodeType> {
   document_id: string; workflow_ref: WorkflowRef; target: NodeTarget<T>; inputs: InputLink[]; variable_inputs?: VariableInputLink[];
 }
@@ -24,12 +31,14 @@ export interface PortMapping {
 /** Each handler binds and validates P through its pinned local JSON schema. */
 export interface NodeApplyRequest<T extends NodeType, P> extends NodeTargetRequest<T> {
   operation_id: string; contract_revision: string; mode: string; parameters: P;
+  bindings?: VariableBinding[];
   mappings: PortMapping[]; finish: 'done' | 'execute' | 'close';
   read: {ports: number[]; variable_ports?: number[]; sample_rows: number; require_exact_numbers: boolean; coverage?: 'sample' | (T extends 'transform.collapse_columns' | 'transform.cross_table' ? 'full' : never)};
   budgets: {configure_ms: number; execute_ms: number; total_ms: number};
 }
 export interface NodeHandler<T extends NodeType, P> {
   type?: T; revision: string; modes: readonly string[]; parameter_schema?: object;
+  binding_schema?: object;
   output_wizard?: 'embedded' | 'separate';
   /** Host-only JavaScript lifecycle: await materialization before output mapping. */
   materialize_output?: boolean;
@@ -39,7 +48,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): VariablesCalculatorConfigurationReadback | DataToVarConfigurationReadback | UserVariablesConfigurationReadback | AssnRulesConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): VariablesCalculatorConfigurationReadback | DataToVarConfigurationReadback | UserVariablesConfigurationReadback | AssnRulesConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisModesConfigurationReadback | CorrAnalysisRanksConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | SamplingUniformConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -56,7 +65,7 @@ export interface NodeApplyResult {
   execution: NodeExecution; output: NodeOutput;
   /** A local node checkpoint never proves that the package was saved. */
   package_saved: false; cleanup_complete: boolean; warnings: string[];
-  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; variable_mappings?: VariableMappingReadback[]; readback?: DataToVarConfigurationReadback | UserVariablesConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
+  configuration?: {status: 'applied' | 'discarded' | 'not_requested'; bindings?: VariableBindingReadback[]; variable_mappings?: VariableMappingReadback[]; readback?: DataToVarConfigurationReadback | UserVariablesConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisModesConfigurationReadback | CorrAnalysisRanksConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | SamplingUniformConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback};
   checkpoint_kind?: 'local_node_checkpoint' | 'local_node_cancellation' | 'local_node_stopped' | 'local_node_failed';
   persisted_package_verified?: false; pending_phase?: PhaseName | null; error?: NodeError;
 }
@@ -107,7 +116,7 @@ export interface GroupingParameters {
   /** Full ordered lists, or both omitted to retain an existing configuration. */
   group_by?: Array<{kind: 'input_field'; name: string}>;
   measures?: Array<{field: {kind: 'input_field'; name: string};
-    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'median' | 'unique_count'; name: string; label: string}>;
+    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'median' | 'mode' | 'stddev' | 'null_count' | 'unique_count'; name: string; label: string}>;
 }
 export interface GroupingConfigurationReadback {
   kind: 'grouping'; scope: 'observed_before_verified_finish'; node: NodeRef;
@@ -386,6 +395,10 @@ export interface SamplingModesConfigurationReadback extends Omit<SamplingConfigu
  bias_field:string | null; bias_factors:Array<{value:string;factor:number}>; test_priority:false;
 }
 
+export interface CorrAnalysisRanksConfigurationReadback extends Omit<CorrAnalysisConfigurationReadback,'mode'|'coefficients'> {
+ mode:'spearman' | 'kendall'; coefficients:['spearman'] | ['kendall'];
+}
+
 export interface CorrAnalysisConfigurationReadback {
  kind: 'corr_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
  node: NodeRef; receipt_ids: string[]; mode: 'pearson'; first_set: string[]; second_set: string[];
@@ -461,15 +474,20 @@ export interface FactorAnalysisConfigurationReadback {
   package_persistence_verified: false;
 }
 
+export interface FactorAnalysisModesConfigurationReadback extends Omit<FactorAnalysisConfigurationReadback, 'mode'> {
+  mode: 'pca_fixed' | 'pca_eigenvalue' | 'pca_variance'; criterion: 'fixed' | 'eigenvalue' | 'variance';
+  eigenvalue?: number; variance_percent?: number; output_factors: number | false;
+}
+
 export interface TreeConversionConfigurationReadback { kind: "table_to_tree" | "tree_to_json"; mode: "manual_structure" | "serialize"; scope: "observed_before_verified_finish"; values_are: "observed_ui_values"; node: NodeRef; receipt_ids: string[]; package_persistence_verified: false; input_port: 0; output_port: 0; nodes?: {path:string;name:string;label:string;type:"object"|"integer"|"real"|"string"|"boolean";is_array:boolean;source_field?:string}[]; exclude_root?: true; pretty?: false; keys?: "names"; multi_row?: false; datetime?: "iso8601" }
 
-export interface EnrichParameters {enrichment?: {tables:Array<{port:1|2;keys:Array<{main:string;lookup:string}>}>;
+export interface EnrichParameters {enrichment?: {tables:Array<{port:number;keys:Array<{main:string;lookup:string}>}>;
   prefixes:{enabled:boolean;name:string;label:string}}}
 export interface EnrichConfigurationReadback {
   kind:'enrich';scope:'observed_before_verified_finish';node:NodeRef;
   receipt_ids:string[];values_are:'observed_ui_values';package_persistence_verified:false;mode:'left';
   prefixes:{enabled:boolean;name:string;label:string};
-  tables:Array<{port:1|2;native_index:number;keys:Array<{main:string;lookup:string}>}>;
+  tables:Array<{port:number;native_index:number;keys:Array<{main:string;lookup:string}>}>;
   input_mappings:Array<{port:0|1|2;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
     autosync:boolean;fields:JoinConfigurationReadback['input_mappings'][number]['fields']}>;
   output_mapping:GroupingConfigurationReadback['output_mapping'];
@@ -512,4 +530,8 @@ export interface DataToVarConfigurationReadback {
  node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'; order: number; aggregations: string[]}>;
  input_mapping: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string; type: string; source_name: string}>};
  output_port: 0; port_kind: 'variables'; package_persistence_verified: false;
+}
+
+export interface SamplingUniformConfigurationReadback extends Omit<SamplingModesConfigurationReadback,'mode'|'test_priority'> {
+ mode:'uniform'; group_size_rows:number[]; test_priority:boolean; test_priority_position?:'beginning'|'end'|'algorithm'|null;
 }

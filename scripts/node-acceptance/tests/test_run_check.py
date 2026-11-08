@@ -22,6 +22,24 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_variables_replace_match_order_policy(self):
+        case = runner.scenario('variables-replace-match')
+        initial = runner.read(case['source'] / case['variable_initial'])
+        self.assertNotIn('column_order', initial['variable_inventory']['outputs'][0])
+        for cold in [False, True]:
+            output = runner.expected_for(case, '/own/match.lgp', cold=cold)['variable_inventory']['outputs'][0]
+            self.assertEqual(output['column_order'], 'any')
+            self.assertEqual(output['variables'], initial['variable_inventory']['outputs'][0]['variables'])
+
+    def test_uniform_export_plans_cover_each_requested_stage_and_port(self):
+        for name, count, ports in [('sampling-uniform', 2, 1), ('partition-uniform', 3, 3), ('partition-test-priority', 6, 3)]:
+            case = runner.scenario(name)
+            self.assertEqual(case.get('export_count'), count)
+            expected = runner.expected_for(case, '/own/uniform.lgp')
+            self.assertEqual(len(expected['outputs']), ports)
+            self.assertEqual(expected['sampling_modes']['mode'], 'uniform')
+            self.assertEqual(expected['sampling_modes']['group_size_rows'], [1] * (2 if ports == 3 else 1))
+
     def test_rest_c1_single_method_scenarios(self):
         for name, method in [('rest-post-body', 'POST'), ('rest-put-body', 'PUT'),
                              ('rest-patch-body', 'PATCH'), ('rest-delete', 'DELETE')]:
@@ -514,6 +532,19 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual([(c['name'], c['type']) for c in expected['outputs'][0]['columns']], [('Region', 'string'), ('Metric', 'real')])
         self.assertEqual({r['Region']: r['Metric'] for r in expected['outputs'][0]['rows']}, {'B': 3, 'A': 4, 'C': 7, 'D': None, 'E': 2})
         self.assertIn('grouping-median', runner.scenario_names('grouping-median'))
+
+    def test_grouping_cycle_two_uses_approved_tasks_and_oracle(self):
+        for scenario, mode, types in [('grouping-mode', 'mode', ['string', 'integer', 'string']),
+                                     ('grouping-stddev', 'stddev', ['string', 'real']),
+                                     ('grouping-null-count', 'null_count', ['string', 'integer', 'integer'])]:
+            with self.subTest(scenario=scenario):
+                case = runner.scenario(scenario)
+                self.assertEqual(case['prompt'].name, 'task-' + scenario.removeprefix('grouping-') + '.md')
+                self.assertEqual(case['input_files'], ['modes.csv'])
+                expected = runner.expected_for(case, '/test/modes.lgp')
+                self.assertEqual(expected['outputs'], json.loads(subprocess.check_output([
+                    sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages'])
+                self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], types)
 
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')

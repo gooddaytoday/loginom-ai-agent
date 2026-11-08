@@ -65,7 +65,7 @@ export function validateUiAction(action, snapshot) {
   if (action.verb === 'set_checked' && typeof action.checked !== 'boolean') throw new Error('set_checked requires a boolean checked value');
   if (snapshot) {
     if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&action.expected_stage[0]==='tree_output_mapping'&&!['json_tree','table_tree'].includes(snapshot.wizard?.stage))throw new Error('Tree conditional destinations require JSON tree configuration');
-    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['table_tree','tree_json','json_tree','tree_table','variables_to_table','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','smoothing','sliding_window','date_time','field_parameters','row_filter','ungroup','join','union','enrich','col_union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
+    if(action.verb==='wizard_step'&&Array.isArray(action.expected_stage)&&!['factor_analysis','table_tree','tree_json','json_tree','tree_table','variables_to_table','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','smoothing','sliding_window','date_time','field_parameters','row_filter','ungroup','join','union','enrich','col_union'].includes(snapshot.wizard?.stage))throw new Error('Conditional destinations require a supported transform configuration');
     if(action.verb==='wizard_step' && (snapshot.wizard?.status!=='observed' || snapshot.wizard.stage===action.expected_stage))throw new Error('wizard_step requires a different destination stage and an observed wizard');
     if (!Array.isArray(snapshot.ui?.elements)) throw new Error('UI action requires an observation snapshot');
     for (const ref of refs) {
@@ -371,7 +371,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input',owner+' [data-tid]', '[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
-      ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
+      ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator','cbbAutoDetectColumnsMode'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
+      '[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;seReadRowCount"]','[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;seReadRowCount"] input',
       ...['edtMultipleDelimiters;ValueControl','edtMultipleDelimiters;ValueControl;InputEl','edtMultipleDelimiters;ValueControl;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+'"]'),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
@@ -882,7 +883,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return workflowAncestor ? 'workflow' : 'global';
     };
     const wizardForms=all.filter(element=>getTid(element)===workflow?.prefix+';WizrdMCF' && visible(element) && !sensitive(element));
-    let wizard={status:wizardForms.length?'ambiguous':'absent'};
+    let wizard={status:wizardForms.length?'ambiguous':'absent'},factorWizard=false;
     if (wizardForms.length===1) {
       const form=wizardForms[0],base=getTid(form);
       const matching=suffix=>(tids.get(base+suffix)??[]).filter(element=>form.contains(element) && visible(element) && !sensitive(element));
@@ -891,6 +892,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // distinguishes its -1 page from Binning's two-card ranges wizard.
       const qualityPages=[0,1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard'+(port?'-'+port:''));
       const qualityWizard=qualityPages.every(name=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name)+']')];return es.length===1&&form.contains(es[0]);});
+      // PCA owns exactly two derived-output cards; the hidden factor form
+      // distinguishes its loadings card from the historical Binning stage.
+      const owned=name=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name)+']')];return es.length===1&&form.contains(es[0]);};
+      factorWizard=['FactorAnalysisWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].every(owned)
+        &&!document.querySelectorAll('[data-tid='+JSON.stringify(base+';DerivedDataSourceMappingEngineOutputPortWizard-2')+']').length;
       const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>{
         if(key==='coarse_classes_mapping_2'&&!(tids.get(base+';CoarseClassesWizard-1')??[]).some(element=>form.contains(element)))return [];
         const counts=[suffixes].flat().map(suffix=>key==='binning_ranges_mapping'&&qualityWizard||key==='output_mapping'&&!qualityWizard&&/Wizard-[1-4];/.test(suffix)?0:matching(suffix).length);
@@ -1441,7 +1447,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       }
     }
     scanStage='output_definitions';
-    if(wizard.status==='observed' && ['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)) {
+    const factorLoadingsMapping=factorWizard&&wizard.stage==='binning_ranges_mapping';
+    if(wizard.status==='observed' && (['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)||factorLoadingsMapping)) {
       const reform=wizard.stage==='field_parameters',columnsKey=reform?'reform_columns':'output_columns';
       const mappingForms=[...[1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard-'+port),'ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
         (tids.get(wizard.root_tid+';'+name+';'+(name==='TuneDataSourceInputPortWizard'?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(visible).length===1);
@@ -1489,7 +1496,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     }
     if(wizard.output_columns) {
       let coverage={status:'partial',source_identity_verified:false};
-      const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
+      const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard',...(factorWizard?['DerivedDataSourceMappingEngineOutputPortWizard-1']:[])].filter(name=>
         (tids.get(wizard.root_tid+';'+name+';'+(name==='TuneDataSourceInputPortWizard'?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e)).length===1);
       const base=wizard.root_tid+';'+(forms.length===1?forms[0]:'__unobserved__')+';';
       const unique=key=>{const es=tids.get(base+key)??[];return es.length===1 && wizardForms[0].contains(es[0])
@@ -1598,7 +1605,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const view=globalThis.Ext?.getCmp?.(boundId),store=view?.el?.dom===body?view.getStore?.():null;
           const records=store?.$className==='Ext.data.Store' && !store.isBufferedStore && !store.isLoading?.()
             ?store.getData?.()?.items:null;
-          const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(forms[0]),groupIndices=new Map();
+          const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].includes(forms[0]),groupIndices=new Map();
           // Grouped CollectionProxy totals count active fields or retain the
           // last load after a local removal. Accept only a complete unfiltered
           // local cache; the rendered record identities are still checked below.
@@ -2220,7 +2227,7 @@ function readRenderedInputMapping(observation) {
     }
     if(wizard.status==='observed' && wizard.stage==='text_import_format') {
       const base=wizard.root_tid+';ImportTextFileParamsWizard;';
-      const fields={delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator',date_format:'edtDateFormat',date_separator:'edtDateSeparator'};
+      const fields={delimiter:'edtDelimiterChar',text_qualifier:'edtTextQualifier',null_marker:'edtValueNull',decimal_separator:'edtDecimalSeparator',date_format:'edtDateFormat',date_separator:'edtDateSeparator',auto_detect_columns:'cbbAutoDetectColumnsMode'};
       wizard.settings={status:'draft_ui_values',applied_verified:false,fields:Object.fromEntries(Object.entries(fields).map(([name,key])=>{
         const owners=(tids.get(base+key+';ValueControl')??[]).filter(item=>wizardForms[0].contains(item) && visible(item) && !sensitive(item));
         const inputs=owners.length===1?dom.filter(item=>{charge();return owners[0].contains(item) && item.matches('input:not([type="hidden"]),textarea') && visible(item) && !sensitive(item);}):[];
@@ -2234,6 +2241,17 @@ function readRenderedInputMapping(observation) {
         return [name,{status:'observed',value:value.slice(0,256),value_length_utf16:value.length,truncated:value.length>256,
           enabled:enabled(input),read_only:input.readOnly===true,source_tid:ownerTid,input_ref:refOf(input),owner_ref:refOf(owners[0]),value_kind:'displayed_input_text',native_max_length_utf16:nativeMax}];
       }))};
+      // Added fields stay absent when unobserved so older guards over every setting are unchanged.
+      if(wizard.settings.fields.auto_detect_columns.status!=='observed')delete wizard.settings.fields.auto_detect_columns;
+      const rowsTid=base+'ColumnDefsTuning;seReadRowCount';
+      const rowsOwners=(tids.get(rowsTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
+      const rowsInputs=rowsOwners.length===1?dom.filter(e=>{charge();return rowsOwners[0].contains(e)&&e.matches('input:not([type="hidden"])')&&visible(e)&&!sensitive(e);}):[];
+      if(rowsInputs.length===1&&/^[0-9]{1,7}$/.test(String(rowsInputs[0].value))) {
+        const input=rowsInputs[0],value=String(input.value);
+        if(enabled(input)&&!input.readOnly)wizardFields.set(input,{name:'analysis_rows',scope:'import_format',max_length_utf16:7,stage:wizard.stage,root_ref:refOf(wizardForms[0]),owner_ref:refOf(rowsOwners[0])});
+        wizard.settings.fields.analysis_rows={status:'observed',value,value_length_utf16:value.length,truncated:false,enabled:enabled(input),read_only:input.readOnly===true,
+          source_tid:rowsTid,input_ref:refOf(input),owner_ref:refOf(rowsOwners[0]),value_kind:'displayed_input_text'};
+      }
       const multipleTid=base+'edtMultipleDelimiters;ValueControl';
       const multipleOwners=(tids.get(multipleTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
       const multipleDisplays=(tids.get(multipleTid+';DisplayEl')??[]).filter(e=>multipleOwners.length===1&&multipleOwners[0].contains(e)&&visible(e)&&!sensitive(e));
@@ -2733,7 +2751,7 @@ function readRenderedInputMapping(observation) {
       }
     }
     const outputColumnCells=new Map();
-    if(['output_mapping','input_mapping'].includes(wizard.stage) && !wizard.column_parameters
+    if((['output_mapping','input_mapping'].includes(wizard.stage)||factorLoadingsMapping) && !wizard.column_parameters
       &&(wizard.output_columns?.page?.status==='complete_definition_page'
         ||wizard.output_columns?.definition_coverage?.status==='complete_configured_rows')) {
       for(const field of wizard.output_columns.fields??[])if(field.status==='observed') {
@@ -2873,7 +2891,7 @@ function readRenderedInputMapping(observation) {
           if(!Number.isSafeInteger(index)||index<0||!r?.isModel||typeof d?.Name!=='string'||!d.Name||row.getAttribute('data-recordid')!==String(r.internalId)||row.getAttribute('data-boundview')!==grid.id)continue;
           for(const cell of row.querySelectorAll('[data-tid]')){
             const tid=getTid(cell),match=/;normalHeaderCt;(chk|col)([1-9][0-9]*)_/.exec(tid??'');
-            if(!match||tid!==base+'normalHeaderCt;'+match[1]+match[2]+'_'+d.Name||Number(match[2])>2||!visible(cell)||sensitive(cell))continue;
+            if(!match||tid!==base+'normalHeaderCt;'+match[1]+match[2]+'_'+d.Name||Number(match[2])>14||!visible(cell)||sensitive(cell))continue;
             enrichCells.set(refOf(cell),{part:match[1]==='chk'?'check':'field',port:Number(match[2]),field_key:d.Name,record_id:String(r.internalId),row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
           }
         }
@@ -3172,7 +3190,7 @@ function readRenderedInputMapping(observation) {
     const coarseClassesControl=element=>wizard.stage==='coarse_classes'&&(getTid(element)??'').startsWith(wizard.root_tid+';CoarseClassesWizard-1;')&&/;(?:colColumnDisplayName_[^;]+|colColumnPurpose_[^;]+|trg_picker|boundlist;[^;]+|DisplayEl)$/.test(getTid(element)??'');
     const interesting = element => ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
       &&(getTid(element)??'').startsWith(wizard.root_tid+';')
-      &&(/;pedSamplingMethod;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
+      &&(/;(?:pedSamplingMethod|pedTestPriorityPosition);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
         || /;(?:StratifiedMethodForm;grdStratifiedGrid;headercontainer;UsageFlag_[^;]+|BiasedMethodForm;colDisplayName_[^;]+|BiasedMethodForm;colBiasedValue_[^;]+)$/.test(getTid(element)??'')
         || /;SizeGridForm;col(?:SizeType|AbsoluteSize)_[^;]+$|;SequenceMethodForm;col[^;]+$/.test(getTid(element)??''))
       || wizard.stage==='col_union'&&/;ColUnionDataWizard;colDisplayText_[01]$/.test(getTid(element)??'') || wizard.stage==='auto_correlation'&&/;AutoCorrelationWizard;pedDomainCalc;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || wizard.stage==='corr_analysis'&&/;CorrAnalysisWizard;colChk(?:First|Second)Set_[^;]+$/.test(getTid(element)??'') || slidingWindowControl(element) || navigationUp.length===1&&element===navigationUp[0] || wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || smoothingCells.has(state.ids.get(element)) || elimOutlierCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || enrichCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || ungroupCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || datatovarCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')

@@ -1,0 +1,32 @@
+import {createNodeProcedure} from './node-procedure.mjs';
+import {withBrowserReceipt} from './executor.mjs';
+export async function preflightBuiltinBindings(options,ctx,config,source){
+ const {operation,execute,onRecord,now,receiptOptions}=options,r=operation.parameters;
+ const channelFor=node=>createNodeProcedure({operation,execute,record:onRecord,now,...config,maxSteps:1024,signal:ctx.signal,
+  preparedNodeContext:{document_id:r.document_id,workflow_ref:r.workflow_ref,node},
+  wrapMutation:(code,p)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(p.id,p.action_key,p.signature),operation_id:p.id})});
+ // Empty Close uses the existing independent user-values reader and Cancels
+ // both untouched drafts. It preserves dirty state and every variable ID.
+ const result=await channelFor(source).configureUserVariables([],'close');
+ if(result.verified!==true||result.cleanup_complete!==true||result.independent_readback!==true||result.settings_applied!==false)throw Error('BINDING_SOURCE_UNVERIFIED');
+ let savedMapping;
+ if(r.target.kind==='existing'){
+  const read=await channelFor(r.target.ref).readVariablePortMapping({direction:'input',kind:'control',port:0});
+  if(read.verified!==true||read.cleanup_complete!==true||read.independent_readback!==true)throw Error('BINDING_SOURCE_UNVERIFIED');
+  savedMapping=read.mapping;
+ }
+ validateBuiltinBindingSource(result,r,savedMapping);
+ return {...result,source};
+}
+
+export function validateBuiltinBindingSource(result,r,savedMapping){
+ for(const b of r.bindings){
+  const mapping=r.mappings.find(m=>m.kind==='control'&&m.port===0),field=(mapping?.fields??mapping?.changes??[]).find(f=>f.name===b.variable.name);
+  const saved=savedMapping?.fields.find(f=>f.name===b.variable.name);
+  const name=field?.source?.name??saved?.source?.name??b.variable.name,vs=result.variables.filter(v=>v.name===name&&(field||!saved||v.id===saved.source?.id));
+  if(vs.length!==1)throw Error('BINDING_VARIABLE_MISSING: '+b.parameter);
+  const [,,g,c]=b.parameter.split('/'),condition=r.parameters.groups?.[Number(g)]?.[Number(c)],v=vs[0];
+  if(condition&&v.type!==condition.type)throw Error('BINDING_TYPE_MISMATCH: '+b.parameter);
+  if(v.cell?.is_null!==false)throw Error('BINDING_NULL_UNSUPPORTED: '+b.parameter);
+ }
+}

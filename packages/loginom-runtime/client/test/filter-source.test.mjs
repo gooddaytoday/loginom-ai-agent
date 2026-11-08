@@ -26,3 +26,22 @@ test('incomplete graph refuses before interpreting source identity',async()=>{
 test('Close retains disposal path without inspecting or executing builtin',async()=>{
  const f=fixture({finish:'close'});assert.equal((await f.run()).verified,true);assert.equal(f.reads(),0);
 });
+for(const existing of [false,true])test('empty bindings cannot admit builtin legacy operands '+existing,async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'flow'},target:existing?{kind:'existing',ref:{...ref,node_id:'filter'}}:{kind:'new'},finish:'done',bindings:[],mappings:[],inputs:[],
+  parameters:{groups:[[{field:{kind:'input_field',name:'Amount'},type:'integer',operator:'>',value:{kind:'variable',name:'Limit'}}]]},variable_inputs:existing?[]:[{kind:'control',input:0,output:4,source:ref}]};
+ const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[{ref,type:'variables.user'}],links:[],variable_links:[{source:'source',target:'filter',kind:'control',input:0,output:4}]};
+ const options={operation:{parameters:request,nodeTargetAdapter:{observe:async()=>graph}}};
+ await assert.rejects(preflightFilterSource(options,{},{}),e=>e.nodePhaseRefusal?.status==='NOT_APPLIED'&&e.nodePhaseRefusal.effect_possible===false);
+ request.bindings=[{parameter:'/groups/0/1/value',variable:{kind:'control',input:0,name:'Other'}}];
+ request.parameters.groups[0].push({field:{kind:'input_field',name:'Amount'},type:'integer',operator:'>'});
+ await assert.rejects(preflightFilterSource(options,{},{}),e=>e.nodePhaseRefusal?.status==='NOT_APPLIED'&&e.nodePhaseRefusal.effect_possible===false);
+});
+import {isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
+test('empty and omitted bindings use the same unchanged execution without builtin preflight',async()=>{
+ for(const extra of [{},{bindings:[]}]){
+  const request={document_id:'doc',workflow_ref:{workflow_id:'flow'},target:{kind:'existing',type:'transform.filter_data',ref:{...ref,node_id:'filter'}},mode:'conditions',finish:'execute',parameters:{},inputs:[],mappings:[],variable_inputs:[],...extra};
+  assert.equal(isUnchangedTransformExecution(request),true);
+  const r=await preflightFilterSource({operation:{parameters:request,nodeTargetAdapter:{observe:async()=>{throw Error('must not inspect the builtin source');}}}},{},{});
+  assert.equal(r.verified,true);
+ }
+});

@@ -35,11 +35,16 @@ export function readMappingBrowser(request) {
   const fail=reason=>({verified:false,reason,source_identity_verified:false});
   const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
   const exact=tid=>[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')===tid);
-  const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','TuneDataSourceMappingWizard','DerivedDataSourceMappingEngineOutputPortWizard'];
+  const wizard=exact(prefix+';WizrdMCF');
+  const owned=name=>{const es=exact(prefix+';WizrdMCF;'+name);return es.length===1&&wizard.length===1&&wizard[0].contains(es[0]);};
+  const factorWizard=owned('FactorAnalysisWizard')&&owned('DerivedDataSourceMappingEngineOutputPortWizard')
+    &&owned('DerivedDataSourceMappingEngineOutputPortWizard-1')&&!exact(prefix+';WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard-2').length;
+  const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','TuneDataSourceMappingWizard','DerivedDataSourceMappingEngineOutputPortWizard',...(factorWizard?['DerivedDataSourceMappingEngineOutputPortWizard-1']:[])];
   const candidates=forms.flatMap(form=>exact(prefix+';WizrdMCF;'+form).filter(e=>e.checkVisibility({checkVisibilityCSS:true})).map(root=>({form,root})));
   if(candidates.length!==1)return fail('mapping_root');
-  const {form,root}=candidates[0],input=form==='TuneDataSourceMappingWizard',grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(form);
+  const {form,root}=candidates[0],input=form==='TuneDataSourceMappingWizard',grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].includes(form);
   const base=prefix+';WizrdMCF;'+form+';';
+  const importMapping=form==='ColumnsMappingEngineOutputPortWizard'&&exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length===1;
   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
   if(masks.some(e=>{
     // The empty output grid disables delete-all with an Ext control mask.
@@ -74,13 +79,18 @@ export function readMappingBrowser(request) {
         &&selected[0].getAttribute('data-recordid')===editor.record_id&&selected[0].getAttribute('data-boundview')===grids[0].id)
         return false;
     }
-    return !(form==='DataSetOutputSocketWizard'&&e.classList?.contains('x-mask')
+    // «Автоопределение столбцов: Все» fixes the imported schema, so the same
+    // native disabled delete-all column also appears in the text import's own
+    // generic output mapping form. Other nodes keep the stricter admission.
+    return !((form==='DataSetOutputSocketWizard'||importMapping)&&e.classList?.contains('x-mask')
       &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
       &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
       &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1&&root.contains(parent)
       &&wizard.length===1&&model?.FView?.el?.dom===wizard[0]&&wizard[0].contains(root)
       &&column?.el?.dom===parent&&column.disabled===true&&masks.filter(mask=>mask.parentElement===parent).length===1);
-  }))return fail('mapping_mask');
+  }))return {...fail('mapping_mask'),form,import_pages:exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length,mask_detail:masks.slice(0,4).map(e=>{
+    try{return {cls:String(e.className??'').slice(0,80),role:e.getAttribute('role'),parent_tid:e.parentElement?.getAttribute('data-tid')??null,
+      parent_cls:String(e.parentElement?.className??'').slice(0,80),text:String(e.textContent??'').trim().slice(0,40)};}catch{return null;}})};
   const grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(s=>exact(base+s));
   if(grids.some(es=>es.length!==1||!root.contains(es[0])))return fail('mapping_grids');
   const elements=grids.map(es=>es[0]),views=elements.map(e=>globalThis.Ext?.getCmp?.(e.id));
@@ -196,7 +206,8 @@ export function readMappingBrowser(request) {
   const rows=[...elements[1].querySelectorAll('table.x-grid-item')],rendered=new Set();
   // A cold code-generated output can have two fully empty cached stores.
   // Nonempty inventories still require rendered rows as an independent witness.
-  if(!rows.length&&!(form==='DataSetOutputSocketWizard'&&sources.length===0&&targets.length===0)||rows.length>200)return fail('mapping_render_bound');
+  // «Все» defines the imported schema only when the node executes: the text import's cached mapping is empty until then.
+  if(!rows.length&&!((form==='DataSetOutputSocketWizard'||importMapping)&&sources.length===0&&targets.length===0)||rows.length>200)return {...fail('mapping_render_bound'),form,counts:{sources:sources.length,targets:targets.length,rows:rows.length}};
   for(const row of rows) {
     const index=Number(row.getAttribute('data-recordindex')),target=targets[index];
     if(!Number.isSafeInteger(index)||index<0||!target||rendered.has(index)

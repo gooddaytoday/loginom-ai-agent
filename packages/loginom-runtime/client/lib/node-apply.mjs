@@ -1,3 +1,4 @@
+import {validateVariableBindings} from './variable-binding-parameters.mjs';
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
@@ -23,12 +24,14 @@ const id = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
  */
 export function validateNodeApplyRequest(request, handlers) {
   object(request, ['operation_id','contract_revision','document_id','workflow_ref','target','inputs',
-    'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[])]);
+    'mode','parameters','mappings','finish','read','budgets',...(Object.hasOwn(request??{},'variable_inputs')?['variable_inputs']:[]),...(Object.hasOwn(request??{},'bindings')?['bindings']:[])]);
+  validateVariableBindings(request.bindings,request.target?.type);
   requireValue(id(request.operation_id) && request.contract_revision === NODE_CONTRACT_REVISION,
     'Unsupported node.apply operation ID or contract revision');
   const graph = Object.fromEntries(['document_id','workflow_ref','target','inputs',...(Object.hasOwn(request,'variable_inputs')?['variable_inputs']:[])].map(k=>[k,request[k]]));
   validateNodeTargetRequest(graph);
   const installed = handlers.get(request.target.type);
+  requireValue(!request.bindings?.length||installed?.binding_schema&&request.mode!==NODE_READ_MODE,'BINDING_PARAMETER_UNSUPPORTED: bindings require a registered configuration mode');
   const handler = installed && request.mode===NODE_READ_MODE ? nodeReadHandler(installed) : installed;
   requireValue(handler && typeof handler.validate === 'function' && typeof handler.configure === 'function'
     && typeof handler.revision === 'string' && handler.revision.length > 0, 'No local configuration handler for this node type');
@@ -520,6 +523,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
       try{
         result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
+        const bindings=state.phases.find(p=>p.phase==='node_finish')?.value?.bindings;
+        if(result.configuration.readback.kind==='row_filter'&&bindings)result.configuration.bindings=structuredClone(bindings);
       }catch(error){
         // Projection uses only accepted receipts. Its failure cannot make the
         // completed UI phases uncertain or strand a quiet node without a phase.
@@ -588,7 +593,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:error.nodeExecutionFailure?.code??/^(UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
