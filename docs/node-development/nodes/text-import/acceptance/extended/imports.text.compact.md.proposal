@@ -11,8 +11,9 @@ Server text preview: `dock_node_apply` for `imports.text`,
 `finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}` returns
 `output.server_profile` and closes the draft without Execute. Set known
 `settings.source.encoding`, e.g. `CP1251`; if UTF-8 mangles Cyrillic, refresh
-`dock_storage_source` and retry `CP1251`; mojibake is not file data. A closed
-empty node needs full sample Import settings from the local profile.
+`dock_storage_source` and retry `CP1251`; mojibake is not file data. Preview may
+be partial: it proves no rare types. Reuse the ref after download/sampling; a
+closed empty node needs full sample Import settings from the local profile.
 
 If the prepared table is a text Import's direct output and only field
 renames/types are needed, change that Import's `settings.columns`; add no Reform.
