@@ -544,7 +544,7 @@ abs=1e-8 только для real, метки через label_any.
 Утверждённые `task-string-formats.md`, `fixtures/formats.csv` и независимый expected из
 `docs/node-development/nodes/date-time/acceptance/modes`; модели передаются только
 задание и CSV. Порядок полей и строк точный, Raw не разбирается, Keep не меняется,
-пропуски остаются NULL; CSV/Save/cold/cleanup.
+пропуски остаются NULL; CSV/Save/cold/cleanup. Полночь с миллисекундами в проходном datetime CSV Loginom пишет датой — учитывается как D76 `midnight_date` (LAB-1101), остальные ячейки строгие.
 
 `logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
 со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
