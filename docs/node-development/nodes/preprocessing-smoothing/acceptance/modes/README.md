@@ -16,8 +16,15 @@ Haar depth 1/2, утверждённые назначением, повторн�
 | task-cdf97-reflect.md | expected-cdf97-reflect.json | 1.96e-14 |
 
 Вход всех шести — существующий маленький `fixtures/wavelet.csv`, 8 строк
-непостоянного ряда. `oracle-filters.py --write --check` воспроизводит JSON с зависимостями
-из `requirements-filters.txt` (на mas3 Python 3.14). Oracle получает только CSV и
+непостоянного ряда. Expected получены прежним oracle на numpy/PyWavelets 1.9.0
+(mas3, Python 3.14). Сейчас `oracle-filters.py` — stdlib-порт (решение 6 LAB-1119):
+`--check` сверяет X_S с этими JSON по допуску 1e-10 (не через `==`), проверяет
+ортонормальность db2/coif1 (Σh=√2, Σh²=1, Σh_k·h_{k+2m}=0) и полную реконструкцию.
+Коэффициенты db2/coif1 — замкнутые формулы, расхождение с expected ≤1.1e-14;
+CDF — те же lifting-шаги, совпадение точное. Второй filter-bank расчёт CDF
+(pywt bior4.4) в порт не перенесён: его роль играет сверка с JSON, полученными
+вместе с ним. Фаза CDF держится на нечётном halo=19 — это наблюдение для этого
+входа, в порте `assert halo % 2 == 1`. Oracle получает только CSV и
 явные математические параметры. Loginom, runtime и actual-файлы он не читает.
 RowID/X/Tag сверяются точно, X_S — прежним Real abs=1e-8/rel=1e-10.
 Задания требуют RowID,X,Tag,X_S: естественный UI-порядок RowID,X,X_S,Tag надо
