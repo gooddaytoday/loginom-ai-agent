@@ -173,3 +173,25 @@ test('tree-to-table read accepts exactly one generated integer index column and 
  await assert.rejects(implementation.readOutputs({readOutputPort:async()=>({output:{port_kind:'table',sample_complete:true,schema:[col('Index','integer'),col('batch'),col('code'),col('qty','integer')]}})},
   {ports:[0],sample_rows:100},{portExecution:{},execution:{execution_id:'exec'},receipt_id:'r'},{configuration:plain}),/field names or order differ/);
 });
+
+test('tree-to-table configure refuses when the native index leaf does not settle after a click',async()=>{
+ const state=tableState(false),performed=[];
+ const channel={observe:async options=>{assert.ok(options.ready(state));return structuredClone(state);},perform:async options=>{
+  const action=options.resolve(state);if(action.verb==='click'){performed.push(action.ref);return;}state.wizard.stage='done';}};
+ await assert.rejects(tableImplementation().configure(channel,{global_index_paths:['/items']},{request:{finish:'execute',target:{kind:'new'}}}),/Tree table stage 1 settings differ/);
+ assert.deepEqual(performed,['index']);
+});
+test('earlier tree and table refusals are unchanged: dates, Variant, inferred dates and non-tree cell decoding',async()=>{
+ const {decodePortCell}=await import('../lib/node-port-output.mjs');
+ const {validateSerializationTree}=await import('../lib/tree-conversion-parameters.mjs');
+ const schema=type=>[{path:'',name:'Root',is_container:true,is_array:false},{path:'/items',name:'items',is_container:true,is_array:true},
+  {path:'/items/v',name:'v',type,is_container:false,is_array:false}];
+ for(const type of ['datetime','variant']){
+  assert.throws(()=>validateSelectedTreePaths(schema(type),['/items/v']),/supported types/);
+  assert.throws(()=>validateSerializationTree({port_kind:'tree',tree:{complete:true,schema:schema(type)}}),/dates and Variant/);
+ }
+ assert.throws(()=>validateTreeJsonScope('{"items":[{"v":"2024-01-01"}]}'),/inferred dates/);
+ assert.deepEqual(decodePortCell('x','variant').limitations,['variant_display_precision']);
+ assert.deepEqual(decodePortCell(1.5,'real').limitations,[]);
+ assert.throws(()=>decodePortCell({},'string'),/unsupported_type/);
+});

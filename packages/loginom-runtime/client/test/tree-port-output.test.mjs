@@ -107,3 +107,10 @@ test('tree_io reads datetime leaves as civil milliseconds and still refuses Vari
  assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree:result,sample_complete:true}).valid,true);
  await assert.rejects(read({noteType:6}),/tree_scalar_type/);
 });
+test('tree_io public schema admits root_rows only from 2 and root_row only as a nonnegative integer',async()=>{
+ const tree=await read({rows:2,count:2}),validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
+ const port=tree=>({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree,sample_complete:true});
+ assert.equal(validate(port(tree)).valid,true);
+ for(const rows of [1,0,257])assert.equal(validate(port({...tree,root_rows:rows})).valid,false,String(rows));
+ const bad=structuredClone(tree);bad.instances[0].root_row=-1;assert.equal(validate(port(bad)).valid,false);
+});

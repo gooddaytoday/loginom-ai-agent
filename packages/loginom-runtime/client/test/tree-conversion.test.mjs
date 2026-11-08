@@ -119,3 +119,11 @@ test('replacement maps newly created unbound leaves without opening Clear Links 
  assert.equal(result.verified,true);assert.equal(tree.nodes[2].source_field,'RowID');
  assert.equal(actions.some(a=>a.ref==='W;btnClearLinks'),false);
 });
+
+test('tree-to-JSON serialization refuses a tree with several root rows before any edit',()=>{
+ const schema=[{path:'',name:'Root',type:'object',is_container:true,is_array:false},{path:'/group',name:'group',type:'string',is_container:false,is_array:false},
+  {path:'/items',name:'items',type:'object',is_container:true,is_array:true},{path:'/items/code',name:'code',type:'string',is_container:false,is_array:false}];
+ const port={port_kind:'tree',tree:{complete:true,schema,instances:[],node_count:1,max_depth:0}};
+ assert.equal(validateSerializationTree(port),true);
+ assert.throws(()=>validateSerializationTree({...port,tree:{...port.tree,root_rows:2}}),/several root rows/);
+});
