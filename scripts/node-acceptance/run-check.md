@@ -819,3 +819,8 @@ supplies the private initial/final W1 expectations. Two typed execution variable
 retain civil milliseconds, IDs, types and order; native configuration retains
 three expressions, intermediate base and every property except base formula 2→4.
 Save, independent cold execution and confirmed package close/logout are required.
+
+`smoothing-haar` and `smoothing-haar-depth2` use the approved Haar tasks and
+immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
+`fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
+real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.
