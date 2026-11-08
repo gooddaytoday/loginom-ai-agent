@@ -5,7 +5,20 @@ import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-executi
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
-import {resolveVariablesColumnUnionInputs,validateVariablesColumnUnionInventory} from './variables-coluniondatavar-parameters.mjs';
+import {resolveVariablesColumnUnionInputs,validateVariablesColumnUnionInventory,validateVariablesColumnUnionFields} from './variables-coluniondatavar-parameters.mjs';
+export function variablesColumnUnionSourceExecution(snapshot,node){
+ const need=(ok,m)=>{if(!ok)throw Error('Variables union read-only source: '+m);};
+ need(snapshot?.verified===true&&snapshot.inventory_complete===true&&snapshot.show_completed===true&&typeof snapshot.root_id==='string'
+  &&snapshot.node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>snapshot.node_context[k]===node[k]),'complete owned history required');
+ const ps=snapshot.processes,owned=ps.filter(p=>p.owner?.verified===true&&p.owner.node_id===node.node_id&&p.owner.source==='native_process_model_identity');
+ need(owned.length>0&&owned.every(p=>/^[1-9]\d*(?:\.[1-9]\d*)+$/.test(p.process_id)),'execute and read both sources before manual mapping');
+ const latest=owned.reduce((a,b)=>BigInt(a.process_id.split('.')[0])>BigInt(b.process_id.split('.')[0])?a:b),id=latest.process_id.split('.')[0];
+ const group=ps.filter(p=>p.process_id===id&&p.parent_id===null);
+ need(group.length===1&&group[0].children_loaded===true&&group[0].state==='completed'&&group[0].error===false
+  &&latest.state==='completed'&&latest.error===false&&owned.filter(p=>p.process_id.split('.')[0]===id).length===1,'latest source execution must be completed');
+ return {verified:true,cleanup_complete:true,effect_possible:false,status:'completed',owner_verified:true,
+  execution_id:node.document_id+':'+snapshot.root_id+':'+id,group_id:id,process_id:latest.process_id,process_record_id:latest.record_id};
+}
 export async function preflightVariablesColumnUnion(options,ctx,config){
  const {operation,execute,onRecord,now,receiptOptions}=options,request=operation.parameters;
  const graph=await createNodeTargetBrowserAdapter({execute,origin:config.targetOrigin,build:config.targetBuild}).observe(request,ctx.deadline);
@@ -13,24 +26,36 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
  const channelFor=node=>createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:2048,...config,signal:ctx.signal,
   preparedNodeContext:{document_id:request.document_id,workflow_ref:request.workflow_ref,node},
   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
- if(request.target.kind==='existing'){
+ const manual=request.parameters.column_union?.mapping==='manual';
+ if(request.target.kind==='existing'&&!manual){
   const channel=channelFor(request.target.ref),state=await channel.observe({condition:'owned union before automatic mapping check',ready:s=>s.prepared_node_context?.surface==='graph'});
   await selectPreparedGraphNode(channel,state,'select union for read-only mapping preflight');await openPreparedWizard(channel);
   const observed=await channel.observe({condition:'saved union automatic mapping',readVariablesColumnUnion:true,ready:s=>s.node_variables_column_union?.verified===true});
   await closePreparedWizard(channel);
  }
- if(request.finish==='close')return {verified:true,inputs,outputs,not_applicable:true};
+ if(request.finish==='close'&&!manual)return {verified:true,inputs,outputs,not_applicable:true};
  for(const input of inputs){
   const channel=channelFor(input.source),driver=createNodeExecutionProcedure(channel,input.source,{allowDeactivate:true});
-  await driver.prepare();await finishConfiguredGraph(channel,driver,'execute',input.source);
-  const execution=await driver.waitCompleted();
+  let execution;
+  if(manual){
+   await driver.prepare({keepConsoleOpen:true});
+   const snapshot=await channel.observe({condition:'existing source execution for manual type preflight',readProcesses:true,ready:s=>s.node_processes?.verified===true});
+   execution=variablesColumnUnionSourceExecution(snapshot.node_processes,input.source);
+   const close=s=>s.ui.elements.filter(e=>['ConsoleForm;btnClose','MF;ConsoleForm;btnClose'].includes(e.tid)&&e.allowed_actions.includes('click'));
+   await channel.perform({condition:'close read-only source history',initialObservation:snapshot,ready:s=>close(s).length===1,identity:()=>input.source,resolve:s=>({verb:'click',ref:close(s)[0].ref})});
+  }else{
+   await driver.prepare();await finishConfiguredGraph(channel,driver,'execute',input.source);execution=await driver.waitCompleted();
+  }
   const read=await channel.readVariablePort({port:input.output,execution});outputs.push(read.output);
  }
  validateVariablesColumnUnionInventory(outputs);
- for(const field of request.parameters.column_union?.fields??[]){
-  const found=outputs[field.input].variables.filter(v=>v.name===field.source);
-  if(found.length!==1||!(found[0].type===field.type||found[0].type==='integer'&&field.type==='string'))throw Error('Variables column union: unique source and unchanged type or integer to string required');
+ if(manual){
+  const after=await createNodeTargetBrowserAdapter({execute,origin:config.targetOrigin,build:config.targetBuild}).observe(request,ctx.deadline);
+  const domain=g=>({...g,nodes:g.nodes.map(({dom_epoch,...n})=>n)});
+  if(JSON.stringify(domain(graph))!==JSON.stringify(domain(after)))throw Error('Variables union source graph changed during read-only preflight');
+  await onRecord({phase:'node_variables_union_preflight',operation_id:operation.id,graph_before:graph,graph_after:after,outputs,settings_changed:false});
+  try{validateVariablesColumnUnionFields(request.parameters,outputs);}catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  }
  operation.variablesColumnUnionPreflight={inputs,outputs};
- return {verified:true,cleanup_complete:true,effect_possible:true,inputs,outputs};
+ return {verified:true,cleanup_complete:true,effect_possible:!manual,inputs,outputs};
 }

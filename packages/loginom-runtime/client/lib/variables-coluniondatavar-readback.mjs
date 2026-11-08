@@ -6,7 +6,7 @@ export function variablesColumnUnionConfigurationReadback({node,phases,operation
  if(!Array.isArray(inputs)||inputs.length!==2)throw Error('Variables union exact input identities required');
  const read=phases.find(p=>p.phase==='read')?.value?.variable_ports?.[0],sources=receipt('input_mapping').value.source_fields;
  if(c.mapping==='manual'){
-  if(!c.inventory_complete||!Array.isArray(c.fields)||!c.fields.length||c.fields.some(f=>!sources.some(s=>s.input===f.input&&s.name===f.source&&(s.type===f.type||s.type==='integer'&&f.type==='string')))
+  if(!c.inventory_complete||!Array.isArray(c.fields)||!c.fields.length||c.fields.some(f=>!sources.some(s=>s.input===f.input&&s.name===f.source&&s.type===f.type))
    ||read&&(read.variables.length!==c.fields.length||read.variables.some((v,i)=>v.name!==c.fields[i].name||v.label!==c.fields[i].label||v.type!==c.fields[i].type)))throw Error('Variables union complete ordered manual output differs');
   return {kind:'variables_column_union',mode:'append_variables',mapping:'manual',input_count:2,node:structuredClone(node),scope:'observed_after_verified_finish',values_are:'observed_ui_values',receipt_ids:[configured.receipt_id,finished.receipt_id],inputs,
    fields:c.fields,output_names:c.fields.map(f=>f.name),mapping_fields:c.fields.map(f=>({input:f.input,source_name:f.source,output_name:f.name})),package_persistence_verified:false};

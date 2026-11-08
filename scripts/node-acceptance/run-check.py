@@ -446,6 +446,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     input_files=['variables.json', 'rules.json'], variable_only=True, variable_audit='variables-replace', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
+    if name == 'variables-union-type-refusal':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-type-refusal.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None,
+                    expected_name='expected-type-refusal-run.json', variables_union_refusal=True,
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-manual.mjs')
     if name == 'variables-union-manual':
         src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
         return dict(source=src, prompt=src / 'task-manual.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None, expected_name='expected-manual-updated-run.json',
@@ -1565,7 +1570,9 @@ class Runner:
                 if event.get('type') != 'tool_use': continue
                 request = part.get('state', {}).get('input', {})
                 if part.get('tool') == 'loginom_dock_node_apply':
-                    if spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
+                    if spec.get('variables_union_refusal') and request.get('target',{}).get('type')=='variables.column_union':
+                        assert request.get('parameters',{}).get('column_union',{}).get('mapping') == 'manual', 'UNION_REFUSAL_REQUEST'
+                    elif spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
                         state=part.get('state',{})
                         reply=json.JSONDecoder().raw_decode(state.get('output') or state.get('error',''))[0]
                         assert reply.get('status')=='NOT_APPLIED' and reply.get('request_rejected') is True and reply.get('effect_possible') is False and reply.get('cleanup_complete') is True, 'XLS_REFUSAL_EFFECT'
@@ -1741,6 +1748,11 @@ class Runner:
             self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union'] else 'snapshot')})
             return session, expected, None, None
         if refusal:
+            if spec.get('variables_union_refusal'):
+                evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+                evidence.sort(key=lambda event: event.get('recorded_at', ''))
+                write(folder / 'variable-events.json', evidence)
+                self.phase('variable-refusal-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], 'refusal', folder / 'variable-events.json'], folder, timeout=60)
             self.current.update(csv='— (expected refusal)', cold='— (expected refusal)')
             return session, expected, None, None
         if lgd_corrupt:

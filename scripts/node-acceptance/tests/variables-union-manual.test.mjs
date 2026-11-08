@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {auditVariablesUnionManual} from '../variables-union-manual.mjs';
+import {auditVariablesUnionManual,auditVariablesUnionRefusal} from '../variables-union-manual.mjs';
 const load=phase=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-coluniondatavar/acceptance/expected-manual-'+phase+'-run.json',import.meta.url)));
 const initial=load('initial'),updated=load('updated');
 function history(){
@@ -22,5 +22,17 @@ test('manual oracle requires full typed ordered results, retained IDs, source-on
   e=>e[3].result.output.variable_ports[0].variables.reverse(),e=>e[3].result.output.variable_ports[0].variables[1].cell.value='7,0',
   e=>e[3].result.output.variable_ports[0].variables[0].id=99,e=>e[3].result.configuration.readback={...e[3].result.configuration.readback,inputs:[]}]){
   const events=history();change(events);assert.throws(()=>auditVariablesUnionManual(events,initial,updated));
+ }
+});
+test('type-refusal oracle requires native preflight, unchanged graph and values, no engine gesture or workaround',()=>{
+ const graph={complete:true,nodes:[{type:'variables.calculator',ref:{node_id:'left'}},{type:'variables.calculator',ref:{node_id:'right'}},{type:'variables.user',ref:{node_id:'builtin'}}],links:[],variable_links:[]};
+ const events=[{phase:'node_apply_prepared',request:{operation_id:'refusal',target:{kind:'new',type:'variables.column_union'},parameters:{column_union:{mapping:'manual',fields:[{input:0,source:'amount',type:'string'}]}}}},
+  {phase:'node_variables_union_preflight',operation_id:'refusal',settings_changed:false,graph_before:graph,graph_after:structuredClone(graph),outputs:[0,1].map(input=>({complete:true,count:2,variables:[{name:'amount',label:'amount',type:'integer',cell:{type:'integer',is_null:false,precision:'exact_integer',value:String(input?19:7)}},{name:input?'enabled':'empty',label:input?'enabled':'empty',type:input?'boolean':'string',cell:{type:input?'boolean':'string',is_null:false,value:input?false:''}}]}))},
+  {phase:'node_phase_refused',operation_id:'refusal',receipt:{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true}}];
+ assert.equal(auditVariablesUnionRefusal(events).status,'PASS');
+ for(const change of [e=>e.shift(),e=>e[1].graph_after.nodes.push({type:'variables.column_union'}),e=>e[1].outputs[1].variables[0].cell.value='23',
+  e=>e[2].receipt.effect_possible=true,e=>e.push({phase:'node_step_prepared',operation_id:'refusal',action:{verb:'execute_graph_node'}}),
+  e=>e.push({phase:'node_apply_prepared',request:{target:{type:'variables.calculator'}}})]){
+  const e=structuredClone(events);change(e);assert.throws(()=>auditVariablesUnionRefusal(e));
  }
 });

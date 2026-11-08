@@ -10,7 +10,7 @@ export function variablesColumnUnionTargetRequest(request,graph){
  const label=Array.from({length:201},(_,i)=>base+(i?' '+(i+1):'')).find(name=>!labels.has(name));
  need(label,'no unique union caption available');return {...request,target:{...request.target,label}};
 }
-export const variablesColumnUnionParametersSchema={type:'object',additionalProperties:false,properties:{column_union:{type:'object',additionalProperties:false,properties:{mapping:{type:'string',enum:['automatic','manual'],description:'automatic retains every input variable. manual uses fields as the complete ordered output selection.'},fields:{type:'array',minItems:1,maxItems:128,items:{type:'object',additionalProperties:false,properties:{input:{type:'integer',enum:[0,1]},source:{type:'string',minLength:1,maxLength:128},name:{type:'string',minLength:1,maxLength:128},label:{type:'string',maxLength:240},type:{type:'string',enum:['integer','real','string','boolean']}},required:['input','source','name','label','type']}}},required:['mapping']}},description:'Two fixed variable inputs. Omitted settings preserve the saved automatic or manual mapping. Manual supports unchanged types and integer to string.'};
+export const variablesColumnUnionParametersSchema={type:'object',additionalProperties:false,properties:{column_union:{type:'object',additionalProperties:false,properties:{mapping:{type:'string',enum:['automatic','manual'],description:'automatic retains every input variable. manual uses fields as the complete ordered output selection without changing source types.'},fields:{type:'array',minItems:1,maxItems:128,items:{type:'object',additionalProperties:false,properties:{input:{type:'integer',enum:[0,1]},source:{type:'string',minLength:1,maxLength:128},name:{type:'string',minLength:1,maxLength:128},label:{type:'string',maxLength:240},type:{type:'string',enum:['integer','real','string','boolean']}},required:['input','source','name','label','type']}}},required:['mapping']}},description:'Two fixed variable inputs. Omitted settings preserve the saved automatic or manual mapping. Manual retains source types; convert using a Variables Calculator after the union.'};
 export function validateVariablesColumnUnionParameters(p,mode,r){
  need(mode==='append_variables','use append_variables mode');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='column_union'),'only column_union settings supported');
@@ -32,12 +32,19 @@ export function validateVariablesColumnUnionParameters(p,mode,r){
   }
  }
  if(!r)return;
- need(p.column_union?.mapping!=='manual'||r.target.kind!=='new'||r.target.label!=='Соединение (переменные)','omit target.label for a new manual union, or choose a custom caption: Loginom auto-renames its default caption after linking');
  need(r.inputs.length===0&&r.mappings.length===0,'table inputs and custom mappings are unsupported');
  need(r.read.ports.length===0&&(r.read.variable_ports??[]).every(p=>p===0),'read variable output zero, no table ports');
  const inputs=r.variable_inputs??[];
  need(inputs.length===0&&r.target.kind==='existing'||inputs.length===2&&inputs.every((i,n)=>i.kind==='variables'&&i.input===n)
   &&inputs[0].source.node_id!==inputs[1].source.node_id,'exactly two distinct variable sources in input order 0,1 required');
+}
+export function validateVariablesColumnUnionFields(parameters,outputs){
+ for(const field of parameters.column_union?.fields??[]){
+  const found=outputs[field.input]?.variables.filter(v=>v.name===field.source);
+  need(found?.length===1,'unique source required for '+field.source);
+  need(found[0].type===field.type,'Loginom 7.4.2: ручное соответствие не преобразует '+found[0].type+' → '+field.type
+   +'. Источники, узел и связи не изменены. Используйте Калькулятор переменных после Соединения.');
+ }
 }
 export function resolveVariablesColumnUnionInputs(request,graph){
  const existing=request.target.kind==='existing'?graph.nodes.find(n=>n.ref.node_id===request.target.ref.node_id):null;

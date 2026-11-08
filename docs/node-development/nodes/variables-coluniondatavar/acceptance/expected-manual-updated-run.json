@@ -21,10 +21,10 @@
             "value": 23
           },
           {
-            "name": "left_text",
-            "label": "Левая сумма текстом",
-            "type": "string",
-            "value": "7"
+            "name": "left_amount",
+            "label": "Левая сумма",
+            "type": "integer",
+            "value": 7
           }
         ]
       }

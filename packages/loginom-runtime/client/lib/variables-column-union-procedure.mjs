@@ -88,7 +88,9 @@ export async function configureVariablesColumnUnion(page,task,readNode=readPrepa
    need(box.width>0&&box.height>0&&!e.closest('.x-item-disabled')&&!e.disabled&&(hit===e||e.contains(hit)),'enabled hit target '+tid);return {x,y};
   },{tid,record,cell,editor_record,dialog,root,base,origin:task.origin,build:task.build});
  };
- const click=async(tid,opts={})=>{phase=tid;const p=await point(tid,opts);effect=true;await page.mouse.click(p.x,p.y);};
+ const click=async(tid,opts={})=>{phase=tid;const end=Math.min(task.deadline,Date.now()+15000);let p;
+  for(;;){try{p=await point(tid,opts);break;}catch(error){if(!error.message.includes('enabled hit target '+tid)||Date.now()>=end)throw error;await page.waitForTimeout(Math.min(100,remaining()));}}
+  effect=true;await page.mouse.click(p.x,p.y);};
  const fill=async(tid,value)=>{await point(tid,{dialog:true});const input=at(tid).locator('input:visible');need(await input.count()===1,'one metadata input');effect=true;await input.fill(value,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});};
  const choose=async(tid,value)=>{
   await click(tid+';trg_picker',{dialog:true});await owned();
@@ -104,16 +106,16 @@ export async function configureVariablesColumnUnion(page,task,readNode=readPrepa
  };
  try{
   let state=await inventory();
-  if(state.sources.length!==task.source_fields.length){await click(base+';btnGetSourceColumns');state=await inventory(s=>s.sources.length===task.source_fields.length);}
+  need(state.sources.length===task.source_fields.length,'input stores must be materialized by the initial union Execute');
   need(state.sources.every((s,i)=>s.type===task.source_fields[i].type&&s.label===task.source_fields[i].label),'complete ordered input schemas changed');
   const project=s=>s.fields.map(f=>{
    const source=task.source_fields[f.source_index];need(source,'every manual output must be connected');
-   need(f.type===source.type||source.type==='integer'&&f.type==='string','unsupported saved conversion');
+   need(f.type===source.type,'unsupported saved conversion');
    return {input:source.input,source:source.name,name:f.name,label:f.label,type:f.type};
   });
   const requested=task.parameters.column_union;
   if(requested?.mapping==='manual'){
-   const wanted=requested.fields.map(f=>{const matches=task.source_fields.flatMap((s,index)=>s.input===f.input&&s.name===f.source?[{...s,index}]:[]);need(matches.length===1,'unique requested source');const s=matches[0];need(s.type===f.type||s.type==='integer'&&f.type==='string','only same type or integer to string');return {...f,source_index:s.index};});
+   const wanted=requested.fields.map(f=>{const matches=task.source_fields.flatMap((s,index)=>s.input===f.input&&s.name===f.source?[{...s,index}]:[]);need(matches.length===1,'unique requested source');const s=matches[0];need(s.type===f.type,'manual mapping retains source types');return {...f,source_index:s.index};});
    if(!state.table){await click(base+';rbTable');state=await inventory(s=>s.table);}
    if(state.mapping==='automatic')await click(base+';btnAutoSyncThroughColumns');
    state=await inventory(s=>s.mapping==='manual');

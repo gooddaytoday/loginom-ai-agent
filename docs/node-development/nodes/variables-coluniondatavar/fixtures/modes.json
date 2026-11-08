@@ -3,6 +3,6 @@
   "right": [{"name":"amount","label":"amount","type":"integer","value":19}, {"name":"enabled","label":"enabled","type":"boolean","value":false}],
   "third": [{"name":"zero","label":"Ноль","type":"integer","value":0}],
   "control": [{"name":"limit","label":"Порог","type":"integer","value":3}],
-  "manual": [{"input":1,"source":"amount","name":"right_amount","label":"Правая сумма","type":"integer"}, {"input":0,"source":"amount","name":"left_text","label":"Левая сумма текстом","type":"string"}],
+  "manual": [{"input":1,"source":"amount","name":"right_amount","label":"Правая сумма","type":"integer"}, {"input":0,"source":"amount","name":"left_amount","label":"Левая сумма","type":"integer"}],
   "update": {"input":1,"name":"amount","value":23}
 }

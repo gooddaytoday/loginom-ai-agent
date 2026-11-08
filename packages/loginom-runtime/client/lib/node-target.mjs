@@ -390,7 +390,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     }
     // Its first native variable link derives the default caption. Preserve an
     // explicitly requested label after that owned transition, without relinking.
-    if(request.target.kind==='new'&&request.target.type==='variables.to_table'&&request.target.label!==undefined
+    if(request.target.kind==='new'&&['variables.to_table','variables.column_union'].includes(request.target.type)&&request.target.label!==undefined
       &&node(graph,state.targetId).label!==request.target.label){
       graph=await change('rename',{ref:node(graph,state.targetId).ref,label:request.target.label},(before,after)=>
         !!verifyNodeTargetEffect({kind:'rename',parameters:{ref:node(before,state.targetId).ref,label:request.target.label},before},after,adapter.positionMatches));

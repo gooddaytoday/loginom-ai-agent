@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {validateVariablesColumnUnionParameters} from '../lib/variables-coluniondatavar-parameters.mjs';
+import {validateVariablesColumnUnionParameters,validateVariablesColumnUnionFields} from '../lib/variables-coluniondatavar-parameters.mjs';
+import {variablesColumnUnionSourceExecution} from '../lib/variables-coluniondatavar-preflight.mjs';
 import {readVariablesColumnUnionMapping,readVariablesColumnUnionSourceEditor} from '../lib/variables-column-union-procedure.mjs';
 import {variablesColumnUnionConfigurationReadback} from '../lib/variables-coluniondatavar-readback.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
@@ -9,16 +10,33 @@ import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 
 const parameters=()=>({column_union:{mapping:'manual',fields:[
  {input:1,source:'amount',name:'right_amount',label:'Правая сумма',type:'integer'},
- {input:0,source:'amount',name:'left_text',label:'Левая сумма текстом',type:'string'},
+ {input:0,source:'amount',name:'left_amount',label:'Левая сумма',type:'integer'},
 ]}});
 test('manual union accepts an ordered complete selection with names, labels and declared types',()=>{
  validateVariablesColumnUnionParameters(parameters(),'append_variables');
 });
-test('manual creation rejects the native auto-renaming default caption before preparing any graph effect',()=>{
+test('manual creation accepts the native default caption with guarded first-link reconciliation',()=>{
  const request={target:{kind:'new',label:'Соединение (переменные)'},inputs:[],mappings:[],variable_inputs:[0,1].map(input=>({kind:'variables',input,source:{node_id:'s'+input}})),read:{ports:[],variable_ports:[0]}};
- assert.throws(()=>validateVariablesColumnUnionParameters(parameters(),'append_variables',request),/omit target.label/);
+ validateVariablesColumnUnionParameters(parameters(),'append_variables',request);
  delete request.target.label;validateVariablesColumnUnionParameters(parameters(),'append_variables',request);
  request.target.label='User union';validateVariablesColumnUnionParameters(parameters(),'append_variables',request);
+});
+test('manual preflight refuses integer to string with a clear platform reason before a target effect',()=>{
+ const outputs=[0,1].map(()=>({variables:[{name:'amount',type:'integer'}]}));
+ validateVariablesColumnUnionFields(parameters(),outputs);
+ const p=parameters();p.column_union.fields[1].type='string';
+ assert.throws(()=>validateVariablesColumnUnionFields(p,outputs),e=>/Loginom 7.4.2.*integer.*string/.test(e.message)&&/Калькулятор переменных после Соединения/.test(e.message));
+});
+test('manual source read binds the latest completed native-owned process without executing the source',()=>{
+ const node={document_id:'d',workflow_id:'w',node_id:'left'};
+ const snapshot={verified:true,inventory_complete:true,show_completed:true,root_id:'r',node_context:{verified:true,...node},processes:[
+  {process_id:'1',record_id:'g',parent_id:null,state:'completed',error:false,children_loaded:true},
+  {process_id:'1.1',record_id:'p',parent_id:'1',state:'completed',error:false,owner:{verified:true,node_id:'left',source:'native_process_model_identity'}}]};
+ assert.equal(variablesColumnUnionSourceExecution(snapshot,node).execution_id,'d:r:1');
+ for(const change of [s=>s.processes[1].owner.node_id='other',s=>s.processes[0].error=true,s=>s.inventory_complete=false,
+  s=>s.processes.push({...s.processes[1],process_id:'2.1',parent_id:'2',record_id:'later',state:'pending_or_failed'})]){
+  const s=structuredClone(snapshot);change(s);assert.throws(()=>variablesColumnUnionSourceExecution(s,node));
+ }
 });
 test('manual production readback fits the public result and refuses wrong order or conversion metadata',()=>{
  const node={document_id:'d',workflow_id:'w',node_id:'u'},fields=parameters().column_union.fields;

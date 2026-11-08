@@ -1214,7 +1214,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     checkNodeRef(sourceNode); checkNodeRef(targetNode);
     const bound=task.node_target_context;
     if(effectPossible&&readNodeTargetGraph&&bound?.request?.target?.kind==='new'
-      &&bound.request.target.type==='variables.to_table'&&task.parameters.source_port.kind==='var'&&targetPort.kind==='var'){
+      &&['variables.to_table','variables.column_union'].includes(bound.request.target.type)&&task.parameters.source_port.kind==='var'&&targetPort.kind==='var'){
       const baseline=bound.graph_baseline,source=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[0].id),target=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[1].id);
       const outputs=source[0]?.variable_outputs?.filter(p=>p.kind==='variables'&&p.native_index===task.parameters.source_port.index);
       const inputs=target[0]?.variable_inputs?.filter(p=>p.kind==='variables'&&p.native_index===targetPort.index);

@@ -27,7 +27,34 @@ export function auditVariablesUnionManual(events,initial,final){
  need(!requests.some(r=>['programming.javascript','transform.calculator'].includes(r.target?.type)),'NATIVE_UNION_REQUIRED');
  return {status:'PASS',node:a.r.node,executions:found.map(c=>c.r.execution.execution_id),inputs:cb.inputs};
 }
+export function auditVariablesUnionRefusal(events){
+ const need=(v,m)=>{if(!v)throw Error('VARIABLES_UNION_REFUSAL_'+m);};
+ const attempts=events.filter(e=>e.phase==='node_apply_prepared'&&e.request?.target?.type==='variables.column_union');
+ need(attempts.length===1,'ONE_NATIVE_REQUEST');
+ const request=attempts[0].request,id=request.operation_id,fields=request.parameters?.column_union?.fields;
+ need(request.target.kind==='new'&&request.parameters.column_union.mapping==='manual'
+  &&fields?.some(f=>f.input===0&&f.source==='amount'&&f.type==='string'),'INTEGER_STRING_REQUEST');
+ const own=events.filter(e=>e.operation_id===id),proofs=own.filter(e=>e.phase==='node_variables_union_preflight');
+ need(proofs.length===1,'READ_ONLY_PREFLIGHT');const p=proofs[0];
+ const domain=g=>({...g,nodes:g.nodes.map(({dom_epoch,...n})=>n)});
+ need(p.settings_changed===false&&p.graph_before.complete===true&&isDeepStrictEqual(domain(p.graph_before),domain(p.graph_after)),'UNCHANGED_GRAPH');
+ need(p.graph_before.nodes.filter(n=>n.type==='variables.calculator').length===2
+  &&p.graph_before.nodes.every(n=>['variables.calculator','variables.user'].includes(n.type))
+  &&p.graph_before.links.length===0&&(p.graph_before.variable_links??[]).length===0,'SOURCES_ONLY');
+ need(p.outputs.length===2&&p.outputs.every((o,input)=>o.complete===true&&o.count===2&&o.variables.length===2
+  &&o.variables[0].name==='amount'&&o.variables[0].label==='amount'&&o.variables[0].type==='integer'
+  &&o.variables[0].cell.type==='integer'&&o.variables[0].cell.is_null===false&&o.variables[0].cell.precision==='exact_integer'&&o.variables[0].cell.value===String(input?19:7)
+  &&o.variables[1].name===(input?'enabled':'empty')&&o.variables[1].label===o.variables[1].name&&o.variables[1].type===(input?'boolean':'string')
+  &&o.variables[1].cell.type===o.variables[1].type&&o.variables[1].cell.is_null===false&&o.variables[1].cell.value===(input?false:'')),'RETAINED_TYPED_INPUTS');
+ need(own.some(e=>e.phase==='node_phase_refused'&&e.receipt?.phase==='target'&&e.receipt.status==='NOT_APPLIED'
+  &&e.receipt.effect_possible===false&&e.receipt.cleanup_complete===true),'PRE_MUTATION_REFUSAL');
+ need(!own.some(e=>e.phase==='node_target_effect_prepared'||e.phase==='node_variables_union_materialized'
+  ||e.action&&['execute_graph_node','deactivate_graph_node','begin_wizard','finish_wizard','execute_wizard','confirm_wizard_deactivation'].includes(e.action.verb)),'NO_ENGINE_MUTATION');
+ const start=events.indexOf(attempts[0]);
+ need(!events.slice(start+1).some(e=>e.phase==='node_apply_prepared'),'NO_WORKAROUND_OR_SOURCE_PATCH');
+ return {status:'PASS',operation_id:id,graph_unchanged:true,sources_unchanged:true};
+}
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const read=p=>JSON.parse(readFileSync(p,'utf8'));
- console.log(JSON.stringify(auditVariablesUnionManual(read(process.argv[5]),read(process.argv[3]),read(process.argv[4]))));
+ console.log(JSON.stringify(process.argv[2]==='refusal'?auditVariablesUnionRefusal(read(process.argv[3])):auditVariablesUnionManual(read(process.argv[5]),read(process.argv[3]),read(process.argv[4]))));
 }

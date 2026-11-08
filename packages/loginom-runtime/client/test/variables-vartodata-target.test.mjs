@@ -32,19 +32,21 @@ test('a user label and an existing connection do not acquire automatic-label per
   assert.equal(verifyNodeTargetEffect(f.effect,f.after),null);
  }
 });
-for(const mode of ['owned','foreign','wrong-guid','other-type'])test('serialized link primitive handles VarToData caption: '+mode,async()=>{
+for(const type of ['variables.to_table','variables.column_union'])for(const mode of ['owned','foreign','wrong-guid','other-type'])test('serialized link primitive handles '+type+' caption: '+mode,async()=>{
  const f=fixture(),page=linkPage();page.nodes=[];
- page.addNode('Source',104,104,['Output_Var-0']);page.addNode('Переменные_в_таблицу',400,104,['Input_Var-0','Output_Data-0']);
+ if(type==='variables.column_union'){f.before.nodes[1].type=type;f.before.nodes[1].label='Соединение (переменные)';f.after.nodes[1].type=type;f.after.nodes[1].label='amount, empty';}
+ const defaultTid=type==='variables.column_union'?'Соединение_(переменные)':'Переменные_в_таблицу';
+ page.addNode('Source',104,104,['Output_Var-0']);page.addNode(defaultTid,400,104,['Input_Var-0','Output_Data-0']);
  f.before.workflow_ref={tab_tid:page.tabTid,prefix:page.prefix,workflow_id:'wf'};
  f.after.workflow_ref=structuredClone(f.before.workflow_ref);
- const renamed='В_столбцы:_Количество_Флаг_(+6)';
+ const renamed=type==='variables.column_union'?'amount_empty':'В_столбцы:_Количество_Флаг_(+6)';
  page.onDrop=()=>{page.nodes[1].label=renamed;page.edges.push('Source|Output_Var-0|'+renamed+'|Input_Var-0');};
  page.nativeGraph=probe=>{
   const g=structuredClone(page.drops?f.after:f.before);
   if(page.drops&&mode==='foreign')g.nodes[0].label='foreign';
   if(page.drops&&mode==='wrong-guid')g.variable_links[0].target_port_guid='other';
   if(mode==='other-type')g.nodes[1].type='transform.sorting';
-  if(probe?.read_bindings)g.native_bindings=[{node_id:'s',label:'Source'},{node_id:'t',label:page.drops?renamed:'Переменные_в_таблицу'}];return g;
+  if(probe?.read_bindings)g.native_bindings=[{node_id:'s',label:'Source'},{node_id:'t',label:page.drops?renamed:defaultTid}];return g;
  };
  if(mode==='other-type')f.before.nodes[1].type='transform.sorting';
  const evaluate=page.evaluate.bind(page);
@@ -54,10 +56,10 @@ for(const mode of ['owned','foreign','wrong-guid','other-type'])test('serialized
   return evaluate(fn,arg);
  };
  const result=await run(page,'link.create',{
-  source_node:page.ref('Source'),target_node:page.ref('Переменные_в_таблицу'),source_port:{kind:'var',index:0},target_port:{kind:'var',index:0}
+  source_node:page.ref('Source'),target_node:page.ref(defaultTid),source_port:{kind:'var',index:0},target_port:{kind:'var',index:0}
  },{node_target_graph_reader:async (page,probe)=>page.nativeGraph(probe),node_target_context:{
-  request:{document_id:'doc',workflow_ref:f.before.workflow_ref,target:{kind:'new',type:'variables.to_table'}},
-  graph_baseline:f.before,graph_probe:{},dom_epoch:1,nodes:[{id:'s',tid:'Source',dom_epoch:2},{id:'t',tid:'Переменные_в_таблицу',dom_epoch:3}]
+  request:{document_id:'doc',workflow_ref:f.before.workflow_ref,target:{kind:'new',type}},
+  graph_baseline:f.before,graph_probe:{},dom_epoch:1,nodes:[{id:'s',tid:'Source',dom_epoch:2},{id:'t',tid:defaultTid,dom_epoch:3}]
  }});
  assert.equal(result.status,mode==='owned'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result));
  assert.equal(page.drops,1);assert.equal(page.upCalls,1);assert.equal(page.down,false);

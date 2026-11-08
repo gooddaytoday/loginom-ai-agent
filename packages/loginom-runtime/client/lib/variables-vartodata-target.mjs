@@ -6,8 +6,11 @@ export function normalizeVariablesToTableLinkGraph(before,after,edge){
  if(!before?.complete||!after?.complete||edge?.kind!=='variables'||edge.input!==0)return unchanged();
  const one=(g,id)=>{const ns=g.nodes?.filter(n=>n.ref?.node_id===id);return ns?.length===1?ns[0]:null;};
  const source=one(before,edge.source),target=one(before,edge.target),current=one(after,edge.target);
- if(!source||target?.type!=='variables.to_table'||target.label!=='Переменные в таблицу'
-  ||current?.type!==target.type||!current.label?.startsWith('В столбцы: ')||current.label.length<='В столбцы: '.length)return unchanged();
+ const table=target?.type==='variables.to_table'&&target.label==='Переменные в таблицу'
+  &&current?.label?.startsWith('В столбцы: ')&&current.label.length>'В столбцы: '.length;
+ const union=target?.type==='variables.column_union'&&target.label==='Соединение (переменные)'
+  &&typeof current?.label==='string'&&/^[A-Za-z_][A-Za-z_0-9]*(?:, [A-Za-z_][A-Za-z_0-9]*)*$/.test(current.label);
+ if(!source||!(table||union)||current?.type!==target.type)return unchanged();
  if([...(before.links??[]),...(before.variable_links??[])].some(e=>e.source===edge.target||e.target===edge.target))return unchanged();
  const outputs=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===edge.output),inputs=target.variable_inputs?.filter(p=>p.kind==='variables'&&p.port===0);
  if(outputs?.length!==1||inputs?.length!==1||![outputs[0].port_guid,inputs[0].port_guid].every(v=>typeof v==='string'&&v.length>0))return unchanged();
