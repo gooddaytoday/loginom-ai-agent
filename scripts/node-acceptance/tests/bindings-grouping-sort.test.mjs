@@ -16,7 +16,7 @@ function history(){
 test('the main oracle requires source-only update and fresh results on the same grouping',()=>{
  assert.equal(auditBooleanBindings(history(),initial,final).status,'PASS');
 });
-for(const fault of ['literal','second node','sentinel','identity','reconfigure','stale execution'])test('the main oracle rejects '+fault,()=>{
+for(const fault of ['literal','second node','sentinel','identity','reconfigure','stale execution','initial true','final false'])test('the main oracle rejects '+fault,()=>{
  const events=history();
  if(fault==='literal')delete events[1].result.configuration.bindings;
  if(fault==='second node')events[4].result.node={...events[4].result.node,node_id:'another'};
@@ -24,6 +24,8 @@ for(const fault of ['literal','second node','sentinel','identity','reconfigure',
  if(fault==='identity')events[3].result.configuration.readback.variables[0].id=3;
  if(fault==='reconfigure')events.splice(4,0,{phase:'node_apply_prepared',request:{target:{kind:'existing',type:'transform.group_data',ref:events[1].result.node},mode:'conditions',parameters:{groups:[]}}});
  if(fault==='stale execution')events[4].result.execution.execution_id='first';
+ if(fault==='initial true')events[0].result.configuration.readback.variables[0].value=true;
+ if(fault==='final false')events[3].result.configuration.readback.variables[0].value=false;
  assert.throws(()=>auditBooleanBindings(events,initial,final),{literal:/BOOLEAN_BINDING_INITIAL/,'second node':/BOOLEAN_BINDING_FINAL_SAME_NODE/,sentinel:{code:'ERR_ASSERTION'},identity:{code:'ERR_ASSERTION'},reconfigure:/BOOLEAN_BINDING_RECONFIGURED/,'stale execution':/BOOLEAN_BINDING_FINAL_SAME_NODE/}[fault]);
 });
 test('cycle3 scenarios register unchanged tasks, fixtures, two phases and three exports',()=>{
@@ -35,5 +37,7 @@ for name,node in [('bindings-grouping-sort','grouping'),('bindings-sorting-local
  assert c['binding_initial']==node+'/expected-initial.json' and c['expected_name']==node+'/expected.json'
  assert c['prompt'].name=='task-'+node+'.md' and c['oracle'].is_file()
  assert c['data'].name=='fixtures' and c['data'].parent.name==node
+c=m.scenario('grouping-sort-result')
+assert c['export_count']==2 and len(m.expected_for(c,'/own/package.lgp')['outputs'])==1
 `],{cwd:new URL('../../../',import.meta.url)});
 });

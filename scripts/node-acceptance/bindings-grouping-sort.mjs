@@ -29,6 +29,7 @@ export function auditBooleanBindings(events,initial,final){
  const source=c=>c.result.node?.node_id===b.source.ref.node_id?c.result.configuration?.readback?.variables??c.result.output?.variable_ports?.[0]?.variables:undefined;
  const before=checkpoints.filter(c=>c.index<first.index).map(source).filter(Boolean).at(-1),after=checkpoints.filter(c=>c.index>patch).map(source).find(Boolean);
  assert.ok(before&&after,'BOOLEAN_BINDING_SOURCE_INVENTORY');
+ for(const [variables,value] of [[before,false],[after,true]]){const flags=variables.filter(v=>v.name==='Flag');assert.equal(flags.length,1);assert.equal(flags[0].type,'boolean');assert.equal(flags[0].cell?.value??flags[0].value,value,'BOOLEAN_BINDING_FLAG_VALUE');}
  assert.deepEqual(before.map(v=>[v.id,v.index,v.name,v.type]),after.map(v=>[v.id,v.index,v.name,v.type]),'BOOLEAN_BINDING_VARIABLE_IDENTITY');
  const sentinel=v=>v.find(x=>x.name==='Sentinel');assert.ok(sentinel(before),'BOOLEAN_BINDING_SENTINEL');assert.deepEqual(sentinel(before),sentinel(after));
  return {status:'PASS',node:first.result.node,binding:b,initial_execution_id:first.result.execution.execution_id,final_execution_id:second.result.execution.execution_id};

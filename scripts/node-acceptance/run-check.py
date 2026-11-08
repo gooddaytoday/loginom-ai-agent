@@ -100,7 +100,7 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'grouping-sort-result':
         node = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance/modes/task-sort-result.md',
-                    data=node / 'fixtures', input_files=['modes.csv'], base=None,
+                    data=node / 'fixtures', input_files=['modes.csv'], base=None, export_count=2,
                     grouping_case='sort_result', oracle=node / 'acceptance/modes/oracle.py')
     if name == 'import-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
@@ -2003,6 +2003,7 @@ class Runner:
             counts = {}
             csv_expected = (read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
                             else expected['outputs'][0] if spec.get('binding_initial')
+                            else expected['outputs'][0] if spec.get('grouping_case')
                             else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
