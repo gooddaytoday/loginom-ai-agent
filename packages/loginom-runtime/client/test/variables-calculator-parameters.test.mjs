@@ -73,6 +73,7 @@ test('datetime and intermediate patches agree with the schema and preserve omitt
  assert.equal(check(p).valid,true);validateVariablesCalculatorParameters(p,'expression',request);
  const created=resolveVariablesCalculatorPatch(p,blank(),{newNode:true});
  assert.equal(created.expressions[1].intermediate,true);assert.equal(created.expressions[0].intermediate,false);
+ assert.equal(created.expressions[2].intermediate,false);
  const before=observed(created.expressions);before.expressions[1].intermediate=true;
  const update={expressions:[{target:{kind:'existing',name:'base'},formula:'4'}]};
  const plan=resolveVariablesCalculatorPatch(update,before);
