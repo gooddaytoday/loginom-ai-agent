@@ -12,7 +12,7 @@ export function validateClusteringParameters(p,mode,request){
  need(request.target.kind==='existing'||p.features!==undefined&&(automatic?p.min_clusters!==undefined&&p.max_clusters!==undefined&&p.threshold!==undefined:p.clusters!==undefined),'new nodes require features and '+(automatic?'min_clusters, max_clusters, threshold':'clusters'));
  for(const key of ['min_clusters','max_clusters'])if(p[key]!==undefined)need(Number.isSafeInteger(p[key])&&p[key]>=1&&p[key]<=1000,key+' must be an integer from 1 to 1000');
  need(p.min_clusters===undefined||p.max_clusters===undefined||p.min_clusters<=p.max_clusters,'min_clusters must not exceed max_clusters');
- if(p.threshold!==undefined)need(typeof p.threshold==='number'&&Number.isFinite(p.threshold)&&p.threshold>0,'threshold must be a finite positive number');
+ if(p.threshold!==undefined)need(typeof p.threshold==='number'&&Number.isFinite(p.threshold)&&p.threshold>=0.1&&p.threshold<=5,'threshold must be a finite number from 0.1 to 5');
  if(p.features!==undefined)need(Array.isArray(p.features)&&p.features.length>0&&p.features.length<=128&&p.features.every(f=>f&&Object.keys(f).sort().join(',')==='kind,name'&&f.kind==='input_field'&&typeof f.name==='string'&&f.name.length>0&&f.name.length<=128)&&new Set(p.features.map(f=>f.name)).size===p.features.length,'features must be distinct input_field names');
  if(p.clusters!==undefined)need(Number.isSafeInteger(p.clusters)&&p.clusters>=2&&p.clusters<=1000,'clusters must be an integer from 2 to 1000');
  if(p.seed!==undefined)need(Number.isSafeInteger(p.seed)&&p.seed>=0&&p.seed<=2147483647,'seed must be an integer from 0 to 2147483647');

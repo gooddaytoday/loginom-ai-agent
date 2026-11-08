@@ -1,5 +1,5 @@
 import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clustering-apply.mjs';
-import {checkGmeansRound,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
+import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
 import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
@@ -59,7 +59,7 @@ const { loginBrowser } = await load("src/connection-check.mjs")
 const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
 const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
 const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
-const { createNodeExecutionProcedure } = await load("client/lib/node-execution-procedure.mjs")
+const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
 const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
 const { withBrowserReceipt } = await load("client/lib/executor.mjs")
 const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
@@ -288,7 +288,7 @@ page = context.pages()[0]
   if(expected.clustering_apply||expected.clustering_normalized||expected.clustering_gmeans){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');
    if(nodes.length!==1)throw Error('CLUSTERING_NORMALIZED_ONE_SAVED_NODE');
-   const settings=await (expected.clustering_apply?observeApplySavedSettings:expected.clustering_gmeans?observeGmeansSavedSettings:observeClusteringSavedSettings)({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected});
+   const settings=await (expected.clustering_apply?observeApplySavedSettings:expected.clustering_gmeans?observeGmeansSavedSettings:observeClusteringSavedSettings)({load,channel:channelFor(nodes[0].ref,'clustering-saved'),expected,execute,record});
    await record({phase:'clustering_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.sampling_modes?.mode==='uniform'){
@@ -297,7 +297,8 @@ page = context.pages()[0]
    await record({phase:'sampling_saved_settings',node:target.ref,...settings});
   }
   const actual=[],ownedExecutions=[];
-  const readPlans=sampling?[...reads,...reads]:reads;
+  const readPlans=sampling?[...reads,...reads]:expected.clustering_gmeans?[...reads,...reads.filter(r=>r.node.type==='datamining.clustering')]:reads;
+  const gmeansRounds=[];
   for(const [outputIndex,{node:target,ports,treeContract}] of readPlans.entries()){
   const node=target.ref;
 
@@ -347,6 +348,10 @@ page = context.pages()[0]
       ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
     return result;
   };
+  if(expected.clustering_gmeans&&target.type==='datamining.clustering'){
+   const training=await trainConfiguredNode(channel,node);
+   await record({phase:'gmeans_seed_repeat_training',node,training,settings_applied:false});
+  }
   if(expected.excel_named_range&&target.type==='imports.excel'){
    const settings=await inspectSavedExcelNamed({load,channel,execute,graph,node,expected:expected.excel_named_range,origin});
    await record({phase:'cold_excel_named_saved_settings',node,...settings});
@@ -397,6 +402,7 @@ page = context.pages()[0]
    await record({phase:'sampling_cold_reactivated_after_cancel',node,execution,settings_applied:false});
   }
 
+  if(expected.clustering_gmeans&&target.type==='datamining.clustering')gmeansRounds.push([]);
   for(const {port:outputPort,content_candidate} of ports){
   let useNative=false,ownedPreview;
   const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
@@ -472,6 +478,16 @@ page = context.pages()[0]
   await returnFromOutputTable(channel, opened.table)
   }
 
+  if(expected.clustering_gmeans&&target.type==='datamining.clustering'){
+   gmeansRounds.at(-1).push({node,type:target.type,output_port:outputPort,execution,data});
+   if(gmeansRounds.length===2){
+    if(gmeansRounds[1].length===ports.length){
+     const proof=checkGmeansSeedRepeat(rawExpected,...gmeansRounds);
+     await record({phase:'gmeans_seed_repeat_verified',...proof,settings_applied:false});
+    }
+    continue;
+   }
+  }
   actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,cold_read_ceiling:coldReadCeiling,
    ...(sampling?{sampling_mapping:samplingMappings.get(outputPort)}:{}),
    ...(content_candidate?{content_candidate:true}:{})});
@@ -500,7 +516,10 @@ page = context.pages()[0]
   }
   const samplingResult=sampling?checkSamplingCold(expected,actual,samplingBaseline):null;
   if(expected.clustering_apply)checkApplyRound(rawExpected,actual.filter(r=>r.type==='datamining.clustering'),{cold:true});
-  if(expected.clustering_gmeans)checkGmeansRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
+  if(expected.clustering_gmeans){
+   if(gmeansRounds.length!==2||gmeansRounds[1].length!==2)throw Error('CLUSTERING_GMEANS_REPEAT_MISSING');
+   checkGmeansRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
+  }
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));

@@ -73,12 +73,25 @@ export function checkGmeansMain(expected,replies){
   rounds.set(id,{node:reply.node.node_id,expected:resolved,values:resolved.outputs.map(o=>o.rows)});
  }
  const values=[...rounds.values()];
- need(values.length>=2&&new Set(values.map(r=>r.node)).size===1,'TWO_EXECUTIONS_SAME_NODE');
+ need(values.length>=1&&new Set(values.map(r=>r.node)).size===1,'VERIFIED_EXECUTION');
  need(values.every(r=>same(r.values,values[0].values)),'SEED_REPEAT');
  return values.at(-1).expected;
 }
 
-export async function observeGmeansSavedSettings({load,channel,expected}){
+// Seed repeat belongs to the harness: two native trainings of the saved node.
+export function checkGmeansSeedRepeat(expected,first,second){
+ for(const round of [first,second]){
+  need(round.length===2&&round.every(r=>r.node?.node_id===round[0].node?.node_id
+   &&r.execution?.status==='completed'&&r.execution?.verified===true&&r.execution?.owner_verified===true
+   &&r.execution?.execution_id===round[0].execution?.execution_id),'REPEAT_EXECUTION_PROOF');
+  checkGmeansRound(expected,round,{cold:true});
+ }
+ need(first[0].node.node_id===second[0].node.node_id&&first[0].execution.execution_id!==second[0].execution.execution_id,'TWO_EXECUTIONS_SAME_NODE');
+ need([0,1].every(port=>same(first.find(r=>r.output_port===port).data.sample,second.find(r=>r.output_port===port).data.sample)),'SEED_REPEAT');
+ return {verified:true,node_id:first[0].node.node_id,execution_ids:[first[0].execution.execution_id,second[0].execution.execution_id]};
+}
+
+export async function observeGmeansSavedSettings({load,channel,expected,execute,record}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
@@ -96,6 +109,13 @@ export async function observeGmeansSavedSettings({load,channel,expected}){
   need(same(norm.node_clustering.fields.map(f=>f.name),c.features)&&norm.node_clustering.fields.every(f=>f.norm_type===0),'SAVED_NORMALIZATION');
   await next('normalization');
   const params=await channel.observe({condition:'cold g-means bounds and seed',readClustering:true,ready:s=>s.wizard?.stage==='clustering'&&s.node_clustering?.verified===true});
+  if(execute){
+   // Read the native Ext control bound to this exact data-tid, without setters.
+   const tid=params.wizard.root_tid+';ClusterizationWizard;pedThreshold;ValueControl';
+   const range=await execute('async page=>page.evaluate(tid=>{const es=[...document.querySelectorAll("[data-tid="+JSON.stringify(tid)+"]")];const e=es[0],c=es.length===1&&globalThis.Ext?.getCmp?.(e.id);if(c?.el?.dom!==e)throw Error("THRESHOLD_CONTROL");return {tid,min:c.minValue,max:c.maxValue,step:c.step};},'+JSON.stringify(tid)+')');
+   need(range.min===0.1&&range.max===5,'NATIVE_THRESHOLD_RANGE');
+   await record({phase:'gmeans_native_threshold_range',...range});
+  }
   need(params.node_clustering.auto===true&&Object.values(params.node_clustering.switches).every(v=>v===false)&&['min_clusters','max_clusters','threshold','seed'].every(k=>params.node_clustering[k]===c[k]),'SAVED_PARAMETERS');
   return {mode:'g_means',min_clusters:c.min_clusters,max_clusters:c.max_clusters,threshold:c.threshold,seed:c.seed,settings_applied:false};
  }finally{
@@ -106,5 +126,5 @@ export async function observeGmeansSavedSettings({load,channel,expected}){
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const expected=JSON.parse(await readFile(process.argv[2],'utf8')),replies=JSON.parse(await readFile(process.argv[3],'utf8'));
  await writeFile(process.argv[4],JSON.stringify(checkGmeansMain(expected,replies),null,2));
- console.log('PASS: g-means bounds, source, means, distances, types/order and seed repeat');
+ console.log('PASS: g-means bounds, source, means, distances, types/order and native outputs');
 }

@@ -18,7 +18,7 @@ function fixture(initial=[5,5],kind='existing',parameters={}){
  const element=(tid,verb='click',label)=>({tid,ref:tid,allowed_actions:[verb],label});
  const state=()=>({prepared_node_context:node,wizard:{stage,root_tid:'W',root_ref:'wizard'},
   node_clustering:{verified:true,node_context:node,inventory_complete:true,...(stage==='input_mapping'?{fields}:stage==='normalization'?{kind:'normalization',fields:structuredClone(norms),selected,editor,source_status:'Вход активирован'}:{kind:'parameters',...params,switches:{},values:{pedClustersMin:params.min_clusters,pedClustersMax:params.max_clusters,pedThreshold:params.threshold}})},
-  ui:{elements:[element('W;btnNext','wizard_step'),element('W;ClusterizationWizard;pedAutoClusters;ValueControl;DisplayEl','set_checked'),...Object.values(keys).flatMap(key=>['fill','press'].map(verb=>element('W;ClusterizationWizard;'+key+';ValueControl',verb))),...fields.map(f=>element('W;NormTuneWizard;colDisplayName_'+f.name)),element('W;NormTuneWizard;btnEdit'),
+  ui:{elements:[element('W;btnNext','wizard_step'),element('W;btnPrev','wizard_step'),element('W;ClusterizationWizard;pedAutoClusters;ValueControl;DisplayEl','set_checked'),...Object.values(keys).flatMap(key=>['fill','press'].map(verb=>element('W;ClusterizationWizard;'+key+';ValueControl',verb))),...fields.map(f=>element('W;NormTuneWizard;colDisplayName_'+f.name)),element('W;NormTuneWizard;btnEdit'),
    ...(editor?[element('W;ColumnsEditForm;cbxNormType;trg_picker'),element('W;ColumnsEditForm;btnApply')]:[]),
    ...(picker?Object.keys(labels).map(label=>element('W;ColumnsEditForm;cbxNormType;boundlist;'+label,'click',label)):[])]}});
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform({ready,resolve}){
@@ -50,7 +50,7 @@ for(const [method,id,label] of [['scale_minus_one_one',2,'Масштабиров
 test('mixed and unsupported methods require explicit choice before normalizer edits',async()=>{
  for(const ids of [[2,3],[1,1],[6,6]]){
   const f=fixture(ids);await assert.rejects(f.run({}),/explicit/);
-  assert.equal(f.actions.length,1);
+  assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
  }
  const f=fixture([2,3]);await f.run({normalization:'absolute_scale'});
  assert.deepEqual(f.norms.map(n=>n.norm_type),[4,4]);
@@ -73,6 +73,13 @@ test('g-means partial edits validate combined saved bounds before parameter muta
  assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
  const saved=fixture([0,0],'existing',{auto:true,min_clusters:2,max_clusters:4});
  const r=await saved.run({threshold:0.5},'g_means');assert.equal(r.configuration.min_clusters,2);assert.equal(r.configuration.max_clusters,4);
+});
+test('existing mode switches require explicit active parameters before any settings mutation',async()=>{
+ for(const [auto,mode,parameters] of [[true,'k_means',{}],[true,'k_means',{seed:7,normalization:'none'}],[false,'g_means',{}],[false,'g_means',{min_clusters:2,max_clusters:4}],[false,'g_means',{min_clusters:2,threshold:1}],[false,'g_means',{max_clusters:4,threshold:1}]]){
+  const f=fixture([5,5],'existing',{auto});
+  await assert.rejects(f.run(parameters,mode),/mode change requires explicit/);
+  assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
+ }
 });
 test('g-means raises maximum before minimum and can return to fixed k on the same node',async()=>{
  const f=fixture([0,0],'existing',{auto:true,min_clusters:2,max_clusters:4});
