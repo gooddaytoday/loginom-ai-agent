@@ -5,7 +5,7 @@
 
 Меняя `measures` existing Группировки, задай полный `group_by` и связь входа 0 в `inputs`.
 Удаление полных дублей = Группировка по всем полям без мер (`measures: []`).
-В output mapping `configured_field.name` — текущее выходное имя: `name` меры (например `Metric`) или имя ключа; native-имена вида `Amount_Median` не подходят.
+В output mapping `configured_field.name` — текущее выходное имя: после apply с `measures` это `name` меры (например `Metric`) или имя ключа; не составляй имя из поля и функции (`Amount_Median`), если узел его не выдал.
 
 ## Медиана
 

@@ -108,9 +108,11 @@ test('LAB-1162 skill text covers repeated model refusals from live runs',async t
  assert.match(skill,/[Пп]осле каждого `loginom_dock_prepare`[^\n]*(open_package|повторн)[^\n]*\n?[^\n]*describe/);
  const workflow=await readFile(join(source.directory,'references/workflow.md'),'utf8');
  assert.match(workflow,/source_operation_id[\s\S]{0,80}finish:"execute"/);
- assert.match(workflow,/finish:"done"[\s\S]{0,60}не подходит/);
+ assert.match(workflow,/табличного узла[\s\S]{0,60}finish:"execute"[\s\S]{0,20}`finish:"done"` и экспорт не подходят[\s\S]{0,20}снимок\s+`variables\.user` — по его карточке/);
+ assert.doesNotMatch(workflow,/операция с `finish:"done"`[^\n]*не подходит/);
  const card={type:'transform.group_data',modes:NODE_TYPES['transform.group_data'].modes};
  const [aggregate]=await loader.describeNodes([card],['aggregate']);
- assert.match(aggregate.guidance,/configured_field\.name[\s\S]{0,120}`name` меры/);
- assert.match(aggregate.guidance,/Amount_Median/);
+ assert.match(aggregate.guidance,/configured_field\.name[\s\S]{0,40}текущее выходное имя: после apply с `measures`[\s\S]{0,20}`name` меры/);
+ assert.match(aggregate.guidance,/не составляй имя из поля и функции \(`Amount_Median`\), если узел его не выдал/);
+ assert.doesNotMatch(aggregate.guidance,/native-имена[^\n]*не подходят/);
 });
