@@ -364,6 +364,8 @@ in `D87` only after LAB-413 provides the XLSX switching path and validate it liv
 (median/most_probable, previous при ordered, delete). Модель получает только
 `acceptance/task-*.md` и CSV из `fixtures/` (statistics, ordered, delete); ожидания —
 `acceptance/modes/expected*.json` (воспроизводит `oracle.py --check`). CSV, Save, cold и cleanup — штатная оснастка.
+Цикл 2: `missing-linear` (linear при ordered, ordered.csv) и `missing-random` (random, random-single-value.csv,
+единственное известное значение — результат детерминирован) по тем же правилам.
 
 `grouping-median`: цикл 1 «Группировка: медиана» (LAB-998): `task-median.md` и
 `fixtures/modes.csv` модели; ожидания берутся из независимого

@@ -1,10 +1,11 @@
 const need=(v,m)=>{if(!v)throw Error(m);};
 const object=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 const numeric=['integer','real'];
-// Observed Loginom 7.4.2 menus: previous exists only for ordered input, delete only for unordered input.
-export const MISSING_VALUES_METHODS=['mean','zero','constant','median','most_probable','previous','delete'];
+// Observed Loginom 7.4.2 menus: previous/linear exist only for ordered input, delete/random only for unordered input.
+export const MISSING_VALUES_METHODS=['mean','zero','constant','median','most_probable','previous','delete','random','linear'];
+const ORDERED_METHODS=['previous','linear'];
 const compatible=(method,s)=>method==='zero'?numeric.includes(s.type)&&['Непрерывный','Дискретный'].includes(s.data_kind)
- :['mean','median','previous','delete'].includes(method)?numeric.includes(s.type)&&s.data_kind==='Непрерывный'
+ :['mean','median','previous','delete','random','linear'].includes(method)?numeric.includes(s.type)&&s.data_kind==='Непрерывный'
  :s.type==='string'&&s.data_kind==='Дискретный';
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 
@@ -24,7 +25,7 @@ export function validateMissingValuesParameters(p,mode,r){
    need(object(f,['field','method','value'])&&object(f.field,['kind','name'])&&f.field.kind==='input_field'&&name(f.field.name),'Exact input field name required');
    need(!seen.has(f.field.name.toLowerCase()),'Duplicate missing values field');seen.add(f.field.name.toLowerCase());
    need(MISSING_VALUES_METHODS.includes(f.method),'Unsupported missing values method');
-   need((f.method==='previous')===(p.ordered===true),'previous requires ordered:true, and ordered:true allows only previous');
+   need(ORDERED_METHODS.includes(f.method)===(p.ordered===true),'previous and linear require ordered:true, and ordered:true allows only previous and linear');
    need(f.method!=='constant'?!Object.hasOwn(f,'value'):typeof f.value==='string'&&f.value.length<=2048&&!/[\r\n\u0000]/.test(f.value),'Only string constant accepts an explicit replacement value');
   }
  }
@@ -49,7 +50,7 @@ export function resolveMissingValuesParameters(p,fields,ordered=p.ordered){
   need(MISSING_VALUES_METHODS.includes(f.method)&&(f.method!=='constant'||typeof f.value==='string'&&f.value.length<=2048&&!/[\r\n\u0000]/.test(f.value)),'Unsupported saved missing values method/value');
   const matches=fields.filter(s=>s.name===f.field.name);need(matches.length===1,'Missing values input field is missing: '+f.field.name);
   const source=matches[0];
-  need((f.method==='previous')===(ordered===true),'Missing values method is incompatible with ordered input: '+f.field.name);
+  need(ORDERED_METHODS.includes(f.method)===(ordered===true),'Missing values method is incompatible with ordered input: '+f.field.name);
   need(compatible(f.method,source),'Missing values method is incompatible with type/data kind: '+source.name);
   return {...source,method:f.method,...(f.method==='constant'?{value:f.value}:{})};
  });

@@ -307,12 +307,12 @@ export interface MissingValuesConfigurationReadback {
 }
 
 export interface MissingValuesModesParameters {
-  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
+  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'|'random'|'linear'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
   max_nulls_percent:number; ordered:boolean;
 }
 export interface MissingValuesModesConfigurationReadback extends Omit<MissingValuesConfigurationReadback,'ordered'|'fields'> {
   ordered:boolean;
-  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete';value?:string}>;
+  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete'|'random'|'linear';value?:string}>;
 }
 
 export interface CollapseParameters {

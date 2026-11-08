@@ -486,7 +486,9 @@ class RunCheckTests(unittest.TestCase):
                        check=True, capture_output=True)
         for name, task, csv_name, rows, nodes in [('missing-median-mode', 'task-median-mode.md', 'statistics.csv', 4, 3),
                                                   ('missing-previous', 'task-previous.md', 'ordered.csv', 5, 3),
-                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3)]:
+                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3),
+                                                  ('missing-linear', 'task-linear.md', 'ordered.csv', 5, 3),
+                                                  ('missing-random', 'task-random.md', 'random-single-value.csv', 4, 3)]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['input_files'], [csv_name])
