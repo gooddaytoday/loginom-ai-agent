@@ -165,11 +165,16 @@ admission, provenance или бюджеты. Существующий Collapse f
 
 ## Какие узлы разблокируются
 
+Уже включено: variables.to_table, imports.lgd (sample-пределы).
+`node-procedure.mjs:267` всегда передаёт им `typedVariants`; предел —
+обычный sample 100 строк / 10 000 ячеек (`node-port-output.mjs:220,328`),
+а не full 50×8. Цикл 1 этот allowlist не меняет и проверяет его регрессией.
+
 | Узел | Что даёт общий tabular reader | Что остаётся отдельно |
 |---|---|---|
 | Свёртка столбцов | единый subtype decode с generic completed-port | её существующие full/chain guards; повторная свёртка и Empty |
-| Замена, иной result_type + keep | точный boolean/string/NULL в одном поле | нынешний preflight запрещает этот режим; настройка узла требует отдельного допуска |
-| Конечные классы | точное чтение полей Variant после выполнения | учить/применять, все порты, семантика интервалов и модель не меняются |
+| Замена, Boolean + other keep | точный boolean/string/NULL в одном поле | режим keep→Variant вводит #882; приёмка — принятый `replace-keep-variant` |
+| Конечные классы | точное чтение порта 1: `LowerBound`/`UpperBound` (Variant) после выполнения | учить/применять, прочие порты, семантика интервалов и модель не меняются |
 | Таблица в переменные | **не разблокируется одним interface116** | VariablesForm/W1 adapter, subtype proof и список агрегатов |
 
 У DataToVar выход переменных. `node-output-context.mjs:readVariableRecords`
@@ -186,20 +191,24 @@ store и намеренно не вызывает Value/$self proxy. Поэто�
 
 `acceptance/task-collapse.md` + `fixtures/mixed.csv`: 15 строк, все шесть
 наблюдённых subtype, пустая строка, zero, false, пять NULL, порядок и типы.
-`acceptance/task-replacement.md` + `fixtures/status.csv`: boolean true после
-замены и исходная string `true` должны оставаться разными; string empty и NULL
-тоже различаются. Режим keep пока блокирует production preflight.
+Отдельный сценарий Замены не нужен: принятый комплект
+`replacement/acceptance/task-result-keep.md` + `extended/expected-result-keep.json`
+(`replace-keep-variant`) уже проверяет boolean true, исходные строки и NULL
+в одном Variant-поле. В нём флаг `Status_Replaced:false` на NULL —
+наблюдение Loginom 7.4.2 (при keep исходный NULL не считается заменой),
+а не выведенное правило.
 
 `acceptance/oracle.py` использует только CSV/авторский JSON и Python stdlib.
 `--write` регенерирует `acceptance/expected.json`, `--check` проверяет его
 полностью и фиксированные независимые anchors int64, 0.1, −0, datetime .006,
 NULL/Empty. Не импортирует reader, Loginom, журналы или результаты UI.
-В expected две stock-подобные таблицы cases и 13 precision_vectors;
+В expected stock-подобная таблица `cases.collapse` и 13 precision_vectors;
 последние **не являются новым механизмом верификации** и не исполняются
 штатным matcher до решения владельца. Файл не зарегистрирован в run-check.
-Для этапа 1 выбрать `cases.collapse`/`cases.replacement` в частный expected,
+Для этапа 1 выбрать `cases.collapse` в частный expected,
 проверить допустимость stock matcher для subtype/null и зарегистрировать
-сценарии отдельно. Передавать модели только выбранный task и input CSV;
+сценарий отдельно. Векторы precision сверяются со значениями
+`fixtures/precision.csv` (якорь на строку с кавычками). Передавать модели только выбранный task и input CSV;
 oracle, expected, precision vectors, карточки-предложения ей не передавать.
 `fixtures/precision.csv` — предложенный дополнительный источник для будущей
 проверки больших int64, 0.1, signed zero, соседних binary64 и datetime .006.
@@ -219,6 +228,8 @@ oracle, expected, precision vectors, карточки-предложения е�
    До одобрения Empty/3/4 — точный отказ без публикации fabricated subtype.
 5. Регрессии всех текущих scalar/Variant consumers, full bounds, stale
    execution/source, pending callback, unknown tag и envelope budget.
+   Уже включено: variables.to_table, imports.lgd (sample-пределы) —
+   регрессия ×1 `variables-rows` и `lgd-import-empty-variant`.
 
 Это новые критерии для общего кода, поэтому этап 1 ожидает решения.
 На этапе 0 код не изменён, CLI не собирался, модельные run-check/cold
@@ -253,26 +264,23 @@ opt-in, сохранение отказов и проверка старых п�
 в client — 185 PASS. `model_tool_bytes=8051` (лимит 20000),
 `full_input_schema_bytes=71306` (не отправляется модели, без лимита).
 Общий reader не является новым node type; отдельную карточку ему не создаём.
-`acceptance/type-cards.proposal.json` — четыре существующие карточки с
-проектом общей заметки, все hash-поля заменены 64 нулями. Размер —
-UTF-8 `JSON.stringify(card)`, полная guidance всех modes:
+Общая заметка в карточки и `SKILL.md` не добавляется: четыре типа уже
+маршрутизируются, а `variables.from_table` до W1-адаптера заметку не получает.
+Вместо неё — одна строка в файле узла Свёртки и Замены («подтип Variant —
+через `read.require_exact_numbers:true`»). Прежний проект с общей заметкой
+давал Замене 12439 Б карточки и 6057 Б справки — сверх лимитов. Порядок —
+сначала сокращение и повторный замер, лимиты не поднимаются. Замер на голове
+цикла 1 (`model-schema-budget.test.mjs`, UTF-8 `JSON.stringify(card)`, полная
+guidance всех modes):
 
-| Тип | Сейчас, Б | Проект, Б | Лимит, Б |
+| Тип | Карточка, Б | Справка, Б | Лимиты, Б |
 |---|---:|---:|---:|
-| transform.collapse_columns | 5227 | 5698 | 12000 |
-| transform.replace_columns | 11968 | **12439** | 12000 |
-| variables.from_table | 6514 | 6985 | 12000 |
-| preprocessing.coarse_classes | 7912 | 8383 | 12000 |
+| transform.collapse_columns | 5404 | 2599 | 12000 / 6000 |
+| transform.replace_columns | 11957 | 5569 | 12000 / 6000 |
 
-`SKILL.md` сейчас 28823 Б; добавление одной `skill-note.proposal.md`
-(468 Б) с двумя переводами строк даст 29293 Б, лимит 40000.
-Новая routing-строка не нужна: четыре существующих типа уже маршрутизируются.
-Node references сейчас: collapse 2424 Б, replacement 5587 Б,
-from_table 2984 Б, coarse_classes 3466 Б. Та же заметка с двумя LF даст
-2894/6057/3454/3936 Б соответственно: replacement превышает лимит 6000.
-Карточку и reference Замены нужно сократить в этапе 1 либо сослаться на
-общую заметку с повторным реальным замером; лимиты не увеличивать.
-Project files — предложение текста, не действующая регистрация поддержки.
+Замена уложилась сжатием собственного текста справки, без исключения.
+`SKILL.md` не меняется (28823 Б). `skill-note.proposal.md` — только текст
+правила на будущее, не регистрация поддержки.
 
 ## Проверка самого предложения
 

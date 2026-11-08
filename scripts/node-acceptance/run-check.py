@@ -544,12 +544,10 @@ def scenario(name, case_root=None, *, cases=None):
                           'replace-keep-variant': ('task-result-keep.md', 'expected-result-keep.json')}[name]
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures/extended', input_files=['input.csv'], base=None, expected_name=expected)
-    if name in ['variant-reader-collapse', 'variant-reader-replace']:
+    if name == 'variant-reader-collapse':
         node = REPO / 'docs/node-development/nodes/variant-reader'
-        collapse = name == 'variant-reader-collapse'
-        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-collapse.md' if collapse else 'task-replacement.md'),
-                    data=node / 'fixtures', input_files=['mixed.csv' if collapse else 'status.csv'], base=None,
-                    expected_name='expected-collapse.json' if collapse else 'expected-replacement.json')
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-collapse.md',
+                    data=node / 'fixtures', input_files=['mixed.csv'], base=None, expected_name='expected-collapse.json')
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)

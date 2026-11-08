@@ -7,7 +7,7 @@
   {"kind":"datetime","text":"2026-01-02T03:04:05.006"},
   {"kind":"string","value":"19"},
   {"kind":"string","value":""},
-  {"kind":"string","value":"Привет, \"ё\"\nNULL"},
+  {"kind":"string","value":"Привет, \"ё\""},
   {"kind":"boolean","value":false},
   {"kind":"boolean","value":true},
   {"kind":"null","value":null},

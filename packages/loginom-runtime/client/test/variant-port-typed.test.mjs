@@ -7,7 +7,7 @@ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-
 const execution={verified:true,owner_verified:true,status:'completed',execution_id:'execution',process_id:'1',process_record_id:'process'};
 
 async function dispatched(type,requireExactNumbers,route='apply'){
- const operation=route==='apply'?{id:'op',deadline:10000,action:{action_key:'node.apply',revision:'1'},parameters:{target:{type}}}
+ const operation=route==='apply'?{id:'op',deadline:10000,action:{action_key:'node.apply',revision:'1'},parameters:{},nodeApply:{request:{target:{type}}}}
   :{id:'op',deadline:10000,action:{action_key:'node.read',revision:'1'},parameters:{target:{type},parameters:{}}};
  let code;
  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2',now:()=>1,

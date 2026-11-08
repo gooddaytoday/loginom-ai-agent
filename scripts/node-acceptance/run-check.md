@@ -737,8 +737,8 @@ Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1
 прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
 typed matcher native reader, порядок, CSV/Save/cold/cleanup.
 
-`variant-reader-collapse` / `variant-reader-replace` — task-collapse.md + mixed.csv и
-task-replacement.md + status.csv общего Variant reader; expected-collapse.json /
-expected-replacement.json пишет `oracle.py --write` из `cases.*`. Values/Status
+`variant-reader-collapse` — task-collapse.md + mixed.csv общего Variant reader;
+expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Values
 сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
-порядок, CSV/Save/cold/cleanup. Модели — только task и CSV.
+порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
+проверяется принятым `replace-keep-variant`.

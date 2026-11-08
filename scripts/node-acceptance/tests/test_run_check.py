@@ -488,8 +488,7 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(len(expected['outputs'][0]['columns']), 5)
 
     def test_variant_reader_cases_use_only_task_input_and_oracle_expected(self):
-        for name, task, data, rows, node_type in [('variant-reader-collapse', 'task-collapse.md', 'mixed.csv', 15, 'transform.collapse_columns'),
-                                                   ('variant-reader-replace', 'task-replacement.md', 'status.csv', 5, 'transform.replace_columns')]:
+        for name, task, data, rows, node_type in [('variant-reader-collapse', 'task-collapse.md', 'mixed.csv', 15, 'transform.collapse_columns')]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['input_files'], [data])
@@ -499,6 +498,7 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(expected['outputs'][0]['output_node_type'], node_type)
             self.assertEqual(len(expected['outputs'][0]['rows']), rows)
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
+        with self.assertRaises(ValueError): runner.scenario('variant-reader-replace')
 
     def test_replace_convert_uses_independent_typed_fixture(self):
         case = runner.scenario('replace-convert')
