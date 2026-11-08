@@ -334,7 +334,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    const baseDecode=exactVariants?eval('('+variant.decode+')'):null;
    // Replacement-only opt-in: a VT_EMPTY frame (tag 0) is the NULL that keep carries over from the source; every other path refuses it.
    const nativeDecode=exactVariants&&q.variantEmptyIsNull===true?(payload,size)=>payload[0]===0&&payload[1]===0?baseDecode([1,...payload.slice(1)],size):baseDecode(payload,size):baseDecode,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
-   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},nativeDecode,eval('('+variant.collect+')'),variant.pins);
+   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins);
    const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
    const helper=sourceBaseline.helper;
    let limited=requested<Math.min(rowCount-offset,q.sampleRows);
@@ -345,8 +345,8 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
       let cell;
       try{cell=await nativeReader.read(row,column);}
       catch(error){
-       // Guard, transport and deadline failures keep their exact cause and stop at once.
-       if(error?.message?.startsWith('Variant read:')||nativeReader.unsettled||Date.now()>=o.deadline)throw error;
+       // Only a decoder refusal (positively marked) may continue; guard, transport and deadline failures keep their exact cause and stop at once.
+       if(!error?.variantDecode||nativeReader.unsettled||Date.now()>=o.deadline)throw error;
        // Diagnostic only, for decoder refusals: scan the rest so the refusal names every cell and its ordinary value kind.
        let kind;try{live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();kind=raw===null||raw===undefined?'null':typeof raw;}catch(cause){if(reason!=='read_failed')throw cause;kind='unread';}
        variantFailures.push('r'+row+'c'+column+' '+kind+' '+String(error?.message).slice(0,48));rawValues.push(null);continue;
