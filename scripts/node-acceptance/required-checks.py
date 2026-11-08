@@ -86,6 +86,7 @@ RULES = (
       'docs/node-development/nodes/integration-restrequest/acceptance/modes/delete/**'),
      ('live-ui',), ('rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete')),
     (('docs/node-development/nodes/integration-restrequest/acceptance/plain/**',), ('live-ui',), ('rest-get-plain',)),
+    (('docs/node-development/nodes/preprocessing-*/acceptance/v040/**', C + 'sampling-*.mjs', C + 'data-partition-*.mjs', 'scripts/node-acceptance/sampling-modes.mjs'), ('live-ui',), ('sampling-uniform', 'partition-uniform', 'partition-test-priority')),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random', 'sampling-stratified', 'sampling-biased', 'partition-stratified', 'partition-biased')),
     ((C + 'date-time-*.mjs',), ('live-ui',), ('n17', 'date-time-iso', 'date-time-iso-empty', 'date-time-minsec')),
