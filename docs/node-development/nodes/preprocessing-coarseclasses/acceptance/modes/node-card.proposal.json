@@ -11,7 +11,7 @@
     "internal",
     "apply"
   ],
-  "semantics": "Continuous predictor and native external/manual/frozen partition proposals. Keep three outputs. Use existing typedVariants opt-in for numeric class bounds. Unknown/NULL category handling and zero-frequency smoothing remain quarantined until native evidence.",
+  "semantics": "Proposal: internal trains the current binary target; apply preserves saved classes without Train. Continuous/manual/frozen partitions and canonical external class tables require observed native settings. External input 1 uses ColumnName, ClassNumber and UniqueValue for discrete groups; use the ready partition, and report native output numbering, which can change. Read all three table outputs [0,1,2], preserving Variant boundary types. Unknown/NULL mixtures and additive alpha=0.5 remain outside the accepted slice; do not invent a smoothing parameter.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "coarse-classes-v1-internal-1",

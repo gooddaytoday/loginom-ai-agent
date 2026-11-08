@@ -127,6 +127,9 @@ changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 `calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
 `modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
 
+`calculator-javascript` uses `task-javascript.md` and `modes/expected.json` (JavaScript language, `this.Expr`,
+intermediate cached Helper, reorder); only the task and `fixtures/modes.csv` reach the model.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
@@ -672,3 +675,9 @@ factor-sign matcher. Final two CSVs, Save, cold and cleanup are required.
 on the same node, physically one Factor field on both ports. The cap oracle
 and stock CSV/cold matcher retain exact types, NULL and field order.
 Only task and matrix.csv reach the model.
+
+
+`replace-boolean` и `replace-mixed` используют утверждённые task-boolean.md/task-mixed.md
+и только fixtures/extended/input.csv из replacement. Независимые expected.json
+и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
+Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.

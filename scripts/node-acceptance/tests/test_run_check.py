@@ -113,6 +113,19 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual([output['rows'][0][k] for k in ['Tail', 'Doubled']], [10, 6])
         self.assertNotRegex(case['prompt'].read_text(), r'Field\.|Expr\.')
 
+    def test_calculator_javascript_sends_only_task_and_csv(self):
+        case = runner.scenario('calculator-javascript')
+        expected = runner.expected_for(case, '/own/calculator.lgp')
+        self.assertEqual(case['input_files'], ['modes.csv'])
+        self.assertTrue((case['data'] / 'modes.csv').is_file())
+        self.assertEqual(case['prompt'].name, 'task-javascript.md')
+        output = expected['outputs'][0]
+        self.assertEqual([c['name'] for c in output['columns']],
+                         ['RowID', 'Quantity', 'UnitPrice', 'Amount', 'Bare', 'FromField', 'JsTotal', 'FromExpr'])
+        self.assertNotIn('Helper', [c['name'] for c in output['columns']])
+        self.assertIsNone(output['rows'][3]['Amount'])
+        self.assertEqual([output['rows'][0][k] for k in ['Bare', 'JsTotal', 'FromExpr']], [100, 202, 10])
+
     def test_csv_without_header_checks_the_first_json_cell(self):
         output = dict(header=False, columns=[dict(name='JSON', type='string', comparison='json_ast')],
                       rows=[dict(JSON='{"id":10,"children":[{"name":"Продажи"}]}')])
@@ -440,6 +453,20 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(rows[1]['R_Delta'], 0.24999900000000075)
         self.assertNotEqual(rows[1]['R_Delta'], 0.249999)
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
+
+    def test_replacement_boolean_and_mixed_use_only_approved_task_and_input(self):
+        for name, task, expected_name in [('replace-boolean', 'task-boolean.md', 'expected.json'),
+                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json')]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['expected_name'], expected_name)
+            self.assertEqual(case['input_files'], ['input.csv'])
+            self.assertTrue((case['data'] / 'input.csv').is_file())
+            expected = runner.expected_for(case, '/test/replacement.lgp')
+            self.assertEqual(expected['package_path'], '/test/replacement.lgp')
+            self.assertEqual(len(expected['outputs'][0]['rows']), 8)
+            self.assertEqual(expected['outputs'][0]['output_node_type'], 'transform.replace_columns')
+            self.assertEqual(len(expected['outputs'][0]['columns']), 5)
 
     def test_replace_convert_uses_independent_typed_fixture(self):
         case = runner.scenario('replace-convert')

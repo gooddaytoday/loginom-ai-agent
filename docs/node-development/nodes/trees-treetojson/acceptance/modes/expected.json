@@ -1,0 +1,233 @@
+{
+  "status": "PROPOSAL; owner decision and native data probes required before implementation",
+  "package_path": "{{PACKAGE_PATH}}",
+  "node": "trees-treetojson",
+  "limits": {
+    "max_nodes": 256,
+    "max_depth": 16,
+    "max_bytes": 1048576
+  },
+  "acceptance": "Existing typed main/CSV/Save/cold/cleanup standard; new comparisons require owner approval.",
+  "cases": [
+    {
+      "id": "root-array",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "exclude_root": true,
+        "multi_row": false
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "JSON",
+            "name_any": true,
+            "label_any": true,
+            "type": "string",
+            "comparison": "json_ast"
+          }
+        ],
+        "rows": [
+          {
+            "JSON": "[{\"code\":\"x\",\"qty\":2},{\"code\":\"y\",\"qty\":0}]"
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "split",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "exclude_root": true,
+        "multi_row": true
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "JSON",
+            "name_any": true,
+            "label_any": true,
+            "type": "string",
+            "comparison": "json_ast"
+          }
+        ],
+        "rows": [
+          {
+            "JSON": "{\"code\":\"x\",\"qty\":2}"
+          },
+          {
+            "JSON": "{\"code\":\"y\",\"qty\":0}"
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "pretty-labels",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "pretty": true,
+        "keys": "labels",
+        "formatting": "valid JSON with a line break outside string tokens; indentation not specified"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "JSON",
+            "name_any": true,
+            "label_any": true,
+            "type": "string",
+            "comparison": "json_ast"
+          }
+        ],
+        "rows": [
+          {
+            "JSON": "{\"Партия\":\"Бета\",\"Позиции\":[{\"Код\":\"x\",\"Количество\":2},{\"Код\":\"y\",\"Количество\":0}],\"Теги\":[{\"Тег\":\"a\"},{\"Тег\":\"b\"},{\"Тег\":\"c\"}]}"
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "dates",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "datetime": "iso8601",
+        "custom_date": "DD.MM.YYYY",
+        "custom_time": "hh:mm:ss.zzz",
+        "custom_output": {
+          "port": 0,
+          "port_kind": "table",
+          "columns": [
+            {
+              "name": "JSON",
+              "name_any": true,
+              "label_any": true,
+              "type": "string",
+              "comparison": "json_ast"
+            }
+          ],
+          "rows": [
+            {
+              "JSON": "{\"batch\":\"Бета\",\"items\":[{\"code\":\"x\",\"qty\":2},{\"code\":\"y\",\"qty\":0}],\"tags\":[{\"tag\":\"a\"},{\"tag\":\"b\"},{\"tag\":\"c\"}],\"when\":\"07.11.2026 12:34:56.789\"}"
+            }
+          ],
+          "ordered": true
+        },
+        "timezone": "none; custom exact spelling pending UI probe"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "JSON",
+            "name_any": true,
+            "label_any": true,
+            "type": "string",
+            "comparison": "json_ast"
+          }
+        ],
+        "rows": [
+          {
+            "JSON": "{\"batch\":\"Бета\",\"items\":[{\"code\":\"x\",\"qty\":2},{\"code\":\"y\",\"qty\":0}],\"tags\":[{\"tag\":\"a\"},{\"tag\":\"b\"},{\"tag\":\"c\"}],\"when\":\"2026-11-07T12:34:56.789\"}"
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "siblings",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "sibling_arrays": "preserve independent array lengths 2 and 3; no flattening"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "JSON",
+            "name_any": true,
+            "label_any": true,
+            "type": "string",
+            "comparison": "json_ast"
+          }
+        ],
+        "rows": [
+          {
+            "JSON": "{\"batch\":\"Бета\",\"items\":[{\"code\":\"x\",\"qty\":2},{\"code\":\"y\",\"qty\":0}],\"tags\":[{\"tag\":\"a\"},{\"tag\":\"b\"},{\"tag\":\"c\"}]}"
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "empty",
+      "native_status": "not_checked",
+      "settings_proposal": {
+        "multi_row_false_document_count": 1,
+        "multi_row_true_output": {
+          "port": 0,
+          "port_kind": "table",
+          "columns": [
+            {
+              "name": "JSON",
+              "name_any": true,
+              "label_any": true,
+              "type": "string",
+              "comparison": "json_ast"
+            }
+          ],
+          "rows": [],
+          "ordered": true
+        },
+        "empty_object_output": {
+          "port": 0,
+          "port_kind": "table",
+          "columns": [
+            {
+              "name": "JSON",
+              "name_any": true,
+              "label_any": true,
+              "type": "string",
+              "comparison": "json_ast"
+            }
+          ],
+          "rows": [
+            {
+              "JSON": "{}"
+            }
+          ],
+          "ordered": true
+        },
+        "zero_root_instances": "not_checked; distinct from a present empty root array/object"
+      },
+      "output": {
+        "port": 0,
+        "port_kind": "table",
+        "columns": [
+          {
+            "name": "JSON",
+            "name_any": true,
+            "label_any": true,
+            "type": "string",
+            "comparison": "json_ast"
+          }
+        ],
+        "rows": [
+          {
+            "JSON": "[]"
+          }
+        ],
+        "ordered": true
+      }
+    }
+  ]
+}

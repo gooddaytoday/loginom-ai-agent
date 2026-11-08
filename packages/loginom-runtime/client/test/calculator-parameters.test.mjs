@@ -126,3 +126,18 @@ test('flags default to false for added expressions and survive an unrelated patc
  const q={expressions:[{target:{kind:'existing',name:'A'},formula:'2'}]};
  assert.deepEqual(resolveCalculatorPatch(q,before,inputs).expressions.map(e=>[e.intermediate,e.cached]),[[true,true],[false,true]]);
 });
+
+test('syntax selects one language for the node; a language change needs a formula for every retained expression',()=>{
+ const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
+ for(const syntax of ['expression','javascript']){
+  assert.equal(check({expressions:[],syntax}).valid,true);assert.doesNotThrow(()=>validateCalculatorParameters({expressions:[],syntax},'expression',request()));
+ }
+ assert.equal(check({expressions:[],syntax:'python'}).valid,false);
+ assert.throws(()=>validateCalculatorParameters({expressions:[],syntax:'python'},'expression',request()),/syntax/);
+ const o=observed();o.syntax='expression';
+ assert.throws(()=>resolveCalculatorPatch({expressions:[{target:{kind:'existing',name:'A'},formula:'return 1;'}],syntax:'javascript'},o,inputs),/does not translate formulas/);
+ const plan=resolveCalculatorPatch({expressions:[{target:{kind:'existing',name:'A'},formula:'return 1;'},{target:{kind:'existing',name:'B'},formula:'return 2;'}],syntax:'javascript'},o,inputs);
+ assert.deepEqual(plan.expressions.map(e=>e.formula),['return 1;','return 2;']);
+ assert.doesNotThrow(()=>resolveCalculatorPatch({expressions:[],syntax:'expression'},o,inputs));
+ assert.doesNotThrow(()=>resolveCalculatorPatch({expressions:[]},o,inputs));
+});

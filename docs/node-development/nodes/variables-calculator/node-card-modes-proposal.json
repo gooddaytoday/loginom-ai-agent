@@ -1,0 +1,247 @@
+{
+  "type": "variables.calculator",
+  "title": "Калькулятор (переменные)",
+  "palette_group": "Переменные",
+  "icon_class": "bg-vendor-icon-calcvariables",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 0,
+  "tabular_outputs": 0,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "expression"
+  ],
+  "variable_inputs": 1,
+  "variable_outputs": 1,
+  "semantics": "Proposal pending owner approval; not current runtime support. Scalar expression mode with integer/real/string/boolean/datetime/variant. Use bare names, e.g. base+1; not Expr./Field. Intermediate expressions feed later expressions but are excluded from output variables 0. replace=true requires an exact input-variable name and intermediate=false; total+10 reads incoming total and replaces its value and label at the same output position, preserving all other inputs. expression_order is a complete name permutation of saved expressions and preserves existing output mapping. Omitted properties retain their saved values. Civil datetime preserves milliseconds without UTC conversion; Variant retains declared type and runtime subtype. Execute/read variable_ports:[0], ports:[], Save separately.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "variables-calculator-v1",
+  "configuration_status": "candidate_pending_autonomous_acceptance",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/variables/variables-calc.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "expression"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "description": "Proposal: scalar variable expressions, intermediate flag, input replacement and explicit expression order. New nodes require expressions; saved-node reorder can supply expression_order alone.",
+    "additionalProperties": false,
+    "properties": {
+      "expressions": {
+        "type": "array",
+        "description": "1–32 expression changes; input replacement must use the exact incoming variable name. Unlisted expressions and output mapping stay unchanged.",
+        "minItems": 1,
+        "maxItems": 32,
+        "items": {
+          "type": "object",
+          "description": "Ordered scalar expression patch, including optional intermediate flag; unlisted saved expressions stay unchanged.",
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "type": "object",
+              "description": "Choose one new or existing expression.",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "description": "new adds a variable; existing patches one saved expression.",
+                  "maxLength": 128,
+                  "enum": [
+                    "new",
+                    "existing"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Exact saved expression name; required only for existing.",
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "new"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "not": {
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "name"
+                    ]
+                  }
+                }
+              ]
+            },
+            "name": {
+              "type": "string",
+              "description": "Technical output name. Required for new; existing omission preserves it.",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+            },
+            "label": {
+              "type": "string",
+              "description": "Display label independent of name. Required for new; omission preserves existing.",
+              "maxLength": 120,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f]+$"
+            },
+            "type": {
+              "type": "string",
+              "description": "Output type; no inference. Required for new; omission preserves existing.",
+              "maxLength": 128,
+              "enum": [
+                "integer",
+                "real",
+                "string",
+                "boolean",
+                "datetime",
+                "variant"
+              ]
+            },
+            "formula": {
+              "type": "string",
+              "description": "Native Loginom expression. Use bare earlier names, e.g. base+1; Expr./Field. prefixes are unsupported in Loginom 7.4.2. Civil datetime: EncodeDateTime; Variant retains its runtime subtype.",
+              "maxLength": 2048,
+              "minLength": 1,
+              "allOf": [
+                {
+                  "pattern": "\\S"
+                },
+                {
+                  "not": {
+                    "pattern": "[\\r\\u0000]"
+                  }
+                }
+              ]
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional expression description; omission preserves existing.",
+              "maxLength": 512,
+              "pattern": "^[^\\x00-\\x08\\x0b-\\x1f]*$"
+            },
+            "intermediate": {
+              "type": "boolean",
+              "description": "Intermediate expressions can feed later expressions but are excluded from output variables. Omission preserves the existing flag; new defaults to false."
+            },
+            "replace": {
+              "type": "boolean",
+              "description": "Replace the incoming variable with the same exact technical name; formula reads its incoming value. Requires intermediate=false. Changed label is the expression label; preserve all other variables and output order. Omission preserves the saved flag, new defaults to false."
+            }
+          },
+          "required": [
+            "target"
+          ],
+          "minProperties": 2,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "target": {
+                    "properties": {
+                      "kind": {
+                        "const": "new"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  }
+                },
+                "required": [
+                  "target"
+                ]
+              },
+              "then": {
+                "required": [
+                  "name",
+                  "label",
+                  "type",
+                  "formula"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expression_order": {
+        "type": "array",
+        "description": "Complete permutation of all expression names after patches, each exactly once. Changes expression order only; preserve existing output-variable mapping and order. Omission preserves saved expression order. Do not silently change formulas to permit a dependency move.",
+        "minItems": 1,
+        "maxItems": 32,
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+        }
+      }
+    },
+    "anyOf": [
+      {
+        "required": [
+          "expressions"
+        ]
+      },
+      {
+        "required": [
+          "expression_order"
+        ]
+      }
+    ]
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  }
+}
