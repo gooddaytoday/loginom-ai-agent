@@ -1,3 +1,4 @@
+import {closePreparedWizard} from './node-wizard-close.mjs';
 import {resolveClusteringFeatures,clusteringNormalizations} from './clustering-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
@@ -47,6 +48,7 @@ export async function configureClusteringRoles(channel,p,inputMapping){
 }
 
 export async function configureClustering(channel,p,{request,inputMapping}){
+ if(request.mode==='apply')return configureClusteringApply(channel);
  const roles=await configureClusteringRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'clustering '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -111,4 +113,31 @@ export async function configureClustering(channel,p,{request,inputMapping}){
  need(after.auto===automatic&&Object.entries(wanted).every(([key,value])=>after[key]===value)&&(automatic?after.clusters===old.clusters:['pedClustersMin','pedClustersMax','pedThreshold'].every(k=>same(after.values[k],old.values[k]))),'unrequested clustering parameters changed');
  await next('clustering','done');const done=await channel.observe({condition:'clustering settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,mode:automatic?'g_means':'k_means',...(automatic?{min_clusters:after.min_clusters,max_clusters:after.max_clusters,threshold:after.threshold}:{clusters:after.clusters}),seed:after.seed,normalization:normalization.fields,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+}
+
+// Inspect and Cancel: even an unchanged Done can invalidate the saved model.
+async function configureClusteringApply(channel){
+ const observe=stage=>channel.observe({condition:'inspect saved clustering '+stage,readClustering:true,ready:s=>s.wizard?.stage===stage&&s.node_clustering?.verified===true});
+ const saved=async(value,message)=>{
+  if(value)return;
+  const error=Error('Clustering apply: saved '+message+' is unsupported; no training requested');
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'clustering_apply_preserved',proof:{closed:await closePreparedWizard(channel)}};throw error;
+ };
+ const next=(stage,destination)=>channel.perform({condition:'inspect clustering '+stage,ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
+  resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:destination};}});
+ const roles=(await observe('input_mapping')).node_clustering;
+ const features=roles.fields.filter(f=>f.usage_type===3);
+ await saved(features.length>0&&roles.fields.every(f=>f.usage_type===0||f.usage_type===3)&&features.every(f=>['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный'),'numeric roles');
+ await next('input_mapping','normalization');
+ const norm=(await observe('normalization')).node_clustering.fields;
+ await saved(same(norm.map(f=>f.name),features.map(f=>f.name))&&norm.every(f=>f.norm_type===0),'normalization (only none is supported for apply)');
+ await next('normalization','clustering');
+ const params=(await observe('clustering')).node_clustering;
+ await saved(params.auto===false&&Object.values(params.switches).every(v=>v===false)&&Number.isSafeInteger(params.clusters)&&params.clusters>=2&&params.clusters<=1000,'fixed count');
+ await next('clustering','done');
+ const done=await channel.observe({condition:'saved clustering inspected',ready:s=>s.wizard?.stage==='done'});
+ return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false,
+  configuration:{...roles,mode:'apply',normalization:norm,clusters:params.clusters,seed:params.seed,node_context:done.prepared_node_context},
+  validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
