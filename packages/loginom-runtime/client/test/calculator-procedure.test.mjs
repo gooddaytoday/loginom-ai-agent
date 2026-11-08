@@ -4,16 +4,17 @@ import {configureCalculator,previewCalculator} from '../lib/calculator-procedure
 
 // A UI model with per-Apply uniqueness and a clipped expression grid. It rejects
 // clicks outside the visible page and retains records through edits and moves.
-function fixture(names,{pageSize=8,top=0,stuck=false}={}) {
+function fixture(names,{pageSize=8,top=0,stuck=false,syntax='expression'}={}) {
  const expressions=names.map((name,index)=>({name,index,record_id:'r'+index,expression_id:String(index),label:'Same',type:'real',formula:'1',replace:false,intermediate:false,cached:true,description:'Keep '+index,selected:index===0}));
- const calls=[],base='MF;TF;WizrdMCF',prefix=base+';CalcDataWizard;',editor=base+';ExprDataEditForm;';let draft=null;
+ const calls=[],base='MF;TF;WizrdMCF',prefix=base+';CalcDataWizard;',editor=base+';ExprDataEditForm;';let draft=null,menuOpen=false;
  const selected=()=>expressions.find(e=>e.selected);
  const control=(tid,allowed_actions,extra={})=>({tid,ref:tid,allowed_actions,interaction:{state:'point_observed'},...extra});
  const snapshot=()=>{
   const rows=expressions.map((e,index)=>control(prefix+'colExpressionName_'+e.name,['click','double_click','scroll'],{
    interaction:{state:index>=top&&index<top+pageSize?'point_observed':'obscured'},bounding_box:{y:(index-top)*24},
    ...(expressions.length>pageSize?{scroll:{ref:'grid',top:top*24,max_top:(expressions.length-pageSize)*24}}:{})}));
-  const ui=[...rows,...['btnExprUp','btnReplaceField','btnAddExpr'].map(k=>control(prefix+k,['click'])),control(prefix+'cmpExpression',['replace_expression'])];
+  const ui=[...rows,...['btnExprUp','btnReplaceField','btnAddExpr'].map(k=>control(prefix+k,['click'])),control(prefix+'cmpExpression',['replace_expression']),control(prefix+'btnCalcMode',['click','press'])];
+  if(menuOpen)for(const k of ['cmExpression','cmJavaScript'])ui.push(control(prefix+'btnCalcMode;mn;'+k,['click']));
   const wizard={root_tid:base,stage:'calculator'};
   if(draft){wizard.expression_parameters={status:'observed',root_ref:editor,selected_expression:selected().record_id,fields:Object.fromEntries(['name','label'].map(k=>[k,{status:'observed',value:draft[k],input_ref:editor+k}]).concat([['type_label',{status:'observed',value:'Вещественный'}]]))};ui.push(control(editor+'btnApply',['apply_expression_parameters']));
    wizard.expression_parameters.options={};
@@ -21,11 +22,13 @@ function fixture(names,{pageSize=8,top=0,stuck=false}={}) {
     wizard.expression_parameters.options[key]={status:'observed',value:draft[key],enabled:true,input_ref:editor+tid+';InputEl',display_ref:editor+tid+';DisplayEl'};
     for(const part of ['InputEl','DisplayEl'])ui.push(control(editor+tid+';'+part,['set_checked'],{check_state:{kind:'checkbox',checked:draft[key],indeterminate:false}}));
    }}
-  return structuredClone({wizard,ui:{elements:ui},node_calculator:{verified:true,mode:'expression',inventory_complete:true,input_fields:[],expressions}});
+  return structuredClone({wizard,ui:{elements:ui,dialogs:[]},node_calculator:{verified:true,mode:'expression',syntax,inventory_complete:true,input_fields:[],expressions}});
  };
  const channel={async observe({ready}){const s=snapshot();assert.ok(ready(s));return s},async perform({ready,resolve}){
   const s=snapshot();assert.ok(ready(s));const action=resolve(s);calls.push(action);
   if(action.verb==='scroll'){if(!stuck)top=Math.max(0,Math.min(expressions.length-pageSize,top+Math.round(action.delta_y/24)));return;}
+  if(action.ref===prefix+'btnCalcMode'){assert.equal(action.verb,'press');assert.equal(action.key,'ArrowDown');menuOpen=true;return;}
+  if(action.ref.startsWith(prefix+'btnCalcMode;mn;')){assert.ok(menuOpen,'Menu closed');syntax=action.ref.endsWith('cmJavaScript')?'javascript':'expression';menuOpen=false;return;}
   if(action.ref.startsWith(prefix+'colExpressionName_')){
    const e=expressions.find(e=>prefix+'colExpressionName_'+e.name===action.ref);assert.ok(e);assert.ok(e.index>=top&&e.index<top+pageSize,'Hidden row clicked');
    expressions.forEach(r=>r.selected=r===e);if(action.verb==='double_click')draft={...e};return;
@@ -43,7 +46,7 @@ function fixture(names,{pageSize=8,top=0,stuck=false}={}) {
   if(action.ref===prefix+'btnExprUp'){const index=selected().index;[expressions[index],expressions[index-1]]=[expressions[index-1],expressions[index]];expressions.forEach((e,i)=>e.index=i);return;}
   throw Error('Unexpected action '+JSON.stringify(action));
  }};
- return {channel,calls,expressions};
+ return {channel,calls,expressions,syntax:()=>syntax};
 }
 test('cyclic rename keeps both record identities, formulas and unrequested options',async()=>{
  const f=fixture(['A','B','Untouched']);const result=await configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'A'},name:'B',formula:'2'},{target:{kind:'existing',name:'B'},name:'A',formula:'3'}]});
@@ -104,4 +107,25 @@ test('valid formulas complete one owned Preview and close it before returning to
  assert.equal((await previewCalculator(channel)).status,'accepted_by_loginom_preview');
  assert.deepEqual(calls,[{verb:'click',ref:'preview'},{verb:'click',ref:'close'}]);
  assert.equal(opened,false);
+});
+
+test('a requested language is chosen once through the menu before any expression is edited',async()=>{
+ const f=fixture(['A']);
+ await configureCalculator(f.channel,{syntax:'javascript',expressions:[{target:{kind:'existing',name:'A'},formula:'return Amount;'}]});
+ assert.equal(f.syntax(),'javascript');
+ const verbs=f.calls.map(c=>c.verb+':'+c.ref.split(';').slice(-1)[0]);
+ assert.deepEqual(verbs.slice(0,2),['press:btnCalcMode','click:cmJavaScript']);
+ assert.equal(f.calls.filter(c=>c.ref.includes('btnCalcMode')).length,2);
+ assert.equal(f.expressions[0].formula,'return Amount;');
+});
+test('the language is left alone when it is omitted or already as requested',async()=>{
+ for(const [syntax,patch] of [['javascript',{}],['javascript',{syntax:'javascript'}],['expression',{}],['expression',{syntax:'expression'}]]){
+  const f=fixture(['A'],{syntax});await configureCalculator(f.channel,{...patch,expressions:[]});
+  assert.equal(f.calls.length,0);assert.equal(f.syntax(),syntax);
+ }
+});
+test('a language change that Loginom cannot translate is refused before any gesture',async()=>{
+ const f=fixture(['A','B']);
+ await assert.rejects(configureCalculator(f.channel,{syntax:'javascript',expressions:[{target:{kind:'existing',name:'A'},formula:'return 1;'}]}),/does not translate formulas/);
+ assert.equal(f.calls.length,0);assert.equal(f.syntax(),'expression');
 });

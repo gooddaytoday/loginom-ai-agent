@@ -14,7 +14,7 @@ function fixture(){
  const values={cbxReplaceOther:0,chkCaseSensitivity:true,edPrecision:0,edtReplaceOther:'x'};
  for(const k of Object.keys(values)){const e=element(base+k,root);components[e.id]={el:{dom:e},getValue:()=>values[k]};}
  const target={type:null,badIcon:false},button=element(base+'btnTypeChange',root),icon=element(base+'icon',root);
- components[button.id]={el:{dom:button},btnIconEl:{dom:icon},get iconCls(){return 'bg-TBGDataType-'+({2:'dtDateTime',3:'dtFloat',4:'dtInteger',5:'dtString'}[target.type??fields[0].data.DataType]);}};
+ components[button.id]={el:{dom:button},btnIconEl:{dom:icon},get iconCls(){return 'bg-TBGDataType-'+({1:'dtBoolean',2:'dtDateTime',3:'dtFloat',4:'dtInteger',5:'dtString'}[target.type??fields[0].data.DataType]);}};
  icon.classList={contains:value=>!target.badIcon&&value===components[button.id].iconCls};
  const masks=[];const context={Date,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?all.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q.startsWith('.x-mask')?masks:[]}};
  const addControl=(name,properties)=>{const e=all.find(e=>e.tid===base+name)??element(base+name,root);components[e.id]={el:{dom:e},...properties};};
@@ -43,11 +43,11 @@ test('real editor separators come from the exact owned local controls',()=>{
  assert.deepEqual(JSON.parse(JSON.stringify(absent.read().real_decimal_separators)),{from:null,to:null,other:null});
 });
 test('cached rules retain Null, empty and literal null without invoking remote getters',()=>{const r=fixture().read();assert.equal(r.verified,true);assert.deepEqual(Array.from(r.pairs,p=>p.from.value),[null,'','null']);assert.equal(r.pairs.length,3);assert.equal(r.input_fields[1].name,'Other');});
-test('regex group reads ordered literal constants and refuses mixed or nonconstant tables',()=>{
+test('regex group reads ordered literal constants and reads mixed groups and refuses nonconstant tables',()=>{
  const f=fixture();f.pairs.splice(0,f.pairs.length,...['(?i)AB-([0-9]{2})','^AB-00$'].map((pattern,i)=>({isModel:true,internalId:'r'+i,data:{Index:i,CollectionID:1,RegularExpression:pattern,Replacement:'SKU-$1',ReplacementType:0,ValueRender:pattern,ReplaceRender:'SKU-$1'}})));
  const r=f.read();assert.equal(r.verified,true);assert.equal(r.mode,'regex');assert.deepEqual(Array.from(r.pairs,p=>p.from.value),['(?i)AB-([0-9]{2})','^AB-00$']);assert.equal(r.pairs[0].to.value,'SKU-$1');
  f.pairs[0].data.ReplacementType=1;assert.equal(f.read().verified,false);f.pairs[0].data.ReplacementType=0;
- f.pairs.push({isModel:true,internalId:'exact',data:{Index:0,CollectionID:0,DataValueType:5,ReplaceByType:5,ValueRender:'x',ReplaceRender:'y'}});assert.equal(f.read().verified,false);
+ f.pairs.push({isModel:true,internalId:'exact',data:{Index:0,CollectionID:0,DataValueType:5,ReplaceByType:5,ValueRender:'x',ReplaceRender:'y'}});assert.equal(f.read().verified,true);assert.equal(f.read().mode,'mixed');assert.equal(f.read().pairs[0].collection_id,0);assert.equal(f.read().pairs[1].collection_id,1);
 });
 test('exact Int64 native BigInt is serialized as a decimal string',()=>{const f=fixture();f.fields[0].data.DataType=4;f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'p',data:{Index:0,CollectionID:0,DataValueType:4,ReplaceByType:4,ValueRender:1,ReplaceRender:9223372036854775807n}});assert.equal(f.read().pairs[0].to.value,'9223372036854775807');});
 test('reader refuses loading, pending responses, foreign selection and unsupported rules',()=>{
@@ -62,5 +62,13 @@ test('numeric precision and its separator are read from the owned control',()=>{
   const f=fixture();f.fields[0].data.DataType=type;f.pairs.splice(0,f.pairs.length);
   f.addControl('edPrecision',{getValue:()=>0.25,decimalSeparator:separator});
   const r=f.read();assert.equal(r.verified,true);assert.equal(r.precision,0.25);assert.equal(r.precision_decimal_separator,separator);
+ }
+});
+
+test('Boolean result icon and cached values retain false and typed NULL',()=>{
+ for(const value of [true,false,null]){
+  const f=fixture();f.target.type=1;f.values.cbxReplaceOther=1;
+  f.pairs.splice(0,f.pairs.length,{isModel:true,internalId:'bool',data:{Index:0,CollectionID:0,DataValueType:5,ReplaceByType:1,ValueRender:'no',ReplaceRender:value}});
+  const r=f.read();assert.equal(r.verified,true);assert.equal(r.result_type,'boolean');assert.equal(r.pairs[0].to.value,value);
  }
 });
