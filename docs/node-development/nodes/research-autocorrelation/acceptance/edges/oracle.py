@@ -52,8 +52,11 @@ def expected():
                                     explicit_1_3_7=[r for r in rows if r['Lag'] in [1,3,7]]),
                 degenerate_math=dict(empty='undefined: no mean', one='undefined: zero variance',
                                      null='undefined without an explicit missing-data policy'),
+                observations_not_claimed=dict(
+                    one=dict(status='observation_not_claimed', accepted_output=False,
+                             observed_rows=[dict(Lag=0, X_ACF=1.0, X_StdErr=0.0, X_Significant=True)],
+                             reason='One native run; mathematical coefficient undefined at N=1')),
                 native_conventions=dict(
-                    one=output([dict(Lag=0, X_ACF=1.0, X_StdErr=0.0, X_Significant=True)]),
                     empty=dict(status='platform_limitation', accepted_output=False,
                                observed='Access violation on empty input; inconsistent output cache is not a result'),
                     null=dict(status='execution_refused', accepted_output=False,
