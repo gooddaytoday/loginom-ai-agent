@@ -1,5 +1,6 @@
 # Excel файл (`imports.excel`)
 
+<!-- mode: xlsx -->
 ## Режим XLSX: импорт из Excel
 
 Для исходной XLSX-книги используй `imports.excel`, `mode:"xlsx"`.
@@ -12,6 +13,15 @@
 для другого исходного заголовка укажи `source_name`. Поля справа от видимой
 области тоже включай в `columns`: мастер прокручивает сетку при настройке.
 NULL сохраняются; преобразование XLSX в CSV до импорта не требуется.
+
+Именованный диапазон: тот же `dock_node_apply`, `mode:"xlsx"`,
+`parameters.excel.named_range:"SalesRange"` — точное имя, без `sheet_name`.
+`extend_range:false` (default) — строго его границы; `true` — только его
+столбцы до последней заполненной строки. Задай `header_rows` и `columns`
+этого диапазона. Затем `target.kind:"existing"`, прежний `node_id`, те же
+source/настройки и другое `extend_range`: выполни тот же узел. Первый CSV
+выгрузи до изменения. Читай свежий выход: скан листа не доказывает N диапазона.
+Не заменяй диапазон листом, Калькулятором или JavaScript.
 
 Логическое поле импортируй тем же `dock_node_apply`, `target.type:"imports.excel"`,
 `mode:"xlsx"`: в `parameters.excel.columns` укажи `type:"boolean"` и
@@ -32,12 +42,6 @@ NULL сохраняются; преобразование XLSX в CSV до им�
 Указанный пользователем лист передавай точным именем в `excel.sheet_name`;
 без выбора листа сохраняется прежнее поведение — первый лист книги.
 
-При `source_switch` ([переключение на полный файл](../large-files.md#переключение-на-полный-файл))
-передай только `excel:{source_path:"<полная книга>",sheet_name:"<выбранный лист>"}`,
-без columns/header_rows/mappings. Лист, заголовки и политика пустых строк должны
-совпадать с точным XLSX-проходом. Для Excel остаётся отдельный Execute импорта;
-проверь `full_import_verification` с expected/actual N и execution_id.
-
 Для книги шире 12 столбцов или с более чем 10 строками заголовка также вызывай
 `dock_node_apply` с `target.type:"imports.excel"`, `mode:"xlsx"` и полным
 `parameters.excel.columns`. Укажи фактический `header_rows`; данные начинаются
@@ -47,3 +51,10 @@ NULL сохраняются; преобразование XLSX в CSV до им�
 Пагинацию `loginom_file_profile` дочитай через continuation и собери полный список
 полей перед настройкой. Пределы этого режима: 64 поля, 1000 строк заголовка;
 при превышении сообщи предел и запроси выбор нужной области данных.
+
+При `source_switch` ([переключение на полный файл](../large-files.md#переключение-на-полный-файл))
+передай только `excel:{source_path:"<полная книга>",sheet_name:"<выбранный лист>"}`,
+без columns/header_rows/mappings. Лист, заголовки и политика пустых строк должны
+совпадать с точным XLSX-проходом. Для Excel остаётся отдельный Execute импорта;
+проверь `full_import_verification` с expected/actual N и execution_id.
+<!-- /mode -->

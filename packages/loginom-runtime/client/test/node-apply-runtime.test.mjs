@@ -8,13 +8,17 @@ import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {actions} from './support/executor-fixture.mjs';
 import {compactActionResult,compactNodeResult} from '../lib/user-results.mjs';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now,pinnedActions=new Map(),browserRecovery=false}={}){
+function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now,pinnedActions=new Map(),browserRecovery=false,record=async e=>e}={}){
  const calls=[],events=[];const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'new'},type:e.parameters.type,label:'Source',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
  const ok=(name,extra={})=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false,...extra}};
@@ -25,7 +29,7 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
  const handlers=new Map([['imports.text',handler]]);
  const runtime=createActionRuntime({pinned:{actions:pinnedActions,selectors:new Map(),pins:{}},allowCandidate:pinnedActions.size>0,execute,now,
   browserRecovery,nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
-  onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return e;}});
+  onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return record(e);}});
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
 
@@ -93,7 +97,7 @@ test('read-only target refusal is NOT_APPLIED with confirmed cleanup and no grap
  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.phase==='target'&&e.receipt.effect_possible===false));
  const count=f.calls.length;await f.runtime.runNodeApply(request());assert.equal(f.calls.length,count);
 });
-test('occupied existing export explains the safe new-target path without replacing its input',async()=>{
+test('occupied existing export explains upstream recovery without duplicating the export or replacing its input',async()=>{
  for(const variant of ['different source','different output','same connection','preserve input']){
   const f=fixture(),ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
   f.handlers.set('exports.text',f.handler);
@@ -112,8 +116,10 @@ test('occupied existing export explains the safe new-target path without replaci
    assert.equal(reply.error.code,'NODE_APPLY_STOPPED');
    assert.match(reply.error.message,/Requested input is occupied by an unowned link/);
    assert.match(reply.error.message,/does not replace existing connections/);
-   assert.match(reply.error.message,/target.kind:"new".*NEW operation_id/);
-   assert.match(reply.error.message,/same source.*inputs:\[\]/);
+   assert.match(reply.error.message,/correct the existing upstream chain/);
+   assert.match(reply.error.message,/same Export with inputs:\[\].*NEW operation_id/);
+   assert.match(reply.error.message,/Do not create a second Export/);
+   assert.ok(!reply.error.message.includes('target.kind:"new"'));
    assert.match(reply.next_step.instruction,/No node mutation or browser recovery is required/);
    assert.deepEqual(f.calls,['source']);
    assert.equal((await f.runtime.runNodeApply(r)).error.message,outcome.error.message);
@@ -591,6 +597,26 @@ test('foreign graph cannot reach source preflight after workflow verification',a
  f.adapter.activateWorkflow=f.adapter.verifyWorkflow;
  f.adapter.observe=async()=>({...f.graph,document_id:'foreign'});
  assert.notEqual((await f.runtime.runNodeApply(request())).status,'SUCCEEDED');assert.equal(preflightReads,0);assert.equal(f.graph.nodes.length,0);
+});
+
+for(const corruptAck of [false,true])test('completed target inspection uses real journal ACK with URL/Cyrillic label, corrupt='+corruptAck,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'lab1041-runtime-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const journal=createExecutionJournal({directory,metadata:{sessionId:'offline-lab1041'}});
+ let lost=false;
+ const f=fixture({record:async event=>{
+  const saved=await journal(event);
+  if(event.phase==='node_phase_completed'&&event.receipt.phase==='target'&&!lost){lost=true;throw Error('lost target phase ACK');}
+  if(corruptAck&&event.phase==='node_target_reconciled')saved.result.node.label='corrupt-label';
+  return saved;
+ }});
+ const r=request(),label='Итог https://example.org/путь_Кириллица';delete r.target.label;
+ const mutate=f.adapter.mutate;f.adapter.mutate=async effect=>{const result=await mutate(effect);if(effect.kind==='create')f.graph.nodes[0].label=label;return result;};
+ assert.equal((await f.runtime.runNodeApply(r)).status,'AMBIGUOUS');
+ const count=f.calls.length;
+ if(corruptAck)await assert.rejects(f.runtime.inspect({operationId:'apply'}),/journal acknowledgement differs/);
+ else assert.equal((await f.runtime.inspect({operationId:'apply'})).output.internal_resume_available,true);
+ assert.equal(f.calls.length,count);assert.equal(f.graph.nodes[0].label,label);
+ assert.ok(f.events.some(event=>event.phase==='node_target_reconciled'));
 });
 
 function targetRecoveryFixture({fault='rename',...options}={}){

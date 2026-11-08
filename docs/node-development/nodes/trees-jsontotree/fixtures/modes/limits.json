@@ -1,0 +1,9 @@
+{
+  "limits":{"max_nodes":256,"max_depth":16,"max_bytes":1048576},
+  "nodes_256":"Root object with rows array of 127 objects, each with x=0: 1 + 1 + 127*(1+1).",
+  "nodes_257":"Same document with one extra root scalar extra=0.",
+  "depth_16":"Root n0 object containing n1 ... n15, whose value is scalar 0. Root depth is 0, leaf depth 16.",
+  "depth_17":"Add one more enclosing object before scalar 0.",
+  "bytes":"Pad the ASCII string of {\"value\":\"\"} with x to exact UTF-8 input lengths 1048576 and 1048577. Reader response has a separate bound; never confuse input and typed-output byte counts.",
+  "delivery":"Recipes keep fixtures small. Future runner preparation generates inputs privately; no production limits are changed."
+}

@@ -1,58 +1,70 @@
 # Логистическая регрессия (`datamining.log_regression`)
 
-## Логистическая регрессия
+<!-- mode: enter forward backward stepwise apply -->
+## Обучение и прогноз
 
-Для бинарной строковой цели и вероятности события используй
-`loginom_dock_node_apply` с `target.type:"datamining.log_regression"`,
+Используй `loginom_dock_node_apply`, `target.type:"datamining.log_regression"`,
 `mode:"enter"`, `parameters:{logistic:{input_fields:[...],target_field:"...",event:"...",threshold:...}}`.
-Укажи точную метку события и явный порог: событие при `p >= threshold`.
-`finish:"execute"` обучает на всех строках текущего входа и выполняет модель;
-`read.ports:[0]` возвращает класс, вероятность и исходные поля.
-`input_fields` содержит только числовые факторы; идентификаторы и комментарии
-сохраняются без роли. Константа и epsilon 1e-10 фиксированы. Для отбора факторов вызывай `loginom_dock_node_apply` с `target.type:"datamining.log_regression"`, `mode:"forward"`, `"backward"` или `"stepwise"`. Пользовательский критерий задавай в `parameters.logistic.selection.criterion`: `"deviance"`, `"aic"`, `"aicc"`, `"bic"` или `"hqic"`. При Deviance Forward требует только `entry_significance`, Backward — только `removal_significance`, Stepwise — оба; значения строго между 0 и 1, для Stepwise entry < removal. При информационных критериях пороги отбора запрещены. Без `selection` сохраняются стандартные Deviance 0.05/0.1. `input_fields` — кандидаты; исключённые факторы сохраняются в выходной таблице. Веса, валидация и
-выход переменных пока недоступны. Сначала запроси `parameter_schema` узла.
+Цель — дискретная строка с двумя непустыми классами. Укажи точную метку события
+и порог: событие при `p >= threshold`. Числовые факторы — в `input_fields`;
+идентификаторы, комментарии и остальные поля сохраняются без роли.
+`finish:"execute"` обучает на текущем входе и прогнозирует; `read.ports:[0]`
+возвращает класс, вероятность и исходные поля. Константа и epsilon 1e-10 фиксированы.
+Веса, валидация и выход переменных недоступны. Сначала запроси `parameter_schema`.
 
+## Отбор факторов
 
-## Режим apply
+Режимы `forward`, `backward`, `stepwise`; критерий —
+`parameters.logistic.selection.criterion`: `deviance`, `aic`, `aicc`, `bic`, `hqic`.
+Для Deviance Forward требует `entry_significance`, Backward — `removal_significance`,
+Stepwise — оба: 0 < entry < removal < 1. Информационные критерии запрещают пороги.
+Без selection сохраняются стандартные Deviance 0.05/0.1. input_fields — кандидаты;
+исключённые факторы остаются в выходной таблице.
 
-Для прогноза сохранённой моделью выбирай `datamining.log_regression`,
-`mode:"apply"`. Сначала обучи её через `enter` с `finish:"execute"`
-и сохрани пакет. Замени источник того же импорта, сохранив схему полей;
-выполни импорт. В apply укажи `target.kind:"existing"`, прежний `target.ref`,
-`inputs:[]`, `mappings:[]`, `finish:"execute"`, `read.ports:[0]` и прежние
-`parameters.logistic.input_fields`, `target_field`, `event`, `threshold`.
-Мастер только сверяется и закрывается без сохранения настроек; Teach не
-вызывается. Поддерживается сохранённая Enter-модель без нормализации.
-При несовпадении параметров запрос отклоняется. Для нового обучения используй
-`enter`. NULL в целевом поле новых строк допустим: прогноз остаётся, ActualEvent
-будет NULL. Save выполни отдельно; после открытия пакета снова используй apply
-на прежнем узле, без настройки и обучения.
+## Сохранённая Enter-модель
 
-## Таблица коэффициентов
+`mode:"apply"` — только для ранее обученной Enter-модели с none или standardize.
+Сохрани пакет, замени источник прежнего импорта с той же схемой и выполни импорт.
+На прежнем узле: `target.kind:"existing"`, свежий `target.ref`, `inputs:[]`,
+`mappings:[]`, прежние logistic-параметры, `finish:"execute"`, `read.ports:[0]`.
+Apply сверяет настройки и закрывает мастер без сохранения и Teach; несовпадение
+отклоняется. Для обучения — enter. NULL в новой цели допустим: ActualEvent будет NULL.
+После Save/reopen обнови refs наблюдением графа и повторяй apply без перенастройки.
 
-Для полной таблицы коэффициентов выбирай `datamining.log_regression`,
-`mode:"enter"`, прежние `parameters.logistic` и `finish:"execute"`.
-Укажи `read.ports:[1]` (или `[0,1]` вместе с прогнозом),
-`read.require_exact_numbers:true`. Порт 1 содержит константу и факторы:
-`Name`, `DisplayName`, `UniqueValues`, затем поля с префиксом технического
-имени цели: `_coefficients`, `_stdError`, `_wald`, `_waldPValue`,
-`_oddsRatio`, `_lowerBound`, `_upperBound`. Последние границы — 95%.
-Сохраняй native NULL, точность и порядок всех десяти полей. Экспортируй
-через `exports.text` со связью `output:1` от этого узла и техническими
-именами CSV. После Save и открытия пакета используй `mode:"apply"` на
-прежнем узле, `inputs:[]`, `mappings:[]`, прежние параметры и `read.ports:[1]`:
-сохранённая модель выполняется без перенастройки и Teach.
+## Коэффициенты
 
-## Регуляризация
+На этом узле `mode:"enter"`, прежние параметры, `finish:"execute"`, `read.ports:[1]`
+(или [0,1]), `read.require_exact_numbers:true`. Порт 1: Name, DisplayName,
+UniqueValues, затем поля с префиксом цели: _coefficients, _stdError, _wald,
+_waldPValue, _oddsRatio, _lowerBound, _upperBound (последние — 95%).
+Сохрани native NULL, точность и порядок всех десяти полей. Экспорт — новый
+`exports.text` от output:1, технические имена. После Save/reopen Enter-модель
+читай через apply с прежними параметрами и read.ports:[1], без Teach.
+Калькулятор и JavaScript не нужны.
 
-Для Ridge (L2): `mode:"ridge"`, `parameters.logistic.regularization:{lambda_ridge:1}`
-(либо λ>0 пользователя), остальные logistic-параметры обязательны, без `selection`.
-λ ручной, константа не штрафуется; `finish:"execute"` обучает и прогнозирует.
-Повтор — прежний `target.ref`, `target.kind:"existing"`, `inputs:[]`, те же параметры.
-Save отдельно.
-После открытия обнови `workflow_ref` и `target.ref` наблюдением графа.
-Не используй Enter-only `mode:"apply"` для Ridge. На прежнем узле — `mode:"ridge"`,
-те же параметры, `inputs:[]`, `mappings:[]`, `finish:"done"`, `read.ports:[]`:
-без Teach. Первый CSV — после открытия: новый `exports.text`, связь `output:0`
-от этого узла, `finish:"execute"`, технические имена и порядок сохранённого порта.
-Проверь результат CSV и снова сохрани пакет с экспортом.
+## Нормализация
+
+`parameters.logistic.normalization:"standardize"` стандартизует числовые факторы,
+`"none"` отключает её. Сначала enter/none, Execute и read.ports:[0]; затем на том
+же existing target/ref — standardize, Execute и read.ports:[0,1]. Прочие параметры
+и кодирование цели сохраняй. Коэффициенты нормализованной модели выдаются в шкале
+нормализованных факторов. Пропуск normalization на существующем узле сохраняет её.
+После Save/reopen apply с прежними параметрами сверяет нормализатор без Teach.
+
+<!-- /mode -->
+
+<!-- mode: ridge -->
+## Ridge (L2)
+
+`mode:"ridge"`, `parameters.logistic.regularization:{lambda_ridge:1}` (либо λ>0
+пользователя); остальные logistic-параметры обязательны, selection запрещён.
+Задай input_fields, target_field, event и threshold; read.ports:[0] — полный прогноз.
+normalization none/standardize задаёт факторы; пропуск на существующем узле сохраняет её.
+λ ручной, константа не штрафуется; Execute обучает и прогнозирует. Повтор —
+тот же existing target/ref, inputs:[], прежние параметры. Save отдельно.
+После открытия обнови workflow_ref и target.ref наблюдением графа.
+Не используй Enter-only mode apply для Ridge. На прежнем узле — ridge,
+прежние параметры, inputs:[], mappings:[], `finish:"done"`, `read.ports:[]`, без Teach.
+Первый CSV после открытия — новый exports.text от актуального output:0,
+Execute, технические имена и порядок сохранённого порта. Проверь CSV и сохрани пакет.
+<!-- /mode -->

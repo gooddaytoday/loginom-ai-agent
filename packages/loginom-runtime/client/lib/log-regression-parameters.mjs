@@ -3,7 +3,7 @@ export function validateLogRegressionParameters(parameters,mode,r){
  need(['enter','forward','backward','stepwise','ridge','apply'].includes(mode),'use enter, forward, backward, stepwise, ridge or apply');
  need(parameters&&Object.keys(parameters).length===1&&parameters.logistic,'use parameters.logistic');
  const p=parameters.logistic;
- need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','regularization'].includes(k)),'use input_fields, target_field, event and threshold');
+ need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization','regularization'].includes(k)),'use input_fields, target_field, event and threshold');
  const name=n=>typeof n==='string'&&n.trim().length>0&&n.length<=128;
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(name),'input_fields must list continuous numeric predictors by technical name');
  need(name(p.target_field),'target_field must name one discrete string response');
@@ -12,6 +12,7 @@ export function validateLogRegressionParameters(parameters,mode,r){
  const regularization=p.regularization;
  if(mode==='ridge')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_ridge==='number'&&Number.isFinite(regularization.lambda_ridge)&&regularization.lambda_ridge>0,'ridge requires regularization:{lambda_ridge:positive finite number}');
  else need(regularization===undefined,'regularization requires mode ridge');
+ need(p.normalization===undefined||['none','standardize'].includes(p.normalization),'normalization must be none or standardize');
  const selection=p.selection;
  if(mode==='enter'||mode==='apply'||mode==='ridge')need(selection===undefined,'Enter/apply/Ridge does not accept selection');
  else if(selection!==undefined) {

@@ -1,3 +1,4 @@
+import {configureLogRegressionNormalization} from './log-regression-normalization.mjs';
 import {resolveLogRegressionRoles} from './log-regression-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
@@ -53,12 +54,14 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  const next=async(stage,destination)=>channel.perform({condition:'logistic '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Next unavailable').ref,expected_stage:destination})});
  await next('input_mapping','normalization');
- let state=await observe('normalization','complete logistic normalizers');const normalization=state.node_logregression;
+ let state=await observe('normalization','complete logistic normalizers');const baseline=state.node_logregression;
  const used=roles.configuration.fields.filter(f=>f.usage_type!==0);
- need(normalization.fields.length===used.length&&new Set(normalization.fields.map(f=>f.name)).size===used.length
-  &&normalization.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
-   &&(p.input_fields.includes(f.name)?f.norm_type===0&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
-  'only unnormalized continuous predictors and native categorical target encoding are supported');
+ need(baseline.fields.length===used.length&&new Set(baseline.fields.map(f=>f.name)).size===used.length
+  &&baseline.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
+   &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
+  'only none/standardize continuous predictors and native categorical target encoding are supported');
+ const normalization=await configureLogRegressionNormalization(channel,p,{request,baseline});
+ state=await observe('normalization','complete logistic normalizers after edit');
  if(normalization.source_status==='Не активировано'){
   await channel.perform({condition:'activate connected logistic input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
@@ -188,7 +191,7 @@ async function configureLogRegressionApply(channel,p){
  const normalization=state.node_logregression.fields,used=roles.fields.filter(f=>f.usage_type!==0);
  await saved(normalization.length===used.length&&new Set(normalization.map(f=>f.name)).size===used.length
   &&normalization.every(f=>used.some(role=>['name','label','type','index'].every(k=>role[k]===f[k]))
-   &&(p.input_fields.includes(f.name)?f.norm_type===0:Number.isInteger(f.norm_type))),'normalization');
+   &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(p.normalization===undefined||f.norm_type==={none:0,standardize:5}[p.normalization]):Number.isInteger(f.norm_type)))&&new Set(normalization.filter(f=>p.input_fields.includes(f.name)).map(f=>f.norm_type)).size===1,'normalization');
  await next('normalization','learn_partition');
  state=await observe('learn_partition','saved logistic partition');const partition=state.node_logregression.values;
  await saved(partition.train===100&&partition.test===0&&partition.validation===0,'partition');

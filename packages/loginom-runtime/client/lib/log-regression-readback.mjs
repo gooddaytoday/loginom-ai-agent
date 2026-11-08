@@ -8,5 +8,5 @@ export function logRegressionConfigurationReadback({node,phases,operation_id}){
  need(applying?training.status==='not_requested':finished.value.mode!=='execute'||training.status==='trained'&&training.execution_id!==finished.value.execution_id&&training.source?.length===1,'training on connected source must complete before Execute');
  return {kind:'log_regression',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'enter',...(c.selection?{selection:structuredClone(c.selection)}:{}),
   ...(c.regularization?{regularization:structuredClone(c.regularization)}:{}),input_fields:c.fields.filter(f=>f.usage_type===3).map(f=>f.name),target_field:c.target_field,classes:structuredClone(c.classes),event:c.event,threshold:c.threshold,intercept:c.intercept,epsilon:c.epsilon,
-  normalization:'none',train_percent:100,validation:'none',calibration:'train',training:structuredClone(training),package_persistence_verified:false};
+  normalization:c.normalization?.filter(f=>c.fields.some(role=>role.name===f.name&&role.usage_type===3)).every(f=>f.norm_type===5)&&c.normalization?.length?'standardize':'none',train_percent:100,validation:'none',calibration:'train',training:structuredClone(training),package_persistence_verified:false};
 }

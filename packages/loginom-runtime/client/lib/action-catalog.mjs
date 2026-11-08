@@ -23,10 +23,11 @@ export const actionDescribeTool = {
     type: 'object',
     properties: { action_key: { type: 'string', enum: [...ACTION_KEYS], description: 'Single action only. Omit action_keys and node_types; for a combined request use action_keys instead.' },
       action_keys: { type: 'array', items: { type: 'string', enum: [...ACTION_KEYS] }, description: 'Batch actions, optionally with node_types. Omit action_key, even for one action: ["package.save_checkpoint"].' },
-      node_types: { type: 'array', items: { type: 'string', enum: Object.keys(NODE_TYPES) }, description: 'Selected node schemas, optionally with action_keys. Never combine with action_key.' } },
+      node_types: { type: 'array', items: { type: 'string', enum: Object.keys(NODE_TYPES) }, description: 'Selected node schemas and guidance from the prepared skill. Never combine with action_key.' },
+      modes:{type:'array',minItems:1,uniqueItems:true,items:{type:'string'},description:'With node_types: include rules for these modes. Omit for common guidance and the mode index.'} },
     allOf: [{ oneOf: [
       { type:'object', properties:{action_key:{type:'string'}}, required:['action_key'], additionalProperties:false },
-      { type:'object', properties:{action_keys:{type:'array',items:{type:'string'}},node_types:{type:'array',items:{type:'string'}}}, additionalProperties:false },
+      { type:'object', properties:{action_keys:{type:'array',items:{type:'string'}},node_types:{type:'array',items:{type:'string'}},modes:{type:'array',items:{type:'string'}}}, additionalProperties:false },
     ] }],
     additionalProperties: false,
   },

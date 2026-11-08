@@ -16,9 +16,11 @@ Object.assign(cases,{placement_before_drag:'REST checkpoints its unchanged graph
 Object.assign(cases,{plain_label:'plain GET waits for buffered native URL and label changes before saving without parameter edits'});
 for(const stage of ['placement_still_full','placement_before_drag'])for(const fault of ['changed','incomplete','busy','owner'])
  cases[stage+':'+fault]='REST refuses '+stage+' checkpoint with '+fault+' graph or owner';
+for(const method of ['POST','PUT','PATCH','DELETE'])cases['c1_'+method]='C1 saves and independently rereads native '+method+' and request Content-Type';
 for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  const [stage,fault]=scenario.split(':');
- const reusing=stage.startsWith('reuse');
+ const reusing=stage.startsWith('reuse'),c1=stage.startsWith('c1_');
+ let method='GET',requestType='text/plain';
  const prefix='MF;TF-1',fields=prefix+';WizardModelConnectionForm;ConnectionWizard;';
  const item=prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль>Echo;TreeText';
  let urlPoints=0,tileReads=0,fills=0,visibleChecks=0,parameterReads=0,queryFills=0,palettePoints=0,added=false,label='REST-сервис',url='',paramName='param0',lastSelector='';
@@ -72,7 +74,8 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   inputValue:async()=>{
    if(selector.includes('fldLabel'))return label;
    if(selector.includes('pedURL'))return url;
-   if(selector.includes('pedVerb'))return 'GET';
+   if(selector.includes('pedVerb'))return method;
+   if(selector.includes('pedRequestContentType'))return requestType;
    if(selector.includes('pedResponseContentType'))return stage==='mime_stale'&&wizardCloses>0?'application/json':responseType;
    if(selector.includes('pedFieldType'))return 'Строка запроса';
    if(selector.includes('txtAuth'))return 'Не требуется';
@@ -118,6 +121,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    return fn(element);
   },
   fill:async value=>{
+   if(selector.includes('pedRequestContentType')){requestType=value;return;}
    if(selector.includes('pedResponseContentType')){responseFills++;responseType=value;return;}
    if(selector.includes('pedURL')){assert.equal(urlPoints,4);url=value;pendingUrl=stage==='plain_label';fills++;if(stage==='input')throw Error('fixture stopped after the sole reachable fill');return;}
    if(selector.includes('fldLabel')){label=value;pendingLabel=stage==='plain_label';return;}
@@ -125,7 +129,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   },
   press:async()=>{},
  });
- const page={locator,mouse:{click:async()=>{if(lastSelector.includes(';ReferenceInfo'))sourceController.FController.constructor.name='ConnectionsViewWizard';if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone')){if(stage==='plain_label')settleFields();wizardCloses++;}if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
+ const page={locator,mouse:{click:async()=>{if(lastSelector.includes('pedVerb;ValueControl;boundlist;'))method=stage.slice(3);if(lastSelector.includes(';ReferenceInfo'))sourceController.FController.constructor.name='ConnectionsViewWizard';if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone')){if(stage==='plain_label')settleFields();wizardCloses++;}if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
   move:async()=>{if(!held&&reusing)referenceMoves++;if(held){dragMoves++;}},
   down:async()=>{assert.equal(palettePoints,2);if(stage==='palette')throw Error('fixture stopped before the sole palette drag');held=true;downCount++;},
   up:async()=>{held=false;upCount++;}},waitForTimeout:async()=>{if(stage==='plain_label')settleFields();if(stage==='refresh_populated')throw Error('fixture stopped while waiting for existing rows');},
@@ -149,7 +153,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  try{
   const task={deadline:Date.now()+10000,document_id:'doc',origin:'http://example.test',build:'7.4.2',
    workflow_ref:workflow,...(reusing?{existing_target:{document_id:'doc',workflow_id:'flow',node_id:'rest'}}:{}),
-   connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:stage==='plain_label'?[]:[{name:'Key',field:'Key'}]};
+   connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(c1?{method:stage.slice(3),...(stage==='c1_DELETE'?{}:{request_content_type:'application/json'})}:{}),...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:stage==='plain_label'?[]:[{name:'Key',field:'Key'}]};
   const result=['placement_native','placement_reselect'].includes(stage)?await vm.runInNewContext('('+makeRestConnectionCode(task)+')',{get document(){return globalThis.document;},innerWidth:1280,innerHeight:800})(page):await restConnectionCapability(page,task,async()=>{
    const graph=structuredClone(placementGraph);
    if(reusing&&++serviceGraphReads===2&&stage==='reuse_changed')graph.rest_connection_links=[];
@@ -168,6 +172,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    if(stage==='placement_changed')placementGraph.nodes[0].position.x++;
    await args.guard();return {fully_visible:!['placement_hidden','placement_reselect'].includes(stage),zoom_steps:3,navigation_steps:[]};
   },nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,samePlacementGraph,{});
+  if(c1){assert.equal(result.verified,true,result.error);assert.equal(result.connection.method,stage.slice(3));if(stage!=='c1_DELETE')assert.equal(result.connection.request_content_type,'application/json');return;}
   if(reusing){assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(queryFills,0);if(['reuse','reuse_hidden_controls'].includes(stage)){assert.equal(result.verified,true,result.error);assert.equal(result.connection.reference_node_id,'saved-reference');assert.equal(serviceGraphReads,2);}else{assert.equal(result.verified,false);assert.match(result.error,/requested connection differs|source owner differs|connection changed|connection is ambiguous|complete owned graph/);}return;}
   if(stage==='placement_dense'){assert.equal(result.verified,true,result.error);assert.equal(navigationCalls,0);assert.equal(downCount,1);assert.equal(upCount,1);return;}
   if(stage==='placement_reselect'){

@@ -1,0 +1,153 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.duplicates"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.duplicates",
+      "output_node_label": "Типизированные ключи",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Duplicate",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "DuplicateGroup",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Contradiction",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "ContradictionGroup",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "B",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "R",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "D",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "B": true,
+          "R": 1.25,
+          "D": "2024-02-29T12:34:56.000",
+          "Value": "x",
+          "Keep": null,
+          "Duplicate": true,
+          "DuplicateGroup": 1,
+          "Contradiction": false,
+          "ContradictionGroup": null
+        },
+        {
+          "RowID": 2,
+          "B": true,
+          "R": 1.25,
+          "D": "2024-02-29T12:34:56.000",
+          "Value": "x",
+          "Keep": "untouched",
+          "Duplicate": true,
+          "DuplicateGroup": 1,
+          "Contradiction": false,
+          "ContradictionGroup": null
+        },
+        {
+          "RowID": 3,
+          "B": null,
+          "R": null,
+          "D": null,
+          "Value": "y",
+          "Keep": "",
+          "Duplicate": false,
+          "DuplicateGroup": null,
+          "Contradiction": true,
+          "ContradictionGroup": 1
+        },
+        {
+          "RowID": 4,
+          "B": null,
+          "R": null,
+          "D": null,
+          "Value": "z",
+          "Keep": "null",
+          "Duplicate": false,
+          "DuplicateGroup": null,
+          "Contradiction": true,
+          "ContradictionGroup": 1
+        },
+        {
+          "RowID": 5,
+          "B": false,
+          "R": 0.0,
+          "D": null,
+          "Value": "w",
+          "Keep": "0",
+          "Duplicate": false,
+          "DuplicateGroup": null,
+          "Contradiction": false,
+          "ContradictionGroup": null
+        },
+        {
+          "RowID": 6,
+          "B": true,
+          "R": 1.2500000000000002,
+          "D": "2024-02-29T12:34:56.000",
+          "Value": "q",
+          "Keep": "last",
+          "Duplicate": false,
+          "DuplicateGroup": null,
+          "Contradiction": false,
+          "ContradictionGroup": null
+        }
+      ]
+    }
+  ]
+}

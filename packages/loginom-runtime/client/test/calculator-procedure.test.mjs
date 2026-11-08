@@ -13,9 +13,14 @@ function fixture(names,{pageSize=8,top=0,stuck=false}={}) {
   const rows=expressions.map((e,index)=>control(prefix+'colExpressionName_'+e.name,['click','double_click','scroll'],{
    interaction:{state:index>=top&&index<top+pageSize?'point_observed':'obscured'},bounding_box:{y:(index-top)*24},
    ...(expressions.length>pageSize?{scroll:{ref:'grid',top:top*24,max_top:(expressions.length-pageSize)*24}}:{})}));
-  const ui=[...rows,...['btnExprUp','btnReplaceField'].map(k=>control(prefix+k,['click'])),control(prefix+'cmpExpression',['replace_expression'])];
+  const ui=[...rows,...['btnExprUp','btnReplaceField','btnAddExpr'].map(k=>control(prefix+k,['click'])),control(prefix+'cmpExpression',['replace_expression'])];
   const wizard={root_tid:base,stage:'calculator'};
-  if(draft){wizard.expression_parameters={status:'observed',root_ref:editor,selected_expression:selected().record_id,fields:Object.fromEntries(['name','label'].map(k=>[k,{status:'observed',value:draft[k],input_ref:editor+k}]).concat([['type_label',{status:'observed',value:'Вещественный'}]]))};ui.push(control(editor+'btnApply',['apply_expression_parameters']));}
+  if(draft){wizard.expression_parameters={status:'observed',root_ref:editor,selected_expression:selected().record_id,fields:Object.fromEntries(['name','label'].map(k=>[k,{status:'observed',value:draft[k],input_ref:editor+k}]).concat([['type_label',{status:'observed',value:'Вещественный'}]]))};ui.push(control(editor+'btnApply',['apply_expression_parameters']));
+   wizard.expression_parameters.options={};
+   for(const [key,tid] of [['intermediate','chbIntermediate'],['cached','chbCached']]){
+    wizard.expression_parameters.options[key]={status:'observed',value:draft[key],enabled:true,input_ref:editor+tid+';InputEl',display_ref:editor+tid+';DisplayEl'};
+    for(const part of ['InputEl','DisplayEl'])ui.push(control(editor+tid+';'+part,['set_checked'],{check_state:{kind:'checkbox',checked:draft[key],indeterminate:false}}));
+   }}
   return structuredClone({wizard,ui:{elements:ui},node_calculator:{verified:true,mode:'expression',inventory_complete:true,input_fields:[],expressions}});
  };
  const channel={async observe({ready}){const s=snapshot();assert.ok(ready(s));return s},async perform({ready,resolve}){
@@ -25,6 +30,11 @@ function fixture(names,{pageSize=8,top=0,stuck=false}={}) {
    const e=expressions.find(e=>prefix+'colExpressionName_'+e.name===action.ref);assert.ok(e);assert.ok(e.index>=top&&e.index<top+pageSize,'Hidden row clicked');
    expressions.forEach(r=>r.selected=r===e);if(action.verb==='double_click')draft={...e};return;
   }
+  if(action.ref===prefix+'btnAddExpr'){
+   const e={name:'Expr'+expressions.length,index:expressions.length,record_id:'n'+expressions.length,label:'Expr',type:'real',formula:'',replace:false,intermediate:false,cached:false,description:''};
+   expressions.forEach(r=>r.selected=false);e.selected=true;expressions.push(e);draft={...e};return;
+  }
+  if(action.verb==='set_checked'){assert.ok(draft,'Editor closed');const key=action.ref.includes('chbCached')?'cached':'intermediate';draft[key]=action.checked;return;}
   if(action.verb==='set_wizard_field'){draft[action.ref.slice(editor.length)]=action.text;return;}
   if(action.verb==='apply_expression_parameters'){
    assert.ok(!expressions.some(e=>e!==selected()&&e.name.toLowerCase()===draft.name.toLowerCase()),'Duplicate name rejected by Loginom');Object.assign(selected(),draft);draft=null;return;
@@ -39,6 +49,32 @@ test('cyclic rename keeps both record identities, formulas and unrequested optio
  const f=fixture(['A','B','Untouched']);const result=await configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'A'},name:'B',formula:'2'},{target:{kind:'existing',name:'B'},name:'A',formula:'3'}]});
  assert.equal(result.verified,true);assert.deepEqual(f.expressions.map(e=>[e.record_id,e.name,e.formula,e.description,e.cached]),[['r0','B','2','Keep 0',true],['r1','A','3','Keep 1',true],['r2','Untouched','1','Keep 2',true]]);
  assert.equal(f.calls.filter(c=>c.verb==='apply_expression_parameters').length,3);
+});
+test('new intermediate cached expression is created with both flags checked before one Apply',async()=>{
+ const f=fixture(['A']);
+ await configureCalculator(f.channel,{expressions:[{target:{kind:'new'},name:'Helper',label:'Helper',type:'real',formula:'A + 1',replace:false,intermediate:true,cached:true}]});
+ const h=f.expressions.find(e=>e.name==='Helper');
+ assert.deepEqual([h.intermediate,h.cached,h.formula],[true,true,'A + 1']);
+ assert.deepEqual(f.calls.filter(c=>c.verb==='set_checked').map(c=>[c.ref.split(';').slice(-2).join(';'),c.checked]),[['chbIntermediate;InputEl',true],['chbCached;InputEl',true]]);
+ assert.equal(f.calls.filter(c=>c.verb==='apply_expression_parameters').length,1);
+});
+test('changing only cached reopens that saved row, keeps its record, formula and other flags',async()=>{
+ const f=fixture(['A','Helper']);f.expressions[1].intermediate=true;
+ await configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'Helper'},cached:false}]});
+ const h=f.expressions[1];assert.deepEqual([h.record_id,h.formula,h.description,h.intermediate,h.cached],['r1','1','Keep 1',true,false]);
+ assert.deepEqual(f.calls.filter(c=>c.verb==='set_checked').map(c=>c.checked),[false]);
+ assert.deepEqual(f.calls.filter(c=>c.verb==='double_click').length,1);
+ assert.equal(f.calls.filter(c=>c.verb==='set_wizard_field').length,0);
+});
+test('a flag that already has the requested value is not toggled',async()=>{
+ const f=fixture(['A']);await configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'A'},cached:true,intermediate:false}]});
+ assert.deepEqual(f.calls,[]);
+});
+test('a disabled flag is refused before Apply',async()=>{
+ const f=fixture(['A']),observe=f.channel.observe;
+ f.channel.observe=async o=>{const s=await observe(o);for(const k of ['intermediate','cached'])if(s.wizard.expression_parameters?.options)s.wizard.expression_parameters.options[k].enabled=false;return s;};
+ await assert.rejects(configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'A'},intermediate:true}]}),/option unavailable: intermediate/);
+ assert.equal(f.calls.filter(c=>c.verb==='apply_expression_parameters').length,0);
 });
 test('patching a far row reveals it in both directions before editing',async()=>{
  const f=fixture(Array.from({length:40},(_,i)=>'E'+i));await configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'E39'},formula:'39'},{target:{kind:'existing',name:'E0'},formula:'40'}]});

@@ -97,3 +97,11 @@ test('input binding is derived without modifying the observation used to authori
  const f=fixture(),r=await configureReform(f.channel,{changes:[{field:{kind:'input_field',name:'A'},name:'Amount'}]},{inputMapping:f.inputMapping});
  assert.equal(r.configuration.source_identity_verified,true);assert.equal(r.configuration.fields[0].input_field.name,'A');assert.equal(r.applied_editors,1);
 });
+test('reform swaps two names through a temporary one that is absent from the final draft',async()=>{
+ const f=fixture(),input=name=>({kind:'input_field',name});
+ const r=await configureReform(f.channel,{changes:[{field:input('A'),name:'B',label:'LB'},{field:input('B'),name:'A',label:'LA',type:'integer'}]},{inputMapping:f.inputMapping});
+ assert.equal(r.applied_editors,3);assert.equal(f.events.filter(a=>a.verb==='apply_reform_column').length,3);
+ assert.deepEqual(f.records.map(x=>[x.record_id,x.name,x.label,x.type]),[['r0','B','LB','string'],['r1','A','LA','integer']]);
+ assert.deepEqual(r.configuration.fields.map(x=>x.name),['B','A']);
+ assert.ok(f.records.every(x=>!x.name.startsWith('_reform_tmp')));assert.equal(f.records[0].caching_method,2);
+});

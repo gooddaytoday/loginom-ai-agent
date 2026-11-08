@@ -12,6 +12,10 @@ ID `component.preprocessing.Binning`, slug `preprocessing-binning`.
 
 ## Исторические материалы и план расширений
 
+[LAB-1046: checkpoint новых режимов](plan.md#7-lab-1046-расширения-v040-checkpoint-этапа-0) ·
+[комплект предложений и оставшиеся проверки](acceptance/modes/README.md).
+Этап 0 расширений не завершён: остановка после двух восстановлений сеанса.
+
 [Подплан](plan.md) · [discovery LAB-645](discovery.md) ·
 [критерии и задания](acceptance/task.md) · [независимый oracle](acceptance/oracle.py).
 

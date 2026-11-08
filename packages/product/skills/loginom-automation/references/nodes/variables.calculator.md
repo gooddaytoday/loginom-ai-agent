@@ -1,5 +1,6 @@
 # variables.calculator / expression
 
+<!-- mode: expression -->
 Для скалярных параметров сценария выбери `dock_node_apply` с
 `target.type="variables.calculator"`, `mode="expression"`.
 Табличные выражения относятся к `transform.calculator`; скалярные
@@ -26,3 +27,4 @@ datetime, Variant, промежуточные выражения, замену �
 пустую строку, false и ноль. Форматированный текст 0.13 может означать 0.125;
 используй typed reader, а при невозможности точного чтения сообщи отказ.
 После изменения снова выполни узел, проверь результат и сохрани пакет.
+<!-- /mode -->
