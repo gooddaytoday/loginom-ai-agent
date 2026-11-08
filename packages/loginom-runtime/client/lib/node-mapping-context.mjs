@@ -80,7 +80,9 @@ export function readMappingBrowser(request) {
       &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1&&root.contains(parent)
       &&wizard.length===1&&model?.FView?.el?.dom===wizard[0]&&wizard[0].contains(root)
       &&column?.el?.dom===parent&&column.disabled===true&&masks.filter(mask=>mask.parentElement===parent).length===1);
-  }))return fail('mapping_mask');
+  }))return {...fail('mapping_mask'),mask_detail:masks.slice(0,4).map(e=>{
+    try{return {cls:String(e.className??'').slice(0,80),role:e.getAttribute('role'),parent_tid:e.parentElement?.getAttribute('data-tid')??null,
+      parent_cls:String(e.parentElement?.className??'').slice(0,80),text:String(e.textContent??'').trim().slice(0,40)};}catch{return null;}})};
   const grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(s=>exact(base+s));
   if(grids.some(es=>es.length!==1||!root.contains(es[0])))return fail('mapping_grids');
   const elements=grids.map(es=>es[0]),views=elements.map(e=>globalThis.Ext?.getCmp?.(e.id));

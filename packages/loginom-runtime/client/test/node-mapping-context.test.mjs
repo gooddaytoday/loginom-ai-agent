@@ -46,6 +46,7 @@ test('node mapping brackets its read with the same prepared wizard identity',asy
 
  test('native mapping refuses a plain reconnect mask even while cached grids remain',()=>{
  const f=fixture();f.all.push({mask:true,getAttribute:()=>null,checkVisibility:()=>true});assert.equal(f.read().reason,'mapping_mask');
+ assert.ok(Array.isArray(f.read().mask_detail),'a refused mask names what was observed');
  });
 
 function excludedFixture() {

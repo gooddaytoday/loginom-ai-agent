@@ -261,7 +261,8 @@ export async function readNativeImportMapping(channel,condition,ready) {
     let reason='unobserved';
     try{
       const m=(await channel.observe({condition:condition+' state',readMappings:true,ready:()=>true})).node_mapping;
-      reason=[m?.reason??(m?.verified===true?'verified':'unverified'),m?.verified===true?null:'source_identity_verified='+m?.source_identity_verified].filter(Boolean).join(', ');
+      reason=[m?.reason??(m?.verified===true?'verified':'unverified'),m?.verified===true?null:'source_identity_verified='+m?.source_identity_verified,
+        m?.mask_detail?'masks='+JSON.stringify(m.mask_detail).slice(0,600):null].filter(Boolean).join(', ');
     }catch{}
     const explained=new NodeReadinessTimeout(condition+' ('+reason+')');
     throw explained;
