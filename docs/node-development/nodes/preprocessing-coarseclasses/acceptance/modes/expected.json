@@ -68,7 +68,7 @@
           "Target": "yes",
           "X_ClassNum": 0,
           "X_ClassMark": "Low",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.6397329453931244
         },
         {
           "RowID": 2,
@@ -76,7 +76,7 @@
           "Target": "yes",
           "X_ClassNum": 0,
           "X_ClassMark": "Low",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.6397329453931244
         },
         {
           "RowID": 3,
@@ -84,7 +84,7 @@
           "Target": "yes",
           "X_ClassNum": 0,
           "X_ClassMark": "Low",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.6397329453931244
         },
         {
           "RowID": 4,
@@ -92,7 +92,7 @@
           "Target": "no",
           "X_ClassNum": 0,
           "X_ClassMark": "Low",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.6397329453931244
         },
         {
           "RowID": 5,
@@ -100,7 +100,7 @@
           "Target": "yes",
           "X_ClassNum": 1,
           "X_ClassMark": "High",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.7269657119902757
         },
         {
           "RowID": 6,
@@ -108,7 +108,7 @@
           "Target": "no",
           "X_ClassNum": 1,
           "X_ClassMark": "High",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.7269657119902757
         },
         {
           "RowID": 7,
@@ -116,7 +116,7 @@
           "Target": "no",
           "X_ClassNum": 1,
           "X_ClassMark": "High",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.7269657119902757
         },
         {
           "RowID": 8,
@@ -124,7 +124,15 @@
           "Target": "no",
           "X_ClassNum": 1,
           "X_ClassMark": "High",
-          "X_ClassSignificant": 0.5493061443340549
+          "X_ClassSignificant": 0.7269657119902757
+        },
+        {
+          "RowID": 9,
+          "X": 7,
+          "Target": "yes",
+          "X_ClassNum": 0,
+          "X_ClassMark": "Low",
+          "X_ClassSignificant": 0.6397329453931244
         }
       ]
     },
@@ -249,19 +257,19 @@
           "ClassNumber": 0,
           "UniqueValue": null,
           "ClassMark": "Low",
-          "EventsCount": 3,
+          "EventsCount": 4,
           "NonEventsCount": 1,
-          "EventRate": 0.75,
-          "NonEventRate": 0.25,
+          "EventRate": 0.8,
+          "NonEventRate": 0.2,
           "LowerBound": null,
           "UpperBound": {
             "cell_type": "real",
             "value": 7
           },
-          "WoE": -1.0986122886681098,
-          "IV": 0.5493061443340549,
-          "Weight": 0.5,
-          "IncludeUpperBound": true,
+          "WoE": -1.1631508098056809,
+          "IV": 0.6397329453931244,
+          "Weight": 0.5555555555555556,
+          "IncludeUpperBound": false,
           "PreQuantingApplied": false
         },
         {
@@ -280,10 +288,10 @@
             "value": 7
           },
           "UpperBound": null,
-          "WoE": 1.0986122886681098,
-          "IV": 0.5493061443340549,
-          "Weight": 0.5,
-          "IncludeUpperBound": true,
+          "WoE": 1.3217558399823195,
+          "IV": 0.7269657119902757,
+          "Weight": 0.4444444444444444,
+          "IncludeUpperBound": false,
           "PreQuantingApplied": false
         }
       ]
@@ -356,15 +364,18 @@
         {
           "ColumnName": "X",
           "ColumnDisplayName": "X",
-          "EventsCount": 4,
+          "EventsCount": 5,
           "NonEventsCount": 4,
-          "EventRate": 0.5,
-          "NonEventRate": 0.5,
-          "TotalEventsCount": 8,
-          "IV": 1.0986122886681098,
+          "EventRate": 0.5555555555555556,
+          "NonEventRate": 0.4444444444444444,
+          "TotalEventsCount": 9,
+          "IV": 1.3666986573834001,
           "Significance": "Высокая"
         }
       ]
     }
-  ]
+  ],
+  "observations": {
+    "IncludeUpperBound": "Native field, observation of 7.4.2, not claimed; boundary membership is checked by X=7 in class 0."
+  }
 }
