@@ -5,7 +5,7 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
-import {validateExcelExportParameters,excelExportParametersSchema} from './exports-excel-parameters.mjs';
+import {validateExcelExportParameters,excelExportParametersSchema,validateExcelWorkbookArtifact} from './exports-excel-parameters.mjs';
 import {configureExcelExport} from './exports-excel-procedure.mjs';
 import {synchronizeTextExportInput} from './text-export-node.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
@@ -23,7 +23,7 @@ export function excelExportReadback({node,phases}){
 }
 export function createExcelExportNodeSupport({targetOrigin,targetBuild,storageDirectories=null}){
  let storageContinuation=null;
- const nodeApplyHandlers=new Map([['exports.excel',{revision:'excel-export-v1-candidate',fileOutput:true,modes:['xlsx'],parameter_schema:excelExportParametersSchema,
+ const nodeApplyHandlers=new Map([['exports.excel',{revision:'excel-export-v2-candidate',fileOutput:true,modes:['xlsx','xls'],parameter_schema:excelExportParametersSchema,
   validate:(p,m,r)=>validateExcelExportParameters(p,m,r,storageDirectories),configurationReadback:excelExportReadback,configure:(ctx,p,drivers)=>drivers.configureExport(ctx,p.excel_export??{})}]]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now,receiptOptions,artifactStore}=options;
@@ -121,7 +121,7 @@ export function createExcelExportNodeSupport({targetOrigin,targetBuild,storageDi
    async readOutput(read,ctx){enter(ctx);need(!read.ports.length&&execution?.verified&&execution.owner_verified&&execution.execution_id===ctx.execution.execution_id,'Export execution ownership missing');
     const output=await readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories,storageContinuation,
      rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},ctx,configuration,execution);
-    return verified({effect_possible:true,status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,file_artifacts:[output]});},
+    return verified({effect_possible:true,status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,file_artifacts:[validateExcelWorkbookArtifact(output)]});},
    releasePendingPhases:['input_mapping','open','configure','output_mapping','finish','execute'],
    async releasePending(state,{signal:releaseSignal}={}){
     need(['input_mapping','open','configure','output_mapping','finish','execute'].includes(state.pending?.phase),

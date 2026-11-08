@@ -29,12 +29,13 @@ export function readReplacementBrowser(prefix){
  if(!field)return {verified:true,inventory_complete:true,input_fields:fields,selected:null,pairs:[],settings_applied:false};
  const rows=records(cmp('grdReplaceItems'),'bg.ext.CollectionListProxy',512);if(!rows)return fail('replacement_table_inventory');
  const typeButton=cmp('btnTypeChange'),icon=typeButton?.btnIconEl?.dom;
- const resultType=field.mode==='none'?field.type:Object.entries({string:'dtString',integer:'dtInteger',real:'dtFloat',datetime:'dtDateTime'})
+ const resultType=field.mode==='none'?field.type:Object.entries({boolean:'dtBoolean',string:'dtString',integer:'dtInteger',real:'dtFloat',datetime:'dtDateTime'})
   .find(([,suffix])=>typeButton?.iconCls==='bg-TBGDataType-'+suffix&&icon&&roots[0].contains(icon)&&icon.classList.contains(typeButton.iconCls))?.[0];
  if(!resultType)return fail('replacement_result_type');
  const typed=(v,type)=>{
   if(v===null)return {type,value:null};
   if(type==='string'&&typeof v==='string'&&v.length<=2048)return {type,value:v};
+  if(type==='boolean'&&typeof v==='boolean')return {type,value:v};
   if(type==='real'&&typeof v==='number'&&Number.isFinite(v))return {type,value:v};
   if(type==='datetime'&&v instanceof Date&&Number.isFinite(+v)&&v.getMilliseconds()===0){
    const z=(n,l=2)=>String(n).padStart(l,'0');return {type,value:`${z(v.getFullYear(),4)}-${z(v.getMonth()+1)}-${z(v.getDate())}T${z(v.getHours())}:${z(v.getMinutes())}:${z(v.getSeconds())}`};
@@ -53,11 +54,11 @@ export function readReplacementBrowser(prefix){
  const pairs=[],seen=new Set(),groups=new Set();for(const r of rows){const d=r?.data,id=String(r?.internalId??'');
   if(!r?.isModel||!id||seen.has(id)||![0,1].includes(d?.CollectionID))return fail('replacement_table_record');seen.add(id);
   if(!Object.hasOwn(d,'DataValueType')&&!Object.hasOwn(d,'ReplaceByType')&&!Object.hasOwn(d,'RegularExpression')&&!Object.hasOwn(d,'ReplacementType'))continue; // Empty group placeholder.
-  groups.add(d.CollectionID);if(groups.size>1)return fail('replacement_mixed_exact_regex');
+  groups.add(d.CollectionID);
   if(d.CollectionID===0?(types[d.DataValueType]!==field.type||types[d.ReplaceByType]!==resultType):(field.type!=='string'||resultType!=='string'||d.ReplacementType!==0||typeof d.RegularExpression!=='string'||typeof d.Replacement!=='string'))return fail('replacement_unsupported_rule');
   const from=typed(d.CollectionID===1?d.RegularExpression:d.ValueRender,field.type),to=typed(d.CollectionID===1?d.Replacement:d.ReplaceRender,resultType);
-  if(!from||!to||!Number.isSafeInteger(d.Index)||d.Index<0||pairs.some(p=>p.index===d.Index))return fail('replacement_typed_value');
-  pairs.push({record_id:id,index:d.Index,from,to});
+  if(!from||!to||!Number.isSafeInteger(d.Index)||d.Index<0||pairs.some(p=>p.collection_id===d.CollectionID&&p.index===d.Index))return fail('replacement_typed_value');
+  pairs.push({record_id:id,collection_id:d.CollectionID,index:d.Index,from,to});
  }
  const otherControl=cmp('cbxReplaceOther'),caseControl=cmp('chkCaseSensitivity'),precisionControl=cmp('edPrecision');
  const mode=otherControl?.getValue?.(),caseSensitive=caseControl?.getValue?.(),precision=precisionControl?.getValue?.();
@@ -71,5 +72,5 @@ export function readReplacementBrowser(prefix){
   to:separator('ReplaceEditor-1;fldVariant;ValueContainer;num'),
   other:separator('edtReplaceOtherFloat'),
  }:null;
- return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,result_type:resultType,mode:groups.size?(groups.has(1)?'regex':'exact'):null,pairs:pairs.sort((a,b)=>a.index-b.index),other,case_sensitive:caseSensitive,precision,precision_decimal_separator:['.',','].includes(precisionControl.decimalSeparator)?precisionControl.decimalSeparator:null,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
+ return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,result_type:resultType,mode:groups.size>1?'mixed':groups.size?(groups.has(1)?'regex':'exact'):null,pairs:pairs.sort((a,b)=>a.collection_id-b.collection_id||a.index-b.index),other,case_sensitive:caseSensitive,precision,precision_decimal_separator:['.',','].includes(precisionControl.decimalSeparator)?precisionControl.decimalSeparator:null,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
 }

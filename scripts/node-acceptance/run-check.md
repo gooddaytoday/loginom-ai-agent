@@ -127,6 +127,9 @@ changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 `calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
 `modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
 
+`calculator-javascript` uses `task-javascript.md` and `modes/expected.json` (JavaScript language, `this.Expr`,
+intermediate cached Helper, reorder); only the task and `fixtures/modes.csv` reach the model.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
@@ -350,6 +353,11 @@ The saved package remains for inspection; after source cleanup its original
 large import cannot be rerun without regenerating that source.
 X1 already has the generator/oracle/task template; remove its `pending` marker
 in `D87` only after LAB-413 provides the XLSX switching path and validate it live.
+
+`missing-median-mode`, `missing-previous`, `missing-delete`: цикл 1 «Заполнение пропусков»
+(median/most_probable, previous при ordered, delete). Модель получает только
+`acceptance/task-*.md` и CSV из `fixtures/` (statistics, ordered, delete); ожидания —
+`acceptance/modes/expected*.json` (воспроизводит `oracle.py --check`). CSV, Save, cold и cleanup — штатная оснастка.
 
 `grouping-median`: цикл 1 «Группировка: медиана» (LAB-998): `task-median.md` и
 `fixtures/modes.csv` модели; ожидания берутся из независимого
@@ -649,6 +657,11 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
 
+`logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
+повтор настройки и Teach того же узла; прогноз по независимому штрафному
+score из `datamining-logregression/acceptance/modes/ridge`, CSV/Save/cold.
+Модели передаются только task-ridge.md и train.csv.
+
 `sorting-locale`: импорт modes.csv, сортировка Word и RowID без учёта регистра;
 на одном узле сначала compare_with_locale=false, затем true (русская локаль
 пользователя). Утверждённый `sorting/acceptance/modes/task-locale.md` и
@@ -672,3 +685,8 @@ CSV в порядке задания, cold Execute проверяет после
 Первое/последнее включают крайний NULL; единственное допускает повторы;
 список исключает NULL, сохраняет пустую строку, сортировку и уникальность.
 Типы/порядок полей, Save и cleanup проверяются штатными reader/matcher.
+
+`replace-boolean` и `replace-mixed` используют утверждённые task-boolean.md/task-mixed.md
+и только fixtures/extended/input.csv из replacement. Независимые expected.json
+и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
+Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.

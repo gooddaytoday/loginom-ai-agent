@@ -35,3 +35,39 @@ test('union label/type matching uses labels independently of names and rejects a
  const p=automatic('label_type');assert.deepEqual(resolveUnionTables(p,[[{name:'A',label:'Title',type:'string'}],[{name:'B',label:'TITLE',type:'string'}]])[0].pairs,[{main:'A',source:'B'}]);
  assert.throws(()=>validateUnionParameters(automatic('guess'),'append_all',request));
 });
+
+const twoStage=()=>({...automatic('name_then_label_type'),prefixes:{enabled:false,name:'Union',label:'Объединение'}});
+const stageSchemas=()=>{
+ const fixture=JSON.parse(readFileSync(new URL('../../../../docs/node-development/nodes/union/fixtures/v040/schema.json',import.meta.url)));
+ return ['main.csv','second.csv'].map(file=>fixture.files[file].columns);
+};
+test('two-stage union reserves all name/type matches before matching remaining label/type fields',()=>{
+ const schemas=stageSchemas(),p=twoStage();
+ validateUnionParameters(p,'append_all',{...request,inputs:request.inputs.slice(0,2)});
+ const expected=[{port:1,pairs:[{main:'Amount',source:'Amount'},{main:'Code',source:'Code'},{main:'Backup',source:'Reserve'}],unmatched:[]}];
+ assert.deepEqual(resolveUnionTables(p,schemas),expected);
+ // A label-only source before a same-name source must not take its target.
+ schemas[1].reverse();
+ assert.deepEqual(resolveUnionTables(p,schemas)[0].pairs,[...expected[0].pairs].reverse());
+ assert.deepEqual(unionOutputFields({input_fields:schemas,mappings:expected,prefixes:p.prefixes}).map(f=>f.name),['Code','Backup','Amount']);
+});
+test('two-stage union honors explicit pairs and null before either automatic pass',()=>{
+ const p=twoStage(),schemas=stageSchemas();p.prefixes.enabled=true;
+ p.tables[0].fields=[{source:'Reserve',main:'Code'},{source:'Code',main:null}];
+ assert.deepEqual(resolveUnionTables(p,schemas),[{port:1,pairs:[{main:'Amount',source:'Amount'},{main:'Code',source:'Reserve'}],unmatched:['Code']}]);
+});
+test('two-stage union matches case-insensitively with exact types and keeps unmatched fields',()=>{
+ const schemas=[[{name:'A',label:'Alpha',type:'integer'},{name:'B',label:'Beta',type:'string'}],
+  [{name:'a',label:'Different',type:'integer'},{name:'Other',label:'BETA',type:'string'},{name:'Wrong',label:'Alpha',type:'real'}]];
+ assert.deepEqual(resolveUnionTables(twoStage(),schemas),[{port:1,pairs:[{main:'A',source:'a'},{main:'B',source:'Other'}],unmatched:['Wrong']}]);
+});
+test('two-stage union refuses competing label sources and multiple remaining destinations',()=>{
+ const main=[{name:'A',label:'Same',type:'string'}],source=[{name:'X',label:'Same',type:'string'},{name:'Y',label:'SAME',type:'string'}];
+ for(const schemas of [[main,source],[[...main,{name:'B',label:'Same',type:'string'}],source.slice(0,1)]])
+  assert.throws(()=>resolveUnionTables(twoStage(),schemas),e=>e.code==='UNION_AUTO_MATCH_AMBIGUOUS');
+});
+test('two-stage union resets reserved automatic destinations for each joined table',()=>{
+ const schemas=stageSchemas(),p=twoStage();p.tables.push({port:2,fields:[]});
+ const mappings=resolveUnionTables(p,[...schemas,schemas[1]]);
+ assert.deepEqual(mappings[1],{...mappings[0],port:2});
+});
