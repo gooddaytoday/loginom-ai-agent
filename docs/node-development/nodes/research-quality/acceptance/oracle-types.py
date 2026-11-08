@@ -4,16 +4,21 @@
 Never reads Loginom, package XML, runtime code or actual output. Reuses only the
 independent arithmetic oracle next to this file. Variant subtypes are proposals
 to confirm in phase 1; two-decimal UI strings do not establish native tags.
+--check regenerates expected-types.json in memory and fails on drift.
 """
+import argparse
 import csv
+import importlib.util
 import json
 from datetime import date
 from fractions import Fraction
 from pathlib import Path
 
-from oracle import SUMMARY, statistics
-
 ROOT = Path(__file__).resolve().parent
+_spec = importlib.util.spec_from_file_location('quality_oracle', ROOT / 'oracle.py')
+_oracle = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_oracle)
+SUMMARY, statistics = _oracle.SUMMARY, _oracle.statistics
 FIELDS = [('RowID', 'integer', 'Непрерывный'), ('Flag', 'boolean', 'Дискретный'),
           ('Stamp', 'datetime', 'Непрерывный'), ('Code', 'integer', 'Дискретный'),
           ('Measure', 'real', 'Дискретный'), ('Text', 'string', 'Дискретный')]
@@ -60,9 +65,17 @@ def expected():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--check', action='store_true', help='compare committed expected-types.json')
+    args = parser.parse_args()
     result = expected()
     summary = result['outputs'][4]['rows']
     assert summary[1]['Col7'] == float(Fraction(4, 7)) and summary[1]['Col9'] is None
     assert summary[2]['Col7'] == float(Fraction(322185, 7))
     assert summary[3]['Col8'] == dict(cell_type='real', value=1.375)
-    print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
+    text = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
+    if args.check:
+        assert (ROOT / 'expected-types.json').read_text(encoding='utf-8') == text, 'expected-types.json'
+        print('OK: expected-types.json matches')
+    else:
+        print(text, end='')

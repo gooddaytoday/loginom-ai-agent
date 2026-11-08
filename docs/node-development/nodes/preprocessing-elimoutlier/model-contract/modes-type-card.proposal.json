@@ -11,7 +11,7 @@
     "detect",
     "edit"
   ],
-  "semantics": "LAB-1103 PROPOSAL; not implemented or owner-approved. Detect keeps values; edit selects independent outlier/extreme policies keep/delete/mean/median/most_probable/constant/limit for continuous numeric fields. Always fit current input; three ports: edited rows, original outliers excluding extremes, original extremes. NULL is retained, excluded from fit. Observed IQR fixtures select upper-rank Q(p)=sorted_non_null[min(floor(n*p),n-1)] with strict fences. SD 1/2 mean uses normal values; median and histogram mode include all non-NULL training values; exact clipping and arbitrary-factor behavior still need preflight. Quality is hidden in 7.4.2 UI; frozen-model apply not established, source changes recompute even with Always Run. Neither mode is proposed.",
+  "semantics": "Detect keeps values; edit selects independent outlier/extreme policies keep/delete/mean/median/most_probable/constant/limit for continuous numeric fields. Always fit current input; three ports: edited rows, original outliers excluding extremes, original extremes. NULL is retained, excluded from fit. IQR uses upper-rank Q(p)=sorted_non_null[min(floor(n*p),n-1)] with strict fences. SD 1/2 mean uses normal values; median and histogram mode include all non-NULL training values. Quality is hidden in 7.4.2 UI and frozen-model apply is unavailable: source changes recompute even with Always Run.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "elim-outlier-v1-internal-1",

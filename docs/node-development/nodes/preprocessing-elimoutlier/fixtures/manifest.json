@@ -237,15 +237,15 @@
     },
     {
       "path": "quartile-boundaries.csv",
-      "bytes": 224,
-      "sha256": "decb13fa5824cbc57660ba7821349488cc0d290c232c1d79b1ac707ec60713c1",
+      "bytes": 131,
+      "sha256": "5bf18675ffbdd3a564bead9f3a2d63d49af7427eabfd55318764cb1cb7702dda",
       "rows": 16,
       "purpose": "IQR 1.5/3, upper-rank Q1=3/Q3=7: strict fences -3/13 (equal values not anomalous), extremes -9/19; outliers 1,15, extreme 16"
     },
     {
       "path": "replacement-discriminator.csv",
-      "bytes": 81,
-      "sha256": "7a32b596b1ae96d4c8e09fd93d1e0c925339a8757cc601df2e1d1a3048ab594a",
+      "bytes": 68,
+      "sha256": "bf66d4179b00d0e3544745b99f066fb534f6df659b105b9ec9cf9a846e19bfa3",
       "rows": 9,
       "purpose": "edit SD 1/2 replacement sample: normal [0,2,2,2,3,4,6], extreme RowID 8, NULL row 9; mean 19/7, median 3, mode 15/2, limit 19/7+sqrt(150/49)"
     }
