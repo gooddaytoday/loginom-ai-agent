@@ -9,7 +9,7 @@ const field=name=>({kind:'input_field',name});
 const measure=(name,fn,output)=>({field:field(name),function:fn,name:output,label:output});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
 // LAB-998 native FactorEditDialog;grpFactors chb-6/7/9;DisplayEl.
-const cases=[['mode',64,'Mode','Мода',['integer','string']],['stddev',128,'Std','Стандартное откл.',['integer']],['null_count',512,'Null','Кол-во пропусков',['integer','string']]];
+const cases=[['mode',64,'Mode','Мода',['integer','string']],['stddev',128,'Std','Стандартное откл.',['integer']],['null_count',512,'Null','Кол-во пропусков',['integer','string']],['first',1024,'First','Первый',['integer','string']],['last',2048,'Last','Последний',['integer','string']],['only',4096,'Only','Единственный',['integer','string']]];
 for(const [fn,bit,suffix,label,types] of cases){
  test(`Grouping ${fn} validates only observed input types and combines native masks`,()=>{
   assert.ok(groupingMeasureSchema.properties.function.enum.includes(fn));

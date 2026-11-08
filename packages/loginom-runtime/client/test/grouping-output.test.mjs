@@ -99,3 +99,25 @@ test('Grouping preserves an explicit autosync choice for a requested field order
  const f=outputChannel();await configureGroupingOutput(f.channel,f.config,f.params,{autosync:true});
  assert.equal(f.native.autosync,true);assert.ok(!f.actions.some(a=>a.ref==='auto'));
 });
+
+for(const option of ['cache_groups','sort_result'])for(const value of [false,true])test(`Grouping ${option}=${value} freezes a complete layout even when its initial order already matches`,async()=>{
+ const f=outputChannel();
+ f.native.target_fields.sort((a,b)=>a.source.index-b.source.index).forEach((field,index)=>{field.index=index;field.group_index=index;});
+ await configureGroupingOutput(f.channel,f.config,{...f.params,[option]:value},{});
+ assert.equal(f.native.autosync,false,'a matching initial order must survive native source regeneration after reopen');
+ assert.equal(f.actions[0].ref,'auto');
+ assert.deepEqual(f.native.target_fields.map(f=>f.name),['Segment','Group','OtherTotal','MeanAmount','TextRows']);
+});
+for(const parameters of [{},{cache_groups:false},{sort_result:true}])test(`Grouping preserves omitted output settings for an options-only request ${JSON.stringify(parameters)}`,async()=>{
+ const f=outputChannel(),before=structuredClone(f.native);
+ await configureGroupingOutput(f.channel,f.config,parameters,{});
+ assert.deepEqual(f.native,before);assert.deepEqual(f.actions,[]);
+});
+test('Grouping retains legacy defaults and explicit autosync for an already ordered layout',async()=>{
+ for(const parameters of [{},{sort_result:true}]){
+  const f=outputChannel();
+  f.native.target_fields.sort((a,b)=>a.source.index-b.source.index).forEach((field,index)=>{field.index=index;field.group_index=index;});
+  await configureGroupingOutput(f.channel,f.config,{...f.params,...parameters},parameters.sort_result===true?{autosync:true}:{});
+  assert.equal(f.native.autosync,true);
+ }
+});

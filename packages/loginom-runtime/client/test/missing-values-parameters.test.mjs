@@ -11,7 +11,7 @@ test('missing values resolves by name despite identical labels and leaves unrequ
  assert.deepEqual(schema.map(f=>f.data_kind),['Непрерывный','Дискретный','Дискретный']);
 });
 test('missing values requires full settings and rejects unsupported methods before configuration',()=>{
- for(const mutate of [p=>delete p.ordered,p=>p.ordered=true,p=>delete p.max_nulls_percent,p=>p.max_nulls_percent=-1,p=>p.max_nulls_percent=101,p=>p.max_nulls_percent=0.5,p=>p.fields=[],p=>p.fields.push(p.fields[0]),p=>p.fields[0].method='linear',p=>p.fields[0].method='random',p=>p.fields[0].value=0,p=>p.fields[1].value=42,p=>delete p.fields[1].value,p=>p.fields[0].field.kind='label',p=>p.extra=true]){
+ for(const mutate of [p=>delete p.ordered,p=>p.ordered=true,p=>delete p.max_nulls_percent,p=>p.max_nulls_percent=-1,p=>p.max_nulls_percent=101,p=>p.max_nulls_percent=0.5,p=>p.fields=[],p=>p.fields.push(p.fields[0]),p=>p.fields[0].method='linear',p=>p.fields[0].method='cubic',p=>p.fields[0].value=0,p=>p.fields[1].value=42,p=>delete p.fields[1].value,p=>p.fields[0].field.kind='label',p=>p.extra=true]){
   const p=parameters();mutate(p);assert.throws(()=>validate(p,'impute',request));
  }
  for(const value of ['', 'null', '0', '—', '"quoted"']){const p=parameters();p.fields[1].value=value;assert.doesNotThrow(()=>validate(p,'impute',request));}
@@ -46,8 +46,11 @@ test('v0.4.0 modes: median, most_probable, previous and delete follow the observ
  assert.doesNotThrow(()=>validate(ok,'impute',request));assert.deepEqual(resolve(ok,stats).map(f=>f.method),['median','median','most_probable']);
  const prev=base(true,[{field:field('R'),method:'previous'}]);assert.doesNotThrow(()=>validate(prev,'impute',request));assert.equal(resolve(prev,stats)[0].method,'previous');
  const del=base(false,[{field:field('R'),method:'delete'}]);assert.doesNotThrow(()=>validate(del,'impute',request));assert.equal(resolve(del,stats)[0].method,'delete');
+ const rnd=base(false,[{field:field('I'),method:'random'},{field:field('R'),method:'random'}]);assert.doesNotThrow(()=>validate(rnd,'impute',request));assert.deepEqual(resolve(rnd,stats).map(f=>f.method),['random','random']);
+ const lin=base(true,[{field:field('R'),method:'linear'},{field:field('I'),method:'previous'}]);assert.doesNotThrow(()=>validate(lin,'impute',request));assert.deepEqual(resolve(lin,stats).map(f=>f.method),['linear','previous']);
+ for(const bad of [base(false,[{field:field('R'),method:'linear'}]),base(true,[{field:field('R'),method:'random'}]),base(true,[{field:field('R'),method:'linear'},{field:field('I'),method:'mean'}])])assert.throws(()=>resolve(bad,stats),/ordered/);
  for(const bad of [base(false,[{field:field('R'),method:'previous'}]),base(true,[{field:field('R'),method:'delete'}]),base(true,[{field:field('R'),method:'median'}]),base(true,[{field:field('R'),method:'previous'},{field:field('I'),method:'mean'}])])assert.throws(()=>resolve(bad,stats),/ordered|incompatible/);
- for(const method of ['median','most_probable','previous','delete'])assert.throws(()=>validate(base(method==='previous',[{field:field('R'),method,value:'0'}]),'impute',request));
- for(const [method,type,data_kind] of [['median','string','Дискретный'],['median','real','Дискретный'],['most_probable','real','Непрерывный'],['most_probable','integer','Дискретный'],['delete','string','Дискретный'],['delete','real','Дискретный'],['previous','string','Дискретный'],['previous','datetime','Непрерывный']])
-  assert.throws(()=>resolve(base(method==='previous',[{field:field('X'),method}]),[{name:'X',type,data_kind}]),/incompatible/);
+ for(const method of ['median','most_probable','previous','delete','random','linear'])assert.throws(()=>validate(base(method==='previous'||method==='linear',[{field:field('R'),method,value:'0'}]),'impute',request));
+ for(const [method,type,data_kind] of [['median','string','Дискретный'],['median','real','Дискретный'],['most_probable','real','Непрерывный'],['most_probable','integer','Дискретный'],['delete','string','Дискретный'],['delete','real','Дискретный'],['previous','string','Дискретный'],['previous','datetime','Непрерывный'],['random','string','Дискретный'],['random','real','Дискретный'],['linear','string','Дискретный'],['linear','integer','Дискретный']])
+  assert.throws(()=>resolve(base(method==='previous'||method==='linear',[{field:field('X'),method}]),[{name:'X',type,data_kind}]),/incompatible/);
 });

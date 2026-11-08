@@ -100,3 +100,19 @@ test('stale document identity defers to the authoritative document guard after S
  assert.equal(b.checkNodeDescription(request),null);
  assert.equal(b.checkNodeDescription({...request,document_id:'new-document'}).error.code,'NODE_TYPE_NOT_DESCRIBED');
 });
+
+test('acceptance review rules reach the model: describe after reopen, import all without mappings, replace rules without table inputs',async t=>{
+ const main=await readFile(new URL('../../../product/skills/loginom-automation/SKILL.md',import.meta.url),'utf8');
+ const reopen=main.split('\n').find(line=>line.includes('open_package')&&line.includes('dock_action_describe'));
+ assert.ok(reopen&&Buffer.byteLength(reopen)<=200,reopen);
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const [text]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
+ assert.match(text.guidance,/`all`: поля появятся лишь после Execute[^.]*не передавай `columns` и output `mappings`/);
+ assert.match(text.guidance,/для управления полями — `new`\/`none`/);
+ const [rules]=await loader.describeNodes([{type:'variables.replace',modes:NODE_TYPES['variables.replace'].modes}],['rules']);
+ assert.match(rules.guidance,/без табличных `inputs` и `mappings`/);
+ assert.match(rules.guidance,/только через `variable_inputs`/);
+ for(const file of ['imports.text','variables.replace'])
+  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/'+file+'.md')))<=6000,file);
+});

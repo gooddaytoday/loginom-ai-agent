@@ -22,6 +22,7 @@ export function validateSequentialParameters(p,mode,request,keys){
    keys=[...keys,'test_priority','test_priority_position'];
    if(p?.test_priority!==undefined)need(typeof p.test_priority==='boolean','test_priority must be Boolean');
    if(p?.test_priority_position!==undefined)need(['beginning','end'].includes(p.test_priority_position),'test priority position must be beginning or end');
+   if(p?.test_priority_position!==undefined)need(p.test_priority===true,'test_priority_position requires test_priority:true');
    if(request.target.kind==='new'&&p?.test_priority===true)need(p.test_priority_position!==undefined,'priority position required');
   }
  }

@@ -116,14 +116,16 @@ export interface GroupingParameters {
   /** Full ordered lists, or both omitted to retain an existing configuration. */
   group_by?: Array<{kind: 'input_field'; name: string}>;
   measures?: Array<{field: {kind: 'input_field'; name: string};
-    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'median' | 'mode' | 'stddev' | 'null_count' | 'unique_count'; name: string; label: string}>;
+    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'median' | 'mode' | 'stddev' | 'null_count' | 'unique_count' | 'first' | 'last' | 'only' | 'concat'; name: string; label: string;
+    concat?: {separator: string; wrapper: '' | '"' | "'"; unique: boolean; order: 'none' | 'ASC' | 'DESC'}}>;
 }
 export interface GroupingConfigurationReadback {
   kind: 'grouping'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
   mode: 'aggregate';
   group_by: Array<{name: string; label: string; type: string; order: number}>;
-  measures: Array<{name: string; label: string; type: string; order: number; functions: number}>;
+  measures: Array<{name: string; label: string; type: string; order: number; functions: number;
+    concat?: {separator: string; wrapper: string; unique: boolean; sort: boolean; direction: number}}>;
   options: {pedDimCache: {value: boolean; switch_pressed: boolean}; pedSortResult: {value: boolean; switch_pressed: boolean}};
   input_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>};
@@ -307,12 +309,12 @@ export interface MissingValuesConfigurationReadback {
 }
 
 export interface MissingValuesModesParameters {
-  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
+  fields: Array<{field:{kind:'input_field';name:string};method:'mean'|'zero'|'median'|'most_probable'|'previous'|'delete'|'random'|'linear'} | {field:{kind:'input_field';name:string};method:'constant';value:string}>;
   max_nulls_percent:number; ordered:boolean;
 }
 export interface MissingValuesModesConfigurationReadback extends Omit<MissingValuesConfigurationReadback,'ordered'|'fields'> {
   ordered:boolean;
-  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete';value?:string}>;
+  fields:Array<{name:string;label:string;type:string;data_kind:string;used:boolean;method?:'mean'|'zero'|'constant'|'median'|'most_probable'|'previous'|'delete'|'random'|'linear';value?:string}>;
 }
 
 export interface CollapseParameters {
@@ -484,7 +486,7 @@ export interface EnrichConfigurationReadback {
   receipt_ids:string[];values_are:'observed_ui_values';package_persistence_verified:false;mode:'left';
   prefixes:{enabled:boolean;name:string;label:string};
   tables:Array<{port:number;native_index:number;keys:Array<{main:string;lookup:string}>}>;
-  input_mappings:Array<{port:0|1|2;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
+  input_mappings:Array<{port:number;native_index:number;port_guid:string;source:{node:NodeRef;output:number};
     autosync:boolean;fields:JoinConfigurationReadback['input_mappings'][number]['fields']}>;
   output_mapping:GroupingConfigurationReadback['output_mapping'];
 }
