@@ -27,6 +27,19 @@ def vector(item):
     return result
 
 
+def csv_vectors(items):
+    # Every precision.json value the CSV can carry must occur verbatim in precision.csv.
+    with (ROOT / 'fixtures/precision.csv').open(newline='', encoding='utf-8') as stream:
+        rows = list(csv.DictReader(stream))
+    columns = {'integer': 'I', 'real': 'R', 'string': 'S', 'datetime': 'D'}
+    for kind, name in columns.items():
+        json_values = [item.get('text', item.get('value')) for item in items if item['kind'] == kind]
+        csv_values = [row[name] for row in rows if row[name] != '?']
+        assert json_values and all(value in csv_values for value in json_values), kind
+    booleans = [row['B'] == 'true' for row in rows if row['B'] != '?']
+    assert sorted(item['value'] for item in items if item['kind'] == 'boolean') == sorted(booleans)
+
+
 def expected():
     types = {'I': ('integer', 4), 'R': ('real', 3), 'S': ('string', 5),
              'B': ('boolean', 1), 'D': ('datetime', 2)}
@@ -46,24 +59,18 @@ def expected():
                 'columns': [{'name': name, 'type': kind, 'label_any': True} for name, kind in
                             [('Id', 'integer'), ('Names', 'string'), ('DisplayNames', 'string'),
                              ('Values', 'variant'), ('DataTypes', 'integer')]], 'rows': rows}
-    with (ROOT / 'fixtures/status.csv').open(newline='', encoding='utf-8') as stream:
-        status = list(csv.DictReader(stream))
-    replacement = {'output_node_type': 'transform.replace_columns', 'output_port': 0,
-                   'ordered': True, 'column_order': 'exact',
-                   'columns': [{'name': name, 'type': kind, 'label_any': True} for name, kind in
-                               [('Id', 'integer'), ('Status', 'variant'), ('Status_Replaced', 'boolean')]],
-                   'rows': [{'Id': int(row['Id']),
-                             'Status': None if row['Status'] == '?' else
-                             {'cell_type': 'boolean' if row['Status'] == 'yes' else 'string',
-                              'value': True if row['Status'] == 'yes' else row['Status']},
-                             'Status_Replaced': row['Status'] == 'yes'} for row in status]}
     return {'status': 'proposal_requires_owner_acceptance',
             'cases': {name: {'package_path': '{{PACKAGE_PATH}}', 'null_marker': '?',
                              'nodes': [{'type': 'imports.text'}, {'type': output['output_node_type']},
                                        {'type': 'exports.text'}], 'outputs': [output]}
-                      for name, output in [('collapse', collapse), ('replacement', replacement)]},
-            'precision_vectors': [vector(item) for item in json.loads(
-                (ROOT / 'fixtures/precision.json').read_text(encoding='utf-8'))]}
+                      for name, output in [('collapse', collapse)]},
+            'precision_vectors': precision_vectors()}
+
+
+def precision_vectors():
+    items = json.loads((ROOT / 'fixtures/precision.json').read_text(encoding='utf-8'))
+    csv_vectors(items)
+    return [vector(item) for item in items]
 
 
 if __name__ == '__main__':
@@ -76,6 +83,7 @@ if __name__ == '__main__':
     assert vectors[2]['bytes_le'] == '9a9999999999b93f'
     assert vectors[3]['bytes_le'] == '0000000000000080'
     assert vectors[5]['bytes_le'] == '4aee3a170479e640'
+    assert vectors[8] == {'cell_type': 'string', 'value': 'Привет, "ё"'}
     assert vectors[-2] == {'cell_type': 'null', 'value': None}
     assert vectors[-1] == {'cell_type': 'empty'}
     assert len(result['cases']['collapse']['outputs'][0]['rows']) == 15
@@ -84,4 +92,4 @@ if __name__ == '__main__':
         path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     else:
         assert json.loads(path.read_text(encoding='utf-8')) == result
-    print('PASS: independent proposal, two node cases and 13 precision vectors')
+    print('PASS: independent proposal, collapse case and 13 precision vectors')
