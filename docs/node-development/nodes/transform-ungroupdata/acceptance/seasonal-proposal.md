@@ -19,7 +19,9 @@
 | ungroup-seasonal-empty-support | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | 0 / 0 |
 | ungroup-seasonal-empty-totals | task-seasonal-empty-totals.md | expected-seasonal-empty-totals.json | 0 / 0 |
 
-Во всех сценариях два CSV: totals и support из `oracle-seasonal.py:CASES`;
+Во всех сценариях два входных CSV: totals и support из `oracle-seasonal.py:CASES`;
+выгрузки названы в task: `seasonal-details.csv` — порт 0, `seasonal-quality.csv` — порт 1
+(порядок `outputs` в expected), даты экспорта — `yyyy-mm-dd hh:nn:ss`, NULL входа — `?`;
 пустые файлы импортируются с явно заданной схемой, без определения типов
 по отсутствующим строкам. Два экспорта, новый чат/профиль/пакет, стандартные
 CSV/Save/cold/cleanup, 2/3 и независимые 2/3 на одном SHA. При пустых входах

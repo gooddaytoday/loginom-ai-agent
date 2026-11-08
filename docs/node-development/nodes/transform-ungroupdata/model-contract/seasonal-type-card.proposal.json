@@ -11,7 +11,7 @@
     "shares",
     "seasonal"
   ],
-  "semantics": "PROPOSAL, not implemented: retain shares. Seasonal uses two inputs, Group links and one datetime order field on each input, integer Total/Weight and string Item. Select native seasonal method, year x1, 12 indices, rare_density .25, absent_periods 1, novelty_periods 1, max_history_periods 0. Execute recomputes current inputs. Output 0 adds Period, confidence bounds, trend, seasonal factor, value code and text; numeric detail/trend/bounds remain integer for this fixture. Output 1: Item,Group,UngroupQuality,SeasonalIndex1..12 (real metrics). Constant support 1:3 gives 25/75 and unit indices, quality NULL. All-zero support produces zero/excluded code6 and quality1; NULL-only/empty support or empty totals gives empty both ports. Proposed acceptance explicitly projects out confidence bounds; their formula and nonconstant estimator lack an independent oracle. Calendar alternatives/none exist in UI but are outside this initial proposal. Preserve port identity and exact types; no JavaScript substitute. No seasonal support before owner approval and stage1.",
+  "semantics": "PROPOSAL, not implemented; shares semantics unchanged. Mode seasonal: Group links only; seasonality.total_order_field/support_order_field name the datetime order field of each input, never a key. Integer Total/Weight, string Item. Execute recomputes current inputs. Output 0 adds Period, ConfidenceBandUpper/Lower, OutputTrend, OutputSI, OutputVT, OutputVTDesc with native types; output 1 is Item, Group, UngroupQuality, SeasonalIndex1..N (real). Nonconstant estimator and band formula lack an independent oracle. No JavaScript substitute.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "ungroup-seasonal-proposal",
@@ -25,7 +25,7 @@
   ],
   "parameter_schema": {
     "type": "object",
-    "description": "Proposed shares/seasonal settings. Seasonal proposal requires complete ungroup plus seasonality; existing {} preserves supported saved settings.",
+    "description": "shares/seasonal (proposal). New node: complete ungroup, plus seasonality for seasonal; existing {} keeps supported saved settings.",
     "properties": {
       "ungroup": {
         "type": "object",
@@ -126,65 +126,63 @@
       },
       "seasonality": {
         "type": "object",
-        "description": "Proposal: annual/monthly constant history only. All settings explicit; alternate periods/none and point-depth settings require separate acceptance.",
+        "description": "Proposal: annual history only; every value explicit.",
         "properties": {
           "total_order_field": {
             "type": "string",
-            "description": "Datetime order field on input 0; Period.",
+            "description": "Datetime order field, input 0.",
             "minLength": 1,
             "maxLength": 128
           },
           "support_order_field": {
             "type": "string",
-            "description": "Datetime order field on input 1; Period.",
+            "description": "Datetime order field, input 1.",
             "minLength": 1,
             "maxLength": 128
           },
           "period": {
             "type": "string",
-            "description": "Native annual seasonal period.",
             "enum": [
               "year"
             ]
           },
           "multiplier": {
             "type": "integer",
-            "description": "Native period multiplier.",
             "enum": [
               1
             ]
           },
           "index_count": {
             "type": "integer",
-            "description": "Number of SeasonalIndex columns; UI minimum 3, proposed 12.",
+            "description": "SeasonalIndex column count; UI minimum 3.",
             "enum": [
               12
             ]
           },
           "rare_density": {
             "type": "number",
-            "description": "Native rare-position density.",
+            "description": "Rare-position density.",
             "enum": [
               0.25
             ]
           },
           "absent_periods": {
             "type": "number",
-            "description": "Periods absent before exclusion.",
+            "description": "Absence periods before exclusion.",
             "enum": [
               1
             ]
           },
           "novelty_periods": {
             "type": "number",
-            "description": "Periods present for a new position.",
+            "description": "Presence periods of a new position.",
             "enum": [
               1
             ]
           },
           "max_history_periods": {
             "type": "number",
-            "description": "History periods; 0 uses all history.",
+            "description": "0 = all history.",
             "enum": [
               0
             ]

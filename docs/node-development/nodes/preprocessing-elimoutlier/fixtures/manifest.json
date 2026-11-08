@@ -25,7 +25,7 @@
       "data_kind": "discrete"
     }
   ],
-  "oracle_dependencies": "Python 3 stdlib csv, fractions, json; no third-party or Loginom imports",
+  "oracle_dependencies": "Python 3 stdlib csv, fractions, json, math, collections; no third-party or Loginom imports",
   "files": [
     {
       "path": "constant.csv",
@@ -220,6 +220,34 @@
           "data_kind": "discrete"
         }
       ]
+    },
+    {
+      "path": "policies.csv",
+      "bytes": 75,
+      "sha256": "656b372d9b78f1033e73783b17e7acacb053e7fb79baf79ac88c93386106ff8d",
+      "rows": 8,
+      "purpose": "edit policies SD 1/2: only RowID 7 extreme, port 1 empty; NULL row 8 (LAB-1018/LAB-1103)"
+    },
+    {
+      "path": "policies-apply.csv",
+      "bytes": 74,
+      "sha256": "537b2d29203dde9a3b46d7676a3ae39a991ce4d2d6fc2cd3703131bd161013c5",
+      "rows": 4,
+      "purpose": "proposed frozen-fit apply contrast after policies.csv; not native expected, excluded from stage 1"
+    },
+    {
+      "path": "quartile-boundaries.csv",
+      "bytes": 224,
+      "sha256": "decb13fa5824cbc57660ba7821349488cc0d290c232c1d79b1ac707ec60713c1",
+      "rows": 16,
+      "purpose": "IQR 1.5/3, upper-rank Q1=3/Q3=7: strict fences -3/13 (equal values not anomalous), extremes -9/19; outliers 1,15, extreme 16"
+    },
+    {
+      "path": "replacement-discriminator.csv",
+      "bytes": 81,
+      "sha256": "7a32b596b1ae96d4c8e09fd93d1e0c925339a8757cc601df2e1d1a3048ab594a",
+      "rows": 9,
+      "purpose": "edit SD 1/2 replacement sample: normal [0,2,2,2,3,4,6], extreme RowID 8, NULL row 9; mean 19/7, median 3, mode 15/2, limit 19/7+sqrt(150/49)"
     }
   ]
 }

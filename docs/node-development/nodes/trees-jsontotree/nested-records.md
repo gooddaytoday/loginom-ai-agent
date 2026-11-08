@@ -118,7 +118,7 @@ emptyObject = пустой тип, false, true; nullOnly = «Переменны�
 ## Причина отказа кода и объём реализации
 
 `client/lib/tree-parameters.mjs:59` — явный отказ nested containers внутри
-repeated record; `:57` также ограничивает число массивов одним и отвергает
+repeated record; `:55` также ограничивает число массивов одним и отвергает
 пустой массив; `:60` отвергает mixed Variant. `validateSelectedTreePaths`
 в том же файле требует один массив и scalar types. JSON-handler повторно
 вызывает этот validator на output (`tree-node.mjs:127`). Нельзя просто снять

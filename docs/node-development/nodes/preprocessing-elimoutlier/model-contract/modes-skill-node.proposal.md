@@ -1,9 +1,9 @@
 # Редактирование выбросов — предложение LAB-1103
 
 Это проект этапа 1; текущая поставка поддерживает только detect.
-Используй штатный узел `preprocessing.elim_outlier`, один табличный вход.
+Используй `dock_node_apply` со штатным `preprocessing.elim_outlier`, один табличный вход.
 Обрабатывай только выбранные непрерывные integer/real поля; остальные сохраняй.
-NULL не участвует в статистике. Читай все три порта одного выполнения:
+NULL не участвует в статистике. `finish:execute`, `read.ports:[0,1,2]`:
 0 — результат обработки, 1 — исходные выбросы без экстремумов,
 2 — исходные экстремальные строки. Боковые выходы сохраняют исходные значения.
 Затем CSV каждого выхода, Save, повторное открытие и cleanup.
@@ -18,7 +18,10 @@ Q1−k*(Q3−Q1), Q3+k*(Q3−Q1); квантили не интерполирую
 <!-- /mode -->
 
 <!-- mode: edit -->
-`mode:edit` дополнительно задаёт независимые `outlier_policy` и
+`mode:edit`, `parameters.outlier`: `fields`, `method:sd|iqr`, явные
+`outlier_factor`, `extreme_factor` и `ordered` для нового узла.
+Перед Execute обучи на текущем входе.
+Дополнительно задай независимые `outlier_policy` и
 `extreme_policy`: keep, delete, mean, median, most_probable, constant, limit.
 При constant нужны отдельные `outlier_constant`/`extreme_constant`.
 Для новых узлов укажи обе политики явно; patch сохраняет пропущенное.
