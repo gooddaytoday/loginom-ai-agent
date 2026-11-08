@@ -1,4 +1,4 @@
-import {enrichOutputFields} from './enrich-parameters.mjs';
+import {enrichOutputFields,MAX_ENRICH_LOOKUPS} from './enrich-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error('Enrich readback: '+m);};
 const pick=(v,keys)=>Object.fromEntries(keys.map(k=>[k,v[k]]));
 const schema=fs=>fs.map(f=>pick(f,['name','label','type'])).sort((a,b)=>a.name.localeCompare(b.name));
@@ -8,7 +8,7 @@ export function enrichConfigurationReadback({node,phases,operation_id}){
  const input=receipt('input_mapping'),configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
  const c=configured.value.configuration,m=mapped.value.native_mapping;
  need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&Array.isArray(c.mappings)&&c.mappings.length===c.input_fields?.length-1,'configuration owner');
- need(typeof c.prefixes?.enabled==='boolean'&&typeof c.prefixes.name==='string'&&typeof c.prefixes.label==='string'&&Array.isArray(c.input_fields)&&c.input_fields.length>=2&&c.input_fields.length<=3,'explicit options and input schemas');
+ need(typeof c.prefixes?.enabled==='boolean'&&typeof c.prefixes.name==='string'&&typeof c.prefixes.label==='string'&&Array.isArray(c.input_fields)&&c.input_fields.length>=2&&c.input_fields.length<=MAX_ENRICH_LOOKUPS+1,'explicit options and input schemas');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context),'validation');
  need(saved.value.settings_applied===true&&saved.value.mode==='done'&&owner(saved.value.node_context)
   &&finished.value.settings_applied===true&&['done','execute'].includes(finished.value.mode)&&owner(finished.value.node_context),'finish');

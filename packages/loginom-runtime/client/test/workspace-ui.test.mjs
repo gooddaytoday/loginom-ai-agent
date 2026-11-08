@@ -1487,12 +1487,13 @@ test('Calculator document read distinguishes empty, multiline and offscreen text
   assert.equal(record.calculator_editor.document.full_text_verified,false);
 });
 
-test('Calculator replacement requires selected field, expression mode and writable owned document',async()=>{
+test('Calculator replacement requires selected field, a known language and writable owned document',async()=>{
   const page=new Page(),c=calculatorDocument(page);
   const read=async()=>(await page.observe()).ui.elements.find(e=>e.tid===c.base+'cmpExpression');
   c.row.attrs.class='';assert.deepEqual((await read()).allowed_actions,[]);
   c.row.attrs.class='x-grid-item-selected';c.state.readOnly=true;assert.deepEqual((await read()).allowed_actions,[]);
-  c.state.readOnly=false;c.icon.attrs.class='bg-TBGCalcMode-cmJavaScript';assert.deepEqual((await read()).allowed_actions,[]);
+  c.state.readOnly=false;c.icon.attrs.class='bg-TBGCalcMode-cmJavaScript';assert.deepEqual((await read()).allowed_actions,['replace_expression']);
+  c.icon.attrs.class='';assert.deepEqual((await read()).allowed_actions,[]);
   c.icon.attrs.class='bg-TBGCalcMode-cmExpression';c.wrapper.CodeMirror.getWrapperElement=()=>c.editor;
   assert.deepEqual((await read()).allowed_actions,[]);
   assert.throws(()=>validateUiAction({verb:'replace_expression',ref:'ui-1',text:'a\rb'}),/LF/);
@@ -1627,6 +1628,22 @@ test('import settings preserve blank and whitespace values and exclude hidden or
   assert.equal((await page.observe()).wizard.settings.fields.delimiter.status,'unobserved');
 });
 
+test('import wizard exposes detection mode and analysis rows only when natively observed',async()=>{
+  const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base),p=base+';ImportTextFileParamsWizard;';
+  page.add('div',p+'edtValueNull','',undefined,form);
+  const nullOwner=page.add('div',p+'edtValueNull;ValueControl','',undefined,form);page.add('input',null,'',undefined,nullOwner).value='NULL';
+  let fields=(await page.observe()).wizard.settings.fields;
+  assert.equal(Object.hasOwn(fields,'auto_detect_columns'),false);assert.equal(Object.hasOwn(fields,'analysis_rows'),false);
+  const mode=page.add('div',p+'cbbAutoDetectColumnsMode;ValueControl','',undefined,form),modeInput=page.add('input',null,'',undefined,mode);modeInput.value='Только новые';modeInput.readOnly=true;
+  const rows=page.add('div',p+'ColumnDefsTuning;seReadRowCount','',undefined,form),rowsInput=page.add('input',null,'',undefined,rows);rowsInput.value='25';
+  const snapshot=await page.observe();fields=snapshot.wizard.settings.fields;
+  assert.equal(fields.auto_detect_columns.value,'Только новые');assert.equal(fields.auto_detect_columns.status,'observed');
+  assert.equal(fields.analysis_rows.value,'25');assert.equal(fields.analysis_rows.enabled,true);
+  assert.ok(snapshot.ui.elements.some(e=>e.wizard_field?.name==='analysis_rows'&&e.allowed_actions.includes('set_wizard_field')));
+  assert.ok(!snapshot.ui.elements.some(e=>e.wizard_field?.name==='auto_detect_columns'));
+  rowsInput.value='many';fields=(await page.observe()).wizard.settings.fields;assert.equal(Object.hasOwn(fields,'analysis_rows'),false);
+});
+
 function importFormatField(page) {
   page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   page.context.innerWidth=1000;page.context.innerHeight=800;
@@ -1694,14 +1711,14 @@ function wizardStepFixture(page,direction='next') {
 }
 
 test('replacement type portal exposes only items owned by the selected field and split button',async()=>{
- for(const foreign of [false,true]){
+ for(const foreign of [false,true])for(const type of ['Int','Boolean']){
   const page=new Page(),c=wizardStepFixture(page),base=c.base+';ReplaceColumnsWizard;';
   page.context.innerWidth=1000;page.context.innerHeight=800;
   c.marker.attrs['data-tid']=base+'grdDataList;tbl';
   const grid=page.add('div',base+'grdDataList','',undefined,c.form);grid.id='replace-input';
   const button=page.add('a',base+'btnTypeChange','Изменить тип замены',undefined,c.form);button.id='replace-type';
   const menu=page.add('div',base+'btnTypeChange;mn','',{x:200,y:150,width:200,height:160});menu.id='replace-menu';
-  const item=page.add('div',base+'itmTypeChangeInt','Целый',{x:220,y:180,width:160,height:24},menu);item.id='replace-integer';item.attrs.role='menuitemcheckbox';
+  const item=page.add('div',base+'itmTypeChange'+type,'Целый',{x:220,y:180,width:160,height:24},menu);item.id='replace-integer';item.attrs.role='menuitemcheckbox';
   const selected={isModel:true,internalId:'field',data:{Name:'Code',ReplaceMode:1}},nativeMenu={el:{dom:foreign?{}:menu}};
   const components={
    'replace-input':{el:{dom:grid},getSelectionModel:()=>({getSelection:()=>[selected]}),getStore:()=>({getData:()=>({items:[selected]})})},
@@ -1712,7 +1729,7 @@ test('replacement type portal exposes only items owned by the selected field and
   const roots=(await page.execute({mode:'observe',discover_roots:true})).output;
   const root=roots.ui.elements.find(e=>e.tid===base+'btnTypeChange;mn');assert.ok(root);
   const observed=(await page.execute({mode:'observe',root_ref:root.ref})).output;
-  const control=observed.ui.elements.find(e=>e.tid===base+'itmTypeChangeInt');
+  const control=observed.ui.elements.find(e=>e.tid===base+'itmTypeChange'+type);
   if(foreign)assert.equal(control?.replacement_field,undefined);
   else{assert.equal(control?.replacement_field?.field_key,'Code');assert.ok(control.allowed_actions.includes('click'),JSON.stringify(control));}
  }
@@ -6275,6 +6292,27 @@ test('output mapping coverage also binds each native derived socket family',asyn
   }
 });
 
+test('PCA second mapping exposes output definitions only within its own wizard inventory',async()=>{
+ for(const fault of [null,'missing','foreign','duplicate','third']){
+  const page=new Page(),c=mappingCoverageFixture(page),family='DerivedDataSourceMappingEngineOutputPortWizard-1';
+  page.add('div','MF;TF-1;WizrdMCF;'+family,'',undefined,c.form);
+  for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
+  if(fault!=='missing')page.add('div','MF;TF-1;WizrdMCF;FactorAnalysisWizard','',undefined,fault==='foreign'?undefined:c.form).style.display='none';
+  if(fault==='duplicate')page.add('div','MF;TF-1;WizrdMCF;FactorAnalysisWizard','',undefined,c.form).style.display='none';
+  page.add('div','MF;TF-1;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard','',undefined,c.form).style.display='none';
+  if(fault==='third')page.add('div','MF;TF-1;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard-2','',undefined,c.form).style.display='none';
+  const s=await page.observe();
+  assert.equal(s.wizard.stage,'binning_ranges_mapping',String(fault));
+  if(fault)assert.equal(s.wizard.output_columns,undefined);
+  else{
+   assert.equal(s.wizard.output_columns.definition_coverage.status,'complete_configured_rows');
+   assert.ok(s.ui.elements.find(e=>e.ref===s.wizard.output_columns.fields[0].name_ref).allowed_actions.includes('press'));
+   const narrow=await page.execute({mode:'observe',root_ref:s.wizard.root_ref});
+   assert.deepEqual(narrow.output.wizard.output_columns,s.wizard.output_columns);
+  }
+ }
+});
+
 function outputPortFinishFixture(mode='valid') {
   const page=new Page(),c=mappingCoverageFixture(page),panel=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let path='';
   const crumbs=[];
@@ -8143,4 +8181,26 @@ test('filter variable picker binds cached metadata without reading the RPC varia
  assert.equal(observedOption?.filter_cell?.part,'variable_option');assert.equal(observedOption.filter_cell.variable_name,'limit');
  assert.ok(observedOption.allowed_actions.includes('click'));
  assert.ok(observed.ui.elements.find(e=>e.tid===switchButton.attrs['data-tid']).allowed_actions.includes('click'));
+});
+
+test('Excel input0 overflow retains typed Close only for its native input1 owner',async()=>{
+ for(const mode of ['valid','wrong_icon','wrong_index','foreign_node','missing_opening']){
+  const {page,binding,crumbs,opening,preparation}=await exportInputPortOverflowFixture();
+  opening.node.FIconCls='bg-vendor-icon-exportexcelfile';
+  crumbs[5].children[0].attrs.class=mode==='wrong_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exportexcelfile';
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_index')opening.nativeIndex=0;
+  if(mode==='foreign_node')opening.node.FGuid='foreign';
+  if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const r=await page.execute({mode:'observe',prepared_node_context:binding});
+  const yes=r.output?.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,mode==='valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
 });

@@ -71,3 +71,18 @@ test('partial replacement validates saved rules with the effective output mode',
  for(const mode of ['replace','add'])assert.deepEqual(resolve({output_mode:mode},fields,[rule('B'),rule('C')],'replace').rules.map(r=>r.field.name),['B','C']);
  assert.doesNotThrow(()=>resolve({rules:[rule('A')]},fields,[rule('B')],'replace'));
 });
+
+test('Boolean result constants preserve false and NULL and refuse Variant or boolean remaining editor',()=>{
+ const p=params(),r=p.rules[0];r.result_type='boolean';r.other={mode:'null'};
+ r.pairs=[{from:value('yes'),to:value(true,'boolean')},{from:value('no'),to:value(false,'boolean')},{from:value(null),to:value(null,'boolean')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'exact',request));
+ for(const v of ['false',0,1])assert.throws(()=>validateReplacementValue(value(v,'boolean'),'boolean'),/Boolean/);
+ r.other={mode:'keep'};assert.throws(()=>validateReplacementParameters(p,'exact',request),/Variant/);
+ r.other={mode:'value',value:value(false,'boolean')};assert.throws(()=>validateReplacementParameters(p,'exact',request),/Boolean.*null/);
+});
+test('mixed mode validates exact keys independently of ordered regex pairs',()=>{
+ const p=params(),r=p.rules[0];r.pairs=[{from:value('AB-12'),to:value('EXACT-FIRST')}];r.regex_pairs=[{from:value('AB-([0-9]{2})'),to:value('REGEX')}];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'mixed',request));
+ assert.throws(()=>validateReplacementParameters(p,'exact',request),/mixed/);
+ for(const change of [r=>r.regex_pairs[0].from.value='a*',r=>r.regex_pairs[0].to.value=null,r=>r.result_type='integer',r=>r.case_sensitive=undefined]){const bad=structuredClone(p);change(bad.rules[0]);assert.throws(()=>validateReplacementParameters(bad,'mixed',request));}
+});

@@ -11,8 +11,17 @@ test('fixed clustering admits numeric feature roles and preserves omitted existi
 test('unsupported training modes and malformed requests refuse before UI work',()=>{
  for(const patch of [{clusters:1},{clusters:2.5},{seed:-1},{seed:2147483648},{normalization:'minmax'},{auto:true},{features:[]},{features:[p.features[0],p.features[0]]}])
   assert.throws(()=>validateClusteringParameters({...p,...patch},'k_means',request),/Clustering:/);
- assert.throws(()=>validateClusteringParameters(p,'g_means',request),/fixed k_means/);
+ assert.throws(()=>validateClusteringParameters(p,'unknown',request),/supported/);
  assert.throws(()=>validateClusteringParameters(p,'k_means',{...request,mappings:[{direction:'output',port:0}]}),/mapping overrides/);
+});
+
+test('g-means requires automatic bounds, rejects fixed k and validates partial existing edits',()=>{
+ const automatic={features:p.features,min_clusters:2,max_clusters:4,threshold:1,seed:42};
+ validateClusteringParameters(automatic,'g_means',request);
+ validateClusteringParameters({threshold:0.5},'g_means',{...request,target:{kind:'existing'},inputs:[]});
+ for(const patch of [{min_clusters:0},{max_clusters:1001},{min_clusters:5},{threshold:0},{threshold:Infinity},{clusters:3},{max_clusters:undefined}])
+  assert.throws(()=>validateClusteringParameters({...automatic,...patch},'g_means',request),/Clustering:/);
+ assert.throws(()=>validateClusteringParameters({...p,min_clusters:2},'k_means',request),/Clustering:/);
 });
 test('standardization is admitted through the production validator',()=>{
  validateClusteringParameters({...p,normalization:'standardize'},'k_means',request);

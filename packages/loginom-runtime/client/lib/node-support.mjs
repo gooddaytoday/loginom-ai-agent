@@ -40,7 +40,7 @@ import {createTextExportNodeSupport} from './text-export-node.mjs';
 import {createUngroupNodeSupport} from './ungroup-node.mjs';
 import {createJoinNodeSupport} from './join-node.mjs';
 import {createFilterNodeSupport} from './filter-node.mjs';
-import {createTextImportNodeSupport,verifyDeferredTextImportSources} from './text-import-node.mjs';
+import {createTextImportNodeSupport,verifyDeferredTextImportSources,readDeferredImportCounts} from './text-import-node.mjs';
 import {createSortingNodeSupport} from './sorting-node.mjs';
 import {createGroupingNodeSupport} from './grouping-node.mjs';
 import {createReformNodeSupport} from './reform-node.mjs';
@@ -174,6 +174,8 @@ export function createCandidateNodeSupport(config) {
   },readOutput:async(...args)=>{
    let value=await drivers.readOutput(...args);
    const [read,ctx]=args;
+   const fullImportVerification=await readDeferredImportCounts(options,ctx,config);
+   if(fullImportVerification.length)value={...value,full_import_verification:fullImportVerification};
    if(type!=='variables.user'&&read.variable_ports?.length){
     options.operation.deadline=ctx.deadline;
     const execution=options.operation.nodeApply?.phases.findLast(p=>p.phase==='execute')?.value;

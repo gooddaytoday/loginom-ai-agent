@@ -121,6 +121,13 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name='composite/expected.json' if composite else 'expected.json',
                     input_files=['composite-main.csv', 'composite-ref.csv'] if composite else
                     ['main.csv', 'ref-b.csv', 'ref-c.csv', 'ref-b-duplicates.csv'])
+    if name in ['enrich-three-lookups', 'enrich-four-lookups']:
+        node = REPO / 'docs/node-development/nodes/transform-enrichdata'
+        four = name == 'enrich-four-lookups'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-four-lookups.md' if four else 'task-three-lookups.md'),
+                    data=node / 'fixtures/extended', base=None,
+                    expected_name='extended/expected-four.json' if four else 'extended/expected.json',
+                    input_files=['main.csv', 'ref-a.csv', 'ref-b.csv', 'ref-c.csv'] + (['ref-d.csv'] if four else []))
     if name == 'variables-rows':
         src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
         return dict(source=src, prompt=src / 'task-rows.md', data=src / 'data', base=None,
@@ -170,11 +177,21 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] + (['typed-update.csv'] if export_case == 'overwrite' else []) if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
                     expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=None if edges or name == 'lgd-export-compression' else export_case, lgd_empty_variant=edges, export_count=2 if edges else 1, lgd_export_compression=name == 'lgd-export-compression',
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
+    if name == 'clustering-gmeans':
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
+        return dict(source=src, prompt=src / 'task-g-means.md', data=src.parent.parent / 'fixtures/v040', base=None,
+                    input_files=['probe.csv'], export_count=2, expected_name='expected-g-means-run.json')
     if name in ['clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute']:
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/scaling'
         kind = name.removeprefix('clustering-scale-')
         return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
                     input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
+    if name in ['factor-auto', 'factor-cap']:
+        src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'modes' / ('task-auto.md' if name == 'factor-auto' else 'task-cap.md'),
+                    data=src / 'data', base=None, input_files=['matrix.csv'], export_count=2,
+                    factor_mode='variance' if name == 'factor-auto' else 'cap',
+                    oracle=src / 'modes/oracle.py')
     if name in ['factor-pca', 'factor-retrain']:
         src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
         update = name == 'factor-retrain'
@@ -214,10 +231,16 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
-    if name == 'grouping-median':
+    if name in ['text-auto-types', 'text-auto-update']:
+        node = REPO / 'docs/node-development/nodes/text-import'
+        update = name == 'text-auto-update'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
+                    data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
+                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
+    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count']:
         root = REPO / 'docs/node-development/nodes/grouping'
-        return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance/modes/task-median.md',
-                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode='median')
+        return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -231,6 +254,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance' / name
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=[filename], external=True)
+    if name in ['missing-median-mode', 'missing-previous', 'missing-delete']:
+        # v0.4.0 cycle 1: only the task and its CSV go to the model; expected tables are static oracle output.
+        root = REPO / 'docs/node-development/nodes/missing-values'
+        task, csv_name, expected = {'missing-median-mode': ('task-median-mode.md', 'statistics.csv', 'expected.json'),
+                                    'missing-previous': ('task-previous.md', 'ordered.csv', 'expected-previous.json'),
+                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json')}[name]
+        return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance' / task, data=root / 'fixtures',
+                    input_files=[csv_name], base=None, expected_name=expected)
     if name in ['missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean']:
         src = REPO / 'docs/node-development/nodes/missing-values/acceptance/zero'
         kind = {'missing-zero': 'core', 'missing-zero-threshold': 'threshold',
@@ -251,6 +282,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/text-export/acceptance/cp1251'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     export_count=2, csv_header='labels', text_export_encodings=['cp1251', 'utf-8'])
+    if name in ['excel-export-xls', 'excel-export-numeric', 'excel-export-replace']:
+        src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
+        mode = name.removeprefix('excel-export-')
+        return dict(source=src, prompt=src / {'xls':'task-xls.md', 'numeric':'task-numeric-cells.md', 'replace':'task-replace-workbook.md'}[mode],
+                    data=src.parent / 'fixtures', input_files=['modes.csv'], base=None,
+                    excel_mode=mode if mode!='xls' else None, excel_xls_refusal=mode=='xls')
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
@@ -307,6 +344,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
                     input_files=inputs, export_count=count)
+    if name == 'corr-ranks':
+        src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-ranks.md', data=src / 'fixtures', base=None,
+                    input_files=['ranks.csv'], corr_ranks=True)
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -357,6 +398,12 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name=('matrix/' + kind + '.json') if matrix else 'expected-repeat.json' if variant == 'repeat' else 'expected.json',
                     export_count=len(indices) if indices is not None else 12 if matrix else 1,
                     colunion_output_indices=indices)
+    if name in ['union-two-stage', 'union-auto-label']:
+        src = REPO / 'docs/node-development/nodes/union/acceptance'
+        variant = name.removeprefix('union-')
+        return dict(source=src / 'v040' / variant, prompt=src / ('task-' + variant + '.md'),
+                    data=src.parent / 'fixtures/v040', input_files=['main.csv', 'second.csv'],
+                    oracle=src / 'oracle-v040.py', expected_name='expected.json', base=None)
     if name == 'union-auto-match':
         src = REPO / 'docs/node-development/nodes/union/acceptance/union-auto-match'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -396,6 +443,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
                     expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
                     input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
+    if name == 'logreg-ridge':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/ridge'
+        return dict(source=src, prompt=src / 'task-ridge.md', data=src / 'data', base=None,
+                    input_files=['train.csv'], expected_name='expected.json',
+                    oracle=src.parent / 'oracle.py')
+
     if name == 'logreg-normalization':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/normalization'
         return dict(source=src, prompt=src / 'task-normalization.md', data=src / 'data', base=None,
@@ -420,6 +473,13 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'variables-replace-match':
+        src = REPO / 'docs/node-development/nodes/variables-replace/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'task-match-modes.md', data=src.parent / 'fixtures', base=None,
+                    expected_name='expected-reopened-run.json', cold_expected_name='expected-reopened-run.json',
+                    input_files=['modes-source.json'], variable_only=True,
+                    variable_audit='variables-replace-match', variable_initial='expected-run.json', variable_read_path='execution',
+                    oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
     if name == 'variables-replace-exact':
         src = REPO / 'docs/node-development/nodes/variables-replace/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
@@ -463,6 +523,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/calculator/acceptance'
         return dict(source=src / 'modes', prompt=src / 'task-expression-options.md', data=src.parent / 'fixtures',
                     input_files=['modes.csv'], base=None, expected_name='expected-expression-options.json')
+    if name == 'calculator-javascript':
+        src = REPO / 'docs/node-development/nodes/calculator/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'task-javascript.md', data=src.parent / 'fixtures',
+                    input_files=['modes.csv'], base=None, expected_name='expected.json')
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -479,6 +543,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'replace-nearest':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['replace-boolean', 'replace-mixed']:
+        node = REPO / 'docs/node-development/nodes/replacement'
+        return dict(source=node / 'acceptance/extended',
+                    prompt=node / 'acceptance' / ('task-boolean.md' if name == 'replace-boolean' else 'task-mixed.md'),
+                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None,
+                    expected_name='expected.json' if name == 'replace-boolean' else 'expected-mixed.json')
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -488,6 +558,11 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name in ['collapse-variant', 'collapse-mixed']:
+        src = REPO / 'docs/node-development/nodes/collapse-columns/acceptance/v040'
+        variant = name == 'collapse-variant'
+        return dict(source=src, prompt=src / ('task-variant.md' if variant else 'task-mixed.md'), data=src / 'fixtures',
+                    base=None, input_files=['mixed.csv'], expected_name='expected-variant.json' if variant else 'expected.json')
     if name == 'date-time-minsec':
         src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -503,6 +578,14 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'n21':
         src = REPO / 'docs/node-development/nodes/transform-slidingwindow/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['sampling-uniform', 'partition-uniform', 'partition-test-priority']:
+        slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
+        root = REPO / 'docs/node-development/nodes' / slug
+        src = root / 'acceptance/v040'
+        return dict(source=src, prompt=src / ('task-test-priority.md' if name.endswith('test-priority') else 'task-uniform.md'),
+                    data=root / 'fixtures/v040', input_files=['rows.csv'], base=None, sampling_uniform=True,
+                    sampling_priority=name.endswith('test-priority'),
+                    export_count=6 if name.endswith('test-priority') else 2 if name.startswith('sampling') else 3)
     if name in ['sampling-random', 'sampling-stratified', 'sampling-biased', 'partition-random', 'partition-stratified', 'partition-biased']:
         slug = 'preprocessing-sampling' if name.startswith('sampling') else 'preprocessing-datapartition'
         mode = name.rsplit('-', 1)[1]
@@ -569,9 +652,33 @@ def expected_for(case, package, cold=False):
     src = case['source']
     if cold and case.get('cold_expected_name'):
         return expected_for({**case, 'expected_name': case['cold_expected_name'], 'cold_expected_name': None}, package)
+    if case.get('factor_mode'):
+        expected = read(src / 'expected.json')['cases'][case['factor_mode']]
+        return dict(expected, package_path=package)
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
                     outputs=[sorting_stages(case)[-1]])
+    if case.get('sampling_uniform'):
+        proposal = read(src / 'expected.json')
+        partition = proposal['node_type'] == 'preprocessing.data_partition'
+        proposal['source'] = dict(rows=proposal['source'], row_count=len(proposal['source']))
+        proposal['requested_sizes'] = dict(train=proposal['train_count'], test=proposal['test_count']) if partition else dict(sample=proposal['count'])
+        proposal['group_size_rows'] = list(proposal['group_size_rows'].values()) if partition else [proposal['group_size_rows']]
+        if case.get('sampling_priority'):
+            proposal.update(test_priority=True, test_priority_position='both')
+        return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
+            'expected', '/dev/stdin', 'uniform', package], input=json.dumps(proposal).encode()))
+    if case.get('excel_xls_refusal'):
+        return dict(package_path=package,nodes=[dict(type='imports.text',label_any=True)],outputs=[],refusal=dict(text='XLS'))
+    if case.get('excel_mode'):
+        approved = read(src / 'modes/expected.json')
+        formats = ['xlsx']  # LAB-1057: XLS is a pre-mutation platform refusal, not a workbook case.
+        stems = {'xls':'legacy', 'numeric':'numeric', 'replace':'existing'}
+        books = [dict(output_node_type='exports.excel', output_port=None, format=ext, filename=stems[case['excel_mode']]+'.'+ext,
+            sheet_name='Данные', header='names', number_format=1 if case['excel_mode']=='numeric' else 0, decimal_count=2, divide_thousands=case['excel_mode']=='numeric',
+            columns=[dict(c,label_any=True) for c in approved['input_columns']], rows=approved['input_rows']) for ext in formats]
+        return dict(package_path=package, nodes=[dict(type='imports.text',label_any=True), *approved['nodes']], outputs=books, excel_books=books,
+                    excel_case={'xls':'new', 'numeric':'numeric', 'replace':'replace-workbook'}[case['excel_mode']])
     # The owner-approved sampling envelope is separate from stock exact rows.
     if case.get('sampling_mode'):
         return json.loads(subprocess.check_output(['node', str(REPO / 'scripts/node-acceptance/sampling-modes.mjs'),
@@ -581,6 +688,10 @@ def expected_for(case, package, cold=False):
         cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py')]))['cases']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
                     outputs=cases[case['grouping_mode']]['stages'])
+    if case.get('corr_ranks'):
+        expected = read(src / 'expected.json')['cases']['kendall']
+        expected['package_path'] = package
+        return expected
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
     if case.get('expected_name'):
         expected = read(src / case['expected_name'])
@@ -1322,6 +1433,7 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('excel_mode') == 'replace': prompt = prompt.replace('existing.xlsx либо\nexisting.xls', 'existing.xlsx')
         if spec.get('lgd') == 'roundtrip':
             lgd_destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-roundtrip.lgd'
             prompt = prompt.replace('{{EXPORT_DIRECTORY}}/roundtrip.lgd', lgd_destination)
@@ -1361,6 +1473,7 @@ class Runner:
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
@@ -1373,7 +1486,9 @@ class Runner:
             if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
             if spec.get('import_initial'): prompt += ' Порядок файлов: первый импорт, второй импорт, второй импорт после повторного открытия пакета.'
-            elif spec.get('export_count') == 3: prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('sampling_uniform'):
+                prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and not spec.get('import_initial'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
@@ -1383,10 +1498,11 @@ class Runner:
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not spec.get('text_export_cases') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('variable_only') and not spec.get('text_export_cases') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
-        for output in expected['outputs']:
-            if output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
+        for index, output in enumerate(expected['outputs']):
+            if spec.get('excel_mode'): output['export_destination'] = destinations[index]
+            elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         if spec.get('lgd') == 'roundtrip': expected['lgd']['destination'] = lgd_destination
         if spec.get('lgd_case') == 'variable':
@@ -1397,6 +1513,9 @@ class Runner:
             expected['binding_inventory'] = [dict(node=dict(type='imports.text'), parameter='/settings/source/source_path',
                 mode='variable', variable=dict(kind='variables', input=0, name='CsvPath', type='string', is_null=False),
                 source=dict(type='variables.user', output=4))]
+        if spec.get('excel_mode') == 'replace':
+            write(folder / 'seed-config.json', dict(login=login, books=[dict(fixture=str(spec['data'] / ('existing.'+b['format'])), destination=b['export_destination']) for b in expected['excel_books']]))
+            self.phase('excel-seeds', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs', build / 'resources/loginom', folder / 'seed-config.json', folder / 'seeds'], folder, timeout=300)
         if case == 'filter-bindings':
             for output in expected['outputs']: output['column_order'] = 'any'
             expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter='/groups/0/0/value',
@@ -1448,6 +1567,12 @@ class Runner:
                 except (ValueError, TypeError): continue
                 if isinstance(value, dict): replies.append((n, value))
             replies.sort(key=lambda item: item[0])
+        if spec.get('corr_ranks'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'corr-ranks-events.json', evidence)
+            self.phase('corr-ranks-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/corr-ranks.mjs',
+                src / 'expected.json', folder / 'corr-ranks-events.json'], folder, timeout=60)
         if case in ['quality-default', 'quality-spikes']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -1525,12 +1650,21 @@ class Runner:
                 if event.get('type') != 'tool_use': continue
                 request = part.get('state', {}).get('input', {})
                 if part.get('tool') == 'loginom_dock_node_apply':
-                    assert request.get('target', {}).get('type') in allowed, 'UNEXPECTED_NODE'
+                    if spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
+                        state=part.get('state',{})
+                        reply=json.JSONDecoder().raw_decode(state.get('output') or state.get('error',''))[0]
+                        assert reply.get('status')=='NOT_APPLIED' and reply.get('request_rejected') is True and reply.get('effect_possible') is False and reply.get('cleanup_complete') is True, 'XLS_REFUSAL_EFFECT'
+                        assert 'формат XLS в этой версии Loginom не выгружает данные' in reply.get('error',{}).get('message','') and 'XLSX' in reply.get('error',{}).get('message',''), 'XLS_REFUSAL_REASON'
+                    else:
+                        assert request.get('target', {}).get('type') in allowed, 'UNEXPECTED_NODE'
                 if part.get('tool') == 'loginom_dock_action_run' and request.get('action_key') == 'node.add':
                     assert request.get('parameters', {}).get('component_key') in allowed, 'UNEXPECTED_NODE'
             answer = next(((n, event.get('part', {}).get('text', '')) for n, event in reversed(events)
                            if event.get('type') == 'text'), (None, ''))
             assert refusal['text'] in answer[1], 'REFUSAL_NOT_REPORTED'
+            if spec.get('excel_xls_refusal'):
+                assert re.search('xlsx',answer[1],re.I) and re.search(r'недоступ|не[^.\n]*(?:поддерж|выгружа)|огранич',answer[1],re.I), 'XLS_LIMITATION_NOT_REPORTED'
+                assert not any(p.is_file() for ext in ['*.xls','*.xlsx'] for p in profile.rglob(ext)), 'XLS_REFUSAL_CREATED_WORKBOOK'
             inputs = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in files if p.is_file()}
             assert not any(p.is_file() and not any(
                 re.fullmatch(r'[0-9a-f]{64}-\d+-' + re.escape(name), p.name)
@@ -1752,6 +1886,21 @@ class Runner:
                     '--case', kind, '--file', actual], folder, timeout=60)
             self.current['csv'] = 'PASS (exact text bytes)'
             return session, expected, actual, ';'
+        if spec.get('excel_mode'):
+            manifest = []
+            for book in expected['excel_books']:
+                destination = book['export_destination']
+                assert any(o.get('status')=='SUCCEEDED' and o.get('configuration',{}).get('readback',{}).get('kind')=='excel_export'
+                    and o['configuration']['readback'].get('destination')==destination
+                    and any(f.get('destination')==destination and f.get('bytes',0)>0 for f in o.get('output',{}).get('file_artifacts',[])) for _,o in replies), 'EXCEL_SINK_FILE_EVIDENCE_MISSING'
+                actual = folder / Path(destination).name
+                shutil.copyfile(downloaded_csv(profile,destination),actual)
+                self.phase('oracle', [sys.executable, '-B', src / 'modes/oracle.py', '--case', expected['excel_case'], '--file', actual], folder, timeout=60)
+                manifest.append(dict(file=str(actual), case=expected['excel_case']))
+            actual = folder / 'excel-books.json'
+            write(actual,manifest)
+            self.current['csv'] = 'PASS (Excel)'
+            return session, expected, actual, ','
         if spec.get('xlsx'):
             assert len(destinations) == 1, 'XLSX_SINGLE_SINK'
             actual = folder / Path(destinations[0]).name
@@ -1761,16 +1910,40 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if expected.get('clustering_gmeans'):
+            write(folder / 'clustering-gmeans-replies.json', [o for _, o in replies])
+            self.phase('clustering-gmeans-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-gmeans.mjs',
+                folder / 'expected.json', folder / 'clustering-gmeans-replies.json', folder / 'clustering-gmeans-resolved.json'], folder, timeout=60)
+            expected = read(folder / 'clustering-gmeans-resolved.json')
+            write(folder / 'expected.json', expected)
         if expected.get('factor_signs'):
-            rounds = {}
+            rounds, configurations = {}, {}
             for _, reply in replies:
                 for owner, port in ports(reply):
                     if owner.get('configuration', {}).get('readback', {}).get('kind') != 'factor_analysis': continue
                     key = owner.get('execution', {}).get('execution_id')
+                    configurations[key] = dict(owner['configuration']['readback'], node=owner['node'])
                     rounds.setdefault(key, {})[port['port']] = dict(node=owner['node'], type='research.factor_analysis',
                         output_port=port['port'], execution=owner['execution'], data=port)
             complete = [list(group.values()) for group in rounds.values() if set(group) == {0, 1}]
             assert complete, 'FACTOR_BOTH_TYPED_OUTPUTS_MISSING'
+            if spec.get('factor_mode'):
+                final = configurations[complete[-1][0]['execution']['execution_id']]
+                if spec['factor_mode'] == 'variance':
+                    assert final['mode'] == 'pca_variance' and final['variance_percent'] == 90, 'FACTOR_FINAL_VARIANCE_MISSING'
+                    initial = next((group for group in complete[:-1] if
+                        configurations[group[0]['execution']['execution_id']].get('mode') == 'pca_eigenvalue' and
+                        configurations[group[0]['execution']['execution_id']].get('eigenvalue') == 1.1 and
+                        group[0]['node'] == complete[-1][0]['node']), None)
+                    assert initial, 'FACTOR_INITIAL_EIGENVALUE_SAME_NODE_MISSING'
+                    write(folder / 'factor-initial.json', initial)
+                    write(folder / 'factor-initial-expected.json', dict(read(src / 'expected.json')['cases']['eigenvalue'], package_path=package))
+                    self.phase('factor-initial-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                        'factor-signs', folder / 'factor-initial-expected.json', folder / 'factor-initial.json', folder / 'factor-initial-aligned.json'], folder, timeout=60)
+                else:
+                    assert final['mode'] == 'pca_fixed' and final['factors'] == 2 and final['output_factors'] == 1, 'FACTOR_CAP_COUNT_CHANGED'
+                    assert any(c['node'] == final['node'] and c['mode'] == 'pca_fixed' and c['factors'] == 2 and
+                               not c.get('output_factors') for c in list(configurations.values())[:-1]), 'FACTOR_INITIAL_FIXED_SAME_NODE_MISSING'
             write(folder / 'factor-actual.json', complete[-1])
             self.phase('factor-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
@@ -1878,7 +2051,7 @@ class Runner:
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, expected_for(spec, r['package'], cold=True))
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

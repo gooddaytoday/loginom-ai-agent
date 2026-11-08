@@ -3,7 +3,7 @@ import {observeReplacementOutputPolicy} from './replacement-output.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
-const normalized=(r,mode)=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,...(r.result_type&&r.result_type!==r.input_fields.find(f=>f.name===r.selected).type?{result_type:r.result_type}:{}),pairs:r.pairs.map(({from,to})=>({from,to})),other:r.other,...(mode==='regex'?{}:r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
+const normalized=(r,mode)=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,...(r.result_type&&r.result_type!==r.input_fields.find(f=>f.name===r.selected).type?{result_type:r.result_type}:{}),pairs:r.pairs.filter(p=>mode!=='mixed'||p.collection_id===0).map(({from,to})=>({from,to})),...(mode==='mixed'?{regex_pairs:r.pairs.filter(p=>p.collection_id===1).map(({from,to})=>({from,to}))}:{}),other:r.other,...(mode==='regex'?{}:r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
 const pairKeys=ps=>ps.map(p=>[replacementValueKey(p.from),replacementValueKey(p.to)]);
 export function replacementRealEditorText(value,separator){
  need(typeof value==='number'&&Number.isFinite(value),'Finite replacement real required');
@@ -33,8 +33,7 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
  let state=await observe('replacement input inventory'),baseline=state.node_replacement;
  resolveReplacementParameters(p,baseline.input_fields);
  const control=(s,suffix,verb='click')=>{const tid=s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix,es=s.ui.elements.filter(e=>(e.tid===tid||['fill','press'].includes(verb)&&e.identity?.anchor_tid===tid)&&e.allowed_actions.includes(verb));need(es.length===1,'Replacement control unavailable: '+suffix);return es[0];};
- const add='grdReplaceItems;tbl;GroupHeader;'+(mode==='regex'?1:0)+';AddButton';
- const act=async(suffix,verb='click',args={})=>{const s=suffix===add?await revealReplacementAdd(channel,observe,ready,mode):await observe('replacement control '+suffix);return channel.perform({condition:'replacement '+suffix,initialObservation:s,ready,identity:()=>({field:s.node_replacement.selected,suffix}),resolve:s=>({verb,ref:control(s,suffix,verb).ref,...args})});};
+ const act=async(suffix,verb='click',args={})=>{const group=/;GroupHeader;([01]);AddButton$/.exec(suffix);const s=group?await revealReplacementAdd(channel,observe,ready,group[1]==='1'?'regex':'exact'):await observe('replacement control '+suffix);return channel.perform({condition:'replacement '+suffix,initialObservation:s,ready,identity:()=>({field:s.node_replacement.selected,suffix}),resolve:s=>({verb,ref:control(s,suffix,verb).ref,...args})});};
  const cell=(s,name,role,part,id)=>{const es=s.ui.elements.filter(e=>e.replacement_field?.field_key===name&&e.replacement_field.role===role&&e.replacement_field.part===part&&(id===undefined||e.replacement_field.record_id===id)&&e.allowed_actions.includes('click'));need(es.length===1,'Replacement bound cell unavailable: '+name+'/'+part);return es[0];};
  const reveal=async(name,role,part,id)=>{
   let s=await observe('replacement row readiness');
@@ -55,7 +54,7 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
   return (await observe('replacement selected field',r=>r.selected===name)).node_replacement;
  };
  const oldRules=[];
- for(const f of baseline.input_fields.filter(f=>f.mode==='manual')){const r=await select(f.name);need(!r.editor_open,'Existing replacement row editor is active');need(!r.mode||r.mode===mode,'Existing replacement mode differs; exact/regex mixing is unsupported');oldRules.push(normalized(r,mode));}
+ for(const f of baseline.input_fields.filter(f=>f.mode==='manual')){const r=await select(f.name);need(!r.editor_open,'Existing replacement row editor is active');need(!r.mode||r.mode===mode||mode==='mixed','Existing replacement mode differs; use mode mixed for both tables');oldRules.push(normalized(r,mode));}
  if(newNode)need(oldRules.length===0,'New replacement has unexpected rules');
  if(oldRules.length)validateReplacementParameters({rules:oldRules},mode,{target:{kind:'existing'},inputs:[],read:{ports:[]},mappings:[],finish:'done'});
  let outputMode=p.output_mode,modeProof=null,inventoryRefresh=null;
@@ -104,19 +103,23 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
    // The button is a split button: its body does not open the type menu.
    // Clear old pairs first: Loginom otherwise converts their saved constants.
    await act('btnTypeChange','press',{key:'ArrowDown'});
-   await act('itmTypeChange'+{string:'Str',integer:'Int',real:'Float',datetime:'DTime'}[resultType]);
+   await act('itmTypeChange'+{string:'Str',integer:'Int',real:'Float',datetime:'DTime',boolean:'Boolean'}[resultType]);
    r=(await observe('replacement result type applied',r=>r.result_type===resultType&&r.pairs.length===0)).node_replacement;
   }
-  for(const pair of rule.pairs){
+  for(const [group,pairs] of [[mode==='regex'?1:0,rule.pairs],...(mode==='mixed'?[[1,rule.regex_pairs??[]]]:[])])for(const pair of pairs){
+   const add='grdReplaceItems;tbl;GroupHeader;'+group+';AddButton';
    const before=r.pairs.map(p=>p.record_id);await act(add);
    r=(await observe('replacement row added',r=>r.pairs.length===before.length+1)).node_replacement;
    const added=r.pairs.filter(p=>!before.includes(p.record_id));need(added.length===1,'Replacement added row ambiguous');
    await gesture(rule.field.name,'pair','from',added[0].record_id,'double_click');
    await observe('replacement row editor opened',r=>r.editor_open);
    for(const [side,value] of [['ReplaceEditor',pair.from],['ReplaceEditor-1',pair.to]]){
-    const kind={string:'txt',real:'num',integer:'Int64Field',datetime:'datetimefield'}[value.type],suffix=side+';fldVariant;ValueContainer;'+kind;
+    const kind={string:'txt',real:'num',integer:'Int64Field',datetime:'datetimefield',boolean:'cbx'}[value.type],suffix=side+';fldVariant;ValueContainer;'+kind;
     if(value.value===null)await act(suffix+';trg_SetNullTrigger');
-    else{
+    else if(value.type==='boolean'){
+     await act(suffix,'press',{key:'ArrowDown'});
+     await act(suffix+';boundlist;'+String(value.value));
+    }else{
      const s=await observe('typed replacement editor');const es=s.ui.elements.filter(e=>e.allowed_actions.includes('fill')&&(e.identity?.anchor_tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid===s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix||e.tid?.startsWith(s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix+';')));
      need(es.length===1,'Typed replacement input unavailable');const text=value.type==='real'?replacementRealEditorText(value.value,s.node_replacement.real_decimal_separators?.[side==='ReplaceEditor'?'from':'to']):String(value.value);await channel.perform({condition:'fill typed replacement value',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id,side}),resolve:()=>({verb:'fill',ref:es[0].ref,text})});
      if(value.type==='datetime')await act(suffix,'press',{key:'Tab'});
@@ -125,7 +128,7 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
    const s=await observe('replacement row ready to commit');await channel.perform({condition:'commit replacement row',initialObservation:s,ready,identity:()=>({field:rule.field.name,row:added[0].record_id}),resolve:s=>{const es=s.ui.elements.filter(e=>e.tid==='roweditorbuttons;update'&&e.allowed_actions.includes('click'));need(es.length===1,'Replacement row update unavailable');return {verb:'click',ref:es[0].ref};}});
    r=(await observe('replacement pair committed',r=>!r.editor_open&&r.pairs.some(p=>p.record_id===added[0].record_id&&same(pairKeys([p]),pairKeys([pair]))))).node_replacement;
   }
-  if(mode==='exact'&&rule.type==='string'&&r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
+  if(mode!=='regex'&&rule.type==='string'&&r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
   if(rule.type!=='string'&&r.precision!==rule.precision){
    await act('edPrecision','fill',{text:replacementRealEditorText(rule.precision,r.precision_decimal_separator)});
    await act('edPrecision','press',{key:'Tab'});
@@ -139,11 +142,11 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
    await act('cbxReplaceOther','press',{key:'Tab'});
   }
   r=(await observe('complete replacement field readback')).node_replacement;
-  need((r.result_type??rule.type)===resultType&&same(pairKeys(r.pairs),pairKeys(rule.pairs))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===rule.precision),'Replacement field readback differs');
+  need((r.result_type??rule.type)===resultType&&same(pairKeys(r.pairs.filter(p=>mode!=='mixed'||p.collection_id===0)),pairKeys(rule.pairs))&&(mode!=='mixed'||same(pairKeys(r.pairs.filter(p=>p.collection_id===1)),pairKeys(rule.regex_pairs??[])))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===rule.precision),'Replacement field readback differs');
  }
  const expected=oldRules.filter(r=>!p.rules?.some(w=>w.field.name===r.field.name)).concat(p.rules??[]),rules=[];
  for(const f of baseline.input_fields){const current=(await observe('replacement final membership')).node_replacement.input_fields.find(x=>x.name===f.name);need(current.mode===(expected.some(r=>r.field.name===f.name)?'manual':'none'),'Unrequested replacement mode changed');if(current.mode==='manual')rules.push(normalized(await select(f.name),mode));}
- for(const {result_type,...baseRule} of expected){const rule={...baseRule,...(result_type&&result_type!==baseRule.type?{result_type}:{})},actual=rules.find(r=>r.field.name===rule.field.name);need(actual&&same(pairKeys(actual.pairs),pairKeys(rule.pairs))&&same({...actual,pairs:[]},{...rule,pairs:[],...(rule.other.mode==='value'?{other:{mode:'value',value:{...rule.other.value,value:(rule.result_type??rule.type)==='integer'&&rule.other.value.value!==null?String(rule.other.value.value):rule.other.value.value}}}:{} )}),'Final replacement rule differs');}
+ for(const {result_type,...baseRule} of expected){const rule={...baseRule,...(mode==='mixed'?{regex_pairs:baseRule.regex_pairs??[]}:{}),...(result_type&&result_type!==baseRule.type?{result_type}:{})},actual=rules.find(r=>r.field.name===rule.field.name);need(actual&&same(pairKeys(actual.pairs),pairKeys(rule.pairs))&&same({...actual,pairs:[]},{...rule,pairs:[],...(rule.other.mode==='value'?{other:{mode:'value',value:{...rule.other.value,value:(rule.result_type??rule.type)==='integer'&&rule.other.value.value!==null?String(rule.other.value.value):rule.other.value.value}}}:{} )}),'Final replacement rule differs');}
  state=await observe('replacement final owner');
  const schema=fields=>fields.map(({record_id,name,label,type})=>({record_id,name,label,type}));
  need(same(schema(state.node_replacement.input_fields),schema(baseline.input_fields)),'Replacement input identity changed');

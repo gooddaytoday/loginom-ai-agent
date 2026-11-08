@@ -35,7 +35,7 @@ test('constant prompt retains method context without claiming an active cell edi
  f.grid.editingPlugin.context.grid={};assert.equal(f.read().verified,false);
 });
 test('native zero enum 11 is distinct from mean, constants and unsupported methods',()=>{
- for(const [code,method] of [[11,'zero'],[3,'mean'],[6,'constant'],[1,null],[2,null],[4,null],[5,null],[7,null],[12,null]]){
+ for(const [code,method] of [[11,'zero'],[3,'mean'],[6,'constant'],[4,'median'],[5,'most_probable'],[12,'previous'],[2,'delete'],[1,null],[7,null],[8,null],[9,null],[10,null]]){
   const f=fixture();f.records[0].data.ActionNull=code;
   assert.equal(f.read().fields[0].method,method);assert.equal(f.read().fields[0].method_code,code);
  }

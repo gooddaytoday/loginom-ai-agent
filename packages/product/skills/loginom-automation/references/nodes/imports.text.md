@@ -28,10 +28,8 @@ output mappings меняй на том же Import. Доставь исходн�
 Неизменённый существующий Import выполняй с `mode=delimited`,
 `parameters:{settings:{}}`, `inputs:[]`, `mappings:[]`, `finish=execute`,
 `read:{ports:[0]}`: текущая конфигурация без мастера. Не передавай `source`/старый
-`upload_operation_id` и не доставляй CSV заново; квитанция старой сессии не нужна.
+`upload_operation_id`, CSV заново не доставляй.
 `UPLOAD_PATH_CONFLICT` не разрешает перезапись для активации сохранённого узла.
-Изменения источника, колонок, формата или mappings требуют проверенную загрузку
-текущей сессии.
 
 В новом Import после доставки source_path можно опустить: Dock берёт путь по
 upload_operation_id. Defaults: UTF-8, заголовок в первой строке, пропуск 0,
@@ -41,6 +39,15 @@ upload_operation_id. Defaults: UTF-8, заголовок в первой стр�
 При `source_switch` ([переключение на полный файл](../large-files.md#переключение-на-полный-файл))
 в `settings` передай только `source:{source_path:"<полный файл>"}`, без columns/format/mappings.
 Переключай с `finish:"done"` и `read.ports:[]`, без отдельного Execute импорта.
+
+## Автоопределение типов
+
+Типы «по данным»: `settings.format.auto_detect_columns`
+(`none`/`new`/`all`), `settings.analysis`: `rows`, `refresh` (`all` — поля и типы
+заново, `types` — только типы). Новому узлу `columns` не нужны: схема читается, сверь
+с `output`. `all`: типы задаёт Loginom, `columns` отклоняется. `new`:
+ручные типы (отдельным вызовом того же узла) остаются при смене `source_path`.
+`refresh` стирает ручные типы: только по просьбе.
 <!-- /mode -->
 
 <!-- mode: delimited -->

@@ -23,5 +23,5 @@ export function readExcelExportBrowser({prefix,fields}){
   values[key]={value,display,tid:tid+';ValueControl',variable:false};
  }
  if(cmp(base+'ExportExcelFilePreviewWizard;edtConnection')?.getValue?.()!=='Локальное')return fail('excel_export_connection');
- return {verified:true,stage:'excel_export',values,connection:'Локальное',format:'xlsx',settings_applied:false};
+ return {verified:true,stage:'excel_export',values,connection:'Локальное',format:values.file_type.value===0?'xls':'xlsx',settings_applied:false};
 }

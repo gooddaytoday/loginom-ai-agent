@@ -174,7 +174,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Ассоциативные правила | `datamining.assn_rules` / fp_growth | [читать](references/nodes/datamining.assn_rules.md) |
 | Кросс-таблица | `transform.cross_table` / pivot | [читать](references/nodes/transform.cross_table.md) |
 | Дубликаты и противоречия | `research.duplicates` / mark | [читать](references/nodes/research.duplicates.md) |
-| Заполнение NULL | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |
+| Пропуски: среднее, медиана, мода, предыдущее, удаление | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |
 | Экспорт XLSX | `exports.excel` / xlsx | [читать](references/nodes/exports.excel.md) |
 | Экспорт CSV/TXT | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |
 | Импорт XLSX | `imports.excel` / xlsx | [читать](references/nodes/imports.excel.md) |

@@ -1,10 +1,10 @@
 import {importBindingSchema,resolveImportBindingParameters,prepareImportBinding,configureImportBinding,readImportBindings,resolveImportBindingSourceReadback} from './import-bindings.mjs';
 import {verifyUploadLineage,verifiedLocalDelivery} from './upload-lineage.mjs';
 import {validateImportSource} from './storage-policy.mjs';
-import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
+import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
-import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError} from './text-import-procedure.mjs';
+import {autoTypesRequested,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
@@ -18,6 +18,7 @@ import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import {isUnchangedTextImportExecution} from './node-read-contract.mjs';
+import {makeNodeProcessContextCode} from './node-process-context.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
@@ -58,7 +59,8 @@ export function validateTextImportNodeParameters(p,mode,request) {
   if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
   requireValue(p && (Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='settings,source'||request.target.kind==='existing'&&request.bindings?.length&&Object.keys(p).join(',')==='settings'),'Exact import source and settings required');
   const existing=request.target?.kind==='existing';
-  if(!existing)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,
+  const nativeTypes=p.settings?.columns===undefined&&autoTypesRequested(p.settings);
+  if(!existing&&!nativeTypes)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,
     'Invalid parameters.parameters.settings.columns: new imports require a nonempty list of source columns with their selected names and types');
   (existing?validateTextImportPatch:validateTextImportFieldsRequest)(p.settings);
   if(!existing)resolveTextImportEncoding(p.settings.source.encoding);
@@ -75,7 +77,7 @@ export function validateTextImportNodeParameters(p,mode,request) {
   requireValue(mode==='delimited' && ['done','execute','close'].includes(request.finish) && (request.read.ports.length===0||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
     && request.mappings.length<=1 && request.mappings.every(m=>m.direction==='output'&&m.port===0
       &&((m.fields??m.changes)===undefined||m.fields===undefined&&m.changes?.length===0||(m.fields??m.changes).length>0&&(m.fields??m.changes).every(f=>f.source?.kind==='configured_field'&&f.excluded!==true))) && request.inputs.length===0
-    && (existing||p.settings.columns.some(c=>c.used===true)),
+    && (existing||nativeTypes||p.settings.columns.some(c=>c.used===true)),
   'Private import node currently supports Done/Execute/Close with optional executed output 0 and configured output fields with at least one used field; input mappings and output exclusion are not installed');
 }
 
@@ -145,7 +147,7 @@ function fullImportSourceReason(profileId,receipt,source) {
 export async function verifyDeferredTextImportSources(request,history,resolveStorageSource) {
   if(request.finish!=='execute')return [];
   const latest=new Map();
-  for(const entry of history??[])if(entry.request?.target?.type==='imports.text'
+  for(const entry of history??[])if(['imports.text','imports.excel'].includes(entry.request?.target?.type)
     &&entry.request.document_id===request.document_id&&entry.request.workflow_ref?.workflow_id===request.workflow_ref?.workflow_id
     &&entry.outcome?.status==='SUCCEEDED'&&entry.cleanup_confirmed===true&&entry.outcome.output?.node?.node_id
     &&entry.source)latest.set(entry.outcome.output.node.node_id,entry);
@@ -160,12 +162,76 @@ export async function verifyDeferredTextImportSources(request,history,resolveSto
         &&(before.kind!=='storage'||current.sha256===before.sha256)
         &&!fullImportSourceReason(entry.request.parameters.source_switch.profile_id,entry.scan_receipt,before.kind==='storage'?current:before),
         'LOGINOM_FILE_CHANGED: switched source identity, size or exact-scan digest changed; chain execution refused');
-      checked.push({node:entry.outcome.output.node,source:current,profile_id:entry.request.parameters.source_switch.profile_id});
+      checked.push({node:entry.outcome.output.node,source:before.kind==='storage'?current:before,
+        profile_id:entry.request.parameters.source_switch.profile_id,scan_receipt:entry.scan_receipt,
+        type:entry.request.target.type,configuration:entry.outcome.output.configuration?.readback});
     }catch(error){
       error.nodePhaseRefusal={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
     }
   }
   return checked;
+}
+
+// Done deliberately does not execute. The downstream launch is the first point
+// at which its import's completed port can establish full N without reexecution.
+export async function readDeferredImportCounts(options,ctx,config) {
+  const {operation,execute,onRecord,now}=options;
+  const sources=operation.nodeApply?.phases.find(p=>p.phase==='source')?.value?.switched_sources??[];
+  const results=[];
+  for(const switched of sources){
+    if(switched.node.node_id===ctx.node?.node_id)continue;
+    const base={node:switched.node,profile_id:switched.profile_id,expected_records:switched.scan_receipt?.records,
+      actual_records:null,matches_scan:null,execution_id:ctx.execution.execution_id,chain_execution_id:ctx.execution.execution_id};
+    const unavailable=reason=>({...base,status:'not_verified',message:'N не сверено',reason});
+    const binding={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:switched.node};
+    operation.deadline=ctx.deadline;
+    let processes;
+    // Execution verification closes the console before output reads. Reuse the
+    // existing read-only hidden-cache allowance: no rendered controls or UI
+    // actions are taken from this inventory. The port reader rechecks ownership.
+    try{processes=await execute(makeNodeProcessContextCode(binding,{errorToast:true}),{timeout:Math.max(5000,ctx.deadline-now()+5000)});}
+    catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+    const group=ctx.execution.execution_id.split(':').at(-1);
+    const candidates=processes.processes?.filter(p=>p.owner?.verified===true&&p.owner.node_id===switched.node.node_id
+      &&p.owner.source==='native_process_model_identity'&&p.parent_id===p.process_id.split('.')[0]
+      &&BigInt(p.parent_id)<=BigInt(group)
+      &&p.state==='completed'&&p.error===false)??[];
+    // A later Export can consume the still-active import without rerunning it.
+    // Use its latest completed group; the existing reader rejects any newer
+    // native import process and rechecks the same active port/source identity.
+    const latest=candidates.reduce((latest,p)=>BigInt(p.parent_id)>BigInt(latest)?p.parent_id:latest,'0');
+    const own=candidates.filter(p=>p.parent_id===latest);
+    let result=unavailable(processes.verified!==true?'Completed import process inventory unavailable: '+processes.reason
+      :'Import has '+own.length+' completed processes in its latest execution group; expected one');
+    if(processes.verified===true&&processes.inventory_complete===true
+      &&ctx.execution.execution_id===ctx.document_id+':'+processes.root_id+':'+group&&own.length===1){
+      const execution={verified:true,owner_verified:true,status:'completed',execution_id:ctx.document_id+':'+processes.root_id+':'+latest,
+        process_id:own[0].process_id,process_record_id:own[0].record_id};
+      const channel=createNodeProcedure({operation,execute,record:onRecord,now,signal:ctx.signal,
+        targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,preparedNodeContext:binding});
+      let output;
+      try{
+        // The existing reader independently checks native process/port identity,
+        // freshness and cleanup. Zero sample rows avoids reading the full data.
+        ({output}=await channel.readOutputPort({port:0,execution,sampleRows:0,requireExactNumbers:false}));
+        const proof=switched.type==='imports.excel'
+          ?await (await import('./imports-excel-node.mjs')).verifyExcelFullCount(switched.profile_id,switched.scan_receipt,
+            switched.source,switched.configuration??{},output,execution)
+          :verifyFullImportCount(switched.profile_id,switched.scan_receipt,switched.source,output,execution);
+        result={...base,...proof,actual_records:output.row_count,matches_scan:proof.status==='verified'?true:null};
+      }catch(error){
+        if(operation.transportUncertain===true||operation.cleanupConfirmed===false)throw error;
+        result={...unavailable(String(error.message)),actual_records:output?.row_count??null,
+          matches_scan:String(error.message).startsWith('LOGINOM_ROW_COUNT_MISMATCH:')?false:null};
+      }
+    }
+    await onRecord({operation_id:operation.id,action_key:'node.apply',phase:'node_deferred_import_count',result,
+      process_inventory:{verified:processes.verified,reason:processes.reason,root_id:processes.root_id,
+        processes:processes.processes?.map(p=>({process_id:p.process_id,record_id:p.record_id,parent_id:p.parent_id,
+          state:p.state,error:p.error,owner:p.owner}))}});
+    results.push(result);
+  }
+  return results;
 }
 
 export function importSchemaSnapshot({source,format,columns,mapping}) {
@@ -186,6 +252,43 @@ export function verifyImportSchema(before,after) {
   requireValue(JSON.stringify(before)===JSON.stringify(after),
     'LOGINOM_IMPORT_SCHEMA_CHANGED: source switch changed definitions, parsing settings or output mapping; execution refused');
   return true;
+}
+
+// A readiness timeout alone does not say why the native mapping stayed unverified.
+// Read it once more without a condition and name the observed reason in the refusal.
+export async function readNativeImportMapping(channel,condition,ready) {
+  try{return await channel.observe({condition,readMappings:true,ready});}
+  catch(error){
+    if(!(error instanceof NodeReadinessTimeout))throw error;
+    let reason='unobserved';
+    try{
+      const m=(await channel.observe({condition:condition+' state',readMappings:true,ready:()=>true})).node_mapping;
+      reason=[m?.reason??(m?.verified===true?'verified':'unverified'),m?.verified===true?null:'source_identity_verified='+m?.source_identity_verified,
+        m?.counts?'form='+m.form+', counts='+JSON.stringify(m.counts):null,
+        m?.mask_detail?'form='+m.form+', import_pages='+m.import_pages+', masks='+JSON.stringify(m.mask_detail).slice(0,500):null].filter(Boolean).join(', ');
+    }catch{}
+    const explained=new NodeReadinessTimeout(condition+' ('+reason+')');
+    throw explained;
+  }
+}
+
+// «Автоопределение: Все» creates the output fields when the node executes, so the
+// cached native source mapping is legitimately empty at the mapping stage (an executed
+// node can still carry its previous targets). Only that state is deferred to the
+// executed port read; a mapping with sources keeps the full verification.
+export function deferredImportOutput(configured,native,mappings) {
+  const mode=configured?.format?.fields?.auto_detect_columns?.value;
+  if(mode!=='Все'||native?.verified!==true||native.source_fields?.length!==0||!Array.isArray(native.target_fields)
+    ||!configured.columns.some(c=>c.used))return null;
+  requireValue(mappings.length===0,'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
+  return configured.columns.filter(c=>c.used).map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:true}));
+}
+
+// Only «Только новые» with autosync off and no requested mappings: outputs of new
+// source fields are added natively instead of asking the caller for mappings.
+export function shouldResyncNewOutputs(configured,native) {
+  return configured?.format?.fields?.auto_detect_columns?.value==='Только новые'
+    &&native?.verified===true&&native.autosync===false&&outputsOutOfSync(native);
 }
 
 export function bindIdentityOutputColumns(configured,actual) {
@@ -424,8 +527,20 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         await next('text_import_format','output_mapping');
         const outputFields=configured.columns.filter(c=>c.used);
         const nativeReady=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
-        let native=(await channel.observe({condition:'configured import native output mapping',readMappings:true,ready:nativeReady})).node_mapping;
+        let native=(await readNativeImportMapping(channel,'configured import native output mapping',nativeReady)).node_mapping;
+        const deferred=deferredImportOutput(configured,native,mappings);
+        if(deferred) {
+          outputColumns=deferred;
+          const done=await next('output_mapping','done');
+          return verified({effect_possible:true,mapping:{fields:[]},native_mapping:native,deferred_output:true,completion:done.wizard.completion,changes:[],source_identity_verified:true});
+        }
         const changes=[];
+        // «Только новые» adds source fields, but their outputs appear only through native synchronization;
+        // requested mappings are then resolved against the synchronized native mapping.
+        if(shouldResyncNewOutputs(configured,native)) {
+          const resync=await resyncOutputFields(channel,native);
+          changes.push(resync);native=resync.native_mapping;
+        }
         if(mappings.length) {
           const mapping=one(mappings,'One import output mapping required');
           const resolved=resolveConfiguredOutputMapping(mapping,configured.columns,native);

@@ -22,6 +22,24 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_variables_replace_match_order_policy(self):
+        case = runner.scenario('variables-replace-match')
+        initial = runner.read(case['source'] / case['variable_initial'])
+        self.assertNotIn('column_order', initial['variable_inventory']['outputs'][0])
+        for cold in [False, True]:
+            output = runner.expected_for(case, '/own/match.lgp', cold=cold)['variable_inventory']['outputs'][0]
+            self.assertEqual(output['column_order'], 'any')
+            self.assertEqual(output['variables'], initial['variable_inventory']['outputs'][0]['variables'])
+
+    def test_uniform_export_plans_cover_each_requested_stage_and_port(self):
+        for name, count, ports in [('sampling-uniform', 2, 1), ('partition-uniform', 3, 3), ('partition-test-priority', 6, 3)]:
+            case = runner.scenario(name)
+            self.assertEqual(case.get('export_count'), count)
+            expected = runner.expected_for(case, '/own/uniform.lgp')
+            self.assertEqual(len(expected['outputs']), ports)
+            self.assertEqual(expected['sampling_modes']['mode'], 'uniform')
+            self.assertEqual(expected['sampling_modes']['group_size_rows'], [1] * (2 if ports == 3 else 1))
+
     def test_rest_c1_single_method_scenarios(self):
         for name, method in [('rest-post-body', 'POST'), ('rest-put-body', 'PUT'),
                              ('rest-patch-body', 'PATCH'), ('rest-delete', 'DELETE')]:
@@ -112,6 +130,19 @@ class RunCheckTests(unittest.TestCase):
         self.assertIsNone(output['rows'][3]['Amount'])
         self.assertEqual([output['rows'][0][k] for k in ['Tail', 'Doubled']], [10, 6])
         self.assertNotRegex(case['prompt'].read_text(), r'Field\.|Expr\.')
+
+    def test_calculator_javascript_sends_only_task_and_csv(self):
+        case = runner.scenario('calculator-javascript')
+        expected = runner.expected_for(case, '/own/calculator.lgp')
+        self.assertEqual(case['input_files'], ['modes.csv'])
+        self.assertTrue((case['data'] / 'modes.csv').is_file())
+        self.assertEqual(case['prompt'].name, 'task-javascript.md')
+        output = expected['outputs'][0]
+        self.assertEqual([c['name'] for c in output['columns']],
+                         ['RowID', 'Quantity', 'UnitPrice', 'Amount', 'Bare', 'FromField', 'JsTotal', 'FromExpr'])
+        self.assertNotIn('Helper', [c['name'] for c in output['columns']])
+        self.assertIsNone(output['rows'][3]['Amount'])
+        self.assertEqual([output['rows'][0][k] for k in ['Bare', 'JsTotal', 'FromExpr']], [100, 202, 10])
 
     def test_csv_without_header_checks_the_first_json_cell(self):
         output = dict(header=False, columns=[dict(name='JSON', type='string', comparison='json_ast')],
@@ -441,6 +472,20 @@ class RunCheckTests(unittest.TestCase):
         self.assertNotEqual(rows[1]['R_Delta'], 0.249999)
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
 
+    def test_replacement_boolean_and_mixed_use_only_approved_task_and_input(self):
+        for name, task, expected_name in [('replace-boolean', 'task-boolean.md', 'expected.json'),
+                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json')]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['expected_name'], expected_name)
+            self.assertEqual(case['input_files'], ['input.csv'])
+            self.assertTrue((case['data'] / 'input.csv').is_file())
+            expected = runner.expected_for(case, '/test/replacement.lgp')
+            self.assertEqual(expected['package_path'], '/test/replacement.lgp')
+            self.assertEqual(len(expected['outputs'][0]['rows']), 8)
+            self.assertEqual(expected['outputs'][0]['output_node_type'], 'transform.replace_columns')
+            self.assertEqual(len(expected['outputs'][0]['columns']), 5)
+
     def test_replace_convert_uses_independent_typed_fixture(self):
         case = runner.scenario('replace-convert')
         self.assertTrue(case['prompt'].is_file())
@@ -454,6 +499,27 @@ class RunCheckTests(unittest.TestCase):
                 self.assertRegex(row['DateText'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}$')
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
 
+    def test_missing_modes_use_task_csv_and_independent_oracle(self):
+        subprocess.run([sys.executable, str(runner.REPO / 'docs/node-development/nodes/missing-values/acceptance/modes/oracle.py'), '--check'],
+                       check=True, capture_output=True)
+        for name, task, csv_name, rows, nodes in [('missing-median-mode', 'task-median-mode.md', 'statistics.csv', 4, 3),
+                                                  ('missing-previous', 'task-previous.md', 'ordered.csv', 5, 3),
+                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3)]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['input_files'], [csv_name])
+            self.assertTrue((case['data'] / csv_name).is_file())
+            self.assertIn('{{PACKAGE_PATH}}', case['prompt'].read_text())
+            expected = runner.expected_for(case, '/test/missing.lgp')
+            self.assertEqual(expected['package_path'], '/test/missing.lgp')
+            self.assertEqual([n['type'] for n in expected['nodes']], ['imports.text', 'preprocessing.data_recovery', 'exports.text'])
+            if rows: self.assertEqual(len(expected['outputs'][0]['rows']), rows)
+            subprocess.run(['node', '--input-type=module', '-e',
+                            "import {parseExpectedOutputs} from './scripts/node-acceptance/expected-outputs.mjs';"
+                            "let s='';for await(const part of process.stdin)s+=part;parseExpectedOutputs(JSON.parse(s));"],
+                           input=json.dumps(expected), text=True, check=True, cwd=runner.REPO, capture_output=True)
+            self.assertIn(name, runner.scenario_names(name))
+
     def test_grouping_median_uses_modes_task_csv_and_independent_oracle(self):
         case = runner.scenario('grouping-median')
         self.assertEqual(case['prompt'].name, 'task-median.md')
@@ -466,6 +532,19 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual([(c['name'], c['type']) for c in expected['outputs'][0]['columns']], [('Region', 'string'), ('Metric', 'real')])
         self.assertEqual({r['Region']: r['Metric'] for r in expected['outputs'][0]['rows']}, {'B': 3, 'A': 4, 'C': 7, 'D': None, 'E': 2})
         self.assertIn('grouping-median', runner.scenario_names('grouping-median'))
+
+    def test_grouping_cycle_two_uses_approved_tasks_and_oracle(self):
+        for scenario, mode, types in [('grouping-mode', 'mode', ['string', 'integer', 'string']),
+                                     ('grouping-stddev', 'stddev', ['string', 'real']),
+                                     ('grouping-null-count', 'null_count', ['string', 'integer', 'integer'])]:
+            with self.subTest(scenario=scenario):
+                case = runner.scenario(scenario)
+                self.assertEqual(case['prompt'].name, 'task-' + scenario.removeprefix('grouping-') + '.md')
+                self.assertEqual(case['input_files'], ['modes.csv'])
+                expected = runner.expected_for(case, '/test/modes.lgp')
+                self.assertEqual(expected['outputs'], json.loads(subprocess.check_output([
+                    sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages'])
+                self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], types)
 
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')

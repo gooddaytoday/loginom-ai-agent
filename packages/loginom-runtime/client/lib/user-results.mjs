@@ -63,7 +63,7 @@ export function compactNodeRequestFailure(outcome,request={}) {
 
 export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
-  const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source','server_profile']) : {};
+  const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source','server_profile','full_import_verification']) : {};
   if(data?.variable_ports){
     output.variable_ports=data.variable_ports.map(port=>({...pick(port,['port','kind','port_guid','fresh','source','native_source','read_id','execution_id','complete','count','completeness','package_modified']),
       variables:port.variables.map(variable=>({...pick(variable,['id','index','name','label','type']),
@@ -86,6 +86,8 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   if (data?.format_restoration) output.format_restoration = pick(data.format_restoration, ['restored', 'table']);
   if (data?.workflow_return) output.workflow_returned = data.workflow_return.verified === true;
   const limitations=[...(node?.warnings??[])];
+  for(const proof of data?.full_import_verification??[])if(proof.status!=='verified')
+    limitations.push('N не сверено: '+proof.reason+'. В итоговом ответе явно укажи «N не сверено» и эту причину; N scan и число строк группировки не подтверждают полный импорт.');
   if(outcome?.status==='SUCCEEDED')limitations.push(...calculatorPrecisionWarnings(node));
   // Delivery jobs carry their byte-verified destination in outcome directly.
   if (!node && outcome) Object.assign(output, outcome);

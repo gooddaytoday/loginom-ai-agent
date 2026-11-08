@@ -21,6 +21,20 @@ test('union native automatic command is narrowed to explicit overrides and final
  assert.deepEqual(r.configuration.mappings[0],{port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']});
  assert.equal(f.actions.filter(a=>a.ref==='auto').length,1);assert.equal(f.actions[0].verb,'right_click');
 });
+test('combined matching retains the native label fallback without replaying the automatic command',async()=>{
+ const f=fixture();f.c.input_fields[0][0].label='Title';
+ f.c.input_fields[1].forEach(field=>field.label=field.name==='Right'?'TITLE':'Other');
+ f.state.ui.elements.find(e=>e.tid?.endsWith('col1_A')).allowed_actions.push('right_click');
+ const perform=f.channel.perform;f.channel.perform=async spec=>{
+  const action=spec.resolve(f.state);
+  if(action.verb==='right_click'){f.actions.push(action);f.state.ui.elements.push({tid:'mnUnionGrid;mniLinksAuto',ref:'auto',allowed_actions:['click']});return;}
+  if(action.ref==='auto'){f.actions.push(action);f.state.ui.elements.splice(f.state.ui.elements.findIndex(e=>e.ref==='auto'),1);f.c.mappings[0]={port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']};return;}
+  return perform(spec);
+ };
+ const result=await configureUnion(f.channel,{...p,auto_match:'name_then_label_type',tables:[{port:1,fields:[]}]},{request:{finish:'done'}});
+ assert.deepEqual(result.configuration.mappings[0],{port:1,pairs:[{main:'A',source:'Right'}],unmatched:['Wrong']});
+ assert.deepEqual(f.actions.map(a=>a.verb),['right_click','click']);
+});
 test('union replaces the automatic compatible choice with the explicit source',async()=>{const f=fixture();const r=await configureUnion(f.channel,p,{request:{finish:'execute'}});assert.equal(r.configuration.mappings[0].pairs[0].source,'Right');assert.equal(f.actions.length,3);});
 test('union does not repeat a mapping gesture after losing its reply',async()=>{const f=fixture('lost response');await assert.rejects(configureUnion(f.channel,p,{request:{finish:'execute'}}),/lost response/);assert.equal(f.actions.length,1);});
 test('union Close leaves the entire draft unchanged',async()=>{const f=fixture(),before=structuredClone(f.c);const r=await configureUnion(f.channel,p,{request:{finish:'close'}});assert.equal(r.effect_possible,false);assert.deepEqual(f.c,before);assert.equal(f.actions.length,0);});
