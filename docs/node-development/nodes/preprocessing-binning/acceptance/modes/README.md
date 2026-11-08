@@ -44,6 +44,18 @@ runtime не изменён, сценарии run-check не зарегистр�
 count=2 располагает min/max в центрах крайних интервалов; SD использует population
 variance и ±1/±2 σ. Эти две формулы ещё не приняты как полный native-контракт.
 
+**Обязательная сверка на стенде первым шагом цикла** (решение 5 LAB-1119; при
+расхождении — стоп и docs-PR): expected-auto/expected-sd утверждают не только эти
+формулы, но и соглашения, которые наблюдением не подтверждены:
+- формулы: центры крайних интервалов auto, population SD, ±1/±2 σ;
+- включение краёв интервалов у auto и SD (LowBoundIncl/UppBoundIncl, LowBoundQuota/UppBoundQuota);
+- внешние границы SD = μ±2σ;
+- LowLimitOpen/UppLimitOpen (и LowLimOpen/UppLimOpen строк)=True у всех интервалов SD;
+- LowDev=LowBound (и UppDev=UppBound);
+- BinQuota=NULL.
+
+Пока сверка не пройдена, эти столбцы не дают PASS/FAIL.
+
 Штатный parser принимает все три expected после замены {{PACKAGE_PATH}}.
 ordered/column_order/порты/NULL/типы — стандартные; Real abs/rel=1e-12,
 остальные значения точны, незаданные метки колонок — label_any.
