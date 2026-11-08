@@ -34,3 +34,18 @@ for name,task,expected in [('smoothing-haar','task-wavelet.md','expected.json'),
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
+
+test('non-Haar wavelets resolve approved tasks and private oracle tables with one CSV',()=>{
+ const result=spawnSync('python3',['-B','-c',`import importlib.util
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+for name,variant in [('db2','db2-symmetric'),('db2-depth2','db2-depth2'),('coif1','coif1-symmetric'),('cdf97','cdf97-symmetric'),('db2-zero','db2-zero'),('cdf97-reflect','cdf97-reflect')]:
+ c=r.scenario('smoothing-'+name);e=r.expected_for(c,'/owned/wavelet.lgp');o=e['outputs'][0]
+ assert c['prompt'].name=='task-'+variant+'.md' and c['input_files']==['wavelet.csv'] and c['export_count']==1
+ assert c['expected_name']=='expected-'+variant+'.json' and c['source'].name=='modes'
+ assert [f['name'] for f in o['columns']]==['RowID','X','Tag','X_S'] and len(o['rows'])==8
+ assert o['columns'][-1]['tolerance']==dict(abs=1e-8,rel=1e-10)
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});

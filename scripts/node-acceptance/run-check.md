@@ -831,3 +831,9 @@ Save, independent cold execution and confirmed package close/logout are required
 immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
 `fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
 real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.
+
+`smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
+`smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
+expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
+передаётся модели. Все 8 строк, RowID,X,Tag,X_S, real abs 1e-8 / rel 1e-10,
+CSV, Save, cold без перенастройки и cleanup; CDF сохраняется без order.
