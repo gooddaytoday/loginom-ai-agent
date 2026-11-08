@@ -1,3 +1,11 @@
+`factor-rotation` uses the approved factor-analysis `modes/task-rotation.md`
+and only `fixtures/rotation.csv`. The intermediate full typed Varimax round
+is checked by `factor-initial-signs`; the final Quartimax round must belong
+to the same node with unchanged X/Y/Z features and two trained factors.
+The independent Kaiser oracle checks both ports, exact field order and Factor3
+(NULL scores, zero loadings). Stock final CSV, Save, cold and cleanup apply.
+Oracle and expected values never reach the model.
+
 `corr-ranks` uses the approved `research-corranalysis/acceptance/modes/task-ranks.md`
 and ranks.csv only. The stage-0 oracle stays outside the model workspace. Full
 production checkpoints verify Spearman followed by Kendall tau-b on the same

@@ -470,7 +470,7 @@ export interface CoarseClassesConfigurationReadback {
 export interface FactorAnalysisConfigurationReadback {
   kind: 'factor_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'pca_fixed'; features: string[];
-  factors: number; rotation: 'none'; training: ClusteringConfigurationReadback['training'];
+  factors: number; rotation: 'none' | 'varimax' | 'quartimax'; training: ClusteringConfigurationReadback['training'];
   output_mappings: Array<{port: number; fields: Array<{index: number; name: string; label: string;
     type: string; data_kind: string; source_name: string}>}>;
   package_persistence_verified: false;

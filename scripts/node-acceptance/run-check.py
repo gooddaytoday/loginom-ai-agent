@@ -198,6 +198,10 @@ def scenario(name, case_root=None, *, cases=None):
         kind = name.removeprefix('clustering-scale-')
         return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
                     input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
+    if name == 'factor-rotation':
+        src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-rotation.md', data=src / 'fixtures', base=None,
+                    input_files=['rotation.csv'], export_count=2, factor_mode='quartimax', oracle=src / 'oracle.py')
     if name in ['factor-auto', 'factor-cap']:
         src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
         return dict(source=src / 'modes', prompt=src / 'modes' / ('task-auto.md' if name == 'factor-auto' else 'task-cap.md'),
@@ -2017,6 +2021,20 @@ class Runner:
                     assert initial, 'FACTOR_INITIAL_EIGENVALUE_SAME_NODE_MISSING'
                     write(folder / 'factor-initial.json', initial)
                     write(folder / 'factor-initial-expected.json', dict(read(src / 'expected.json')['cases']['eigenvalue'], package_path=package))
+                    self.phase('factor-initial-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                        'factor-signs', folder / 'factor-initial-expected.json', folder / 'factor-initial.json', folder / 'factor-initial-aligned.json'], folder, timeout=60)
+                elif spec['factor_mode'] == 'quartimax':
+                    assert final['mode'] == 'pca_fixed' and final['factors'] == 2 and final['rotation'] == 'quartimax', 'FACTOR_FINAL_QUARTIMAX_MISSING'
+                    assert final['features'] == ['X', 'Y', 'Z'], 'FACTOR_ROTATION_FEATURES_CHANGED'
+                    initial = next((group for group in complete[:-1] if
+                        configurations[group[0]['execution']['execution_id']].get('mode') == 'pca_fixed' and
+                        configurations[group[0]['execution']['execution_id']].get('factors') == 2 and
+                        configurations[group[0]['execution']['execution_id']].get('features') == final['features'] and
+                        configurations[group[0]['execution']['execution_id']].get('rotation') == 'varimax' and
+                        group[0]['node'] == complete[-1][0]['node']), None)
+                    assert initial, 'FACTOR_INITIAL_VARIMAX_SAME_NODE_MISSING'
+                    write(folder / 'factor-initial.json', initial)
+                    write(folder / 'factor-initial-expected.json', dict(read(src / 'expected.json')['cases']['varimax'], package_path=package))
                     self.phase('factor-initial-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
                         'factor-signs', folder / 'factor-initial-expected.json', folder / 'factor-initial.json', folder / 'factor-initial-aligned.json'], folder, timeout=60)
                 else:

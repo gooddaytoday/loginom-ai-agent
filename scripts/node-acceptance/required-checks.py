@@ -77,7 +77,7 @@ RULES = (
     ((C + 'clustering-*.mjs',), ('live-ui',), ('clustering-apply', 'clustering-gmeans', 'n19', 'r1', 'r2', 'clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
     (('docs/node-development/nodes/datamining-clustering/acceptance/scaling/**',), ('live-ui',),
      ('clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
-    ((C + 'factor-analysis-*.mjs', 'docs/node-development/nodes/research-factoranalysis/acceptance/**'), ('live-ui',), ('factor-pca', 'factor-retrain', 'factor-auto', 'factor-cap')),
+    ((C + 'factor-analysis-*.mjs', 'docs/node-development/nodes/research-factoranalysis/acceptance/**'), ('live-ui',), ('factor-pca', 'factor-retrain', 'factor-auto', 'factor-cap', 'factor-rotation')),
     ((C + 'assn-rules-*.mjs', 'docs/node-development/nodes/datamining-assnrules/acceptance/**'), ('live-ui',), ('assnrules-basic', 'assnrules-length')),
     (('scripts/node-acceptance/clustering-normalized.mjs',
       'docs/node-development/nodes/datamining-clustering/acceptance/normalized/**'), ('live-ui',), ('clustering-normalized',)),
