@@ -48,3 +48,20 @@ print('PASS')`;
  const result=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
+test('ACF empty/null replace the same import and expect a fixed execution error without outputs',()=>{
+ const script=`import importlib.util, json
+from pathlib import Path
+p=Path('scripts/node-acceptance/run-check.py')
+s=importlib.util.spec_from_file_location('run_check',p); m=importlib.util.module_from_spec(s); s.loader.exec_module(m)
+src=Path('docs/node-development/nodes/research-autocorrelation/acceptance/edges')
+oracle=json.loads((src/'expected.json').read_text())
+for name,text in [('acf-empty','Во входных данных нет строк'),('acf-null',oracle['native_conventions']['null']['message'])]:
+ c=m.scenario(name); e=m.expected_for(c,'/own/edge.lgp')
+ assert c['prompt']==m.REPO/src/('task-'+name[4:]+'.md') and c['input_files']==['lab1144-series.csv','lab1144-'+name[4:]+'.csv']
+ assert all((c['data']/n).is_file() for n in c['input_files'])
+ assert e=={'package_path':'/own/edge.lgp','nodes':[{'type':'imports.text'},{'type':'research.auto_correlation'}],'outputs':[],'execution_error':{'text':text}}
+assert 'остановись' not in (src/'task-empty.md').read_text()
+print('PASS')`;
+ const result=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});

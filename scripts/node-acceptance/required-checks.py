@@ -71,7 +71,7 @@ RULES = (
      ('live-ui',), ('js-declared-empty',)),
     ((C + 'auto-correlation-*.mjs', 'docs/node-development/nodes/research-autocorrelation/acceptance/edges/**',
       'packages/product/skills/loginom-automation/references/nodes/research.auto_correlation.md'),
-     ('live-ui',), ('acf-nonzero', 'acf-one', 'acf-series', 'acf-eight', 'acf-update')),
+     ('live-ui',), ('acf-nonzero', 'acf-empty', 'acf-null', 'acf-one', 'acf-series', 'acf-eight', 'acf-update')),
     ((C + 'quality-*.mjs',), ('live-ui',), ('quality-default', 'quality-spikes')),
 
     ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights')),
