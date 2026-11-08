@@ -37,10 +37,13 @@ export async function observeImportBindingInventory({load,graph,channelFor,expec
   const node=targets[0].ref,links=graph.variable_links.filter(l=>l.target===node.node_id&&l.kind==='variables'&&l.input===0);assert.equal(links.length,1);
   const source=graph.nodes.find(n=>n.ref.node_id===links[0].source);assert.equal(source.type,'variables.user');
   const proof=await channelFor(source.ref,'cold-import-binding-source').configureUserVariables([],'close');
-  const channel=channelFor(node,'cold-import-binding'),mapped=await channel.readVariablePortMapping({direction:'input',kind:'variables',port:0});
+  const channel=channelFor(node,'cold-import-binding');
+  // Use the production readback order: restore the prepared target and settle
+  // its field editor before opening W1 after the source wizard was cancelled.
+  const s=await readImportBindingField(channel);
+  const mapped=await channel.readVariablePortMapping({direction:'input',kind:'variables',port:0});
   assert.ok(mapped.verified&&mapped.cleanup_complete&&mapped.independent_readback);
   const value=resolveImportBindingValue(proof,want.variable.name,mapped.mapping);
-  const s=await readImportBindingField(channel);
   const bindings=importBindingInventory(s.wizard.import_source.fields.source_path,{...value,mapping:mapped.mapping,source,link:links[0],graph},node),b=bindings[0];
   assert.equal(b.parameter,want.parameter);assert.equal(b.mode,want.mode);
   for(const [key,value] of Object.entries(want.variable))assert.deepEqual(b.variable[key],value);
