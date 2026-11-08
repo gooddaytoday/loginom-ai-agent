@@ -143,6 +143,7 @@ export interface SortingParameters {
   /** Full replacement, or omitted to preserve existing keys. */
   keys?: Array<{field: {kind: 'input_field'; name: string}; direction: 'ASC' | 'DESC'; case_sensitive?: boolean}>;
   compare_with_locale?: boolean;
+  max_threads?: 0 | 1 | 2 | 4 | 8 | 16 | 32;
 }
 export interface SortingConfigurationReadback {
   kind: 'sorting'; scope: 'observed_before_verified_finish'; node: NodeRef;
@@ -380,7 +381,7 @@ export interface AssnRulesConfigurationReadback {
 
 export interface LinRegressionConfigurationReadback {
   kind: 'lin_regression'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
-  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward' | 'stepwise' | 'ridge'; regularization?: {setup:'manual';lambda_l2:number}; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10; input_fields: string[]; target_field: string;
+  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward' | 'stepwise' | 'ridge' | 'lasso'; regularization?: {setup:'manual';lambda_l2:number} | {setup:'manual';lambda_l1:number}; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10; input_fields: string[]; target_field: string;
   intercept: true; normalization: 'none'; package_persistence_verified: false;
   training: ClusteringConfigurationReadback['training'];
 }

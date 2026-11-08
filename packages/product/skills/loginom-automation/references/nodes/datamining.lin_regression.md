@@ -5,7 +5,7 @@
 
 Для прогноза LinReg на новых данных используй `mode:"apply"` на уже обученном узле с сохранёнными `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`; `enter` обучает или переобучает модель.
 
-### LinReg на новых данных
+### Новые данные
 
 Сохранённые input_fields/target_field; enter обучает/переобучает.
 <!-- /mode -->
@@ -29,19 +29,19 @@ R² (`r2`) пока недоступен: native-приёмка не подтв�
 <!-- /mode -->
 
 <!-- mode: backward -->
-## Режим backward
-
-Для пошагового исключения факторов выбирай `datamining.lin_regression`, `mode:"backward"` в `dock_node_apply`. Передай `parameters.input_fields`, `target_field` и `linear_regression.selection.criterion:"f"`; `remove_significance:0.1` — порог исключения, `add_significance:0.05` — проверка отключённого сохранённого порога добавления. Настраиваемый порог исключения должен быть строго между 0 и 1. Для adjusted_r2/aic/aicc/bic/hqc пороги не передавай. R² (`r2`) отклоняется до эффекта с `NOT_APPLIED`, `effect_possible:false`; сообщи причину пользователю. Используй native Backward вместо Калькулятора или JS. Сохранение и повторное открытие должны сохранять метод и выбранные факторы без перенастройки.
+Для исключения факторов выбирай `mode:"backward"`, `linear_regression.selection.criterion:"f"`. `remove_significance:0.1` — порог исключения строго 0..1; `add_significance:0.05` — проверка отключённого порога добавления. Для adjusted_r2/aic/aicc/bic/hqc пороги не передавай.
 <!-- /mode -->
 
 <!-- mode: stepwise -->
-## Режим stepwise
-
-Для отбора с включением и исключением факторов используй `dock_node_apply`, тип `datamining.lin_regression`, `mode:"stepwise"`, вместо Калькулятора или JS. Передай `parameters.input_fields`, `target_field`, `linear_regression.selection:{criterion:"f",add_significance:0.05,remove_significance:0.1}`. Оба порога редактируются: строго 0..1, добавление меньше исключения. `finish:"execute"` обучает, затем исполняет; читай оба порта `read.ports:[0,1]`, экспортируй прогнозы с порта 0 и сохрани пакет. После открытия исполняй сохранённый граф без перенастройки. R² (`r2`) отклоняется до эффекта; сообщи причину, не заменяй критерий.
+Для включения и исключения выбирай `mode:"stepwise"`, `linear_regression.selection:{criterion:"f",add_significance:0.05,remove_significance:0.1}`. Оба порога редактируются, строго 0..1; добавление меньше исключения. Для остальных критериев пороги не передавай.
 <!-- /mode -->
 
 <!-- mode: ridge -->
 ## Ridge
 
 Use native `datamining.lin_regression` in `dock_node_apply`, `mode:"ridge"`, instead of Calculator/JS. Set `parameters:{input_fields:["X1","X2","X3"],target_field:"Y",linear_regression:{lambda_l2:1}}`. Manual L2 only; no auto-selection or bindings. Import Y as real/continuous, retain other source types. All rows train with intercept, no normalization/validation. `finish:"execute"` trains then executes; `read.ports:[0,1]` reads predictions and coefficients. Export port 0 with `exports.text`, Save; cold executes the saved graph.
+<!-- /mode -->
+
+<!-- mode: lasso -->
+Для LASSO используй `dock_node_apply`, `datamining.lin_regression`, `mode:"lasso"`, `parameters:{input_fields:["X1","X2","X3"],target_field:"Y",linear_regression:{lambda_l1:1}}`. Ручной L1 — конечное число ≥0. Точность 1e-10. Штраф RSS+λΣ|β| включает константу. Автоподбор λ и привязки не поддерживаются; сообщи причину. Строгая точность коэффициентов на коррелированных данных не гарантируется. Используй native LASSO вместо Калькулятора/JS. Y импортируй real/continuous, остальные типы сохраняй; все строки обучающие, константа, без нормализации/валидации. `finish:"execute"` явно обучает, затем исполняет; повторная настройка того же узла также требует обучения. Читай `read.ports:[0,1]`, экспортируй порт 0 через `exports.text`, сохрани пакет. Cold исполняет сохранённый граф без перенастройки.
 <!-- /mode -->
