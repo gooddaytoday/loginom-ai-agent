@@ -1,0 +1,305 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.ungroup_data"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.ungroup_data",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Total",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Total_Rounded",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "OutputValue",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Period",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "OutputTrend",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "OutputSI",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "OutputVT",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "OutputVTDesc",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Group": "G",
+          "Total": 100,
+          "Total_Rounded": 100,
+          "Item": "a",
+          "OutputValue": 25,
+          "Period": "2026-01-01T00:00:00.000",
+          "OutputTrend": 25,
+          "OutputSI": 1,
+          "OutputVT": 0,
+          "OutputVTDesc": "Разгруппированное"
+        },
+        {
+          "Group": "G",
+          "Total": 100,
+          "Total_Rounded": 100,
+          "Item": "b",
+          "OutputValue": 75,
+          "Period": "2026-01-01T00:00:00.000",
+          "OutputTrend": 75,
+          "OutputSI": 1,
+          "OutputVT": 0,
+          "OutputVTDesc": "Разгруппированное"
+        },
+        {
+          "Group": "G",
+          "Total": 100,
+          "Total_Rounded": 100,
+          "Item": "a",
+          "OutputValue": 25,
+          "Period": "2026-02-01T00:00:00.000",
+          "OutputTrend": 25,
+          "OutputSI": 1,
+          "OutputVT": 0,
+          "OutputVTDesc": "Разгруппированное"
+        },
+        {
+          "Group": "G",
+          "Total": 100,
+          "Total_Rounded": 100,
+          "Item": "b",
+          "OutputValue": 75,
+          "Period": "2026-02-01T00:00:00.000",
+          "OutputTrend": 75,
+          "OutputSI": 1,
+          "OutputVT": 0,
+          "OutputVTDesc": "Разгруппированное"
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.ungroup_data",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "UngroupQuality",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex1",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex2",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex3",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex4",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex5",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex6",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex7",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex8",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex9",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex10",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex11",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "SeasonalIndex12",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-12,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Item": "a",
+          "Group": "G",
+          "UngroupQuality": null,
+          "SeasonalIndex1": 1,
+          "SeasonalIndex2": 1,
+          "SeasonalIndex3": 1,
+          "SeasonalIndex4": 1,
+          "SeasonalIndex5": 1,
+          "SeasonalIndex6": 1,
+          "SeasonalIndex7": 1,
+          "SeasonalIndex8": 1,
+          "SeasonalIndex9": 1,
+          "SeasonalIndex10": 1,
+          "SeasonalIndex11": 1,
+          "SeasonalIndex12": 1
+        },
+        {
+          "Item": "b",
+          "Group": "G",
+          "UngroupQuality": null,
+          "SeasonalIndex1": 1,
+          "SeasonalIndex2": 1,
+          "SeasonalIndex3": 1,
+          "SeasonalIndex4": 1,
+          "SeasonalIndex5": 1,
+          "SeasonalIndex6": 1,
+          "SeasonalIndex7": 1,
+          "SeasonalIndex8": 1,
+          "SeasonalIndex9": 1,
+          "SeasonalIndex10": 1,
+          "SeasonalIndex11": 1,
+          "SeasonalIndex12": 1
+        }
+      ]
+    }
+  ]
+}
