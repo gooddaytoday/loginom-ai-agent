@@ -374,8 +374,8 @@ export interface ClusteringGmeansConfigurationReadback extends Omit<ClusteringCo
 export interface AssnRulesConfigurationReadback {
   kind: 'assn_rules'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'fp_growth'; transaction_field: string; item_field: string;
-  min_support_pct: number; min_confidence_pct: number; max_items: 2;
-  min_lift: 0; singletons: true; consequence_limit: 1;
+  min_support_pct: number; min_confidence_pct: number; max_items: 2 | 3;
+  min_lift: number; singletons: true; consequence_limit: 1 | 2;
   training: ClusteringConfigurationReadback['training']; package_persistence_verified: false;
 }
 
