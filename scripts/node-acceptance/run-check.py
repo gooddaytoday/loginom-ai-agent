@@ -90,6 +90,12 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['duplicates-typed', 'duplicates-empty', 'duplicates-singleton']:
+        root = REPO / 'docs/node-development/nodes/duplicates'
+        kind = 'keys' if name == 'duplicates-typed' else name.removeprefix('duplicates-')
+        return dict(source=root / 'acceptance', prompt=root / 'acceptance' / ('task-typed-keys.md' if kind == 'keys' else 'task-' + kind + '.md'),
+                    data=root / 'fixtures', input_files=['typed-' + kind + '.csv'], base=None, oracle=root / 'acceptance/modes/oracle.py',
+                    expected_name='modes/expected.json' if kind == 'keys' else 'modes/expected-' + kind + '.json')
     if name == 'import-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,

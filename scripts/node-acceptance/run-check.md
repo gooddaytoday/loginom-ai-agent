@@ -1,3 +1,10 @@
+`duplicates-typed`, `duplicates-empty`, `duplicates-singleton` use the approved
+`duplicates/acceptance/task-{typed-keys,empty,singleton}.md`, one corresponding
+`fixtures/typed-*.csv` and unchanged `acceptance/modes/expected*.json`.
+Only task and CSV reach the model. Stock exact typed matching checks Boolean,
+real precision, civil datetime, NULL versus empty string, all original fields
+and four marker columns; CSV, Save, cold execution and cleanup are required.
+
 `corr-ranks` uses the approved `research-corranalysis/acceptance/modes/task-ranks.md`
 and ranks.csv only. The stage-0 oracle stays outside the model workspace. Full
 production checkpoints verify Spearman followed by Kendall tau-b on the same

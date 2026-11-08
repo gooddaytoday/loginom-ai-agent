@@ -76,6 +76,15 @@ for(const [path,scenario] of [
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
 });
 
+for(const path of ['docs/node-development/nodes/duplicates/acceptance/task-typed-keys.md',
+ 'docs/node-development/nodes/duplicates/fixtures/typed-empty.csv',
+ 'packages/product/skills/loginom-automation/references/nodes/research.duplicates.md'])
+test(`duplicates typed acceptance paths require all three cases: ${path}`,t=>{
+ const r=repo(t);r.commit(path);const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['duplicates-typed','duplicates-empty','duplicates-singleton'])assert.ok(text.includes(name));
+});
+
 test('REST C1 requires four single-method cases and excludes the retired eight-row example',t=>{
  const r=repo(t);r.commit('packages/loginom-runtime/client/lib/rest-request.mjs');const text=r.list();
  for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
