@@ -124,6 +124,13 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=[], expected_name='expected.json')
+    if name == 'variables-totable-switch':
+        node = REPO / 'docs/node-development/nodes/variables-vartodata'
+        src = node / 'acceptance'
+        return dict(source=src, prompt=src / 'task-switch-run.md', data=node / 'fixtures', base=None, input_files=['modes.json'],
+                    expected_name='modes/expected-run.json', variable_only=True, variable_audit='variables-totable-switch',
+                    variable_initial='modes/expected-phases.json', variable_read_path='port',
+                    oracle=REPO / 'scripts/node-acceptance/variables-totable-switch.mjs')
     if name in ['quality-default', 'quality-spikes']:
         src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
         case = src / 'probe' if name == 'quality-spikes' else src

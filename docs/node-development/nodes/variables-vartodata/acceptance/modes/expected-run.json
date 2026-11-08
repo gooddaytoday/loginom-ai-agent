@@ -1,0 +1,53 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.user"
+    },
+    {
+      "type": "variables.to_table"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "variables.to_table",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "amount",
+          "label": "amount",
+          "type": "integer"
+        },
+        {
+          "name": "enabled",
+          "label": "enabled",
+          "type": "boolean"
+        },
+        {
+          "name": "missing",
+          "label": "missing",
+          "type": "integer"
+        },
+        {
+          "name": "rate",
+          "label": "rate",
+          "type": "real",
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "amount": 11,
+          "enabled": false,
+          "missing": null,
+          "rate": 0.125
+        }
+      ]
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import {variablesToTableConfigurationReadback} from './variables-vartodata-readb
 
 // W1 owns typed variable links; this module owns both orientations and table output.
 export function createVariablesToTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'variables.to_table',modes:['columns','rows'],revision:'variables-vartodata-v2-internal-1',
+ type:'variables.to_table',modes:['columns','rows'],revision:'variables-vartodata-v2-internal-2',
  readback:variablesToTableConfigurationReadback,parameterSchema:variablesToTableParametersSchema,
  validate:validateVariablesToTableParameters,
  async configureInputs(channel,mappings){

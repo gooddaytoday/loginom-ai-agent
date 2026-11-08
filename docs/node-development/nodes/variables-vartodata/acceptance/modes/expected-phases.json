@@ -1,0 +1,150 @@
+{
+  "switch_rows": {
+    "output_node_type": "variables.to_table",
+    "output_port": 0,
+    "ordered": true,
+    "column_order": "exact",
+    "columns": [
+      {
+        "name": "Name",
+        "label": "Имя",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "label": "Метка",
+        "type": "string"
+      },
+      {
+        "name": "Value",
+        "label": "Значение",
+        "type": "variant"
+      }
+    ],
+    "rows": [
+      {
+        "Name": "amount",
+        "DisplayName": "amount",
+        "Value": {
+          "cell_type": "integer",
+          "value": 7
+        }
+      },
+      {
+        "Name": "empty",
+        "DisplayName": "empty",
+        "Value": {
+          "cell_type": "string",
+          "value": ""
+        }
+      },
+      {
+        "Name": "enabled",
+        "DisplayName": "enabled",
+        "Value": {
+          "cell_type": "boolean",
+          "value": false
+        }
+      },
+      {
+        "Name": "missing",
+        "DisplayName": "missing",
+        "Value": null
+      }
+    ]
+  },
+  "changed_rows": {
+    "output_node_type": "variables.to_table",
+    "output_port": 0,
+    "ordered": true,
+    "column_order": "exact",
+    "columns": [
+      {
+        "name": "Name",
+        "label": "Имя",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "label": "Метка",
+        "type": "string"
+      },
+      {
+        "name": "Value",
+        "label": "Значение",
+        "type": "variant"
+      }
+    ],
+    "rows": [
+      {
+        "Name": "amount",
+        "DisplayName": "amount",
+        "Value": {
+          "cell_type": "integer",
+          "value": 11
+        }
+      },
+      {
+        "Name": "enabled",
+        "DisplayName": "enabled",
+        "Value": {
+          "cell_type": "boolean",
+          "value": false
+        }
+      },
+      {
+        "Name": "missing",
+        "DisplayName": "missing",
+        "Value": null
+      },
+      {
+        "Name": "rate",
+        "DisplayName": "rate",
+        "Value": {
+          "cell_type": "real",
+          "value": 0.125
+        }
+      }
+    ]
+  },
+  "switch_back_columns": {
+    "output_node_type": "variables.to_table",
+    "output_port": 0,
+    "ordered": true,
+    "column_order": "exact",
+    "columns": [
+      {
+        "name": "amount",
+        "label": "amount",
+        "type": "integer"
+      },
+      {
+        "name": "enabled",
+        "label": "enabled",
+        "type": "boolean"
+      },
+      {
+        "name": "missing",
+        "label": "missing",
+        "type": "integer"
+      },
+      {
+        "name": "rate",
+        "label": "rate",
+        "type": "real",
+        "tolerance": {
+          "abs": 0,
+          "rel": 0
+        }
+      }
+    ],
+    "rows": [
+      {
+        "amount": 11,
+        "enabled": false,
+        "missing": null,
+        "rate": 0.125
+      }
+    ]
+  }
+}

@@ -13,7 +13,10 @@ export async function configureVariablesToTable(channel,parameters,{request}){
  if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,draft_edits_skipped:true};
  const mode=request.mode;
  need(['columns','rows'].includes(mode),'Этот режим пока не поддерживается');
- need(request.target.kind==='new'||baseline.mode===mode,'Этот режим пока не поддерживается');
+ // Switching an existing node regenerates its derived output. A requested
+ // custom mapping would be dropped silently, so refuse before the first gesture.
+ need(request.target.kind==='new'||baseline.mode===mode||!request.mappings?.length,
+  'смена режима существующего узла пересоздаёт выход; mappings:[] и затем отдельная настройка соответствия');
  const control=(s,suffix,verb)=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+suffix&&e.allowed_actions.includes(verb));need(es.length===1,'unique wizard control required: '+suffix);return es[0];};
  if(baseline.mode!==mode){
   await channel.perform({condition:'select '+mode+' orientation once',initialObservation:state,ready:owner,identity:()=>node,

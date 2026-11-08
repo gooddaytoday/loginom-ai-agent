@@ -386,6 +386,20 @@ class RunCheckTests(unittest.TestCase):
             if kind == 'threshold':
                 self.assertIn('для I выбери замену средним', case['prompt'].read_text())
 
+    def test_variables_totable_switch_catalog_isolates_task_and_typed_phases(self):
+        case = runner.scenario('variables-totable-switch')
+        self.assertEqual(case['prompt'].name, 'task-switch-run.md')
+        self.assertEqual(case['input_files'], ['modes.json'])
+        self.assertTrue((case['data'] / 'modes.json').is_file() and case['variable_only'])
+        self.assertNotIn('oracle', case['prompt'].read_text().lower())
+        expected = runner.expected_for(case, '/test/switch.lgp')
+        self.assertEqual(expected['package_path'], '/test/switch.lgp')
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['amount', 'enabled', 'missing', 'rate'])
+        phases = json.loads((case['source'] / case['variable_initial']).read_text())
+        self.assertEqual(expected['outputs'][0], phases['switch_back_columns'])
+        self.assertEqual([c['name'] for c in phases['changed_rows']['columns']], ['Name', 'DisplayName', 'Value'])
+        self.assertEqual(expected['nodes'], [{'type': 'variables.user'}, {'type': 'variables.to_table'}])
+
     def test_variables_columns_catalog_uses_original_fixture_and_exact_typed_oracle(self):
         case = runner.scenario('variables-columns')
         self.assertEqual(case['source'].name, 'acceptance')

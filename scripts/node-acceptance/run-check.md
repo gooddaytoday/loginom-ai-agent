@@ -713,3 +713,10 @@ oracle и expected — нет. Проверяются все значения, �
 cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
 сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
 выгрузке run-check не различает — его подтверждает журнал вызова узла.
+
+`variables-totable-switch` (LAB-1095, «Переменные в таблицу», цикл 1): модель получает `task-switch-run.md`
+и `modes.json` (initial/changed; метки равны именам), сама собирает источник и преобразователь columns,
+затем переключает тот же узел columns→rows, правит источник, повторяет выполнение и возвращает columns.
+Ожидания — `acceptance/modes/oracle.py --write` (`expected-phases.json`, `expected-run.json`); типизированный
+аудит журнала `variables-totable-switch.mjs` (тот же GUID узла, связь сохранена, один преобразователь,
+свежие выполнения, Variant-подтипы строк). Save, cold без настройки и cleanup — штатные.
