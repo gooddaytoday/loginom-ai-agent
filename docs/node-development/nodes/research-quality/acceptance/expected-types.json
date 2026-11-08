@@ -1,0 +1,460 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.quality"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "research.quality",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Stamp",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Measure",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Flag": true,
+          "Stamp": "2026-01-01T00:00:00.000",
+          "Code": 1,
+          "Measure": 1.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 2,
+          "Flag": false,
+          "Stamp": "2026-01-02T00:00:00.000",
+          "Code": 1,
+          "Measure": 1.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 3,
+          "Flag": true,
+          "Stamp": "2026-01-03T00:00:00.000",
+          "Code": 2,
+          "Measure": 2.0,
+          "Text": "B"
+        },
+        {
+          "RowID": 4,
+          "Flag": null,
+          "Stamp": "2026-01-04T00:00:00.000",
+          "Code": 2,
+          "Measure": 2.0,
+          "Text": "B"
+        },
+        {
+          "RowID": 5,
+          "Flag": false,
+          "Stamp": null,
+          "Code": 3,
+          "Measure": 3.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 6,
+          "Flag": true,
+          "Stamp": "2026-01-06T00:00:00.000",
+          "Code": 3,
+          "Measure": 3.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 7,
+          "Flag": false,
+          "Stamp": "2026-01-07T00:00:00.000",
+          "Code": 4,
+          "Measure": 4.0,
+          "Text": "B"
+        },
+        {
+          "RowID": 8,
+          "Flag": true,
+          "Stamp": "2026-01-08T00:00:00.000",
+          "Code": 4,
+          "Measure": 4.0,
+          "Text": "B"
+        }
+      ]
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Stamp",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Measure",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Stamp",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Measure",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 3,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Stamp",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Code",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Measure",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Flag": true,
+          "Stamp": "2026-01-01T00:00:00.000",
+          "Code": 1,
+          "Measure": 1.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 2,
+          "Flag": false,
+          "Stamp": "2026-01-02T00:00:00.000",
+          "Code": 1,
+          "Measure": 1.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 3,
+          "Flag": true,
+          "Stamp": "2026-01-03T00:00:00.000",
+          "Code": 2,
+          "Measure": 2.0,
+          "Text": "B"
+        },
+        {
+          "RowID": 4,
+          "Flag": null,
+          "Stamp": "2026-01-04T00:00:00.000",
+          "Code": 2,
+          "Measure": 2.0,
+          "Text": "B"
+        },
+        {
+          "RowID": 5,
+          "Flag": false,
+          "Stamp": null,
+          "Code": 3,
+          "Measure": 3.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 6,
+          "Flag": true,
+          "Stamp": "2026-01-06T00:00:00.000",
+          "Code": 3,
+          "Measure": 3.0,
+          "Text": "A"
+        },
+        {
+          "RowID": 7,
+          "Flag": false,
+          "Stamp": "2026-01-07T00:00:00.000",
+          "Code": 4,
+          "Measure": 4.0,
+          "Text": "B"
+        },
+        {
+          "RowID": 8,
+          "Flag": true,
+          "Stamp": "2026-01-08T00:00:00.000",
+          "Code": 4,
+          "Measure": 4.0,
+          "Text": "B"
+        }
+      ]
+    },
+    {
+      "output_node_type": "research.quality",
+      "output_port": 4,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Col0",
+          "label": "N",
+          "type": "integer"
+        },
+        {
+          "name": "Col1",
+          "label": "DisplayName",
+          "type": "string"
+        },
+        {
+          "name": "Col2",
+          "label": "DataType",
+          "type": "string"
+        },
+        {
+          "name": "Col3",
+          "label": "DataKind",
+          "type": "string"
+        },
+        {
+          "name": "Col4",
+          "label": "Null",
+          "type": "integer"
+        },
+        {
+          "name": "Col5",
+          "label": "Out",
+          "type": "integer"
+        },
+        {
+          "name": "Col6",
+          "label": "Extr",
+          "type": "integer"
+        },
+        {
+          "name": "Col7",
+          "label": "Avg",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        },
+        {
+          "name": "Col8",
+          "label": "Moda",
+          "type": "variant"
+        },
+        {
+          "name": "Col9",
+          "label": "Median",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Col0": 1,
+          "Col1": "RowID",
+          "Col2": "Целый",
+          "Col3": "Непрерывный",
+          "Col4": 0,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": 4.5,
+          "Col8": {
+            "cell_type": "real",
+            "value": 1.875
+          },
+          "Col9": 5.0
+        },
+        {
+          "Col0": 2,
+          "Col1": "Flag",
+          "Col2": "Логический",
+          "Col3": "Дискретный",
+          "Col4": 1,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": 0.5714285714285714,
+          "Col8": {
+            "cell_type": "boolean",
+            "value": true
+          },
+          "Col9": null
+        },
+        {
+          "Col0": 3,
+          "Col1": "Stamp",
+          "Col2": "Дата/Время",
+          "Col3": "Непрерывный",
+          "Col4": 1,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": 46026.42857142857,
+          "Col8": {
+            "cell_type": "real",
+            "value": 46023.875
+          },
+          "Col9": 46026.0
+        },
+        {
+          "Col0": 4,
+          "Col1": "Code",
+          "Col2": "Целый",
+          "Col3": "Дискретный",
+          "Col4": 0,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": 2.5,
+          "Col8": {
+            "cell_type": "real",
+            "value": 1.375
+          },
+          "Col9": 3.0
+        },
+        {
+          "Col0": 5,
+          "Col1": "Measure",
+          "Col2": "Вещественный",
+          "Col3": "Дискретный",
+          "Col4": 0,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": 2.5,
+          "Col8": {
+            "cell_type": "real",
+            "value": 1.375
+          },
+          "Col9": 3.0
+        },
+        {
+          "Col0": 6,
+          "Col1": "Text",
+          "Col2": "Строковый",
+          "Col3": "Дискретный",
+          "Col4": 0,
+          "Col5": 0,
+          "Col6": 0,
+          "Col7": null,
+          "Col8": {
+            "cell_type": "string",
+            "value": "B"
+          },
+          "Col9": null
+        }
+      ]
+    }
+  ]
+}

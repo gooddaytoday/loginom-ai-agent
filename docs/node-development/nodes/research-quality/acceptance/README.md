@@ -123,3 +123,13 @@ python3 -B docs/node-development/nodes/research-quality/acceptance/oracle.py
 [Предложение и незавершённые проверки](../modes-stage0.md). Старые expected выше
 сохраняются; новые файлы LAB-1018 не утверждают native/runtime поддержку.
 После двух разрывов связи исследование остановлено по карточке.
+
+## Дополнение LAB-1103
+
+`task-types.md` + `../fixtures/types.csv` → `expected-types.json`.
+Воспроизведение: `python3 -B oracle-types.py` из этого каталога.
+Это независимый proposed expected всех пяти портов. Native rounded preflight
+и ограничения описаны в [modes-lab1103.md](../modes-lab1103.md).
+Boolean/date Moda subtypes требуют точного native preflight до модельного
+прогона. Скрытые настройки и frozen-fit apply через UI не найдены; для них
+нет выдуманного expected. Модели передавать только task/CSV.
