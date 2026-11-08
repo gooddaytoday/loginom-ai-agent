@@ -1,6 +1,7 @@
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {calculatorVariableMappingRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
+import {journalCopy} from './execution-journal.mjs';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
@@ -148,7 +149,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const acknowledge=async entry=>{
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,...entry};
     const saved=await record(event);
-    requireValue(saved && hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),
+    requireValue(saved && hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),
       'Node phase journal acknowledgement differs');
     return saved;
   };
@@ -318,8 +319,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       const replacementClosed=refusal?.proof?.closed;
-      const regressionRefusal=['datamining.lin_regression','preprocessing.binning','preprocessing.coarse_classes'].includes(request.target.type)&&request.mode==='apply'
-        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='preprocessing.coarse_classes'?'coarse_classes_apply_preserved':request.target.type==='preprocessing.binning'?'binning_apply_preserved':'linregression_apply_preserved')
+      const regressionRefusal=['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes'].includes(request.target.type)&&request.mode==='apply'
+        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='preprocessing.coarse_classes'?'coarse_classes_apply_preserved':request.target.type==='preprocessing.binning'?'binning_apply_preserved':request.target.type==='datamining.log_regression'?'logregression_apply_preserved':'linregression_apply_preserved')
         &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
@@ -431,7 +432,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
     if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      if(['datamining.lin_regression','preprocessing.binning','preprocessing.coarse_classes'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
+      if(['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
         &&value.settings_applied===false&&value.draft_discarded===true&&value.execution_started===false&&value.execution_id==null,
         'Applying a saved regression must discard the inspected draft without committing or training');
       else if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
@@ -623,7 +624,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
       phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
     const saved=await record(event);
-    requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+    requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),'Node phase journal acknowledgement differs');
     state.pending=null;state.cleanup_complete=true;state.result=structuredClone(result);
     return result;
   }
@@ -682,7 +683,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
     phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
   const saved=await record(event);
-  requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+  requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(journalCopy(event)),'Node phase journal acknowledgement differs');
   state.pending=null;state.cleanup_complete=true;state.effect_possible=true;state.result=structuredClone(result);
   return result;
 }

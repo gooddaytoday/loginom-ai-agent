@@ -1,0 +1,72 @@
+{
+  "type": "object",
+  "properties": {
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "input_field"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                "description": "ASCII name; title=label."
+              }
+            },
+            "required": [
+              "kind",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "mean",
+              "constant",
+              "zero",
+              "median",
+              "most_probable",
+              "previous",
+              "linear",
+              "random",
+              "delete"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "field",
+          "method"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 128,
+      "minItems": 1
+    },
+    "max_nulls_percent": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "ordered": {
+      "type": "boolean",
+      "description": "Explicit input order: true enables previous/linear, using physical source row order; never sort by RowID."
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

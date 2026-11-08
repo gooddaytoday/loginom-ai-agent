@@ -1,5 +1,9 @@
 # Сглаживание
 
+LAB-1055 (07.11, mas3): **checkpoint / blocked после второго разрыва**.
+[Продолжение подплана](plan.md#8-lab-1055-checkpoint) · [новые предложения и статусы](acceptance/modes/README.md).
+Новые runtime-режимы не реализованы; критерии ожидают решения владельца.
+
 Component ID: `component.preprocessing.Smoothing`, slug `preprocessing-smoothing`.
 Предложение runtime: `preprocessing.smoothing`, mode `hodrick_prescott`.
 

@@ -1,4 +1,6 @@
+import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
+import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
@@ -30,6 +32,7 @@ const args = parseArgs({
     'csv-delimiter': { type: "string", default: ',' },
     'csv-header': { type: "string", default: 'names' },
     'csv-encoding': { type: "string", default: 'UTF-8' },
+    'text-export-case': { type: 'string' },
     'exact-port-windows': { type: 'boolean', default: false },
     'sampling-baseline': { type: 'string' },
   },
@@ -65,6 +68,10 @@ const config = JSON.parse(await readFile(args.config, "utf8"))
 const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
+if(args['text-export-case']){
+ if(!args.csv||!['fixed-width','windows-1252','utf16-le','utf16-be'].includes(args['text-export-case']))throw Error('COLD_TEXT_FILE_REQUIRED');
+ execFileSync('python3',['-B',new URL('../../docs/node-development/nodes/text-export/acceptance/modes/oracle.py',import.meta.url).pathname,'--case',args['text-export-case'],'--file',resolve(args.csv)],{stdio:'pipe'});
+}
 const rawExpected = JSON.parse(await readFile(args.expected, "utf8"))
 const excelExpected=excelColdExpected(rawExpected)
 if(excelExpected){
@@ -261,6 +268,12 @@ page = context.pages()[0]
     reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
    }
   }
+  if(expected.logreg_normalization){
+   const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');
+   if(nodes.length!==1)throw Error('LOGREG_NORMALIZATION_ONE_SAVED_NODE');
+   const settings=await observeLogregNormalizationSaved({load,channel:channelFor(nodes[0].ref,'logreg-normalization-saved')});
+   await record({phase:'logreg_normalization_saved_settings',node:nodes[0].ref,...settings});
+  }
   if(expected.clustering_normalized){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');
    if(nodes.length!==1)throw Error('CLUSTERING_NORMALIZED_ONE_SAVED_NODE');
@@ -318,6 +331,10 @@ page = context.pages()[0]
       ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
     return result;
   };
+  if(expected.excel_named_range&&target.type==='imports.excel'){
+   const settings=await inspectSavedExcelNamed({load,channel,execute,graph,node,expected:expected.excel_named_range,origin});
+   await record({phase:'cold_excel_named_saved_settings',node,...settings});
+  }
   if(expected.tree_settings&&['trees.from_table','trees.to_json'].includes(target.type)){
    const settings=await observeTreeConversionSavedSettings({load,channel,expected:expected.tree_settings,type:target.type});
    await record({phase:'cold_tree_saved_settings',node,...settings});

@@ -44,13 +44,19 @@ export function resolveReformChanges(p,baseline) {
  const projected=fields.map(f=>changes.find(c=>c.original.record_id===f.record_id)?.wanted??f);
  need(new Set(projected.map(f=>f.name.toLowerCase())).size===projected.length,'Reform output name collision');
  need(projected.some(f=>!f.excluded),'At least one reform field must remain');
- // Move renames to vacated names in dependency order. Cyclic swaps require a
- // separate explicit operation; do not silently introduce temporary names.
+ // Move renames to vacated names in dependency order. A cycle (A<->B) is broken
+ // by parking one field under a temporary name that no field uses, then renaming
+ // it last; the temporary name never reaches the projected final fields.
  const remaining=[...changes],ordered=[],occupied=new Map(fields.map(f=>[f.name.toLowerCase(),f.record_id]));
+ const taken=new Set([...fields,...projected].map(f=>f.name.toLowerCase()));
+ const free=change=>!occupied.has(change.wanted.name.toLowerCase())||occupied.get(change.wanted.name.toLowerCase())===change.original.record_id;
+ const move=change=>{occupied.delete(change.original.name.toLowerCase());occupied.set(change.wanted.name.toLowerCase(),change.original.record_id);ordered.push(change);};
  while(remaining.length) {
-  const index=remaining.findIndex(c=>!occupied.has(c.wanted.name.toLowerCase())||occupied.get(c.wanted.name.toLowerCase())===c.original.record_id);
-  need(index>=0,'Cyclic reform renames are unsupported');
-  const [change]=remaining.splice(index,1);occupied.delete(change.original.name.toLowerCase());occupied.set(change.wanted.name.toLowerCase(),change.original.record_id);ordered.push(change);
+  const index=remaining.findIndex(free);
+  if(index>=0){move(remaining.splice(index,1)[0]);continue;}
+  let n=1;while(taken.has('_reform_tmp_'+n))n++;const temporary='_reform_tmp_'+n;taken.add(temporary);
+  const [change]=remaining.splice(0,1),parked={original:change.original,wanted:{...change.original,name:temporary}};
+  move(parked);remaining.unshift({original:parked.wanted,wanted:change.wanted});
  }
  return {changes:ordered,fields:projected};
 }

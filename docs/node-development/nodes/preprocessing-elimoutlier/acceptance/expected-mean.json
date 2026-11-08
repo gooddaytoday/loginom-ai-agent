@@ -1,0 +1,147 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.elim_outlier"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-10,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0.0,
+          "Note": "zero"
+        },
+        {
+          "RowID": 2,
+          "X": 2.0,
+          "Note": "a"
+        },
+        {
+          "RowID": 3,
+          "X": 2.0,
+          "Note": "b"
+        },
+        {
+          "RowID": 4,
+          "X": 2.0,
+          "Note": "c"
+        },
+        {
+          "RowID": 5,
+          "X": 2.0,
+          "Note": "d"
+        },
+        {
+          "RowID": 6,
+          "X": 4.0,
+          "Note": "e"
+        },
+        {
+          "RowID": 7,
+          "X": 4.571428571428571,
+          "Note": "spike"
+        },
+        {
+          "RowID": 8,
+          "X": null,
+          "Note": "missing"
+        }
+      ]
+    },
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 1,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-10,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    },
+    {
+      "output_node_type": "preprocessing.elim_outlier",
+      "output_port": 2,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-10,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 7,
+          "X": 20.0,
+          "Note": "spike"
+        }
+      ]
+    }
+  ]
+}

@@ -6,8 +6,8 @@ import {readLogRegressionOutputs,configureLogRegressionOutputs} from './log-regr
 import {logRegressionParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error('Logistic regression: '+m);};
-export function createLogRegressionNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'datamining.log_regression',modes:['enter','forward','backward','stepwise'],revision:'log-regression-v1-internal-1',parameterSchema:logRegressionParametersSchema,
+export function createLogRegressionNodeSupport(config){const support=createTabularTransformNodeSupport(config,{
+ type:'datamining.log_regression',modes:['enter','forward','backward','stepwise','apply'],revision:'log-regression-v1-internal-1',parameterSchema:logRegressionParametersSchema,
  validate:validateLogRegressionParameters,validateInput:(p,resolved,native)=>resolveLogRegressionRoles(p,resolved.fields??native.target_fields),readback:logRegressionConfigurationReadback,
  configurationObservation:{condition:'logistic feature roles',readLogRegression:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_logregression?.verified===true},
  async configure(channel,p,context){
@@ -19,6 +19,7 @@ export function createLogRegressionNodeSupport(config){return createTabularTrans
  },
  configureAllOutputs:configureLogRegressionOutputs,
  async beforeGraphExecute(options,ctx,configuration,channel){
+  if(options.operation.nodeApply.request.mode==='apply')return {};
   const request={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref};
   const graph=await options.operation.nodeTargetAdapter.observe(request,ctx.deadline);
   const source=graph.links.filter(e=>e.target===ctx.node.node_id).map(e=>({node:graph.nodes.find(n=>n.ref.node_id===e.source)?.ref,output:e.output,input:e.input}));
@@ -29,4 +30,15 @@ export function createLogRegressionNodeSupport(config){return createTabularTrans
   return {training:{...training,source}};
  },
  readOutputs:readLogRegressionOutputs,
-});}
+});return {...support,nodeApplyDriverFactory:options=>{
+ const drivers=support.nodeApplyDriverFactory(options);
+ if(options.operation.parameters.mode!=='apply')return drivers;
+ return {...drivers,
+  async mapPorts(mappings,ctx){
+   if(ctx.receipt_id===options.operation.id+':input_mapping')return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false};
+   return drivers.mapPorts(mappings,ctx);
+  },
+  async finish(mode,ctx){return drivers.finish('close',ctx);},
+  async finishGraph(mode,ctx){return {...await drivers.finishGraph(mode,ctx),settings_applied:false};},
+ };
+}};}

@@ -9,7 +9,7 @@ const semantic=c=>({input_fields:c.input_fields,keys:pairs(c.keys),mode:c.mode,c
 export async function configureJoin(channel,p,{request}){
  let s=await channel.observe({condition:'complete join settings',readJoin:true,ready:joinReady}),before=s.node_join;
  if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:before,draft_edits_skipped:true};
- if(!p.keys){need(before.mode===request.mode,'Preserved join mode differs from requested mode');need(before.keys.length>0,'Preserved join has no keys');return {verified:true,cleanup_complete:true,effect_possible:false,configuration:before,keys:before.keys.map(({left,right})=>({left,right})),preserved:true};}
+ if(!p.keys){need(before.mode===request.mode,'Preserved join mode differs from requested mode');need(before.keys.length>0||before.mode==='full','Preserved join has no keys');return {verified:true,cleanup_complete:true,effect_possible:false,configuration:before,keys:before.keys.map(({left,right})=>({left,right})),preserved:true};}
  resolveJoinKeys(p,before.input_fields);
  const changes=[];
  if(before.mode!==request.mode){

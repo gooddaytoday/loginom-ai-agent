@@ -1,0 +1,6 @@
+{
+  "initial": [{"name":"amount","label":"Сумма","type":"integer","value":7}, {"name":"empty","label":"Пустая строка","type":"string","value":""}, {"name":"enabled","label":"Включён","type":"boolean","value":false}, {"name":"missing","label":"Пропуск","type":"integer","value":null}],
+  "changed": [{"name":"amount","label":"Сумма","type":"integer","value":11}, {"name":"enabled","label":"Включён","type":"boolean","value":false}, {"name":"missing","label":"Пропуск","type":"integer","value":null}, {"name":"rate","label":"Доля","type":"real","value":0.125}],
+  "variant": [{"name":"mixed","label":"Переменное значение","type":"variant","cell_type":"string","value":"19"}],
+  "empty": []
+}

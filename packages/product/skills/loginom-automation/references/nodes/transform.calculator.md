@@ -1,5 +1,6 @@
 # Калькулятор (`transform.calculator`)
 
+<!-- mode: expression -->
 Для формул с переменными сценария используй `dock_node_apply` с
 `target.type:"transform.calculator"`, `mode:"expression"`.
 В `parameters.expressions[].formula` пиши `Var.Amount`; табличное поле
@@ -39,3 +40,26 @@ operation_id на том же узле. После подтверждённой 
 в следующий Калькулятор. Для ранга по позиции используй
 [RowNum()](https://help.loginom.ru/userguide/processors/func/calc-func/other.html#rownum);
 начало нумерации и правила для равных значений сверяй с заданием и Help.
+
+## Промежуточные выражения и кэш
+
+`intermediate:true` — вспомогательное выражение: не выход, в `mappings` не
+указывай, дальше — `Expr.Имя`. `cached:true` включает кэш; незаданные флаги
+сохраняются. `order` включает все выражения. Только кэш выключается так:
+`target:{kind:"existing",name:"Helper"},cached:false`, `finish:"execute"`;
+выход прочитай заново целиком.
+
+## Продолжение пакета
+
+В продолжении после открытия пакета сохранение не доказывает активность выхода.
+Перед новым `transform.calculator` подтверди нужный выход того же существующего табличного
+источника. Используй `loginom_dock_node_read` с успешной локальной операцией
+текущей подготовки; если её нет — existing apply с точным ref, прежним типом/mode,
+`inputs:[]`, пустым patch по схеме и `finish=execute`. Дождись подтверждённого
+выполнения/чтения источника; примеры пустого patch — [Граф и узлы](../canvas.md#продолжение-пакета).
+Отказ `calculator preflight requires an active source output` с `NOT_APPLIED`,
+`effect_possible=false`, `cleanup_complete=true` означает, что новый узел ещё не
+создан: после выполнения источника повтори запрос с новым operation_id, не
+пересоздавая источник и не освобождая несуществующий целевой узел. Это не разрешает
+повтор неизвестного запуска или автоматический запуск REST/JS/экспорта вне просьбы.
+<!-- /mode -->

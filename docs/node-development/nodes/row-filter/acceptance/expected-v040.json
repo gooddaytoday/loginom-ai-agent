@@ -1,0 +1,91 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "transform.filter_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Region": "North",
+          "Amount": 10
+        },
+        {
+          "RowID": 2,
+          "Region": "South",
+          "Amount": 20
+        },
+        {
+          "RowID": 3,
+          "Region": "North",
+          "Amount": 30
+        }
+      ]
+    },
+    {
+      "output_node_type": "transform.filter_data",
+      "output_port": 1,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 4,
+          "Region": "East",
+          "Amount": 20
+        },
+        {
+          "RowID": 5,
+          "Region": null,
+          "Amount": 40
+        },
+        {
+          "RowID": 6,
+          "Region": "north",
+          "Amount": 50
+        }
+      ]
+    }
+  ]
+}

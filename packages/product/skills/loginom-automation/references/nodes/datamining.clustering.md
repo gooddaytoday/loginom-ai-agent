@@ -1,5 +1,6 @@
 # Кластеризация (`datamining.clustering`)
 
+<!-- mode: k_means -->
 ## Кластеризация k-means
 
 Используй `target.type:"datamining.clustering"`, `mode:"k_means"`, вход 0.
@@ -34,3 +35,4 @@ Distance — в нормированных. Пропуск параметра н
 
 Seed фиксируй для повторяемости;
 номера кластеров — метки, а не ранги.
+<!-- /mode -->

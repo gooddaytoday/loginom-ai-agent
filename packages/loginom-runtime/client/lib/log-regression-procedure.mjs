@@ -1,6 +1,8 @@
+import {configureLogRegressionNormalization} from './log-regression-normalization.mjs';
 import {resolveLogRegressionRoles} from './log-regression-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('Logistic regression: '+m);};
 const semantic=fs=>fs.map(({selected,origin_type,...f})=>f);
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -44,6 +46,7 @@ export async function configureLogRegressionRoles(channel,p,inputMapping){
 }
 
 export async function configureLogRegression(channel,parameters,{inputMapping,request}){
+ if(request?.mode==='apply')return configureLogRegressionApply(channel,parameters.logistic);
  const mode=request?.mode??'enter',p=parameters.logistic,roles=await configureLogRegressionRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const ready=kind=>s=>s.node_logregression?.verified===true&&s.node_logregression.kind===kind;
@@ -51,12 +54,14 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  const next=async(stage,destination)=>channel.perform({condition:'logistic '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Next unavailable').ref,expected_stage:destination})});
  await next('input_mapping','normalization');
- let state=await observe('normalization','complete logistic normalizers');const normalization=state.node_logregression;
+ let state=await observe('normalization','complete logistic normalizers');const baseline=state.node_logregression;
  const used=roles.configuration.fields.filter(f=>f.usage_type!==0);
- need(normalization.fields.length===used.length&&new Set(normalization.fields.map(f=>f.name)).size===used.length
-  &&normalization.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
-   &&(p.input_fields.includes(f.name)?f.norm_type===0&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
-  'only unnormalized continuous predictors and native categorical target encoding are supported');
+ need(baseline.fields.length===used.length&&new Set(baseline.fields.map(f=>f.name)).size===used.length
+  &&baseline.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
+   &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
+  'only none/standardize continuous predictors and native categorical target encoding are supported');
+ const normalization=await configureLogRegressionNormalization(channel,p,{request,baseline});
+ state=await observe('normalization','complete logistic normalizers after edit');
  if(normalization.source_status==='Не активировано'){
   await channel.perform({condition:'activate connected logistic input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
@@ -152,5 +157,53 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  const done=await channel.observe({condition:'logistic settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,normalization:normalization.fields,partition,classes:classes.map(({index,label})=>({index,label})),
   mode:observedMode,...(selection?{selection}:{}),target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
+  validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+}
+
+// Native apply is ActivateNode, not a new training method. Inspect the saved
+// wizard and discard it: even an unchanged Done can invalidate its model.
+async function configureLogRegressionApply(channel,p){
+ const observe=(stage,condition)=>channel.observe({condition,readLogRegression:true,
+  ready:s=>s.wizard?.stage===stage&&s.node_logregression?.verified===true});
+ const saved=async(value,message)=>{
+  if(value)return;
+  const error=Error('Logistic regression apply: saved '+message+' differs; no training requested');
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'logregression_apply_preserved',proof:{closed:await closePreparedWizard(channel)}};
+  throw error;
+ };
+ const next=async(stage,destination)=>channel.perform({condition:'inspect saved logistic '+stage,
+  ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,resolve:s=>{
+   const buttons=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));
+   need(buttons.length===1,'Next unavailable');return {verb:'wizard_step',ref:buttons[0].ref,expected_stage:destination};}});
+ let state=await observe('input_mapping','saved logistic roles');
+ const roles=state.node_logregression;
+ const expected=resolveLogRegressionRoles({logistic:p},roles.fields);
+ await saved(roles.fields.every((f,i)=>f.usage_type===expected[i].usage_type),'roles');
+ await next('input_mapping','normalization');
+ state=await observe('normalization','saved logistic normalization');
+ const normalization=state.node_logregression.fields,used=roles.fields.filter(f=>f.usage_type!==0);
+ await saved(normalization.length===used.length&&new Set(normalization.map(f=>f.name)).size===used.length
+  &&normalization.every(f=>used.some(role=>['name','label','type','index'].every(k=>role[k]===f[k]))
+   &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(p.normalization===undefined||f.norm_type==={none:0,standardize:5}[p.normalization]):Number.isInteger(f.norm_type)))&&new Set(normalization.filter(f=>p.input_fields.includes(f.name)).map(f=>f.norm_type)).size===1,'normalization');
+ await next('normalization','learn_partition');
+ state=await observe('learn_partition','saved logistic partition');const partition=state.node_logregression.values;
+ await saved(partition.train===100&&partition.test===0&&partition.validation===0,'partition');
+ await next('learn_partition','lin_regression');
+ state=await observe('lin_regression','saved logistic model parameters');
+ const {values,classes,switches}=state.node_logregression;
+ await saved(values.pedAutoMethod===false&&values.pedRegressionMethod===0&&values.pedDenormalize===true
+  &&values.pedUseDetailedSettings===true&&values.pedEventType===4&&values.pedUseScoring===false&&values.pedSetupCalibration===false
+  &&Object.values(switches).every(v=>v===false)&&classes.length===2&&new Set(classes.map(c=>c.index)).size===2
+  &&new Set(classes.map(c=>c.label)).size===2&&classes.some(c=>c.index===values.pedEventId&&c.label===p.event),'Enter model/event');
+ await next('lin_regression','lin_regression_details');
+ state=await observe('lin_regression_details','saved logistic threshold');const details=state.node_logregression;
+ await saved(details.values.pedIntercept===true&&details.values.pedEpsilon===1e-10&&details.values.pedThreshold===p.threshold
+  &&Object.values(details.switches).every(v=>v===false),'intercept/epsilon/threshold');
+ await next('lin_regression_details','done');
+ const done=await channel.observe({condition:'saved logistic inspection complete',ready:s=>s.wizard?.stage==='done'});
+ return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false,
+  configuration:{...roles,mode:'apply',normalization,partition,classes:classes.map(({index,label})=>({index,label})),
+   target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
   validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,142975,'2861871909854089a2a4a091681d4891b600a68e925742745a5927c1eee570c7'],
-  [nodeApiTools.map(userNodeTool),19698,'9d3089ccf965a0f3caa14793209a5b9cd7257e3d8bd36ffb3430a478e4e37810'],
+  [nodeApiTools,148937,'a0ef37f01999a992518ac809652a5fce38a215b9c005a960e88f0518e276a5ff'],
+  [nodeApiTools.map(userNodeTool),12571,'92669583402f4b9b6abffc38b4ed6754e83051958680805c2ae1067c1488b8aa'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
   assert.equal(Buffer.byteLength(json),bytes);
@@ -216,4 +216,18 @@ test('W1 variable reread selection is additive and distinct from table ports',as
  const args={operation_id:'fresh',source_operation_id:'executed',read:{ports:[],variable_ports:[0]}};
  await dispatchNodeApi(runtime,'dock_node_read',args);assert.deepEqual(received,args);
  await assert.rejects(()=>dispatchNodeApi(runtime,'dock_node_read',{...args,read:{...args.read,variable_ports:[100]}}));
+});
+
+test('Forward scoped selection passes the public schema and real registered handler together',async()=>{
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'forward',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'datamining.lin_regression',ref:{document_id:'doc',workflow_id:'wf',node_id:'regression'}},inputs:[],mode:'forward',
+  parameters:{input_fields:['X'],target_field:'Y',linear_regression:{selection:{criterion:'f',add_significance:0.05,remove_significance:0.1}}},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:100,require_exact_numbers:true},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,mode:'enter'}),/only in forward/);
 });

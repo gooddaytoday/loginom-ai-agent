@@ -3,7 +3,13 @@ import { mkdtemp, readFile, rm, writeFile, appendFile, readdir } from "node:fs/p
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { ZipWriter, Uint8ArrayWriter, TextReader, ZipReader, Uint8ArrayReader, TextWriter } from "@zip.js/zip.js"
-import { profileFile, scanFile, sampleFile, profilePage, exactScanReceipt } from "../../src/tool/loginom-file-profile-core"
+import {
+  profileFile,
+  scanFile,
+  sampleFile,
+  profilePage,
+  exactScanReceipt,
+} from "../../src/tool/loginom-file-profile-core"
 import { validateExcelParameters } from "../../../loginom-runtime/client/lib/imports-excel-parameters.mjs"
 
 const ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -56,6 +62,32 @@ async function contents(path: string) {
     await zip.close()
   }
 }
+
+test("Boolean XLSX settings preserve false, true and NULL for the Excel runtime", async () => {
+  await fixture(
+    `<row r="1">${text("A", 1, "Id")}${text("B", 1, "Active")}</row>` +
+      `<row r="2">${num("A", 2, "1")}<c r="B2" t="b"><v>0</v></c></row>` +
+      `<row r="3">${num("A", 3, "2")}<c r="B3" t="b"><v>1</v></c></row>` +
+      `<row r="4">${num("A", 4, "3")}</row>`,
+    async (path, dir) => {
+      const p = await profile(path, dir)
+      expect(p.settings_complete).toBe(true)
+      expect(p.settings.excel.columns.map((c) => c.type)).toEqual(["integer", "boolean"])
+      validateExcelParameters({ source: { artifact_id: "a", upload_operation_id: "u" },
+        excel: { ...p.settings.excel, source_path: "/boolean.xlsx" } }, "xlsx",
+        { inputs: [], mappings: [], finish: "done", read: { ports: [] } })
+      expect((await scanFile(p.profile_id, dir)).records).toBe(3)
+      const sample = await sampleFile(p.profile_id, dir)
+      const xml = (await contents(sample.path))["xl/worksheets/sheet1.xml"]
+      expect(xml).toContain('<c r="B2" s="0" t="b"><v>0</v></c>')
+      expect(xml).toContain('<c r="B3" s="0" t="b"><v>1</v></c>')
+      expect(xml).not.toContain('r="B4"')
+      const again = await profile(sample.path, join(dir, "roundtrip"))
+      expect(again.settings_complete).toBe(true)
+      expect(again.settings.excel.columns).toEqual(p.settings.excel.columns)
+    },
+  )
+})
 
 test("container relationships, SST/inline, hidden sheet, settings and small XLSX sample", async () => {
   await fixture(
@@ -128,12 +160,26 @@ test("formula without cache is explicit incompleteness and sample refusal", asyn
 })
 
 test("twelve-column worksheet returns complete import settings", async () => {
-  await fixture('<row r="1">' + Array.from({ length: 12 }, (_, i) => text(String.fromCharCode(65+i), 1, `Field${i}`)).join("") + '</row><row r="2">' + Array.from({ length: 12 }, (_, i) => num(String.fromCharCode(65+i), 2, String(i))).join("") + '</row>', async (path, dir) => {
-    const p = await profile(path, dir)
-    expect(p.settings_complete).toBe(true)
-    expect(p.settings.excel.columns).toHaveLength(12)
-    validateExcelParameters({ source: { artifact_id: "a", upload_operation_id: "u" }, excel: { ...p.settings.excel, source_path: "/wide.xlsx" } }, "xlsx", { inputs: [], mappings: [], finish: "done", read: { ports: [] } })
-  })
+  await fixture(
+    '<row r="1">' +
+      Array.from({ length: 12 }, (_, i) => text(String.fromCharCode(65 + i), 1, `Field${i}`)).join("") +
+      '</row><row r="2">' +
+      Array.from({ length: 12 }, (_, i) => num(String.fromCharCode(65 + i), 2, String(i))).join("") +
+      "</row>",
+    async (path, dir) => {
+      const p = await profile(path, dir)
+      expect(p.settings_complete).toBe(true)
+      expect(p.settings.excel.columns).toHaveLength(12)
+      validateExcelParameters(
+        {
+          source: { artifact_id: "a", upload_operation_id: "u" },
+          excel: { ...p.settings.excel, source_path: "/wide.xlsx" },
+        },
+        "xlsx",
+        { inputs: [], mappings: [], finish: "done", read: { ports: [] } },
+      )
+    },
+  )
 })
 
 test("wide worksheet profiles within 8 KiB but is not importable", async () => {
@@ -151,7 +197,7 @@ test("wide worksheet profiles within 8 KiB but is not importable", async () => {
       const p = await profile(path, dir)
       expect(p.columns_total).toBe(120)
       expect(p.settings_complete).toBe(false)
-      expect(p.settings_incomplete_reason).toContain("1–12")
+      expect(p.settings_incomplete_reason).toContain("1–64")
       expect(Buffer.byteLength(JSON.stringify(p))).toBeLessThanOrEqual(8192)
       expect(p.continuation).not.toBeNull()
       const next = await profilePage(p.profile_id, dir, p.continuation!)
@@ -310,4 +356,75 @@ test("XLSX exact receipt retains selected worksheet and count policies", async (
     expect(receipt?.records).toBe(1)
     expect(receipt?.xlsx).toEqual({ sheet_name: "Sales", sheet_index: 1, header_rows: 1, blank_rows: "import" })
   })
+})
+
+test("C1 profiles sixteen fields and eleven compound header rows for native Excel", async () => {
+  const source = new URL(
+    "../../../../docs/node-development/nodes/imports-excel/acceptance/capabilities/fixtures/",
+    import.meta.url,
+  )
+  for (const [file, header_rows, width] of [
+    ["wide16.xlsx", 1, 16],
+    ["headers11.xlsx", 11, 2],
+  ] as const) {
+    const dir = await mkdtemp(join(tmpdir(), "xlsx-c1-"))
+    try {
+      const p = await profile(new URL(file, source).pathname, dir, { header_rows })
+      expect(p.settings_complete).toBe(true)
+      expect(p.columns_total).toBe(width)
+      expect(p.settings.excel.header_rows).toBe(header_rows)
+      if (header_rows === 11)
+        expect(p.settings.excel.columns.map((c) => c.source_name)).toEqual([
+          Array(11).fill("Id").join("_"),
+          Array(11).fill("Amount").join("_"),
+        ])
+      validateExcelParameters(
+        {
+          source: { artifact_id: "a", upload_operation_id: "u" },
+          excel: { ...p.settings.excel, source_path: "/source.xlsx" },
+        },
+        "xlsx",
+        { inputs: [], mappings: [], finish: "done", read: { ports: [] } },
+      )
+      expect((await scanFile(p.profile_id, dir)).records).toBe(2)
+      if (header_rows === 11) {
+        const sampled = await sampleFile(p.profile_id, dir)
+        const again = await profile(sampled.path, join(dir, "sample"), { header_rows })
+        expect(again.settings.excel.columns).toEqual(p.settings.excel.columns)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }
+})
+test("C1 bounds: profile 64/65 fields and 1000/1001 header rows without relaxing pagination", async () => {
+  const column = (n: number) =>
+    n < 26
+      ? String.fromCharCode(65 + n)
+      : String.fromCharCode(64 + Math.floor(n / 26)) + String.fromCharCode(65 + (n % 26))
+  for (const width of [64, 65])
+    await fixture(
+      `<row r="1">${Array.from({ length: width }, (_, i) => text(column(i), 1, "C" + i)).join("")}</row><row r="2">${Array.from({ length: width }, (_, i) => num(column(i), 2, String(i))).join("")}</row>`,
+      async (path, dir) => {
+        const p = await profile(path, dir)
+        expect(p.columns_total).toBe(width)
+        expect(p.settings_incomplete_reason.includes("1–64")).toBe(width === 65)
+        const columns = [...p.columns]
+        for (let next = p.continuation; next; ) {
+          const page = await profilePage(p.profile_id, dir, next)
+          columns.push(...page.columns)
+          next = page.continuation
+        }
+        expect(columns.length).toBe(width)
+      },
+    )
+  await fixture(
+    `<row r="1">${text("A", 1, "Id")}</row><row r="1001">${num("A", 1001, "7")}</row>`,
+    async (path, dir) => {
+      const p = await profile(path, dir, { header_rows: 1000 })
+      expect(p.settings_complete).toBe(true)
+      expect((await scanFile(p.profile_id, dir)).records).toBe(1)
+      await expect(profile(path, join(dir, "too-many"), { header_rows: 1001 })).rejects.toThrow("0..1000")
+    },
+  )
 })

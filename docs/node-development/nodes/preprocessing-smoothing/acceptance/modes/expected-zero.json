@@ -1,0 +1,435 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "preprocessing.smoothing"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "preprocessing.smoothing",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Tag",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "X_S",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0,
+          "Tag": "z1",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 2,
+          "X": 0,
+          "Tag": "z2",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 3,
+          "X": 0,
+          "Tag": "z3",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 4,
+          "X": 0,
+          "Tag": "z4",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 5,
+          "X": 0,
+          "Tag": "z5",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 6,
+          "X": 0,
+          "Tag": "z6",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 7,
+          "X": 0,
+          "Tag": "z7",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 8,
+          "X": 0,
+          "Tag": "z8",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 9,
+          "X": 0,
+          "Tag": "z9",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 10,
+          "X": 0,
+          "Tag": "z10",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 11,
+          "X": 0,
+          "Tag": "z11",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 12,
+          "X": 0,
+          "Tag": "z12",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 13,
+          "X": 0,
+          "Tag": "z13",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 14,
+          "X": 0,
+          "Tag": "z14",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 15,
+          "X": 0,
+          "Tag": "z15",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 16,
+          "X": 0,
+          "Tag": "z16",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 17,
+          "X": 0,
+          "Tag": "z17",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 18,
+          "X": 0,
+          "Tag": "z18",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 19,
+          "X": 0,
+          "Tag": "z19",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 20,
+          "X": 0,
+          "Tag": "z20",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 21,
+          "X": 0,
+          "Tag": "z21",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 22,
+          "X": 0,
+          "Tag": "z22",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 23,
+          "X": 0,
+          "Tag": "z23",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 24,
+          "X": 0,
+          "Tag": "z24",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 25,
+          "X": 0,
+          "Tag": "z25",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 26,
+          "X": 0,
+          "Tag": "z26",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 27,
+          "X": 0,
+          "Tag": "z27",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 28,
+          "X": 0,
+          "Tag": "z28",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 29,
+          "X": 0,
+          "Tag": "z29",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 30,
+          "X": 0,
+          "Tag": "z30",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 31,
+          "X": 0,
+          "Tag": "z31",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 32,
+          "X": 0,
+          "Tag": "z32",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 33,
+          "X": 0,
+          "Tag": "z33",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 34,
+          "X": 0,
+          "Tag": "z34",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 35,
+          "X": 0,
+          "Tag": "z35",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 36,
+          "X": 0,
+          "Tag": "z36",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 37,
+          "X": 0,
+          "Tag": "z37",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 38,
+          "X": 0,
+          "Tag": "z38",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 39,
+          "X": 0,
+          "Tag": "z39",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 40,
+          "X": 0,
+          "Tag": "z40",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 41,
+          "X": 0,
+          "Tag": "z41",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 42,
+          "X": 0,
+          "Tag": "z42",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 43,
+          "X": 0,
+          "Tag": "z43",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 44,
+          "X": 0,
+          "Tag": "z44",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 45,
+          "X": 0,
+          "Tag": "z45",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 46,
+          "X": 0,
+          "Tag": "z46",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 47,
+          "X": 0,
+          "Tag": "z47",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 48,
+          "X": 0,
+          "Tag": "z48",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 49,
+          "X": 0,
+          "Tag": "z49",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 50,
+          "X": 0,
+          "Tag": "z50",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 51,
+          "X": 0,
+          "Tag": "z51",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 52,
+          "X": 0,
+          "Tag": "z52",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 53,
+          "X": 0,
+          "Tag": "z53",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 54,
+          "X": 0,
+          "Tag": "z54",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 55,
+          "X": 0,
+          "Tag": "z55",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 56,
+          "X": 0,
+          "Tag": "z56",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 57,
+          "X": 0,
+          "Tag": "z57",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 58,
+          "X": 0,
+          "Tag": "z58",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 59,
+          "X": 0,
+          "Tag": "z59",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 60,
+          "X": 0,
+          "Tag": "z60",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 61,
+          "X": 0,
+          "Tag": "z61",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 62,
+          "X": 0,
+          "Tag": "z62",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 63,
+          "X": 0,
+          "Tag": "z63",
+          "X_S": 0.0
+        },
+        {
+          "RowID": 64,
+          "X": 0,
+          "Tag": "z64",
+          "X_S": 0.0
+        }
+      ]
+    }
+  ]
+}

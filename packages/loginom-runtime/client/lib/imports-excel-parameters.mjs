@@ -3,11 +3,13 @@ const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
  source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion.'},
- sheet_name:{...text(120),description:'Exact sheet; omit=first initially, preserve during source_switch. No named ranges.'},
- header_rows:{type:'integer',minimum:1,maximum:10,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
- columns:{type:'array',minItems:1,maxItems:12,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
+ sheet_name:{...text(120),description:'Exact worksheet; exclusive with named_range. Omit both=first initially, preserve during source_switch.'},
+ named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange. Select the native named range, only its columns; exclusive with sheet_name.'},
+ extend_range:{type:'boolean',description:'Only with named_range. false/omitted=defined boundaries; true=continue its columns to the last populated row. Reconfigure the same node to change this.'},
+ header_rows:{type:'integer',minimum:1,maximum:1000,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
+ columns:{type:'array',minItems:1,maxItems:64,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
-  type:{type:'string',enum:['string','integer','real','datetime']},
+  type:{type:'string',enum:['string','integer','real','datetime','boolean']},
   data_kind:{type:'string',enum:['Непрерывный','Дискретный']},
  },['name','label','type'])},
 },['source_path']);
@@ -26,6 +28,9 @@ export function validateExcelParameters(p,mode,r){
  need(typeof e.source_path==='string'&&e.source_path.length<=2048&&/^\/(?!\/)/.test(e.source_path)&&/\.xlsx$/i.test(e.source_path)
   &&!/[|*?%\\\x00-\x1f]/.test(e.source_path)&&e.source_path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..'),'one explicit verified XLSX storage path is required');
  need(e.sheet_name===undefined||typeof e.sheet_name==='string'&&e.sheet_name.length>0&&e.sheet_name.length<=120&&!/[\x00-\x1f]/.test(e.sheet_name),'invalid sheet name');
+ if(Object.hasOwn(e,'named_range'))need(typeof e.named_range==='string'&&e.named_range.length>0&&e.named_range.length<=120&&!/[\x00-\x1f]/.test(e.named_range),'invalid named_range');
+ need(e.named_range===undefined||e.sheet_name===undefined,'sheet_name and named_range are mutually exclusive');
+ need(!Object.hasOwn(e,'extend_range')||e.named_range!==undefined&&typeof e.extend_range==='boolean','extend_range requires named_range and a boolean');
  if(switching){
   need(r.target?.kind==='existing'&&r.finish==='execute'&&r.inputs.length===0&&r.mappings.length===0&&r.read.ports.length===1&&r.read.ports[0]===0
    &&Object.keys(e).every(k=>['source_path','sheet_name'].includes(k))&&p.source_switch&&Object.keys(p.source_switch).sort().join(',')==='profile_id,save_operation_id'
@@ -33,18 +38,19 @@ export function validateExcelParameters(p,mode,r){
    'source_switch requires an existing Excel import, source_path/sheet_name only, scan/save IDs and executed output 0; no column or mapping edits');
   return;
  }
- need(Number.isInteger(e.header_rows)&&e.header_rows>=1&&e.header_rows<=10,'header_rows must be 1..10');
- need(Array.isArray(e.columns)&&e.columns.length>=1&&e.columns.length<=12,'1..12 explicit columns are required');
+ need(Number.isInteger(e.header_rows)&&e.header_rows>=1&&e.header_rows<=1000,'header_rows must be 1..1000');
+ need(Array.isArray(e.columns)&&e.columns.length>=1&&e.columns.length<=64,'1..64 explicit columns are required');
  for(const c of e.columns){
   need(c&&Object.keys(c).every(k=>['source_name','name','label','type','data_kind'].includes(k)),'unsupported column setting');
   need(typeof c.name==='string'&&c.name.length<=120&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(c.name),'technical names must be ASCII identifiers; keep the header in source_name');
   need(['label',...(c.source_name===undefined?[]:['source_name'])].every(k=>typeof c[k]==='string'&&c[k].length>0&&c[k].length<=120&&!/[\x00-\x1f]/.test(c[k])),'column label/header is required');
-  need(['string','integer','real','datetime'].includes(c.type),'explicit string/integer/real/datetime type required');
+  need(['string','integer','real','datetime','boolean'].includes(c.type),'explicit string/integer/real/datetime/boolean type required');
   need(c.data_kind===undefined||['Непрерывный','Дискретный'].includes(c.data_kind),'invalid data kind');
   need(c.type!=='string'||c.data_kind===undefined||c.data_kind==='Дискретный','string columns require discrete kind');
+  need(c.type!=='boolean'||c.data_kind===undefined||c.data_kind==='Дискретный','boolean columns require discrete kind');
  }
  need(new Set(e.columns.map(c=>c.name)).size===e.columns.length&&new Set(e.columns.map(c=>c.source_name??c.name)).size===e.columns.length,'duplicate source or output names');
  need(r.inputs.length===0&&r.mappings.length===0,'Excel has no table input; output remapping is outside stage 1');
  need(['done','execute','close'].includes(r.finish)&&r.read.ports.every(p=>p===0)&&r.read.ports.length<=1,'only output 0 is supported');
 }
-export const excelColumns=e=>e.columns.map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind??(c.type==='string'?'Дискретный':'Непрерывный'),used:true}));
+export const excelColumns=e=>e.columns.map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind??(['string','boolean'].includes(c.type)?'Дискретный':'Непрерывный'),used:true}));

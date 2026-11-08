@@ -1,4 +1,7 @@
 import { verifyBundledSkills } from './bundled-skill-manifest.mjs';
+import {readFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {createHash} from 'node:crypto';
 
 export function createSkillLoader({ resources }) {
   let pinned;
@@ -16,7 +19,30 @@ export function createSkillLoader({ resources }) {
         content: bundle.content } };
     return pinned;
   }
-  return { prepare() {
+  return { async describeNodes(cards, modes) {
+    if(modes!==undefined&&(!Array.isArray(modes)||!modes.length||new Set(modes).size!==modes.length
+      ||modes.some(mode=>typeof mode!=='string'||!cards.some(card=>card.modes.includes(mode)))))
+      throw Error('Select distinct supported modes for the selected node types');
+    const prepared=await this.prepare();
+    return Promise.all(cards.map(async card=>{
+      const path=`skills/loginom-automation/references/nodes/${card.type}.md`;
+      const file=prepared.detail.files.find(file=>file.path===path);
+      if(!file)throw Error('LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING: '+path);
+      const text=await readFile(join(prepared.directory,'references/nodes',card.type+'.md'),'utf8');
+      if(createHash('sha256').update(text).digest('hex')!==file.sha256)throw Error('LOGINOM_SKILL_HASH_MISMATCH: '+path);
+      const pattern=/^<!-- mode: ([a-z0-9_]+(?: [a-z0-9_]+)*) -->\r?\n([\s\S]*?)^<!-- \/mode -->\r?$/gm;
+      const sections=[...text.matchAll(pattern)];
+      const common=text.replace(pattern,'').trim();
+      if(common.includes('<!-- mode:')||common.includes('<!-- /mode -->')
+        ||sections.some(section=>section[2].includes('<!-- mode:')||section[1].split(' ').some(mode=>!card.modes.includes(mode)))
+        ||card.modes.some(mode=>!sections.some(section=>section[1].split(' ').includes(mode))))
+        throw Error('LOGINOM_SKILL_NODE_MODES_INVALID: '+card.type);
+      const selected=sections.filter(section=>modes?.some(mode=>section[1].split(' ').includes(mode)));
+      const guidance=[common,...selected.map(section=>section[2].trim())].filter(Boolean).join('\n\n');
+      return {...card,guidance,cache_key:createHash('sha256').update(JSON.stringify([card.cache_key,prepared.detail.revision,guidance])).digest('hex'),
+        guidance_modes:[...card.modes]};
+    }));
+  }, prepare() {
     pending ??= load().finally(() => { pending = undefined; });
     return pending;
   } };

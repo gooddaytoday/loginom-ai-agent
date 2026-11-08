@@ -1,0 +1,605 @@
+{
+  "status": "proposal_requires_owner_approval_not_stock_expected",
+  "package_path": "{{PACKAGE_PATH}}",
+  "source": "../../fixtures/modes.csv",
+  "cases": {
+    "median": {
+      "task": "task-median.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "real",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": 3.0
+            },
+            {
+              "Region": "A",
+              "Metric": 4
+            },
+            {
+              "Region": "C",
+              "Metric": 7
+            },
+            {
+              "Region": "D",
+              "Metric": null
+            },
+            {
+              "Region": "E",
+              "Metric": 2.0
+            }
+          ]
+        }
+      ]
+    },
+    "mode": {
+      "task": "task-mode.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": 3,
+              "TextMetric": "beta"
+            },
+            {
+              "Region": "A",
+              "Metric": 4,
+              "TextMetric": "alpha"
+            },
+            {
+              "Region": "C",
+              "Metric": 7,
+              "TextMetric": "solo"
+            },
+            {
+              "Region": "D",
+              "Metric": 0,
+              "TextMetric": ""
+            },
+            {
+              "Region": "E",
+              "Metric": 2,
+              "TextMetric": ""
+            }
+          ]
+        }
+      ]
+    },
+    "stddev": {
+      "task": "task-stddev.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "real",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": 1.632993161855452
+            },
+            {
+              "Region": "A",
+              "Metric": 3.4641016151377544
+            },
+            {
+              "Region": "C",
+              "Metric": 0.0
+            },
+            {
+              "Region": "D",
+              "Metric": null
+            },
+            {
+              "Region": "E",
+              "Metric": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    "null_count": {
+      "task": "task-null-count.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "integer",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": 0,
+              "TextMetric": 0
+            },
+            {
+              "Region": "A",
+              "Metric": 1,
+              "TextMetric": 1
+            },
+            {
+              "Region": "C",
+              "Metric": 0,
+              "TextMetric": 0
+            },
+            {
+              "Region": "D",
+              "Metric": 2,
+              "TextMetric": 2
+            },
+            {
+              "Region": "E",
+              "Metric": 0,
+              "TextMetric": 0
+            }
+          ]
+        }
+      ]
+    },
+    "first": {
+      "task": "task-first.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": 1,
+              "TextMetric": "beta"
+            },
+            {
+              "Region": "A",
+              "Metric": 4,
+              "TextMetric": "alpha"
+            },
+            {
+              "Region": "C",
+              "Metric": 7,
+              "TextMetric": "solo"
+            },
+            {
+              "Region": "D",
+              "Metric": null,
+              "TextMetric": null
+            },
+            {
+              "Region": "E",
+              "Metric": 2,
+              "TextMetric": ""
+            }
+          ]
+        }
+      ]
+    },
+    "last": {
+      "task": "task-last.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": 5,
+              "TextMetric": ""
+            },
+            {
+              "Region": "A",
+              "Metric": null,
+              "TextMetric": null
+            },
+            {
+              "Region": "C",
+              "Metric": 7,
+              "TextMetric": "solo"
+            },
+            {
+              "Region": "D",
+              "Metric": null,
+              "TextMetric": null
+            },
+            {
+              "Region": "E",
+              "Metric": 2,
+              "TextMetric": ""
+            }
+          ]
+        }
+      ]
+    },
+    "only": {
+      "task": "task-only.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "integer",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": null,
+              "TextMetric": null
+            },
+            {
+              "Region": "A",
+              "Metric": null,
+              "TextMetric": null
+            },
+            {
+              "Region": "C",
+              "Metric": 7,
+              "TextMetric": "solo"
+            },
+            {
+              "Region": "D",
+              "Metric": null,
+              "TextMetric": null
+            },
+            {
+              "Region": "E",
+              "Metric": 2,
+              "TextMetric": ""
+            }
+          ]
+        }
+      ]
+    },
+    "concat": {
+      "task": "task-concat.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": "1|3|3|5",
+              "TextMetric": "\"beta\"|\"alpha\"|\"beta\"|\"\""
+            },
+            {
+              "Region": "A",
+              "Metric": "4|4|10",
+              "TextMetric": "\"alpha\"|\"alpha\"|\"gamma\""
+            },
+            {
+              "Region": "C",
+              "Metric": "7",
+              "TextMetric": "\"solo\""
+            },
+            {
+              "Region": "D",
+              "Metric": "",
+              "TextMetric": ""
+            },
+            {
+              "Region": "E",
+              "Metric": "2|2",
+              "TextMetric": "\"\"|\"\""
+            }
+          ]
+        },
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": "1|3|5",
+              "TextMetric": "\"\"|\"alpha\"|\"beta\""
+            },
+            {
+              "Region": "A",
+              "Metric": "4|10",
+              "TextMetric": "\"alpha\"|\"gamma\""
+            },
+            {
+              "Region": "C",
+              "Metric": "7",
+              "TextMetric": "\"solo\""
+            },
+            {
+              "Region": "D",
+              "Metric": "",
+              "TextMetric": ""
+            },
+            {
+              "Region": "E",
+              "Metric": "2",
+              "TextMetric": "\"\""
+            }
+          ]
+        },
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "TextMetric",
+              "type": "string",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": "5|3|1",
+              "TextMetric": "\"beta\"|\"alpha\"|\"\""
+            },
+            {
+              "Region": "A",
+              "Metric": "10|4",
+              "TextMetric": "\"gamma\"|\"alpha\""
+            },
+            {
+              "Region": "C",
+              "Metric": "7",
+              "TextMetric": "\"solo\""
+            },
+            {
+              "Region": "D",
+              "Metric": "",
+              "TextMetric": ""
+            },
+            {
+              "Region": "E",
+              "Metric": "2",
+              "TextMetric": "\"\""
+            }
+          ]
+        }
+      ]
+    },
+    "cache": {
+      "task": "task-cache.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": false,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "real",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "B",
+              "Metric": 12
+            },
+            {
+              "Region": "A",
+              "Metric": 18
+            },
+            {
+              "Region": "C",
+              "Metric": 7
+            },
+            {
+              "Region": "D",
+              "Metric": null
+            },
+            {
+              "Region": "E",
+              "Metric": 4
+            }
+          ]
+        }
+      ]
+    },
+    "sort_result": {
+      "task": "task-sort-result.md",
+      "stages": [
+        {
+          "output_node_type": "transform.group_data",
+          "output_port": 0,
+          "ordered": true,
+          "columns": [
+            {
+              "name": "Region",
+              "type": "string",
+              "label_any": true
+            },
+            {
+              "name": "Metric",
+              "type": "real",
+              "label_any": true
+            }
+          ],
+          "rows": [
+            {
+              "Region": "A",
+              "Metric": 18
+            },
+            {
+              "Region": "B",
+              "Metric": 12
+            },
+            {
+              "Region": "C",
+              "Metric": 7
+            },
+            {
+              "Region": "D",
+              "Metric": null
+            },
+            {
+              "Region": "E",
+              "Metric": 4
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

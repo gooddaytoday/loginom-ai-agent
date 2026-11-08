@@ -34,3 +34,12 @@ test('Done commits settings without claiming training and foreign settings refus
  input.phases[1].value.configuration.node_context={...node,node_id:'foreign'};
  assert.throws(()=>linRegressionConfigurationReadback(input),/configuration owner/);
 });
+
+test('Ridge readback reports observed manual lambda without aliasing configuration',()=>{
+ const input=candidate(),configuration=input.phases[1].value.configuration;
+ Object.assign(configuration,{mode:'ridge',regularization:{setup:'manual',lambda_l2:1},epsilon:1e-10});
+ const result=linRegressionConfigurationReadback(input);
+ assert.equal(result.mode,'ridge');assert.deepEqual(result.regularization,{setup:'manual',lambda_l2:1});
+ assert.equal(result.epsilon,1e-10);assert.equal(result.training.status,'trained');
+ configuration.regularization.lambda_l2=2;assert.equal(result.regularization.lambda_l2,1);
+});

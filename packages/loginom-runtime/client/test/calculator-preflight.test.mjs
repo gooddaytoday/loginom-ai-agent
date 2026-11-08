@@ -11,6 +11,14 @@ test('new calculator predicts all inherited and calculated output fields',()=>{
  assert.equal(predictNewCalculatorOutput(parameters,input,layout(['category','tax','amount'])).length,3);
 });
 
+test('an intermediate expression is not an output field and cannot be mapped',()=>{
+ const helper={target:{kind:'new'},name:'helper',label:'Helper',type:'real',formula:'amount+1',replace:false,intermediate:true};
+ const both={expressions:[helper,...parameters.expressions]};
+ assert.deepEqual(predictNewCalculatorOutput(both,input).map(f=>f.name),['tax','amount','category']);
+ assert.equal(predictNewCalculatorOutput(both,input,layout(['category','tax','amount'])).length,3);
+ assert.throws(()=>predictNewCalculatorOutput(both,input,layout(['helper','category','tax','amount'])),/full output list|unknown or repeated source/);
+});
+
 function inactiveFixture(fault){
  const node={document_id:'doc',workflow_id:'flow',node_id:'import'},tid='source',port={index:0,port_guid:'port',tid:tid+';Output_Data-0',active:false};
  const icon=fault==='calculated'?'bg-vendor-icon-calcdata':'bg-vendor-icon-importtextfile';

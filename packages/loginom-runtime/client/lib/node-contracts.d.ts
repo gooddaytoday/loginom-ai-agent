@@ -107,7 +107,7 @@ export interface GroupingParameters {
   /** Full ordered lists, or both omitted to retain an existing configuration. */
   group_by?: Array<{kind: 'input_field'; name: string}>;
   measures?: Array<{field: {kind: 'input_field'; name: string};
-    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'unique_count'; name: string; label: string}>;
+    function: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'median' | 'unique_count'; name: string; label: string}>;
 }
 export interface GroupingConfigurationReadback {
   kind: 'grouping'; scope: 'observed_before_verified_finish'; node: NodeRef;
@@ -342,7 +342,7 @@ export interface AssnRulesConfigurationReadback {
 
 export interface LinRegressionConfigurationReadback {
   kind: 'lin_regression'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
-  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply'; input_fields: string[]; target_field: string;
+  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward' | 'stepwise' | 'ridge'; regularization?: {setup:'manual';lambda_l2:number}; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10; input_fields: string[]; target_field: string;
   intercept: true; normalization: 'none'; package_persistence_verified: false;
   training: ClusteringConfigurationReadback['training'];
 }
@@ -374,7 +374,7 @@ export interface ElimOutlierConfigurationReadback {
 
 export interface LogRegressionConfigurationReadback {
  kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
- node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'; selection?:{criterion:'deviance'|'aic'|'aicc'|'bic'|'hqic';entry_significance?:number;removal_significance?:number}; input_fields:string[]; target_field:string;
+ node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'|'apply'; selection?:{criterion:'deviance'|'aic'|'aicc'|'bic'|'hqic';entry_significance?:number;removal_significance?:number}; input_fields:string[]; target_field:string;
  classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;
  normalization:'none'; train_percent:100; validation:'none'; calibration:'train';
  training:ClusteringConfigurationReadback['training']; package_persistence_verified:false;

@@ -10,6 +10,10 @@ import {createRedactor} from '../lib/redact.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const source={node_id:'source',document_id:'doc',workflow_id:'flow'};
 const request={target:{kind:'new',type:'programming.javascript',position:{x:256,y:256}},mode:'script',
@@ -24,7 +28,10 @@ for(const point of ['read','replace'])test('configure cancellation during manage
  const outcome=JSON.parse(result.stdout.trim());assert.equal(outcome.pending_phase,'configure');
 });
 
-for(const kind of ['new','existing'])test('redaction preflight refuses before the actual target/browser boundary '+kind,async()=>{
+for(const kind of ['new','existing'])test('redaction preflight refuses before the actual target/browser boundary '+kind,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'javascript-preflight-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const record=createExecutionJournal({directory,metadata:{sessionId:'javascript-preflight'}});
  const p={...structuredClone(request),operation_id:'redaction-'+kind,contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]},
   target:kind==='new'?request.target:{kind,type:'programming.javascript',ref:node},inputs:kind==='new'?request.inputs:[],finish:'done',
@@ -36,7 +43,7 @@ for(const kind of ['new','existing'])test('redaction preflight refuses before th
   onRecord:async event=>event,now:Date.now,receiptOptions:()=>({})});
  const result=await applyNode({request:p,operation,handlers:support.nodeApplyHandlers,
   drivers:{...driver,prepareTarget:async(graph,ctx)=>{calls.push('target');return driver.beforeTarget(ctx);}},
-  record:async event=>{events.push(event);return event;}});
+  record:async event=>{events.push(event);return record(event);}});
  assert.equal(result.status,'NOT_APPLIED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
  assert.equal(result.effect_possible,false);assert.deepEqual(calls,[]);
  assert.equal(events.some(event=>event.phase==='node_phase_prepared'&&event.receipt.phase==='target'),false);

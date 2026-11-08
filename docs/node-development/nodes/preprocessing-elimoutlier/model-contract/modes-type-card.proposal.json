@@ -1,0 +1,129 @@
+{
+  "type": "preprocessing.elim_outlier",
+  "title": "Редактирование выбросов",
+  "palette_group": "Предобработка",
+  "icon_class": "bg-vendor-icon-elimoutlier",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 3,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "detect",
+    "edit",
+    "quality",
+    "apply"
+  ],
+  "semantics": "Detect outliers in selected continuous numeric fields using parameters.outlier: fields, method sd/iqr, explicit outlier_factor/extreme_factor and ordered. Train current input before Execute; keep/keep retains original values. Read all three ports: 0 all rows, 1 outliers excluding extremes, 2 extremes. New nodes require all five settings; existing patches preserve omitted settings. Editing policies, quality, variables and saved-model apply are unsupported. STAGE0 PROPOSAL ONLY: editing, quality and saved-model apply have not been observed in LAB-1018 because the UI session disconnected twice. The mathematical expected files are hypotheses, not established native rules. Do not implement these modes until discovery and owner approval.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "elim-outlier-v1-internal-1",
+  "configuration_status": "stage0_proposal_not_implemented",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/preprocessing/eliminate-outliers.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "detect",
+    "edit",
+    "quality",
+    "apply"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "outlier": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Complete continuous numeric field names; retain unlisted fields."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "sd",
+              "iqr"
+            ],
+            "description": "SD about mean or IQR fences."
+          },
+          "outlier_factor": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Explicit outlier multiplier."
+          },
+          "extreme_factor": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Explicit extreme multiplier >= outlier_factor."
+          },
+          "ordered": {
+            "type": "boolean",
+            "description": "Input already ordered; does not sort."
+          },
+          "outlier_policy": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "delete",
+              "mean",
+              "median",
+              "most_probable",
+              "constant",
+              "limit"
+            ],
+            "description": "Proposed per-class native editing action; convention and side-output behavior await observation."
+          },
+          "extreme_policy": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "delete",
+              "mean",
+              "median",
+              "most_probable",
+              "constant",
+              "limit"
+            ],
+            "description": "Proposed per-class native editing action; convention and side-output behavior await observation."
+          },
+          "outlier_constant": {
+            "type": "number",
+            "description": "Proposed replacement only when the matching policy is constant; finite number."
+          },
+          "extreme_constant": {
+            "type": "number",
+            "description": "Proposed replacement only when the matching policy is constant; finite number."
+          },
+          "quality": {
+            "type": "boolean",
+            "description": "Proposed native quality switch; output schema and semantics await discovery."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "session_manifest": {}
+}

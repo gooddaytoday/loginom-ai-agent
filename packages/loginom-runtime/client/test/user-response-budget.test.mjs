@@ -123,12 +123,16 @@ test('actual factory descriptions retain complete JS knowledge/schema/pins and r
   assert.equal(card.javascript_knowledge.column_names.observed_pairs.length,5);
   assert.ok(card.parameter_schema.properties.source_text);assert.ok(card.session_manifest.skillRevision);
   assert.equal(card.knowledge_sha256.length,64);
+  assert.deepEqual(card.validated_for,card.javascript_knowledge.validated_for);
+  assert.ok(card.javascript_knowledge.limitations.length>0);
+  assert.equal(card.limitations,undefined,'duplicate facts remain intact in javascript_knowledge');
  }
  const all=reply(catalog()),before=JSON.stringify(all);assert.equal(JSON.parse(all.content[0].text).node_types.length,32);
  assert.ok(bytes(all)>46000);
  const refused=boundedUserToolReply(all,{tool:'dock_action_describe'}),value=JSON.parse(refused.content[0].text);
  assert.equal(refused.isError,true);assert.equal(value.result_delivery,'refused');
  assert.equal(value.error.scope,'whole_response');assert.equal(value.next_step.tool,'dock_action_describe');
+ assert.match(value.next_step.instruction,/modes/);
  assert.ok(bytes(refused)<2000);assert.equal(JSON.stringify(all),before);
 });
 
@@ -230,4 +234,11 @@ test('local open_package delivers its first full knowledge bundle and retains ge
    env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_OPEN_PACKAGE:'1'}});
  assert.match(result.stdout,/# pass 1/);
  assert.match(result.stdout,/# fail 0/);
+});
+
+for(const scenario of ['s4','union-auto-match'])test(scenario+' three-file prepare retains knowledge and inputs with 3000 bytes of headroom',async()=>{
+ const result=await promisify(execFile)(process.execPath,['--test','--test-reporter=tap','--experimental-test-module-mocks',
+  new URL('./support/bridge-budget.mjs',import.meta.url).pathname],{maxBuffer:200000,
+  env:{...process.env,NODE_TEST_CONTEXT:undefined,LOGINOM_TEST_THREE_FILES:scenario}});
+ assert.match(result.stdout,/# pass 1/);assert.match(result.stdout,/# fail 0/);
 });

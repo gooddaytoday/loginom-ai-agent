@@ -63,12 +63,12 @@ export function textExportReadback({node,phases}){
  need(configured?.value?.configuration&&input?.value?.source_identity_verified&&finish?.status==='verified','Export readback chain incomplete');
  const c=configured.value.configuration;
  return {kind:'text_export',scope:'observed_before_verified_finish',node,receipt_ids:[input.receipt_id,configured.receipt_id,finish.receipt_id],values_are:'observed_ui_values',
-  destination:c.destination,settings:Object.fromEntries(Object.values(c.configured).filter(x=>x?.values).flatMap(x=>Object.entries(x.values).map(([k,v])=>[k,v.value]))),
+  destination:c.destination,format:c.configured.text_export_format.format??'delimited',settings:Object.fromEntries(Object.values(c.configured).filter(x=>x?.values).flatMap(x=>Object.entries(x.values).map(([k,v])=>[k,v.value]))),
   input_mapping:{port:0,autosync:input.value.native_mapping.autosync,fields:input.value.native_mapping.target_fields.map(f=>({index:f.index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,source_name:f.source.name}))},package_persistence_verified:false};
 }
 export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDirectories=null}){
  let storageContinuation=null;
- const nodeApplyHandlers=new Map([['exports.text',{revision:'text-export-v1-candidate',fileOutput:true,modes:['delimited'],parameter_schema:textExportParametersSchema,
+ const nodeApplyHandlers=new Map([['exports.text',{revision:'text-export-v1-candidate',fileOutput:true,modes:['delimited','fixed_width'],parameter_schema:textExportParametersSchema,
   validate:(p,m,r)=>validateTextExportParameters(p,m,r,storageDirectories),configurationReadback:textExportReadback,configure:(ctx,p,drivers)=>drivers.configureExport(ctx,p)}]]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now,receiptOptions,artifactStore}=options;
@@ -151,7 +151,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
      resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'))).ref,expected_stage:'text_export_params'})});
     return verified({effect_possible:true});
    },
-   async configureExport(ctx,p){enter(ctx);const r=await configureTextExport(channel,p,{...ctx,finish:operation.nodeApply.request.finish},{...options,targetOrigin,storageDirectories,close:closePreparedWizard});configuration=r.configuration;return r;},
+   async configureExport(ctx,p){enter(ctx);const r=await configureTextExport(channel,p,{...ctx,mode:operation.nodeApply.request.mode,finish:operation.nodeApply.request.finish},{...options,targetOrigin,storageDirectories,close:closePreparedWizard});configuration=r.configuration;return r;},
    finish,
    async waitExecution(ctx){enter(ctx);need(driver,'Export execution baseline missing');
     try{execution=await driver.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});}

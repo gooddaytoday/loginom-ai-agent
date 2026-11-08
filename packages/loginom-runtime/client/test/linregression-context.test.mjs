@@ -55,3 +55,25 @@ test('the native Enter method picker is actionable through the serialized worksp
  const clicked=await page.act({verb:'click',ref:control.ref},observed);
  assert.equal(clicked.status,'SUCCEEDED',JSON.stringify(clicked.error));
 });
+
+test('Forward native selection and numeric controls are included in the serialized wizard observation',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+ page.add('div',base+';LinRegressionWizard-1;pedEpsilon','',undefined,form);
+ const field=page.add('div',base+';LinRegressionWizard-1;pedRegSelQuality;ValueControl','',undefined,form);
+ const picker=page.add('div',field.getAttribute('data-tid')+';trg_picker','',{x:100,y:100,width:20,height:20},field);
+ const observation=await page.observe();assert.equal(observation.wizard.stage,'lin_regression_details');
+ const observed=observation.ui.elements.find(e=>e.tid===picker.getAttribute('data-tid'));
+ assert.ok(observed?.allowed_actions.includes('click'));
+});
+
+test('Ridge manual setup picker is exposed by the production wizard observer',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+ page.add('div',base+';LinRegressionWizard-1;pedEpsilon','',undefined,form);
+ const field=page.add('div',base+';LinRegressionWizard-1;pedRidgeSetupMethod;ValueControl','',undefined,form);
+ const picker=page.add('div',field.getAttribute('data-tid')+';trg_picker','',{x:100,y:100,width:20,height:20},field);
+ const observation=await page.observe();assert.equal(observation.wizard.stage,'lin_regression_details');
+ const control=observation.ui.elements.find(e=>e.tid===picker.getAttribute('data-tid'));
+ assert.ok(control?.allowed_actions.includes('click'));
+});
