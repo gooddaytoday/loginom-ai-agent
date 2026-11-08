@@ -24,9 +24,9 @@
 Для yes/no → логический признак используй Замену с `result_type:"boolean"`,
 `to:{type:"boolean",value:true}` и `to:{type:"boolean",value:false}`,
 `other:{mode:"null"}`. Boolean допускает true/false/NULL, а не строки и не 0/1.
-Boolean допускает и `other:{mode:"keep"}`: выход Variant, совпавшие ячейки
-логические, прочие хранят исходный тип/NULL. Другой тип с keep отклоняется.
-Datetime требует `other.null`, локальный ISO `YYYY-MM-DDTHH:mm:ss`, без зоны.
+Boolean: `other` null или keep (Variant: совпавшие логические, прочие с
+исходным типом/NULL); другой тип с keep отклоняется. Datetime: other.null,
+локальный ISO `YYYY-MM-DDTHH:mm:ss`.
 Это словарь, а не автоматическое преобразование текста: незаданный ключ
 подчиняется `other`. При other.null исходный NULL тоже даёт NULL и флаг true.
 <!-- /mode -->
