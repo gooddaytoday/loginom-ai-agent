@@ -3,8 +3,8 @@ import {expandOutputChanges} from './output-mapping-changes.mjs';
 import {ensureMappingTableView} from './mapping-table-view.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const mappingControl=(s,suffix)=>{
-  const tids=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','TuneDataSourceMappingWizard','DerivedDataSourceMappingEngineOutputPortWizard'].map(form=>s.wizard.root_tid+';'+form+';'+suffix);
+const mappingControl=(s,suffix,mappingWizard)=>{
+  const tids=(mappingWizard?[mappingWizard]:['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','TuneDataSourceMappingWizard','DerivedDataSourceMappingEngineOutputPortWizard']).map(form=>s.wizard.root_tid+';'+form+';'+suffix);
   const controls=s.ui.elements.filter(e=>tids.includes(e.tid)&&e.allowed_actions.includes('click'));
   if(controls.length!==1)throw Error('Unique output mapping control unavailable');
   return controls[0];
@@ -14,10 +14,10 @@ const schema=definition=>definition.fields.map(f=>({name:f.name,label:f.label,ty
 
 // Changes the observed port option, preserving the entire output definition.
 // Native synchronization itself remains a separate, explicitly requested action.
-export async function configureOutputAutosync(channel,value) {
+export async function configureOutputAutosync(channel,value,{mappingWizard,stage}={}) {
   if(typeof value!=='boolean')throw new Error('Explicit output autosync boolean required');
-  const before=await readOutputDefinitionPages(channel);
-  const ready=s=>s.wizard?.status==='observed'&&['output_mapping','input_mapping'].includes(s.wizard.stage)
+  const before=await readOutputDefinitionPages(channel,{stage});
+  const ready=s=>s.wizard?.status==='observed'&&(stage?s.wizard.stage===stage:['output_mapping','input_mapping'].includes(s.wizard.stage))
     &&!s.wizard.column_parameters&&s.wizard.output_columns?.auto_sync?.status==='observed'
     &&typeof s.wizard.output_columns.auto_sync.value==='boolean';
   const initial=await channel.observe({condition:'output autosync option available',ready});
@@ -28,13 +28,13 @@ export async function configureOutputAutosync(channel,value) {
       ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===option.value,
       identity:s=>({root:s.wizard.root_ref,option:s.wizard.output_columns.auto_sync}),
       resolve:s=>{
-        if(mappingControl(s,'btnAutoSyncThroughColumns').ref!==option.ref)throw new Error('Unique output autosync control unavailable');
+        if(mappingControl(s,'btnAutoSyncThroughColumns',mappingWizard).ref!==option.ref)throw new Error('Unique output autosync control unavailable');
         return {verb:'click',ref:option.ref};
       }});
   }
   await channel.observe({condition:'requested output autosync value applied',
     ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===value});
-  const after=await readOutputDefinitionPages(channel,{expectedCount:before.total_columns,
+  const after=await readOutputDefinitionPages(channel,{expectedCount:before.total_columns,stage,
     ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===value});
   if(!same(schema(before),schema(after)))throw new Error('Output definition changed while setting autosync');
   return {verified:true,cleanup_complete:true,effect_possible:option.value!==value,

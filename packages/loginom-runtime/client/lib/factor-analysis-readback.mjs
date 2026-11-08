@@ -7,9 +7,15 @@ export function factorAnalysisConfigurationReadback({node,phases,operation_id}){
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&saved.value.settings_applied===true&&finished.value.settings_applied===true,'settings were not committed');
  need(finished.value.mode!=='execute'||training.status==='trained'&&training.execution_id!==finished.value.execution_id&&training.source?.length===1,'training on the connected source must complete before Execute');
  const features=c.fields.filter(f=>f.usage_type===3).map(f=>f.name);
- need(c.criterion==='fixed'&&c.rotation==='none'&&c.output_cap===false&&features.length>=c.factors,'unsupported PCA settings');
+ const mode=c.mode??'pca_fixed';
+ need(c.rotation==='none'&&['pca_fixed','pca_eigenvalue','pca_variance'].includes(mode),'unsupported PCA settings');
+ need(mode!=='pca_fixed'||c.criterion==='fixed'&&Number.isSafeInteger(c.factors)&&c.factors>=1&&features.length>=c.factors,'invalid fixed count');
+ need(mode!=='pca_eigenvalue'||c.criterion==='eigenvalue'&&Number.isFinite(c.eigenvalue)&&c.eigenvalue>=0.1&&c.eigenvalue<=1.5,'invalid eigenvalue criterion');
+ need(mode!=='pca_variance'||c.criterion==='variance'&&Number.isFinite(c.variance_percent)&&c.variance_percent>=1&&c.variance_percent<=100,'invalid variance criterion');
+ need(typeof c.output_cap==='boolean'&&(!c.output_cap||Number.isSafeInteger(c.output_factors)&&c.output_factors>=1&&c.output_factors<=128),'invalid output cap');
  const output_mappings=mapped.value.ports.map(({port,mapping})=>({port,fields:mapping.target_fields.map((f,index)=>({index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,source_name:f.source?.name??f.name}))}));
  return {kind:'factor_analysis',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),
-  receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'pca_fixed',features,factors:c.factors,rotation:'none',
+  receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode,features,factors:c.factors,rotation:'none',
+  ...(mode!=='pca_fixed'||c.output_cap?{criterion:c.criterion,output_factors:c.output_cap?c.output_factors:false,...(mode==='pca_eigenvalue'?{eigenvalue:c.eigenvalue}:{}),...(mode==='pca_variance'?{variance_percent:c.variance_percent}:{})}:{}),
   training:structuredClone(training),output_mappings,package_persistence_verified:false};
 }

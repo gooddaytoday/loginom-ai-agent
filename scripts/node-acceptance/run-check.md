@@ -677,6 +677,15 @@ order; fixed width supplies the real .txt file without treating it as CSV,
 while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
 the byte oracle for the file passed through --csv. No oracle reaches the model.
 
+`factor-auto` uses the approved `modes/task-auto.md`: eigenvalue 1.1 then
+variance 90% on the same node, both complete typed outputs after each execution.
+Both stages use the unchanged independent `modes/expected.json` and stock
+factor-sign matcher. Final two CSVs, Save, cold and cleanup are required.
+`factor-cap` uses `task-cap.md`: fixed two trained factors, then output cap one
+on the same node, physically one Factor field on both ports. The cap oracle
+and stock CSV/cold matcher retain exact types, NULL and field order.
+Only task and matrix.csv reach the model.
+
 
 `replace-boolean` и `replace-mixed` используют утверждённые task-boolean.md/task-mixed.md
 и только fixtures/extended/input.csv из replacement. Независимые expected.json
