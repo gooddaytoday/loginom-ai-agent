@@ -162,13 +162,13 @@ export function compactActionResult(result,{wireSize=previewWireSize}={}) {
 }
 
 export function compactKnowledgeBundle(description) {
-  // Per-type cache keys remain on dock_action_describe. Preparation already
-  // carries the session manifest and contract revisions; repeating every hash
-  // spends ~4 KB of its wire budget before any input artifacts are listed.
+  // Per-type cache keys, contract revisions, apply tool and handler revisions
+  // remain on dock_action_describe. They are identical in every type or
+  // handler-internal, and repeating them spends ~6 KB of the first reply.
   return {
     version: 'user-v1', session_manifest: description.session_manifest,
     actions: description.actions.map(action => pick(action, ['action_key', 'revision', 'description', 'input_schema', 'effect'])),
-    node_types: description.node_types.map(node => pick(node, ['type', 'contract_revision', 'candidate_node_apply_available',
-      'candidate_apply_tool', 'configuration_handler', 'semantics', 'modes', 'limitations', 'knowledge_sha256', 'validated_for'])),
+    node_types: description.node_types.map(node => pick(node, ['type', 'candidate_node_apply_available',
+      'semantics', 'modes', 'limitations', 'knowledge_sha256', 'validated_for'])),
   };
 }
