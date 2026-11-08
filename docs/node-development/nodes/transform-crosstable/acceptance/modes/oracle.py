@@ -2,6 +2,11 @@
 
 No Loginom/runtime imports or captured output. Only task and CSV reach the model.
 --check regenerates all expectations in memory and detects stale files.
+
+DateTime expectations use canonical ISO millisecond strings for semantic values,
+not literal CSV bytes. Loginom 7.4.2 omits midnight's time part in text export,
+even with hh:nn:ss.zzz selected. The existing CSV comparator parses both forms
+with datetime.fromisoformat; no captured output or tolerance enters this oracle.
 """
 import argparse
 import importlib.util
