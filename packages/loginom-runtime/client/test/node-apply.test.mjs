@@ -431,6 +431,13 @@ function separateFixture(){
  f.drivers.finishGraph=async mode=>{f.calls.push('graph-'+mode);return {verified:true,cleanup_complete:true,effect_possible:mode==='execute',mode,settings_applied:true,execution_started:mode==='execute',execution_id:mode==='execute'?'execution1':null};};
  return f;
 }
+for(const kind of ['grouping','sorting'])test(kind+' projects independent binding receipts into configuration.bindings',async()=>{
+ const f=separateFixture(),bindings=[{parameter:kind==='grouping'?'/sort_result':'/compare_with_locale',mode:'variable',verified:true,variable:{name:'Flag',type:'boolean',id:5}}];
+ f.handlers.get('imports.text').configurationReadback=()=>({kind});
+ const finish=f.drivers.finish;f.drivers.finish=async mode=>({...await finish(mode),bindings});
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED');assert.deepEqual(result.configuration.bindings,bindings);
+ bindings[0].variable.name='changed';assert.equal(result.configuration.bindings[0].variable.name,'Flag');
+});
 for(const mode of ['done','execute','close'])test('separate output wizard preserves complete '+mode+' lifecycle',async()=>{
  const f=separateFixture(),p=request();p.finish=mode;if(mode!=='execute')p.read.ports=[];
  const r=await f.run(p);assert.equal(r.status,'SUCCEEDED');

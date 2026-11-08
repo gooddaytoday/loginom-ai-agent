@@ -22,6 +22,8 @@ export async function configureSorting(channel,p,{newNode=false,bound=false}={})
  const ready=s=>s.wizard?.stage==='sorting'&&s.node_sorting?.verified===true;
  const observe=condition=>channel.observe({condition,readSorting:true,ready});
  const initial=await observe('complete sorting configuration'),baseline=initial.node_sorting;
+ need(!baseline.options.chkLocaleAware.switch_pressed||p.compare_with_locale===undefined,'Variable-driven sorting locale requires omission of the literal');
+ bound=bound||(baseline.options.chkLocaleAware.switch_pressed&&p.compare_with_locale===undefined);
  need(p.keys!==undefined||baseline.keys.every(k=>!k.missing_input),'Existing sorting contains missing input keys; provide complete replacement keys');
  const plan=p.keys===undefined?baseline.keys:resolveSortingParameters(p,baseline.input_fields);
  need(plan.length>0,'Existing sorting requires nonempty keys');
