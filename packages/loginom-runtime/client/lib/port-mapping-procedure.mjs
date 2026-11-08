@@ -83,7 +83,9 @@ export async function resyncOutputFields(channel,before) {
     const now=synced.target_fields.find(t=>sourceKey(t.source)===sourceKey(source));
     if(previous&&(!now||names(now)!==names(previous)))throw new Error('Output resynchronization changed an existing output field: '+source.name);
   }
-  const off=await toggle(true,false,on);
+  // The mapping reads above advanced the document; restore from a fresh observation.
+  const current=await channel.observe({condition:'output autosync option is on before it is restored',ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===true});
+  const off=await toggle(true,false,current);
   const final=(await channel.observe({condition:'native output mapping after autosync is restored',readMappings:true,
     ready:s=>mapped(s)&&s.wizard.output_columns.auto_sync.value===false&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
   if(final.target_fields.length!==synced.target_fields.length)throw new Error('Restoring autosync changed the output definition');

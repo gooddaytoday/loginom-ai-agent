@@ -508,8 +508,9 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           return verified({effect_possible:true,mapping:{fields:[]},native_mapping:native,deferred_output:true,completion:done.wizard.completion,changes:[],source_identity_verified:true});
         }
         const changes=[];
-        // «Только новые» adds source fields, but their outputs appear only through native synchronization.
-        if(!mappings.length&&shouldResyncNewOutputs(configured,native)) {
+        // «Только новые» adds source fields, but their outputs appear only through native synchronization;
+        // requested mappings are then resolved against the synchronized native mapping.
+        if(shouldResyncNewOutputs(configured,native)) {
           const resync=await resyncOutputFields(channel,native);
           changes.push(resync);native=resync.native_mapping;
         }

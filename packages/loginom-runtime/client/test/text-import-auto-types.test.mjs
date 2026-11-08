@@ -167,8 +167,9 @@ function mappingFixture({targetsOf,autosync=false,reset=false}) {
  const mapping=()=>({verified:true,inventory_complete:true,source_identity_verified:true,autosync:on,source_fields:sources,target_fields:structuredClone(targets)});
  const state=()=>({wizard:{status:'observed',stage:'output_mapping',root_ref:'root',root_tid:'wizard',output_columns:{auto_sync:{status:'observed',value:on,ref:'sync'}}},
   node_mapping:mapping(),ui:{elements:[{tid:'wizard;ColumnsMappingEngineOutputPortWizard;btnAutoSyncThroughColumns',ref:'sync',allowed_actions:['click']}]}});
- const channel={observe:async options=>{const s=state();if(!options.ready(s))throw Error('refused: '+options.condition);return s;},
-  perform:async o=>{assert.equal(o.ready(o.initialObservation),true);const a=o.resolve(o.initialObservation);assert.deepEqual(a,{verb:'click',ref:'sync'});
+ let epoch=0;
+ const channel={observe:async options=>{const s=state();if(options.readMappings)epoch++;s.epoch=epoch;if(!options.ready(s))throw Error('refused: '+options.condition);return s;},
+  perform:async o=>{if(o.initialObservation.epoch!==epoch)throw Error('Initial bound observation is no longer current or ready');assert.equal(o.ready(o.initialObservation),true);const a=o.resolve(o.initialObservation);assert.deepEqual(a,{verb:'click',ref:'sync'});
    clicks++;on=!on;if(on)targets=sources.map(s=>(!reset&&targets.find(t=>t.source.record_id===s.record_id))||targetOf(s));}};
  return {sources,channel,get clicks(){return clicks;},get autosync(){return on;},native:mapping()};
 }
