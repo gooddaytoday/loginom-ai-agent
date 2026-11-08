@@ -11,7 +11,7 @@ test('ungroup accepts explicit shares and all observed rounding/balance combinat
  }
 });
 test('ungroup refuses unsupported modes and malformed complete configurations before UI',()=>{
- for(const mode of ['computed','seasonal','weights'])assert.throws(()=>validateUngroupParameters(valid(),mode,request),/unsupported|shares/i);
+ for(const mode of ['seasonal','weights'])assert.throws(()=>validateUngroupParameters(valid(),mode,request),/unsupported|shares/i);
  for(const mutate of [p=>p.extra=true,p=>p.ungroup.keys=[],p=>p.ungroup.keys.push({total:'GROUP',support:'Other'}),p=>p.ungroup.share_field='Item',p=>p.ungroup.value_field='Group',p=>delete p.ungroup.balance,p=>p.ungroup.rounding={format:'none',value:0},p=>p.ungroup.rounding={format:'precision',value:13},p=>p.ungroup.rounding={format:'multiple',value:0},p=>p.ungroup.variable='V']){
   const p=valid();mutate(p);assert.throws(()=>validateUngroupParameters(p,'shares',request));
  }

@@ -66,7 +66,7 @@ RULES = (
     ((C + 'auto-correlation-*.mjs',), ('live-ui',), ('acf-one', 'acf-series', 'acf-eight', 'acf-update')),
     ((C + 'quality-*.mjs',), ('live-ui',), ('quality-default', 'quality-spikes')),
 
-    ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding')),
+    ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights')),
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age', 'corr-ranks')),
     ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
     (('scripts/node-acceptance/clustering-apply.mjs',), ('live-ui',), ('clustering-apply',)),
