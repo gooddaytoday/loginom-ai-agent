@@ -42,6 +42,57 @@ export async function configureOutputAutosync(channel,value,{mappingWizard,stage
     settings_applied:false,package_saved:false};
 }
 
+// An output is out of sync when a source has no output or an output lost its source.
+// Source records are recreated by a re-read of the file; outputs keep the old identity.
+const sourceKey=f=>f?.record_id===undefined?null:String(f.record_id)+':'+String(f.field_id);
+export function outputsOutOfSync(native) {
+  const sources=native?.source_fields,targets=native?.target_fields;
+  if(!Array.isArray(sources)||!Array.isArray(targets)||native.verified!==true||sources.length===0)return false;
+  const sourceKeys=new Set(sources.map(sourceKey)),targetKeys=targets.map(t=>sourceKey(t.source??t.exclusion_source));
+  return sources.some(s=>!targetKeys.includes(sourceKey(s)))||targetKeys.some(k=>k===null||!sourceKeys.has(k));
+}
+
+// Native synchronization adds the outputs of new source fields. It is requested
+// only for an explicitly out-of-sync import with autosync off; the previous
+// autosync value is restored and existing output names must survive.
+export async function resyncOutputFields(channel,before) {
+  const ready=s=>s.wizard?.status==='observed'&&s.wizard.stage==='output_mapping'
+    &&!s.wizard.column_parameters&&s.wizard.output_columns?.auto_sync?.status==='observed'
+    &&typeof s.wizard.output_columns.auto_sync.value==='boolean';
+  const initial=await channel.observe({condition:'output autosync option available for resynchronization',ready});
+  const root=initial.wizard.root_ref,option=initial.wizard.output_columns.auto_sync;
+  if(option.value!==false)throw new Error('Output resynchronization requires autosync to be off');
+  const bound=s=>ready(s)&&s.wizard.root_ref===root&&s.wizard.output_columns.auto_sync.ref===option.ref;
+  const toggle=async(from,to,state)=>{
+    await channel.perform({condition:'toggle the bound output autosync option '+from+' to '+to,initialObservation:state,
+      ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===from,
+      identity:s=>({root:s.wizard.root_ref,option:s.wizard.output_columns.auto_sync}),
+      resolve:s=>{
+        if(mappingControl(s,'btnAutoSyncThroughColumns').ref!==option.ref)throw new Error('Unique output autosync control unavailable');
+        return {verb:'click',ref:option.ref};
+      }});
+    return channel.observe({condition:'output autosync option is '+to,ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===to});
+  };
+  const mapped=s=>bound(s)&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
+  const on=await toggle(false,true,initial);
+  const synced=(await channel.observe({condition:'native output mapping after synchronization',readMappings:true,
+    ready:s=>mapped(s)&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
+  const names=f=>f.name+'\u0000'+f.label;
+  for(const source of synced.source_fields) {
+    const old=before.source_fields.find(f=>f.name===source.name),previous=old&&before.target_fields.find(t=>t.source&&sourceKey(t.source)===sourceKey(old));
+    const now=synced.target_fields.find(t=>sourceKey(t.source)===sourceKey(source));
+    if(previous&&(!now||names(now)!==names(previous)))throw new Error('Output resynchronization changed an existing output field: '+source.name);
+  }
+  // The mapping reads above advanced the document; restore from a fresh observation.
+  const current=await channel.observe({condition:'output autosync option is on before it is restored',ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===true});
+  const off=await toggle(true,false,current);
+  const final=(await channel.observe({condition:'native output mapping after autosync is restored',readMappings:true,
+    ready:s=>mapped(s)&&s.wizard.output_columns.auto_sync.value===false&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
+  if(final.target_fields.length!==synced.target_fields.length)throw new Error('Restoring autosync changed the output definition');
+  return {verified:true,cleanup_complete:true,effect_possible:true,autosync:{before:false,during:true,after:off.wizard.output_columns.auto_sync.value},
+    added_outputs:synced.target_fields.length-before.target_fields.length,native_mapping:final,settings_applied:false,package_saved:false};
+}
+
 // A new node has no observed schema ID before its own configuration. This
 // explicit self-reference is resolved only against that complete native source.
 // A fields list is the full ordered layout; exclusions are explicit entries.
