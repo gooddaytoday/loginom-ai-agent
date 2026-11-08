@@ -159,4 +159,6 @@ test('the installed catalog and request validator admit Enter with both tabular 
  assert.throws(()=>validateNodeApplyRequest({...request,mode:'ridge'},support.nodeApplyHandlers),/ridge requires/);
  assert.equal(validateNodeApplyRequest({...request,mode:'ridge',parameters:{...request.parameters,linear_regression:{lambda_l2:1}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
  assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l2.minimum,0);
+ assert.equal(validateNodeApplyRequest({...request,mode:'lasso',parameters:{...request.parameters,linear_regression:{lambda_l1:1}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
+ assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l1.minimum,0);
 });

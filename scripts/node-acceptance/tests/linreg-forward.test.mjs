@@ -54,3 +54,17 @@ print(json.dumps(dict(task=c['prompt'].name,expected=c['expected_name'],files=c[
  assert.deepEqual(value.outputs[1].rows.map(r=>r.Name),['<Константа>','X1','X2','X3']);
  assert.equal(value.outputs[1].rows[1].Y_coefficients,32/17);
 });
+
+
+test('C9 LASSO delivers only the approved task and shifted CSV with unchanged KKT expectations',()=>{
+ const value=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('linreg-lasso');e=m.expected_for(c,'/worker/c9.lgp')
+approved=json.loads(Path('docs/node-development/nodes/datamining-linregression/acceptance/penalty/expected.json').read_text())['cases']['shifted-lasso']['expected']
+approved['package_path']='/worker/c9.lgp';assert e==approved
+print(json.dumps(dict(task=c['prompt'].name,files=c['input_files'],outputs=e['outputs'])))`],{encoding:'utf8'}));
+ assert.equal(value.task,'task-lasso.md');assert.deepEqual(value.files,['shifted.csv']);
+ assert.equal(value.outputs.length,2);assert.equal(value.outputs[0].rows.length,16);
+ assert.deepEqual(value.outputs[1].rows.map(r=>r.Y_coefficients),[95/32,63/32,15/32,0]);
+});
