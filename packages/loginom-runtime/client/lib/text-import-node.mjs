@@ -313,6 +313,34 @@ export function bindConfiguredOutputColumns(configured,actual,native) {
   return expected.map(f=>({name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,used:true}));
 }
 
+// Native autosync can replace a changed-type target at the end of the list.
+// Record IDs belong to the current wizard; associate layouts through the verified
+// source names, never through output aliases or former source positions.
+export async function restoreImportOutputLayout(channel,before,native,mappings,columns=[]) {
+  if(!before?.autosync||!native.autosync||mappings.some(m=>m.fields!==undefined))return null;
+  requireValue(before.verified&&before.inventory_complete&&before.source_identity_verified
+    &&native.verified&&native.inventory_complete&&native.source_identity_verified,'Complete import layout identity required');
+  const retained=before.target_fields.flatMap(previous=>{
+    const source=previous.source;
+    requireValue(source&&before.source_fields.some(s=>s.record_id===source.record_id&&s.field_id===source.field_id),
+      'Previous import output source is unverified');
+    const rename=columns.find(c=>c.source_name===source.name&&c.name!==undefined);
+    const name=rename?.name??source.name;
+    const current=native.target_fields.filter(f=>f.source?.name===name);
+    requireValue(current.length<=1,'Ambiguous retained import output source');
+    return current.map(field=>({source:{kind:'configured_field',name},name:previous.name,label:previous.label,current:field}));
+  });
+  const fields=[...retained,...native.target_fields.filter(f=>!retained.some(r=>r.current.record_id===f.record_id))
+    .map(f=>({source:{kind:'configured_field',name:f.source.name},name:f.name,label:f.label,current:f}))];
+  const changes=[];
+  if(retained.some(f=>f.name!==f.current.name||f.label!==f.current.label))
+    changes.push(await configureOutputFields(channel,{direction:'output',port:0,fields:fields.map(({current,...f})=>f)},
+      native.source_fields.map(f=>({...f,used:true}))));
+  if(fields.some((f,i)=>f.current.record_id!==native.target_fields[i].record_id))
+    changes.push(await reorderOutputFields(channel,fields.map(f=>f.current.record_id)));
+  return changes;
+}
+
 // Host-owned support object. It is deliberately not registered in the public
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
@@ -322,7 +350,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
   const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,resolveDeliveredSource,verifySourceSwitchSave,scanReceipt})=>{
-    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,schemaBefore,schemaAfter,saveReceipt;
+    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,schemaBefore,schemaAfter,saveReceipt,outputLayout;
     const sourceSwitch=(operation.nodeApply?.request??operation.parameters)?.parameters?.source_switch;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
     const enter=ctx=>{
@@ -336,12 +364,12 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     };
     const read=(stage,condition,ready=()=>true)=>channel.observe({condition,ready:s=>s.wizard?.status==='observed'
       && s.wizard.stage===stage && s.prepared_node_context?.surface==='wizard' && ready(s)});
-    const next=async(from,to)=>{
+    const next=async(from,to,button='btnNext')=>{
       const s=await read(from,'import '+from+' Next available',s=>s.ui.elements.some(e=>
-        e.tid===s.wizard.root_tid+';btnNext' && e.allowed_actions.includes('wizard_step')));
+        e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes('wizard_step')));
       await channel.perform({condition:'bound import '+from+' to '+to,initialObservation:s,
-        ready:s=>s.wizard?.stage===from && s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';btnNext' && e.allowed_actions.includes('wizard_step')),
-        resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'),'Unique Next required').ref,expected_stage:to}),
+        ready:s=>s.wizard?.stage===from && s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes('wizard_step')),
+        resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+button),'Unique wizard navigation control required').ref,expected_stage:to}),
         identity:s=>({node:s.prepared_node_context,from,to})});
       return read(to,'import '+to+' ready');
     };
@@ -467,6 +495,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
               server_profile:serverPreviewProfile({source:observedSource,format,columns:definitions.fields,preview})};
             return configured;
           }
+          const request=operation.nodeApply.request;
+          if(request.target.kind==='existing'&&!sourceSwitch&&!request.mappings.some(m=>m.fields!==undefined)
+            &&(p.settings.analysis?.refresh||p.settings.columns?.some(c=>c.type!==undefined)||p.settings.source)) {
+            await next('text_import_file','text_import_format');
+            await next('text_import_format','output_mapping');
+            outputLayout=structuredClone((await readNativeImportMapping(channel,'import output layout before configuration',
+              s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true)).node_mapping);
+            await next('output_mapping','text_import_format','btnPrev');
+            await next('text_import_format','text_import_file','btnPrev');
+          }
           configured=operation.nodeApply.request.target.kind==='existing'
             ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch})
             :await configureTextImportFields(channel,p.settings,owner);
@@ -513,6 +551,13 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         if(shouldResyncNewOutputs(configured,native)) {
           const resync=await resyncOutputFields(channel,native);
           changes.push(resync);native=resync.native_mapping;
+        }
+        const restored=await restoreImportOutputLayout(channel,outputLayout,native,mappings,
+          operation.nodeApply.request.parameters.settings.columns);
+        if(restored?.length) {
+          changes.push(...restored);
+          native=(await channel.observe({condition:'restored import output layout',readMappings:true,ready:nativeReady})).node_mapping;
+          requireValue(native.autosync===outputLayout.autosync,'Import layout restoration changed autosync');
         }
         if(mappings.length) {
           const mapping=one(mappings,'One import output mapping required');

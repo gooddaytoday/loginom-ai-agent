@@ -242,7 +242,8 @@ def scenario(name, case_root=None, *, cases=None):
         update = name == 'text-auto-update'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
-                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
+                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
+                    text_update=update, export_count=2 if update else 1)
     if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
@@ -664,6 +665,34 @@ def sorting_stages(case):
     # Independent oracle: one ordered table per saved/exported stage, last = final node state.
     stages = json.loads(subprocess.check_output([sys.executable, '-B', str(case['source'] / 'oracle.py')]))['cases'][case['sorting_case']]['stages']
     return [dict(stage, column_order='exact') for stage in stages]
+
+
+def text_update_stages(case):
+    return [read(case['source'] / name)['outputs'][0] for name in
+            ['expected-auto-update-string.json', 'expected-auto-update.json']]
+
+
+def check_text_update_ports(replies, destinations, stages):
+    assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
+    previous, node = -1, None
+    for destination, stage in zip(destinations, stages):
+        exports = [n for n, reply in replies if reply.get('status') == 'SUCCEEDED'
+                   and reply.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'
+                   and reply['configuration']['readback'].get('destination') == destination]
+        assert exports and exports[-1] > previous, 'TEXT_UPDATE_EXPORT_MISSING_OR_ORDER'
+        reads = [(n, owner, port) for n, reply in replies if previous < n < exports[-1]
+                 for owner, port in ports(reply) if owner.get('status') == 'SUCCEEDED'
+                 and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'
+                 and port.get('port') == 0]
+        assert reads, 'TEXT_UPDATE_PORT_MISSING'
+        _, owner, port = reads[-1]
+        identity = owner.get('node')
+        assert identity and (node is None or identity == node), 'TEXT_UPDATE_IMPORT_CHANGED'
+        node = identity
+        assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
+        assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
+            (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
+        previous = exports[-1]
 
 
 def expected_for(case, package, cold=False):
@@ -1493,6 +1522,7 @@ class Runner:
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('text_update'): exports = ['text-update-string.csv', 'text-update-real.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
@@ -1964,6 +1994,8 @@ class Runner:
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
             expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
+        if spec.get('text_update'):
+            check_text_update_ports(replies, destinations, text_update_stages(spec))
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)
         sampling_csvs = []
@@ -1988,7 +2020,8 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (sorting_stages(spec)[index] if spec.get('sorting_case')
+            csv_expected = (text_update_stages(spec)[index] if spec.get('text_update')
+                            else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
                             else read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0

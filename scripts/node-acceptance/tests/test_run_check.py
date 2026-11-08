@@ -22,6 +22,38 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_text_update_has_two_named_stages_and_final_only_cold(self):
+        case = runner.scenario('text-auto-update')
+        self.assertEqual(case.get('export_count'), 2)
+        stages = runner.text_update_stages(case)
+        self.assertEqual([s['columns'][1]['type'] for s in stages], ['string', 'real'])
+        self.assertEqual(stages[0]['rows'][0]['Amount'], '8.25')
+        self.assertEqual(runner.expected_for(case, '/own/text.lgp')['outputs'], stages[-1:])
+        prompt = case['prompt'].read_text()
+        for name in ['text-update-string.csv', 'text-update-real.csv']:
+            self.assertIn(name, prompt)
+
+    def test_text_update_requires_both_stage_ports_before_their_exports(self):
+        stages = runner.text_update_stages(runner.scenario('text-auto-update'))
+        replies = []
+        for i, stage in enumerate(stages):
+            port = dict(port=0, schema=copy.deepcopy(stage['columns']), sample=[],
+                        row_count=2, sample_complete=True, freshness_basis='completed_execution_port_source')
+            reply = dict(status='SUCCEEDED', cleanup_complete=True, node=dict(node_id='same-import'),
+                         configuration=dict(readback=dict(kind='text_import')), output=dict(ports=[port]))
+            replies += [(i * 2, reply), (i * 2 + 1, dict(status='SUCCEEDED', configuration=dict(
+                readback=dict(kind='text_export', destination=f'/own/stage-{i}.csv'))))]
+        runner.check_text_update_ports(replies, ['/own/stage-0.csv', '/own/stage-1.csv'], stages)
+        for fault in ['missing-final', 'wrong-order', 'wrong-type', 'other-node', 'stale']:
+            bad = copy.deepcopy(replies)
+            if fault == 'missing-final': bad.pop()
+            if fault == 'wrong-order': bad[2][1]['output']['ports'][0]['schema'].reverse()
+            if fault == 'wrong-type': bad[0][1]['output']['ports'][0]['schema'][1]['type'] = 'real'
+            if fault == 'other-node': bad[2][1]['node']['node_id'] = 'another-import'
+            if fault == 'stale': bad[2][1]['output']['ports'][0]['sample_complete'] = False
+            with self.subTest(fault=fault), self.assertRaisesRegex(AssertionError, 'TEXT_UPDATE'):
+                runner.check_text_update_ports(bad, ['/own/stage-0.csv', '/own/stage-1.csv'], stages)
+
     def test_variables_replace_match_order_policy(self):
         case = runner.scenario('variables-replace-match')
         initial = runner.read(case['source'] / case['variable_initial'])
