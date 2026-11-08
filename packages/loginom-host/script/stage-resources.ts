@@ -6,6 +6,7 @@ import { $ } from "bun"
 import { nativeResourceCandidates } from "./native-resource-candidates"
 import { buildPhase } from "./build-phase"
 import { buildKeychain } from "./build-keychain"
+import { ripgrepPinForTarget, stageRipgrep } from "./ripgrep-resource"
 import { buildPackageDocs } from "./build-package-docs"
 import { collectBuildNotices } from "./collect-build-notices"
 import release from "../../product/loginom-release.json"
@@ -106,6 +107,8 @@ export async function stageResources(input: {
   if (input.knowledgeKey?.trim()) await Bun.write(join(staging, "knowledge-key"), input.knowledgeKey.trim())
   await cp(productSkillsDirectory, join(staging, "skills"), { recursive: true, verbatimSymlinks: true })
   await cp(node, join(staging, pins.node))
+  // Bundled so the agent's glob/grep never download ripgrep at runtime.
+  await stageRipgrep({ resources: staging, pin: ripgrepPinForTarget(target) })
   await cp(browsers, join(staging, "browsers"), {
     recursive: true,
     verbatimSymlinks: true,
@@ -181,6 +184,7 @@ export async function stageResources(input: {
   Loginom AI Agent includes code derived from OpenCode (MIT) and Loginom Dock (AGPL-3.0).
   The original copyright/license notices are preserved in licenses/.
   Node.js license and bundled dependency notices are in licenses/Node.txt.
+  ripgrep (MIT or Unlicense) is bundled in ripgrep/; its license texts are in licenses/ripgrep/.
   Package documentation uses Golos Text under the SIL Open Font License (licenses/Golos-OFL.txt).
   Its emitted npm dependency notices are in licenses/package-docs/.
   Playwright, MCP and their dependency license files are included alongside their package sources in runtime/client/node_modules/.

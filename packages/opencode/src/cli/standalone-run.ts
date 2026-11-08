@@ -2,6 +2,7 @@ import { Option, Schema } from "effect"
 import { Loginom } from "@opencode-ai/schema/loginom"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { launchNodeHost, NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
+import { withBundledRipgrep } from "@loginom-ai-agent/loginom-host/bundled-ripgrep"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
 import { standaloneCancellation } from "./standalone-cancellation"
@@ -53,6 +54,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
   })
   if (!bundle) return
   process.env.LOGINOM_AI_AGENT_RESOURCES = bundle.resources
+  withBundledRipgrep(process.env, bundle.resources)
   if (signal?.aborted) {
     failure("CLI_CANCELLED", 130)
     return

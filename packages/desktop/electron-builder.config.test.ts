@@ -57,7 +57,11 @@ test("macOS test packages use explicit ad-hoc arm64 signing without rewriting ve
     { target: "dmg", arch: ["arm64"] },
     { target: "zip", arch: ["arm64"] },
   ])
-  expect(config.mac?.signIgnore).toEqual(["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"])
+  expect(config.mac?.signIgnore).toEqual([
+    "/Contents/Resources/loginom/bin/",
+    "/Contents/Resources/loginom/browsers/",
+    "/Contents/Resources/loginom/ripgrep/",
+  ])
   expect(JSON.stringify(config.extraResources)).not.toContain("native/")
 })
 

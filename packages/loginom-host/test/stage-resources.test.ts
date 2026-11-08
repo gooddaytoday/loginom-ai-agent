@@ -6,6 +6,7 @@ import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageR
 import release from "../../product/loginom-release.json"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { verifyBundledSkills } from "../src/bundled-skills"
+import { ripgrepPins } from "../script/ripgrep-resource"
 
 test("resource staging selects the signed action catalog for the target platform", () => {
   expect(actionCatalogForPlatform("linux")).toEqual({
@@ -147,6 +148,12 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(true)
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
+      expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("licenses/ripgrep/")
+      const rg = process.platform === "win32" ? "ripgrep/rg.exe" : "ripgrep/rg"
+      expect(manifest.files.some((file: { path: string }) => file.path === rg)).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "licenses/ripgrep/LICENSE-MIT")).toBe(true)
+      const version = Bun.spawnSync([join(destination, rg), "--version"]).stdout.toString()
+      expect(version).toStartWith(`ripgrep ${ripgrepPins.version}`)
       const notices = await Bun.file(join(destination, "licenses/package-docs/inventory.json")).json()
       expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@zip.js/zip.js")).toBe(true)
       expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@xmldom/xmldom")).toBe(true)

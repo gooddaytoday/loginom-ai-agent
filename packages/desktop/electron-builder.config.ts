@@ -89,7 +89,11 @@ const config: Configuration = {
     minimumSystemVersion: "14.0",
     identity: "-",
     // Preserve upstream signatures and the staged resource-manifest hashes.
-    signIgnore: ["/Contents/Resources/loginom/bin/", "/Contents/Resources/loginom/browsers/"],
+    signIgnore: [
+      "/Contents/Resources/loginom/bin/",
+      "/Contents/Resources/loginom/browsers/",
+      "/Contents/Resources/loginom/ripgrep/",
+    ],
     notarize: false,
     target: [
       { target: "dmg", arch: ["arm64"] },

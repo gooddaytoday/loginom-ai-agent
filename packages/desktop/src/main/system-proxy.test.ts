@@ -3,7 +3,7 @@ import { createServer as createNetServer } from "node:net"
 import { once } from "node:events"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { assignProxyEnvironment, SidecarStartError, startWithProxyFallback } from "./proxy-env"
 import { formatSystemProxyLog, loopbackNoProxy, sidecarEnvironment, startSystemProxyDetection } from "./system-proxy"
 
@@ -15,6 +15,12 @@ test("sidecar receives the application resource root independently of shell and 
     expect(env.DEBUG).toBeUndefined()
   }
   expect(base.LOGINOM_AI_AGENT_RESOURCES).toBe("/untrusted/shell")
+})
+
+test("sidecar finds the bundled ripgrep after the inherited PATH", () => {
+  const env = sidecarEnvironment({ PATH: ["/usr/bin", "/bin"].join(delimiter) }, undefined, "/application/resources/loginom")
+  expect(env.PATH).toBe(["/usr/bin", "/bin", join("/application/resources/loginom", "ripgrep")].join(delimiter))
+  expect(sidecarEnvironment({ PATH: "/usr/bin" }).PATH).toBe("/usr/bin")
 })
 
 test("a later proxy message replaces only proxy variables", () => {
