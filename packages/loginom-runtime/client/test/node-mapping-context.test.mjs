@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readMappingBrowser,readNodeMapping,makeNodeMappingContextCode} from '../lib/node-mapping-context.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
-function fixture({grouped=false,input=false,socket=false}={}) {
+function fixture({grouped=false,input=false,socket=false,names=['A','B'],sameNames=false}={}) {
  grouped ||= socket;
  const base='MF;TF;WizrdMCF;'+(input?'TuneDataSourceMappingWizard':socket?'DataSetOutputSocketWizard':grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';',all=[],views={};
  const el=(tid,text='',parent=null)=>{const e={tid,textContent:text,parent,id:'e'+all.length,attrs:{},checkVisibility:()=>true,
   getAttribute(k){return k==='data-tid'?this.tid:this.attrs[k]??null;},contains(other){return other===this||!!other.parent&&this.contains(other.parent);},
   querySelectorAll(q){return all.filter(x=>x!==this&&this.contains(x)&&q==='table.x-grid-item'&&x.row);},classList:{contains:()=>false}};all.push(e);return e;};
  const root=el(base.slice(0,-1)),grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(s=>el(base+s,'',root));
- const source=['A','B'].map((name,i)=>({isModel:true,internalId:'s'+i,data:{ID:i,Index:i,Name:name,DisplayName:'Same',DataType:5,Broken:false,Required:false}}));
- const target=source.map((s,i)=>{const t={isModel:true,internalId:'t'+i,data:{...s.data,Name:'Out'+i,DataKind:2,ConnectedRecord:s,SourceDisplayName:'Same',SourceDataType:5}};s.data.ConnectedRecord=t;return t;});
+ const source=names.map((name,i)=>({isModel:true,internalId:'s'+i,data:{ID:i,Index:i,Name:name,DisplayName:'Same',DataType:5,Broken:false,Required:false}}));
+ const target=source.map((s,i)=>{const t={isModel:true,internalId:'t'+i,data:{...s.data,Name:sameNames?s.data.Name:'Out'+i,DataKind:2,ConnectedRecord:s,SourceDisplayName:'Same',SourceDataType:5}};s.data.ConnectedRecord=t;return t;});
  if(input)for(const t of target)Object.assign(t.data,{UsageType:3,DefaultUsageType:0,OriginType:0,ReverseBroken:false,IsDerived:false});
  if(grouped){for(const s of source)s.data.GroupField='';for(const t of target)Object.assign(t.data,{GroupField:'',IsDerived:false});}
  const stores=[source,target].map(items=>({$className:'Ext.data.Store',isLoading:()=>false,getCount:()=>items.length,getTotalCount:()=>items.length,getData:()=>({items,getSource:()=>({items})})}));
@@ -490,5 +490,40 @@ test('text import output mapping may be empty before execution only for the impo
   assert.equal(r.verified,variant==='import',variant+': '+r.reason);
   if(variant==='import'){assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.source_identity_verified,true);}
   else assert.equal(r.reason,'mapping_render_bound');
+ }
+});
+
+// LAB-1096 weights-1 execution-events:657,812,828,893: Execute retains
+// Group/Item/Weight roles 6/4/9. The repeat fails in the reader, before the
+// ungroup schema comparison. Test the production reader on both native ports.
+for(const [mode,value,type] of [['computed','Weight',4],['shares','Share',3]])test('empty '+mode+' apply can inspect both saved ungroup inputs after Execute',async()=>{
+ const totals=fixture({input:true,names:['Group','Total'],sameNames:true});
+ const support=fixture({input:true,names:['Group','Item',value],sameNames:true});
+ for(const [f,index,dataType] of [[totals,1,type],[support,2,type]]){
+  f.source[index].data.DataType=dataType;
+  Object.assign(f.target[index].data,{DataType:dataType,SourceDataType:dataType,DataKind:0});
+ }
+ const owner=port=>({verified:true,surface:'wizard',node_id:'ungroup',input_port:{direction:'input',port,node_icon_class:'bg-vendor-icon-ungroupdata'}});
+ const read=(f,port)=>readNodeMapping({evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)},
+  {workflow_ref:{prefix:'MF;TF'}},async()=>owner(port));
+ for(const t of support.target)t.data.UsageType=0;
+ assert.equal((await read(support,1)).verified,true,'initial support mapping');
+ totals.target.forEach((t,i)=>t.data.UsageType=[6,7][i]);
+ support.target.forEach((t,i)=>t.data.UsageType=[6,4,9][i]);
+ const result=[];
+ for(const [port,f] of [totals,support].entries())result.push(await read(f,port));
+ assert.ok(result.every(r=>r.verified),JSON.stringify(result.map(r=>r.reason)));
+ assert.deepEqual(Array.from(result[1].target_fields,f=>[f.name,f.type,f.usage_type]),[['Group','string',6],['Item','string',4],[value,type===4?'integer':'real',9]]);
+ assert.deepEqual(Array.from(result[1].source_fields,f=>f.name),['Group','Item',value]);
+ support.target[2].data.ReverseBroken=true;assert.equal((await read(support,1)).reason,'mapping_input_usage');
+});
+
+test('saved ungroup share role is bound only to its native support input',async()=>{
+ for(const [direction,port,icon,role] of [['input',0,'bg-vendor-icon-ungroupdata',9],['input',2,'bg-vendor-icon-ungroupdata',9],
+  ['output',1,'bg-vendor-icon-ungroupdata',9],['input',1,'bg-vendor-icon-calculator',9],['input',1,'bg-vendor-icon-ungroupdata',8],['input',1,'bg-vendor-icon-ungroupdata',10]]){
+  const f=fixture({input:true});f.target[0].data.UsageType=role;
+  const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+  const result=await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port:{direction,port,node_icon_class:icon}}));
+  assert.equal(result.reason,'mapping_input_usage',JSON.stringify({direction,port,icon,role}));
  }
 });
