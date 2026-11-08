@@ -80,13 +80,13 @@ test('PCA settings commit follows native role binding and preserves existing sup
      :{verified:true,kind:'parameters',criterion:2,rotation:0,factors:2,output_cap:false,values,switches:{}}};
    assert.equal(ready(state),true);return state;
   },
-  async perform(task){const state=await this.observe({ready:task.ready});const action=task.resolve(state);actions.push(action);stage=action.expected_stage;return {verified:true};},
+  async perform(task){const state=await this.observe({ready:task.ready});const action=task.resolve(state);actions.push(action);stage=Array.isArray(action.expected_stage)?'done':action.expected_stage;return {verified:true};},
  };
  const result=await configureFactorAnalysis(channel,{}, {inputMapping,request:{target:{kind:'existing'}}});
  assert.equal(result.validation.status,'accepted_by_loginom_next');
  assert.equal(result.configuration.factors,2);assert.equal(result.configuration.rotation,'none');
  assert.deepEqual(result.configuration.fields.filter(f=>f.usage_type===3).map(f=>f.name),['X','Y','Z']);
- assert.deepEqual(actions.map(a=>a.expected_stage),['factor_analysis','done']);
+ assert.deepEqual(actions.map(a=>a.expected_stage),['factor_analysis',['output_mapping','done']]);
  const foreign=structuredClone(inputMapping);foreign.node_context.node_id='foreign';stage='input_mapping';
  await assert.rejects(()=>configureFactorAnalysis(channel,{}, {inputMapping:foreign}),/owned input/);
 });
@@ -119,7 +119,7 @@ test('observed PCA radio DisplayEl controls select fixed count and no rotation',
   node_factor_analysis:stage==='input_mapping'?{verified:true,inventory_complete:true,node_context:owner,fields:nativeFields}
    :{verified:true,kind:'parameters',criterion,rotation,factors:2,output_cap,values:{pedEigenValuesThreshold:1,pedCumDispersion:90,pedNOutFactorsMax:1},switches:{}}});
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform(task){const s=state();assert.equal(task.ready(s),true);const a=task.resolve(s);actions.push(a);
-  if(a.verb==='wizard_step')stage=a.expected_stage;
+  if(a.verb==='wizard_step')stage=Array.isArray(a.expected_stage)?'done':a.expected_stage;
   else if(a.ref.startsWith('pedSignificanceCriterion'))criterion=2;
   else if(a.ref.startsWith('pedRotationType'))rotation=0;
   else if(a.ref.startsWith('cntOutFactorsMax'))output_cap=false;

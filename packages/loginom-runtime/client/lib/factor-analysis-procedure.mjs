@@ -1,6 +1,8 @@
 import {resolveFactorAnalysisFeatures} from './factor-analysis-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {configureDerivedInlineMapping} from './grouping-inline-mapping.mjs';
+import {factorAnalysisInlineSources} from './factor-analysis-output.mjs';
 const need=(v,m)=>{if(!v)throw Error('FactorAnalysis: '+m);};
 const semantic=fs=>fs.map(({selected,origin_type,...f})=>f);
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -94,6 +96,11 @@ export async function configureFactorAnalysis(channel,p,{inputMapping,request}){
  need((key==='pedNFactors'?after.factors:after.values[key])===value&&(!output_cap||after.values.pedNOutFactorsMax===output_factors),'PCA threshold/count or output limit differs');
  const changed=new Set([key,...(typeof a.output_factors==='number'?['pedNOutFactorsMax']:[])]);
  need(['pedNFactors','pedEigenValuesThreshold','pedCumDispersion','pedNOutFactorsMax'].filter(k=>!changed.has(k)).every(k=>same(k==='pedNFactors'?after.factors:after.values[k],k==='pedNFactors'?old.factors:old.values[k])),'unrequested PCA settings changed');
- await next('factor_analysis','done');const done=await channel.observe({condition:'PCA accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,mode,factors:after.factors,rotation:'none',criterion,...(radio!==2?{[parameter]:value}:{}),output_cap,output_factors:output_cap?output_factors:false,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ const configuration={...roles.configuration,mode,factors:after.factors,rotation:'none',criterion,...(radio!==2?{[parameter]:value}:{}),output_cap,output_factors:output_cap?output_factors:false,
+  output_schema_changed:Math.min(features.length,old.output_cap?old.values.pedNOutFactorsMax:features.length)!==Math.min(features.length,output_cap?output_factors:features.length)};
+ await next('factor_analysis',['output_mapping','done']);
+ const destination=await channel.observe({condition:'PCA validated destination',ready:s=>['output_mapping','done'].includes(s.wizard?.stage)});
+ if(destination.wizard.stage==='output_mapping')await configureDerivedInlineMapping(channel,configuration,factorAnalysisInlineSources);
+ const done=await channel.observe({condition:'PCA accepted',ready:s=>s.wizard?.stage==='done'});
+ return {...roles,configuration:{...configuration,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
