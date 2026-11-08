@@ -135,7 +135,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 требуемый шаг доступными стандартными узлами и режимами.
 
 Перед `dock_node_apply` вызови `dock_action_describe` с типом узла и нужными `modes`: правила узла — в `guidance` карточки, параметры — в `parameter_schema`; [разметка правил](references/nodes/README.md).
-Каждый `dock_prepare` (и `open_package`) сбрасывает прочитанные карточки: снова `dock_action_describe` с типом и `modes` перед первым apply.
+После каждого `loginom_dock_prepare` (и `open_package`) карточки сброшены: снова `dock_action_describe` с типом и `modes` перед apply.
 Для вычисляемой формулы или разбора произвольного текста выбирай Калькулятор;
 для словаря соответствий с другим типом результата — Замену.
 На просьбу о неподдерживаемом режиме явно сообщи: «Этот режим пока не поддерживается».
@@ -190,7 +190,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 |Доли итогов|`transform.ungroup_data` / shares|[читать](references/nodes/transform.ungroup_data.md)|
 | Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
-| Календарные признаки | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
+| Календарные признаки, строки дат | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
 | Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
 | Сортировка | `transform.sorting` / keys | [читать](references/nodes/transform.sorting.md) |
 | Слияние по ключам | `transform.join_data` / inner, left, right, full, difference | [читать](references/nodes/transform.join_data.md) |

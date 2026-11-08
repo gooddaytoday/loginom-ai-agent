@@ -10,7 +10,7 @@ import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-cr
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 import { standaloneFixture, invoke } from "../fixture/standalone"
 
-test("ordinary standalone chat reaches the provider without configured Loginom and releases its profile", async () => {
+test.each([false, true])("ordinary standalone chat omits todowrite and releases its profile (auto=%s)", async (auto) => {
   await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
   const provider = ManagedRuntime.make(TestLLMServer.layer)
   try {
@@ -19,13 +19,25 @@ test("ordinary standalone chat reaches the provider without configured Loginom a
     await writeFile(join(fixture.profile, "config/loginom-ai-agent.json"), JSON.stringify(testProviderConfig(llm.url)))
     const result = await invoke(
       fixture,
-      ["--", "Сколько будет 2 + 2?"],
+      [...(auto ? ["--dangerously-skip-permissions"] : []), "--", "Сколько будет 2 + 2?"],
       undefined,
       fixture.binary ? { PATH: "/nonexistent" } : undefined,
     )
     expect(result).toMatchObject({ exit: 0 })
     expect(result.events.find((event) => event.type === "text")?.part.text).toBe("Ответ: 4.")
     expect(await provider.runPromise(llm.calls)).toBeGreaterThan(0)
+    const requests = (await provider.runPromise(llm.hits)).filter(
+      (hit) => Array.isArray(hit.body.tools) && hit.body.tools.length > 0,
+    )
+    expect(requests.length).toBeGreaterThan(0)
+    for (const request of requests) {
+      expect(request.body.tools).toContainEqual(
+        expect.objectContaining({ function: expect.objectContaining({ name: "skill" }) }),
+      )
+      expect(request.body.tools).not.toContainEqual(
+        expect.objectContaining({ function: expect.objectContaining({ name: "todowrite" }) }),
+      )
+    }
     expect(result.errors).not.toContain("LOGINOM_CONFIG_REQUIRED")
     expect(await readdir(fixture.profile)).not.toContain(".writer")
     expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")

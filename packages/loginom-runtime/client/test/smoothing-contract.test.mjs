@@ -48,3 +48,17 @@ test('HP production preflight accepts Preview metadata while input mapping still
  assert.doesNotThrow(()=>parameterModule.validateSmoothingInputParameters(parameters,{fields},{}));
  assert.throws(()=>parameterModule.validateSmoothingInputParameters(parameters,{fields:fields.map(f=>f.name==='X'?{...f,data_kind:'Дискретный'}:f)},{}),/continuous/);
 });
+
+test('Haar wavelet validates exact mode-specific rules before touching UI',async()=>{
+ const {smoothingParametersSchema}=await import('../lib/node-api.mjs');
+ const {validateActionParameters}=await import('../lib/action-catalog.mjs');
+ for(const depth of [1,2]){
+  const p={smoothing:[{field:'X',family:'daubechies',order:1,depth,boundary:'symmetric'}]};
+  validateActionParameters(smoothingParametersSchema,p);
+  validateSmoothingParameters(p,'wavelet',request);
+  assert.equal(resolveSmoothingParameters(p,fields).find(f=>f.name==='X').depth,depth);
+  assert.throws(()=>validateSmoothingParameters(p,'hodrick_prescott',request));
+  for(const patch of [{family:'coiflet'},{order:2},{depth:3},{depth:1.5},{boundary:'zero'},{lambda:1}])
+   assert.throws(()=>validateSmoothingParameters({smoothing:[{...p.smoothing[0],...patch}]},'wavelet',request));
+ }
+});

@@ -28,3 +28,11 @@ test('readback binds all five receipts to exact smoothing/input/output ownership
   const copy=fixture();change(copy);assert.throws(()=>smoothingConfigurationReadback(copy));
  }
 });
+
+test('wavelet readback preserves saved Haar parameters with exact ownership and result schema',()=>{
+ const input=fixture(),config=input.phases.find(p=>p.phase==='configure').value.configuration;
+ config.mode='wavelet';Object.assign(config.fields[0],{algorithm:1,family:'daubechies',order:1,depth:2,boundary:'symmetric'});
+ const result=smoothingConfigurationReadback(input);
+ assert.equal(result.mode,'wavelet');assert.deepEqual(result.smoothing,[{field:'I',family:'daubechies',order:1,depth:2,boundary:'symmetric'}]);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback)(result).valid,true);
+});

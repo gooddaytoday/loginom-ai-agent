@@ -16,7 +16,7 @@ export function variablesCalculatorConfigurationReadback({node,phases,operation_
   &&owner(finished.value.node_context),'verified finish required');
  need(Array.isArray(c.expressions)&&c.expressions.length>0&&c.expressions.length<=32
   &&c.expressions.every((e,i)=>e.index===i&&typeof e.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(e.name)
-   &&typeof e.label==='string'&&['integer','real','string','boolean'].includes(e.type)
+   &&typeof e.label==='string'&&['integer','real','string','boolean','datetime'].includes(e.type)
    &&typeof e.formula==='string'&&e.formula.trim().length>0&&e.formula.length<=2048&&!/[\r\0]/.test(e.formula)
    &&typeof e.description==='string'&&typeof e.intermediate==='boolean')
   &&new Set(c.expressions.map(e=>e.name.toLowerCase())).size===c.expressions.length,'incomplete expressions');

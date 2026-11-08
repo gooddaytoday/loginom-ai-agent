@@ -192,8 +192,8 @@ export function reconcileImportColumnPatch(before,parsed,changes=[],{schemaChang
 
 // The new phase ends at the configured format page. Mapping, finish and run
 // belong to the enclosing node operation; no wizard reopen occurs here.
-export const configureTextImportFields=(channel,parameters,owner)=>configureImport(channel,parameters,owner,true);
-export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema});
+export const configureTextImportFields=(channel,parameters,owner,{boundSource=false}={})=>configureImport(channel,parameters,owner,true,undefined,boundSource);
+export const configureTextImportPatch=(channel,parameters,owner,verifiedSourcePath,{preserveSchema=false,boundSource=false}={})=>configureImport(channel,parameters,owner,true,{verifiedSourcePath,preserveSchema},boundSource);
 export const configureTextImportDraft=(channel,parameters,owner)=>configureImport(channel,parameters,owner,false);
 
 export function bindImportSourceColumns(requested,observed) {
@@ -212,6 +212,15 @@ export class ImportColumnBindingError extends Error {
     super('Requested source field is missing or ambiguous: '+JSON.stringify(key)
       +'; observed name/label: '+JSON.stringify((candidates.length?candidates:observed).slice(0,8).map(({name,label})=>({name,label}))));
     this.name='ImportColumnBindingError';
+  }
+}
+
+// Refused after read-only observations of the existing «Все» node's format page.
+export class ImportAllModeColumnsError extends ImportColumnBindingError {
+  constructor() {
+    super(null,[],[]);
+    this.name='ImportAllModeColumnsError';
+    this.message=allModeColumns;
   }
 }
 
@@ -332,11 +341,12 @@ export function setImportFormatField(channel,initial,name,text) {
     resolve:state=>({verb:'set_wizard_field',ref:state.wizard.settings.fields[name].input_ref,text})});
 }
 
-async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
+async function configureImport(channel, parameters, owner,fieldsOnly,patch,boundSource=false) {
   if(patch?.preserveSchema)requireValue(Object.keys(parameters).join(',')==='source'
     &&Object.keys(parameters.source??{}).join(',')==='source_path',
     'Full source switch changes source_path only; column and format edits are forbidden');
-  (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
+  if(boundSource)requireValue(parameters.source?.source_path===undefined,'BINDING_CONFLICT');
+  (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(boundSource?{...parameters,source:{...parameters.source,source_path:'/binding-validation.csv'}}:parameters);
   parameters=structuredClone(parameters);
   if(patch)parameters={source:parameters.source??{},format:parameters.format??{},columns:parameters.columns??[],...(parameters.analysis?{analysis:parameters.analysis}:{})};
   requireValue(owner?.status === 'observed' && owner.node?.tid && owner.path?.length, 'An observed wizard owner is required');
@@ -382,19 +392,24 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   // Source and format are caller decisions. No automatic type detection result
   // is treated as confirmation of the requested schema.
   const sourceBaseline=patch?(await read('text_import_file','existing source initialized',isTextImportSourceReady)).wizard.import_source:null;
+  if(patch&&boundSource)requireValue(sourceBaseline.fields.source_path.variable_mode===true,'BINDING_SOURCE_UNVERIFIED');
   // A discarded first configuration leaves a graph node with no source. There
   // is no retained schema to inspect until complete source settings are applied.
-  if(patch&&sourceBaseline.fields.source_path.value==='') {
+  if(patch&&!boundSource&&sourceBaseline.fields.source_path.value==='') {
     requireValue(!patch.preserveSchema,'LOGINOM_IMPORT_SCHEMA_CHANGED: source switch requires a saved configured import');
     validateInitialExistingImportSettings(parameters,patch.verifiedSourcePath);
     return configureImport(channel,parameters,owner,true);
   }
-  if(patch && parameters.source.source_path===undefined)requireValue(sourceBaseline.fields.source_path.value===patch.verifiedSourcePath,'Existing source does not match the verified upload');
+  if(patch && !boundSource && parameters.source.source_path===undefined)requireValue(sourceBaseline.fields.source_path.value===patch.verifiedSourcePath,'Existing source does not match the verified upload');
   let formatBaseline,columnBaseline;
   const capturePatchSchema=async()=>{
     await read('text_import_format','existing file parsing completed',state=>
       state.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout');
     formatBaseline=(await read('text_import_format')).wizard.settings;
+    // An existing «Все» node owns its schema natively; refuse before any settings
+    // gesture as a binding refusal, so the configure phase discards this draft.
+    if(parameters.columns?.length&&parameters.format.auto_detect_columns===undefined
+      &&formatBaseline.fields.auto_detect_columns?.value===autoDetectLabels.all)throw new ImportAllModeColumnsError();
     columnBaseline=await readImportDefinitionPages(channel,{ready:state=>same(identity(state.wizard?.owner_context),identity(currentOwner))});
   };
   // Read the existing schema before changing parsing options: Loginom may
@@ -421,7 +436,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   }
 
   for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title']) {
-    if(patch&&!Object.hasOwn(parameters.source,name))continue;
+    if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
     let s = await read('text_import_file'), f = field(s, name, true);
     const encoding = fieldsOnly && name==='encoding' ? resolveTextImportEncoding(parameters.source.encoding):null;
     const desired = encoding ? encoding.label : name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];

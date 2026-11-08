@@ -12,6 +12,23 @@ import { cliIt } from "../../lib/cli-process"
 import { testProviderConfig } from "../../lib/test-provider"
 
 describe("opencode run (non-interactive subprocess)", () => {
+  cliIt.live(
+    "keeps todowrite in provider requests outside standalone CLI",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("planning remains available")
+        opencode.expectExit(yield* opencode.run("say hi"), 0)
+        const requests = (yield* llm.hits).filter((hit) => Array.isArray(hit.body.tools) && hit.body.tools.length > 0)
+        expect(requests.length).toBeGreaterThan(0)
+        for (const request of requests) {
+          expect(request.body.tools).toContainEqual(
+            expect.objectContaining({ function: expect.objectContaining({ name: "todowrite" }) }),
+          )
+        }
+      }),
+    60_000,
+  )
+
   for (const cliRoot of [false, true]) {
     for (const command of [undefined, "inspect-lgp"]) {
       cliIt.live(

@@ -374,6 +374,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       ...['edtDelimiterChar','edtTextQualifier','edtValueNull','edtDecimalSeparator','edtDateFormat','edtDateSeparator','cbbAutoDetectColumnsMode'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+';ValueControl"]';return [owner,owner+' input',owner+' textarea'];}),
       '[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;seReadRowCount"]','[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;seReadRowCount"] input',
       ...['edtMultipleDelimiters;ValueControl','edtMultipleDelimiters;ValueControl;InputEl','edtMultipleDelimiters;ValueControl;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+'"]'),
+      ...['SwitchButton','VariableControl','VariableControl;trg_picker','VariableControl;boundlist'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName;'+name+'"]';return [owner,owner+' input',owner+' [data-recordid]'];}),
       ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl"]',
@@ -937,7 +938,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // components to this graph GUID; verify that exact component still
       // belongs to the active workflow before retaining its overflow caption.
       const pending=component?._node?.data?.node;
-      if(wizard.status==='absent'&&icons[0].classList.contains('bg-vendor-icon-calcvariables')
+      if(wizard.status==='absent'&&['bg-vendor-icon-calcvariables','bg-vendor-icon-importtextfile'].some(c=>icons[0].classList.contains(c))
         &&preparedPendingWizardNode?.tid===getTid(element)&&preparedPendingWizardNode.label===element.textContent.trim()
         &&app?.ModelNodeTreeNode&&pending instanceof app.ModelNodeTreeNode&&pending.FGuid===preparedNodeId
         &&component?.el?.dom===element&&node&&pending.ParentNode===node)return true;
@@ -2040,6 +2041,20 @@ function readRenderedInputMapping(observation) {
       const base=wizard.root_tid+';ImportTextFilePreviewWizard;';
       const fields=Object.fromEntries(Object.entries({source_path:'edtFileName;ValueControl',connection:'edtConnection',
         encoding:'edtCodePage;ValueControl',rows_to_skip:'edtRowsToSkip;ValueControl'}).map(([name,key])=>{
+        if(name==='source_path'){
+          const switches=(tids.get(base+'edtFileName;SwitchButton')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+          const sw=switches.length===1?globalThis.Ext?.getCmp?.(switches[0].id):null;
+          if(sw?.pressed===true){
+            const es=(tids.get(base+'edtFileName;VariableControl')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+            const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,store=c?.getStore?.(),rows=store?.getData?.()?.items;
+            const selected=Array.isArray(rows)&&!store.isLoading?.()?rows.filter(r=>r.data.field1===c.getValue?.()):[];
+            const caption=selected.length===1?selected[0].data.field2:null;
+            const pathOffset=typeof caption==='string'?caption.lastIndexOf(' ( /'):-1,offset=pathOffset>=1?pathOffset:typeof caption==='string'?caption.lastIndexOf(' ( '):-1;
+            if(c?.el?.dom!==es[0]||typeof caption!=='string'||caption.length>2304||(offset>=1&&!caption.endsWith(' )'))||c.inputEl?.dom?.value!==c.getRawValue?.())return [name,{status:'unobserved_or_variable'}];
+            const raw=offset>=1?caption.slice(offset+3,-2):'',url=/[a-z][a-z0-9+.-]*:\/\//i.test(raw),value=url?'':raw;
+            return [name,{status:'observed',variable_mode:true,variable_caption:url?caption.slice(0,offset)+' ( [redacted] )':caption,row_id:String(selected[0].internalId),value,value_length_utf16:value.length,truncated:value.length>2048,owner_ref:refOf(es[0]),enabled:enabled(es[0]),read_only:true,value_kind:'selected_variable'}];
+          }
+        }
         const owners=(tids.get(base+key)??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e));
         const inputs=owners.length===1?dom.filter(e=>{charge();return owners[0].contains(e)
           && e.matches('input:not([type="hidden"]),textarea') && visible(e) && !sensitive(e);}):[];
@@ -2675,6 +2690,12 @@ function readRenderedInputMapping(observation) {
     if (rootRef && (!selectedRoot || !visible(selectedRoot) || sensitive(selectedRoot) || scopeOf(selectedRoot)==='inactive_workflow')) {
       const error=new Error('Observed root is detached, hidden or belongs to another workspace');error.code='UI_ROOT_STALE';throw error;
     }
+    if(wizard.stage==='smoothing')for(const key of ['grdColumnsSettings;tbl;celleditor;cbx','edtEdgeExtension;ValueControl']){
+      const ownerTid=wizard.root_tid+';SmoothingWizard;'+key,owners=tids.get(ownerTid)??[];
+      if(owners.length!==1||!visible(owners[0]))continue;
+      const inputs=[...owners[0].querySelectorAll('input')].filter(visible);
+      if(inputs.length===1&&enabled(inputs[0]))wizardCombos.set(ownerTid,{name:key,scope:'smoothing',owner_ref:refOf(owners[0]),input_ref:refOf(inputs[0]),root_ref:wizard.root_ref,value:String(inputs[0].value??'')});
+    }
     const comboPart=element=>{
       const tid=getTid(element)??'';
       for(const [ownerTid,field] of wizardCombos) {
@@ -2695,6 +2716,16 @@ function readRenderedInputMapping(observation) {
     };
     // Filter rows and their child delete/check icons retain the native record
     // identity in their signature, even when Loginom reuses a cell test ID.
+    const importBindingCells=new Map();
+    if(wizard.stage==='text_import_file'){
+      const base=wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName';
+      const es=(tids.get(base+';VariableControl')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
+      const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,picker=c?.picker,store=c?.getStore?.(),rows=store?.getData?.()?.items;
+      if(c?.el?.dom===es[0]&&picker?.pickerField===c&&!store.isLoading?.()&&Array.isArray(rows)&&rows.length<=128)for(const e of picker.el?.dom?.querySelectorAll('[data-recordid]')??[]){
+        const r=rows.find(r=>String(r.internalId)===e.getAttribute('data-recordid'));
+        if(r&&picker.getRecord(e)===r&&typeof r.data.field2==='string')importBindingCells.set(refOf(e),{caption:r.data.field2,record_id:String(r.internalId)});
+      }
+    }
     const filterCells=new Map();
     if(wizard.stage==='row_filter') {
       const base=wizard.root_tid+';FilterDataWizard;FilterDataPanel',roots=tids.get(base)??[];
@@ -2984,7 +3015,7 @@ function readRenderedInputMapping(observation) {
         for(const row of grid.querySelectorAll('table.x-grid-item')){
           const index=Number(row.getAttribute('data-recordindex')),r=records[index],d=r?.data;
           if(!Number.isSafeInteger(index)||index<0||!r?.isModel||typeof d?.Name!=='string'||typeof d.Usable!=='boolean'||row.getAttribute('data-recordid')!==String(r.internalId)||row.getAttribute('data-boundview')!==grid.id)continue;
-          for(const [column,part] of [['colDisplayName_','field'],['colUsable_','used']]){
+          for(const [column,part] of [['colDisplayName_','field'],['colUsable_','used'],['colAlgorithm_','algorithm']]){
             const cells=[...row.querySelectorAll('[data-tid]')].filter(e=>(getTid(e)??'').startsWith(base+column));
             const targets=part==='used'&&cells.length===1?[...cells[0].querySelectorAll('img.x-grid-checkcolumn')]:cells;
             if(targets.length!==1||!visible(targets[0])||sensitive(targets[0])||part==='used'&&targets[0].classList.contains('x-grid-checkcolumn-checked')!==d.Usable)continue;
@@ -3046,7 +3077,22 @@ function readRenderedInputMapping(observation) {
           const imgs=cells.length===1?[...cells[0].querySelectorAll('img.x-grid-checkcolumn')]:[];
           if(imgs.length===1&&typeof d[flag]==='boolean'&&imgs[0].classList.contains('x-grid-checkcolumn-checked')===d[flag])
             dateTimeCells.set(refOf(imgs[0]),{role,flag,func:d.Func,iso:d.ISO8601,checked:d[flag],record_id:String(r.internalId),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
+          // The same cell opens the native string-format editor (Ext CellEditing);
+          // a click away from the checkbox image never toggles the flag.
+          if(flag==='DoString'&&cells.length===1&&typeof d.StringFmt==='string')
+            dateTimeCells.set(refOf(cells[0]),{role:'format_cell',func:d.Func,iso:d.ISO8601,string_format:d.StringFmt,record_id:String(r.internalId),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
         }
+      }
+    }
+    // The active string-format editor is one ComboBox inside the matrix; its
+    // anonymous input carries the typed text. Bind it to the edited record only.
+    if(!discoverRoots&&wizard.stage==='date_time'){
+      const base=wizard.root_tid+';DateReformWizard;',editors=tids.get(base+'grdDataFormat;tbl;celleditor;FormatStrEditor;cbx')??[],panels=tids.get(base+'grdDataFormat')??[];
+      if(editors.length===1&&panels.length===1){
+        // CellEditing belongs to the grid panel, not to its table view.
+        const inputs=[...editors[0].querySelectorAll('input[type="text"]')],panel=globalThis.Ext?.getCmp?.(panels[0].id),context=panel?.findPlugin?.('cellediting')?.context,record=context?.record;
+        if(inputs.length===1&&panel?.el?.dom===panels[0]&&context?.column?.dataIndex==='DoString'&&record?.isModel&&record.data.Func===18&&record.data.ISO8601===false)
+          dateTimeCells.set(refOf(inputs[0]),{role:'format_editor',func:18,iso:false,record_id:String(record.internalId),grid_ref:refOf(panels[0]),wizard_root_ref:wizard.root_ref});
       }
     }
     // A removed date transform can leave a renamed, unbound output behind.
@@ -3188,7 +3234,7 @@ function readRenderedInputMapping(observation) {
     };
     const binningControl=element=>wizard.stage==='binning'&&((getTid(element)??'').startsWith(wizard.root_tid+';MethodSettingsWizard-1;')&&/;(?:colDisplayName_\d+|colMethodType_\d+|trg_picker|boundlist;[^;]+)$/.test(getTid(element))||(getTid(element)??'').startsWith('MethodSettingFrame;')&&/;(?:DisplayEl|trg_picker|boundlist;[^;]+)$/.test(getTid(element)));
     const coarseClassesControl=element=>wizard.stage==='coarse_classes'&&(getTid(element)??'').startsWith(wizard.root_tid+';CoarseClassesWizard-1;')&&/;(?:colColumnDisplayName_[^;]+|colColumnPurpose_[^;]+|trg_picker|boundlist;[^;]+|DisplayEl)$/.test(getTid(element)??'');
-    const interesting = element => ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
+    const interesting = element => importBindingCells.has(state.ids.get(element)) || wizard.stage==='text_import_file'&&(getTid(element)??'').startsWith(wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName;')&&/;(?:SwitchButton|trg_picker)$/.test(getTid(element)??'') || ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
       &&(getTid(element)??'').startsWith(wizard.root_tid+';')
       &&(/;(?:pedSamplingMethod|pedTestPriorityPosition);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
         || /;(?:StratifiedMethodForm;grdStratifiedGrid;headercontainer;UsageFlag_[^;]+|BiasedMethodForm;colDisplayName_[^;]+|BiasedMethodForm;colBiasedValue_[^;]+)$/.test(getTid(element)??'')
@@ -3321,7 +3367,7 @@ function readRenderedInputMapping(observation) {
       }
       return null;
     };
-    const interactionOf = element => {
+    const interactionOf = (element, accept) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
       if (![width,height].every(Number.isFinite)) return { state:'unverified', point:null };
@@ -3331,7 +3377,7 @@ function readRenderedInputMapping(observation) {
       for (const y of [0.5,0.25,0.75]) for (const x of [0.5,0.25,0.75]) {
         charge();
         const point={x:left+(right-left)*x,y:top+(bottom-top)*y},hit=document.elementFromPoint(point.x,point.y);
-        if (hit && (hit===element || element.contains(hit))) return {state:'point_observed',point};
+        if (hit && (hit===element || element.contains(hit)) && (!accept || accept(hit))) return {state:'point_observed',point};
         if(hit && !seenCovering.has(hit) && covering.length<3) {
           seenCovering.add(hit);
           // No text or values: identify the covering layer without reading its
@@ -3444,7 +3490,9 @@ function readRenderedInputMapping(observation) {
       const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
       const scroll = scrollOf(element);
       const horizontalScroll=horizontalScrollOf(element);
-      const interaction = interactionOf(element);
+      // A date string-format cell also holds the flag checkbox image: never
+      // choose a point on that image, it would toggle the flag instead of editing.
+      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined);
       const checkState=checkStateOf(element);
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);
@@ -3591,12 +3639,12 @@ function readRenderedInputMapping(observation) {
         ...(expressionCancel ? {expression_cancel:expressionCancel} : {}),
         ...(wizardFields.has(element) ? {wizard_field:wizardFields.get(element)} : {}),
         ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),
-        ...(filterCell?{filter_cell:filterCell}:{}),
-        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(smoothingCell?{smoothing_cell:smoothingCell}:{}),...(elimOutlierCell?{elim_outlier_cell:elimOutlierCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(enrichField?{enrich_field:enrichField}:{}), ...(unionField?{union_field:unionField}:{}), ...(ungroupField?{ungroup_field:ungroupField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(datatovarField?{datatovar_field:datatovarField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
+        ...(filterCell?{filter_cell:filterCell}:{}),...(importBindingCells.has(state.ids.get(element))?{import_binding:importBindingCells.get(state.ids.get(element))}:{}),
+        signature: { ...(nativeGraphControl(element)?{native_graph:nativeGraphControl(element)}:{}), ...(crossTableField?{crosstable_field:crossTableField}:{}), ...(collapseField?{collapse_field:collapseField}:{}), ...(missingValuesField?{missing_values_field:missingValuesField}:{}), ...(dateTimeCell?{date_time_cell:dateTimeCell}:{}),...(smoothingCell?{smoothing_cell:smoothingCell}:{}),...(elimOutlierCell?{elim_outlier_cell:elimOutlierCell}:{}), ...(replacementField?{replacement_field:replacementField}:{}), ...(enrichField?{enrich_field:enrichField}:{}), ...(unionField?{union_field:unionField}:{}), ...(ungroupField?{ungroup_field:ungroupField}:{}), ...(joinField?{join_field:joinField}:{}), ...(filterCell?{filter_cell:filterCell}:{}),...(importBindingCells.has(state.ids.get(element))?{import_binding:importBindingCells.get(state.ids.get(element))}:{}),tag, tid, role, type: element.getAttribute('type'), name: element.getAttribute('name'), label, ...fieldValue, dialog_ref: dialogRef(element), scroll, check_state:checkState, ...(horizontalScroll?{horizontal_scroll:horizontalScroll}:{}),...(groupingField?{grouping_field:groupingField}:{}),...(datatovarField?{datatovar_field:datatovarField}:{}),...(sortingField?{sorting_field:sortingField}:{}),...(viewToggle?{view_toggle:viewToggle}:{}),...(viewerVendor?{viewer_vendor:viewerVendor}:{}),...(viewerControl?{viewer_card:viewerControl}:{}),...(tableScroller?{table_scroller:tableScroller}:{}),...(processGrid?{process_grid:processGrid}:{}),...(processExpander?{process_expander:processExpander}:{}),...(processRow?{process_row:processRow}:{}),...(processMenu?{process_menu:processMenu}:{}),...(outputColumn?{output_column:outputColumn}:{}),...(reformColumnField?{reform_column:reformColumnField}:{}),...(importDefinitionCell?{import_definition_cell:importDefinitionCell}:{}) },
         enabled: isEnabled, visible: true, interaction, bounding_box: boxOf(element),
         // A bounded prefix is not a sufficient value precondition. A dedicated
         // large-field driver must establish its own complete read/write contract.
-        allowed_actions: datatovarField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : ungroupField ? (allowed&&interaction.state==='point_observed'?['click','double_click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : smoothingCell ? (allowed && interaction.state==='point_observed' ? ['click',...(scroll?['scroll']:[])] : []) : elimOutlierCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : enrichField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','right_click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
+        allowed_actions: datatovarField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : ungroupField ? (allowed&&interaction.state==='point_observed'?['click','double_click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : smoothingCell ? (allowed && interaction.state==='point_observed' ? ['click',...(smoothingCell.part==='algorithm'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : elimOutlierCell ? (allowed&&interaction.state==='point_observed'?['click',...(scroll?['scroll']:[])]:[]) : crossTableField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : collapseField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : missingValuesField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[])]:[]) : dateTimeCell ? (allowed&&interaction.state==='point_observed'?['click',...(dateTimeCell.role==='format_editor'?['fill','press']:[]),...(scroll?['scroll']:[])]:[]) : replacementField ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : enrichField ? (allowed&&interaction.state==='point_observed'?['click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : unionField ? (allowed&&interaction.state==='point_observed'?['click','right_click','press',...(scroll?['scroll']:[]),...(horizontalScroll?['scroll_horizontal']:[])]:[]) : joinField ? (allowed&&interaction.state==='point_observed'?['click','right_click','drag','press',...(scroll?['scroll']:[])]:[]) : filterCell ? (allowed&&interaction.state==='point_observed'?['click','double_click','press',...(editable?['fill']:[]),...(scroll?['scroll']:[])]:[]) : tid===workflow?.prefix+';ModelForm;btnToggleActivateCurrent' ? (allowed&&graphExecution&&interaction.state==='point_observed'?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]) : element===storageRoot ? (allowed && interaction.state==='point_observed'?['click']:[]) : reformColumnField ? (allowed && interaction.state==='point_observed'?['click','double_click','press',...(scroll?['scroll']:[])]:[]) : outputColumn ? (allowed && interaction.state==='point_observed'?['click','double_click','press']:[]) : tableScroller ? (allowed && interaction.state==='point_observed'?[...(scroll?.ref===refOf(element)?['scroll']:[]),...(horizontalScroll?.ref===refOf(element)?['scroll_horizontal']:[])]:[]) : viewerControl ? (allowed && interaction.state==='point_observed' ? [viewerControl.kind==='enter'?'enter_table':'click'] : []) : processGrid || processExpander ? (allowed && interaction.state==='point_observed' ? (processGrid?['right_click','press',...(scroll?.ref===refOf(element)?['scroll']:[])]:['click']) : []) : outputScroller(element) ? (allowed && scroll && scroll.ref===refOf(element) && interaction.state==='point_observed'?['scroll']:[]) : importScroller(element) ? (allowed && horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[]) : processRow || processMenu ? (allowed && interaction.state==='point_observed' ? (processRow?['click','right_click','press']:processMenu.action==='mniCancel'?['cancel_process']:['click','press',...(processMenu.action==='mniShowNodeToProcess'?['show_process_node']:[])]) : []) : sortingField ? (allowed && interaction.state==='point_observed' ? ['click',...(sortingField.part==='field'?['double_click','press']:[]),...(scroll?['scroll']:[])] : []) : groupingField ? (allowed && interaction.state==='point_observed' ? ['click','double_click','press',...(scroll?['scroll']:[])] : []) : expressionWritable ? ['replace_expression'] : allowed && !valueTruncated ? ['click', 'double_click', 'right_click', 'press', 'drag', ...(editable ? ['fill',...(wizardFields.has(element)?['set_wizard_field']:[])] : []), ...(checkState ? ['set_checked'] : []), ...(wizardStep?['wizard_step']:[]), ...(closeConfirmation?['confirm_wizard_close']:[]), ...(deactivationConfirmation?['confirm_wizard_deactivation']:[]), ...(openWizard?['open_wizard','begin_wizard']:[]),...(openNodeViews?['open_node_views']:[]),...(graphExecution?[graphExecution.mode==='execute'?'execute_graph_node':'deactivate_graph_node']:[]), ...(finishWizard?[finishWizard.mode==='execute'?'execute_wizard':'finish_wizard']:[]), ...(columnClose?[columnClose.mode+'_'+columnClose.scope+'_column']:[]), ...(expressionApply?['apply_expression_parameters']:[]), ...(expressionCancel?['cancel_expression_parameters']:[]), ...(combo?.kind==='option'?['select_wizard_option']:[]), ...(scroll && interaction.state === 'point_observed' ? ['scroll'] : []), ...(horizontalScroll && interaction.state==='point_observed'?['scroll_horizontal']:[])] : [] };
     });
     scanStage='data_views';
     // VariablesNode has no visible Label cell and cannot be selected like a
@@ -4314,17 +4362,18 @@ function readRenderedInputMapping(observation) {
       || Math.abs(box[key] - current.bounding_box[key]) > 0.75)) fail('UI_REFERENCE_STALE', 'Observed control geometry changed');
     // Buffered rows and graph controls can be clipped or covered at their centre.
     // Hit-test and dispatch the same freshly observed point, including body selection.
-    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
+    const formatCell = current.date_time_cell?.role==='format_cell';
+    const point = (formatCell || current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
       ? current.interaction.point : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     if (!isGraphLink && viewport && (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height)) fail('UI_REFERENCE_OFFSCREEN', 'Observed control is outside the viewport');
-    const hit = await handle.evaluate((element, { point, viewport, isGraphLink }) => {
+    const hit = await handle.evaluate((element, { point, viewport, isGraphLink, formatCell }) => {
       let checked = 0;
       const ownsPoint = candidate => {
         if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.y) || candidate.x < 0 || candidate.y < 0
           || (viewport && (candidate.x >= viewport.width || candidate.y >= viewport.height))) return false;
         checked++;
         const target = document.elementFromPoint(candidate.x, candidate.y);
-        return target === element || element.contains(target);
+        return (target === element || element.contains(target)) && !(formatCell && target?.closest?.('img.x-grid-checkcolumn'));
       };
       if (ownsPoint(point)) return { point, source: 'box_center', candidates_checked: checked };
       if (!isGraphLink) return null;
@@ -4348,7 +4397,7 @@ function readRenderedInputMapping(observation) {
         } catch { /* Detached or malformed SVG geometry is never a click target. */ }
       }
       return null;
-    }, { point, viewport, isGraphLink });
+    }, { point, viewport, isGraphLink, formatCell });
     if (!hit) {
       if(!effectPossible&&task.snapshot?.wizard?.status==='observed') {
         const waits=trace.filter(e=>e.event==='ui_mask_wait_started').length;
@@ -4600,12 +4649,18 @@ function readRenderedInputMapping(observation) {
         // Loginom asks this after an input-port Done whose mapping still links
         // fields that no longer exist upstream. Deleting only those lost links
         // completes the same Done; the caller still verifies the mapping.
+        const unionInputChange=task.variables_union_input_change===true&&task.action.verb==='wizard_step'
+          &&task.action.expected_stage==='done'&&current.wizard.stage==='variables_column_union'
+          &&current.ui.elements.find(e=>e.ref===task.action.ref)?.tid===current.wizard.root_tid+';btnNext'
+          &&current.prepared_node_context?.verified===true&&!current.prepared_node_context.input_port&&!current.prepared_node_context.output_port;
         const deleteLostLinks=async fresh=>{
           const finish=current.ui.elements.find(e=>e.ref===task.action.ref)?.wizard_finish,dialog=fresh.ui.dialogs.length===1?fresh.ui.dialogs[0]:null;
           const owned=s=>lifecycleContextMatches({...s,ui:{...s.ui,dialogs:[]}})
             &&s.wizard.root_ref===current.wizard.root_ref&&same(s.wizard.input_port_context,current.wizard.input_port_context)
-            &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.dialog_ref===null&&m.target_tid===current.wizard.root_tid);
-          if(task.action.verb!=='finish_wizard'||finish?.mode!=='input_port'||lostLinksDeleted||!dialog
+            &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.dialog_ref===null&&m.target_tid===current.wizard.root_tid)
+            &&(!unionInputChange||s.wizard.stage==='variables_column_union'&&s.wizard.owner_context?.status==='observed'
+              &&same(s.wizard.owner_context,current.wizard.owner_context)&&same(s.prepared_node_context,current.prepared_node_context));
+          if(!(task.action.verb==='finish_wizard'&&finish?.mode==='input_port'||unionInputChange)||lostLinksDeleted||!dialog
             ||!owned(fresh))return false;
           const wizardRoot=postActionRoot;postActionRoot=dialog.ref;
           try{
@@ -5143,13 +5198,52 @@ function readRenderedInputMapping(observation) {
           }
           return observed;
           };
-          observed=await continueSavedJoin(observed);
+          let unionNextRepeated=false;
+          const continueUnionAfterLostLinks=async fresh=>{
+            const owned=s=>unionInputChange&&lostLinksDeleted&&!unionNextRepeated&&lifecycleContextMatches(s)
+              &&s.wizard.stage==='variables_column_union'&&s.wizard.root_ref===current.wizard.root_ref
+              &&s.wizard.owner_context?.status==='observed'&&same(s.wizard.owner_context,current.wizard.owner_context)
+              &&same(s.prepared_node_context,current.prepared_node_context)&&s.ui.masks.length===0;
+            if(!owned(fresh))return fresh;
+            // Native probe LAB-1107: Yes removes lost links, but validation
+            // keeps this page and changes Next to "Всё равно далее". Only this
+            // observed warning permits one new Next; never another Yes.
+            const warning=await page.evaluate(rootTid=>{
+              const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],root=exact(rootTid),errors=exact(rootTid+';btnError'),next=exact(rootTid+';btnNext');
+              if(root.length!==1||errors.length!==1||next.length!==1)return null;
+              for(const e of [root[0],errors[0],next[0]])if(!e.checkVisibility({checkVisibilityCSS:true}))return null;
+              if(!root[0].contains(errors[0])||!root[0].contains(next[0])
+                ||globalThis.Ext?.getCmp(errors[0].id)?.el?.dom!==errors[0]||globalThis.Ext?.getCmp(next[0].id)?.el?.dom!==next[0]
+                ||next[0].getAttribute('data-qtip')!=='Всё равно далее')return null;
+              const text=errors[0].getAttribute('data-qtip');if(typeof text!=='string'||text.length>40000)return null;
+              const lines=text.split(String.fromCharCode(10)),suffix=' не сопоставлена входная переменная';
+              if(!lines.length||lines.length>128||lines.some((line,i)=>{
+                const prefix=(i+1)+'. Выходной переменной ',label=line.slice(prefix.length,-suffix.length);
+                return !line.startsWith(prefix)||!line.endsWith(suffix)||label.length<1||label.length>240||label.includes(String.fromCharCode(13));
+              }))return null;
+              return {text};
+            },current.wizard.root_tid);
+            if(!warning)return fresh;
+            const checked=await readUi(),buttons=checked.ui.elements.filter(e=>e.tid===current.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));
+            if(!owned(checked)||!same(fresh.dom_epoch,checked.dom_epoch)||buttons.length!==1)return checked;
+            const target=await checkedHandle(buttons[0],buttons[0],'wizard_step');
+            if(!same(await boundNode(),current.prepared_node_context))fail('PREPARED_NODE_CONTEXT_CHANGED','Union owner changed before its post-question Next');
+            const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+              if(!state?.observer)return null;state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
+            if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','Union warning changed before its post-question Next');
+            unionNextRepeated=true;timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+            record('variables_union_next_repeated_after_lost_links',{button:buttons[0].tid,warning:warning.text,settings_applied:false});
+            return readUi();
+          };
+          const readStepUi=async fresh=>{if(await deleteLostLinks(fresh))fresh=await readUi();return continueSavedJoin(await continueUnionAfterLostLinks(fresh));};
+          observed=await readStepUi(observed);
           const unchangedContext=fresh=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
             && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
             && same(fresh.active_identity,current.active_identity) && fresh.wizard.status==='observed'
             && fresh.wizard.root_ref===current.wizard.root_ref && same(fresh.ui.dialogs,current.ui.dialogs);
-          // Wait only for this one click. No timeout or intermediate mask can
-          // issue a second click or turn a closed wizard into an applied claim.
+          // Other steps wait only for their one click. The private union path
+          // above permits one fresh Next after its exact question and warning;
+          // a timeout never grants another gesture or an applied claim.
           for(let attempt=0;attempt<(task.opening_timeout_ms?225:24) && unchangedContext(observed)
             && (!destination(observed.wizard.stage) || observed.ui.masks.length);attempt++) {
             const calculatorValidation=current.wizard.stage==='calculator';
@@ -5157,14 +5251,14 @@ function readRenderedInputMapping(observation) {
             if(!observed.ui.masks.length && observed.wizard.stage===current.wizard.stage
               && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref) {
               // Confirm the owned error once more without issuing another gesture.
-              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await continueSavedJoin(await readUi());
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readStepUi(await readUi());
               if(unchangedContext(fresh) && !fresh.ui.masks.length && fresh.wizard.stage===current.wizard.stage
                 && same(calculatorValidation?fresh.wizard.calculator_validation:fresh.wizard.source_validation,validation)) {
                 observed=fresh;record(calculatorValidation?'wizard_calculator_validation_failed':'wizard_source_validation_failed',validation);
                 fail(calculatorValidation?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_SOURCE_VALIDATION_FAILED',validation.message);
               }
               observed=fresh;
-            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await continueSavedJoin(await readUi()); }
+            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readStepUi(await readUi()); }
           }
           if(!unchangedContext(observed) || observed.ui.masks.length || !destination(observed.wizard.stage))
             fail('WIZARD_STEP_NOT_CONFIRMED','The requested destination stage was not confirmed after one click; inspect before retry');
@@ -5302,6 +5396,11 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false, downloa
     ||options.snapshot?.wizard?.stage!=='input_mapping'||options.snapshot?.wizard?.owner_context?.status!=='observed'
     ||options.snapshot?.prepared_node_context?.input_port||options.snapshot?.prepared_node_context?.output_port))
     throw Error('Preserved Join mapping requires a bound input-to-Join node read');
+  if(options.variables_union_input_change!==undefined&&(options.variables_union_input_change!==true||!options.prepared_node_context
+    ||options.mode!=='act'||options.action?.verb!=='wizard_step'||options.action.expected_stage!=='done'
+    ||options.snapshot?.wizard?.stage!=='variables_column_union'||options.snapshot?.wizard?.owner_context?.status!=='observed'
+    ||options.snapshot?.prepared_node_context?.input_port||options.snapshot?.prepared_node_context?.output_port))
+    throw Error('Union lost-links answer requires a bound input-change Next');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||options.snapshot?.wizard?.status!=='observed'&&!['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)

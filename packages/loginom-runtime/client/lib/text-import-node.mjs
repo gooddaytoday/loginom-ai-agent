@@ -1,3 +1,4 @@
+import {importBindingSchema,resolveImportBindingParameters,prepareImportBinding,configureImportBinding,readImportBindings,resolveImportBindingSourceReadback} from './import-bindings.mjs';
 import {verifyUploadLineage,verifiedLocalDelivery} from './upload-lineage.mjs';
 import {validateImportSource} from './storage-policy.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
@@ -44,6 +45,7 @@ export function serverPreviewProfile({source,format,columns,preview}) {
 }
 
 export function validateTextImportNodeParameters(p,mode,request) {
+  p=resolveImportBindingParameters(p,request);
   if(p?.preview_only===true){
     requireValue(mode==='delimited'&&p.source?.kind==='storage'&&request.finish==='close'
       &&request.inputs?.length===0&&request.mappings?.length===0&&request.read?.ports?.length===0
@@ -55,14 +57,17 @@ export function validateTextImportNodeParameters(p,mode,request) {
     if(p.settings.source.encoding!==undefined)resolveTextImportEncoding(p.settings.source.encoding);return;
   }
   if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
-  requireValue(p && Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='settings,source','Exact import source and settings required');
+  requireValue(p && (Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='settings,source'||request.target.kind==='existing'&&request.bindings?.length&&Object.keys(p).join(',')==='settings'),'Exact import source and settings required');
   const existing=request.target?.kind==='existing';
   const nativeTypes=p.settings?.columns===undefined&&autoTypesRequested(p.settings);
   if(!existing&&!nativeTypes)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,
     'Invalid parameters.parameters.settings.columns: new imports require a nonempty list of source columns with their selected names and types');
   (existing?validateTextImportPatch:validateTextImportFieldsRequest)(p.settings);
   if(!existing)resolveTextImportEncoding(p.settings.source.encoding);
-  validateImportSource(p.source);
+  // Same refusal as deferredImportOutput, but before the format is applied.
+  requireValue(!(p.settings.format?.auto_detect_columns==='all'&&request.mappings?.length),
+    'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
+  if(p.source)validateImportSource(p.source);
   if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&(request.finish==='done'&&request.read.ports.length===0
     ||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
     &&request.mappings.length===0&&Object.keys(p.settings).join(',')==='source'
@@ -344,12 +349,18 @@ export async function restoreImportOutputLayout(channel,before,native,mappings,c
 // Host-owned support object. It is deliberately not registered in the public
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
+  const parameterSchema=structuredClone(textImportParametersSchema);
+  parameterSchema.properties.preview_only.description='Storage+source_path/encoding; Close/no inputs,mappings,read. Preview <=25 rows, no SHA/N; discard. Reuse after profile/scan/sample.';
+  parameterSchema.properties.source_switch.description='Existing text/Excel import only: exact full scan, save_checkpoint, then only text settings.source.source_path or Excel path/optional sheet. Preserve and independently reopen-check columns/output mapping; no format/column/mapping edits. Text Done/read.ports:[], then dock_storage_source immediately before one terminal-node Execute with identity/size/SHA rechecked. Excel Execute verifies full output-0 N. Backend binds profile_id to delivered digest; never expected_records. Missing proof means N not verified; inspect the SAME operation on timeout, never execute again.';
+  parameterSchema.properties.source.description='Required for new imports and configuration changes: storage server_source_ref observed in Files (no upload), or completed verified_delivery artifact_id/upload_operation_id (legacy IDs accepted). Optional bytes/SHA must match. Omit source only to execute an unchanged existing Import: settings:{}, inputs/mappings:[], Execute/read.ports:[0]; no reupload/stale upload ID.';
+  parameterSchema.properties.settings.description='New: source (verified source_path,encoding,rows_to_skip,first_line_as_title), format (delimiter,decimal_separator,null_marker,text_qualifier), all columns (name,label,type,data_kind,used; optional source_name on rename), at least one used. Binding replaces source_path. Existing omitted settings preserved; {} reuses saved configuration. Column identity: source_name or name. Optional multiple_delimiters:boolean, explicit date_format/order and date_separator; no automatic encoding/date substitution.';
   const nodeApplyHandlers=new Map([['imports.text',{revision:'text-import-output-v2',modes:['delimited'],
-    parameter_schema:textImportParametersSchema,
+    parameter_schema:parameterSchema,binding_schema:importBindingSchema,
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
-  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,resolveDeliveredSource,verifySourceSwitchSave,scanReceipt})=>{
+  const nodeApplyDriverFactory=options=>{
+    const {operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,resolveDeliveredSource,verifySourceSwitchSave,scanReceipt}=options;
     let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,schemaBefore,schemaAfter,saveReceipt,outputLayout;
     const sourceSwitch=(operation.nodeApply?.request??operation.parameters)?.parameters?.source_switch;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
@@ -392,10 +403,17 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       throw error;
     };
     return {
-      verifySource:async p=>{
+      ...(operation.parameters?.bindings?.length?{async beforeTarget(ctx){
+        operation.importBinding=await prepareImportBinding(options,ctx,{targetOrigin,targetBuild},{expectedPath:sourceReceipt?.source.destination});
+        sourceReceipt??=verified({source:operation.importBinding.file});
+        return verified();
+      }}:{}),
+      verifySource:async (p,ctx)=>{
         try{
-        sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),
-          p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref):undefined);
+        if(!p.source&&operation.parameters?.bindings?.length&&operation.parameters.target.kind==='existing')return verified({source_kind:'current_bound_file'});
+        const storage=p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref):undefined;
+        if(operation.parameters?.bindings?.length&&storage)p={...p,settings:{...p.settings,source:{...p.settings.source,source_path:storage.destination}}};
+        sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),storage);
         if(sourceSwitch){
           if(p.source.kind==='storage'){
             requireValue(scanReceipt?.basis==='backend_exact_scan'&&scanReceipt.profile_id===sourceSwitch.profile_id,
@@ -423,6 +441,14 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       },
       async openWizard(ctx) {
         enter(ctx);
+        if(operation.importBinding){
+          // Binding only observes the connected layout; no input mapping
+          // changes were requested. Cancel instead of saving its defaults.
+          const mapped=await channel.readVariablePortMapping({direction:'input',kind:'variables',port:0});
+          requireValue(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');
+          operation.importBinding.mapping=mapped.mapping;
+          operation.importBinding.graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+        }
         if(operation.nodeApply.request.finish==='execute') {
           executionDriver=createNodeExecutionProcedure(channel,{document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id});
           await executionDriver.prepare();
@@ -497,7 +523,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           }
           const request=operation.nodeApply.request;
           if(request.target.kind==='existing'&&!sourceSwitch&&!request.mappings.some(m=>m.fields!==undefined)
-            &&(p.settings.analysis?.refresh||p.settings.columns?.some(c=>c.type!==undefined)||p.settings.source)) {
+            &&(p.settings.analysis?.refresh||p.settings.columns?.some(c=>c.type!==undefined)||!operation.importBinding&&p.settings.source)) {
             await next('text_import_file','text_import_format');
             await next('text_import_format','output_mapping');
             outputLayout=structuredClone((await readNativeImportMapping(channel,'import output layout before configuration',
@@ -505,9 +531,13 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
             await next('output_mapping','text_import_format','btnPrev');
             await next('text_import_format','text_import_file','btnPrev');
           }
+          // A file-page round trip can reset its draft variable selector. Bind
+          // only after capturing the old layout; binding changes alone need no capture.
+          if(operation.importBinding)await configureImportBinding(channel,operation.importBinding);
           configured=operation.nodeApply.request.target.kind==='existing'
-            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch})
-            :await configureTextImportFields(channel,p.settings,owner);
+            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch,boundSource:!!operation.importBinding})
+            :await configureTextImportFields(channel,p.settings,owner,{boundSource:!!operation.importBinding});
+          if(operation.importBinding)configured={...configured,source:resolveImportBindingSourceReadback(configured.source,operation.importBinding,ctx.node)};
           requireValue(configured.columns.some(c=>c.used),'Import output requires at least one used field');
           return configured;
         } catch(error) {
@@ -549,7 +579,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         // «Только новые» adds source fields, but their outputs appear only through native synchronization;
         // requested mappings are then resolved against the synchronized native mapping.
         if(shouldResyncNewOutputs(configured,native)) {
-          const resync=await resyncOutputFields(channel,native);
+          const resync=await resyncOutputFields(channel,native,{previousColumns:configured.preservation?.columns_before?.map(c=>c.name),
+            restoreOutputs:changes=>configureOutputFields(channel,{direction:'output',port:0,changes},configured.columns)});
           changes.push(resync);native=resync.native_mapping;
         }
         const restored=await restoreImportOutputLayout(channel,outputLayout,native,mappings,
@@ -588,7 +619,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       async finish(mode,ctx) {
         requireValue(['done','execute','close'].includes(mode),'Unsupported finish mode');enter(ctx);
         if(mode==='close')return {...await closePreparedWizard(channel),...(configured?.server_profile?{server_profile:configured.server_profile}:{})};
-        const executeRequested=mode==='execute'&&!sourceSwitch,verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
+        const executeRequested=mode==='execute'&&!sourceSwitch&&!operation.importBinding,verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
         requireValue(mode!=='execute'||executionDriver,'Execution baseline was not prepared');
         const s=await read('done',mode+' available for the prepared node',s=>s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)));
         await channel.perform({condition:'bound import '+mode+' available',initialObservation:s,
@@ -618,13 +649,24 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
             execution_group:execution,continuation_surface:continuationSurface,node_context:graph.prepared_node_context,node_label:label,
             package_saved:false,reopen_performed:true,schema_before:schemaBefore,schema_after:schemaAfter});
         }
+        if(operation.importBinding){
+          operation.importBinding.graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+          operation.importBindingInventory=await readImportBindings(channel,operation.importBinding);
+          if(mode==='execute'){
+            await executionDriver.launchGraph();
+            const execution=await executionDriver.identify();
+            const continuationSurface=finishedImportSurface(await channel.observe({condition:'bound import execution continuity',readProcesses:true,readOutputs:true,
+              ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true}));
+            return verified({effect_possible:true,mode,execution_started:true,settings_applied:true,execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface,node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:true});
+          }
+        }
         const execution=executeRequested?await executionDriver.identify():null;
         const continuationSurface=executeRequested?finishedImportSurface(await channel.observe({
           condition:'identified execution and graph continuity checkpoint',readProcesses:true,readOutputs:true,
           ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true})):null;
         return verified({effect_possible:true,mode,execution_started:executeRequested,settings_applied:true,
           ...(execution?{execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface}:{}),
-          node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:false});
+          node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:!!operation.importBinding});
       },
       async waitExecution(ctx) {
         enter(ctx);requireValue(executionDriver,'Execution driver is unavailable');
