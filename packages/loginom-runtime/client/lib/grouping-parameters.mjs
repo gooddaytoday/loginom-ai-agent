@@ -10,7 +10,8 @@ const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const field=v=>v&&Object.keys(v).sort().join(',')==='kind,name'&&v.kind==='input_field'&&name(v.name);
 export function validateGroupingParameters(p,mode,r) {
  requireValue(mode==='aggregate','Grouping supports aggregate mode');
- requireValue(p&&Object.keys(p).every(k=>['group_by','measures'].includes(k)),'Invalid grouping parameters');
+ requireValue(p&&Object.keys(p).every(k=>['group_by','measures','cache_groups','sort_result'].includes(k)),'Invalid grouping parameters');
+ for(const k of ['cache_groups','sort_result'])requireValue(p[k]===undefined||typeof p[k]==='boolean','Grouping '+k+' requires a literal boolean');
  const preserved=p.group_by===undefined&&p.measures===undefined;
  requireValue(!preserved||r.target.kind==='existing','New grouping requires complete keys and measures');
  if(!preserved){

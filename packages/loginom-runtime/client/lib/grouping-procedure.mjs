@@ -6,9 +6,32 @@ export async function configureGrouping(channel,p){
  const ready=s=>s.wizard?.stage==='grouping'&&s.node_grouping?.verified===true;
  const observe=condition=>channel.observe({condition,readGrouping:true,ready});
  const before=await observe('complete grouping inventory'),baseline=before.node_grouping;
+ if(p.group_by===undefined)need(baseline.keys.length&&Array.isArray(baseline.measures)&&baseline.measures.every(supportedGroupingMeasure),'Existing grouping contains unsupported or incomplete aggregation');
+ const optionNames={cache_groups:'pedDimCache',sort_result:'pedSortResult'};
+ const requested=Object.entries(optionNames).filter(([key])=>p[key]!==undefined);
+ const expectedOptions=structuredClone(baseline.options);
+ for(const [key,native] of requested){
+  need(typeof p[key]==='boolean'&&typeof baseline.options?.[native]?.value==='boolean'&&baseline.options[native].switch_pressed===false,'Grouping option requires a literal boolean: '+key);
+  expectedOptions[native].value=p[key];
+ }
+ let configured=baseline;
+ for(const [key,native] of requested){
+  const s=await observe('bound grouping option '+key);
+  need(same(s.node_grouping.options,configured.options),'Grouping options changed before gesture');
+  if(s.node_grouping.options[native].value===p[key])continue;
+  await channel.perform({condition:'set grouping option '+key,initialObservation:s,ready,
+   identity:()=>({option:native,value:p[key]}),resolve:state=>{
+    const e=control(state,';GroupDataWizard;'+native+';ValueControl;DisplayEl','set_checked');
+    need(e.check_state?.checked===s.node_grouping.options[native].value,'Grouping option checkbox differs from native value');
+    return {verb:'set_checked',ref:e.ref,checked:p[key]};}});
+  const after=(await observe('verify grouping option '+key)).node_grouping;
+  const expected=structuredClone(configured.options);expected[native].value=p[key];
+  need(same(after.options,expected),'Grouping option did not apply or another option changed');
+  configured=after;
+ }
  if(p.group_by===undefined){
-  need(baseline.keys.length&&Array.isArray(baseline.measures)&&baseline.measures.every(supportedGroupingMeasure),'Existing grouping contains unsupported or incomplete aggregation');
-  return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,preservation:{unchanged:true}};
+  need(same(configured.input_fields,baseline.input_fields),'Grouping option changed input fields');
+  return {verified:true,cleanup_complete:true,effect_possible:!same(configured.options,baseline.options),configuration:configured,preservation:{unchanged:same(configured.options,baseline.options)}};
  }
  const plan=resolveGroupingParameters(p,baseline.input_fields),wanted=new Map([...plan.keys.map(f=>[f.name,6]),...plan.functions.map(f=>[f.name,7])]);
  const select=async(name,role)=>{
@@ -106,9 +129,9 @@ export async function configureGrouping(channel,p){
  }
  const after=(await observe('complete final grouping configuration')).node_grouping;
  need(same(after.keys.map(f=>f.name),plan.keys.map(f=>f.name))&&same(after.measures.map(f=>({name:f.name,mask:f.functions})),plan.functions),'Final grouping lists differ');
- need(same(after.options,baseline.options),'Unrequested grouping options changed');
+ need(same(after.options,expectedOptions),'Unrequested grouping options changed');
  const untouched=f=>({record_id:f.record_id,name:f.name,label:f.label,type:f.type,
   concat:plan.measures.some(m=>m.input.name===f.name&&m.function==='concat')?undefined:f.concat});
  need(same(after.input_fields.map(untouched),baseline.input_fields.map(untouched)),'Grouping changed input identity or unrelated options');
- return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,concat_options:!plan.measures.some(m=>m.function==='concat'),node_options:true},requested_output:plan.measures.map(m=>({field:m.input.name,function:m.function,name:m.name,label:m.label}))};
+ return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,concat_options:!plan.measures.some(m=>m.function==='concat'),node_options:requested.length===0},requested_output:plan.measures.map(m=>({field:m.input.name,function:m.function,name:m.name,label:m.label}))};
 }
