@@ -27,11 +27,17 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
   preparedNodeContext:{document_id:request.document_id,workflow_ref:request.workflow_ref,node},
   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
  const manual=request.parameters.column_union?.mapping==='manual';
+ const topology=request.variable_inputs?.some(i=>i.input===2)||request.parameters.column_union?.disconnect_input===2;
+ if(topology&&manual)throw Error('Third input changes require automatic mapping');
+ if(manual&&inputs.length!==2)throw Error('Manual mapping requires exactly two connected inputs');
+ if(request.parameters.column_union?.disconnect_input===2
+  &&graph.variable_links.filter(e=>e.target===request.target.ref.node_id&&e.kind==='variables'&&e.input===2).length!==1)throw Error('Exactly one observed third input link required');
  if(request.target.kind==='existing'&&!manual){
   const channel=channelFor(request.target.ref),state=await channel.observe({condition:'owned union before automatic mapping check',ready:s=>s.prepared_node_context?.surface==='graph'});
   await selectPreparedGraphNode(channel,state,'select union for read-only mapping preflight');await openPreparedWizard(channel);
   const observed=await channel.observe({condition:'saved union automatic mapping',readVariablesColumnUnion:true,ready:s=>s.node_variables_column_union?.verified===true});
   await closePreparedWizard(channel);
+  if(topology&&observed.node_variables_column_union.mapping!=='automatic')throw Error('Third input changes require a saved automatic union');
  }
  if(request.finish==='close'&&!manual)return {verified:true,inputs,outputs,not_applicable:true};
  for(const input of inputs){

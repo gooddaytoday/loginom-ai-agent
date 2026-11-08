@@ -10,7 +10,7 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
 export function createVariablesColumnUnionNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
-  type:'variables.column_union',mode:'append_variables',revision:'variables-column-union-v1',parameterSchema:variablesColumnUnionParametersSchema,
+  type:'variables.column_union',mode:'append_variables',revision:'variables-column-union-inputs-v2',parameterSchema:variablesColumnUnionParametersSchema,
   validate:validateVariablesColumnUnionParameters,readback:variablesColumnUnionConfigurationReadback,preflight:preflightVariablesColumnUnion,
   configureInputs:async()=>verified({not_applicable:true,mappings:[]}),
   configureAllOutputs:async(_channel,configuration)=>verified({not_applicable:true,node_context:configuration.node_context}),

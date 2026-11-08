@@ -53,6 +53,14 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
       &&same(keep(before,[]),keep(after,[]))?{}:null;
   }
   if(!same(after.foreign_links,before.foreign_links))return null;
+  if(kind==='add_variable_input'){
+    let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
+    const ports=current.variable_inputs,old=original.variable_inputs;
+    if(original.type!=='variables.column_union'||p.input!==2||old?.length!==2||ports?.length!==3
+      ||!same(ports.slice(0,2),old)||ports[2].kind!=='variables'||ports[2].port!==2||typeof ports[2].port_guid!=='string')return null;
+    return same(domainNode({...current,variable_inputs:old}),domainNode(original))
+      &&same(keep(before,[p.ref.node_id]),keep(after,[p.ref.node_id]))?{}:null;
+  }
   if(kind==='reveal_control'){
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
     const control=current.variable_inputs?.filter(v=>v.kind==='control');
@@ -267,7 +275,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         if(outputs?.length!==1)throw Error('Source variable output does not exist');
         if(request.target.kind==='new')continue;
         const target=node(graph,request.target.ref.node_id),ports=target.variable_inputs?.filter(p=>p.kind===input.kind&&p.port===input.input);
-        if(ports?.length!==1&&input.kind!=='control')throw Error('Target variable input does not exist');
+        const third=target.type==='variables.column_union'&&input.kind==='variables'&&input.input===2&&target.variable_inputs?.length===2;
+        if(ports?.length!==1&&input.kind!=='control'&&!third)throw Error('Target variable input does not exist');
         const occupied=(graph.variable_links??[]).filter(e=>e.target===target.ref.node_id&&e.kind===input.kind&&e.input===input.input);
         if(occupied.length>1||occupied.some(e=>e.source!==source.ref.node_id||e.output!==input.output))throw Error('Requested variable input is occupied by an unowned link');
       }
@@ -366,6 +375,19 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
         && unchangedExcept(before, after, [], [edgeKey(edge)]));
     }
     const variableDesired=(request.variable_inputs??[]).map(i=>({source:i.source.node_id,output:i.output,target:state.targetId,input:i.input,kind:i.kind}));
+    if(request.target.type==='variables.column_union'){
+      if(variableDesired.some(e=>e.kind==='variables'&&e.input===2)&&node(graph,state.targetId).variable_inputs?.length===2){
+        graph=await change('add_variable_input',{ref:node(graph,state.targetId).ref,input:2},(before,after)=>
+          !!verifyNodeTargetEffect({kind:'add_variable_input',parameters:{ref:node(before,state.targetId).ref,input:2},before},after,adapter.positionMatches));
+      }
+      if(operation.parameters?.parameters?.column_union?.disconnect_input===2){
+        if(request.target.kind!=='existing'||variableDesired.length)throw Error('Third input disconnection requires an existing union and no new links');
+        const edges=(graph.variable_links??[]).filter(e=>e.target===state.targetId&&e.kind==='variables'&&e.input===2);
+        if(edges.length!==1)throw Error('Exactly one observed third input link required');
+        const edge=edges[0];graph=await change('remove_link',{edge},(before,after)=>
+          !!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
+      }
+    }
     if(variableDesired.length)for(const edge of state.auto_created_variable_links??[]){
       if(variableDesired.some(d=>edgeKey(d)===edgeKey(edge))||!(graph.variable_links??[]).some(e=>edgeKey(e)===edgeKey(edge)))continue;
       graph=await change('remove_link',{edge},(before,after)=>!!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));

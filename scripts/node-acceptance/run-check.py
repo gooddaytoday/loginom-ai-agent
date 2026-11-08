@@ -451,6 +451,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task-type-refusal.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None,
                     expected_name='expected-type-refusal-run.json', variables_union_refusal=True,
                     oracle=REPO / 'scripts/node-acceptance/variables-union-manual.mjs')
+    if name == 'variables-union-inputs':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-inputs.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None,
+                    expected_name='expected-inputs-disconnected-run.json', variable_only=True, variable_audit='variables-union-inputs',
+                    variable_initial='expected-inputs-connected-run.json', variable_read_path='execution',
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-inputs.mjs')
     if name == 'variables-union-manual':
         src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
         return dict(source=src, prompt=src / 'task-manual.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None, expected_name='expected-manual-updated-run.json',
