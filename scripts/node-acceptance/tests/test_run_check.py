@@ -30,7 +30,7 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(stages[0]['rows'][0]['Amount'], '8.25')
         self.assertEqual(runner.expected_for(case, '/own/text.lgp')['outputs'], stages[-1:])
         prompt = case['prompt'].read_text()
-        for name in ['text-update-string.csv', 'text-update-real.csv']:
+        for name in ['text-update-1.csv', 'text-update-2.csv']:
             self.assertIn(name, prompt)
 
     def test_text_update_requires_both_stage_ports_before_their_exports(self):

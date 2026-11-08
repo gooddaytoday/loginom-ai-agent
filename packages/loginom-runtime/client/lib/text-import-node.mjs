@@ -4,7 +4,7 @@ import {validateImportSource} from './storage-policy.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
-import {autoTypesRequested,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError} from './text-import-procedure.mjs';
+import {autoTypesRequested,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError,previousTextImportStep} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
@@ -321,19 +321,31 @@ export function bindConfiguredOutputColumns(configured,actual,native) {
 // Native autosync can replace a changed-type target at the end of the list.
 // Record IDs belong to the current wizard; associate layouts through the verified
 // source names, never through output aliases or former source positions.
+export function importOutputLayoutSnapshot(native) {
+  if(native?.verified!==true||native.inventory_complete!==true||native.source_identity_verified!==true
+    ||!Array.isArray(native.source_fields)||!Array.isArray(native.target_fields)||!native.target_fields.length
+    ||native.source_fields.length!==native.target_fields.length
+    ||new Set(native.source_fields.map(s=>s.record_id)).size!==native.source_fields.length
+    ||new Set(native.target_fields.map(f=>f.record_id)).size!==native.target_fields.length
+    ||new Set(native.target_fields.map(f=>f.source?.record_id)).size!==native.target_fields.length
+    ||native.target_fields.some((f,i)=>f.index!==i||!f.source?.record_id||!native.source_fields.some(s=>
+      JSON.stringify(s)===JSON.stringify(f.source))))return null;
+  return structuredClone(native);
+}
+
 export async function restoreImportOutputLayout(channel,before,native,mappings,columns=[]) {
+  before=importOutputLayoutSnapshot(before);
   if(!before?.autosync||!native.autosync||mappings.some(m=>m.fields!==undefined))return null;
-  requireValue(before.verified&&before.inventory_complete&&before.source_identity_verified
-    &&native.verified&&native.inventory_complete&&native.source_identity_verified,'Complete import layout identity required');
+  requireValue(native.verified&&native.inventory_complete&&native.source_identity_verified,'Complete import layout identity required');
   const retained=before.target_fields.flatMap(previous=>{
     const source=previous.source;
-    requireValue(source&&before.source_fields.some(s=>s.record_id===source.record_id&&s.field_id===source.field_id),
-      'Previous import output source is unverified');
     const rename=columns.find(c=>c.source_name===source.name&&c.name!==undefined);
     const name=rename?.name??source.name;
     const current=native.target_fields.filter(f=>f.source?.name===name);
     requireValue(current.length<=1,'Ambiguous retained import output source');
-    return current.map(field=>({source:{kind:'configured_field',name},name:previous.name,label:previous.label,current:field}));
+    return current.map(field=>({source:{kind:'configured_field',name},
+      name:previous.name!==source.name?previous.name:field.name,
+      label:previous.label!==source.label?previous.label:field.label,current:field}));
   });
   const fields=[...retained,...native.target_fields.filter(f=>!retained.some(r=>r.current.record_id===f.record_id))
     .map(f=>({source:{kind:'configured_field',name:f.source.name},name:f.name,label:f.label,current:f}))];
@@ -373,14 +385,14 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           ...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
       return channel;
     };
-    const read=(stage,condition,ready=()=>true)=>channel.observe({condition,ready:s=>s.wizard?.status==='observed'
+    const read=(stage,condition,ready=()=>true,options={})=>channel.observe({condition,...options,ready:s=>s.wizard?.status==='observed'
       && s.wizard.stage===stage && s.prepared_node_context?.surface==='wizard' && ready(s)});
-    const next=async(from,to,button='btnNext')=>{
+    const next=async(from,to)=>{
       const s=await read(from,'import '+from+' Next available',s=>s.ui.elements.some(e=>
-        e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes('wizard_step')));
+        e.tid===s.wizard.root_tid+';btnNext' && e.allowed_actions.includes('wizard_step')));
       await channel.perform({condition:'bound import '+from+' to '+to,initialObservation:s,
-        ready:s=>s.wizard?.stage===from && s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes('wizard_step')),
-        resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+button),'Unique wizard navigation control required').ref,expected_stage:to}),
+        ready:s=>s.wizard?.stage===from && s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';btnNext' && e.allowed_actions.includes('wizard_step')),
+        resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'),'Unique Next required').ref,expected_stage:to}),
         identity:s=>({node:s.prepared_node_context,from,to})});
       return read(to,'import '+to+' ready');
     };
@@ -526,10 +538,10 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
             &&(p.settings.analysis?.refresh||p.settings.columns?.some(c=>c.type!==undefined)||!operation.importBinding&&p.settings.source)) {
             await next('text_import_file','text_import_format');
             await next('text_import_format','output_mapping');
-            outputLayout=structuredClone((await readNativeImportMapping(channel,'import output layout before configuration',
+            outputLayout=importOutputLayoutSnapshot((await readNativeImportMapping(channel,'import output layout before configuration',
               s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true)).node_mapping);
-            await next('output_mapping','text_import_format','btnPrev');
-            await next('text_import_format','text_import_file','btnPrev');
+            await previousTextImportStep(channel,{from:'output_mapping',to:'text_import_format',owner,read});
+            await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner,read,ready:isTextImportSourceReady});
           }
           // A file-page round trip can reset its draft variable selector. Bind
           // only after capturing the old layout; binding changes alone need no capture.

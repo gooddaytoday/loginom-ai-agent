@@ -1591,7 +1591,7 @@ class Runner:
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
-        if spec.get('text_update'): exports = ['text-update-string.csv', 'text-update-real.csv']
+        if spec.get('text_update'): exports = ['text-update-1.csv', 'text-update-2.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
