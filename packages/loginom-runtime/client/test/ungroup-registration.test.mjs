@@ -22,8 +22,9 @@ test('ungroup public dispatch rejects seasonality, port 1 and unknown fields bef
   mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:600000,execute_ms:120000,total_ms:600000}};
  let count=0;const runtime={tools:nodeApiTools,startNodeApply:args=>{validateNodeApplyRequest(args,support.nodeApplyHandlers);count++;return {};}};
  await dispatchNodeApi(runtime,'dock_node_apply',r);assert.equal(count,1);
+ await dispatchNodeApi(runtime,'dock_node_apply',{...r,mode:'computed',read:{...r.read,ports:[0,1]}});assert.equal(count,2);
  for(const change of [{mode:'seasonal'},{read:{...r.read,ports:[1]}},{parameters:{...r.parameters,variables:{}}}])await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,...change}));
- assert.equal(count,1);
+ assert.equal(count,2);
 });
 test('ungroup may advance only its observed owned wizard through conditional output/done',()=>{
  const action={verb:'wizard_step',ref:'ui-next',expected_stage:['output_mapping','done']};

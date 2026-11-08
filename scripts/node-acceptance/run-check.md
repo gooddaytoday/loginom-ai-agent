@@ -713,3 +713,9 @@ oracle и expected — нет. Проверяются все значения, �
 cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
 сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
 выгрузке run-check не различает — его подтверждает журнал вызова узла.
+
+`ungroup-weights`: Разгруппировка с расчётом долей по всей выборке,
+положительные целые опорные веса и повторяющиеся позиции. Только
+`task-weights.md` и weights-totals/support.csv передаются модели; независимый
+Fraction oracle и expected-weights.json остаются в harness. Оба выхода,
+повтор Execute, native типы и порядок, два CSV, Save/cold/cleanup.

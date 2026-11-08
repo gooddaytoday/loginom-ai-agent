@@ -1,3 +1,4 @@
+import {alignReadSchema} from './node-read-contract.mjs';
 import {ensureJoinOutputComplete} from './join-output-sync.mjs';
 import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
@@ -105,6 +106,8 @@ export async function readUngroupOutputs(channel,read,ctx,mapped){
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
   const expected=mapped.ports.find(p=>p.port===port)?.schema;
   need(expected&&output.schema.length===expected.length&&output.schema.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type),'Ungroup output schema/order differs');
+  const aligned=alignReadSchema(output.schema,expected);
+  output.schema=output.schema.map((f,index)=>({...f,data_kind:aligned[index].data_kind}));
   if(port===1)need(output.row_count===0&&output.sample_complete,'Ungroup computed secondary output must be empty');
   ports.push(output);
  }
