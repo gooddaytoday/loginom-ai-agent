@@ -126,6 +126,13 @@ test('sorting refuses variable-driven or unconfirmed maximum without blind retri
  await assert.rejects(f.run({max_threads:2}),/Variable-driven/);assert.deepEqual(f.gestures,[]);
  const g=fixture();g.flags.lostThreads=true;await assert.rejects(g.run({max_threads:2}),/maximum|threads/i);assert.equal(g.gestures.length,2);
 });
+test('variable-driven maximum refuses requested key or locale changes before any gesture',async()=>{
+ for(const change of [{keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{compare_with_locale:false}]){
+  const f=fixture();f.configuration.options.cbxMaxThreadCount.switch_pressed=true;
+  await assert.rejects(f.run({...change,max_threads:2}),/Variable-driven sorting maximum unsupported/);
+  assert.deepEqual(f.gestures,[]);
+ }
+});
 test('sorting toggles case on the same string key while retaining secondary key and literal options',async()=>{
  const f=fixture();f.configuration.keys.unshift({...f.configuration.input_fields[1],record_id:'name',order:0,direction:'ASC',case_sensitive:false});f.configuration.keys[1].order=1;
  // The production gesture is bound to the native per-key case icon.
