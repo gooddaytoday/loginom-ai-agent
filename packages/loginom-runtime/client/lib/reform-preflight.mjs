@@ -13,7 +13,7 @@ export function preflightReformParameters(parameters,fields){
  const baseline={verified:true,inventory_complete:true,fields:fields.map((f,index)=>({...f,index,record_id:'preview:'+index,excluded:false}))};
  // New reform fields initially have their effective input names. This early
  // preview validates the request only; it never claims native ID correspondence.
- return resolveReformChanges({changes:parameters.changes.map(c=>({...c,field:{kind:'configured_field',name:c.field.name}}))},baseline);
+ return resolveReformChanges({...parameters,changes:parameters.changes.map(c=>({...c,field:{kind:'configured_field',name:c.field.name}}))},baseline);
 }
 export async function preflightReformSource(options,ctx,config){
  const mapped=await preflightMappedReform(options,ctx,config);

@@ -1649,6 +1649,17 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'B', 'A', 'R', 'S'])
         self.assertEqual([r['R'] for r in expected['outputs'][0]['rows']], [2, -3, 0])
 
+    def test_reform_cache_requires_private_settings_audit_and_one_export(self):
+        case = runner.scenario('reform-cache')
+        self.assertEqual(case['prompt'].name, 'task-cache.md')
+        self.assertEqual(case['input_files'], ['reform.csv'])
+        self.assertEqual(case['export_count'], 1)
+        expected = runner.expected_for(case, '/own/cache.lgp')
+        self.assertEqual(expected['reform_cache']['caching']['value'], 3)
+        self.assertEqual([f['caching_method'] for f in expected['reform_cache']['fields']], [0, 1, 2, 0, 0])
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'A', 'B', 'R', 'S'])
+        self.assertEqual(runner.expected_for(case, '/own/cache.lgp', cold=True), expected)
+
     def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
         case = runner.scenario('rest-get-plain')
         self.assertIsNone(case['base'])

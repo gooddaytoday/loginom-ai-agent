@@ -4,14 +4,17 @@ const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 export const REFORM_TYPES=Object.freeze({string:'Строковый',integer:'Целый',real:'Вещественный',boolean:'Логический',datetime:'Дата/Время'});
 export const REFORM_USAGE=Object.freeze({'Не задано':0,'Активное':3,'Выходное':4,'Группа':6,'Показатель':7,'Транзакция':8,'Элемент':9});
 export const REFORM_KINDS=Object.freeze(['Неопределенное','Непрерывный','Дискретный']);
+export const REFORM_CACHE=Object.freeze({disabled:'Отключено',on_activation:'При активации',on_access:'При обращении',selected_fields:'Выбранные поля'});
 
 // A reference names a current configured field, never its non-unique label.
 // Resolve the whole patch against one baseline before any editor is opened.
 export function validateReformChanges(p) {
- need(object(p,['changes'])&&Array.isArray(p.changes)&&p.changes.length<=128,'Bounded reform changes required');
+ need(object(p,['changes','caching'])&&Array.isArray(p.changes)&&p.changes.length<=128,'Bounded reform changes required');
+ need(p.caching===undefined||Object.hasOwn(REFORM_CACHE,p.caching),'Unsupported reform caching');
  const selected=new Set();
  for(const c of p.changes) {
-  need(object(c,['field','name','label','type','data_kind','usage','excluded'])&&Object.keys(c).length>1,'Reform change requires a property');
+  need(object(c,['field','name','label','type','data_kind','usage','excluded','cache'])&&Object.keys(c).length>1,'Reform change requires a property');
+  need(c.cache===undefined||Object.hasOwn(REFORM_CACHE,c.cache)&&c.cache!=='selected_fields','Unsupported reform field cache');
   need(object(c.field,['kind','name'])&&['configured_field','input_field'].includes(c.field.kind)&&name(c.field.name),'Exact reform field identity required');
   need(!selected.has(c.field.name.toLowerCase()),'Duplicate reform field');selected.add(c.field.name.toLowerCase());
   need(c.name===undefined||name(c.name),'Invalid reform field name');
@@ -28,6 +31,11 @@ export function resolveReformChanges(p,baseline) {
  validateReformChanges(p);
  need(baseline?.verified===true&&baseline.inventory_complete===true&&Array.isArray(baseline.fields),'Complete reform inventory required');
  const fields=baseline.fields;
+ const caching=p.caching===undefined?baseline.caching:{value:Object.keys(REFORM_CACHE).indexOf(p.caching),display:REFORM_CACHE[p.caching],variable:false};
+ need(p.caching===undefined||baseline.caching?.variable!==true,'Reform variable caching cannot be replaced');
+ if(p.changes.some(c=>c.cache!==undefined)){
+  need((p.caching===undefined&&!baseline.caching)||caching?.value===3&&caching.variable===false,'Field cache requires literal selected_fields caching');
+ }
  need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length&&new Set(fields.map(f=>f.record_id)).size===fields.length,'Unique reform identities required');
  const changes=p.changes.map(c=>{
   if(c.field.kind==='input_field')need(baseline.source_identity_verified===true,'Verified reform input binding required');
@@ -38,7 +46,8 @@ export function resolveReformChanges(p,baseline) {
     ||c.data_kind===undefined&&original.data_kind===undefined,
     'String and boolean reform fields require discrete kind; request data_kind explicitly when converting a continuous field');
   need(c.type===undefined||c.type===original.type||Object.hasOwn(REFORM_TYPES,original.input_field?.type??original.type),'Conversion from non-scalar source is unsupported');
-  return {original,wanted:{...original,...Object.fromEntries(Object.entries(c).filter(([k])=>!['field','usage'].includes(k))),
+  return {original,wanted:{...original,...Object.fromEntries(Object.entries(c).filter(([k])=>!['field','usage','cache'].includes(k))),
+   ...(c.cache===undefined?{}:{caching_method:Object.keys(REFORM_CACHE).indexOf(c.cache)}),
    ...(c.usage===undefined?{}:{usage_type:REFORM_USAGE[c.usage]})}};
  });
  const projected=fields.map(f=>changes.find(c=>c.original.record_id===f.record_id)?.wanted??f);
@@ -58,5 +67,5 @@ export function resolveReformChanges(p,baseline) {
   const [change]=remaining.splice(0,1),parked={original:change.original,wanted:{...change.original,name:temporary}};
   move(parked);remaining.unshift({original:parked.wanted,wanted:change.wanted});
  }
- return {changes:ordered,fields:projected};
+ return {changes:ordered,fields:projected,caching};
 }

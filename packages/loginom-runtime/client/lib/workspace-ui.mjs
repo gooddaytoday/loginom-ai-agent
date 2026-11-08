@@ -2083,10 +2083,21 @@ function readRenderedInputMapping(observation) {
       if(f?.status==='observed'&&f.enabled&&!f.truncated)wizardCombos.set(wizard.root_tid+';ImportTextFilePreviewWizard;edtCodePage;ValueControl',
         {name:'encoding',scope:'import_source',owner_ref:f.owner_ref,input_ref:f.input_ref,root_ref:wizard.root_ref,value:f.value});
     }
+    if(wizard.status==='observed'&&wizard.stage==='field_parameters'&&!wizard.reform_parameters){
+      const ownerTid=wizard.root_tid+';ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl';
+      const owners=(tids.get(ownerTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
+      const inputs=owners.length===1?dom.filter(e=>owners[0].contains(e)&&e.matches('input')&&visible(e)&&!sensitive(e)):[];
+      if(inputs.length===1){
+        const input=inputs[0],value=String(input.value??''),owner_ref=refOf(owners[0]),input_ref=refOf(input);
+        wizard.settings={status:'draft_ui_values',applied_verified:false,fields:{caching:{status:'observed',value:value.slice(0,256),value_length_utf16:value.length,
+          truncated:value.length>256,enabled:enabled(input),read_only:input.readOnly===true,owner_ref,input_ref}}};
+        if(enabled(input)&&value.length<=256)wizardCombos.set(ownerTid,{name:'caching',scope:'reform_node',owner_ref,input_ref,root_ref:wizard.root_ref,value});
+      }
+    }
     const reformParams=wizard.reform_parameters;
     if(reformParams?.status==='observed' && reformParams.selected_column && Object.keys(reformParams.fields??{}).length===7
       && Object.values(reformParams.fields).every(f=>f.status==='observed' && !f.truncated)) {
-      for(const [name,key] of Object.entries({type_label:'cbxDataType',data_kind:'cbxDataKind',usage:'cbxUsageType'})) {
+      for(const [name,key] of Object.entries({type_label:'cbxDataType',data_kind:'cbxDataKind',usage:'cbxUsageType',caching:'cntMain;cbxCachingMethod'})) {
        const field=reformParams.fields[name];
        if(field.enabled && !field.read_only)
         wizardCombos.set(reformParams.root_tid+';'+key,{name,scope:'reform_column',
