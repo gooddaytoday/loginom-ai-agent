@@ -60,6 +60,13 @@ test('pending input cache retains variable identity while the fresh builtin sour
   assert.equal(f.field.value,cached??'');
  }
 });
+test('Import filename selection can expose the mapped label without a cached value',()=>{
+ const f=fixture();Object.assign(f.field,{value:'',variable_caption:'CsvPath'});
+ const prepared={...resolveImportBindingValue(f.proof,'CsvPath',f.mapping),...f,link:f.graph.variable_links[0]};
+ assert.equal(importBindingInventory(f.field,prepared,f.node)[0].variable.id,9);
+ assert.equal(resolveImportBindingSourceReadback({fields:{source_path:f.field}},prepared,f.node).fields.source_path.value,'/own/a.csv');
+ assert.throws(()=>importBindingInventory({...f.field,variable_caption:'Sentinel'},prepared,f.node),/BINDING_SOURCE_UNVERIFIED/);
+});
 test('the Import adapter supplies its verified file-stage gate to the common variable gesture',async()=>{
  const f=fixture(),base='W;ImportTextFilePreviewWizard;edtFileName';
  const s={wizard:{root_ref:'owned',root_tid:'W',stage:'text_import_file'},prepared_node_context:{verified:true},ui:{elements:[{tid:base+';VariableControl;trg_picker',ref:'trigger',allowed_actions:['click']}]}};
@@ -70,8 +77,8 @@ test('the Import adapter supplies its verified file-stage gate to the common var
  }};
  await assert.rejects(configureImportBinding(channel,{...resolveImportBindingValue(f.proof,'CsvPath',f.mapping),mapping:f.mapping,proof:f.proof}),/OWNED_FILE_GATE/);
 });
-test('the Import writer uses the common switch, exact picker, selection and commit without writing a literal',async()=>{
- const f=fixture(),base='W;ImportTextFilePreviewWizard;edtFileName',caption='CsvPath ( /own/a.csv )';
+for(const caption of ['CsvPath','CsvPath ( /own/a.csv )'])test('the Import writer uses the common switch, exact picker, selection and commit without writing a literal: '+caption,async()=>{
+ const f=fixture(),base='W;ImportTextFilePreviewWizard;edtFileName';
  let phase=0;const actions=[];
  const element=(tid,ref,allowed_actions,extra={})=>({tid,ref,allowed_actions,signature:{tag:'button'},...extra});
  const state=()=>({wizard:{root_ref:'owned',root_tid:'W',stage:'text_import_file',import_source:{fields:{source_path:{status:'observed',variable_mode:phase>=3,variable_caption:phase>=3?caption:undefined}}}},prepared_node_context:{verified:true},ui:{elements:phase===0?[element(base+';SwitchButton','switch',['click'])]:[

@@ -72,7 +72,7 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
    if(f.variable_mode!==true)return null;
    const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
    need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
-   const fields=mapping.fields.filter(v=>f.variable_caption?.startsWith(v.label+' ( '));
+   const fields=mapping.fields.filter(v=>f.variable_caption===v.label||f.variable_caption?.startsWith(v.label+' ( '));
    need(fields.length===1,'BINDING_VARIABLE_MISSING');name=fields[0].name;
   }else{
    const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
@@ -99,7 +99,7 @@ export function importBindingInventory(field,prepared,node){
  const f=fields[0];
  need(f.type===5&&f.source?.id===variable.id&&f.source.type===5
   &&mapping.fields.filter(x=>x.label===f.label).length===1
-  &&field.variable_caption===f.label+' ( '+field.value+' )','BINDING_SOURCE_UNVERIFIED');
+  &&(field.variable_caption===f.label||field.variable_caption===f.label+' ( '+field.value+' )'),'BINDING_SOURCE_UNVERIFIED');
  const links=(graph.variable_links??[]).filter(l=>l.target===node.node_id&&l.kind==='variables'&&l.input===0);
  need(links.length===1&&links[0].source===source.ref.node_id&&links[0].target_port_guid===mapping.port_guid,'BINDING_PORT_MISMATCH');
  // The selector identifies the mapped variable; an inactive input can retain
@@ -118,8 +118,8 @@ export async function configureImportBinding(channel,prepared){
  const observe=(condition,predicate=()=>true)=>channel.observe({condition,ready:s=>ready(s)&&predicate(s)});
  const state=await observe('owned Import binding editor');
  return configureVariableBinding({channel,observe,ready,state,base:state.wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName',identity:s=>s.prepared_node_context,
-  option:e=>chosen(e.import_binding?.caption),
-  committed:s=>{const field=s.wizard.import_source?.fields?.source_path;return field?.status==='observed'&&field.variable_mode===true&&chosen(field.variable_caption);}});
+  option:e=>e.import_binding?.caption===f[0].label||chosen(e.import_binding?.caption),
+  committed:s=>{const field=s.wizard.import_source?.fields?.source_path;return field?.status==='observed'&&field.variable_mode===true&&(field.variable_caption===f[0].label||chosen(field.variable_caption));}});
 }
 export function resolveImportBindingSourceReadback(source,prepared,node){
  const field=source.fields.source_path;

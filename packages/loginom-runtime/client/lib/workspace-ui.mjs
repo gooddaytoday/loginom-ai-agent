@@ -2034,8 +2034,8 @@ function readRenderedInputMapping(observation) {
             const selected=Array.isArray(rows)&&!store.isLoading?.()?rows.filter(r=>r.data.field1===c.getValue?.()):[];
             const caption=selected.length===1?selected[0].data.field2:null;
             const pathOffset=typeof caption==='string'?caption.lastIndexOf(' ( /'):-1,offset=pathOffset>=1?pathOffset:typeof caption==='string'?caption.lastIndexOf(' ( '):-1;
-            if(c?.el?.dom!==es[0]||offset<1||caption.length>2304||!caption.endsWith(' )')||c.inputEl?.dom?.value!==c.getRawValue?.())return [name,{status:'unobserved_or_variable'}];
-            const raw=caption.slice(offset+3,-2),url=/[a-z][a-z0-9+.-]*:\/\//i.test(raw),value=url?'':raw;
+            if(c?.el?.dom!==es[0]||typeof caption!=='string'||caption.length>2304||(offset>=1&&!caption.endsWith(' )'))||c.inputEl?.dom?.value!==c.getRawValue?.())return [name,{status:'unobserved_or_variable'}];
+            const raw=offset>=1?caption.slice(offset+3,-2):'',url=/[a-z][a-z0-9+.-]*:\/\//i.test(raw),value=url?'':raw;
             return [name,{status:'observed',variable_mode:true,variable_caption:url?caption.slice(0,offset)+' ( [redacted] )':caption,row_id:String(selected[0].internalId),value,value_length_utf16:value.length,truncated:value.length>2048,owner_ref:refOf(es[0]),enabled:enabled(es[0]),read_only:true,value_kind:'selected_variable'}];
           }
         }
