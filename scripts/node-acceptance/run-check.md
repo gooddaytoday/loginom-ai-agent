@@ -727,3 +727,16 @@ oracle и expected — нет. Проверяются все значения, �
 cleanup. Для update сравнивается итоговая стадия (`expected-auto-update.json`, Amount real);
 сохранение ручного Amount при «Только новые» (`expected-auto-new.json`) в промежуточной
 выгрузке run-check не различает — его подтверждает журнал вызова узла.
+
+`clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
+Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
+Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,
+Distance из независимой геометрии, точные типы/NULL/порядок, два CSV, Save,
+cold Execute с сохранёнными ролями/auto/min/max/threshold/seed и cleanup.
+Эталон геометрии из stage-0 oracle остаётся только в оснастке.
+
+В `clustering-gmeans` точный hot-порядок порта 0 —
+Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
+Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
+нативное восстановление ставит используемые поля перед сохранёнными ID.
+Оба порядка проверяются явно; остальные перестановки запрещены.
