@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nodeApiTools,deliveryApiTools,dispatchNodeApi} from '../lib/node-api.mjs';
+import {nodeApiTools,deliveryApiTools,dispatchNodeApi,clusteringParametersSchema} from '../lib/node-api.mjs';
 import {validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
 import {userNodeTool} from '../lib/user-workflow.mjs';
 import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,158786,'898d93babb5287ef681b8aebb49398be637c2f630d299e2c88a12a05970df88a'],
+  [nodeApiTools,158896,'4fc49bb19020dfe1a946d870ef9a012d65f8fd571ea7947bd14d27ab6384b8aa'],
   [nodeApiTools.map(userNodeTool),13183,'03d4f81d1e939ce5aacbdf33a3cb9c09ae7405eed44544cfbc4c91264a4c9623'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -63,6 +63,9 @@ test('g-means public schema reaches the production handler with bounded automati
  const request={operation_id:'gmeans',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'datamining.clustering',position:{x:320,y:280}},inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:0,input:0}],mode:'g_means',parameters:{features:[{kind:'input_field',name:'X'},{kind:'input_field',name:'Y'}],min_clusters:2,max_clusters:4,threshold:1,seed:42,normalization:'none'},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
  const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
  await dispatchNodeApi(runtime,'dock_node_apply',request);
+ assert.equal(clusteringParametersSchema.properties.threshold.minimum,0.1);
+ assert.equal(clusteringParametersSchema.properties.threshold.maximum,5);
+ for(const threshold of [0.099,5.001])await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,parameters:{...request.parameters,threshold}}),/threshold|Invalid/);
  const apply={...request,mode:'apply',target:{kind:'existing',type:'datamining.clustering',ref:{document_id:'doc',workflow_id:'wf',node_id:'saved'}},parameters:{},inputs:[]};
  await dispatchNodeApi(runtime,'dock_node_apply',apply);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...apply,parameters:{seed:42}}),/apply/);
