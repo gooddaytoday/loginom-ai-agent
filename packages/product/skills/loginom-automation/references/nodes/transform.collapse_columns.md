@@ -18,6 +18,8 @@ Variant разрешён в `transposed`: поле Variant, в том числе
 смешанные значения в строки. Вход Variant в `information` не поддержан.
 DataTypes описывает тип входного поля: для Variant это 6, даже если
 конкретная ячейка содержит integer или string. Не считай это типом ячейки.
+Фактический тип ячейки Values читай с `read.require_exact_numbers:true`:
+каждое значение приходит вместе с `cell_type`.
 ignore_empty исключает NULL; пустая строка, false и 0 остаются значениями.
 All-null и header-only сохраняют схему; при ignore_empty возможны нулевые
 строки. Полный input/output mapping должен включать каждое требуемое поле,
