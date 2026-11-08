@@ -113,3 +113,20 @@ test('a request without detection settings gives no mode, rows or refresh gestur
  assert.deepEqual(f.gestures.map(g=>g.verb),['wizard_step']);
  assert.equal(f.mode,'Нет');
 });
+
+test('a native output mapping timeout names the observed reason and stays a readiness timeout',async()=>{
+ const {readNativeImportMapping}=await import('../lib/text-import-node.mjs');
+ const {NodeReadinessTimeout}=await import('../lib/node-procedure.mjs');
+ const calls=[];
+ const channel={observe:async options=>{
+  calls.push(options.condition);
+  if(options.condition==='mapping')throw new NodeReadinessTimeout('mapping');
+  return {node_mapping:{verified:false,reason:'mapping_source_pending',source_identity_verified:false}};
+ }};
+ await assert.rejects(readNativeImportMapping(channel,'mapping',()=>false),error=>
+  error instanceof NodeReadinessTimeout&&/mapping \(mapping_source_pending, source_identity_verified=false\)/.test(error.message));
+ assert.deepEqual(calls,['mapping','mapping state']);
+ const ok=await readNativeImportMapping({observe:async()=>({node_mapping:{verified:true}})},'mapping',()=>true);
+ assert.equal(ok.node_mapping.verified,true);
+ await assert.rejects(readNativeImportMapping({observe:async()=>{throw new Error('transport');}},'mapping',()=>true),/transport/);
+});

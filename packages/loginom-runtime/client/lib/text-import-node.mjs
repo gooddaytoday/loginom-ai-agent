@@ -252,6 +252,22 @@ export function verifyImportSchema(before,after) {
   return true;
 }
 
+// A readiness timeout alone does not say why the native mapping stayed unverified.
+// Read it once more without a condition and name the observed reason in the refusal.
+export async function readNativeImportMapping(channel,condition,ready) {
+  try{return await channel.observe({condition,readMappings:true,ready});}
+  catch(error){
+    if(!(error instanceof NodeReadinessTimeout))throw error;
+    let reason='unobserved';
+    try{
+      const m=(await channel.observe({condition:condition+' state',readMappings:true,ready:()=>true})).node_mapping;
+      reason=[m?.reason??(m?.verified===true?'verified':'unverified'),m?.verified===true?null:'source_identity_verified='+m?.source_identity_verified].filter(Boolean).join(', ');
+    }catch{}
+    const explained=new NodeReadinessTimeout(condition+' ('+reason+')');
+    throw explained;
+  }
+}
+
 export function bindIdentityOutputColumns(configured,actual) {
   const expected=configured.filter(c=>c.used);
   requireValue(actual.fields.length===expected.length&&actual.total_columns===expected.length
@@ -463,7 +479,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         await next('text_import_format','output_mapping');
         const outputFields=configured.columns.filter(c=>c.used);
         const nativeReady=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
-        let native=(await channel.observe({condition:'configured import native output mapping',readMappings:true,ready:nativeReady})).node_mapping;
+        let native=(await readNativeImportMapping(channel,'configured import native output mapping',nativeReady)).node_mapping;
         const changes=[];
         if(mappings.length) {
           const mapping=one(mappings,'One import output mapping required');
