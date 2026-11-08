@@ -37,7 +37,10 @@ export function checkApplyRound(expected,records,{cold=false}={}){
   const rows=centers.filter(r=>Math.abs(r.X-X)<=1e-8&&Math.abs(r.Y-Y)<=1e-8);
   need(rows.length===1,'SAVED_CENTERS_UNCHANGED');return rows[0].Cluster;
  });
- const outputs=expected.outputs.map(o=>({...o,rows:o.rows.map(r=>({...r,Cluster:ids[expected.outputs[1].rows.findIndex(center=>center.Cluster===r.Cluster)]}))}));
+ const outputs=expected.outputs.map((o,port)=>{
+  const rows=o.rows.map(r=>({...r,Cluster:ids[expected.outputs[1].rows.findIndex(center=>center.Cluster===r.Cluster)]}));
+  return {...o,ordered:true,rows:port===1?rows.sort((a,b)=>a.Cluster-b.Cluster):rows};
+ });
  need(records.every(r=>matchesExpectedOutput(r.data,outputs[r.output_port])),'HOLDOUT_VALUES_TYPES_ORDER');
  return {...expected,outputs};
 }

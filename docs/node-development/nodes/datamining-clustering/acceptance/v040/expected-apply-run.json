@@ -99,7 +99,8 @@
           "Y": 2,
           "Category": "B"
         }
-      ]
+      ],
+      "ordered": true
     },
     {
       "output_node_type": "datamining.clustering",
@@ -145,7 +146,8 @@
           "X": 2.0,
           "Y": 20.0
         }
-      ]
+      ],
+      "ordered": true
     }
   ],
   "clustering_apply": {

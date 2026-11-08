@@ -40,3 +40,13 @@ test('catalog uses approved task/two CSVs and expected binds stage-0 geometry',(
  assert.deepEqual(expected.outputs[0].rows.map(r=>r.Distance),o.raw_holdout.map(r=>r.distance));
  assert.equal(expected.clustering_apply.seed,o.seed);
 });
+
+test('apply preserves holdout row order and native ascending center labels',()=>{
+ const r=records();r[0].data.sample.reverse();
+ assert.throws(()=>checkApplyRound(expected,r),/CLUSTERING_APPLY/);
+ const tables=records(),ids=[29,17,19];
+ for(const t of tables)t.data.sample.forEach(row=>row[0].value=String(ids[Number(row[0].value)-17]));
+ tables[1].data.sample.sort((a,b)=>Number(a[0].value)-Number(b[0].value));
+ const e=checkApplyRound(expected,tables);
+ assert.deepEqual(e.outputs[1].rows.map(row=>row.Cluster),[17,19,29]);
+});
