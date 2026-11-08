@@ -113,6 +113,11 @@ test('replacement public readback admits typed Null and exact Int64 without clai
   assert.equal(validate(converted).valid,true,result_type);
   rule.result_type='variant';assert.equal(validate(converted).valid,false);
  }
+ const kept=structuredClone(r),keptRule=kept.configuration.readback.rules[0];
+ delete keptRule.precision;Object.assign(keptRule,{type:'string',result_type:'boolean',case_sensitive:true,pairs:[{from:{type:'string',value:'yes'},to:{type:'boolean',value:true}}],other:{mode:'keep'}});
+ kept.configuration.readback.input_mapping.fields[0].type='string';kept.configuration.readback.output_mapping.fields[0].type='variant';
+ assert.equal(validate(kept).valid,true,'Boolean keep readback');
+ keptRule.result_type='integer';keptRule.pairs[0].to={type:'integer',value:'1'};assert.equal(validate(kept).valid,false);
 });
 
 test('regex readback admits only string constants, ordered patterns and keep/null policy',()=>{
