@@ -14,7 +14,7 @@ export async function configureCorrAnalysis(channel,p,{request,inputMapping}){
  state=await observe('complete correlation assignments');const baseline=state.node_corr_analysis;
  if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,draft_edits_skipped:true};
  need(inputMapping?.verified===true&&same(baseline.fields.map(({name,label,type})=>({name,label,type})),inputMapping.target_fields.map(({name,label,type})=>({name,label,type}))),'assignment fields differ from bound input mapping');
- const expected=resolveCorrAnalysisSets(p,baseline.fields);let current=structuredClone(baseline),edits=0;
+ const expected=resolveCorrAnalysisSets(p,baseline.fields,mode);let current=structuredClone(baseline),edits=0;
  const check=s=>need(same(s.node_corr_analysis.fields,current.fields)&&same(s.node_corr_analysis.coefficients,current.coefficients),'unrequested settings changed');
  const controls=[['pearson','cbCorrTypeLinear'],['kendall','cbCorrTypeKendall'],['spearman','cbCorrTypeSpearmen'],['extremum','cbCorrTypeExtremum']];
  // Keep one coefficient active: clearing Pearson first covered Spearman in the native UI (LAB-1076 journal:344).

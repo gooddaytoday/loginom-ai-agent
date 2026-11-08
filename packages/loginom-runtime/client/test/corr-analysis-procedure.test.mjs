@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureCorrAnalysis} from '../lib/corr-analysis-procedure.mjs';
-for(const initial of ['pearson','spearman','kendall','all'])for(const mode of ['pearson','spearman','kendall'])test('native assignments replace '+initial+' with only '+mode+' without clearing the last coefficient',async()=>{
+for(const initial of ['pearson','spearman','kendall','all'])for(const mode of ['pearson','spearman','kendall'])for(const type of mode==='spearman'?['real','string']:['real'])test('native assignments replace '+initial+' with only '+mode+' for '+type+' fields without clearing the last coefficient',async()=>{
  const root='MF;TF;WizrdMCF',owner={document_id:'doc',workflow_id:'wf',node_id:'corr'};
- const fields=['X','Y','Z'].map((name,i)=>({index:i,record_id:String(i),name,label:name,type:'real',first_set:i!==1,second_set:i!==2}));
+ const fields=['X','Y','Z'].map((name,i)=>({index:i,record_id:String(i),name,label:name,type,first_set:i!==1,second_set:i!==2}));
  const coefficients={pearson:initial==='pearson'||initial==='all',kendall:initial==='kendall'||initial==='all',spearman:initial==='spearman'||initial==='all',extremum:initial==='all'},actions=[];
  let stage='corr_analysis';
  const snapshot=()=>({wizard:{stage,root_tid:root},prepared_node_context:owner,node_corr_analysis:{verified:true,inventory_complete:true,node_context:owner,fields:structuredClone(fields),coefficients:{...coefficients}},
