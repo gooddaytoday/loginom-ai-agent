@@ -5,9 +5,20 @@ import {matchesExpectedOutput} from './expected-outputs.mjs';
 const need=(v,m)=>{if(!v)throw Error('CLUSTERING_GMEANS_'+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
+// l1083-g1 cold actual-readback, checkpoint: native regeneration places used
+// fields before retained IDs. Pin this observed order, never column_order:any.
+export function gmeansColdExpected(expected){
+ return {...expected,outputs:expected.outputs.map((output,port)=>{
+  const order=expected.clustering_gmeans.cold_column_order[port];
+  need(Array.isArray(order)&&order.length===output.columns.length&&new Set(order).size===order.length&&output.columns.every(f=>order.includes(f.name)),'COLD_ORDER_CONTRACT');
+  return {...output,columns:order.map(name=>output.columns.find(f=>f.name===name))};
+ })};
+}
+
 // The stage-0 oracle prescribes bounds and geometric invariants, never a true k.
 // Only membership labels come from the native result; all values are recomputed.
-export function checkGmeansRound(expected,records){
+export function checkGmeansRound(expected,records,{cold=false}={}){
+ if(cold)expected=gmeansColdExpected(expected);
  const c=expected.clustering_gmeans;
  need(records.length===2&&new Set(records.map(r=>r.output_port)).size===2,'BOTH_PORTS');
  const tables=[0,1].map(port=>{

@@ -1,4 +1,4 @@
-import {checkGmeansRound,observeGmeansSavedSettings} from './clustering-gmeans.mjs';
+import {checkGmeansRound,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
 import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
@@ -85,7 +85,7 @@ if(excelExpected&&rawExpected.excel_books){
  if(!args.xlsx||!args["xlsx-expected"])throw Error("COLD_XLSX_REQUIRED")
  execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/oracle.py",import.meta.url).pathname,"--xlsx",resolve(args.xlsx),"--expected",resolve(args["xlsx-expected"])],{stdio:"pipe"})
 }
-const expected = excelExpected??rawExpected
+const expected = excelExpected??(rawExpected.clustering_gmeans?gmeansColdExpected(rawExpected):rawExpected)
 const variableInventory=parseExpectedVariableInventory(expected);
 const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(expected)
 if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')

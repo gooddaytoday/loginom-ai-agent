@@ -15,6 +15,16 @@ const receipt=(id='exec1',tables=records())=>({status:'SUCCEEDED',cleanup_comple
 test('g-means admits different bounded k and nonrank cluster IDs using independent geometry',()=>{
  for(const groups of [[[1,2,3,4],[5,6]],[[1,2],[3,4],[5,6]]])assert.equal(checkGmeansRound(expected,records(groups)).outputs[1].rows.length,groups.length);
 });
+test('cold uses the exact observed native used-fields-first order while hot and other orders still refuse',()=>{
+ const cold=records();
+ const permutation=[0,1,3,4,2,5,6];
+ cold[0].data.schema=permutation.map(i=>cold[0].data.schema[i]);
+ cold[0].data.sample=cold[0].data.sample.map(row=>permutation.map(i=>row[i]));
+ assert.throws(()=>checkGmeansRound(expected,cold),/NATIVE_SCHEMA_ORDER/);
+ assert.equal(checkGmeansRound(expected,cold,{cold:true}).outputs[0].columns[2].name,'X');
+ cold[0].data.schema.reverse();
+ assert.throws(()=>checkGmeansRound(expected,cold,{cold:true}),/NATIVE_SCHEMA_ORDER/);
+});
 test('g-means refuses source changes, missing/NULL cells, wrong native types/order, geometry and cross-port IDs',()=>{
  for(const change of [r=>r.pop(),r=>r[0].data.sample.pop(),r=>r[0].data.sample[0][2].value='2',r=>r[0].data.sample[0][5].value='Other',r=>r[0].data.sample[0][6].is_null=true,r=>r[0].data.sample[0][2].type='real',r=>r[1].data.sample[0][1].value+=0.01,r=>r[0].data.sample[0][1].value=0,r=>r[1].data.sample[0][0].value='99',r=>r[1].data.sample.reverse(),r=>r[0].data.schema.reverse(),r=>r[0].data.precision.numbers_verified=false]){
   const r=records();change(r);assert.throws(()=>checkGmeansRound(expected,r),/CLUSTERING_GMEANS/);

@@ -689,3 +689,9 @@ Boolean false/NULL, приоритет exact над regex, типы, поряд�
 Distance из независимой геометрии, точные типы/NULL/порядок, два CSV, Save,
 cold Execute с сохранёнными ролями/auto/min/max/threshold/seed и cleanup.
 Эталон геометрии из stage-0 oracle остаётся только в оснастке.
+
+В `clustering-gmeans` точный hot-порядок порта 0 —
+Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
+Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
+нативное восстановление ставит используемые поля перед сохранёнными ID.
+Оба порядка проверяются явно; остальные перестановки запрещены.
