@@ -1,3 +1,6 @@
+import {verifyN18JavascriptStep} from './n18-cold.mjs';
+import {observeSortingSaved} from './sorting-modes.mjs';
+
 import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clustering-apply.mjs';
 import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
 import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
@@ -268,7 +271,11 @@ page = context.pages()[0]
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {
-    if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
+    if(want.alternative_types!==undefined){
+      if(expected.n18_javascript_step!==true)throw Error('COLD_NODE_ALTERNATIVE_UNSUPPORTED');
+      const proof=await verifyN18JavascriptStep({graph,requirement:want,load,channelFor});
+      await record({phase:'n18_saved_javascript_step',...proof});
+    }else if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
   const reads=expectedOutputs.length===0&&state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0
@@ -279,6 +286,12 @@ page = context.pages()[0]
     if(matches.length!==1)throw Error('COLD_TREE_NODE_AMBIGUOUS');
     reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
    }
+  }
+  if(expected.sorting_mode){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.sorting');
+   if(nodes.length!==1)throw Error('SORTING_MODES_ONE_SAVED_NODE');
+   const settings=await observeSortingSaved({load,channel:channelFor(nodes[0].ref,'sorting-saved'),mode:expected.sorting_mode});
+   await record({phase:'sorting_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.logreg_normalization){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');

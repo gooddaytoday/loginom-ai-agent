@@ -768,6 +768,13 @@ Control не подменяется обычным входом. Только ta
 передаются модели; oracle/expected приватны. Save, stock typed cold с точными
 сохранёнными связями и проверкой GUID узла, Close/logout обязательны.
 
+`sorting-case`, `sorting-threads`, `sorting-auto`: утверждённые задания
+`sorting/acceptance/modes/task-*.md` и modes.csv. Независимый oracle проверяет
+оба полных CSV и оба typed-результата на одном узле, порядок, NULL/пустую строку.
+Case меняет регистр true→false; threads — максимум 1→2; auto — 2→0.
+Cold читает сохранённые ключи и literal максимум, закрывает мастер через Cancel,
+затем штатно выполняет сохранённый узел без настройки; Save/cleanup обязательны.
+
 `text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
 задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
 Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);

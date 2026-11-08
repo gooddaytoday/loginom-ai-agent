@@ -2204,6 +2204,19 @@ function readRenderedInputMapping(observation) {
         }
       }
     }
+    if(wizard.status==='observed'&&wizard.stage==='sorting'){
+      const ownerTid=wizard.root_tid+';SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl';
+      // The boundlist is an observation root; its exact native owner is outside that subtree.
+      const owners=[...document.querySelectorAll('[data-tid='+JSON.stringify(ownerTid)+']')],inputs=owners.length===1?[...owners[0].querySelectorAll('input')].filter(visible):[];
+      if(owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&enabled(inputs[0])&&!sensitive(owners[0])&&!sensitive(inputs[0])){
+        const value=String(inputs[0].value??'');
+        if(value.length<=256){
+          const owner_ref=refOf(owners[0]),input_ref=refOf(inputs[0]);
+          wizardCombos.set(ownerTid,{name:'max_threads',scope:'sorting',owner_ref,input_ref,root_ref:wizard.root_ref,value});
+          wizard.settings={status:'draft_ui_values',applied_verified:false,fields:{max_threads:{status:'observed',value,value_length_utf16:value.length,truncated:false,owner_ref,input_ref,enabled:true,read_only:inputs[0].readOnly===true}}};
+        }
+      }
+    }
     if(wizard.status==='observed'&&wizard.stage==='col_union'){
       const fields={};
       for(const [name,key] of [['padding','pedRowsPaddingType'],['row_count','pedTailsAlignType']]){
@@ -2716,7 +2729,7 @@ function readRenderedInputMapping(observation) {
         if(!tid.startsWith(prefix) || !tid.slice(prefix.length) || tid.slice(prefix.length).includes(';'))continue;
         const lists=(tids.get(ownerTid+';boundlist')??[]).filter(visible);
         if(lists.length!==1 || !lists[0].contains(element) || sensitive(lists[0]))return null;
-        const label=textOf(element,true),formatted=label.replace(/\s/g,'_').replace(/,/g,'');
+        const displayed=textOf(element,true),label=field.scope==='sorting'&&field.name==='max_threads'&&displayed==='Автоопределение (0)'?'Автоопределение':displayed,formatted=label.replace(/\s/g,'_').replace(/,/g,'');
         if(!label || label.length>=240 || tid!==prefix+formatted)return null;
         if(field.scope==='import_column' && !(field.name==='type'
           ? ['Целый','Вещественный','Строковый','Логический','Дата/Время','Переменный']
@@ -5125,6 +5138,7 @@ function readRenderedInputMapping(observation) {
             record('import_column_option_verified',{index:column.index,name:column.name,property:editor.property,
               type:column.type,data_kind:column.data_kind,settings_applied:false});
           } else {
+          const sortingAuto=choice.field.scope==='sorting'&&choice.field.name==='max_threads'&&choice.label==='Автоопределение';
           const parameterKey=choice.field.scope==='expression_parameter'?'expression_parameters':choice.field.scope==='output_column'?'column_parameters':choice.field.scope==='reform_column'?'reform_parameters':null;
           const expressionParameter=parameterKey!==null;
           const sourceOption=choice.field.scope==='import_source';
@@ -5160,7 +5174,7 @@ function readRenderedInputMapping(observation) {
             || observed.wizard.stage!==current.wizard.stage || !same(observed.ui.dialogs,current.ui.dialogs)
             || (expressionParameter?!same(observed.ui.masks,current.ui.masks):observed.ui.masks.length>0)
             || expressionParameter && !same(observed.wizard,expected)
-            || field?.status!=='observed' || field.truncated || field.value!==choice.label
+            || field?.status!=='observed' || field.truncated || field.value!==choice.label&&!(sortingAuto&&field.value==='0')
             || field.input_ref!==choice.field.input_ref || field.owner_ref!==choice.field.owner_ref)
             fail('WIZARD_OPTION_NOT_CONFIRMED','The selected option label was not read back in its original wizard field; inspect before retry');
           record('wizard_option_verified',{field:choice.field.name,label:choice.label,settings_applied:false});
