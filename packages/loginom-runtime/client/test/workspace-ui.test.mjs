@@ -1115,6 +1115,83 @@ for(const stage of ['controls','data_views'])for(const fault of ['transient','pe
  if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
 });
 
+// LAB-1164 grouping-median :1673: a 1092-element Files region scrolled 4000->5000
+// exhausted 500 ms in both the controls read and its single retry. The fake DOM
+// has no layout engine: after the gesture, charge each native layout/style read
+// (getComputedStyle, scroll extents, getBoundingClientRect, hit test) a fixed cost.
+function storageScrollCostFixture(){
+ const clock=fixtureClock(),page=new Page({clock:clock.Date}),prefix='MF;TF-1;FileStorageForm;';
+ page.context.innerWidth=1280;page.context.innerHeight=800;page.waitForTimeout=async ms=>{clock.advance(ms);};
+ let parent=page.document.body;
+ for(let i=0;i<24;i++)parent=page.add('div',null,'',{x:0,y:0,width:1280,height:800},parent);
+ const table=page.add('div',prefix+'pnlFileStorage;tbl','',{x:0,y:80,width:1100,height:600},parent);
+ Object.assign(table,{scrollTop:4000,scrollHeight:10913,clientHeight:600,scrollWidth:1100,clientWidth:1100});table.style.overflowY='auto';
+ const items=page.add('div',null,'',{x:0,y:80,width:1100,height:600},table);
+ for(let r=0;r<48;r++){
+  const y=80+r*23,row=page.add('table',null,'',{x:0,y,width:1100,height:23},items);row.attrs.class='x-grid-item';
+  const tr=page.add('tr',null,'',{x:0,y,width:1100,height:23},page.add('tbody',null,'',{x:0,y,width:1100,height:23},row));
+  for(const [c,col] of ['Name','Size','Date','Type','Owner'].entries()){
+   const td=page.add('td',prefix+(c?'col'+col+'_'+r:'colName_file-'+r+'.csv'),c?'':'file-'+r+'.csv',{x:c*220,y,width:220,height:23},tr);
+   // Ellipsis cells overflow horizontally without being scroll owners.
+   const inner=page.add('div',null,'',{x:c*220,y,width:220,height:23},td);inner.attrs.class='x-grid-cell-inner';
+   Object.assign(inner,{scrollWidth:260,clientWidth:220});inner.style.overflowX='hidden';
+   page.add('span',null,c?'27':'',{x:c*220,y,width:20,height:20},inner);page.add('span',null,'',{x:c*220+20,y,width:20,height:20},inner);
+  }
+ }
+ const bar=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');
+ for(const [i,text] of ['Файлы','user'].entries()){
+  const button=page.add('div','MF;TF-1;cnrNaviMode;b.s_Сервер>Файлы'+(i?'>user':''),'',undefined,bar);
+  page.add('span',null,text,undefined,button).attrs.class='x-btn-inner-default-toolbar-small';
+ }
+ const cost={reads:0,charging:false,extra:0};
+ const read=owner=>{if(cost.charging){cost.reads++;clock.advance(0.12+(owner?cost.extra:0));if(owner)cost.extra=0;}};
+ const style=page.context.getComputedStyle;page.context.getComputedStyle=e=>{read();return style(e);};
+ const hit=page.document.elementFromPoint.bind(page.document);page.document.elementFromPoint=(x,y)=>{read();return hit(x,y);};
+ for(const e of page.document.all()){
+  const box=e.getBoundingClientRect.bind(e);e.getBoundingClientRect=()=>{read();return box();};
+  for(const k of ['scrollHeight','clientHeight','scrollWidth','clientWidth']){let v=e[k];Object.defineProperty(e,k,{get(){read(e===table&&k==='scrollHeight');return v;},set(n){v=n;},configurable:true});}
+ }
+ return {page,table,clock,cost,prefix};
+}
+
+for(const mode of ['fresh','owner','mask','persistent'])test('Files scroll 4000->5000 reads a fresh complete scan within unchanged limits: '+mode,async()=>{
+ const {page,table,clock,cost,prefix}=storageScrollCostFixture();
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const before=await page.execute({mode:'observe',root_ref:root.ref});
+ assert.equal(before.status,'SUCCEEDED');
+ const target=before.output.ui.elements.find(e=>e.tid===prefix+'colName_file-10.csv');
+ assert.ok(target.allowed_actions.includes('scroll'));assert.equal(target.scroll.top,4000);
+ const evaluate=page.evaluate.bind(page);let reads=0;
+ page.evaluate=async(fn,arg)=>{
+  if(!arg||!Object.hasOwn(arg,'discoverRoots'))return evaluate(fn,arg);
+  cost.charging=table.scrollTop===5000;
+  // A slower first controls read (or every one) still reaches the retry guards.
+  if(cost.charging&&mode!=='fresh'&&(mode==='persistent'||++reads===1))cost.extra=600;
+  else if(cost.charging&&reads){
+   if(mode==='owner')table.style.overflowY='hidden';
+   if(mode==='mask')page.add('div',null,'Загрузка...',{x:400,y:300,width:200,height:40},table).attrs.class='x-mask-msg';
+  }
+  return evaluate(fn,arg);
+ };
+ const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+ assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,1);
+ assert.equal(table.scrollTop,5000);
+ if(mode==='fresh'){
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify({error:result.error,trace:result.trace}));
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_limit').length,0);
+  assert.deepEqual([result.output.scan.complete,result.output.scan.max_ms,result.output.scan.max_elements,result.output.scan.max_work],[true,500,6000,250000]);
+  assert.ok(result.output.scan.visited_elements>=1092,String(result.output.scan.visited_elements));
+  const moved=result.output.ui.elements.find(e=>e.ref===target.ref);
+  assert.deepEqual(clone(moved.scroll),{ref:root.ref,top:5000,max_top:10313});
+  assert.equal(moved.horizontal_scroll,undefined);
+ } else {
+  assert.equal(result.status,'AMBIGUOUS');
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,1);
+  assert.equal(result.error.code,mode==='persistent'?'UI_SCAN_LIMIT':'UI_SCROLL_NOT_CONFIRMED',JSON.stringify(result.error));
+ }
+});
+
 test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
   for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
     const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;

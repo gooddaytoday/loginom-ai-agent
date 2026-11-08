@@ -439,7 +439,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const all = select('[data-tid]'), tids = new Map();
     for (const element of all) { const tid = element.getAttribute('data-tid'); const list = tids.get(tid) ?? []; list.push(element); tids.set(tid, list); }
     const getTid = element => element?.getAttribute?.('data-tid') ?? null;
-    const boxOf = element => { const b = element.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; };
+    // Within one synchronous read (cached reads below) each element's box is
+    // read once; callers receive copies.
+    const boxes=new WeakMap();
+    const boxOf = element => {
+      let b=cacheReadPredicates?boxes.get(element):null;
+      if(!b){const r=element.getBoundingClientRect();b={ x: r.x, y: r.y, width: r.width, height: r.height };if(cacheReadPredicates)boxes.set(element,b);}
+      return {...b};
+    };
     // Independent DOM/SVG reads contain float32 noise at fractional DPI. All
     // bounds here are CSS pixels; integer scroll extents and identities remain exact.
     const geometryEpsilon=1/64;
@@ -3304,23 +3311,27 @@ function readRenderedInputMapping(observation) {
       if (['checkbox','radio'].includes(role) && ['true','false','mixed'].includes(value)) return {kind:role,checked:value==='mixed'?null:value==='true',indeterminate:value==='mixed',source:'aria'};
       return null;
     };
-    const scrollOf = element => {
-      for (let parent=element; parent && parent!==document.body; parent=parent.parentElement) {
-        charge();
-        if (parent.scrollHeight>parent.clientHeight && ['auto','scroll'].includes(getComputedStyle(parent).overflowY)) {
-          return { ref: refOf(parent), top: parent.scrollTop, max_top: parent.scrollHeight-parent.clientHeight };
+    // Controls of one region share their scroll ancestors. This read never
+    // writes the DOM, so each ancestor's nearest owner is read once per scan;
+    // nothing is retained across observations or gestures.
+    const nearestScroll=(owns,read)=>{
+      const results=new WeakMap();
+      return element=>{
+        const path=[];let result=null;
+        for(let parent=element;parent && parent!==document.body;parent=parent.parentElement) {
+          charge();
+          if(cacheReadPredicates&&results.has(parent)){result=results.get(parent);break;}
+          path.push(parent);
+          if(owns(parent)){result=read(parent);break;}
         }
-      }
-      return null;
+        if(cacheReadPredicates)for(const parent of path)results.set(parent,result);
+        return result&&{...result};
+      };
     };
-    const horizontalScrollOf = element => {
-      for(let parent=element;parent && parent!==document.body;parent=parent.parentElement) {
-        charge();
-        if(parent.scrollWidth>parent.clientWidth && ['auto','scroll'].includes(getComputedStyle(parent).overflowX))
-          return {ref:refOf(parent),left:parent.scrollLeft,max_left:parent.scrollWidth-parent.clientWidth};
-      }
-      return null;
-    };
+    const scrollOf = nearestScroll(parent=>parent.scrollHeight>parent.clientHeight && ['auto','scroll'].includes(getComputedStyle(parent).overflowY),
+      parent=>({ ref: refOf(parent), top: parent.scrollTop, max_top: parent.scrollHeight-parent.clientHeight }));
+    const horizontalScrollOf = nearestScroll(parent=>parent.scrollWidth>parent.clientWidth && ['auto','scroll'].includes(getComputedStyle(parent).overflowX),
+      parent=>({ref:refOf(parent),left:parent.scrollLeft,max_left:parent.scrollWidth-parent.clientWidth}));
     const interactionOf = element => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
