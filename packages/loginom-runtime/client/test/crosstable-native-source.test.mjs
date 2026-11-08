@@ -2,7 +2,7 @@ import vm from 'node:vm';
 import {bindCollapseNative} from '../lib/collapse-native-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {completedCrossTableCollapses,validateCrossTableNativeSources,verifyCrossTableExecutionOwner,crossTableInputSourceSchema} from '../lib/crosstable-native-source.mjs';
+import {completedCrossTableCollapses,collapseAncestorSources,validateCrossTableNativeSources,verifyCrossTableExecutionOwner,crossTableInputSourceSchema} from '../lib/crosstable-native-source.mjs';
 test('exact CrossTable needs the private verified execution receipt beyond its public execution id',()=>{
  const ctx={document_id:'own',execution:{status:'completed',execution_id:'own:1:2'}},proof={...ctx.execution,verified:true,owner_verified:true};
  assert.equal(verifyCrossTableExecutionOwner(proof,ctx),true);
@@ -112,3 +112,43 @@ for(const [name,change] of [
  ['unowned newer ancestor',f=>{f.root.childNodes[0].data.id='5';f.root.childNodes[0].childNodes[0].data.id='5.1';}],
  ['byte proven source missing',f=>f.args.imports=[]],
 ])test('serialized reordered lineage refuses '+name,async()=>{const f=nativeReorderedBinding();change(f);await assert.rejects(bindCollapseNative(f.page,f.args));});
+
+function collapseChainBinding(){
+ const fields=[{name:'Key',label:'Key',type:'string'}],mapped=fields.map(f=>({...f,source_name:f.name}));
+ const source={FGuid:'source',FIconCls:'bg-vendor-icon-importtextfile',data:{owner:'source'}},first={FGuid:'first',FIconCls:'bg-vendor-icon-columnflipping',data:{owner:'first'}},node={FGuid:'second',FIconCls:'bg-vendor-icon-columnflipping',data:{owner:'second'}};
+ const port={FGuid:'port',parent:node},firstIn={FGuid:'first-in',parent:first},firstOut={FGuid:'first-out',parent:first},sourcePort={FGuid:'source-port',parent:source};
+ const column={Name:'Count',DisplayName:'Count',DataType:4};
+ const dataset={FModelNode:node.data,FDataTable:{FDataSourceStore:{loading:false},FTotalRowCount:51},FDataSource:{$FHelper:{$FRowCount:51}},FColumnInfosStore:{data:{items:[{data:column}]}}};
+ const root={internalId:'1',data:{loaded:true},childNodes:[{data:{id:'4',Status:3,ErrorDetails:'',loaded:true},childNodes:[
+  {data:{id:'4.1',Status:3,ErrorDetails:'',ModelNode:source.data},childNodes:[]},{data:{id:'4.2',Status:3,ErrorDetails:'',ModelNode:first.data},childNodes:[]}]}]};
+ const table={id:'dataset',checkVisibility:()=>true},tree={id:'tree'};
+ const doc={querySelector:q=>q.includes('ConsoleForm')?tree:table};
+ const links=[{FGuid:'l1',FSourcePort:sourcePort,FTargetPort:firstIn},{FGuid:'l2',FSourcePort:firstOut,FTargetPort:port}];
+ const model={FPreviewManager:{FPreviewVisible:true,FPreviewForm:{FCurrentPreviewNode:node,FCurrentPreviewPort:port}},FDiagram:{FNodes:{FCollection:[source,first,node]},FLinks:{FCollection:links}}};
+ const context=vm.createContext({document:doc,location:{origin:'http://own'},bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}},Ext:{getCmp:id=>id==='tree'?{getStore:()=>({isLoading:()=>false,getRoot:()=>root})}:{Controller:dataset}}});
+ vm.runInContext("globalThis.__loginomDockPreparationV1={document,id:'d'}",context);
+ const page={evaluate:(fn,args)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(args)+')',context)};
+ const imports=[{node_id:'source',execution_id:'d:1:4',configuration:{output_mapping:{fields:structuredClone(fields)}}}];
+ const collapses=[{node_id:'first',execution_id:'d:1:4',configuration:{input_mapping:{port:0,fields:structuredClone(mapped)},output_mapping:{port:0,fields:[{...mapped[0],name:'Renamed',source_name:'Key'}]}}}];
+ const args={document_id:'d',workflow_id:'w',node_id:'second',port_guid:'port',origin:'http://own',execution:{execution_id:'d:1:4'},execution_owner_verified:true,prefix:'MF;TF-1',imports,collapse_chain:{collapses},schema:[{name:'Count',label:'Count',type:4}]};
+ return {page,args,root,first};
+}
+test('Collapse fed by a Collapse reaches the native read bound only with settled ancestor provenance and a renamed ancestor output',async()=>{
+ const f=collapseChainBinding();assert.equal((await bindCollapseNative(f.page,f.args)).refusal.code,'NATIVE_FULL_BOUND_EXCEEDED');
+});
+for(const [name,change] of [
+ ['missing Collapse provenance',f=>f.args.collapse_chain.collapses=[]],
+ ['unverified execution owner',f=>f.args.execution_owner_verified=false],
+ ['missing byte proven import',f=>f.args.imports=[]],
+ ['ancestor input differs from import',f=>f.args.collapse_chain.collapses[0].configuration.input_mapping.fields[0].label='Changed'],
+ ['incomplete ancestor execution',f=>f.root.childNodes[0].childNodes[1].data.Status=2],
+ ['unowned newer ancestor execution',f=>{f.root.childNodes[0].data.id='5';f.root.childNodes[0].childNodes.forEach((c,i)=>c.data.id='5.'+(i+1));}],
+])test('Collapse→Collapse lineage refuses '+name,async()=>{const f=collapseChainBinding();change(f);await assert.rejects(bindCollapseNative(f.page,f.args));});
+
+test('Collapse ancestors exclude the read target and fail closed on malformed private history',()=>{
+ const f=fixture();assert.equal(collapseAncestorSources(f.history,ctx,{node_id:'collapse'}).length,0);
+ assert.equal(collapseAncestorSources(f.history,ctx,{node_id:'target'})[0].node_id,'collapse');
+ f.history[0].outcome.output.configuration.readback.input_mapping.fields[0].source_name='Other';
+ assert.equal(collapseAncestorSources(f.history,ctx,{node_id:'target'}).length,0);
+ f.history[0].outcome.output.phases.pop();assert.deepEqual(collapseAncestorSources(f.history,ctx,{node_id:'target'}),[]);
+});

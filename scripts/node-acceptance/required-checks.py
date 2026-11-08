@@ -97,6 +97,7 @@ RULES = (
       'docs/node-development/nodes/exports-lgd/acceptance/**'), ('live-ui', 'cold-export'),
      ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),
     ((C + 'text-import-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
+    ((C + 'collapse-*.mjs', 'docs/node-development/nodes/collapse-columns/acceptance/**'), ('live-ui',), ('collapse-variant', 'collapse-mixed')),
     ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
      ('live-ui',), ('crosstable-real-keys',)),
 )
