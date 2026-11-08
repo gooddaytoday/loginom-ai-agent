@@ -40,7 +40,7 @@ function fixture(fn,bit){
    // Down presses and Enter commit ASC. Reopening starts at the selection.
    if(action.key==='Home'){
     editor.index=0;
-    if(action.ref==='order'){commit(choices[0].value);editor.popup=null;}
+    if(action.ref==='order'&&comboValue('order')!==choices[0].value){commit(choices[0].value);editor.popup=null;}
    }
    if(action.key==='Enter'){commit(choices[editor.index].value);editor.popup=null;}
   }
