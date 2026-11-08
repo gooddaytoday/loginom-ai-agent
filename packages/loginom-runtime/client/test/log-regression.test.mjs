@@ -19,7 +19,7 @@ const request={operation_id:'logistic',contract_revision:'1.0.0',document_id:'do
 test('logistic registration and handler accept prediction and full coefficient outputs',()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
  const card=describeNodeTypes(['datamining.log_regression'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
- assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise','apply']);
+ assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise','ridge','apply']);
  assert.equal(card.tabular_outputs,2);assert.ok(card.parameter_schema.properties.logistic.properties.event.description);
  assert.ok(validateNodeApplyRequest(request,support.nodeApplyHandlers).handler);
  for(const ports of [[1],[0,1]])assert.ok(validateNodeApplyRequest({...request,read:{...request.read,ports}},support.nodeApplyHandlers).handler);
@@ -36,17 +36,18 @@ test('logistic roles keep identifiers and comments and require a discrete string
  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,target_field:'x'}},'enter'));
 });
 
-function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',selection,needsScroll=false,initialCriterion=1,normalization,initialNorm=0,existing=false,corruptTarget=false}={}){
+function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',selection,regularization,needsScroll=false,initialCriterion=1,normalization,initialNorm=0,existing=false,corruptTarget=false}={}){
  const source_fields=fields.map(f=>({record_id:'source-'+f.index,field_id:f.field_id,name:f.name,label:f.label,type:f.type}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
  const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
  const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:initialCriterion,pedAddSignificance:0.05,pedRemoveSignificance:0.1};
+ if(mode==='ridge')Object.assign(details,{pedRidgeSetupMethod:1,pedLambdaRidge:2});
  if(mode==='apply'){Object.assign(values,{pedAutoMethod:false,pedRegressionMethod:0,pedUseDetailedSettings:true,pedEventType:4,pedEventId:2});Object.assign(details,{pedEpsilon:1e-10,pedThreshold:0.8});}
  let stage='input_mapping',picker=null,scrollTop=0,normType=initialNorm,normSelected=false,normEditor=false,editorNorm=initialNorm;const actions=[];
  const rawState=()=>({prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',owner_context:{status:'observed'},stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{dialogs:[],masks:[],elements:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'close',allowed_actions:['click']},{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
   ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>(stage==='lin_regression_details'?['','trg_picker']:['DisplayEl','trg_picker','InputEl']).map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl'+(part?';'+part:''),ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
-  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'Информационный критерий Акаике',aicc:'Информационный критерий Акаике скорректированный',bic:'Информационный критерий Байеса',hqic:'Информационный критерий Ханнана-Куинна'})[selection?.criterion??'deviance']:'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
-  node_logregression:{verified:true,node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>f.usage_type).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:false,pedAddSignificance:details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:details.pedRegSelQuality!==0||mode==='forward'}})}});
+  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)',ridge:'Ridge (Гребневая регрессия)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'Информационный критерий Акаике',aicc:'Информационный критерий Акаике скорректированный',bic:'Информационный критерий Байеса',hqic:'Информационный критерий Ханнана-Куинна'})[selection?.criterion??'deviance']:picker==='pedRidgeSetupMethod'?'Задать вручную':'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
+  node_logregression:{verified:true,node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>f.usage_type).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:mode==='ridge',pedAddSignificance:mode==='ridge'||details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:mode==='ridge'||details.pedRegSelQuality!==0||mode==='forward',...(mode==='ridge'?{pedRidgeSetupMethod:false,pedLambdaRidge:false}:{})}})}});
  const state=()=>{if(stage==='closed')return {wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},ui:{dialogs:[],masks:[],elements:[]}};const s=rawState();
   if(stage==='normalization'){
    s.node_logregression.fields[0].norm_type=normType;
@@ -72,10 +73,10 @@ function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLab
   if(a.verb==='set_checked')target[key]=a.checked;
   else if(a.verb==='fill')target[key]=Number(a.text);
   else if(a.ref.startsWith('event-')){target.pedEventId=classes[Number(a.ref.slice(6))].index;picker=null;}
-  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise'].indexOf(mode):picker==='pedRegSelQuality'?['deviance','aic','aicc','bic','hqic'].indexOf(selection?.criterion??'deviance'):picker==='pedEventType'?4:2;picker=null;}
+  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise','ridge'].indexOf(mode):picker==='pedRegSelQuality'?['deviance','aic','aicc','bic','hqic'].indexOf(selection?.criterion??'deviance'):picker==='pedEventType'?4:picker==='pedRidgeSetupMethod'?0:2;picker=null;}
   else if(a.verb==='click')picker=key;
  }};
- return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,{logistic:{...logistic,...(normalization!==undefined?{normalization}:{}),...(selection?{selection}:{})}},{request:{...request,mode,target:existing?{kind:'existing',ref:node}:request.target},inputMapping})};
+ return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,{logistic:{...logistic,...(normalization!==undefined?{normalization}:{}),...(selection?{selection}:{}),...(regularization?{regularization}:{})}},{request:{...request,mode,target:existing?{kind:'existing',ref:node}:request.target},inputMapping})};
 }
 
 test('normalization validates the native none/standardize choices before mutation',()=>{
@@ -141,6 +142,13 @@ test('readback binds training, event and cutoff to committed settings and separa
  const result=logRegressionConfigurationReadback(candidate);assert.equal(result.threshold,0.8);assert.equal(result.event,'yes');assert.equal(result.training.execution_id,'teach');assert.equal(result.package_persistence_verified,false);
  c.normalization=[{name:'X',norm_type:5},{name:'Target',norm_type:9}];
  assert.equal(logRegressionConfigurationReadback(candidate).normalization,'standardize');
+ c.mode='ridge';c.regularization={lambda_ridge:1};
+ for(const normType of [0,5]){
+  c.normalization[0].norm_type=normType;
+  const ridge=logRegressionConfigurationReadback(candidate);
+  assert.equal(ridge.mode,'ridge');assert.deepEqual(ridge.regularization,{lambda_ridge:1});
+  assert.equal(ridge.normalization,normType===5?'standardize':'none');
+ }
  entries.finish.training.execution_id='execute';assert.throws(()=>logRegressionConfigurationReadback(candidate),/training/);
 });
 
@@ -148,7 +156,7 @@ for(const mode of ['forward','backward','stepwise'])for(const criterion of ['dev
  const selection={criterion,...(criterion==='deviance'?{...(mode!=='backward'?{entry_significance:1e-7}:{}),...(mode!=='forward'?{removal_significance:0.2}:{})}:{})};
  assert.doesNotThrow(()=>validateLogRegressionParameters({logistic:{...logistic,selection}},mode));
  const f=fixture({mode,selection,initialCriterion:criterion==='aic'?0:1}),r=await f.run();
- assert.equal(f.values.pedRegressionMethod,['enter','forward','backward','stepwise'].indexOf(mode));
+ assert.equal(f.values.pedRegressionMethod,['enter','forward','backward','stepwise','ridge'].indexOf(mode));
  assert.equal(r.configuration.mode,mode);assert.deepEqual(r.configuration.selection,selection);
  assert.equal(f.details.pedRegSelQuality,['deviance','aic','aicc','bic','hqic'].indexOf(criterion));
  const edited=f.actions.filter(a=>a.verb==='fill').map(a=>a.ref.split(':')[0]);
@@ -210,4 +218,35 @@ test('apply readback requires discarded draft and no training receipt',()=>{
  assert.throws(()=>logRegressionConfigurationReadback(candidate()),/train/);
  delete entries.finish.training;entries.node_finish.settings_applied=true;
  assert.throws(()=>logRegressionConfigurationReadback(candidate()),/preserv|commit/);
+});
+
+
+test('manual Ridge configures lambda, preserves intercept and reports observed regularization',async()=>{
+ const regularization={lambda_ridge:1};
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ assert.ok(validateNodeApplyRequest({...request,mode:'ridge',parameters:{logistic:{...logistic,regularization}}},support.nodeApplyHandlers).handler);
+ const f=fixture({mode:'ridge',regularization}),r=await f.run();
+ assert.equal(f.values.pedRegressionMethod,4);
+ assert.equal(f.details.pedRidgeSetupMethod,0);assert.equal(f.details.pedLambdaRidge,1);
+ assert.equal(r.configuration.mode,'ridge');assert.deepEqual(r.configuration.regularization,regularization);
+ assert.ok(f.actions.some(a=>a.verb==='fill'&&a.ref.startsWith('pedLambdaRidge')));
+ assert.equal(f.actions.at(-1).expected_stage,'done');
+});
+
+test('Ridge preserves manual lambda with either native predictor normalization',async()=>{
+ for(const normalization of ['none','standardize']){
+  const regularization={lambda_ridge:1};
+  const f=fixture({mode:'ridge',regularization,normalization}),r=await f.run();
+  assert.deepEqual(r.configuration.regularization,regularization);
+  assert.equal(r.configuration.normalization[0].norm_type,normalization==='standardize'?5:0);
+  assert.equal(r.configuration.normalization[1].norm_type,1);
+  assert.equal(f.details.pedLambdaRidge,1);assert.equal(f.values.pedDenormalize,true);
+ }
+});
+
+test('Ridge requires one explicit finite positive lambda and rejects selection or other modes before UI',()=>{
+ for(const regularization of [undefined,{},null,{lambda_ridge:0},{lambda_ridge:-1},{lambda_ridge:Infinity},{lambda_ridge:NaN},{lambda_ridge:'1'},{lambda_ridge:1,lambda_lasso:1}])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization}},'ridge'));
+ assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_ridge:1},selection:{criterion:'aic'}}},'ridge'));
+ for(const mode of ['enter','forward','backward','stepwise','apply'])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_ridge:1}}},mode));
 });

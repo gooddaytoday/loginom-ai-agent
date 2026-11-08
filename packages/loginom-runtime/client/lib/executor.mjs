@@ -727,9 +727,9 @@ export function makeArtifactDownloadCode(options) {
   const artifact=options?.artifact,snapshot=options?.snapshot;
   const matches=snapshot?.ui?.elements?.filter(item=>item.ref===options.file_ref) ?? [];
   const suffix=artifact?.name?.replace(/\s/g,'_').replace(/,/g,'');
-  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xlsx|lgd)$/i.test(artifact.name) || matches.length!==1
+  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xls|xlsx|lgd)$/i.test(artifact.name) || matches.length!==1
     || matches[0].label!==artifact.name || matches[0].tid!==snapshot.workflow_ref?.prefix+';FileStorageForm;colName_'+suffix)
-    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLSX/LGD file');
+    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLS/XLSX/LGD file');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
   // Upload may have observed the folder tree. Verification owns the separately
   // issued exact CSV/TSV/TXT/XLSX/LGD ref, so its narrow reads must follow that file, not the
@@ -3552,7 +3552,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       } finally {running=false;}
     },
     preflightDeliveredArtifact(artifact,snapshot) {
-      if(!/\.(?:csv|tsv|txt|xlsx|lgd)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLSX/LGD files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
+      if(!/\.(?:csv|tsv|txt|xls|xlsx|lgd)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLS/XLSX/LGD files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
       if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),

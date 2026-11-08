@@ -1,5 +1,6 @@
-import {resolveMissingValuesParameters} from './missing-values-parameters.mjs';
+import {resolveMissingValuesParameters,MISSING_VALUES_METHODS} from './missing-values-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error('Missing values readback: '+m);};
+const NATIVE_CODES={mean:3,zero:11,constant:6,median:4,most_probable:5,previous:12,delete:2};
 const pick=(v,keys)=>Object.fromEntries(keys.map(k=>[k,v[k]]));
 export function missingValuesConfigurationReadback({node,phases,operation_id}){
  const owner=c=>c?.verified===true&&['document_id','workflow_id','node_id'].every(k=>c[k]===node[k]);
@@ -15,13 +16,13 @@ export function missingValuesConfigurationReadback({node,phases,operation_id}){
  need(im?.verified&&im.inventory_complete&&owner(im.node_context)&&im.node_context.input_port?.port===0&&input.value.finish?.settings_applied===true,'input owner');
  const inputFields=im.target_fields.map(f=>{const source=f.source;need(source&&im.source_fields.some(s=>s.record_id===source.record_id&&s.name===source.name),'input source');return {...pick(f,['index','name','label','type','data_kind']),source_name:source.name};});
  need(JSON.stringify(inputFields.map(f=>pick(f,['name','label','type','data_kind'])))===JSON.stringify(c.input_fields.map(f=>pick(f,['name','label','type','data_kind']))),'input schema differs');
- need(c.ordered===false&&Number.isInteger(c.max_nulls_percent)&&c.max_nulls_percent>=0&&c.max_nulls_percent<=100,'unsupported options');
+ need(typeof c.ordered==='boolean'&&Number.isInteger(c.max_nulls_percent)&&c.max_nulls_percent>=0&&c.max_nulls_percent<=100,'unsupported options');
  need(c.options&&Object.values(c.options).every(o=>o.switch_pressed===false)&&c.options.pedUseQuality.value===false,'variable/quality settings');
  need(c.options.pedOrderedSample.value===c.ordered&&c.options.pedMaxNullsPercent.value===c.max_nulls_percent,'option readbacks disagree');
  need(c.fields.length===c.input_fields.length&&c.fields.every((f,i)=>f.name===c.input_fields[i].name&&f.type===c.input_fields[i].type&&f.data_kind===c.input_fields[i].data_kind&&typeof f.used==='boolean'),'processing inventory differs');
  const used=c.fields.filter(f=>f.used);need(used.length>0,'empty processing set');
- resolveMissingValuesParameters({fields:used.map(f=>({field:{kind:'input_field',name:f.name},method:f.method,...(f.method==='constant'?{value:f.value}:{})}))},c.input_fields);
- need(used.every(f=>f.method==='mean'?f.method_code===3:f.method==='zero'?f.method_code===11:f.method_code===6&&typeof f.value==='string'),'method enum differs');
+ resolveMissingValuesParameters({fields:used.map(f=>({field:{kind:'input_field',name:f.name},method:f.method,...(f.method==='constant'?{value:f.value}:{})}))},c.input_fields,c.ordered);
+ need(used.every(f=>MISSING_VALUES_METHODS.includes(f.method)&&NATIVE_CODES[f.method]===f.method_code&&(f.method!=='constant'||typeof f.value==='string')),'method enum differs');
  const linked=new Set();
  const output=m.target_fields.map((f,i)=>{
   const source=f.source??f.exclusion_source;

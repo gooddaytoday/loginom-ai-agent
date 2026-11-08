@@ -8,6 +8,7 @@ import {createRedactor} from '../lib/redact.mjs';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {nodeOutputForJournal,createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {isUnchangedTextImportExecution,isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
+import {readDeferredImportCounts} from '../lib/text-import-node.mjs';
 
 test('REST/Join JSON cells retain the exact phase ACK through the real journal redactor',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'node-json-ack-'));
@@ -67,7 +68,7 @@ test('JavaScript product read normalizes echo URL cells before the exact durable
     {type:'string',representation:'data_source_string',precision:'source_text',value:'a b&я'}]]}]};
   const before=structuredClone(raw),redactor=createRedactor(),calls=[];
   // Replace browser driver dependencies only; execute the actual product dispatch.
-  const context={createRedactor,nodeOutputForJournal,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
+  const context={createRedactor,nodeOutputForJournal,readDeferredImportCounts,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
   for(const name of ['VariablesReplace','VariablesColumnUnion','VariablesCalculator','DataToVar','VariablesToTable','UserVariables','LgdImport','LgdExport','Quality','ColUnion','CoarseClasses','FactorAnalysis','TreeConversion','AssnRules','Enrich','Ungroup','Binning','AutoCorrelation','ExcelExport','Tree','ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
    'Smoothing','DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>assert.fail('Wrong driver')});
@@ -102,7 +103,7 @@ test('shared ordinary product output is normalized before durable ACK without mu
    {type:'real',value:-0,decimal:'-0'}]]}]};
   const original=structuredClone(raw),native={ports:[{exact_table:{complete:true}}]};
   let returned=raw;
-  const context={createRedactor,nodeOutputForJournal,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
+  const context={createRedactor,nodeOutputForJournal,readDeferredImportCounts,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
   for(const name of ['VariablesReplace','VariablesColumnUnion','VariablesCalculator','DataToVar','VariablesToTable','UserVariables','LgdImport','LgdExport','Quality','ColUnion','CoarseClasses','FactorAnalysis','TreeConversion','AssnRules','Enrich','Ungroup','Binning','AutoCorrelation','ExcelExport','Tree','ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
    'Smoothing','DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator','JavascriptCode'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>({readOutput:async()=>returned})});

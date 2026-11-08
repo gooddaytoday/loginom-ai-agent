@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,148451,'7610c5a3935c2d389414855a3384d0680383de9a3ac8f7da9215f6cf6f2db9d0'],
+  [nodeApiTools,153769,'248de5fcd570d7c93cb5dc0a21674fc7639cd2e5a842e54c2bc1f048739d3fc1'],
   [nodeApiTools.map(userNodeTool),12571,'92669583402f4b9b6abffc38b4ed6754e83051958680805c2ae1067c1488b8aa'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -230,4 +230,20 @@ test('Forward scoped selection passes the public schema and real registered hand
  const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
  await dispatchNodeApi(runtime,'dock_node_apply',request);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,mode:'enter'}),/only in forward/);
+});
+
+test('replacement Boolean and mixed registrations reach the production parameter validator',async()=>{
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
+ const request={operation_id:'replacement',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'existing',type:'transform.replace_columns',ref:{document_id:'doc',workflow_id:'wf',node_id:'replacement'}},inputs:[],mode:'exact',
+  parameters:{rules:[{field:{kind:'input_field',name:'Status'},type:'string',result_type:'boolean',case_sensitive:true,pairs:[{from:{type:'string',value:'no'},to:{type:'boolean',value:false}}],other:{mode:'null'}}]},mappings:[],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:true},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
+ await dispatchNodeApi(runtime,'dock_node_apply',request);
+ const mixed=structuredClone(request);mixed.mode='mixed';const rule=mixed.parameters.rules[0];delete rule.result_type;rule.pairs[0].to={type:'string',value:'EXACT-FIRST'};rule.regex_pairs=[{from:{type:'string',value:'AB-([0-9]{2})'},to:{type:'string',value:'REGEX'}}];rule.other={mode:'keep'};
+ await dispatchNodeApi(runtime,'dock_node_apply',mixed);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...mixed,mode:'exact'}),/mixed/);
 });
