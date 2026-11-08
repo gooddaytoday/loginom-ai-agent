@@ -1,0 +1,15 @@
+[
+  {"kind":"integer","text":"9007199254740993"},
+  {"kind":"integer","text":"-9223372036854775808"},
+  {"kind":"real","text":"0.1"},
+  {"kind":"real","text":"-0"},
+  {"kind":"real","text":"1.0000000000000002"},
+  {"kind":"datetime","text":"2026-01-02T03:04:05.006"},
+  {"kind":"string","value":"19"},
+  {"kind":"string","value":""},
+  {"kind":"string","value":"Привет, \"ё\"\nNULL"},
+  {"kind":"boolean","value":false},
+  {"kind":"boolean","value":true},
+  {"kind":"null","value":null},
+  {"kind":"empty"}
+]
