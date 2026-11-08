@@ -163,24 +163,37 @@ test('the installed catalog and request validator admit Enter with both tabular 
  assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l1.minimum,0);
 });
 
-test('LASSO freezes prediction field order before training so cold activation cannot move pass-through fields',async()=>{
+for(const mixed of [false,true])test('LASSO freezes prediction field order, mixed='+mixed,async()=>{
  const c={...configuration,mode:'lasso'},predicted=linRegressionOutputColumns(c,0);
  const prediction={verified:true,inventory_complete:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
   target_fields:predicted.map((f,index)=>({...f,index,record_id:'p'+index,required:false,inherited:false,excluded:false})),source_fields:[]};
- const coefficient=configuredCoefficients(),finished=[],actions=[];let port;
+ if(mixed){
+  prediction.source_identity_verified=true;
+  prediction.source_fields=predicted.map((f,index)=>({...f,index,record_id:'s'+index,field_id:String(index)}));
+  prediction.target_fields=prediction.target_fields.map((f,index)=>({...f,source:prediction.source_fields[index]})).reverse()
+   .map((f,index)=>({...f,index,group_index:index}));
+ }
+ const originalSources=structuredClone(prediction.source_fields);
+ const coefficient=configuredCoefficients(),finished=[],actions=[];let port,selected;
  const channel={async openOutputPort(value){port=value;},async observe(options){
   const mapping=port===0?prediction:coefficient,offset=options.outputColumnPage?.offset??0;
-  const fields=mapping.target_fields.slice(offset,offset+8).map(f=>({...f,status:'observed'}));
+  const fields=mapping.target_fields.slice(offset,offset+8).map(f=>({...f,status:'observed',name_ref:f.record_id,selected:f.record_id===selected}));
   const s={node_mapping:structuredClone(mapping),wizard:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'port-'+port,
    output_columns:{auto_sync:{status:'observed',value:mapping.autosync,ref:'auto'},fields,
     page:{status:'complete_definition_page',schema_id:'schema-'+port,offset,limit:8,total_columns:mapping.target_fields.length,returned:fields.length,next_offset:offset+fields.length===mapping.target_fields.length?null:offset+fields.length}}},
-   ui:{elements:[{tid:'W;DerivedDataSourceOutputSocketWizard;btnAutoSyncThroughColumns',ref:'auto',allowed_actions:['click']}]}};
+   ui:{elements:[{tid:'W;DerivedDataSourceOutputSocketWizard;btnAutoSyncThroughColumns',ref:'auto',allowed_actions:['click']},{tid:'W;DerivedDataSourceOutputSocketWizard;btnMoveMappingColumnUp',ref:'move',allowed_actions:['click']},...mapping.target_fields.map(f=>({ref:f.record_id,allowed_actions:['click']}))]}};
   assert.ok(options.ready(s),options.condition);return s;
  },async perform(options){
   const s=options.initialObservation;assert.ok(options.ready(s));const action=options.resolve(s);actions.push(action);
-  assert.equal(port,0);assert.deepEqual(action,{verb:'click',ref:'auto'});prediction.autosync=false;
+  assert.equal(port,0);assert.equal(action.verb,'click');
+  if(action.ref==='auto'){prediction.autosync=false;return;}
+  if(action.ref!=='move'){assert.ok(prediction.target_fields.some(f=>f.record_id===action.ref));selected=action.ref;return;}
+  const index=prediction.target_fields.findIndex(f=>f.record_id===selected);assert.ok(index>0);
+  [prediction.target_fields[index-1],prediction.target_fields[index]]=[prediction.target_fields[index],prediction.target_fields[index-1]];
+  prediction.target_fields=prediction.target_fields.map((f,index)=>({...f,index,group_index:index}));
  }};
  await configureLinRegressionOutputs(channel,c,{},[],async()=>{finished.push(port);});
- assert.deepEqual(finished,[0,1]);assert.equal(prediction.autosync,false);assert.equal(actions.length,1);
+ assert.deepEqual(finished,[0,1]);assert.equal(prediction.autosync,false);assert.equal(actions.filter(a=>a.ref==='auto').length,1);
+ assert.equal(actions.some(a=>a.ref==='move'),mixed);assert.deepEqual(prediction.source_fields,originalSources);
  assert.deepEqual(prediction.target_fields.map(f=>f.name),predicted.map(f=>f.name));
 });
