@@ -85,9 +85,7 @@ def expected(path):
                     ordered=True, column_order='exact', columns=columns, rows=rows)
     return dict(package_path='{{PACKAGE_PATH}}', nodes=[{'type': 'imports.text'},
                 {'type': 'research.factor_analysis'}, {'type': 'exports.text'}, {'type': 'exports.text'}],
-                factor_signs={'status': 'proposal_requires_acceptance_integration',
-                              'columns': ['Factor1', 'Factor2'], 'ports': [0, 1],
-                              'rule': 'one joint sign per factor across every score and loading; no factor permutation'},
+                factor_signs={'columns': ['Factor1', 'Factor2'], 'ports': [0, 1]},
                 outputs=[output(0, factor_columns + [column('RowID', 'integer'), column('X', 'real'),
                                                     column('Y', 'real'), column('Z', 'real'), column('Tag', 'string')], rows0),
                          output(1, [column('ColumnName', 'string'), column('ColumnDisplayName', 'string')] + factor_columns, rows1)])
