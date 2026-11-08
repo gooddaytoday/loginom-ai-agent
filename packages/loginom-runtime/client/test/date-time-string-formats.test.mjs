@@ -29,11 +29,11 @@ test('string sources are told apart from the integer year and datetime date by n
   [['A_Y_1','Year'],['A_Y_2','YearText'],['A_D_1','Day'],['A_D_2','DayText'],['A_T_1','TimeText'],['A_U_1','Stamp']]);
  assert.equal(resolveDateTimeParameters(p,[{name:'A',label:'Дата',type:'datetime'}])[0].input.name,'A');
 });
-function fixture({defaults={},typeDelay=false}={}){
+function fixture({defaults={},defaultsB}={}){
  const names=['A','B'],fields=names.map(name=>({name,label:'Дата',type:'datetime',record_id:name,count:0}));
  const fmt={4:'%Y',16:'%Y-%m-%d',17:'%H:%i:%s',...defaults};
  const matrices=Object.fromEntries(names.map(n=>[n,[...Array.from({length:19},(_,func)=>({func,iso:false})),...[0,1,2,4,5,6,7,8,10,18].map(func=>({func,iso:true}))]
-  .map((r,index)=>({...r,index,record_id:n+index,first:false,last:false,number:false,string:false,string_format:r.iso?'':fmt[r.func]??(r.func===18?'':'%?')}))]));
+  .map((r,index)=>({...r,index,record_id:n+index,first:false,last:false,number:false,string:false,string_format:r.iso?'':(n==='B'&&defaultsB?{...fmt,...defaultsB}:fmt)[r.func]??(r.func===18?'':'%?')}))]));
  let selected='A',editor=null,typed='',calls=[];
  const snapshot=()=>({wizard:{stage:'date_time'},node_date_time:{verified:true,inventory_complete:true,fields,selected:fields.find(f=>f.name===selected),matrix:matrices[selected]},
   ui:{elements:[...fields.map(f=>({ref:f.name,allowed_actions:['click'],date_time_cell:{role:'field',field_key:f.name,record_id:f.record_id}})),
@@ -88,4 +88,11 @@ test('removing the custom operation clears its flag and leaves the typed format 
  const f=fixture();await configureDateTime(f.channel,params(op('string_custom','U','%Y')),{inputMapping:f.inputMapping});
  await configureDateTime(f.channel,params(op('year','Y')),{inputMapping:f.inputMapping});
  assert.equal(row(f,'A',18).string,false);assert.equal(row(f,'A',18).string_format,'%Y');assert.equal(row(f,'A',4).number,true);
+});
+test('a changed default format on the second field refuses before any flag or format gesture on the first',async()=>{
+ const f=fixture({defaultsB:{16:'%d.%m.%Y'}}),before=structuredClone(f.matrices);
+ const fields=[{field:{kind:'input_field',name:'A'},transformations:[op('string_year','Y')]},{field:{kind:'input_field',name:'B'},transformations:[op('string_date','D')]}];
+ await assert.rejects(configureDateTime(f.channel,{fields},{inputMapping:f.inputMapping}),/native string format differs from the expected string_date/);
+ assert.deepEqual(f.matrices,before);
+ assert.deepEqual(f.calls.filter(a=>!['A','B'].includes(a.ref)),[],'only field selection precedes the refusal');
 });

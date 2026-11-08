@@ -8204,3 +8204,28 @@ test('Excel input0 overflow retains typed Close only for its native input1 owner
   assert.deepEqual(page.events,[]);
  }
 });
+
+test('date string-format cell is clicked away from its checkbox image, never on it',async()=>{
+ for(const mode of ['center_image','full_image']){
+  const page=new Page(),base='MF;TF-1;WizrdMCF;DateReformWizard;';
+  page.context.innerWidth=1000;page.context.innerHeight=800;page.viewportSize=()=>({width:1000,height:800});
+  const form=page.add('div','MF;TF-1;WizrdMCF','',{x:10,y:80,width:1000,height:600});
+  const root=page.add('div',base.slice(0,-1),'',{x:20,y:90,width:900,height:500},form);
+  const grid=page.add('div',base+'grdDataFormat;tbl','',{x:30,y:100,width:800,height:400},root);grid.attrs.id='date-grid';grid.id='date-grid';
+  const row=page.add('table',null,'',{x:35,y:120,width:700,height:23},grid);Object.assign(row.attrs,{class:'x-grid-item','data-recordindex':'0','data-recordid':'r0','data-boundview':'date-grid'});
+  const cell=page.add('td',base+'colDoString_0','',{x:400,y:120,width:215,height:23},row);
+  const image=page.add('img',null,'',mode==='full_image'?{x:400,y:120,width:215,height:23}:{x:499.5,y:123.5,width:16,height:16},cell);image.attrs.class='x-grid-checkcolumn x-grid-checkcolumn-checked';
+  const record={isModel:true,internalId:'r0',data:{Func:18,ISO8601:false,DoDateTimeFirst:false,DoDateTimeLast:false,DoNumber:false,DoString:true,StringFmt:''}};
+  page.context.Ext={getCmp:id=>id==='date-grid'?{el:{dom:grid},getStore:()=>({$className:'Ext.data.Store',isLoading:()=>false,getData:()=>({items:[record]})})}:undefined};
+  const s=await page.observe(),formats=s.ui.elements.filter(e=>e.date_time_cell?.role==='format_cell');
+  assert.equal(formats.length,1,mode+JSON.stringify(s.ui.elements.map(e=>({tid:e.tid,role:e.date_time_cell}))));
+  assert.equal(formats[0].date_time_cell.record_id,'r0');assert.equal(formats[0].date_time_cell.string_format,'');
+  if(mode==='full_image'){assert.equal(formats[0].interaction.state,'point_not_observed');assert.ok(!formats[0].allowed_actions.includes('click'));continue;}
+  const point=formats[0].interaction.point;
+  assert.equal(formats[0].interaction.state,'point_observed');assert.ok(formats[0].allowed_actions.includes('click'));
+  assert.ok(point.x<499.5||point.x>515.5||point.y<123.5||point.y>139.5,'point avoids the checkbox: '+JSON.stringify(point));
+  const result=await page.act({verb:'click',ref:formats[0].ref},s);
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(page.clickedPoints,[{...point,clickCount:1}]);
+ }
+});

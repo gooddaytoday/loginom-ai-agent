@@ -18,14 +18,20 @@ export async function configureDateTime(channel,p,{inputMapping,beforeChanges,pr
   if(beforeChanges)await beforeChanges({...baseline,input_fields:inputs,field_matrices:before});
   if(progress){progress.baseline=structuredClone(baseline);progress.before=structuredClone(before);progress.expected=structuredClone(before);}
  }
+ // Refuse a changed native default format of any requested field before the
+ // first flag gesture: only field selection or already collected matrices.
+ for(const field of baseline.fields){
+  const defaults=(wanted.get(field.name)??[]).filter(t=>DATE_TIME_DEFAULT_FORMATS[t.operation]!==undefined);if(!defaults.length)continue;
+  const matrix=(progress?.expected??before).find(f=>f.name===field.name)?.matrix??(await select(field.name)).node_date_time.matrix;
+  for(const t of defaults){const op=DATE_TIME_OPERATIONS[t.operation];
+   need(matrix.find(r=>r.func===op.func&&r.iso===op.iso)?.string_format===DATE_TIME_DEFAULT_FORMATS[t.operation],'native string format differs from the expected '+t.operation+' format');}
+ }
  for(const field of baseline.fields){
   let s=await select(field.name);const original=structuredClone(s.node_date_time.matrix);
   if(!progress&&!beforeChanges)before.push({name:field.name,matrix:original});
   need(same(original,(progress?.expected??before).find(f=>f.name===field.name).matrix),'matrix changed outside verified configuration');
   if(wanted.has(field.name)){
    const desired=wanted.get(field.name).map(t=>DATE_TIME_OPERATIONS[t.operation]);
-   for(const t of wanted.get(field.name)){const expectedFormat=DATE_TIME_DEFAULT_FORMATS[t.operation],op=DATE_TIME_OPERATIONS[t.operation];
-    if(expectedFormat!==undefined)need(original.find(r=>r.func===op.func&&r.iso===op.iso)?.string_format===expectedFormat,'native string format differs from the expected '+t.operation+' format');}
    for(const row of original)for(const [flag,key] of Object.entries(flagKey)){
     const checked=desired.some(d=>d.func===row.func&&d.iso===row.iso&&d.flag===flag);
     const native=s.node_date_time.matrix.find(r=>r.func===row.func&&r.iso===row.iso);need(native,'matrix row disappeared');

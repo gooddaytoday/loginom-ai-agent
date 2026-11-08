@@ -3336,7 +3336,7 @@ function readRenderedInputMapping(observation) {
       }
       return null;
     };
-    const interactionOf = element => {
+    const interactionOf = (element, accept) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,
         height=globalThis.innerHeight ?? document.documentElement.clientHeight;
       if (![width,height].every(Number.isFinite)) return { state:'unverified', point:null };
@@ -3346,7 +3346,7 @@ function readRenderedInputMapping(observation) {
       for (const y of [0.5,0.25,0.75]) for (const x of [0.5,0.25,0.75]) {
         charge();
         const point={x:left+(right-left)*x,y:top+(bottom-top)*y},hit=document.elementFromPoint(point.x,point.y);
-        if (hit && (hit===element || element.contains(hit))) return {state:'point_observed',point};
+        if (hit && (hit===element || element.contains(hit)) && (!accept || accept(hit))) return {state:'point_observed',point};
         if(hit && !seenCovering.has(hit) && covering.length<3) {
           seenCovering.add(hit);
           // No text or values: identify the covering layer without reading its
@@ -3459,7 +3459,9 @@ function readRenderedInputMapping(observation) {
       const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
       const scroll = scrollOf(element);
       const horizontalScroll=horizontalScrollOf(element);
-      const interaction = interactionOf(element);
+      // A date string-format cell also holds the flag checkbox image: never
+      // choose a point on that image, it would toggle the flag instead of editing.
+      const interaction = interactionOf(element, dateTimeCells.get(state.ids.get(element))?.role==='format_cell' ? hit=>!hit.closest('img.x-grid-checkcolumn') : undefined);
       const checkState=checkStateOf(element);
       const calculatorEditor=calculatorEditorOf(element);
       const combo=comboPart(element);
@@ -4329,17 +4331,18 @@ function readRenderedInputMapping(observation) {
       || Math.abs(box[key] - current.bounding_box[key]) > 0.75)) fail('UI_REFERENCE_STALE', 'Observed control geometry changed');
     // Buffered rows and graph controls can be clipped or covered at their centre.
     // Hit-test and dispatch the same freshly observed point, including body selection.
-    const point = (current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
+    const formatCell = current.date_time_cell?.role==='format_cell';
+    const point = (formatCell || current.output_column || current.reform_column || current.import_definition_cell || current.storage_entry || current.viewer_card || current.wizard_open || current.kind==='port'&&current.scope==='graph' || current.graph_node?.part==='visualizers' || current.graph_node?.part==='body'&&verb==='click') && current.interaction?.state==='point_observed'
       ? current.interaction.point : { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     if (!isGraphLink && viewport && (point.x < 0 || point.y < 0 || point.x >= viewport.width || point.y >= viewport.height)) fail('UI_REFERENCE_OFFSCREEN', 'Observed control is outside the viewport');
-    const hit = await handle.evaluate((element, { point, viewport, isGraphLink }) => {
+    const hit = await handle.evaluate((element, { point, viewport, isGraphLink, formatCell }) => {
       let checked = 0;
       const ownsPoint = candidate => {
         if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.y) || candidate.x < 0 || candidate.y < 0
           || (viewport && (candidate.x >= viewport.width || candidate.y >= viewport.height))) return false;
         checked++;
         const target = document.elementFromPoint(candidate.x, candidate.y);
-        return target === element || element.contains(target);
+        return (target === element || element.contains(target)) && !(formatCell && target?.closest?.('img.x-grid-checkcolumn'));
       };
       if (ownsPoint(point)) return { point, source: 'box_center', candidates_checked: checked };
       if (!isGraphLink) return null;
@@ -4363,7 +4366,7 @@ function readRenderedInputMapping(observation) {
         } catch { /* Detached or malformed SVG geometry is never a click target. */ }
       }
       return null;
-    }, { point, viewport, isGraphLink });
+    }, { point, viewport, isGraphLink, formatCell });
     if (!hit) {
       if(!effectPossible&&task.snapshot?.wizard?.status==='observed') {
         const waits=trace.filter(e=>e.event==='ui_mask_wait_started').length;
