@@ -43,11 +43,12 @@ export function filterInputText(value,type,decimalSeparator='.',datetimeCombo=fa
 
 // Complete replacement with observed, identity-bound gestures. A lost reply
 // escapes through the common receipt/reconciliation mechanism; never re-add.
-export async function configureFilter(channel,parameters,{newNode=false,controlVariables}={}){
+export async function configureFilter(channel,parameters,{newNode=false,controlVariables,initialObservation,validateBaseline}={}){
  const ready=s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true;
  const observe=(condition,predicate=()=>true)=>channel.observe({condition,readFilter:true,ready:s=>ready(s)&&predicate(s)});
- let s=await observe('complete filter baseline');
+ let s=initialObservation??await observe('complete filter baseline');
  let baseline=s.node_filter;
+ validateBaseline?.(baseline);
  if(parameters.groups===undefined){
   need(Object.keys(parameters).length===0&&!baseline.dialogs.length&&!baseline.editor,'Saved filter must be settled before reuse');
   const groups=filterGroupsFromNative(baseline);

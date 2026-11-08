@@ -9,6 +9,8 @@ import {configureFilterOutputs,readFilterOutputs} from './filter-output.mjs';
 import {filterConfigurationReadback} from './filter-readback.mjs';
 import {filterParametersSchema} from './node-api.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
+import {createNodeProcedure} from './node-procedure.mjs';
+import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 export function validateFilterParameters(p,mode,r){
@@ -36,10 +38,10 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
  preflight:preflightFilterSource,
  beforeInput:prepareFilterInput,
  async afterDone(channel,request,configured,{readGraph,options,ctx}){
-  if(!request.bindings?.length)return;
+  if(!request.bindings?.length&&!options.operation.variableBindingSource)return;
   const graph=await readGraph(),links=(graph.variable_links??[]).filter(l=>l.target===ctx.node.node_id&&l.kind==='control'&&l.input===0);
   const source=links.length===1?graph.nodes.find(n=>n.ref.node_id===links[0].source):null;
-  const sourceProof=source?.type==='variables.user'?await preflightBuiltinBindings(options,ctx,config,source.ref):undefined;
+  const sourceProof=source?.type==='variables.user'?await preflightBuiltinBindings(options,ctx,config,source):undefined;
   return readFilterBindings(channel,{readGraph,expected:configured,sourceProof});
  },
  configurationObservation:{condition:'filter configuration page',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true},
@@ -48,21 +50,21 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
    const s=await channel.observe({condition:'filter draft ready for disposal',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
    return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_filter,draft_edits_skipped:true};
   }
-  let changed,controlVariables;
-  if(p.groups!==undefined){
-   const s=await channel.observe({condition:'saved binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
-   preserveFilterBindings(s.node_filter,p,request.bindings);
+  let changed,controlVariables,initialObservation;
+  if(request.bindings?.length||bindingSource){
+   initialObservation=await channel.observe({condition:'binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
+   const native=initialObservation.node_filter;
+   if(request.bindings?.length)need(!native.rows.some(r=>r.variable_mode===128),'BINDING_PARAMETER_UNSUPPORTED: saved variable lists cannot be combined with bindings');
+   if(bindingSource)controlVariables=filterBindingVariables(native,bindingMapping??bindingSource.mapping,bindingSource,
+    [...(request.bindings??[]).map(b=>b.variable.name),...native.rows.flatMap(r=>r.value?.kind==='variable'?[r.value.name]:[])]);
+   if(request.bindings?.length){
+    validateFilterBindingValues(p,request.bindings,native,controlVariables);
+    if(p.groups===undefined)changed=await configureSavedFilterBindings(channel,p,request.bindings,native,{controlVariables});
+    else p=resolveFilterBindings(p,request.bindings);
+   }
   }
-  if(request.bindings?.length){
-   const s=await channel.observe({condition:'binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
-   need(!s.node_filter.rows.some(r=>r.variable_mode===128),'BINDING_PARAMETER_UNSUPPORTED: saved variable lists cannot be combined with bindings');
-   if(bindingSource&&request.bindings.length)controlVariables=filterBindingVariables(s.node_filter,bindingMapping,bindingSource,
-    [...request.bindings.map(b=>b.variable.name),...s.node_filter.rows.flatMap(r=>r.value?.kind==='variable'?[r.value.name]:[])]);
-   validateFilterBindingValues(p,request.bindings,s.node_filter,controlVariables);
-   if(request.bindings.length&&p.groups===undefined)changed=await configureSavedFilterBindings(channel,p,request.bindings,s.node_filter,{controlVariables});
-   else p=resolveFilterBindings(p,request.bindings);
-  }
-  changed??=await configureFilter(channel,p,{newNode:request.target.kind==='new',controlVariables});
+  changed??=await configureFilter(channel,p,{newNode:request.target.kind==='new',controlVariables,initialObservation,
+   validateBaseline:request.target.kind==='existing'&&p.groups!==undefined?native=>preserveFilterBindings(native,p,request.bindings):undefined});
   const s=await channel.observe({condition:'filter ready for validation',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
   await channel.perform({condition:'validate filter conditions',initialObservation:s,ready:s=>s.wizard?.stage==='row_filter',identity:s=>s.prepared_node_context,
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Filter Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:'done'};}});
@@ -81,11 +83,23 @@ export async function preflightFilterSource(options,ctx,config){
   if(request.bindings?.length)need(sources.length===1,'BINDING_PORT_MISMATCH: control input 0 requires one source');
   for(const id of sources){
    const nodes=graph.nodes.filter(n=>n.ref.node_id===id);need(nodes.length===1,'Unique filter control source required');
-   if(nodes[0].type==='variables.user'&&(request.target.kind==='new'&&!request.bindings?.length||request.parameters.groups?.flat().some(c=>isFilterVariable(c.value??c.values)))){
-    const error=Error('Filter control variables require an executed source such as Table to variables or Variables calculator. Builtin Scenario variables output 4 is inactive and cannot supply filter values.');
+   const legacy=request.parameters.groups?.flatMap((g,i)=>g.map((c,j)=>({condition:c,parameter:`/groups/${i}/${j}/value`}))).filter(({condition:c})=>isFilterVariable(c.value??c.values))??[];
+   if(nodes[0].type==='variables.user'&&request.target.kind==='existing'&&legacy.length){
+    const proof=await preflightBuiltinBindings(options,ctx,config,nodes[0]);
+    const channel=createNodeProcedure({operation:options.operation,execute:options.execute,record:options.onRecord,now:options.now,...config,maxSteps:1024,signal:ctx.signal,
+     preparedNodeContext:{document_id:request.document_id,workflow_ref:request.workflow_ref,node:request.target.ref},
+     wrapMutation:(code,p)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(p.id,p.action_key,p.signature),operation_id:p.id})});
+    const saved=await readFilterBindings(channel,{readGraph:async()=>graph,sourceProof:proof});
+    if(!legacy.every(({condition:c,parameter})=>isFilterVariable(c.value)&&!isFilterVariable(c.values)&&saved.some(b=>b.parameter===parameter&&b.variable.name===c.value.name))){
+     const error=Error('BINDING_CONFLICT: legacy filter variable must keep its saved position and name; omit groups, or resend the bound row without value via `bindings`');
+     error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:options.operation.nodeEffectPossible===true,cleanup_complete:true};throw error;
+    }
+    options.operation.variableBindingSource=proof;
+   }else if(nodes[0].type==='variables.user'&&(request.target.kind==='new'&&!request.bindings?.length||legacy.length)){
+    const error=Error('Filter control variables require an executed source such as Table to variables or Variables calculator. Builtin Scenario variables output 4 is inactive and cannot supply filter values; omit groups, or resend the bound row without value via `bindings`.');
     error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
    }
-   if(nodes[0].type==='variables.user'&&request.bindings?.length)options.operation.variableBindingSource=await preflightBuiltinBindings(options,ctx,config,nodes[0].ref);
+   else if(nodes[0].type==='variables.user'&&request.bindings?.length)options.operation.variableBindingSource=await preflightBuiltinBindings(options,ctx,config,nodes[0]);
   }
  }
  return preflightTabularSource(options,ctx,config,{required:request.parameters.groups!==undefined,

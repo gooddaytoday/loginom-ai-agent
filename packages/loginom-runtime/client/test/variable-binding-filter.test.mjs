@@ -139,6 +139,22 @@ test('preserveFilterBindings keeps untargeted saved bindings and rejects implici
  }
 });
 
+for(const bindings of [undefined,[]])for(const appendGroup of [false,true])test('saved legacy binding permits an appended '+(appendGroup?'OR group':'condition')+' '+JSON.stringify(bindings),()=>{
+ const field={kind:'input_field',name:'Amount'},value={kind:'variable',name:'Limit'};
+ const native={rows:[{kind:'condition',record_id:'bound',variable_mode:1,field,type:'integer',operator_code:2,value}]};
+ const p={groups:[[{field,type:'integer',operator:'>',value}]]};
+ const extra={field,type:'integer',operator:'<',value:20};
+ if(appendGroup)p.groups.push([extra]);else p.groups[0].push(extra);
+ assert.doesNotThrow(()=>preserveFilterBindings(native,p,bindings));
+});
+test('inserting before a saved variable row refuses with a same-position recovery hint',()=>{
+ const field={kind:'input_field',name:'Amount'},value={kind:'variable',name:'Limit'};
+ const native={rows:[{kind:'condition',record_id:'literal',variable_mode:0,field,type:'integer',operator_code:3,value:0},
+  {kind:'condition',record_id:'bound',variable_mode:1,field,type:'integer',operator_code:2,value}]};
+ const p={groups:[[{field,type:'integer',operator:'>=',value:0},{field,type:'integer',operator:'<',value:20},{field,type:'integer',operator:'>',value}]]};
+ assert.throws(()=>preserveFilterBindings(native,p,[]),/saved row bound keeps variable Limit; resend it at the same position as \{kind:"variable",name\}/);
+});
+
 for(const bindings of [undefined,[]])test('production Filter configure rejects literal replacement before its first mutation '+JSON.stringify(bindings),async()=>{
  const node={document_id:'doc',workflow_id:'flow',node_id:'filter'},records=[];
  const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'scenario',label:'Scenario'}]};

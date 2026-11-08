@@ -28,7 +28,7 @@ export function preserveFilterBindings(native,parameters,bindings){
   const parameter=`/groups/${group}/${condition++}/value`,bound=bindings?.some(b=>b.parameter===parameter);
   if(!row.variable_mode)continue;
   const wanted=bound&&rows[index]?{...rows[index],value:row.value}:rows[index];
-  need(rows.length===native.rows.length&&wanted&&filterConditionMatches(row,wanted),'BINDING_CONFLICT','saved row '+row.record_id);
+  need(wanted&&filterConditionMatches(row,wanted),'BINDING_CONFLICT',`saved row ${row.record_id} keeps variable ${(row.value??row.values)?.name}; resend it at the same position as {kind:"variable",name}`);
  }
 }
 export async function configureSavedFilterBindings(channel,parameters,bindings,baseline,{controlVariables}={}){

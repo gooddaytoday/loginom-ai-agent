@@ -21,8 +21,7 @@ mapped control input 0; сначала подтверди тип/связь че
 Источник — исполняемый `variables.calculator`, mode `expression`, либо
 `variables.from_table`, mode `aggregate`. Выполни источник до подключения
 и после изменения; имена и метки переменных должны совпадать.
-Для builtin «Переменные сценария» используй общий `bindings` ниже;
-прежний operand API требует исполняемый источник.
+Builtin: `bindings`; сохранённый `{kind:"variable",name}` допустим на прежней позиции с тем же name.
 Повторное выполнение фильтра после смены источника: тот же NodeRef,
 `parameters:{}`, `inputs:[]`, `finish:"execute"`, `read.ports:[0,1]`.
 Не вычисляй этот отбор через Калькулятор или JavaScript.
