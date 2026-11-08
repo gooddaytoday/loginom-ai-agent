@@ -1,0 +1,19 @@
+{
+  "base_sha": "ecb11c0e2dce6972aaa00978050680145fd12b04",
+  "current_max_guided_card_bytes": 10876,
+  "proposed_all_modes_guided_card_bytes": 7898,
+  "card_limit": 12000,
+  "current_model_tool_bytes": 8051,
+  "proposed_model_tool_bytes": 8051,
+  "apply_limit": 20000,
+  "proposed_full_input_schema_bytes": 71616,
+  "full_schema_diagnostic_before_proposal": 71306,
+  "skill_bytes": 28823,
+  "proposed_skill_bytes": 28784,
+  "skill_limit": 40000,
+  "current_routing_bytes": 172,
+  "routing_bytes": 133,
+  "current_node_reference_bytes": 5996,
+  "proposed_node_reference_bytes": 3309,
+  "node_reference_limit": 6000
+}

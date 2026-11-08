@@ -1,0 +1,175 @@
+{
+  "type": "datamining.lin_regression",
+  "title": "Линейная регрессия",
+  "palette_group": "Data_Mining",
+  "icon_class": "bg-vendor-icon-linregression",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 2,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "enter",
+    "apply",
+    "forward",
+    "backward",
+    "stepwise",
+    "ridge",
+    "lasso",
+    "elastic_net",
+    "auto_lambda"
+  ],
+  "semantics": "Stage-0 proposal. Existing Enter/apply/Forward/Backward/Stepwise/Ridge behavior is preserved; R2 remains unavailable. Proposed manual lasso uses lambda_l1; elastic_net uses lambda_l1 and lambda_l2. All rows train with an intercept, no normalization or validation, native epsilon 1e-10. Train/retrain explicitly, then execute; read predictions at port 0 and coefficient names/values at port 1. Apply preserves saved roles, settings and model. auto_lambda is an unapproved automatic-L1 research proposal: search loss/grid/final refit are unknown, not an accepted quality contract. Control-variable bindings remain unavailable.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "linregression-v1-internal-2",
+  "configuration_status": "proposal_requires_owner_approval",
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/datamining/linear-regression/README.md"
+  },
+  "catalog_add_available": false,
+  "platform_availability": "requires_live_preflight",
+  "full_node_apply_available": false,
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidate_node_apply_available": true,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "enter",
+    "apply",
+    "forward",
+    "backward",
+    "stepwise",
+    "ridge",
+    "lasso",
+    "elastic_net",
+    "auto_lambda"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "input_fields": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "maxItems": 128,
+        "minItems": 1,
+        "description": "Complete list of continuous numeric predictor field names. Identifier and other unlisted fields are retained and ignored."
+      },
+      "target_field": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "One continuous numeric response name; distinct from all predictors."
+      },
+      "linear_regression": {
+        "type": "object",
+        "properties": {
+          "lambda_l2": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Manual Ridge L2 or proposed Elastic Net second UI coefficient, finite >=0. The Elastic Net mapping is documented in the research; do not assume textbook penalty weights."
+          },
+          "selection": {
+            "type": "object",
+            "properties": {
+              "criterion": {
+                "type": "string",
+                "enum": [
+                  "f",
+                  "r2",
+                  "adjusted_r2",
+                  "aic",
+                  "aicc",
+                  "bic",
+                  "hqc"
+                ],
+                "description": "r2 is reserved but UNAVAILABLE: rejected before any effect because native acceptance failed. Other listed criteria remain available."
+              },
+              "add_significance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "F entry p-value in (0,1), default 0.05. Forward/Stepwise edit it; Backward asserts the disabled saved value. R2 requests are unavailable and refused before effects."
+              },
+              "remove_significance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "F removal p-value in (0,1), default 0.1. Backward/Stepwise edit it; Forward asserts the disabled saved value. R2 is unavailable; inclusive bounds allow a clear pre-effect refusal for diagnostic requests."
+              }
+            },
+            "required": [
+              "criterion"
+            ],
+            "additionalProperties": false
+          },
+          "lambda_l1": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Proposed manual L1 setting; no variable binding."
+          },
+          "lambda_setup": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "auto"
+            ],
+            "description": "Auto is a research proposal; no approved search-quality criterion."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "input_fields",
+      "target_field"
+    ],
+    "additionalProperties": false
+  },
+  "session_manifest": {
+    "capabilityAbi": 1,
+    "executorRevision": "1.3.0",
+    "actionCatalogVersion": "2026.09.14-rc6-linux-candidate",
+    "actionCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "selectorCatalogDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "e2eCommit": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actionManifestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "catalogLifecycleStatus": "candidate",
+    "acceptanceVerified": false,
+    "acceptanceDigest": null,
+    "compatibilityProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    },
+    "skillRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loginomProfile": {
+      "profile_id": "loginom-7.4.2-linux-chromium-ru",
+      "loginom_build": "7.4.2",
+      "platform": "linux",
+      "browser": "chromium"
+    }
+  },
+  "guidance": "# Линейная регрессия (`datamining.lin_regression`)\n\nПроект текста для этапа 1; сейчас новые режимы не зарегистрированы.\nИмпортируй цель как real/continuous, сохраняй исходные типы остальных полей.\nЗадай технические имена input_fields и target_field. RowID не фактор.\nБез нормализации, все строки для обучения, с константой, без валидации.\nПри настройке и повторном обучении нужен явный Teach; Execute применяет\nсохранённую модель. Читай прогнозы с порта 0, коэффициенты с порта 1.\nДля выгрузки используй exports.text на порту 0, затем Save.\n\nEnter обучает/переобучает. Apply требует существующей обученной модели,\nпрежних ролей, inputs:[], finish:execute; настройки и связи не меняются.\n\nДля отбора используй native Forward/Backward/Stepwise, точность 1e-10.\nlinear_regression.selection.criterion: f/adjusted_r2/aic/aicc/bic/hqc.\nR² пока отклоняется до изменений, сообщи причину пользователю.\nТолько для f передавай пороги строго 0..1. Forward добавляет при p<0.05,\nBackward исключает при p>0.1; Stepwise использует оба порога,\nadd_significance<remove_significance. Отключённый для метода порог лишь\nпроверяется. Другим критериям пороги не передавай.\n\nРучной Ridge: linear_regression.lambda_l2 — конечное число ≥0; точность 1e-10.\nАвтоподбор и привязки в этом режиме не поддерживаются.\n\nПроект: ручной LASSO, linear_regression.lambda_l1≥0, точность 1e-10.\nШтраф затрагивает также константу; не обещай сохранение среднего Y.\nИспользуй native обучение, не вычисляй регрессию Калькулятором/JS.\n\nПроект: ручной Elastic Net, linear_regression.lambda_l1≥0 и lambda_l2≥0,\nточность 1e-10. Численная семантика требует утверждения по исследованию;\nне заменяй его суммой отдельно обученных LASSO/Ridge.\n\nИсследовательский проект, пока не режим приёмки: автоматический подбор λ.\nНе обещай конкретную λ/метрику/сетку поиска без утверждённого контракта.\nНулевой прогноз на нулевой цели не доказывает качество выбора λ.",
+  "guidance_modes": [
+    "enter",
+    "apply",
+    "forward",
+    "backward",
+    "stepwise",
+    "ridge",
+    "lasso",
+    "elastic_net",
+    "auto_lambda"
+  ]
+}
