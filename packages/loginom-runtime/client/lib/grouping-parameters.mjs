@@ -1,8 +1,8 @@
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
-export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},median:{bit:32,suffix:'Median',label:'Медиана'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'}});
+export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},median:{bit:32,suffix:'Median',label:'Медиана'},mode:{bit:64,suffix:'Mode',label:'Мода'},stddev:{bit:128,suffix:'Std',label:'Стандартное откл.'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'},null_count:{bit:512,suffix:'Null',label:'Кол-во пропусков'}});
 const supportedMask=Object.values(GROUPING_FUNCTIONS).reduce((mask,f)=>mask|f.bit,0);
 // Input types observed for the functions that are not available on every field.
-const inputTypes={unique_count:['integer','string'],median:['integer']};
+const inputTypes={unique_count:['integer','string'],median:['integer'],mode:['integer','string'],stddev:['integer'],null_count:['integer','string']};
 const typeFits=(fn,type)=>!inputTypes[fn]||inputTypes[fn].includes(type);
 export const supportedGroupingMeasure=f=>Number.isSafeInteger(f.functions)&&f.functions>0&&f.functions<=supportedMask&&(f.functions&~supportedMask)===0
  &&Object.keys(inputTypes).every(fn=>!(f.functions&GROUPING_FUNCTIONS[fn].bit)||typeFits(fn,f.type));

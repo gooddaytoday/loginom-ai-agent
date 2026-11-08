@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import {validateSamplingParameters} from '../lib/sampling-parameters.mjs';
 import {validateDataPartitionParameters} from '../lib/data-partition-parameters.mjs';
 const request=(type,kind='new')=>({target:{type,kind},inputs:[{input:0}],mappings:[],read:{ports:type==='preprocessing.sampling'?[0]:[0,1,2]}});
+test('uniform requires distinct group row sizes and validates priority before UI',()=>{
+ const s=request('preprocessing.sampling'),p=request('preprocessing.data_partition');
+ validateSamplingParameters({count:6,seed:42,group_size_rows:1},'uniform',s);
+ validateDataPartitionParameters({train_count:6,test_count:4,seed:42,train_group_size_rows:1,test_group_size_rows:1,test_priority:true,test_priority_position:'beginning'},'uniform',p);
+ validateDataPartitionParameters({train_count:6,test_count:4,seed:42,train_group_size_rows:1,test_group_size_rows:1},'uniform',p);
+ validateSamplingParameters({},'uniform',request('preprocessing.sampling','existing'));
+ for(const group_size_rows of [0,-1,1.5,NaN,2147483648])assert.throws(()=>validateSamplingParameters({count:6,seed:42,group_size_rows},'uniform',s));
+ assert.throws(()=>validateSamplingParameters({count:6,seed:42},'uniform',s));
+ for(const extra of [{test_priority:'yes'},{test_priority_position:'algorithm'},{group_size_rows:1}])assert.throws(()=>validateDataPartitionParameters({train_count:6,test_count:4,seed:42,train_group_size_rows:1,test_group_size_rows:1,...extra},'uniform',p));
+ assert.throws(()=>validateDataPartitionParameters({train_count:6,test_count:4,seed:42,train_group_size_rows:1,test_group_size_rows:1,test_priority:true},'uniform',p));
+});
 test('random modes validate explicit seed, strata and complete category factors before UI',()=>{
  for(const [type,validate,sizes] of [
   ['preprocessing.sampling',validateSamplingParameters,{count:8}],

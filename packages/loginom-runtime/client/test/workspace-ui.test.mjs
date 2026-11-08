@@ -1628,6 +1628,22 @@ test('import settings preserve blank and whitespace values and exclude hidden or
   assert.equal((await page.observe()).wizard.settings.fields.delimiter.status,'unobserved');
 });
 
+test('import wizard exposes detection mode and analysis rows only when natively observed',async()=>{
+  const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base),p=base+';ImportTextFileParamsWizard;';
+  page.add('div',p+'edtValueNull','',undefined,form);
+  const nullOwner=page.add('div',p+'edtValueNull;ValueControl','',undefined,form);page.add('input',null,'',undefined,nullOwner).value='NULL';
+  let fields=(await page.observe()).wizard.settings.fields;
+  assert.equal(Object.hasOwn(fields,'auto_detect_columns'),false);assert.equal(Object.hasOwn(fields,'analysis_rows'),false);
+  const mode=page.add('div',p+'cbbAutoDetectColumnsMode;ValueControl','',undefined,form),modeInput=page.add('input',null,'',undefined,mode);modeInput.value='Только новые';modeInput.readOnly=true;
+  const rows=page.add('div',p+'ColumnDefsTuning;seReadRowCount','',undefined,form),rowsInput=page.add('input',null,'',undefined,rows);rowsInput.value='25';
+  const snapshot=await page.observe();fields=snapshot.wizard.settings.fields;
+  assert.equal(fields.auto_detect_columns.value,'Только новые');assert.equal(fields.auto_detect_columns.status,'observed');
+  assert.equal(fields.analysis_rows.value,'25');assert.equal(fields.analysis_rows.enabled,true);
+  assert.ok(snapshot.ui.elements.some(e=>e.wizard_field?.name==='analysis_rows'&&e.allowed_actions.includes('set_wizard_field')));
+  assert.ok(!snapshot.ui.elements.some(e=>e.wizard_field?.name==='auto_detect_columns'));
+  rowsInput.value='many';fields=(await page.observe()).wizard.settings.fields;assert.equal(Object.hasOwn(fields,'analysis_rows'),false);
+});
+
 function importFormatField(page) {
   page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   page.context.innerWidth=1000;page.context.innerHeight=800;
@@ -6274,6 +6290,27 @@ test('output mapping coverage also binds each native derived socket family',asyn
     const narrow=await page.execute({mode:'observe',root_ref:raw.output.wizard.root_ref});assert.deepEqual(narrow.output.wizard.output_columns,m);
     c.input.value='Field';const filtered=await page.observe();assert.equal(filtered.wizard.output_columns.definition_coverage.status,'partial');
   }
+});
+
+test('PCA second mapping exposes output definitions only within its own wizard inventory',async()=>{
+ for(const fault of [null,'missing','foreign','duplicate','third']){
+  const page=new Page(),c=mappingCoverageFixture(page),family='DerivedDataSourceMappingEngineOutputPortWizard-1';
+  page.add('div','MF;TF-1;WizrdMCF;'+family,'',undefined,c.form);
+  for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
+  if(fault!=='missing')page.add('div','MF;TF-1;WizrdMCF;FactorAnalysisWizard','',undefined,fault==='foreign'?undefined:c.form).style.display='none';
+  if(fault==='duplicate')page.add('div','MF;TF-1;WizrdMCF;FactorAnalysisWizard','',undefined,c.form).style.display='none';
+  page.add('div','MF;TF-1;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard','',undefined,c.form).style.display='none';
+  if(fault==='third')page.add('div','MF;TF-1;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard-2','',undefined,c.form).style.display='none';
+  const s=await page.observe();
+  assert.equal(s.wizard.stage,'binning_ranges_mapping',String(fault));
+  if(fault)assert.equal(s.wizard.output_columns,undefined);
+  else{
+   assert.equal(s.wizard.output_columns.definition_coverage.status,'complete_configured_rows');
+   assert.ok(s.ui.elements.find(e=>e.ref===s.wizard.output_columns.fields[0].name_ref).allowed_actions.includes('press'));
+   const narrow=await page.execute({mode:'observe',root_ref:s.wizard.root_ref});
+   assert.deepEqual(narrow.output.wizard.output_columns,s.wizard.output_columns);
+  }
+ }
 });
 
 function outputPortFinishFixture(mode='valid') {

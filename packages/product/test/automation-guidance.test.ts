@@ -29,7 +29,14 @@ test("sampling selects native modes through node-specific guidance", async () =>
     expect(settings).toContain('strata_fields:[{kind:"input_field",name:"Class"}]')
     expect(settings).toContain('bias_factors:[{value:"A",factor:0.4},{value:"B",factor:1}]')
     expect(settings).toContain('используй существующий узел и `finish:"execute"`')
-    expect(settings).toContain('Равномерный случайный метод: «Этот режим пока не поддерживается»')
+    expect(settings).toContain('<!-- mode: uniform -->')
+    expect(settings).toContain('mode:"uniform"')
+    expect(settings).toContain('group_size_rows:1')
+    if (type === "preprocessing.data_partition") {
+      expect(settings).toContain('train_group_size_rows:1,test_group_size_rows:1')
+      expect(settings).toContain('test_priority:true,test_priority_position:"beginning"')
+    }
+    expect(settings).not.toContain('Равномерный случайный метод: «Этот режим пока не поддерживается»')
     expect(skill + settings).not.toMatch(/\$(?:[1-9]\d*|ARGUMENTS)/)
   }
 })

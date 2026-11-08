@@ -27,6 +27,20 @@ test('cached mapping ties duplicate labels to distinct source identities',()=>{
  const r=fixture().read();assert.equal(r.verified,true);assert.equal(r.inventory_complete,true);
  assert.deepEqual(Array.from(r.target_fields,t=>t.source.name),['A','B']);assert.equal(r.settings_applied,false);
 });
+test('secondary PCA mapping requires its unique owned factor wizard and both native cards',()=>{
+ for(const fault of [null,'missing','foreign','duplicate','third']){
+  const f=fixture({grouped:true}),root=f.el('MF;TF;WizrdMCF');f.root.parent=root;
+  for(const e of f.all)if(e.tid?.includes('DerivedDataSourceOutputSocketWizard'))e.tid=e.tid.replace('DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard-1');
+  f.el('MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard','',root);
+  if(fault!=='missing')f.el('MF;TF;WizrdMCF;FactorAnalysisWizard','',fault==='foreign'?null:root);
+  if(fault==='duplicate')f.el('MF;TF;WizrdMCF;FactorAnalysisWizard','',root);
+  if(fault==='third')f.el('MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard-2','',root);
+  // Hidden primary card remains in the native inventory.
+  f.all.find(e=>e.tid==='MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard').checkVisibility=()=>false;
+  const r=f.read();assert.equal(r.verified,!fault,String(fault));
+  if(!fault)assert.equal(r.mapping_wizard,'DerivedDataSourceMappingEngineOutputPortWizard-1');
+ }
+});
 test('cached mapping refuses foreign connections, filtered stores and inconsistent rendered rows',()=>{
  const changes=[f=>{f.target[0].data.ConnectedRecord={...f.source[0]};},f=>{f.source[0].data.ConnectedRecord=f.target[1];},
   f=>{f.target[1].data.ConnectedRecord=f.source[0];},f=>{f.stores[0].getTotalCount=()=>3;},
@@ -46,6 +60,7 @@ test('node mapping brackets its read with the same prepared wizard identity',asy
 
  test('native mapping refuses a plain reconnect mask even while cached grids remain',()=>{
  const f=fixture();f.all.push({mask:true,getAttribute:()=>null,checkVisibility:()=>true});assert.equal(f.read().reason,'mapping_mask');
+ assert.ok(Array.isArray(f.read().mask_detail),'a refused mask names what was observed');
  });
 
 function excludedFixture() {
@@ -445,5 +460,35 @@ test('empty output socket mapping reports actual empty inventories without inven
    assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.rendered_indices.length,0);
    assert.equal(r.settings_applied,false);assert.equal(r.package_saved,false);
   }
+ }
+});
+
+test('auto-detected text import output mapping admits its native disabled delete-column mask only inside the import wizard',()=>{
+ for(const variant of ['import','other','enabled','duplicate-mask']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant!=='other')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  const model={FView:{el:{dom:wizard}}};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:column},disabled:variant!=='enabled'};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  const classes=new Set(['x-mask','x-border-box']);mask.classList.contains=name=>classes.has(name);
+  if(variant==='duplicate-mask'){const second=f.el(null,'',column);second.mask=true;second.parentElement=column;}
+  const result=f.read();
+  assert.equal(result.verified,variant==='import',variant+': '+result.reason);
+  if(variant!=='import')assert.equal(result.reason,'mapping_mask',variant);
+ }
+});
+
+test('text import output mapping may be empty before execution only for the import wizard (auto-detect all)',()=>{
+ for(const variant of ['import','other']){
+  const f=fixture();
+  const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  if(variant==='import')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  f.source.length=0;f.target.length=0;for(const row of f.rows)row.row=false;
+  const r=f.read();
+  assert.equal(r.verified,variant==='import',variant+': '+r.reason);
+  if(variant==='import'){assert.equal(r.source_fields.length,0);assert.equal(r.target_fields.length,0);assert.equal(r.source_identity_verified,true);}
+  else assert.equal(r.reason,'mapping_render_bound');
  }
 });

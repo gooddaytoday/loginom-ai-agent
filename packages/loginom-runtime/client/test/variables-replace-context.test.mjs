@@ -34,3 +34,13 @@ test('context reads refuse owner drift and separate port wizards',async()=>{
  let i=0;const r=await readVariablesReplaceContext({evaluate:async()=>({verified:true})},{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',node_id:++i}));assert.equal(r.verified,false);
  assert.equal((await readVariablesReplaceContext({}, {},async()=>({verified:true,surface:'wizard',output_port:{}}))).verified,false);
 });
+test('regex cache reads its own group and rendered offset without touching proxies',()=>{
+ const f=fixture();f.pairs.splice(0,f.pairs.length,
+  {isModel:true,internalId:'placeholder',data:{Index:0,CollectionID:0}},
+  {isModel:true,internalId:'regex',data:{Index:0,CollectionID:1,RegularExpression:'^Ab-[0-9]+$',Replacement:'matched',ReplacementType:0}});
+ Object.defineProperty(f.pairs[1].data,'DataValue',{get(){assert.fail('No proxy getter');}});
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.pairs.length,1);
+ assert.equal(r.pairs[0].collection_id,1);assert.equal(r.pairs[0].index,1);
+ assert.equal(r.pairs[0].from.value,'^Ab-[0-9]+$');assert.equal(r.pairs[0].to.value,'matched');
+ f.pairs[1].data.ReplacementType=1;assert.equal(f.read().verified,false);
+});
