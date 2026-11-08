@@ -3,12 +3,18 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readMappingBrowser,readNodeMapping,makeNodeMappingContextCode} from '../lib/node-mapping-context.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
+// The import wizard's hidden format page keeps «Автоопределение столбцов».
+function importPage(f,wizard,mode='Все'){
+ const page=f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+ const owner=f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard;cbbAutoDetectColumnsMode;ValueControl','',page);
+ const input=f.el(null,'',owner);input.input=true;input.value=mode;return page;
+}
 function fixture({grouped=false,input=false,socket=false}={}) {
  grouped ||= socket;
  const base='MF;TF;WizrdMCF;'+(input?'TuneDataSourceMappingWizard':socket?'DataSetOutputSocketWizard':grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';',all=[],views={};
  const el=(tid,text='',parent=null)=>{const e={tid,textContent:text,parent,id:'e'+all.length,attrs:{},checkVisibility:()=>true,
   getAttribute(k){return k==='data-tid'?this.tid:this.attrs[k]??null;},contains(other){return other===this||!!other.parent&&this.contains(other.parent);},
-  querySelectorAll(q){return all.filter(x=>x!==this&&this.contains(x)&&q==='table.x-grid-item'&&x.row);},classList:{contains:()=>false}};all.push(e);return e;};
+  querySelectorAll(q){return all.filter(x=>x!==this&&this.contains(x)&&(q==='table.x-grid-item'&&x.row||q.startsWith('input')&&x.input));},classList:{contains:()=>false}};all.push(e);return e;};
  const root=el(base.slice(0,-1)),grids=['grdSourceColumns;tbl','grdTargetColumns;tbl'].map(s=>el(base+s,'',root));
  const source=['A','B'].map((name,i)=>({isModel:true,internalId:'s'+i,data:{ID:i,Index:i,Name:name,DisplayName:'Same',DataType:5,Broken:false,Required:false}}));
  const target=source.map((s,i)=>{const t={isModel:true,internalId:'t'+i,data:{...s.data,Name:'Out'+i,DataKind:2,ConnectedRecord:s,SourceDisplayName:'Same',SourceDataType:5}};s.data.ConnectedRecord=t;return t;});
@@ -464,10 +470,10 @@ test('empty output socket mapping reports actual empty inventories without inven
 });
 
 test('auto-detected text import output mapping admits its native disabled delete-column mask only inside the import wizard',()=>{
- for(const variant of ['import','other','enabled','duplicate-mask']){
+ for(const variant of ['import','other','enabled','duplicate-mask','new','none']){
   const f=fixture();
   const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
-  if(variant!=='other')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  if(variant!=='other')importPage(f,wizard,{new:'Только новые',none:'Нет'}[variant]);
   const model={FView:{el:{dom:wizard}}};
   f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}};
   const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:column},disabled:variant!=='enabled'};
@@ -481,10 +487,11 @@ test('auto-detected text import output mapping admits its native disabled delete
 });
 
 test('text import output mapping may be empty before execution only for the import wizard (auto-detect all)',()=>{
- for(const variant of ['import','other']){
+ for(const variant of ['import','other','new','none','unobserved']){
   const f=fixture();
   const wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
-  if(variant==='import')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  if(variant==='unobserved')f.el('MF;TF;WizrdMCF;ImportTextFileParamsWizard','',wizard);
+  else if(variant!=='other')importPage(f,wizard,{new:'Только новые',none:'Нет'}[variant]);
   f.source.length=0;f.target.length=0;for(const row of f.rows)row.row=false;
   const r=f.read();
   assert.equal(r.verified,variant==='import',variant+': '+r.reason);

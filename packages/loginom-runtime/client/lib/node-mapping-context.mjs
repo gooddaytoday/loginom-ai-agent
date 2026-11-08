@@ -44,7 +44,12 @@ export function readMappingBrowser(request) {
   if(candidates.length!==1)return fail('mapping_root');
   const {form,root}=candidates[0],input=form==='TuneDataSourceMappingWizard',grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].includes(form);
   const base=prefix+';WizrdMCF;'+form+';';
-  const importMapping=form==='ColumnsMappingEngineOutputPortWizard'&&exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length===1;
+  // Only «Автоопределение столбцов: Все» defers the imported schema to execution;
+  // its combo stays in the hidden format page of the same wizard.
+  const modes=exact(prefix+';WizrdMCF;ImportTextFileParamsWizard;cbbAutoDetectColumnsMode;ValueControl');
+  const modeInputs=modes.length===1&&wizard.length===1&&wizard[0].contains(modes[0])?[...modes[0].querySelectorAll('input:not([type="hidden"])')]:[];
+  const importMapping=form==='ColumnsMappingEngineOutputPortWizard'&&exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length===1
+    &&modeInputs.length===1&&modeInputs[0].value==='Все';
   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
   if(masks.some(e=>{
     // The empty output grid disables delete-all with an Ext control mask.
