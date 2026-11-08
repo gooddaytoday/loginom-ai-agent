@@ -156,22 +156,24 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
    need(mapped.find(m=>m.name===field.name)?.label===field.label,'output label readback differs');
   }
   need(same(mapped.map(({name,label,type})=>({name,label,type})),configuration.input_fields),'output mapping differs');
-  const readAutosync=async()=>{
-   await owned();
-   return page.evaluate(mapping=>{
-    const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],roots=exact(mapping),buttons=exact(mapping+';btnAutoSyncThroughColumns');
-    const button=buttons.length===1&&globalThis.Ext?.getCmp?.(buttons[0].id);
-    if(roots.length!==1||!roots[0].checkVisibility({checkVisibilityCSS:true})||buttons.length!==1||!roots[0].contains(buttons[0])
-     ||button?.el?.dom!==buttons[0]||typeof button.pressed!=='boolean')throw Error('Variables replacement owned output autosync required');
-    return button.pressed;
-   },mapping);
-  };
-  // Automatic mapping may recreate the output with replaced variables first on
-  // cold Execute. Retain this verified source layout as a custom mapping.
-  if(await readAutosync())await click(mapping+';btnAutoSyncThroughColumns');
-  mapped=await readMapping();
-  need(await readAutosync()===false&&same(mapped.map(({name,label,type})=>({name,label,type})),configuration.input_fields),'fixed output layout required');
-  configuration.output_autosync=false;
+  if(mode==='rules'){
+   const readAutosync=async()=>{
+    await owned();
+    return page.evaluate(mapping=>{
+     const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],roots=exact(mapping),buttons=exact(mapping+';btnAutoSyncThroughColumns');
+     const button=buttons.length===1&&globalThis.Ext?.getCmp?.(buttons[0].id);
+     if(roots.length!==1||!roots[0].checkVisibility({checkVisibilityCSS:true})||buttons.length!==1||!roots[0].contains(buttons[0])
+      ||button?.el?.dom!==buttons[0]||typeof button.pressed!=='boolean')throw Error('Variables replacement owned output autosync required');
+     return button.pressed;
+    },mapping);
+   };
+   // Automatic mapping may recreate the output with replaced variables first on
+   // cold Execute. Retain this verified source layout as a custom mapping.
+   if(await readAutosync())await click(mapping+';btnAutoSyncThroughColumns');
+   mapped=await readMapping();
+   need(await readAutosync()===false&&same(mapped.map(({name,label,type})=>({name,label,type})),configuration.input_fields),'fixed output layout required');
+   configuration.output_autosync=false;
+  }
   configuration.output_mapping=mapped.map(({name,label,type,index})=>({name,label,type,index}));
   await click(root+';btnNext');await at(root+';DoneWizard').waitFor({state:'visible',timeout:remaining()});
   return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:await owned(),configuration,

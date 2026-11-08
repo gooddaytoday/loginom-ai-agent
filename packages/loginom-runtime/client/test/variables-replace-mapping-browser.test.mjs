@@ -10,7 +10,7 @@ test('an onscreen mapping cell can remount without waiting on its old scroll han
  await page.evaluate(()=>{setTimeout(()=>{const e=document.querySelector('td'),copy=e.cloneNode(true);copy.style.animation='none';e.replaceWith(copy);},200);});
  await assert.doesNotReject(()=>revealVariablesReplaceControl(page,tid));
 });
-test('mapping waits for native settlement and disables autosync before committing the source order',options,async t=>{
+for(const mode of ['exact','rules'])test('mapping preserves native settlement and the '+mode+' autosync policy',options,async t=>{
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});t.after(()=>browser.close());
  const page=await browser.newPage();await page.route('http://variables.test/**',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'}));await page.goto('http://variables.test/');
  await page.evaluate(()=>{
@@ -39,9 +39,9 @@ test('mapping waits for native settlement and disables autosync before committin
  });
  const owner={verified:true,document_id:'doc',workflow_id:'wf',node_id:'replace',surface:'wizard',tid:'MF;TF;WizrdMCF'};
  const readNode=async()=>owner,readContext=async()=>({verified:true,inventory_complete:true,node_context:owner,input_fields:[{record_id:'f',name:'Count',label:'Количество',type:'integer',mode:'none'}],selected:null,pairs:[]});
- const task={binding:{workflow_ref:{prefix:'MF;TF'}},origin:'http://variables.test',build:'7.4.2',deadline:Date.now()+10000,parameters:{},new_node:false,finish:'done'};
+ const task={binding:{workflow_ref:{prefix:'MF;TF'}},origin:'http://variables.test',build:'7.4.2',deadline:Date.now()+10000,parameters:{},mode,new_node:false,finish:'done'};
  const result=await configureVariablesReplace(page,task,readNode,readContext);
  assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(result.configuration.output_mapping[0].label,'Количество');
- assert.equal(await page.evaluate(()=>globalThis.finalAutosync),false);
- assert.equal(result.configuration.output_autosync,false);
+ assert.equal(await page.evaluate(()=>globalThis.finalAutosync),mode==='exact');
+ assert.equal(result.configuration.output_autosync,mode==='rules'?false:undefined);
 });
