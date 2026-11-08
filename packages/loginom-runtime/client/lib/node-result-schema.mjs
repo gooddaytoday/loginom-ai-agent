@@ -190,7 +190,7 @@ const missingValuesZeroConfigurationReadback=object({...missingValuesConfigurati
 const missingValuesModesConfigurationReadback=object({...missingValuesZeroConfigurationReadback.properties,ordered:bool,
  fields:{...missingValuesZeroConfigurationReadback.properties.fields,items:{anyOf:[
   ...missingValuesZeroConfigurationReadback.properties.fields.items.anyOf,
-  object({...missingValuesField,type:values('integer','real'),data_kind:values('Непрерывный'),used:{type:'boolean',const:true},method:values('median','previous','delete')}),
+  object({...missingValuesField,type:values('integer','real'),data_kind:values('Непрерывный'),used:{type:'boolean',const:true},method:values('median','previous','delete','random','linear')}),
   object({...missingValuesField,type:values('string'),data_kind:values('Дискретный'),used:{type:'boolean',const:true},method:values('most_probable')}),
  ]}},
  options:object({...missingValuesConfigurationReadback.properties.options.properties,pedOrderedSample:object({value:bool,switch_pressed:disabled})})});

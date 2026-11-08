@@ -30,7 +30,7 @@ export function readMissingValuesBrowser(prefix){
    ||typeof d.DisplayName!=='string'||!types[d.DataType]||!kinds[d.DataKind]||typeof d.Usable!=='boolean'||!Number.isInteger(d.ActionNull)||typeof d.NullStrValue!=='string'||d.NullStrValue.length>5000)return fail('missing_values_field');
   ids.add(id);names.add(d.Name.toLowerCase());
   fields.push({index,record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],used:d.Usable,
-   method_code:d.ActionNull,method:{3:'mean',11:'zero',6:'constant',4:'median',5:'most_probable',12:'previous',2:'delete'}[d.ActionNull]??null,value:d.NullStrValue});
+   method_code:d.ActionNull,method:{3:'mean',11:'zero',6:'constant',4:'median',5:'most_probable',12:'previous',2:'delete',7:'random',8:'linear'}[d.ActionNull]??null,value:d.NullStrValue});
  }
  const options={};
  for(const key of ['pedOrderedSample','pedMaxNullsPercent','pedUseQuality','RandSeedEdit;edtRandSeed']){

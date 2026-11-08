@@ -11,7 +11,7 @@ function fixture(){
 test('preserve saved supported methods without rewriting or computing means',async()=>{const f=fixture(),r=await f.run({});assert.deepEqual(f.actions,[]);assert.equal(r.configuration.max_nulls_percent,50);assert.equal(r.configuration.fields[0].method,'mean');});
 test('full requested processing set explicitly disables omitted fields',async()=>{const f=fixture(),r=await f.run({ordered:false,max_nulls_percent:50,fields:[{field:{kind:'input_field',name:'Amount'},method:'mean'}]});assert.equal(r.configuration.fields[1].used,false);assert.deepEqual(f.actions,[{verb:'click',ref:'Note:usage'}]);});
 test('unsupported saved methods, variables and incompatible types are rejected before gestures',async()=>{
- for(const mutate of [f=>f.c.fields[0].method='linear',f=>f.c.options.pedMaxNullsPercent.switch_pressed=true,f=>f.c.options.pedUseQuality.value=true,f=>f.c.ordered=true,f=>f.c.input_fields[0].data_kind='Дискретный']){const f=fixture();mutate(f);await assert.rejects(f.run({}));assert.deepEqual(f.actions,[]);}
+ for(const mutate of [f=>f.c.fields[0].method='cubic',f=>f.c.options.pedMaxNullsPercent.switch_pressed=true,f=>f.c.options.pedUseQuality.value=true,f=>f.c.ordered=true,f=>f.c.input_fields[0].data_kind='Дискретный']){const f=fixture();mutate(f);await assert.rejects(f.run({}));assert.deepEqual(f.actions,[]);}
 });
 test('dropped membership edits and unrelated schema mutations cannot produce verified configuration',async()=>{
  for(const flag of ['dropGesture','sideEffect','ownerChanged']){const f=fixture();f.flags[flag]=true;await assert.rejects(f.run({ordered:false,max_nulls_percent:50,fields:[{field:{kind:'input_field',name:'Amount'},method:'mean'}]}));}
@@ -79,7 +79,7 @@ test('zero uses the native method option and commits before trusting the record'
 });
 
 test('v0.4.0 methods use their native options; ordering is set first in both directions',async()=>{
- const cases=[['median','Заменять_медианой',4,false,'Amount'],['most_probable','Заменять_наиболее_вероятным',5,false,'Note'],['delete','Удалять_записи',2,false,'Amount'],['previous','Заменять_предыдущим_значением',12,true,'Amount']];
+ const cases=[['median','Заменять_медианой',4,false,'Amount'],['most_probable','Заменять_наиболее_вероятным',5,false,'Note'],['delete','Удалять_записи',2,false,'Amount'],['previous','Заменять_предыдущим_значением',12,true,'Amount'],['random','Заменять_случайными_значениями',7,false,'Amount'],['linear','Линейная_интерполяция',8,true,'Amount']];
  for(const [method,label,code,ordered,name] of cases){
   const f=fixture(),base='root;DataRecoveryWizard;grdColumnsSettings;tbl;celleditor;cbx',actions=[];let selected=false,committed=false;
   // The saved node starts in the opposite ordering; Loginom flips it before the methods are touched.
@@ -99,7 +99,7 @@ test('v0.4.0 methods use their native options; ordering is set first in both dir
    if(a.ref===other.name+':usage')other.used=false;
   }};
   Object.assign(field,{method:'zero',method_code:11});
-  if(method==='median'||method==='delete'||method==='previous')Object.assign(field,{type:'real',data_kind:'Непрерывный'});
+  if(['median','delete','previous','random','linear'].includes(method))Object.assign(field,{type:'real',data_kind:'Непрерывный'});
   const input=f.c.input_fields.find(x=>x.name===name);Object.assign(input,{type:field.type,data_kind:field.data_kind});
   if(method==='most_probable'){field.value='';}
   const result=await configureMissingValues(channel,{ordered,max_nulls_percent:50,fields:[{field:{kind:'input_field',name},method}]});

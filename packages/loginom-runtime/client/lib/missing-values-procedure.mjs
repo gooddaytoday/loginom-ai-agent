@@ -3,7 +3,7 @@ const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(a)===JSON.s
 
 // Native menu item tids are the visible item text with spaces replaced by underscores.
 const METHOD_OPTIONS={mean:'Заменять_средним',zero:'Заменять_на_0',constant:'Заменять_заданным_значением',median:'Заменять_медианой',
- most_probable:'Заменять_наиболее_вероятным',previous:'Заменять_предыдущим_значением',delete:'Удалять_записи'};
+ most_probable:'Заменять_наиболее_вероятным',previous:'Заменять_предыдущим_значением',delete:'Удалять_записи',random:'Заменять_случайными_значениями',linear:'Линейная_интерполяция'};
 
 export async function configureMissingValues(channel,p){
  const ready=s=>s.wizard?.stage==='missing_values'&&s.node_missing_values?.verified===true;

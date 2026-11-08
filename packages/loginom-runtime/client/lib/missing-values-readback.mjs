@@ -1,6 +1,6 @@
 import {resolveMissingValuesParameters,MISSING_VALUES_METHODS} from './missing-values-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error('Missing values readback: '+m);};
-const NATIVE_CODES={mean:3,zero:11,constant:6,median:4,most_probable:5,previous:12,delete:2};
+const NATIVE_CODES={mean:3,zero:11,constant:6,median:4,most_probable:5,previous:12,delete:2,random:7,linear:8};
 const pick=(v,keys)=>Object.fromEntries(keys.map(k=>[k,v[k]]));
 export function missingValuesConfigurationReadback({node,phases,operation_id}){
  const owner=c=>c?.verified===true&&['document_id','workflow_id','node_id'].every(k=>c[k]===node[k]);
