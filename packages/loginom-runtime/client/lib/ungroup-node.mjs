@@ -1,7 +1,7 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {validateUngroupParameters,resolveUngroupFields,ungroupOutputFields} from './ungroup-parameters.mjs';
 import {configureUngroup,ungroupReady,supportedUngroupConfiguration} from './ungroup-procedure.mjs';
-import {configureUngroupInputs,configureUngroupOutput,effectiveUngroupInput} from './ungroup-mappings.mjs';
+import {configureUngroupInputs,configureUngroupOutput,configureUngroupOutputs,readUngroupOutputs,effectiveUngroupInput} from './ungroup-mappings.mjs';
 import {ungroupConfigurationReadback} from './ungroup-readback.mjs';
 import {ungroupParametersSchema} from './node-api.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
@@ -33,7 +33,7 @@ export async function preflightUngroup(options,ctx,config){
   // Preview proves names/types, while complete native port mappings below
   // retain the strict data_kind check before any input mapping commit.
   resolveUngroupFields(request.parameters.ungroup,schemas,{requireKinds:request.target.kind==='existing'});
-  const fields=ungroupOutputFields({input_fields:schemas,ungroup:request.parameters.ungroup});
+  const fields=ungroupOutputFields({input_fields:schemas,ungroup:request.parameters.ungroup,method:request.mode});
   need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'generated names conflict; rename inputs explicitly');
  }catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  return {verified:true,proofs};
@@ -46,7 +46,7 @@ export function validateUngroupInlineSources(c,native){
  return native.target_fields.filter(f=>f.source===null);
 }
 export function createUngroupNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.ungroup_data',mode:'shares',revision:'ungroup-shares-v1',readback:ungroupConfigurationReadback,parameterSchema:ungroupParametersSchema,
+ type:'transform.ungroup_data',modes:['shares','computed'],revision:'ungroup-computed-v1',readback:ungroupConfigurationReadback,parameterSchema:ungroupParametersSchema,
  validate:validateUngroupParameters,preflight:preflightUngroup,configureInputs:configureUngroupInputs,
  configurationObservation:{condition:'ungroup configuration page',readUngroup:true,ready:ungroupReady},
  async configure(channel,p,{request}){
@@ -58,5 +58,5 @@ export function createUngroupNodeSupport(config){return createTabularTransformNo
   const inline_mapping=destination.wizard.stage==='output_mapping'?await configureDerivedInlineMapping(channel,changed.configuration,validateUngroupInlineSources,verifyJoinOutputSync,{sourceOf:f=>f.source??f.exclusion_source}):null;
   const done=await channel.observe({condition:'ungroup accepted by Loginom',ready:s=>s.wizard?.stage==='done'});
   return {...changed,...(inline_mapping?{inline_mapping}:{}),validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
- },configureOutput:configureUngroupOutput,
+ },configureOutput:configureUngroupOutput,configureAllOutputs:configureUngroupOutputs,readOutputs:readUngroupOutputs,
 });}

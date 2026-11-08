@@ -6,15 +6,17 @@ const control=(s,suffix,verb)=>{const tid=suffix.startsWith('mn;')?suffix:s.wiza
  const es=s.ui.elements.filter(e=>e.tid===tid&&e.allowed_actions.includes(verb));need(es.length===1,'control unavailable: '+suffix);return es[0];};
 const field=(port,name,role=false)=>'UngroupDataWizard;col'+(port?'Support':'Ungroup')+(role?'UsageType':'')+'_'+name;
 export function supportedUngroupConfiguration(c){
- need(c?.verified&&c.inventory_complete&&c.method==='shares','saved method unsupported; only supplied shares supported');
+ need(c?.verified&&c.inventory_complete&&['shares','computed'].includes(c.method),'saved method unsupported; only shares/computed supported');
  const u=c.ungroup;
  need(u.keys.length>0&&u.value_fields.length===1&&u.item_fields.length===1&&u.share_fields.length===1,'exactly one total, item and share role required');
+ if(c.method==='computed')need(u.rounding.format==='none'&&u.balance==='none','computed rounding/balance unsupported');
  return {...u,value_field:u.value_fields[0],item_field:u.item_fields[0],share_field:u.share_fields[0]};
 }
 export async function configureUngroup(channel,p,{request}){
  let s=await channel.observe({condition:'complete ungroup settings',readUngroup:true,ready:ungroupReady});
  if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_ungroup,draft_edits_skipped:true};
- if(!p.ungroup){supportedUngroupConfiguration(s.node_ungroup);return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_ungroup,preserved:true};}
+ const mode=request.mode??'shares';
+ if(!p.ungroup){supportedUngroupConfiguration(s.node_ungroup);need(s.node_ungroup.method===mode,'saved method differs from requested mode');return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_ungroup,preserved:true};}
  const u=p.ungroup;
  resolveUngroupFields(u,s.node_ungroup.input_fields,{requireKinds:false});
  const initialFields=s.node_ungroup.input_fields.map(fs=>fs.map(({record_id,name,type,index})=>({record_id,name,type,index})));
@@ -29,7 +31,7 @@ export async function configureUngroup(channel,p,{request}){
    resolve:t=>({verb:'click',ref:control(t,base+';boundlist;'+label,'click').ref})});
   s=await channel.observe({condition:'ungroup option applied',readUngroup:true,ready:t=>stable(t)&&ready(t.node_ungroup)});changes.push(key);
  };
- if(s.node_ungroup.method!=='shares')await choose('pedUngroupMethod;ValueControl','По_заданным_долям',c=>c.method==='shares');
+ if(s.node_ungroup.method!==mode)await choose('pedUngroupMethod;ValueControl',mode==='computed'?'С_расчетом_долей_по_всей_выборке':'По_заданным_долям',c=>c.method===mode);
  if(s.node_ungroup.ungroup.rounding.format!==u.rounding.format)await choose('pedRoundFormat;ValueControl',{
   none:'Не_округлять',precision:'Округлять_до_заданной_точности',multiple:'Округлять_до_кратного_целому'}[u.rounding.format],c=>c.ungroup.rounding.format===u.rounding.format);
  if(u.rounding.format!=='none'&&s.node_ungroup.ungroup.rounding.value!==u.rounding.value){

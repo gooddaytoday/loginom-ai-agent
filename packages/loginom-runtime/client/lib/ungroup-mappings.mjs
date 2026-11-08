@@ -75,3 +75,39 @@ export async function configureUngroupOutput(channel,configuration,parameters,ma
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:s.node_mapping,changes};
 }
+// Keep shares' committing port-0 mapping; inspect computed's secondary output
+// without changing its native empty seasonal-index definition.
+export async function configureUngroupOutputs(channel,c,p,mappings,finishWizard){
+ await channel.openOutputPort(0);
+ const result=await configureUngroupOutput(channel,c,p,mappings[0]??{});
+ const definition=await readOutputDefinitionPages(channel,{expectedCount:result.native_mapping.target_fields.length});
+ need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===result.native_mapping.target_fields[i][k])),'Ungroup rendered definition differs');
+ const finish=await finishWizard('done',true,definition);
+ const ports=[{port:0,schema:result.native_mapping.target_fields.filter(f=>!f.excluded)}];
+ if(c.method==='computed'){
+  await channel.openOutputPort(1);
+  const s=await channel.observe({condition:'ungroup secondary native output',readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified&&s.node_mapping.inventory_complete});
+  const m=s.node_mapping,n=m.node_context,current=s.prepared_node_context,expected=[c.ungroup.item_fields[0],...c.ungroup.keys.map(k=>k.support)].map(name=>c.input_fields[1].find(f=>f.name===name));
+  need(n?.verified&&current?.verified&&['document_id','workflow_id','node_id'].every(k=>n[k]===c.node_context[k]&&n[k]===current[k])
+   &&n.output_port?.port===1&&JSON.stringify(n.output_port)===JSON.stringify(current.output_port),'Ungroup secondary output owner differs');
+  const fields=m.target_fields;
+  need(fields.length===expected.length&&fields.every((f,i)=>!f.excluded&&f.name===expected[i].name&&f.type===expected[i].type),'Ungroup secondary output schema differs');
+  const definition=await readOutputDefinitionPages(channel,{expectedCount:fields.length});
+  need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===fields[i][k])),'Ungroup secondary rendered definition differs');
+  const closed=await closePreparedWizard(channel);
+  ports.push({port:1,schema:fields,native_mapping:m,definition,closed});
+ }
+ return {...result,definition,finish,ports};
+}
+export async function readUngroupOutputs(channel,read,ctx,mapped){
+ const ports=[];
+ for(const port of read.ports){
+  const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+  const expected=mapped.ports.find(p=>p.port===port)?.schema;
+  need(expected&&output.schema.length===expected.length&&output.schema.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type),'Ungroup output schema/order differs');
+  if(port===1)need(output.row_count===0&&output.sample_complete,'Ungroup computed secondary output must be empty');
+  ports.push(output);
+ }
+ need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'Ungroup distinct native output ports required');
+ return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
+}

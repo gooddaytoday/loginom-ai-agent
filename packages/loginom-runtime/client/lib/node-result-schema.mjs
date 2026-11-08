@@ -130,7 +130,7 @@ const filterConfigurationReadback=object({kind:values('row_filter'),scope:values
  output_mappings:{...array(object({port:{type:'integer',minimum:0,maximum:1},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))})),minItems:2,maxItems:2},
  package_persistence_verified:{type:'boolean',const:false}});
 const ungroupConfigurationReadback=object({kind:values('ungroup'),scope:values('observed_before_verified_finish'),node:ref,
- receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('shares'),
+ receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),mode:values('shares','computed'),
  ungroup:object({keys:array(object({total:str,support:str})),value_field:str,item_field:str,share_field:str,rounding:object({format:values('none','precision','multiple'),value:integer},['format']),balance:values('none','last','proportional','equal')}),
  input_mappings:{...array(object({port:{type:'integer',minimum:0,maximum:1},autosync:bool,fields:boundedFields(readbackMappingField)})),minItems:2,maxItems:2},
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),

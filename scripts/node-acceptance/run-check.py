@@ -317,9 +317,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
                     data=src / 'data', base=None, export_count=2, input_files=data,
                     expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
-    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding']:
+    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights']:
         node = REPO / 'docs/node-development/nodes/transform-ungroupdata'
         task, expected, inputs, count = {
+            'ungroup-weights': ('task-weights.md', 'expected-weights.json', ['weights-totals.csv', 'weights-support.csv'], 2),
             'ungroup-shares': ('task.md', 'expected.json', ['totals.csv', 'shares.csv'], 1),
             'ungroup-null': ('task-null.md', 'expected-null.json', ['null-totals.csv', 'edge-shares.csv'], 1),
             'ungroup-empty': ('task-empty.md', 'expected-empty.json', ['empty-totals.csv', 'edge-shares.csv'], 1),
@@ -327,7 +328,7 @@ def scenario(name, case_root=None, *, cases=None):
         }[name]
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
-                    input_files=inputs, export_count=count)
+                    input_files=inputs, export_count=count, **({'oracle': node / 'acceptance/oracle-weights.py'} if name == 'ungroup-weights' else {}))
     if name == 'corr-ranks':
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
         return dict(source=src, prompt=src / 'task-ranks.md', data=src / 'fixtures', base=None,

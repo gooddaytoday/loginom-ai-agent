@@ -490,7 +490,7 @@ export interface UngroupParameters {
   rounding:{format:'none'}|{format:'precision'|'multiple';value:number};balance:'none'|'last'|'proportional'|'equal'};
 }
 export interface UngroupConfigurationReadback extends Omit<JoinConfigurationReadback,'kind'|'mode'|'keys'|'case_sensitive'|'include_joined_keys'> {
- kind:'ungroup';mode:'shares';ungroup:NonNullable<UngroupParameters['ungroup']>;
+ kind:'ungroup';mode:'shares'|'computed';ungroup:NonNullable<UngroupParameters['ungroup']>;
 }
 
 export interface UserVariablesParameters {

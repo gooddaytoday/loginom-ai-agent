@@ -17,7 +17,7 @@ function fixture(){
 }
 test('Ungroup readback binds two inputs, complete output and exact receipts',()=>{const r=ungroupConfigurationReadback(fixture());assert.equal(r.kind,'ungroup');assert.equal(r.input_mappings.length,2);assert.deepEqual(r.output_mapping.fields.map(f=>f.name),['Group','Total','Total_Rounded','Item','OutputValue']);assert.equal(r.package_persistence_verified,false);});
 test('Ungroup readback rejects foreign or partial inputs, incomplete output and invented flags',()=>{
- for(const change of [f=>f.phases[0].value.ports[1].port=0,f=>f.phases[0].value.ports[1].native_mapping.node_context.node_id='foreign',f=>f.phases[0].value.ports[1].native_mapping.source_identity_verified=false,f=>f.phases[0].value.ports.pop(),f=>f.phases[1].value.configuration.method='computed',f=>f.phases[3].value.native_mapping.target_fields.pop(),f=>f.phases[3].value.finish={settings_applied:true,mode:'done',node_context:{}},f=>f.phases[4].receipt_id='other']){
+ for(const change of [f=>f.phases[0].value.ports[1].port=0,f=>f.phases[0].value.ports[1].native_mapping.node_context.node_id='foreign',f=>f.phases[0].value.ports[1].native_mapping.source_identity_verified=false,f=>f.phases[0].value.ports.pop(),f=>f.phases[1].value.configuration.method='seasonal',f=>f.phases[3].value.native_mapping.target_fields.pop(),f=>f.phases[3].value.finish={settings_applied:true,mode:'done',node_context:{}},f=>f.phases[4].receipt_id='other']){
   const f=fixture();change(f);assert.throws(()=>ungroupConfigurationReadback(f));
  }
 });
