@@ -1,0 +1,88 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "?",
+  "nodes": [
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "variables.user"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Metric",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": "A",
+          "Metric": 18
+        },
+        {
+          "Region": "B",
+          "Metric": 12
+        },
+        {
+          "Region": "C",
+          "Metric": 7
+        },
+        {
+          "Region": "D",
+          "Metric": null
+        },
+        {
+          "Region": "E",
+          "Metric": 4
+        }
+      ]
+    }
+  ],
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "Flag",
+            "type": "boolean",
+            "value": true
+          },
+          {
+            "name": "Sentinel",
+            "type": "string",
+            "value": "keep"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.group_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
+}

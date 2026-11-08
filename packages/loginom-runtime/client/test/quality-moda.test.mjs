@@ -42,7 +42,7 @@ test('native subtype remains string or NULL and unknown/interface tags refuse',a
  for(const tag of [1,8,9]){
   const f=fixture(),view=new DataView(f.frame.buffer);view.setInt16(12,tag,true);
   if(tag===8)view.setInt32(22,0,true);
-  if(tag===9){await assert.rejects(f.run(),/tag/);assert.equal(f.context.__loginomDockCollapseNativeV1.poisoned,true);}
+  if(tag===9){await assert.rejects(f.run(),/unknown\/interface tag 9 frame \d+ (?:zero|data)-slot/);assert.equal(f.context.__loginomDockCollapseNativeV1.poisoned,true);}
   else{const cells=await f.run();assert.equal(cells[0].cell_type,tag===1?'null':'string');assert.equal(cells[0].value,tag===1?null:'');}
  }
 });

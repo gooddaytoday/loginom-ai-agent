@@ -2,13 +2,19 @@
 """Stage-0 proposal for constant monthly support, not the native estimator.
 
 Reads fixtures only. Constant signals have no slope and unit seasonal factors.
-NULL/zero exclusions and quality NULL/1 are explicit observed native conventions.
+Computed here: shares 25/75, constant trend, unit indices. Not computed:
+zero/NULL/empty outcomes (OutputVT=6 «Исключено», UngroupQuality=1 at zero
+support, empty ports) and NULL UngroupQuality at positive support are rewritten
+native stage-0 observation (DOM `&nbsp;`, NULL vs NaN not read exactly). Their
+expected files carry "claim": "наблюдение, не заявляется" and are not PASS
+criteria until a native typed-read or an owner decision.
 The proposal projects out confidence bands: their formula is unknown.
 An alternating/nonconstant signal is deliberately refused, never fitted to actual.
+--check regenerates the five committed expected files and fails on drift.
 """
+import argparse
 import csv
 import json
-import sys
 from fractions import Fraction
 from pathlib import Path
 
@@ -19,6 +25,14 @@ CASES = {
     'null': ('seasonal-totals.csv', 'seasonal-null-support.csv'),
     'empty-support': ('seasonal-totals.csv', 'seasonal-empty-support.csv'),
     'empty-totals': ('seasonal-empty-totals.csv', 'seasonal-constant-support.csv'),
+}
+CLAIM = 'наблюдение, не заявляется'
+OBSERVED_NOT_CLAIMED = {
+    'constant': 'UngroupQuality=null при положительной опоре: в DOM `&nbsp;`, NULL против NaN не прочитан',
+    'zero': 'OutputVT=6 «Исключено», OutputValue=OutputTrend=0 и UngroupQuality=1 при нулевой опоре',
+    'null': 'пустые порты 0 и 1 с полной схемой при полностью NULL-опоре',
+    'empty-support': 'пустые порты 0 и 1 с полной схемой при пустой опоре',
+    'empty-totals': 'пустые порты 0 и 1 с полной схемой при пустых итогах',
 }
 
 
@@ -74,14 +88,30 @@ def expected(case):
                                           **({'tolerance': dict(abs=1e-12, rel=1e-12)}
                                              if kind == 'real' else {}))
                                      for name, kind in columns], rows=values))
-    return dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type='imports.text'),
+    return dict(claim=('частично: только UngroupQuality — ' + CLAIM) if case == 'constant' else CLAIM,
+                observation=OBSERVED_NOT_CLAIMED[case],
+                package_path='{{PACKAGE_PATH}}', nodes=[dict(type='imports.text'),
                 dict(type='imports.text'), dict(type='transform.ungroup_data'),
                 dict(type='exports.text'), dict(type='exports.text')], outputs=outputs)
 
 
+def expected_path(case):
+    return Path(__file__).with_name('expected-seasonal' + ('' if case == 'constant' else '-' + case) + '.json')
+
+
 if __name__ == '__main__':
-    result = expected(sys.argv[1] if len(sys.argv) > 1 else 'constant')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('case', nargs='?', choices=CASES, default='constant')
+    parser.add_argument('--check', action='store_true', help='compare all committed expected files')
+    args = parser.parse_args()
+    result = expected(args.case)
     assert [r['OutputValue'] for r in expected('constant')['outputs'][0]['rows']] == [25, 75, 25, 75]
     assert {r['OutputVT'] for r in expected('zero')['outputs'][0]['rows']} == {6}
     assert all(not o['rows'] for o in expected('null')['outputs'])
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if args.check:
+        for case in CASES:
+            text = json.dumps(expected(case), ensure_ascii=False, indent=2) + '\n'
+            assert expected_path(case).read_text(encoding='utf-8') == text, expected_path(case).name
+        print(f'OK: {len(CASES)} expected files match')
+    else:
+        print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -130,7 +130,14 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'variables-columns':
         src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    input_files=[], expected_name='expected.json')
+                    source_package=src.parent / 'fixtures/source.lgp', input_files=[], expected_name='expected.json')
+    if name == 'variables-totable-switch':
+        node = REPO / 'docs/node-development/nodes/variables-vartodata'
+        src = node / 'acceptance'
+        return dict(source=src, prompt=src / 'task-switch-run.md', data=node / 'fixtures', base=None, input_files=['modes.json'],
+                    expected_name='modes/expected-run.json', variable_only=True, variable_audit='variables-totable-switch',
+                    variable_initial='modes/expected-phases.json', variable_read_path='port',
+                    oracle=REPO / 'scripts/node-acceptance/variables-totable-switch.mjs')
     if name in ['quality-default', 'quality-spikes']:
         src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
         case = src / 'probe' if name == 'quality-spikes' else src
@@ -172,6 +179,10 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] + (['typed-update.csv'] if export_case == 'overwrite' else []) if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
                     expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=None if edges or name == 'lgd-export-compression' else export_case, lgd_empty_variant=edges, export_count=2 if edges else 1, lgd_export_compression=name == 'lgd-export-compression',
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
+    if name == 'clustering-apply':
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
+        return dict(source=src, prompt=src / 'task-apply.md', data=src.parent.parent / 'fixtures/v040', base=None,
+                    input_files=['train.csv', 'holdout.csv'], export_count=2, expected_name='expected-apply-run.json')
     if name == 'clustering-gmeans':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
         return dict(source=src, prompt=src / 'task-g-means.md', data=src.parent.parent / 'fixtures/v040', base=None,
@@ -555,12 +566,12 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'replace-nearest':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['replace-boolean', 'replace-mixed']:
+    if name in ['replace-boolean', 'replace-mixed', 'replace-keep-variant']:
         node = REPO / 'docs/node-development/nodes/replacement'
-        return dict(source=node / 'acceptance/extended',
-                    prompt=node / 'acceptance' / ('task-boolean.md' if name == 'replace-boolean' else 'task-mixed.md'),
-                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None,
-                    expected_name='expected.json' if name == 'replace-boolean' else 'expected-mixed.json')
+        task, expected = {'replace-boolean': ('task-boolean.md', 'expected.json'), 'replace-mixed': ('task-mixed.md', 'expected-mixed.json'),
+                          'replace-keep-variant': ('task-result-keep.md', 'expected-result-keep.json')}[name]
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / task,
+                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None, expected_name=expected)
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -1913,6 +1924,12 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if expected.get('clustering_apply'):
+            write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
+            self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
+                folder / 'expected.json', folder / 'clustering-apply-replies.json', folder / 'clustering-apply-resolved.json'], folder, timeout=60)
+            expected = read(folder / 'clustering-apply-resolved.json')
+            write(folder / 'expected.json', expected)
         if expected.get('clustering_gmeans'):
             write(folder / 'clustering-gmeans-replies.json', [o for _, o in replies])
             self.phase('clustering-gmeans-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-gmeans.mjs',

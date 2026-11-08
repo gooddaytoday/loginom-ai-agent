@@ -39,82 +39,82 @@
         {
           "RowID": 1,
           "X": -3.25,
-          "Note": "below_lower"
+          "Note": "a"
         },
         {
           "RowID": 2,
           "X": -3.0,
-          "Note": "on_lower"
+          "Note": "b"
         },
         {
           "RowID": 3,
           "X": -2.75,
-          "Note": "inside_lower"
+          "Note": "c"
         },
         {
           "RowID": 4,
           "X": 2.0,
-          "Note": "normal"
+          "Note": "d"
         },
         {
           "RowID": 5,
           "X": 3.0,
-          "Note": "q1"
+          "Note": "e"
         },
         {
           "RowID": 6,
           "X": 3.0,
-          "Note": "normal"
+          "Note": "f"
         },
         {
           "RowID": 7,
           "X": 3.0,
-          "Note": "normal"
+          "Note": "g"
         },
         {
           "RowID": 8,
           "X": 4.0,
-          "Note": "normal"
+          "Note": "h"
         },
         {
           "RowID": 9,
           "X": 5.0,
-          "Note": "normal"
+          "Note": "i"
         },
         {
           "RowID": 10,
           "X": 6.0,
-          "Note": "normal"
+          "Note": "j"
         },
         {
           "RowID": 11,
           "X": 6.0,
-          "Note": "normal"
+          "Note": "k"
         },
         {
           "RowID": 12,
           "X": 6.0,
-          "Note": "normal"
+          "Note": "l"
         },
         {
           "RowID": 13,
           "X": 7.0,
-          "Note": "q3"
+          "Note": "m"
         },
         {
           "RowID": 14,
           "X": 13.0,
-          "Note": "on_upper"
+          "Note": "n"
         },
         {
           "RowID": 15,
           "X": 13.25,
-          "Note": "above_upper"
+          "Note": "o"
         },
         {
           "RowID": 16,
           "X": 25.0,
-          "Note": "extreme"
+          "Note": "p"
         }
       ]
     },
@@ -148,12 +148,12 @@
         {
           "RowID": 1,
           "X": -3.25,
-          "Note": "below_lower"
+          "Note": "a"
         },
         {
           "RowID": 15,
           "X": 13.25,
-          "Note": "above_upper"
+          "Note": "o"
         }
       ]
     },
@@ -187,7 +187,7 @@
         {
           "RowID": 16,
           "X": 25.0,
-          "Note": "extreme"
+          "Note": "p"
         }
       ]
     }
