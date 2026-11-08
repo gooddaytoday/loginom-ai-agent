@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {coldNativeEligible,coldGraphExecutionIdentity,performColdNodeAction,runColdExecution,openColdOutputViews} from '../cold-reader-policy.mjs';
+import {coldNativeEligible,coldGraphExecutionIdentity,performColdNodeAction,runColdExecution,openColdOutputViews,coldVariantPortRead} from '../cold-reader-policy.mjs';
 import {createNodeProcedure} from '../../../packages/loginom-runtime/client/lib/node-procedure.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'cross'};
 
@@ -247,4 +247,11 @@ for(const [name,change] of Object.entries({
 }))test('cold Views settlement refuses '+name,async()=>{
  const f=openingFixture(change);await assert.rejects(f.run());assert.equal(f.counts().gestures,1);
  assert.equal(f.records.length,0);
+});
+
+test('cold Replacement reads Variant outputs through the completed port only',()=>{
+ const out=type=>[{columns:[{name:'S',type}]}];
+ assert.equal(coldVariantPortRead('transform.replace_columns',out('variant')),true);
+ assert.equal(coldVariantPortRead('transform.replace_columns',out('boolean')),false);
+ assert.equal(coldVariantPortRead('transform.sorting',out('variant')),false);
 });

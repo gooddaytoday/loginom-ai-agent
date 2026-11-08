@@ -313,3 +313,7 @@ export async function runColdExecution({driver,channel,node,operation,readReceip
   }
  }
 }
+
+// Replacement keeps unmatched cells beside matched ones in a Variant column; only
+// the completed-port reader proves their native subtypes.
+export const coldVariantPortRead=(type,outputs)=>type==='transform.replace_columns'&&outputs.some(o=>o.columns?.some(c=>c.type==='variant'));
