@@ -105,3 +105,24 @@ test('rename planning handles chains, cycles, new reuse and reserved temporary n
   assert.deepEqual(current.map(e=>e.name),plan.expressions.map(e=>e.name));
  }
 });
+
+test('intermediate and cached are optional booleans on a new or saved expression',()=>{
+ const check=new AjvJsonSchemaValidator().getValidator(calculatorParametersSchema);
+ const added={target:{kind:'new'},name:'Helper',label:'Helper',type:'integer',formula:'Field.Amount + 1',replace:false,intermediate:true,cached:true};
+ for(const item of [added,{target:{kind:'existing',name:'A'},cached:false}]) {
+  const parameters={expressions:[item]};assert.equal(check(parameters).valid,true);
+  assert.doesNotThrow(()=>validateCalculatorParameters(parameters,'expression',request()));
+ }
+ for(const flag of ['intermediate','cached'])for(const value of ['true',1,null]) {
+  const parameters={expressions:[{target:{kind:'existing',name:'A'},[flag]:value}]};
+  assert.equal(check(parameters).valid,false);assert.throws(()=>validateCalculatorParameters(parameters,'expression',request()),/must be boolean/);
+ }
+});
+test('flags default to false for added expressions and survive an unrelated patch of a saved one',()=>{
+ const before=observed();before.expressions[0].intermediate=true;
+ const p={expressions:[{target:{kind:'existing',name:'A'},cached:false},{target:{kind:'new'},name:'C',label:'C',type:'real',formula:'1',replace:false,intermediate:true}]};
+ validateCalculatorParameters(p,'expression',request());const r=resolveCalculatorPatch(p,before,inputs);
+ assert.deepEqual(r.expressions.map(e=>[e.name,e.intermediate,e.cached]),[['A',true,false],['B',false,true],['C',true,false]]);
+ const q={expressions:[{target:{kind:'existing',name:'A'},formula:'2'}]};
+ assert.deepEqual(resolveCalculatorPatch(q,before,inputs).expressions.map(e=>[e.intermediate,e.cached]),[[true,true],[false,true]]);
+});

@@ -1,5 +1,6 @@
 # Дерево в JSON
 
+<!-- mode: serialize -->
 Прочитай карточку trees.to_json. Сначала выполни и полностью прочитай собственный
 типизированный источник: его tree output 0 подключается к tree input 0.
 Режим serialize: exclude_root=true, pretty=false, keys=names, multi_row=false,
@@ -23,3 +24,4 @@ ML в заявленном контракте; Execute пересчитывае�
 метки вместо имён, даты, Variant и переменные пока отклоняются до мутации.
 
 По запросу сериализации дерева выбирай `dock_node_apply` с `target.type:"trees.to_json"`, `mode:"serialize"`. Получи карточку `dock_action_describe` с `node_types:["trees.to_json"]`. Укажи `exclude_root:true`, `pretty:false`, `keys:"names"`, `multi_row:false`, `datetime:"iso8601"`, `mappings:[]`, `finish:"execute"`, `read.ports:[0]`.
+<!-- /mode -->

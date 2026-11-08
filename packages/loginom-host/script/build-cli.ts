@@ -49,7 +49,8 @@ const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
 if (process.platform === "win32" && (!systemRoot || !isAbsolute(systemRoot)))
   throw Error("LOGINOM_ARCHIVER_UNAVAILABLE")
 const archiver = process.platform === "win32" ? join(systemRoot!, "System32/tar.exe") : "/usr/bin/tar"
-const source = await cliSourceSnapshot(repo)
+const sourceEntries = new Map<string, string>()
+const source = await cliSourceSnapshot(repo, sourceEntries)
 const work = await mkdtemp(join(dirname(destination), ".cli-build-"))
 try {
   await $`${process.execPath} script/build.ts --standalone --single --skip-install ${baseline ? ["--baseline"] : []}`
@@ -135,8 +136,16 @@ try {
       "Runtime, Node, Dock and browser notices are described in resources/loginom/THIRD_PARTY_NOTICES.md.\n",
   )
 
-  if (JSON.stringify(source) !== JSON.stringify(await buildPhase("cli-source-snapshot", () => cliSourceSnapshot(repo))))
-    throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD")
+  const finalEntries = new Map<string, string>()
+  const finalSource = await buildPhase("cli-source-snapshot", () => cliSourceSnapshot(repo, finalEntries))
+  if (JSON.stringify(source) !== JSON.stringify(finalSource)) {
+    const changed = [...new Set([...sourceEntries.keys(), ...finalEntries.keys()])]
+      .filter(path => sourceEntries.get(path) !== finalEntries.get(path))
+    throw new Error("LOGINOM_SOURCE_CHANGED_DURING_BUILD: " + JSON.stringify({
+      changed_paths: changed.slice(0, 30), changed_count: changed.length,
+      before: source, after: finalSource,
+    }))
+  }
   const pkg = await Bun.file(join(artifact, "package.json")).json()
   await buildPhase("cli-manifest", () =>
     writeCliManifest(artifact, {

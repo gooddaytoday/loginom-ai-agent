@@ -98,6 +98,21 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(expected['outputs'][0]['rows'][0]['ScenarioAmount'], value)
             self.assertIsNone(expected['outputs'][0]['rows'][3]['Shifted'])
 
+    def test_calculator_expression_options_sends_only_task_and_csv(self):
+        case = runner.scenario('calculator-expression-options')
+        expected = runner.expected_for(case, '/own/calculator.lgp')
+        self.assertEqual(case['input_files'], ['modes.csv'])
+        self.assertTrue((case['data'] / 'modes.csv').is_file())
+        self.assertEqual(case['prompt'].name, 'task-expression-options.md')
+        self.assertEqual(expected['package_path'], '/own/calculator.lgp')
+        output = expected['outputs'][0]
+        self.assertEqual([c['name'] for c in output['columns']],
+                         ['RowID', 'Quantity', 'UnitPrice', 'Amount', 'Tail', 'Doubled'])
+        self.assertNotIn('Helper', [c['name'] for c in output['columns']])
+        self.assertIsNone(output['rows'][3]['Amount'])
+        self.assertEqual([output['rows'][0][k] for k in ['Tail', 'Doubled']], [10, 6])
+        self.assertNotRegex(case['prompt'].read_text(), r'Field\.|Expr\.')
+
     def test_csv_without_header_checks_the_first_json_cell(self):
         output = dict(header=False, columns=[dict(name='JSON', type='string', comparison='json_ast')],
                       rows=[dict(JSON='{"id":10,"children":[{"name":"Продажи"}]}')])
@@ -363,6 +378,23 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(output['columns'][5]['tolerance'], dict(abs=0, rel=0))
         subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'],
                        check=True, capture_output=True)
+
+    def test_text_export_modes_catalog_uses_original_tasks_and_typed_cold(self):
+        for name, cases, fields in [
+                ('text-export-fixed-width', ['fixed-width'], [('Code', 'string'), ('Amount', 'real'), ('Money', 'real')]),
+                ('text-export-encodings', ['windows-1252', 'utf16-le', 'utf16-be'], [('Code', 'string'), ('Text', 'string')])]:
+            case = runner.scenario(name)
+            self.assertEqual(case['text_export_cases'], cases)
+            self.assertEqual(case['prompt'].name, 'task-' + ('fixed-width' if len(cases) == 1 else 'encodings') + '.md')
+            self.assertTrue(all((case['data'] / f).is_file() for f in case['input_files']))
+            expected = runner.expected_for(case, '/test/modes.lgp')
+            output = expected['outputs'][0]
+            self.assertEqual(output['output_node_type'], 'export_input')
+            self.assertEqual(output['column_order'], 'exact')
+            self.assertEqual([(c['name'], c['type']) for c in output['columns']], fields)
+            self.assertEqual(output.get('header', True), len(cases) != 1)
+            self.assertNotIn('expected', case['input_files'])
+        subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--self-check'], check=True, capture_output=True)
 
     def test_text_export_cp1251_catalog_and_same_node_switch(self):
         case = runner.scenario('text-export-cp1251')

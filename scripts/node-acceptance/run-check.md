@@ -124,6 +124,9 @@ Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
 Only the task and `fixtures/variables.csv` reach the model. The update task
 changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 
+`calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
+`modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
+
 `start` returns only the result directory. The detached worker owns the run;
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
@@ -651,3 +654,12 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 пользователя). Утверждённый `sorting/acceptance/modes/task-locale.md` и
 независимый `oracle.py`: два CSV (первый — бинарный порядок, второй — итоговый
 и сохранённый), точные типы, NULL/пустая строка и порядок полей, Save/cold.
+
+
+`text-export-fixed-width` uses the approved task-fixed-width.md/formats.csv;
+`text-export-encodings` uses task-encodings.md/encodings.csv. The unchanged
+stage-0 modes/oracle.py compares every downloaded byte, including BOM and final
+CRLF. Stock cold reads the saved export input with exact types, values and field
+order; fixed width supplies the real .txt file without treating it as CSV,
+while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
+the byte oracle for the file passed through --csv. No oracle reaches the model.
