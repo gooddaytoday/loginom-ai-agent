@@ -731,3 +731,10 @@ Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
 Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
 нативное восстановление ставит используемые поля перед сохранёнными ID.
 Оба порядка проверяются явно; остальные перестановки запрещены.
+
+`variables-calculator-modes` uses the approved three-expression datetime/intermediate
+`task-datetime-intermediate.md`. Only the task reaches the model; modes/oracle.py
+supplies the private initial/final W1 expectations. Two typed execution variables
+retain civil milliseconds, IDs, types and order; native configuration retains
+three expressions, intermediate base and every property except base formula 2→4.
+Save, independent cold execution and confirmed package close/logout are required.
