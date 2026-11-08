@@ -11,37 +11,42 @@ export async function configureExcelExport(channel,p,ctx,options){
  const readUi=()=>channel.observe({condition:'bound Excel export',ready:s=>s.wizard?.stage==='excel_export'});
  const one=xs=>{need(xs.length===1,'Unique Excel export control required');return xs[0];};
  let current=await native();const initial=current;
- const settings=options.operation.nodeApply.request.target.kind==='new'?{file_type:1,number_format:0,...p}:p;
+ const request=options.operation.nodeApply.request,mode=request.mode??'xlsx';
+ const requested=request.target.kind==='new'?{file_type:mode==='xls'?0:1,destination:p.destination,sheet_name:p.sheet_name,header:p.header,number_format:p.number_format??'general',decimal_count:p.decimal_count??2,divide_thousands:p.divide_thousands??false}:p;
+ const settings=Object.fromEntries(['file_type','destination','sheet_name','header','number_format','decimal_count','divide_thousands'].filter(key=>Object.hasOwn(requested,key)).map(key=>[key,requested[key]]));
  for(const [key,value]of Object.entries(settings)){
   if(key==='overwrite')continue;
-  const expected=key==='header'?{none:0,names:1,labels:2}[value]:value;
+  const expected=key==='header'?{none:0,names:1,labels:2}[value]:key==='number_format'?{general:0,numeric:1}[value]:value;
   if(current.values[key].value===expected)continue;
   const tid=current.values[key].tid,s=await readUi();
-  if(['destination','sheet_name'].includes(key)){
+  if(['destination','sheet_name','decimal_count'].includes(key)){
    const field=s=>one(s.ui.elements.filter(e=>e.wizard_field?.scope==='export_format'&&e.wizard_field.name===key&&e.allowed_actions.includes('set_wizard_field')));
-   await channel.perform({condition:'Excel export '+key,initialObservation:s,ready:s=>s.wizard?.stage==='excel_export',identity:s=>({node:ctx.node,field:field(s).wizard_field,value:field(s).value}),resolve:s=>({verb:'set_wizard_field',ref:field(s).ref,text:value})});
+   await channel.perform({condition:'Excel export '+key,initialObservation:s,ready:s=>s.wizard?.stage==='excel_export',identity:s=>({node:ctx.node,field:field(s).wizard_field,value:field(s).value}),resolve:s=>({verb:'set_wizard_field',ref:field(s).ref,text:String(value)})});
+  }else if(key==='divide_thousands'){
+   const checkbox=s=>one(s.ui.elements.filter(e=>e.tid===tid+';DisplayEl'&&e.allowed_actions.includes('set_checked')));
+   await channel.perform({condition:'Excel thousands separator',initialObservation:s,ready:s=>s.wizard?.stage==='excel_export',identity:s=>({node:ctx.node,checkbox:checkbox(s)}),resolve:s=>({verb:'set_checked',ref:checkbox(s).ref,checked:value})});
   }else{
    const picker=s=>one(s.ui.elements.filter(e=>e.tid===tid+';trg_picker'&&e.allowed_actions.includes('click')));
    await channel.perform({condition:'Excel export options '+key,initialObservation:s,refreshWizardBusy:key==='header',ready:s=>s.wizard?.stage==='excel_export',identity:s=>({node:ctx.node,field:tid,value:picker(s).wizard_combo?.field?.value}),resolve:s=>({verb:'click',ref:picker(s).ref})});
    const opened=await channel.observe({condition:'Excel export option '+key,ready:s=>s.wizard?.stage==='excel_export'&&s.ui.elements.some(e=>e.allowed_actions.includes('select_wizard_option'))});
-   const label=key==='header'?{none:'Нет строки заголовков',names:'Имена полей',labels:'Метки полей'}[value]:key==='file_type'?'Excel 2007':'Общий';
+   const label=key==='header'?{none:'Нет строки заголовков',names:'Имена полей',labels:'Метки полей'}[value]:key==='file_type'?(value===0?'Excel 2003':'Excel 2007'):(value==='numeric'?'Числовой':'Общий');
    const choice=one(opened.ui.elements.filter(e=>e.allowed_actions.includes('select_wizard_option')&&e.label===label&&e.tid.startsWith(tid+';boundlist;')));
    await channel.perform({condition:'choose Excel export '+key,initialObservation:opened,ready:s=>s.wizard?.stage==='excel_export',identity:()=>({node:ctx.node,key,value}),resolve:()=>({verb:'select_wizard_option',ref:choice.ref})});
   }
   const after=await native();need(after.values[key].value===expected,'Excel export setting differs: '+key);
-  for(const other of Object.keys(current.values))if(other!==key)need(same(current.values[other],after.values[other]),'Unrequested Excel export setting changed: '+other);
+  for(const other of Object.keys(current.values))if(other!==key&&!(key==='file_type'&&other==='destination'&&Object.hasOwn(settings,'destination')))need(same(current.values[other],after.values[other]),'Unrequested Excel export setting changed: '+other);
   current=after;
  }
  const configured={excel_export:current};
  if(ctx.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{initial,configured,destination:current.values.destination.value}};
- try{validateNativeExcelExport(current.values,options.storageDirectories);}
+ try{validateNativeExcelExport(current.values,options.storageDirectories,mode);}
  catch(error){
   guard();const closed=await options.close(channel);guard();
   need(closed.cleanup_complete===true&&closed.draft_discarded===true&&closed.settings_applied===false,'Unsupported Excel export draft was not discarded');
   error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'text_export_unsupported_retained'};throw error;
  }
  const destination=validateExcelExportDestination(current.values.destination.value,options.storageDirectories);
- const result=await runExcelExportNext({binding,before:current,destination,overwrite:'reject',origin:options.targetOrigin,operation_id:options.operation.id+':excel-next',deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
+ const result=await runExcelExportNext({binding,before:current,destination,overwrite:p.overwrite??'reject',origin:options.targetOrigin,operation_id:options.operation.id+':excel-next',deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
  need(result.status==='SUCCEEDED'&&result.cleanup_complete,'Excel export Next uncertain');
  if(result.output.rejected){const closed=await options.close(channel);const e=Error('Excel destination exists; reject policy preserved it');e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:closed.cleanup_complete,settings_unchanged:true,verification:'text_export_conflict_rejected'};throw e;}
  configured.destination_check=result.output;
