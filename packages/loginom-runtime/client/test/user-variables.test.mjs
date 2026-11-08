@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
-import {createUserVariablesNodeSupport,validateUserVariablesParameters,readUserVariablesSnapshot,makeUserVariablesSnapshotCode} from '../lib/crosstable-variables.mjs';
+import {createUserVariablesNodeSupport,validateUserVariablesParameters,readUserVariablesSnapshot,makeUserVariablesSnapshotCode,makeUserVariablesConfigureCode} from '../lib/crosstable-variables.mjs';
 import {nodeReadHandler,NODE_READ_MODE} from '../lib/node-read-contract.mjs';
 
 const node={document_id:'doc',workflow_id:'wf',node_id:'user'};
@@ -120,4 +120,10 @@ test('remove of an unknown name refuses before any gesture; known name is delete
   else {assert.equal(result.status,'SUCCEEDED');assert.deepEqual(result.removed,['empty']);assert.deepEqual(result.changed,[]);
    assert.deepEqual(result.variables.map(v=>[v.id,v.name,v.index]),[[1,'amount',0],[3,'enabled',1]]);assert.deepEqual(calls.filter(c=>c.startsWith('mouse')),['mouse:1,2','mouse:10,20']);}
  }
+});
+
+test('independent readback after finish repeats no removal',()=>{
+ const code=makeUserVariablesConfigureCode(binding,{variables:[],remove:['empty'],finish:'done',operation_id:'rm',deadline:1});
+ assert.ok(code.includes("{...task,variables:[],remove:[],finish:'close'"));
+ assert.ok(code.includes('"remove":["empty"]'));
 });

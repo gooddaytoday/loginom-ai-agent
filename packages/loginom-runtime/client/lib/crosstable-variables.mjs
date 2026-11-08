@@ -89,7 +89,7 @@ export function makeUserVariablesConfigureCode(binding,options){
   ${options.variables.flatMap((v,i)=>Object.is(v.value,-0)?['task.variables['+i+'].value=-0;']:[]).join('')}
   const configured=await run(page,task,readNode,openPort,records,decode);
   if(configured.status!=='SUCCEEDED')return configured;
-  const observed=await run(page,{...task,variables:[],finish:'close',operation_id:task.operation_id+':readback'},readNode,openPort,records,decode);
+  const observed=await run(page,{...task,variables:[],remove:[],finish:'close',operation_id:task.operation_id+':readback'},readNode,openPort,records,decode);
   const expected=task.finish==='close'?configured.before_variables:configured.variables;
   if(observed.status!=='SUCCEEDED')return {...observed,status:'AMBIGUOUS',effect_possible:true,error:'Independent user readback after finish failed: '+observed.error};
   if(JSON.stringify(observed.variables)!==JSON.stringify(expected))return {...observed,status:'AMBIGUOUS',verified:false,error:'Independent user variable readback differs after finish'};
