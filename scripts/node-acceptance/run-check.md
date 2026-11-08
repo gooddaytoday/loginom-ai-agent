@@ -619,6 +619,14 @@ K=2, без вращения. Оба порта: 8 строк факторов �
 `factor_signs` в expected разрешает один общий знак на фактор в обоих портах;
 main использует typed matcher, CSV сверяется с его знаком, cold — тем же matcher.
 Без этого поля сравнение остаётся прежним. CSV/Save/cold/cleanup обязательны.
+`assnrules-consequents`: train.csv из fixtures/v040, support 50%, confidence 60%,
+max_items=3, max_consequents=2, min_lift=0 → 1.2 с явным Teach того же узла.
+Четыре CSV в порядке портов 0/1 обоих расчётов; Fraction-oracle генерирует
+expected-consequents.json, cold сверяется с двумя итоговыми портами из
+expected-consequents-cold.json. Нативный порядок A0/C0/A1/C1, RuleID и NULL
+связаны reader до прогонов; модели передаются только task и train.csv.
+Save, cold без настройки и cleanup обязательны.
+
 `assnrules-basic` и `assnrules-length`: частые наборы и правила FP-Growth,
 поддержка 50%, достоверность 60%, max_items=2; вход Transaction/Item.
 Источник — `datamining-assnrules/acceptance` и `length/`; два CSV, Save,

@@ -1,5 +1,28 @@
 # v0.4.0: этап 0, предложение приёмки (LAB-1021)
 
+## Привязка цикла длин и лифта
+
+Native reader Loginom 7.4.2 для `train.csv`, support=50%, confidence=60%,
+max_items=3, max_consequents=2 подтвердил следующие схемы:
+
+- Порт 0: ItemsetID integer, Width integer, Support real, Item_0/Item_1/Item_2 string.
+- Порт 1: RuleID integer, Support/Confidence/Lift real, Item_0_A/Item_0_C/Item_1_A/Item_1_C string, именно в этом порядке.
+
+Пустые позиции — типизированный NULL. Чередование A/C сохраняется и у
+двух следствий. Привязка перечисления наборов и правил — в
+`consequents_expected()`; она относится только к этому fixture, численные
+метрики и состав правил вычисляются независимым Fraction-oracle.
+При min_lift=0 получаются 7 наборов и 12 правил; после изменения min_lift=1.2
+и Teach того же узла — те же наборы и 6 правил с RuleID 1…6.
+Полные native значения обоих расчётов сверены штатным typed matcher с oracle.
+Это привязка перед приёмкой, а не модельный PASS.
+
+`python3 oracle.py --write-consequents` генерирует stock
+`expected-consequents.json` (четыре выгрузки 0/1/0/1) и
+`expected-consequents-cold.json` (два конечных порта).
+`--check-consequents` проверяет воспроизводимость этих файлов.
+Остальной текст ниже сохраняет границы исходного исследования этапа 0.
+
 Docs-only, база `c317bf8999a9fb6825dad12c6c6d0dca80d2c039`, PR #833 → v040.
 Решение владельца 07.11: недоступное «Отношение» исключено, исследование
 продолжено без сборок CLI. Критерии этапа 1 ещё утверждает владелец.

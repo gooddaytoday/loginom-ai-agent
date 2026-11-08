@@ -477,6 +477,12 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-consequents':
+        node = REPO / 'docs/node-development/nodes/datamining-assnrules'
+        src = node / 'acceptance/v040'
+        return dict(source=src, prompt=src / 'task-consequents.md', data=node / 'fixtures/v040',
+                    base=None, input_files=['train.csv'], export_count=4,
+                    expected_name='expected-consequents.json', cold_expected_name='expected-consequents-cold.json')
     if name == 'assnrules-retrain':
         src = REPO / 'docs/node-development/nodes/datamining-assnrules/acceptance'
         return dict(source=src, prompt=src / 'task-retrain.md',

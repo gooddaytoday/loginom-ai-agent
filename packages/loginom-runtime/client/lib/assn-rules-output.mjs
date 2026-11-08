@@ -1,7 +1,8 @@
 export function assnRulesOutputColumns(configuration,port){
  const item=configuration.fields.find(f=>f.usage_type===configuration.roles.item)?.name;
  if(!item)throw Error('Association rules: configured item field missing');
- const names=port===0?['ItemsetID','Width','Support',item+'_0',item+'_1']:['RuleID','Support','Confidence','Lift',item+'_0_A',item+'_0_C'];
+ const width=configuration.max_items??2,consequents=configuration.max_consequents??1;
+ const names=port===0?['ItemsetID','Width','Support',...Array.from({length:width},(_,i)=>item+'_'+i)]:['RuleID','Support','Confidence','Lift',...Array.from({length:width-1},(_,i)=>[item+'_'+i+'_A',...(i<consequents?[item+'_'+i+'_C']:[])]).flat()];
  return names.map((name,index)=>({name,type:index>=(port===0?3:4)?'string':['ItemsetID','Width','RuleID'].includes(name)?'integer':'real'}));
 }
 export function alignAssnRulesOutput(columns,expected){

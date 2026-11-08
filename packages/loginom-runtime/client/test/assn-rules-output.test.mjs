@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {assnRulesOutputColumns,alignAssnRulesOutput,readAssnRulesOutputs} from '../lib/assn-rules-output.mjs';
 const configuration=item=>({fields:[{name:'Transaction',usage_type:6},{name:item,label:'Товар',usage_type:7}],roles:{transaction:6,item:7}});
+test('configured lengths bind all native item columns in exact port order',()=>{
+ const c={...configuration('Item'),max_items:3,max_consequents:2};
+ assert.deepEqual(assnRulesOutputColumns(c,0).map(f=>f.name),['ItemsetID','Width','Support','Item_0','Item_1','Item_2']);
+ assert.deepEqual(assnRulesOutputColumns(c,1).map(f=>f.name),['RuleID','Support','Confidence','Lift','Item_0_A','Item_0_C','Item_1_A','Item_1_C']);
+ const schema=assnRulesOutputColumns(c,1);
+ assert.throws(()=>alignAssnRulesOutput(schema.filter(f=>f.name!=='Item_1_C'),schema),/field order or types/);
+});
 test('missing item role refuses an invented output schema',()=>{
  const input=configuration('Category');input.fields[1].usage_type=0;
  assert.throws(()=>assnRulesOutputColumns(input,0),/configured item field missing/);

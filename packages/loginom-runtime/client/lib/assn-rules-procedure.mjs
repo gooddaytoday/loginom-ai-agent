@@ -60,9 +60,10 @@ export async function configureAssnRules(channel,p,{request,inputMapping}){
  const observe=condition=>channel.observe({condition,readAssnRules:true,ready});
  let state=await observe('initialized FP-Growth parameters');const old=state.node_assn_rules;
  need(Object.values(old.switches).every(v=>v===false),'variable-driven parameters are unsupported');
- need(old.values.pedExcludeLargeSupportItems===false&&old.values.pedSelectColumn===false&&old.values.pedExcludeSingleItems===false&&old.values.pedNConsequentMax===1,'unsupported saved filters or consequence limit');
- const wanted={pedMinSupport:p.min_support_pct??old.values.pedMinSupport,pedMinConfidence:p.min_confidence_pct??old.values.pedMinConfidence,pedNItemsMax:p.max_items??(request.target.kind==='new'?2:old.values.pedNItemsMax),pedMinLift:0};
- need(wanted.pedNItemsMax===2,'existing max_items must be 2 or explicitly set to 2');
+ need(old.values.pedExcludeLargeSupportItems===false&&old.values.pedSelectColumn===false&&old.values.pedExcludeSingleItems===false,'unsupported saved filters');
+ const wanted={pedMinSupport:p.min_support_pct??old.values.pedMinSupport,pedMinConfidence:p.min_confidence_pct??old.values.pedMinConfidence,pedNItemsMax:p.max_items??(request.target.kind==='new'?2:old.values.pedNItemsMax),pedMinLift:p.min_lift??old.values.pedMinLift,pedNConsequentMax:p.max_consequents??old.values.pedNConsequentMax};
+ need([2,3].includes(wanted.pedNItemsMax),'existing max_items must be 2 or 3, or explicitly set');
+ need([1,2].includes(wanted.pedNConsequentMax)&&wanted.pedNConsequentMax<wanted.pedNItemsMax,'max_consequents must be 1 or 2 and less than max_items');
  const act=async(s,condition,key,action)=>channel.perform({condition,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,parameters:s.node_assn_rules}),
   resolve:s=>({...action,ref:one(s,e=>(e.tid===s.wizard.root_tid+';AssnRulesWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';AssnRulesWizard;'+key)&&e.allowed_actions.includes(action.verb),'Parameter control unavailable: '+key).ref})});
  for(const [name,value] of Object.entries(wanted)){
@@ -76,6 +77,6 @@ export async function configureAssnRules(channel,p,{request,inputMapping}){
  need(Object.entries(old.values).every(([k,v])=>after.values[k]===(Object.hasOwn(wanted,k)?wanted[k]:v))&&same(after.switches,old.switches),'unrequested parameters changed');
  await next('assn_rules','done');
  const done=await channel.observe({condition:'association rule settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,min_support_pct:after.values.pedMinSupport,min_confidence_pct:after.values.pedMinConfidence,max_items:after.values.pedNItemsMax,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,min_support_pct:after.values.pedMinSupport,min_confidence_pct:after.values.pedMinConfidence,max_items:after.values.pedNItemsMax,min_lift:after.values.pedMinLift,max_consequents:after.values.pedNConsequentMax,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
 
