@@ -26,8 +26,8 @@ test('one saved formula patch preserves identities, types, descriptions and orde
 });
 test('unsupported controls and malformed values refuse before mutation',()=>{
  const e=parameters.expressions[0];
- for(const p of [{expressions:[]},{...parameters,order:['limit']},{expressions:[{...e,type:'datetime'}]},
-  {expressions:[{...e,intermediate:true}]},{expressions:[{...e,replace:false}]},{expressions:[{...e,cached:true}]},
+ for(const p of [{expressions:[]},{...parameters,order:['limit']},{expressions:[{...e,type:'variant'}]},
+  {expressions:[{...e,intermediate:'true'}]},{expressions:[{...e,replace:false}]},{expressions:[{...e,cached:true}]},
   {expressions:[{...e,target:{kind:'new',name:'limit'}}]},{expressions:[{...e,formula:''}]},
   {expressions:[{...e,formula:'1\r2'}]},{expressions:[{...e,name:'имя'}]},
   {expressions:[{...e,description:'x'.repeat(513)}]},{expressions:[e,{...e,name:'LIMIT'}]}])
@@ -57,6 +57,33 @@ test('published parameter schema agrees on new expressions and saved patches',as
  for(const p of [parameters,{expressions:[{target:{kind:'existing',name:'limit'},formula:'120'}]}])assert.equal(check(p).valid,true);
  const added=parameters.expressions[0],missing={...added};delete missing.formula;
  for(const p of [{expressions:[missing]},{expressions:[{...added,target:{kind:'new',name:'limit'}}]},
-  {expressions:[{target:{kind:'existing'},formula:'120'}]},{expressions:[{...added,type:'datetime'}]},
+  {expressions:[{target:{kind:'existing'},formula:'120'}]},{expressions:[{...added,type:'variant'}]},
   {expressions:[{...added,formula:'1\r2'}]},{expressions:[{...added,formula:' '}]},{expressions:[]}])assert.equal(check(p).valid,false);
+});
+
+test('datetime and intermediate patches agree with the schema and preserve omitted flags and identities',async()=>{
+ const {variablesCalculatorParametersSchema}=await import('../lib/variables-calculator-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const check=new AjvJsonSchemaValidator().getValidator(variablesCalculatorParametersSchema);
+ const p={expressions:[
+  {target:{kind:'new'},name:'report_date',label:'Дата отчёта',type:'datetime',formula:'EncodeDateTime(2026,11,7,23,59,58,123)'},
+  {target:{kind:'new'},name:'base',label:'Основа',type:'integer',formula:'2',intermediate:true},
+  {target:{kind:'new'},name:'total',label:'Итого',type:'integer',formula:'Expr.base+1'},
+ ]};
+ assert.equal(check(p).valid,true);validateVariablesCalculatorParameters(p,'expression',request);
+ const created=resolveVariablesCalculatorPatch(p,blank(),{newNode:true});
+ assert.equal(created.expressions[1].intermediate,true);assert.equal(created.expressions[0].intermediate,false);
+ const before=observed(created.expressions);before.expressions[1].intermediate=true;
+ const update={expressions:[{target:{kind:'existing',name:'base'},formula:'4'}]};
+ const plan=resolveVariablesCalculatorPatch(update,before);
+ assert.deepEqual(plan.expressions[1],{...before.expressions[1],formula:'4'});
+ assert.deepEqual(plan.expressions.filter(e=>e.name!=='base'),before.expressions.filter(e=>e.name!=='base'));
+ const unset={expressions:[{target:{kind:'existing',name:'base'},intermediate:false}]};
+ assert.equal(check(unset).valid,true);
+ assert.equal(resolveVariablesCalculatorPatch(unset,before).expressions[1].intermediate,false);
+ for(const intermediate of [null,0,1,'false']){
+  const invalid={expressions:[{...update.expressions[0],intermediate}]};
+  assert.equal(check(invalid).valid,false);
+  assert.throws(()=>resolveVariablesCalculatorPatch(invalid,before));
+ }
 });

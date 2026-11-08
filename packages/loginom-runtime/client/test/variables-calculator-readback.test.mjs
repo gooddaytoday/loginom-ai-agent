@@ -16,6 +16,16 @@ test('configuration readback projects verified native settings without claiming 
  assert.equal(r.package_persistence_verified,false);assert.equal(Object.hasOwn(r,'values'),false);
  assert.equal(Object.hasOwn(r.expressions[0],'record_id'),false);
 });
+test('readback retains intermediate datetime settings in the published result union',async()=>{
+ const f=fixture(),e=f.phases[0].value.configuration.expressions[0];e.type='datetime';e.intermediate=true;
+ e.formula='EncodeDateTime(2026,11,7,23,59,58,123)';
+ const r=variablesCalculatorConfigurationReadback(f);
+ assert.equal(r.expressions[0].type,'datetime');assert.equal(r.expressions[0].intermediate,true);
+ const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const check=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ assert.equal(check(r).valid,true);
+});
 test('missing or repeated receipts, foreign owners, missing syntax confirmation and incomplete inventory refuse',()=>{
  for(const mutate of [f=>f.phases.pop(),f=>f.phases.push(f.phases[0]),f=>f.phases[0].status='pending',
   f=>f.phases[0].receipt_id='wrong',f=>f.phases[0].value.cleanup_complete=false,

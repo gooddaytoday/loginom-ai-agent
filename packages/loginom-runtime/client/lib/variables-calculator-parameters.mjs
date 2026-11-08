@@ -1,6 +1,6 @@
 const requireValue=(ok,message)=>{if(!ok)throw Error('Variables calculator: '+message);};
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
-const properties=['name','label','type','formula','description'];
+const properties=['name','label','type','formula','description','intermediate'];
 
 export function validateVariablesCalculatorParameters(parameters,mode,request) {
  requireValue(mode==='expression','only native expression mode is supported');
@@ -29,7 +29,8 @@ export function validateVariablesCalculatorParameters(parameters,mode,request) {
   }
   if(e.name!==undefined){requireValue(name(e.name)&&!names.has(e.name.toLowerCase()),'invalid or duplicate expression name');names.add(e.name.toLowerCase());}
   if(e.label!==undefined)requireValue(typeof e.label==='string'&&e.label.length>0&&e.label.length<=120&&!/[\x00-\x1f]/.test(e.label),'invalid label');
-  if(e.type!==undefined)requireValue(['integer','real','string','boolean'].includes(e.type),'unsupported type');
+  if(e.type!==undefined)requireValue(['integer','real','string','boolean','datetime'].includes(e.type),'unsupported type');
+  if(e.intermediate!==undefined)requireValue(typeof e.intermediate==='boolean','intermediate must be boolean');
   if(e.formula!==undefined)requireValue(typeof e.formula==='string'&&e.formula.trim().length>0&&e.formula.length<=2048
    &&!/[\r\0]/.test(e.formula)&&e.formula.split('\n').length<=128,'bounded nonempty LF formula required');
   if(e.description!==undefined)requireValue(typeof e.description==='string'&&e.description.length<=512&&!/[\x00-\x08\x0b-\x1f]/.test(e.description),'invalid description');
