@@ -1,4 +1,27 @@
-# Новые режимы LAB-1018: предложения, ещё не приёмка
+# Новые режимы: предложение LAB-1103, ещё не приёмка
+
+08.11.2026: продолжение native discovery описано в [LAB-1103](../modes-lab1103.md).
+Текст LAB-1018 ниже — история исходных гипотез, не текущие наблюдения.
+Mean/limit expected пересчитаны после их опровержения; quality скрыт в UI,
+apply новым входом пересчитывает статистику, поэтому оба режима исключены
+из предлагаемого этапа 1 до решения владельца.
+
+| Новый различитель | Task / expected | Независимая команда |
+|---|---|---|
+| Строгие IQR-границы, Q1=3/Q3=7 | task-quartile-boundaries.md / expected-quartile-boundaries.json | `python3 -B oracle.py --case quartile-boundaries --quartile-convention upper_rank` |
+| Среднее нормальной выборки | task-replacement-discriminator.md / expected-replacement-mean.json | `python3 -B oracle-policies.py mean --fixture replacement-discriminator.csv` |
+| Медиана всей non-NULL выборки | task-replacement-median.md / expected-replacement-median.json | `python3 -B oracle-policies.py median --fixture replacement-discriminator.csv` |
+| Гистограммная мода всей non-NULL выборки | task-replacement-most-probable.md / expected-replacement-most-probable.json | `python3 -B oracle-policies.py most_probable --fixture replacement-discriminator.csv` |
+| SD 1/2 clip по нормальной выборке | task-replacement-limit.md / expected-replacement-limit.json | `python3 -B oracle-policies.py limit --fixture replacement-discriminator.csv` |
+
+`oracle-policies.py` классифицирует исходную non-NULL выборку, затем считает
+mean по нормальным значениям, median и most_probable по всем non-NULL. Limit —
+2+sqrt(4/3) для первого набора SD 1/2; на втором точная Table дала
+19/7+sqrt(150/49). Обобщение произвольного clipping пока не установлено.
+Новые expected до утверждения
+не регистрируются в run-check. Модели oracle не передаётся.
+
+## История LAB-1018 (состояние до продолжения)
 
 Живое исследование этого узла не началось: два разрыва связи остановили
 сессию при исследовании Разгруппировки. Наблюдения старого detect в соседнем

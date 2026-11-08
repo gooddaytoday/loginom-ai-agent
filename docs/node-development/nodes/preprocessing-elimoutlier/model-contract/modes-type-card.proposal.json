@@ -9,11 +9,9 @@
   "additional_tabular_inputs": false,
   "modes": [
     "detect",
-    "edit",
-    "quality",
-    "apply"
+    "edit"
   ],
-  "semantics": "Detect outliers in selected continuous numeric fields using parameters.outlier: fields, method sd/iqr, explicit outlier_factor/extreme_factor and ordered. Train current input before Execute; keep/keep retains original values. Read all three ports: 0 all rows, 1 outliers excluding extremes, 2 extremes. New nodes require all five settings; existing patches preserve omitted settings. Editing policies, quality, variables and saved-model apply are unsupported. STAGE0 PROPOSAL ONLY: editing, quality and saved-model apply have not been observed in LAB-1018 because the UI session disconnected twice. The mathematical expected files are hypotheses, not established native rules. Do not implement these modes until discovery and owner approval.",
+  "semantics": "LAB-1103 PROPOSAL; not implemented or owner-approved. Detect keeps values; edit selects independent outlier/extreme policies keep/delete/mean/median/most_probable/constant/limit for continuous numeric fields. Always fit current input; three ports: edited rows, original outliers excluding extremes, original extremes. NULL is retained, excluded from fit. Observed IQR fixtures select upper-rank Q(p)=sorted_non_null[min(floor(n*p),n-1)] with strict fences. SD 1/2 mean uses normal values; median and histogram mode include all non-NULL training values; exact clipping and arbitrary-factor behavior still need preflight. Quality is hidden in 7.4.2 UI; frozen-model apply not established, source changes recompute even with Always Run. Neither mode is proposed.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "elim-outlier-v1-internal-1",
@@ -35,9 +33,7 @@
   "candidate_apply_tool": "dock_node_apply",
   "candidate_modes": [
     "detect",
-    "edit",
-    "quality",
-    "apply"
+    "edit"
   ],
   "parameter_schema": {
     "type": "object",
@@ -90,7 +86,7 @@
               "constant",
               "limit"
             ],
-            "description": "Proposed per-class native editing action; convention and side-output behavior await observation."
+            "description": "Independent native policy for this class; new edit nodes require both. Side ports retain source values; delete removes rows only from port 0."
           },
           "extreme_policy": {
             "type": "string",
@@ -103,7 +99,7 @@
               "constant",
               "limit"
             ],
-            "description": "Proposed per-class native editing action; convention and side-output behavior await observation."
+            "description": "Independent native policy for this class; new edit nodes require both. Side ports retain source values; delete removes rows only from port 0."
           },
           "outlier_constant": {
             "type": "number",
@@ -112,10 +108,6 @@
           "extreme_constant": {
             "type": "number",
             "description": "Proposed replacement only when the matching policy is constant; finite number."
-          },
-          "quality": {
-            "type": "boolean",
-            "description": "Proposed native quality switch; output schema and semantics await discovery."
           }
         },
         "required": [],
