@@ -36,7 +36,9 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
   const channel=channelFor(request.target.ref);
   const deactivate=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===request.target.ref.node_id&&e.graph_execution.mode==='deactivate'&&e.allowed_actions.includes('deactivate_graph_node'));
   const execute=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===request.target.ref.node_id&&e.allowed_actions.includes('execute_graph_node'));
-  let state=await channel.observe({condition:'owned union before automatic mapping check',...(topology?{readOutputs:true}:{}),ready:s=>s.prepared_node_context?.surface==='graph'&&(!topology||deactivate(s).length===1||execute(s).length===1)});
+  let state=await channel.observe({condition:'owned union before automatic mapping check',ready:s=>s.prepared_node_context?.surface==='graph'});
+  await selectPreparedGraphNode(channel,state,'select union for read-only mapping preflight');
+  if(topology)state=await channel.observe({condition:'selected union execution control before input change',readOutputs:true,ready:s=>s.prepared_node_context?.surface==='graph'&&(deactivate(s).length===1||execute(s).length===1)});
   if(topology&&deactivate(state).length===1){
    // An active union switches native controllers during the wizard's implicit
    // deactivation confirmation. Settle that graph action before opening it.
@@ -44,7 +46,7 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
     identity:()=>request.target.ref,resolve:s=>({verb:'deactivate_graph_node',ref:deactivate(s)[0].ref})});
    state=await channel.observe({condition:'union inactive before input mapping inspection',readOutputs:true,ready:s=>s.prepared_node_context?.surface==='graph'&&execute(s).length===1});
   }
-  await selectPreparedGraphNode(channel,state,'select union for read-only mapping preflight');await openPreparedWizard(channel);
+  await openPreparedWizard(channel);
   const observed=await channel.observe({condition:'saved union automatic mapping',readVariablesColumnUnion:true,ready:s=>s.node_variables_column_union?.verified===true});
   await closePreparedWizard(channel);
   if(topology&&observed.node_variables_column_union.mapping!=='automatic')throw Error('Third input changes require a saved automatic union');
