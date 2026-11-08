@@ -170,6 +170,12 @@ def scenario(name, case_root=None, *, cases=None):
         kind = name.removeprefix('clustering-scale-')
         return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
                     input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
+    if name in ['factor-auto', 'factor-cap']:
+        src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'modes' / ('task-auto.md' if name == 'factor-auto' else 'task-cap.md'),
+                    data=src / 'data', base=None, input_files=['matrix.csv'], export_count=2,
+                    factor_mode='variance' if name == 'factor-auto' else 'cap',
+                    oracle=src / 'modes/oracle.py')
     if name in ['factor-pca', 'factor-retrain']:
         src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
         update = name == 'factor-retrain'
@@ -209,10 +215,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
-    if name == 'grouping-median':
+    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count']:
         root = REPO / 'docs/node-development/nodes/grouping'
-        return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance/modes/task-median.md',
-                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode='median')
+        return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -316,6 +322,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
                     input_files=inputs, export_count=count)
+    if name == 'corr-ranks':
+        src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-ranks.md', data=src / 'fixtures', base=None,
+                    input_files=['ranks.csv'], corr_ranks=True)
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -605,6 +615,9 @@ def expected_for(case, package, cold=False):
     src = case['source']
     if cold and case.get('cold_expected_name'):
         return expected_for({**case, 'expected_name': case['cold_expected_name'], 'cold_expected_name': None}, package)
+    if case.get('factor_mode'):
+        expected = read(src / 'expected.json')['cases'][case['factor_mode']]
+        return dict(expected, package_path=package)
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
                     outputs=[sorting_stages(case)[-1]])
@@ -628,6 +641,10 @@ def expected_for(case, package, cold=False):
         cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py')]))['cases']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
                     outputs=cases[case['grouping_mode']]['stages'])
+    if case.get('corr_ranks'):
+        expected = read(src / 'expected.json')['cases']['kendall']
+        expected['package_path'] = package
+        return expected
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
     if case.get('expected_name'):
         expected = read(src / case['expected_name'])
@@ -1495,6 +1512,12 @@ class Runner:
                 except (ValueError, TypeError): continue
                 if isinstance(value, dict): replies.append((n, value))
             replies.sort(key=lambda item: item[0])
+        if spec.get('corr_ranks'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'corr-ranks-events.json', evidence)
+            self.phase('corr-ranks-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/corr-ranks.mjs',
+                src / 'expected.json', folder / 'corr-ranks-events.json'], folder, timeout=60)
         if case in ['quality-default', 'quality-spikes']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -1821,15 +1844,33 @@ class Runner:
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
         if expected.get('factor_signs'):
-            rounds = {}
+            rounds, configurations = {}, {}
             for _, reply in replies:
                 for owner, port in ports(reply):
                     if owner.get('configuration', {}).get('readback', {}).get('kind') != 'factor_analysis': continue
                     key = owner.get('execution', {}).get('execution_id')
+                    configurations[key] = dict(owner['configuration']['readback'], node=owner['node'])
                     rounds.setdefault(key, {})[port['port']] = dict(node=owner['node'], type='research.factor_analysis',
                         output_port=port['port'], execution=owner['execution'], data=port)
             complete = [list(group.values()) for group in rounds.values() if set(group) == {0, 1}]
             assert complete, 'FACTOR_BOTH_TYPED_OUTPUTS_MISSING'
+            if spec.get('factor_mode'):
+                final = configurations[complete[-1][0]['execution']['execution_id']]
+                if spec['factor_mode'] == 'variance':
+                    assert final['mode'] == 'pca_variance' and final['variance_percent'] == 90, 'FACTOR_FINAL_VARIANCE_MISSING'
+                    initial = next((group for group in complete[:-1] if
+                        configurations[group[0]['execution']['execution_id']].get('mode') == 'pca_eigenvalue' and
+                        configurations[group[0]['execution']['execution_id']].get('eigenvalue') == 1.1 and
+                        group[0]['node'] == complete[-1][0]['node']), None)
+                    assert initial, 'FACTOR_INITIAL_EIGENVALUE_SAME_NODE_MISSING'
+                    write(folder / 'factor-initial.json', initial)
+                    write(folder / 'factor-initial-expected.json', dict(read(src / 'expected.json')['cases']['eigenvalue'], package_path=package))
+                    self.phase('factor-initial-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                        'factor-signs', folder / 'factor-initial-expected.json', folder / 'factor-initial.json', folder / 'factor-initial-aligned.json'], folder, timeout=60)
+                else:
+                    assert final['mode'] == 'pca_fixed' and final['factors'] == 2 and final['output_factors'] == 1, 'FACTOR_CAP_COUNT_CHANGED'
+                    assert any(c['node'] == final['node'] and c['mode'] == 'pca_fixed' and c['factors'] == 2 and
+                               not c.get('output_factors') for c in list(configurations.values())[:-1]), 'FACTOR_INITIAL_FIXED_SAME_NODE_MISSING'
             write(folder / 'factor-actual.json', complete[-1])
             self.phase('factor-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)

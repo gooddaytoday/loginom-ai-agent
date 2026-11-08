@@ -6276,6 +6276,27 @@ test('output mapping coverage also binds each native derived socket family',asyn
   }
 });
 
+test('PCA second mapping exposes output definitions only within its own wizard inventory',async()=>{
+ for(const fault of [null,'missing','foreign','duplicate','third']){
+  const page=new Page(),c=mappingCoverageFixture(page),family='DerivedDataSourceMappingEngineOutputPortWizard-1';
+  page.add('div','MF;TF-1;WizrdMCF;'+family,'',undefined,c.form);
+  for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
+  if(fault!=='missing')page.add('div','MF;TF-1;WizrdMCF;FactorAnalysisWizard','',undefined,fault==='foreign'?undefined:c.form).style.display='none';
+  if(fault==='duplicate')page.add('div','MF;TF-1;WizrdMCF;FactorAnalysisWizard','',undefined,c.form).style.display='none';
+  page.add('div','MF;TF-1;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard','',undefined,c.form).style.display='none';
+  if(fault==='third')page.add('div','MF;TF-1;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard-2','',undefined,c.form).style.display='none';
+  const s=await page.observe();
+  assert.equal(s.wizard.stage,'binning_ranges_mapping',String(fault));
+  if(fault)assert.equal(s.wizard.output_columns,undefined);
+  else{
+   assert.equal(s.wizard.output_columns.definition_coverage.status,'complete_configured_rows');
+   assert.ok(s.ui.elements.find(e=>e.ref===s.wizard.output_columns.fields[0].name_ref).allowed_actions.includes('press'));
+   const narrow=await page.execute({mode:'observe',root_ref:s.wizard.root_ref});
+   assert.deepEqual(narrow.output.wizard.output_columns,s.wizard.output_columns);
+  }
+ }
+});
+
 function outputPortFinishFixture(mode='valid') {
   const page=new Page(),c=mappingCoverageFixture(page),panel=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let path='';
   const crumbs=[];
