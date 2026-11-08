@@ -3,7 +3,7 @@
 <!-- mode: pca_fixed -->
 Заданное число факторов
 Для `mode:"pca_fixed"` задай `parameters.factor_analysis.factors`.
-Для ограничения выдачи сохрани `factors`, меняй только `output_factors`.
+`output_factors` — только по просьбе ограничить выдачу; «N факторов» — это `factors`.
 Используй `dock_action_describe` и `dock_node_apply` типа
 `research.factor_analysis`, `read.ports:[0,1]`, `mappings:[]`.
 Новый узел: полный `factor_analysis.features` в порядке входа и явное `rotation`: `none`, `varimax` или `quartimax`.
@@ -14,9 +14,8 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 обученное число не меняется. Без cap остаются P Factor-полей: лишние scores NULL,
 нагрузки 0. Cap физически убирает лишние поля обоих портов. Читай полные порты:
 0 — факторы и исходные поля, 1 — ColumnName/ColumnDisplayName и нагрузки.
-Выгрузи оба CSV и сохрани пакет.
+Порядок закрепляет обработчик. Выгрузи нужные CSV и сохрани пакет.
 Для Варимакс/Квартимакс задай `rotation:"varimax"`/`"quartimax"` (Kaiser).
-Меняй вращение того же узла через `dock_node_apply`, `finish:"execute"` переобучает.
 Пропуск `rotation` на existing сохраняет значение; readback показывает фактическое.
 Apply недоступен.
 <!-- /mode -->
@@ -36,9 +35,8 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 обученное число не меняется. Без cap остаются P Factor-полей: лишние scores NULL,
 нагрузки 0. Cap физически убирает лишние поля обоих портов. Читай полные порты:
 0 — факторы и исходные поля, 1 — ColumnName/ColumnDisplayName и нагрузки.
-Выгрузи оба CSV и сохрани пакет.
+Порядок закрепляет обработчик. Выгрузи нужные CSV и сохрани пакет.
 Для Варимакс/Квартимакс задай `rotation:"varimax"`/`"quartimax"` (Kaiser).
-Меняй вращение того же узла через `dock_node_apply`, `finish:"execute"` переобучает.
 Пропуск `rotation` на existing сохраняет значение; readback показывает фактическое.
 Apply недоступен.
 <!-- /mode -->
@@ -58,9 +56,8 @@ RowID/текст оставь без роли. `finish:"execute"` обучает
 обученное число не меняется. Без cap остаются P Factor-полей: лишние scores NULL,
 нагрузки 0. Cap физически убирает лишние поля обоих портов. Читай полные порты:
 0 — факторы и исходные поля, 1 — ColumnName/ColumnDisplayName и нагрузки.
-Выгрузи оба CSV и сохрани пакет.
+Порядок закрепляет обработчик. Выгрузи нужные CSV и сохрани пакет.
 Для Варимакс/Квартимакс задай `rotation:"varimax"`/`"quartimax"` (Kaiser).
-Меняй вращение того же узла через `dock_node_apply`, `finish:"execute"` переобучает.
 Пропуск `rotation` на existing сохраняет значение; readback показывает фактическое.
 Apply недоступен.
 <!-- /mode -->

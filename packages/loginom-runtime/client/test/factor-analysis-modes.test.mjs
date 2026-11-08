@@ -25,7 +25,7 @@ test('automatic PCA criteria validate thresholds before UI and cap is independen
  validateFactorAnalysisParameters({factor_analysis:{output_factors:false}},'pca_fixed',{...request,target:{kind:'existing'}});
 });
 
-function fixture(initial={}){
+function fixture(initial={},faults={}){
  const node={verified:true,document_id:'doc',workflow_id:'wf',node_id:'pca'};
  const source_fields=fields.map((f,index)=>({...f,record_id:'source'+index}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,input_port:{port:0}},source_fields,
@@ -58,10 +58,10 @@ function fixture(initial={}){
   if(['output_mapping','binning_ranges_mapping'].includes(stage)&&a.verb==='press'&&a.key==='Delete'){
    const m=inline();m.autosync=false;m.target_fields=m.target_fields.filter(f=>f.record_id!==selected).map((f,index)=>({...f,index,group_index:index}));selected=null;
   }
-  if(a.verb==='fill'){const key=a.ref.split(';')[0];native.values[key]=Number(a.text);if(key==='pedNFactors')native.factors=Number(a.text);}
+  if(a.verb==='fill'){const key=a.ref.split(';')[0];native.values[key]=Number(a.text);if(key==='pedNFactors')native.factors=Number(a.text);if(faults.resetRotationOnFill)native.rotation=0;}
   if(a.verb==='set_checked'){
    if(a.ref.startsWith('pedSignificanceCriterion'))native.criterion=a.ref.includes('radiofield-2')?2:a.ref.includes('radiofield-1')?1:0;
-   if(a.ref.startsWith('pedRotationType'))native.rotation=a.ref.includes('radiofield-2')?2:a.ref.includes('radiofield-1')?1:0;
+   if(a.ref.startsWith('pedRotationType')&&!faults.ignoreRotationChange)native.rotation=a.ref.includes('radiofield-2')?2:a.ref.includes('radiofield-1')?1:0;
    if(a.ref.startsWith('cntOutFactorsMax'))native.output_cap=a.checked;
   }
   return {verified:true};}};
@@ -95,6 +95,26 @@ test('native rotation radio edits and omission preserve all unrelated PCA settin
  }
  const invalid=fixture({rotation:3});
  await assert.rejects(()=>configureFactorAnalysis(invalid.channel,{}, {inputMapping:invalid.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}}));
+});
+
+test('rotation readback rejects when native set_checked leaves rotation unchanged',async()=>{
+ const f=fixture({}, {ignoreRotationChange:true});
+ await assert.rejects(()=>configureFactorAnalysis(f.channel,{factor_analysis:{rotation:'varimax'}},
+  {inputMapping:f.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}}),/PCA rotation differs/);
+ assert.equal(f.native.rotation,0);
+ assert.deepEqual(f.actions.filter(a=>a.verb==='set_checked').map(a=>a.ref),['pedRotationType;ValueControl;radiofield-1;DisplayEl']);
+ assert.equal(f.actions.some(a=>a.verb==='wizard_step'&&Array.isArray(a.expected_stage)),false);
+});
+
+test('final PCA readback rejects when a numeric fill resets native rotation',async()=>{
+ const f=fixture({rotation:1}, {resetRotationOnFill:true});
+ await assert.rejects(()=>configureFactorAnalysis(f.channel,{factor_analysis:{rotation:'quartimax',factors:3}},
+  {inputMapping:f.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}}),/PCA settings differ/);
+ assert.equal(f.native.rotation,0);
+ assert.equal(f.native.factors,3);
+ assert.deepEqual(f.actions.filter(a=>a.verb==='set_checked'||a.verb==='fill').map(a=>a.ref),[
+  'pedRotationType;ValueControl;radiofield-2;DisplayEl','pedNFactors;ValueControl']);
+ assert.equal(f.actions.some(a=>a.verb==='wizard_step'&&Array.isArray(a.expected_stage)),false);
 });
 
 test('native criterion switching writes only the selected threshold and preserves output cap on omission',async()=>{
