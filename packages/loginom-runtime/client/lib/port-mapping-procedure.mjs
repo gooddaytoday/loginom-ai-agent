@@ -77,18 +77,33 @@ export async function resyncOutputFields(channel,before,{restoreOutputs}={}) {
     return channel.observe({condition:'output autosync option is '+to,ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===to});
   };
   const mapped=s=>bound(s)&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true;
+  // Previous output of each source field name, decided before any gesture. A
+  // re-read leaves an output either on a stale source record (still named) or
+  // without a source (execution-events.jsonl: Amount output with source null);
+  // such an output is attributed by its own name or as the only unlinked pair.
+  const names=f=>f.name+'\u0000'+f.label;
+  const sourceName=t=>t.source?.name??before.source_fields.find(f=>t.source&&sourceKey(f)===sourceKey(t.source))?.name;
+  const previous=new Map(),orphans=[];
+  for(const t of before.target_fields) {
+    const name=t.source?sourceName(t):null;
+    if(!name){orphans.push(t);continue;}
+    if(previous.has(name))throw new Error('Output resynchronization found several outputs of one source: '+name);
+    previous.set(name,t);
+  }
+  const unlinked=()=>before.source_fields.map(f=>f.name).filter(n=>!previous.has(n));
+  for(const t of orphans.filter(t=>unlinked().includes(t.name)))previous.set(t.name,t);
+  const aliased=orphans.filter(t=>![...previous.values()].includes(t));
+  if(aliased.length===1&&unlinked().length===1)previous.set(unlinked()[0],aliased[0]);
+  else if(aliased.length)throw new Error('Output resynchronization cannot attribute an output that lost its source: '+aliased[0].name);
   const on=await toggle(false,true,initial);
   const synced=(await channel.observe({condition:'native output mapping after synchronization',readMappings:true,
     ready:s=>mapped(s)&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
-  const names=f=>f.name+'\u0000'+f.label;
-  const sourceName=t=>t.source?.name??before.source_fields.find(f=>t.source&&sourceKey(f)===sourceKey(t.source))?.name;
   const restore=[];
-  for(const source of synced.source_fields) {
-    const previous=before.target_fields.filter(t=>t.source&&sourceName(t)===source.name);
-    const now=synced.target_fields.find(t=>sourceKey(t.source)===sourceKey(source));
-    if(previous.length>1||previous.length&&(!now||names(now)!==names(previous[0])&&!restoreOutputs))
-      throw new Error('Output resynchronization changed an existing output field: '+source.name);
-    if(previous.length&&names(now)!==names(previous[0]))restore.push({source:{kind:'configured_field',name:source.name},name:previous[0].name,label:previous[0].label});
+  for(const [name,old] of previous) {
+    const source=synced.source_fields.find(f=>f.name===name),now=source&&synced.target_fields.find(t=>sourceKey(t.source)===sourceKey(source));
+    if(!source)continue;
+    if(!now||names(now)!==names(old)&&!restoreOutputs)throw new Error('Output resynchronization changed an existing output field: '+name);
+    if(names(now)!==names(old))restore.push({source:{kind:'configured_field',name},name:old.name,label:old.label});
   }
   // The mapping reads above advanced the document; restore from a fresh observation.
   const current=await channel.observe({condition:'output autosync option is on before it is restored',ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===true});
@@ -99,8 +114,10 @@ export async function resyncOutputFields(channel,before,{restoreOutputs}={}) {
   let restored=final,renamed=null;
   if(restore.length) {
     renamed=await restoreOutputs(restore);
+    // Field edits may switch the grid view; only the wizard root stays bound here.
     restored=(await channel.observe({condition:'native output mapping after previous output names are restored',readMappings:true,
-      ready:s=>mapped(s)&&s.wizard.output_columns.auto_sync.value===false&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
+      ready:s=>ready(s)&&s.wizard.root_ref===root&&s.wizard.output_columns.auto_sync.value===false&&s.node_mapping?.verified===true
+        &&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
     for(const change of restore) {
       const source=restored.source_fields.find(f=>f.name===change.source.name),now=source&&restored.target_fields.find(t=>sourceKey(t.source)===sourceKey(source));
       if(!now||now.name!==change.name||now.label!==change.label)throw new Error('Output resynchronization did not restore an existing output field: '+change.source.name);

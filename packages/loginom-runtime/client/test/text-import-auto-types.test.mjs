@@ -182,8 +182,8 @@ function mappingFixture({targetsOf,autosync=false,reset=false}) {
  let epoch=0;
  const channel={observe:async options=>{const s=state();if(options.readMappings)epoch++;s.epoch=epoch;if(!options.ready(s))throw Error('refused: '+options.condition);return s;},
   perform:async o=>{if(o.initialObservation.epoch!==epoch)throw Error('Initial bound observation is no longer current or ready');assert.equal(o.ready(o.initialObservation),true);const a=o.resolve(o.initialObservation);assert.deepEqual(a,{verb:'click',ref:'sync'});
-   clicks++;on=!on;if(on)targets=sources.map(s=>(!reset&&targets.find(t=>t.source.record_id===s.record_id))||targetOf(s));}};
- const rename=changes=>{for(const c of changes){const s=sources.find(x=>x.name===c.source.name);targets=targets.map(t=>t.source.record_id===s.record_id?{...t,name:c.name,label:c.label}:t);}return {verified:true,edits:changes};};
+   clicks++;on=!on;if(on)targets=sources.map(s=>(!reset&&targets.find(t=>t.source?.record_id===s.record_id))||targetOf(s));}};
+ const rename=changes=>{for(const c of changes){const s=sources.find(x=>x.name===c.source.name);targets=targets.map(t=>t.source?.record_id===s.record_id?{...t,name:c.name,label:c.label}:t);}return {verified:true,edits:changes};};
  return {sources,channel,rename,get clicks(){return clicks;},get autosync(){return on;},native:mapping()};
 }
 
@@ -230,4 +230,20 @@ test('resynchronization after a source re-read restores aliases of outputs bound
   const lost=mappingFixture({targetsOf:s=>[{...targetOf(s[0],'Custom'),source:old(s[0])}],reset});
   await assert.rejects(resyncOutputFields(lost.channel,lost.native,{restoreOutputs:async()=>({verified:true})}),/did not restore an existing output field: Id/);
  }
+});
+
+test('an output that lost its source on re-read keeps its alias or refuses before synchronization',async()=>{
+ const {resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ // execution-events.jsonl:1003 (text-auto-update): the type refresh recreated Amount's source; its output kept source null.
+ const orphan=(name,label=name)=>({name,label,type:'string',source:null});
+ const restore=f=>({restoreOutputs:async changes=>f.rename(changes)});
+ const plain=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Amount'),targetOf(s[2])]});
+ const kept=await resyncOutputFields(plain.channel,plain.native,restore(plain));
+ assert.deepEqual(kept.restored_outputs,[]);assert.deepEqual(kept.native_mapping.target_fields.map(t=>t.name),['Id','Amount','Extra']);
+ const alias=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Custom','Своё'),targetOf(s[2])]});
+ const restored=await resyncOutputFields(alias.channel,alias.native,restore(alias));
+ assert.deepEqual(restored.native_mapping.target_fields.map(t=>[t.name,t.label]),[['Id','Id'],['Custom','Своё'],['Extra','Extra']]);
+ const ambiguous=mappingFixture({targetsOf:s=>[targetOf(s[0]),orphan('Custom')]});
+ await assert.rejects(resyncOutputFields(ambiguous.channel,ambiguous.native,restore(ambiguous)),/cannot attribute an output that lost its source: Custom/);
+ assert.equal(ambiguous.clicks,0);
 });
