@@ -1,7 +1,12 @@
 export const clusteringNormalizations={none:{type:0,label:'Нет'},scale_minus_one_one:{type:2,label:'Масштабирование [-1;1]'},scale_zero_one:{type:3,label:'Масштабирование [0;1]'},absolute_scale:{type:4,label:'Абсолютное масштабирование'},standardize:{type:5,label:'Стандартизация'}};
 const need=(value,message)=>{if(!value)throw Error('Clustering: '+message);};
 export function validateClusteringParameters(p,mode,request){
- need(['k_means','g_means'].includes(mode),'only k_means and g_means are supported');
+ need(['k_means','g_means','apply'].includes(mode),'only k_means, g_means and apply are supported');
+ if(mode==='apply'){
+  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===0,'apply requires parameters:{} to preserve every saved setting');
+  need(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0&&request.finish==='execute','apply requires an existing trained model, unchanged connections, no mappings and finish execute');
+  need(request.read.ports.every(port=>port===0||port===1),'apply reads assignments (0) and saved centers (1)');return;
+ }
  const automatic=mode==='g_means';
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['features','seed','normalization',...(automatic?['min_clusters','max_clusters','threshold']:['clusters'])].includes(k)),'unsupported parameter for '+mode);
  need(request.target.kind==='existing'||p.features!==undefined&&(automatic?p.min_clusters!==undefined&&p.max_clusters!==undefined&&p.threshold!==undefined:p.clusters!==undefined),'new nodes require features and '+(automatic?'min_clusters, max_clusters, threshold':'clusters'));

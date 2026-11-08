@@ -81,3 +81,10 @@ test('g-means raises maximum before minimum and can return to fixed k on the sam
  const k=fixture([0,0],'existing',{auto:true,min_clusters:2,max_clusters:4});await k.run({clusters:3});
  assert.equal(k.actions.find(a=>a.verb==='set_checked').checked,false);
 });
+
+test('apply inspects fixed saved parameters without editing roles or normalization',async()=>{
+ const f=fixture([0,0],'existing'),r=await f.run({},'apply');
+ assert.equal(r.configuration.mode,'apply');assert.equal(r.settings_applied,false);
+ assert.equal(r.configuration.clusters,3);assert.deepEqual(r.configuration.normalization.map(n=>n.norm_type),[0,0]);
+ assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
+});

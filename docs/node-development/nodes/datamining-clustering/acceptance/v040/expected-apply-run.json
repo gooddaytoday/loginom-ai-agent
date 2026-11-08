@@ -1,0 +1,189 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "datamining.clustering",
+      "label_any": true
+    },
+    {
+      "type": "exports.text",
+      "label_any": true
+    },
+    {
+      "type": "exports.text",
+      "label_any": true
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Cluster",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Distance",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Y",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Category",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Cluster": 0,
+          "Distance": 2.0,
+          "RowID": 101,
+          "X": 4,
+          "Y": 2,
+          "Category": "A"
+        },
+        {
+          "Cluster": 1,
+          "Distance": 2.0,
+          "RowID": 102,
+          "X": 18,
+          "Y": 2,
+          "Category": "B"
+        },
+        {
+          "Cluster": 2,
+          "Distance": 2.0,
+          "RowID": 103,
+          "X": 2,
+          "Y": 18,
+          "Category": "C"
+        },
+        {
+          "Cluster": 1,
+          "Distance": 80.0,
+          "RowID": 104,
+          "X": 100,
+          "Y": 2,
+          "Category": "B"
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 1,
+      "columns": [
+        {
+          "name": "Cluster",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        },
+        {
+          "name": "Y",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-08
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Cluster": 0,
+          "X": 2.0,
+          "Y": 2.0
+        },
+        {
+          "Cluster": 1,
+          "X": 20.0,
+          "Y": 2.0
+        },
+        {
+          "Cluster": 2,
+          "X": 2.0,
+          "Y": 20.0
+        }
+      ]
+    }
+  ],
+  "clustering_apply": {
+    "features": [
+      "X",
+      "Y"
+    ],
+    "clusters": 3,
+    "seed": 42,
+    "normalization": "none",
+    "centers": [
+      [
+        2.0,
+        2.0
+      ],
+      [
+        20.0,
+        2.0
+      ],
+      [
+        2.0,
+        20.0
+      ]
+    ],
+    "cold_column_order": [
+      [
+        "Cluster",
+        "Distance",
+        "X",
+        "Y",
+        "RowID",
+        "Category"
+      ],
+      [
+        "Cluster",
+        "X",
+        "Y"
+      ]
+    ]
+  }
+}

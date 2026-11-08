@@ -109,7 +109,7 @@ test('full shell orders configuration before execution and binds empty fresh out
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
 
-for(const [type,mode,preserve] of [['preprocessing.coarse_classes','apply',true],['preprocessing.coarse_classes','internal',false],['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','k_means',false]])
+for(const [type,mode,preserve] of [['preprocessing.coarse_classes','apply',true],['preprocessing.coarse_classes','internal',false],['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','apply',true],['datamining.clustering','k_means',false]])
 for(const close of [true,false])test('saved-model intermediate finish guard '+type+'/'+mode+' close='+close,async()=>{
  const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
  p.target={kind:'existing',type,ref:node};p.mode=mode;

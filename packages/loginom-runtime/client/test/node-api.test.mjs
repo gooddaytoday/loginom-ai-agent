@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,154483,'629168b01c57ac96f6c608c4314b366eca3e7322026aea9ec0b9b4550d5fbe69'],
+  [nodeApiTools,154745,'db63cd5fb000bdfc6fd071fc1bab8197f7a7265a2bc31e335f38909b3fe43a96'],
   [nodeApiTools.map(userNodeTool),12571,'92669583402f4b9b6abffc38b4ed6754e83051958680805c2ae1067c1488b8aa'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -63,6 +63,9 @@ test('g-means public schema reaches the production handler with bounded automati
  const request={operation_id:'gmeans',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},target:{kind:'new',type:'datamining.clustering',position:{x:320,y:280}},inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:0,input:0}],mode:'g_means',parameters:{features:[{kind:'input_field',name:'X'},{kind:'input_field',name:'Y'}],min_clusters:2,max_clusters:4,threshold:1,seed:42,normalization:'none'},mappings:[],finish:'execute',read:{ports:[0,1],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
  const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,support.nodeApplyHandlers)};
  await dispatchNodeApi(runtime,'dock_node_apply',request);
+ const apply={...request,mode:'apply',target:{kind:'existing',type:'datamining.clustering',ref:{document_id:'doc',workflow_id:'wf',node_id:'saved'}},parameters:{},inputs:[]};
+ await dispatchNodeApi(runtime,'dock_node_apply',apply);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...apply,parameters:{seed:42}}),/apply/);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,parameters:{...request.parameters,clusters:3}}),/unsupported parameter/);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,target:{...request.target,type:'transform.calculator'}}),/Unsupported node configuration mode/);
 });

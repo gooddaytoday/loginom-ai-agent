@@ -49,3 +49,14 @@ for(const [norm_type,normalization] of [[2,'scale_minus_one_one'],[3,'scale_zero
  input.phases[1].value.configuration.normalization[1].norm_type=5;
  assert.throws(()=>clusteringConfigurationReadback(input),/normalization/);
 });
+
+test('apply readback requires discarded settings and cannot claim training',()=>{
+ const input=candidate();input.phases[1].value.configuration.mode='apply';
+ Object.assign(input.phases[2].value,{settings_applied:false,draft_discarded:true});
+ Object.assign(input.phases.at(-1).value,{settings_applied:false});delete input.phases.at(-1).value.training;
+ const result=clusteringConfigurationReadback(input);
+ assert.equal(result.mode,'apply');assert.equal(result.training.status,'not_requested');assert.equal(result.clusters,3);
+ for(const alter of [v=>v.phases[2].value.settings_applied=true,v=>v.phases[2].value.draft_discarded=false,v=>v.phases.at(-1).value.settings_applied=true,v=>v.phases.at(-1).value.training={status:'trained'}]){
+  const bad=structuredClone(input);alter(bad);assert.throws(()=>clusteringConfigurationReadback(bad));
+ }
+});

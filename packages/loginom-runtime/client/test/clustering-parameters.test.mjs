@@ -34,3 +34,12 @@ test('identifiers, strings, unknown and discrete numeric fields cannot become fe
 for(const normalization of ['scale_minus_one_one','scale_zero_one','absolute_scale'])test('native scaling enters the production validator: '+normalization,()=>{
  validateClusteringParameters({...p,normalization},'k_means',request);
 });
+
+test('apply requires an existing saved model and refuses all setting or connection edits',()=>{
+ const r={...request,target:{kind:'existing'},inputs:[],finish:'execute'};
+ validateClusteringParameters({},'apply',r);
+ for(const patch of [{clusters:3},{features:p.features},{seed:42},{normalization:'none'}])
+  assert.throws(()=>validateClusteringParameters(patch,'apply',r),/apply/);
+ for(const change of [{target:{kind:'new'}},{inputs:[{input:0}]},{mappings:[{direction:'output',port:0}]},{finish:'done'},{finish:'close'}])
+  assert.throws(()=>validateClusteringParameters({},'apply',{...r,...change}),/apply/);
+});
