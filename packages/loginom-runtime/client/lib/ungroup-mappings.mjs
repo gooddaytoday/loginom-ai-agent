@@ -98,7 +98,7 @@ export async function configureUngroupOutputs(channel,c,p,mappings,finishWizard)
   const closed=await closePreparedWizard(channel);
   ports.push({port:1,schema:fields,native_mapping:m,definition,closed});
  }
- return {...result,definition,finish,ports};
+ return {...result,effect_possible:true,definition,finish,ports};
 }
 export async function readUngroupOutputs(channel,read,ctx,mapped){
  const ports=[];

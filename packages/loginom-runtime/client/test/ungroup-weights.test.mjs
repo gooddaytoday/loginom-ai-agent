@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateUngroupParameters,ungroupOutputFields} from '../lib/ungroup-parameters.mjs';
 import {configureUngroup,supportedUngroupConfiguration} from '../lib/ungroup-procedure.mjs';
-import {readUngroupOutputs} from '../lib/ungroup-mappings.mjs';
+import {configureUngroupOutputs,readUngroupOutputs} from '../lib/ungroup-mappings.mjs';
 import {createUngroupNodeSupport} from '../lib/ungroup-node.mjs';
 const u={keys:[{total:'Group',support:'Group'}],value_field:'Total',item_field:'Item',share_field:'Weight',rounding:{format:'none'},balance:'none'};
 const fields=[['Group','Total'],['Group','Item','Weight']].map(ns=>ns.map((name,index)=>({name,label:name,index,usage:name==='Group'?6:name==='Total'?7:name==='Item'?4:9,type:['Total','Weight'].includes(name)?'integer':'string'})));
@@ -54,4 +54,20 @@ test('shares output retains the verified native mapping labels and data kinds',a
  const run=()=>readUngroupOutputs({readOutputPort:async()=>({output})},{ports:[0]},ctx,mapped);
  assert.equal((await run()).ports[0].schema[0].data_kind,'Непрерывный');
  output.schema[0].label='Changed';await assert.rejects(run(),/identity|schema/);
+});
+test('Ungroup output phase reports possible effect after Done with unchanged fields',async()=>{
+ const c={...structuredClone(configuration),method:'shares'};
+ const source=ungroupOutputFields({...c,ungroup:u}).map((f,index)=>({...f,index,record_id:'s'+index,field_id:'f'+index}));
+ const target=source.map((f,index)=>({...f,record_id:'t'+index,source:f,excluded:false,data_kind:'Дискретный'}));
+ const definition=target.map(f=>({...f,status:'observed'}));
+ const state={wizard:{stage:'output_mapping',output_columns:{fields:definition,page:{status:'complete_definition_page',schema_id:'output',offset:0,limit:8,total_columns:target.length,returned:target.length,next_offset:null}}},
+  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,source_fields:source,target_fields:target,autosync:false}};
+ let commits=0;
+ const channel={openOutputPort:async port=>assert.equal(port,0),observe:async options=>{assert.ok(options.ready(state),options.condition);return state;},perform:async()=>assert.fail('no field edits expected')};
+ const result=await configureUngroupOutputs(channel,c,{},[],async(mode,verify,observed)=>{
+  assert.equal(mode,'done');assert.equal(verify,true);assert.equal(observed.definition_complete,true);commits++;
+  return {settings_applied:true,mode:'done'};
+ });
+ assert.equal(commits,1);assert.deepEqual(result.changes,[]);
+ assert.equal(result.effect_possible,true,'Done can commit native settings even without field edits');
 });
