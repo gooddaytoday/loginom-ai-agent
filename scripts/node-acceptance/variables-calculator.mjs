@@ -19,7 +19,7 @@ export function auditVariablesCalculatorHistory(events,initial,final,scenario='v
  const a=first.result.configuration?.readback,b=changed.result.configuration?.readback;
  need(a?.kind==='variables_calculator'&&b?.kind===a.kind&&a.syntax_validation==='accepted_by_loginom_next'&&b.syntax_validation===a.syntax_validation,'CONFIGURATION_READBACK');
  if(scenario==='variables-calculator-modes'){
-  need(a.expressions.length===4&&b.expressions.length===4&&before.variables.length===3&&after.variables.length===3,'MODES_COUNTS');
+  need(a.expressions.length===3&&b.expressions.length===3&&before.variables.length===2&&after.variables.length===2,'MODES_COUNTS');
   need([a,b].every(r=>r.expressions.every((e,i)=>e.index===i))
    &&isDeepStrictEqual(a.expressions.map(e=>e.name),b.expressions.map(e=>e.name)),'CONFIGURED_EXPRESSION_ORDER');
   const emitted=readback=>readback.expressions.filter(e=>e.intermediate===false).map(e=>e.name);

@@ -23,30 +23,29 @@ test('calculator audit checks two fresh executions, exact typed native values, o
  }
 });
 
-test('modes audit distinguishes four configured expressions from three emitted variables and checks only base changes',()=>{
+test('modes audit distinguishes three configured expressions from two emitted variables and checks only base changes',()=>{
  const state=total=>({nodes:[{type:'variables.calculator'}],outputs:[],variable_inventory:{outputs:[{node:{type:'variables.calculator'},port:0,variables:[
   {name:'report_date',label:'Дата отчёта',type:'datetime',value:'2026-11-07T23:59:58.123'},
-  {name:'marker',label:'Синтетическая константа теста',type:'boolean',value:false},
   {name:'total',label:'Итого',type:'integer',value:total},
  ]}]}});
  const before=state(3),after=state(5);
  const events=()=>history(before,after).map((e,i)=>{
   Object.assign(e.result.output.variable_ports[0].variables[0].cell,{precision:'millisecond',representation:'local_datetime',timezone:'unspecified'});
   const expressions=e.result.configuration.readback.expressions;
-  expressions.splice(2,0,{index:2,name:'base',label:'Основа',type:'integer',formula:i?'4':'2',description:'keep',intermediate:true});
-  expressions[3].index=3;
+  expressions.splice(1,0,{index:1,name:'base',label:'Основа',type:'integer',formula:i?'4':'2',description:'keep',intermediate:true});
+  expressions[2].index=2;
   return e;
  });
  assert.equal(auditVariablesCalculatorHistory(events(),before,after,'variables-calculator-modes').status,'PASS');
  for(const corrupt of [
-  e=>e[0].result.configuration.readback.expressions[2].intermediate=false,
-  e=>e[1].result.configuration.readback.expressions[2].description='changed',
-  e=>e[1].result.configuration.readback.expressions[2].type='real',
-  e=>e[1].result.configuration.readback.expressions[2].formula='2',
+  e=>e[0].result.configuration.readback.expressions[1].intermediate=false,
+  e=>e[1].result.configuration.readback.expressions[1].description='changed',
+  e=>e[1].result.configuration.readback.expressions[1].type='real',
+  e=>e[1].result.configuration.readback.expressions[1].formula='2',
   e=>e[1].result.configuration.readback.expressions[0].formula='changed',
   e=>e[1].result.configuration.readback.expressions.pop(),
   e=>e[1].result.configuration.readback.expressions.reverse(),
-  e=>{const x=e[1].result.configuration.readback.expressions;x.unshift(x.splice(2,1)[0]);x.forEach((v,i)=>v.index=i);},
+  e=>{const x=e[1].result.configuration.readback.expressions;x.unshift(x.splice(1,1)[0]);x.forEach((v,i)=>v.index=i);},
   e=>e[1].result.output.variable_ports[0].variables[0].id=99,
  ]){const e=events();corrupt(e);assert.throws(()=>auditVariablesCalculatorHistory(e,before,after,'variables-calculator-modes'));}
 });
