@@ -8,7 +8,7 @@ import {groupingConfigurationReadback} from './grouping-readback.mjs';
 import {groupingParametersSchema} from './node-api.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 export function createGroupingNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.group_data',mode:'aggregate',revision:'grouping-v4-internal-1',readback:groupingConfigurationReadback,parameterSchema:groupingParametersSchema,
+ type:'transform.group_data',mode:'aggregate',revision:'grouping-v4-internal-2',readback:groupingConfigurationReadback,parameterSchema:groupingParametersSchema,
  validate:validateGroupingParameters,preflight:preflightGroupingSource,
  beforeInput:prepareGroupingInput,
  configurationObservation:{condition:'grouping configuration page',readGrouping:true,ready:s=>s.wizard?.stage==='grouping'&&s.node_grouping?.verified===true},
