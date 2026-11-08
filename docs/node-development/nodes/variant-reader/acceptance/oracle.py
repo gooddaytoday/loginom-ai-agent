@@ -87,9 +87,12 @@ if __name__ == '__main__':
     assert vectors[-2] == {'cell_type': 'null', 'value': None}
     assert vectors[-1] == {'cell_type': 'empty'}
     assert len(result['cases']['collapse']['outputs'][0]['rows']) == 15
-    path = ROOT / 'acceptance/expected.json'
-    if sys.argv[1] == '--write':
-        path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-    else:
-        assert json.loads(path.read_text(encoding='utf-8')) == result
+    # Stage 1: run-check reads one private expected per selected case.
+    files = {'expected.json': result, **{'expected-' + name + '.json': case for name, case in result['cases'].items()}}
+    for name, value in files.items():
+        path = ROOT / 'acceptance' / name
+        if sys.argv[1] == '--write':
+            path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        else:
+            assert json.loads(path.read_text(encoding='utf-8')) == value, name
     print('PASS: independent proposal, collapse case and 13 precision vectors')

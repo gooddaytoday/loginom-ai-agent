@@ -850,3 +850,9 @@ Save, independent cold execution and confirmed package close/logout are required
 immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
 `fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
 real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.
+
+`variant-reader-collapse` — task-collapse.md + mixed.csv общего Variant reader;
+expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Values
+сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
+порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
+проверяется принятым `replace-keep-variant`.

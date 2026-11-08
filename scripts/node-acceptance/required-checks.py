@@ -112,6 +112,8 @@ RULES = (
      ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),
     ((C + 'text-import-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),
     ((C + 'collapse-*.mjs', 'docs/node-development/nodes/collapse-columns/acceptance/**'), ('live-ui',), ('collapse-variant', 'collapse-mixed')),
+    ((C + 'variant-native-*.mjs', C + 'node-port-output.mjs', C + 'node-procedure.mjs', 'docs/node-development/nodes/variant-reader/acceptance/**'),
+     ('live-ui',), ('variant-reader-collapse', 'collapse-variant', 'collapse-mixed', 'replace-keep-variant', 'replace-boolean', 'variables-rows', 'lgd-import-empty-variant')),
     ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
      ('live-ui',), ('crosstable-real-keys',)),
     (('docs/node-development/nodes/transform-crosstable/acceptance/modes/**',
