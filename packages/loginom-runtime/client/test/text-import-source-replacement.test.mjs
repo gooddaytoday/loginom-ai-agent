@@ -177,6 +177,26 @@ test('unconfigured existing import requires complete settings and verified sourc
  assert.equal(f.refreshes,0);
 });
 
+test('an observed filename binding satisfies the existing Import slot without a literal or a path write',async()=>{
+ const f=fixture({unconfigured:true});delete f.parameters.source.source_path;
+ const before=structuredClone(f.parameters),observe=f.channel.observe;
+ f.channel.observe=options=>observe({...options,ready:s=>{
+  Object.assign(s.wizard.import_source.fields.source_path,{variable_mode:true,variable_caption:'CsvPath'});
+  return options.ready(s);
+ }});
+ const acts=[];f.channel.act=async action=>{acts.push(action);throw Error('STOP_AT_NATIVE_NEXT');};
+ await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv',{boundSource:true}),/STOP_AT_NATIVE_NEXT/);
+ assert.equal(acts.length,1);assert.equal(acts[0].verb,'wizard_step');
+ assert.deepEqual(f.parameters,before);
+});
+test('bound existing patches reject a literal conflict or an unobserved variable mode before settings gestures',async()=>{
+ for(const literal of [false,true]){
+  const f=fixture({unconfigured:true});if(!literal)delete f.parameters.source.source_path;
+  await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv',{boundSource:true}),literal?/BINDING_CONFLICT/:/BINDING_SOURCE_UNVERIFIED/);
+  assert.deepEqual(f.gestures,[]);
+ }
+});
+
  test('unconfigured patch without explicit path refuses before any settings gesture and leaves request intact',async()=>{
   for(const change of [p=>delete p.source.source_path,p=>delete p.source,p=>delete p.format,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
    const f=fixture({unconfigured:true});change(f.parameters);const before=structuredClone(f.parameters);

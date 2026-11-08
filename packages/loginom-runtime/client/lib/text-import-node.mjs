@@ -310,7 +310,9 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       async openWizard(ctx) {
         enter(ctx);
         if(operation.importBinding){
-          const mapped=await channel.mapVariablePort({direction:'input',kind:'variables',port:0});
+          // Binding only observes the connected layout; no input mapping
+          // changes were requested. Cancel instead of saving its defaults.
+          const mapped=await channel.readVariablePortMapping({direction:'input',kind:'variables',port:0});
           requireValue(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');
           operation.importBinding.mapping=mapped.mapping;
           operation.importBinding.graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
@@ -389,7 +391,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           }
           if(operation.importBinding)await configureImportBinding(channel,operation.importBinding);
           configured=operation.nodeApply.request.target.kind==='existing'
-            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch})
+            ?await configureTextImportPatch(channel,p.settings,owner,sourceReceipt.source.destination,{preserveSchema:!!sourceSwitch,boundSource:!!operation.importBinding})
             :await configureTextImportFields(channel,p.settings,owner,{boundSource:!!operation.importBinding});
           if(operation.importBinding)configured={...configured,source:resolveImportBindingSourceReadback(configured.source,operation.importBinding,ctx.node)};
           requireValue(configured.columns.some(c=>c.used),'Import output requires at least one used field');
