@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readNodeVariableOutput,decodePortCell} from '../lib/node-port-output.mjs';
+import {readVariableRecords} from '../lib/node-output-context.mjs';
+function fixture(active=true){
+ const prefix='MF;TF-1',root=prefix+';ModelForm;PreviewWindow',els=new Map(),cmps=new Map();let stage='graph',clicks=0;
+ const el=(tid,shown=()=>true)=>{const e={id:tid,closest:()=>null,checkVisibility:shown,classList:{contains:()=>true},getAttribute:k=>k==='data-tid'?tid:null,getBoundingClientRect:()=>({x:0,y:0,width:10,height:10}),contains:x=>x===e||x?.id?.startsWith(tid+';')};els.set(tid,e);return e;};
+ const tab=el(prefix),nodeEl=el(prefix+';Graph;Vars'),portEl=el(nodeEl.id+';Output_Var-4');portEl.getAttribute=()=>null;
+ const n={FGuid:'node',FIconCls:'bg-vendor-icon-modelvariables',FCell:{},data:{},FPorts:[{FCollection:[]}]};
+ for(let i=0;i<5;i++)n.FPorts[0].FCollection.push({FGuid:'guid'+i,FType:1,FSubType:3,FStatus:active?1:0,parent:n,FCell:{parent:n.FCell},data:{}});
+ const port=n.FPorts[0].FCollection[4],container={contains:e=>e===nodeEl||e===portEl,getBoundingClientRect:()=>({x:0,y:0}),scrollLeft:0,scrollTop:0};
+ const g={container,getCellAt:()=>port.FCell,view:{getState:cell=>({shape:{node:cell===n.FCell?nodeEl:portEl}})}};
+ const window=el(root,()=>stage==='preview'),menu=el('mn',()=>stage==='menu'),command=el('mn;mniShowDataPreview',()=>stage==='menu'),close=el(root+';p.h;close',()=>stage==='preview');
+ const formEl=el(root+';PreviewForm;VariablesForm',()=>stage==='preview'),gridEl=el(formEl.id+';grdValuePreview',()=>stage==='preview');
+ const items=[{isModel:true,data:{ID:7,Index:0,Name:'CsvPath',DisplayName:'CsvPath',DataType:5,ValueVariant:'/own/a.csv'}}];
+ const store={complete:true,loadCount:1,getData:()=>({items}),getCount:()=>items.length,getTotalCount:()=>items.length,isLoading:()=>false,getRange:()=>items};
+ class VariablesForm{};const form=Object.assign(new VariablesForm(),{FView:{el:{dom:formEl}},FModelNode:n.data,FVariablesStore:store});
+ cmps.set(formEl.id,{Controller:form});cmps.set(gridEl.id,{el:{dom:gridEl},getStore:()=>store});
+ class ModelForm{};const m=Object.assign(new ModelForm(),{FDiagram:{FmxGraph:g,FNodes:{FCollection:[n]}},FCurrentPortMenu:port,FPortContextMenu:{el:{dom:menu}},FPreviewManager:{FPreviewWindow:{FView:{el:{dom:window}}},FPreviewForm:{FCurrentPreviewNode:n,FCurrentPreviewPort:port,FFormCache:{vars:form}}}});
+ cmps.set(menu.id,m.FPortContextMenu);
+ const workflow={},record={phase:'verified',workflowId:'flow',tab,packageNode:{},nodeTargetWorkflowNode:workflow,nodeTargetPortIdentities:new WeakMap([[port,{graph:g,node:n,cell:port.FCell,guid:port.FGuid,data:port.data,nodeTid:nodeEl.id,type:1,subtype:3,tid:nodeEl.id+';Output_Var-4'}]])};
+ const document={querySelectorAll:q=>{const tid=JSON.parse(q.slice(10,-1)),e=els.get(tid);return e?[e]:[];},elementFromPoint:()=>stage==='menu'?command:stage==='preview'?close:portEl};
+ const context=vm.createContext({TextEncoder,document,location:{origin:'https://app.loginom.ai'},innerWidth:1000,innerHeight:1000,Ext:{getCmp:id=>cmps.get(id)},bg:{app:{Version:'7.4.2',ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:m,Node:{data:{node:workflow}}}})}}}}}}},__loginomDockPreparationV1:{document,id:'doc',receipts:new Map([['r',record]])}});
+ const page={evaluate:(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context)),locator:()=>({waitFor:async()=>{}}),waitForFunction:async()=>{},keyboard:{press:async()=>{stage='graph';}},mouse:{click:async(x,y,o)=>{clicks++;stage=o?.button==='right'?'menu':stage==='menu'?'preview':'graph';}}};
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix,tab_tid:prefix},node:{node_id:'node'}};
+ const task={binding,builtin_snapshot:true,port:4,port_guid:'guid4',origin:'https://app.loginom.ai',build:'7.4.2',operation_id:'op',deadline:Date.now()+10000};
+ const readNode=async()=>({verified:true,surface:'graph',document_id:'doc',workflow_id:'flow',node_id:'node'});
+ return {run:()=>readNodeVariableOutput(page,task,readNode,async()=>{throw Error('Executable reader must not run for builtin snapshot');},readVariableRecords,decodePortCell),port,record,store,get clicks(){return clicks;},get stage(){return stage;}};
+}
+test('inactive builtin preflight refuses before any gesture and never opens values settings',async()=>{const f=fixture(false),r=await f.run();assert.equal(r.verified,true,r.error);assert.equal(r.source_active,false);assert.equal(r.effect_possible,false);assert.equal(f.clicks,0);});
+test('active builtin uses the owned VariablesForm, closes it and preserves computed source',async()=>{const f=fixture(),r=await f.run();assert.equal(r.verified,true,r.error);assert.equal(r.source_active,true);assert.equal(r.independent_readback,true);assert.equal(r.variables[0].cell.value,'/own/a.csv');assert.equal(r.output.source,'snapshot');assert.equal(r.output.execution_id,null);assert.equal(f.port.FStatus,1);assert.equal(f.stage,'graph');assert.equal(f.clicks,3);});
+test('foreign cached port identity refuses before gestures',async()=>{const f=fixture();f.record.nodeTargetPortIdentities.get(f.port).guid='foreign';const r=await f.run();assert.equal(r.verified,false);assert.equal(f.clicks,0);assert.equal(r.cleanup_complete,true);});
+test('failed typed store read closes the owned preview in cleanup',async()=>{const f=fixture();f.store.getTotalCount=()=>2;const r=await f.run();assert.equal(r.verified,false);assert.equal(r.cleanup_complete,true);assert.equal(f.stage,'graph');assert.equal(r.variables,undefined);assert.equal(f.clicks,3);assert.match(r.error,/preview total/); });

@@ -46,13 +46,17 @@ upload_operation_id. Defaults: UTF-8, заголовок в первой стр�
 <!-- mode: delimited -->
 ## Путь из переменной
 
-Выбирай `imports.text`/`delimited`, без Калькулятора/JS. Задай
-`bindings:[{parameter:"/settings/source/source_path",variable:{kind:"variables",input:0,name:"CsvPath"}}]`;
-`variable_inputs`: ref `variables.user`, output 4, input 0, kind variables.
-CsvPath — непустая строка подтверждённого пути. Перед каждым Execute подтверди
-файл через `dock_storage_source`. При настройке: `parameters.source` — проверенная
-доставка/storage; `settings.source.source_path` опусти.
-Для смены файла измени только CsvPath. Тот же Import выполняй с
-`parameters:{settings:{}}`, `bindings:[]`, inputs/mappings пустые, в том числе
-после Save/reopen. Проверяй `configuration.bindings`.
+`imports.text`/`delimited`: bind `/settings/source/source_path` to
+`{kind:"variables",input:0,name:"CsvPath"}` in `bindings`; connect
+`variable_inputs` from `variables.user` output 4 to input 0.
+Before configuration, execute `variables.to_table`/`columns`, `parameters:{}`,
+source output 4 → variables input 0, `read:{ports:[0]}`.
+Do not reopen UserVars values: even Cancel deactivates it.
+Import reads active VariablesForm; inactive refuses before mutation.
+No Calculator/JS or literal copy.
+Verify CsvPath with `dock_storage_source` before each Execute.
+For configuration supply verified delivery/storage in `parameters.source`, omit
+`settings.source.source_path`. To switch files change only CsvPath, execute the
+same Import with `parameters:{settings:{}}`, `bindings:[]`, empty inputs/mappings;
+also after Save/reopen. Check `configuration.bindings`.
 <!-- /mode -->

@@ -82,7 +82,10 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
  const nodes=graph.nodes.filter(n=>n.ref.node_id===(link.source?.node_id??link.source));
  need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
  const source=nodes[0],channel=importBindingChannel(options,ctx,config,source.ref);
- const proof=await channel.configureUserVariables([],'close');
+ const sourcePort=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===4);
+ const proof=saved?await channel.configureUserVariables([],'close'):
+  sourcePort?.length===1?await channel.readBuiltinVariablesPreview({port_guid:sourcePort[0].port_guid}):null;
+ need(saved||proof?.source_active===true,'BINDING_SOURCE_UNVERIFIED: execute variables.to_table from source output 4 before configuring Import; do not reopen source values');
  const result={...resolveImportBindingValue(proof,name,mapping,expectedPath),proof,source,link,graph,mapping};
  // The host resolves only an observed/admitted file in its own selected input
  // directory. It never turns an arbitrary string into a storage reference.
