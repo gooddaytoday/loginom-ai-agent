@@ -10,12 +10,18 @@ function fixture({existing=false,type='variables.user',complete=true,finish='exe
  let reads=0;
  return {run:()=>preflightFilterSource({operation:{parameters:request,nodeTargetAdapter:{observe:async()=>{reads++;return graph;}}}}, {deadline:1000},{}),reads:()=>reads};
 }
-for(const existing of [false,true])test('builtin filter source refuses before mutations, including saved bindings '+existing,async()=>{
+for(const existing of [false])test('new builtin filter source refuses without explicit bindings '+existing,async()=>{
  const f=fixture({existing});await assert.rejects(f.run(),e=>{
   assert.match(e.message,/Builtin Scenario variables output 4 is inactive/);
   assert.doesNotMatch(e.message,/Filter variable type or NULL differs/);
   assert.deepEqual(e.nodePhaseRefusal,{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});return true;
  });assert.equal(f.reads(),1);
+});
+for(const bindings of [undefined,[]])for(const patch of [{finish:'done'},{mappings:[{direction:'output',port:0,autosync:false}]},{variable_inputs:[{source:ref,output:4,input:0,kind:'control'}]}])test('existing builtin binding survives an omitted patch '+JSON.stringify({bindings,patch}),async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'flow'},target:{kind:'existing',type:'transform.filter_data',ref:{...ref,node_id:'filter'}},mode:'conditions',finish:'execute',parameters:{},inputs:[],mappings:[],variable_inputs:[],bindings,...patch};
+ const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[{ref,type:'variables.user'}],variable_links:[{source:'source',target:'filter',kind:'control',input:0,output:4}]};
+ const result=await preflightFilterSource({operation:{parameters:request,nodeTargetAdapter:{observe:async()=>graph}}},{},{});
+ assert.equal(result.verified,true);
 });
 for(const type of ['variables.from_table','variables.calculator'])test('executed variable source is admitted '+type,async()=>{
  const f=fixture({type});assert.equal((await f.run()).verified,true);assert.equal(f.reads(),1);

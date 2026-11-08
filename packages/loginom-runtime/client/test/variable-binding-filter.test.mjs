@@ -2,14 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateVariableBindings} from '../lib/variable-binding-parameters.mjs';
 import {resolveFilterBindings,configureSavedFilterBindings,preserveFilterBindings} from '../lib/filter-bindings.mjs';
-import {filterBindingInventory} from '../lib/variable-binding-readback.mjs';
+import {filterBindingInventory,readFilterBindings} from '../lib/variable-binding-readback.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {nodeApiTools,dispatchNodeApi} from '../lib/node-api.mjs';
 import {prepareFilterInput,preflightFilterSource} from '../lib/filter-node.mjs';
+import {createFilterNodeSupport} from '../lib/filter-node.mjs';
 
 const binding={parameter:'/groups/0/0/value',variable:{kind:'control',input:0,name:'Limit'}};
 const parameters={groups:[[{field:{kind:'input_field',name:'Amount'},operator:'>',type:'integer'}]]};
+test('binding readback attempts cleanup when opening fails and retains the original cause',async()=>{
+ const original=Error('OPEN_READBACK_FAILED'),cleanup=Error('CANCEL_FAILED'),conditions=[];
+ const channel={observe:async o=>{conditions.push(o.condition);throw conditions.length===1?original:cleanup;}};
+ await assert.rejects(readFilterBindings(channel,{readGraph:async()=>({})}),e=>e===cleanup&&e.cause===original);
+ assert.deepEqual(conditions,['prepared graph available for settings','prepared wizard can be cancelled']);
+});
 test('binding supplies one missing scalar operand without changing the caller patch',()=>{
  const before=structuredClone(parameters);
  const resolved=resolveFilterBindings(parameters,[binding]);
@@ -124,5 +131,28 @@ test('preserveFilterBindings keeps untargeted saved bindings and rejects implici
  assert.doesNotThrow(()=>preserveFilterBindings(native,p,bindings));
  p.groups[0][0].value=5;assert.throws(()=>preserveFilterBindings(native,p,bindings),/BINDING_CONFLICT/);
  assert.deepEqual(native,before);
- for(const empty of [undefined,[]])assert.doesNotThrow(()=>preserveFilterBindings(native,p,empty));
+ for(const empty of [undefined,[]]){
+  assert.throws(()=>preserveFilterBindings(native,p,empty),/BINDING_CONFLICT/);
+  p.groups[0][0].value=row.value;p.groups[0][1].value=0;
+  assert.doesNotThrow(()=>preserveFilterBindings(native,p,empty));
+  p.groups[0][0].value=5;
+ }
+});
+
+for(const bindings of [undefined,[]])test('production Filter configure rejects literal replacement before its first mutation '+JSON.stringify(bindings),async()=>{
+ const node={document_id:'doc',workflow_id:'flow',node_id:'filter'},records=[];
+ const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'scenario',label:'Scenario'}]};
+ const n={...node,verified:true,surface:'wizard',locked:false,tid:'MF;TF-1;WizrdMCF'};
+ const native={verified:true,node_context:n,inventory_complete:true,input_fields:[{name:'Amount',type:'integer'}],control_variables:[{name:'Limit',type:'integer',value:5,is_null:false}],editor:null,dialogs:[],
+  rows:[{kind:'condition',record_id:'saved-row',variable_mode:1,field:{kind:'input_field',name:'Amount'},type:'integer',operator_code:2,value:{kind:'variable',name:'Limit'}}]};
+ const state={origin:'https://loginom.test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+  wizard:{status:'observed',stage:'row_filter',root_tid:n.tid,root_ref:'root',owner_context:{status:'observed'}},prepared_node_context:n,
+  ui:{dialogs:[],masks:[],truncated:{dialogs:false,masks:false},elements:[]}};
+ const request={target:{kind:'existing'},finish:'done',bindings,mappings:[]};
+ const operation={id:'preserve',deadline:Date.now()+10000,action:{action_key:'node.apply',revision:'1'},nodeApply:{request,node,phases:[]}};
+ const driver=createFilterNodeSupport({targetOrigin:state.origin,targetBuild:state.loginom_build}).nodeApplyDriverFactory({operation,now:Date.now,receiptOptions:()=>({}),
+  onRecord:async row=>{records.push(row);return structuredClone(row);},execute:async code=>code.includes('async function readFilterContext(')?structuredClone(native):{status:'SUCCEEDED',output:structuredClone(state)}});
+ const p=structuredClone(parameters);p.groups[0][0].value=5;
+ await assert.rejects(driver.configureCalculator({document_id:node.document_id,workflow_ref:workflow,node,deadline:operation.deadline},p),/BINDING_CONFLICT/);
+ assert.equal(records.some(r=>r.phase==='node_step_prepared'),false);
 });

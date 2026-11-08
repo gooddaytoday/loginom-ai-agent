@@ -49,10 +49,13 @@ export function createFilterNodeSupport(config){return createTabularTransformNod
    return {verified:true,cleanup_complete:true,effect_possible:false,configuration:s.node_filter,draft_edits_skipped:true};
   }
   let changed,controlVariables;
+  if(p.groups!==undefined){
+   const s=await channel.observe({condition:'saved binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
+   preserveFilterBindings(s.node_filter,p,request.bindings);
+  }
   if(request.bindings?.length){
    const s=await channel.observe({condition:'binding row baseline',readFilter:true,ready:s=>s.wizard?.stage==='row_filter'&&s.node_filter?.verified===true});
    need(!s.node_filter.rows.some(r=>r.variable_mode===128),'BINDING_PARAMETER_UNSUPPORTED: saved variable lists cannot be combined with bindings');
-   preserveFilterBindings(s.node_filter,p,request.bindings);
    if(bindingSource&&request.bindings.length)controlVariables=filterBindingVariables(s.node_filter,bindingMapping,bindingSource,
     [...request.bindings.map(b=>b.variable.name),...s.node_filter.rows.flatMap(r=>r.value?.kind==='variable'?[r.value.name]:[])]);
    validateFilterBindingValues(p,request.bindings,s.node_filter,controlVariables);
@@ -78,7 +81,7 @@ export async function preflightFilterSource(options,ctx,config){
   if(request.bindings?.length)need(sources.length===1,'BINDING_PORT_MISMATCH: control input 0 requires one source');
   for(const id of sources){
    const nodes=graph.nodes.filter(n=>n.ref.node_id===id);need(nodes.length===1,'Unique filter control source required');
-   if(nodes[0].type==='variables.user'&&(!request.bindings?.length||request.parameters.groups?.flat().some(c=>isFilterVariable(c.value??c.values)))){
+   if(nodes[0].type==='variables.user'&&(request.target.kind==='new'&&!request.bindings?.length||request.parameters.groups?.flat().some(c=>isFilterVariable(c.value??c.values)))){
     const error=Error('Filter control variables require an executed source such as Table to variables or Variables calculator. Builtin Scenario variables output 4 is inactive and cannot supply filter values.');
     error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
    }
