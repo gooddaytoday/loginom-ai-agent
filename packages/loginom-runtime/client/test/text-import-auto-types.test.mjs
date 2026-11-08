@@ -172,7 +172,7 @@ test('an empty native mapping is deferred to execution only for auto-detect all 
 });
 
 const fieldOf=(name,id)=>({record_id:'s'+id,field_id:String(id),name,label:name,type:'string'});
-const targetOf=(source,name=source.name)=>({name,label:name,type:'string',source:{record_id:source.record_id,field_id:source.field_id}});
+const targetOf=(source,name=source.name)=>({name,label:name,type:'string',source:{record_id:source.record_id,field_id:source.field_id,name:source.name,label:source.label}});
 function mappingFixture({targetsOf,autosync=false,reset=false}) {
  const sources=['Id','Amount','Extra'].map((n,i)=>fieldOf(n,i));
  let on=autosync,targets=targetsOf(sources),clicks=0;
@@ -183,7 +183,8 @@ function mappingFixture({targetsOf,autosync=false,reset=false}) {
  const channel={observe:async options=>{const s=state();if(options.readMappings)epoch++;s.epoch=epoch;if(!options.ready(s))throw Error('refused: '+options.condition);return s;},
   perform:async o=>{if(o.initialObservation.epoch!==epoch)throw Error('Initial bound observation is no longer current or ready');assert.equal(o.ready(o.initialObservation),true);const a=o.resolve(o.initialObservation);assert.deepEqual(a,{verb:'click',ref:'sync'});
    clicks++;on=!on;if(on)targets=sources.map(s=>(!reset&&targets.find(t=>t.source.record_id===s.record_id))||targetOf(s));}};
- return {sources,channel,get clicks(){return clicks;},get autosync(){return on;},native:mapping()};
+ const rename=changes=>{for(const c of changes){const s=sources.find(x=>x.name===c.source.name);targets=targets.map(t=>t.source.record_id===s.record_id?{...t,name:c.name,label:c.label}:t);}return {verified:true,edits:changes};};
+ return {sources,channel,rename,get clicks(){return clicks;},get autosync(){return on;},native:mapping()};
 }
 
 test('«Только новые» adds the outputs of new source fields natively and restores autosync',async()=>{
@@ -212,4 +213,21 @@ test('a synchronized or disconnected output mapping is classified without touchi
  assert.equal(on.clicks,0);
  const renamed=mappingFixture({targetsOf:s=>[targetOf(s[0],'Custom'),targetOf(s[1])],reset:true});
  await assert.rejects(resyncOutputFields(renamed.channel,renamed.native),/changed an existing output field: Id/);
+});
+
+test('resynchronization after a source re-read restores aliases of outputs bound to old source records',async()=>{
+ const {resyncOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const old=x=>({record_id:'old'+x.record_id,field_id:x.field_id,name:x.name,label:x.label});
+ for(const reset of [false,true]) {
+  const f=mappingFixture({targetsOf:s=>[{...targetOf(s[0],'Custom'),label:'Своё',source:old(s[0])},{...targetOf(s[1]),source:old(s[1])}],reset});
+  const calls=[];
+  const result=await resyncOutputFields(f.channel,f.native,{restoreOutputs:async changes=>{calls.push(changes);return f.rename(changes);}});
+  assert.deepEqual(calls,[[{source:{kind:'configured_field',name:'Id'},name:'Custom',label:'Своё'}]]);
+  assert.deepEqual(result.native_mapping.target_fields.map(t=>[t.name,t.label]),[['Custom','Своё'],['Amount','Amount'],['Extra','Extra']]);
+  assert.equal(f.autosync,false);
+  const silent=mappingFixture({targetsOf:s=>[{...targetOf(s[0],'Custom'),source:old(s[0])}],reset});
+  await assert.rejects(resyncOutputFields(silent.channel,silent.native),/changed an existing output field: Id/);
+  const lost=mappingFixture({targetsOf:s=>[{...targetOf(s[0],'Custom'),source:old(s[0])}],reset});
+  await assert.rejects(resyncOutputFields(lost.channel,lost.native,{restoreOutputs:async()=>({verified:true})}),/did not restore an existing output field: Id/);
+ }
 });

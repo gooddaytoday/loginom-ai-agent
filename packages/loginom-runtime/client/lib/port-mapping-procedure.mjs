@@ -54,8 +54,11 @@ export function outputsOutOfSync(native) {
 
 // Native synchronization adds the outputs of new source fields. It is requested
 // only for an explicitly out-of-sync import with autosync off; the previous
-// autosync value is restored and existing output names must survive.
-export async function resyncOutputFields(channel,before) {
+// autosync value is restored and existing output names must survive. Previous
+// outputs are matched by their source field name: a re-read recreates source
+// records, so synchronization may replace an aliased output with a default one.
+// Such names and labels are restored through restoreOutputs(changes).
+export async function resyncOutputFields(channel,before,{restoreOutputs}={}) {
   const ready=s=>s.wizard?.status==='observed'&&s.wizard.stage==='output_mapping'
     &&!s.wizard.column_parameters&&s.wizard.output_columns?.auto_sync?.status==='observed'
     &&typeof s.wizard.output_columns.auto_sync.value==='boolean';
@@ -78,10 +81,14 @@ export async function resyncOutputFields(channel,before) {
   const synced=(await channel.observe({condition:'native output mapping after synchronization',readMappings:true,
     ready:s=>mapped(s)&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
   const names=f=>f.name+'\u0000'+f.label;
+  const sourceName=t=>t.source?.name??before.source_fields.find(f=>t.source&&sourceKey(f)===sourceKey(t.source))?.name;
+  const restore=[];
   for(const source of synced.source_fields) {
-    const old=before.source_fields.find(f=>f.name===source.name),previous=old&&before.target_fields.find(t=>t.source&&sourceKey(t.source)===sourceKey(old));
+    const previous=before.target_fields.filter(t=>t.source&&sourceName(t)===source.name);
     const now=synced.target_fields.find(t=>sourceKey(t.source)===sourceKey(source));
-    if(previous&&(!now||names(now)!==names(previous)))throw new Error('Output resynchronization changed an existing output field: '+source.name);
+    if(previous.length>1||previous.length&&(!now||names(now)!==names(previous[0])&&!restoreOutputs))
+      throw new Error('Output resynchronization changed an existing output field: '+source.name);
+    if(previous.length&&names(now)!==names(previous[0]))restore.push({source:{kind:'configured_field',name:source.name},name:previous[0].name,label:previous[0].label});
   }
   // The mapping reads above advanced the document; restore from a fresh observation.
   const current=await channel.observe({condition:'output autosync option is on before it is restored',ready:s=>bound(s)&&s.wizard.output_columns.auto_sync.value===true});
@@ -89,8 +96,20 @@ export async function resyncOutputFields(channel,before) {
   const final=(await channel.observe({condition:'native output mapping after autosync is restored',readMappings:true,
     ready:s=>mapped(s)&&s.wizard.output_columns.auto_sync.value===false&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
   if(final.target_fields.length!==synced.target_fields.length)throw new Error('Restoring autosync changed the output definition');
+  let restored=final,renamed=null;
+  if(restore.length) {
+    renamed=await restoreOutputs(restore);
+    restored=(await channel.observe({condition:'native output mapping after previous output names are restored',readMappings:true,
+      ready:s=>mapped(s)&&s.wizard.output_columns.auto_sync.value===false&&!outputsOutOfSync(s.node_mapping)})).node_mapping;
+    for(const change of restore) {
+      const source=restored.source_fields.find(f=>f.name===change.source.name),now=source&&restored.target_fields.find(t=>sourceKey(t.source)===sourceKey(source));
+      if(!now||now.name!==change.name||now.label!==change.label)throw new Error('Output resynchronization did not restore an existing output field: '+change.source.name);
+    }
+    if(restored.target_fields.length!==final.target_fields.length)throw new Error('Restoring output names changed the output definition');
+  }
   return {verified:true,cleanup_complete:true,effect_possible:true,autosync:{before:false,during:true,after:off.wizard.output_columns.auto_sync.value},
-    added_outputs:synced.target_fields.length-before.target_fields.length,native_mapping:final,settings_applied:false,package_saved:false};
+    added_outputs:synced.target_fields.length-before.target_fields.length,restored_outputs:restore,...(renamed?{restore:renamed}:{}),
+    native_mapping:restored,settings_applied:false,package_saved:false};
 }
 
 // A new node has no observed schema ID before its own configuration. This
