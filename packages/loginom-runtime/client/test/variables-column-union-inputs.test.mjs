@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateVariablesColumnUnionParameters,resolveVariablesColumnUnionInputs,validateVariablesColumnUnionInventory} from '../lib/variables-coluniondatavar-parameters.mjs';
 import {prepareNodeTarget,verifyNodeTargetEffect} from '../lib/node-target.mjs';
+import {variablesColumnUnionConfigurationReadback} from '../lib/variables-coluniondatavar-readback.mjs';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
 const inputs=()=>[0,1,2].map(input=>({kind:'variables',input,output:0,source:ref('s'+input)}));
@@ -28,6 +31,17 @@ test('resolution retains the first two reciprocal GUID pairs and ignores only an
 test('three complete inventories retain typed zero and false',()=>{
  const outputs=inputs().map(()=>({complete:true,count:1,variables:[{type:'integer',cell:{type:'integer',is_null:false,value:'0',precision:'exact_integer'}}]}));
  validateVariablesColumnUnionInventory(outputs);outputs[2].complete=false;assert.throws(()=>validateVariablesColumnUnionInventory(outputs));
+});
+test('three-input native readback fits the public result and binds the complete ordered source schema',()=>{
+ const node=ref('u'),source_fields=inputs().map(i=>({input:i.input,name:'x'+i.input,label:'x'+i.input,type:'integer'}));
+ const phase=(phase,value)=>({phase,status:'verified',receipt_id:'op:'+phase,value:{verified:true,...value}});
+ const phases=[phase('input_mapping',{inputs:inputs().map(i=>({...i,source_port_guid:'out',target_port_guid:'in'+i.input})),source_fields}),
+  phase('configure',{configuration:{mapping:'automatic',node_context:{...node,verified:true}}}),phase('finish',{settings_applied:true}),phase('read',{variable_ports:[{variables:source_fields.map(({name,label,type})=>({name,label,type}))}]})];
+ const read=()=>variablesColumnUnionConfigurationReadback({node,phases,operation_id:'op'}),result=read();
+ assert.equal(result.input_count,3);
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ assert.equal(validate(result).valid,true);
+ phases[3].value.variable_ports[0].variables.reverse();assert.throws(read,/order\/type\/label/);
 });
 test('production target adds only the third port, connects it and later removes only its exact link',async()=>{
  const g=graph(),calls=[],r=request();

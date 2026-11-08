@@ -27,9 +27,26 @@ export function auditVariablesUnionInputs(events,connected,disconnected){
  need(last&&last.nodes.find(n=>n.ref.node_id===b.r.node.node_id)?.variable_inputs?.length===3
   &&last.variable_links.filter(e=>e.target===b.r.node.node_id).length===2
   &&last.variable_links.filter(e=>e.target===b.r.node.node_id).every(e=>e.kind==='variables'&&[0,1].includes(e.input)),'THIRD_PORT_RETAINED_LINK_REMOVED');
- return {status:'PASS',node:b.r.node,executions:[initial,a,b].map(c=>c.r.execution.execution_id),inputs:cb.inputs};
+ const cold_links=cb.inputs.map(input=>{
+  const source=last.nodes.find(n=>n.ref.node_id===input.source.node_id);
+  need(source?.type==='variables.calculator'&&typeof source.label==='string'
+   &&last.nodes.filter(n=>n.type===source.type&&n.label===source.label).length===1,'UNIQUE_COLD_SOURCE_SELECTOR');
+  return {source:{type:source.type,label:source.label},output:input.output,target:{type:'variables.column_union'},input:input.input,kind:'variables'};
+ });
+ return {status:'PASS',node:b.r.node,executions:[initial,a,b].map(c=>c.r.execution.execution_id),inputs:cb.inputs,cold_links};
+}
+export function auditVariablesUnionInputsCold(proof,cold){
+ const need=(ok,m)=>{if(!ok)throw Error('VARIABLES_UNION_INPUTS_COLD_'+m);};
+ const outputs=cold.variable_inventory?.outputs,links=cold.variable_inventory?.links;
+ need(cold.status==='PASS'&&cold.settingsReapplied===false&&cold.cleanup?.package_closed===true&&cold.cleanup?.logged_out===true,'READ_AND_CLEANUP');
+ need(outputs?.length===1&&outputs[0].node.node_id===proof.node.node_id,'SAVED_NODE_GUID');
+ need(links?.length===2&&proof.inputs.every(input=>links.some(link=>link.source===input.source.node_id&&link.target===proof.node.node_id
+  &&link.kind==='variables'&&link.input===input.input&&link.output===input.output
+  &&link.source_port_guid===input.source_port_guid&&link.target_port_guid===input.target_port_guid)),'SAVED_FIRST_TWO_GUID_PAIRS');
+ return {status:'PASS',node_id:proof.node.node_id};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const read=p=>JSON.parse(readFileSync(p,'utf8'));
- console.log(JSON.stringify(auditVariablesUnionInputs(read(process.argv[5]),read(process.argv[3]),read(process.argv[4]))));
+ console.log(JSON.stringify(process.argv[2]==='cold'?auditVariablesUnionInputsCold(read(process.argv[3]),read(process.argv[4])):
+  auditVariablesUnionInputs(read(process.argv[5]),read(process.argv[3]),read(process.argv[4]))));
 }

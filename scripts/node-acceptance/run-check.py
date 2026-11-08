@@ -1959,11 +1959,17 @@ class Runner:
                         if spec.get('cold_expected_name'):
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, expected_for(spec, r['package'], cold=True))
+                        if spec.get('variable_audit') == 'variables-union-inputs':
+                            proof = read(stage / 'variable-oracle.stdout')
+                            cold_expected = stage / 'expected-cold.json'
+                            write(cold_expected, {**expected, 'variable_inventory': {**expected['variable_inventory'], 'links': proof['cold_links']}})
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
+                        if spec.get('variable_audit') == 'variables-union-inputs':
+                            self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
                         r.update(cold='PASS', cleanup='both PASS')
                     r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:
