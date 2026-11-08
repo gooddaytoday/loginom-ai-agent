@@ -3,12 +3,38 @@ import assert from 'node:assert/strict';
 import {validateBinningParameters,resolveBinningField} from '../lib/binning-parameters.mjs';
 import {binningOutputColumns,readBinningOutputs} from '../lib/binning-output.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
-import {binningBeforeGraphExecute} from '../lib/binning-node.mjs';
+import {binningBeforeGraphExecute,createBinningNodeSupport} from '../lib/binning-node.mjs';
 import {binningConfigurationReadback} from '../lib/binning-readback.mjs';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const parameters={binning:{field:'X',method:'count',size:2,limits:[0,20]}};
 const fields=[{name:'RowID',label:'RowID',type:'integer',data_kind:'Непрерывный'},{name:'X',label:'X',type:'real',data_kind:'Непрерывный'},{name:'Note',label:'Note',type:'string',data_kind:'Дискретный'}];
+test('production driver is created before nodeApply state is initialized',()=>{
+ const support=createBinningNodeSupport({});
+ for(const [mode,p] of [['internal',parameters],['internal',{binning:{field:'When',method:'manual',intervals:[]}}],['apply',{}]]){
+  const operation={parameters:{mode,parameters:p}};
+  assert.doesNotThrow(()=>support.nodeApplyDriverFactory({operation}));
+  assert.equal(operation.nodeApply,undefined);
+ }
+});
+test('DateTime count and existing manual edits use civil milliseconds without training',async()=>{
+ const limits=['2026-01-01T00:00:00.000','2026-01-04T00:00:00.000'];
+ const date={binning:{field:'When',method:'count',size:2,limits}};
+ assert.doesNotThrow(()=>validateBinningParameters(date,'internal'));
+ assert.equal(resolveBinningField(date,[{name:'When',type:'datetime'}]).type,'datetime');
+ for(const invalid of [['2026-02-30T00:00:00.000',limits[1]],[limits[0]+'Z',limits[1]],[limits[0],20]])
+  assert.throws(()=>validateBinningParameters({binning:{...date.binning,limits:invalid}},'internal'));
+ const manual={binning:{field:'When',method:'manual',intervals:[
+  {lower:limits[0],upper:'2026-01-02T00:00:00.000',lower_included:true,upper_included:true,label:'Early'},
+  {lower:'2026-01-02T00:00:00.000',upper:limits[1],lower_included:false,upper_included:true,label:'Late'}]}};
+ const request={target:{kind:'existing'},inputs:[],mappings:[],finish:'execute',read:{ports:[0,1]}};
+ assert.doesNotThrow(()=>validateBinningParameters(manual,'internal',request));
+ assert.throws(()=>validateBinningParameters(manual,'internal',{...request,target:{kind:'new'}}));
+ const broken=structuredClone(manual);broken.binning.intervals[1].lower=limits[0];
+ assert.throws(()=>validateBinningParameters(broken,'internal',request),/adjacent/);
+ assert.deepEqual(await binningBeforeGraphExecute({operation:{nodeApply:{request:{mode:'internal',parameters:manual}}}},null,{manual_edits:true},null),{});
+ assert.equal(binningOutputColumns({fields:[{name:'When',type:'datetime'}],field:'When',type:'datetime'},1)[3].type,'datetime');
+});
 test('binning handler is installed for internal/apply and apply never enters training',async()=>{
  const handler=createCandidateNodeSupport({}).nodeApplyHandlers.get('preprocessing.binning');
  assert.deepEqual(handler.modes,['internal','apply']);assert.equal(handler.output_wizard,'separate');
@@ -22,10 +48,20 @@ test('readback requires a separately trained materialized model or an uncommitte
  const trained=binningConfigurationReadback(candidate());assert.equal(trained.state,'materialized');assert.deepEqual(trained.intervals,intervals);
  const configurationSchema=nodeApplyResultSchema.properties.configuration.properties.readback;
  const validate=new AjvJsonSchemaValidator().getValidator(configurationSchema);assert.equal(validate(trained).valid,true,JSON.stringify(validate(trained)));
+ Object.assign(c,{method:'frequency',limits:null,ties:'current'});
+ const frequency=binningConfigurationReadback(candidate());assert.equal(frequency.ties,'current');assert.equal(validate(frequency).valid,true);
+ Object.assign(c,{method:'count',limits:[0,20],ties:null});
  values.finish.training.execution_id='execute';assert.throws(()=>binningConfigurationReadback(candidate()),/separate training/);
  c.mode='apply';c.state='materialized';c.intervals=intervals;values.node_finish={settings_applied:false,draft_discarded:true};values.finish={mode:'execute',settings_applied:false,execution_id:'apply'};
  const applied=binningConfigurationReadback(candidate());assert.equal(applied.training.status,'not_requested');assert.equal(validate(applied).valid,true);
  c.state='settings';c.intervals=[];assert.throws(()=>binningConfigurationReadback(candidate()),/materialized/);
+});
+test('ties current validates only for frequency and other methods report ties explicitly',()=>{
+ assert.doesNotThrow(()=>validateBinningParameters({binning:{field:'X',method:'frequency',size:2,ties:'current'}},'internal'));
+ for(const method of ['count','width','manual']){
+  assert.throws(()=>validateBinningParameters({binning:{...parameters.binning,method,ties:'current'}},'internal'),/ties is supported only for frequency/);
+ }
+ assert.throws(()=>validateBinningParameters({binning:{field:'X',method:'frequency',size:2,ties:'unknown'}},'internal'),/ties/);
 });
 test('binning rejects unsupported combinations before mutation',()=>{
  assert.doesNotThrow(()=>validateBinningParameters(parameters,'internal'));
