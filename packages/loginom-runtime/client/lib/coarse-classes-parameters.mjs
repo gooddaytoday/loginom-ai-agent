@@ -9,10 +9,11 @@ export function validateCoarseClassesParameters(p,mode,r){
  }else{
   need(Object.keys(p).length===1&&p.coarse_classes,'use parameters.coarse_classes');
   const c=p.coarse_classes;
-  need(c&&typeof c==='object'&&!Array.isArray(c)&&Object.keys(c).length===keys.length&&keys.every(k=>Object.hasOwn(c,k)),'all seven coarse_classes settings are required');
+  need(c&&typeof c==='object'&&!Array.isArray(c)&&keys.every(k=>Object.hasOwn(c,k))&&Object.keys(c).every(k=>keys.includes(k)||k==='cut'),'all seven coarse_classes settings and an optional manual cut are required');
   for(const k of ['input_field','target_field','event_value'])need(typeof c[k]==='string'&&c[k].trim().length>0&&c[k].length<=128,k+' must be an exact nonempty string');
   need(c.input_field!==c.target_field,'input and target must differ');
-  need(c.partition==='automatic','only automatic discrete partition is supported');
+  need(['automatic','manual'].includes(c.partition),'use automatic discrete or manual continuous partition');
+  need(c.partition==='manual'?Number.isSafeInteger(c.cut)&&c.max_classes===2:!Object.hasOwn(c,'cut'),'manual requires an integer cut and max_classes:2; automatic omits cut');
   need(Number.isFinite(c.min_class_percent)&&c.min_class_percent>=0&&c.min_class_percent<=50,'min_class_percent must be 0..50');
   need(Number.isSafeInteger(c.max_classes)&&c.max_classes>=1&&c.max_classes<=1000,'max_classes must be 1..1000');
   need(Number.isFinite(c.uniformity_percent)&&c.uniformity_percent>=0&&c.uniformity_percent<=100,'uniformity_percent must be 0..100');
@@ -25,7 +26,8 @@ export function resolveCoarseClassesFields(p,fields){
  need(Array.isArray(fields)&&fields.length>0&&new Set(fields.map(f=>f.name)).size===fields.length,'complete unique input schema required');
  for(const k of ['input_field','target_field']){
   const f=fields.find(f=>f.name===c[k]);
-  need(f&&f.type==='string'&&(f.data_kind===undefined||f.data_kind==='Дискретный'),k+' must name an observed discrete String field');
+  const continuous=k==='input_field'&&c.partition==='manual';
+  need(f&&(continuous?f.type==='integer'&&f.data_kind==='Непрерывный':f.type==='string'&&(f.data_kind===undefined||f.data_kind==='Дискретный')),k+(continuous?' must name an observed continuous Integer field':' must name an observed discrete String field'));
  }
  return c;
 }

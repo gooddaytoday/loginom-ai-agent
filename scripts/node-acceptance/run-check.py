@@ -352,6 +352,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
                     base=None, external=True, expected_name='expected-indices-run.json')
 
+    if name == 'coarse-classes-continuous-manual':
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        return dict(source=src, prompt=src / 'task-continuous-manual.md',
+                    data=src.parent / 'fixtures', base=None, export_count=3,
+                    input_files=['continuous.csv'], expected_name='modes/expected.json')
     if name in ['coarse-classes-train', 'coarse-classes-apply']:
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
         applying = name == 'coarse-classes-apply'
