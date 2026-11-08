@@ -70,7 +70,8 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
  };
  const click=async(tid,options={},double=false)=>{lastAction=tid;await owned();await reveal(page,tid,locate,remaining());const p=await inspect(tid,options);effect=true;await page.mouse.click(p.x,p.y,{clickCount:double?2:1});};
  const fill=async(tid,text,options={})=>{lastAction=tid;await inspect(tid,{...options,input:true});const input=at(tid).locator('input:visible,textarea:visible');need(await input.count()===1,'unique input');effect=true;await input.fill(text,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});};
- const normalize=r=>({variable:{kind:'input_variable',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.map(p=>({from:p.from.value,to:p.to.value})),other:r.other.mode,
+ const mode=task.mode??'exact';
+ const normalize=r=>({variable:{kind:'input_variable',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,pairs:r.pairs.filter(p=>p.collection_id!==1).map(p=>({from:p.from.value,to:p.to.value})),...(r.pairs.some(p=>p.collection_id===1)?{regex_pairs:r.pairs.filter(p=>p.collection_id===1).map(p=>({pattern:p.from.value,replacement:p.to.value}))}:{}),other:r.other.mode,
   ...(r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:['integer','real'].includes(r.input_fields.find(f=>f.name===r.selected).type)?{precision:r.precision}:{})});
  try{
   const before=await inventory(),fields=before.input_fields;
@@ -84,7 +85,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
   const saved=[];
   for(const f of fields.filter(f=>f.mode==='manual'))saved.push(normalize(await select(f.name)));
   need(!task.new_node||saved.length===0,'new node has unexpected saved rules');
-  for(const r of saved)need(r.other==='keep'&&(r.type==='string'?r.case_sensitive===true:['integer','real'].includes(r.type)?r.precision===0:r.type==='boolean')&&new Set(r.pairs.map(p=>JSON.stringify(p.from))).size===r.pairs.length,'unsupported or duplicate saved rules');
+  for(const r of saved)need(['integer','real','string','boolean'].includes(r.type)&&(mode==='exact'?r.other==='keep'&&!r.regex_pairs&&(r.type==='string'?r.case_sensitive===true:['integer','real'].includes(r.type)?r.precision===0:true):['keep','null'].includes(r.other)&&(!r.regex_pairs||r.type==='string'&&r.pairs.length===0))&&new Set(r.pairs.map(p=>JSON.stringify(r.type==='string'&&!r.case_sensitive&&typeof p.from==='string'?p.from.toLowerCase():p.from))).size===r.pairs.length,'unsupported or duplicate saved rules');
   const effective=[...saved.map(r=>requested.find(p=>p.variable.name===r.variable.name)??r),...requested.filter(r=>!saved.some(s=>s.variable.name===r.variable.name))];
   for(const r of requested){
    phase='rules_'+r.variable.name;let state=await select(r.variable.name),field=state.input_fields.find(f=>f.name===r.variable.name);
@@ -97,8 +98,8 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
     await click(base+';colReplaceDelete_'+p.index,{grid:base+';grdReplaceItems',row:p.record_id});
     state=await inventory();need(!state.pairs.some(x=>x.record_id===p.record_id),'pair deletion unconfirmed');
    }
-   for(const pair of r.pairs){
-    const old=state.pairs.map(p=>p.record_id);await click(base+';grdReplaceItems;tbl;GroupHeader;0;AddButton');state=await inventory();
+   for(const [group,pairs] of [[0,r.pairs],[1,(r.regex_pairs??[]).map(p=>({from:p.pattern,to:p.replacement}))]])for(const pair of pairs){
+    const old=state.pairs.map(p=>p.record_id);await click(base+';grdReplaceItems;tbl;GroupHeader;'+group+';AddButton');state=await inventory();
     const added=state.pairs.filter(p=>!old.includes(p.record_id));need(added.length===1&&state.pairs.length===old.length+1,'one added pair required');
     await click(base+';colReplaceValue_'+added[0].index,{grid:base+';grdReplaceItems',row:added[0].record_id},true);
     state=await inventory();need(state.editor_open,'row editor not open');
@@ -116,12 +117,17 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
     await click('roweditorbuttons;update');state=await inventory();
     need(!state.editor_open&&state.pairs.length===old.length+1&&same(state.pairs.at(-1).from.value,pair.from)&&same(state.pairs.at(-1).to.value,pair.to),'typed pair commit differs');
    }
-   if(r.type==='string'&&state.case_sensitive!==true)await click(base+';chkCaseSensitivity;DisplayEl');
-   if(['integer','real'].includes(r.type)&&state.precision!==0)await fill(base+';edPrecision','0');
-   state=await inventory();need(state.other.mode==='keep','unsupported saved unmatched policy');need(same(normalize(state),r),'complete rule readback differs');
+   if(r.type==='string'&&state.case_sensitive!==r.case_sensitive)await click(base+';chkCaseSensitivity;DisplayEl');
+   if(['integer','real'].includes(r.type)&&state.precision!==r.precision){
+    need(['.',','].includes(state.precision_decimal_separator),'observed precision decimal separator required');
+    await fill(base+';edPrecision',String(r.precision).replace('.',state.precision_decimal_separator));
+   }
+   state=await inventory();
+   if(state.other.mode!==r.other){await click(base+';cbxReplaceOther;trg_picker');await click(base+';cbxReplaceOther;boundlist;'+{keep:'Не_заменять',null:'На_пропущенное'}[r.other]);}
+   state=await inventory();need(same(normalize(state),r),'complete rule readback differs');
   }
   for(const rule of effective)need(same(normalize(await select(rule.variable.name)),rule),'unlisted rule changed');
-  const configuration={verified:true,inventory_complete:true,mode:'exact',node_context:await owned(),input_fields:fields.map(({name,label,type})=>({name,label,type})),rules:effective};
+  const configuration={verified:true,inventory_complete:true,mode,node_context:await owned(),input_fields:fields.map(({name,label,type})=>({name,label,type})),rules:effective};
   if(task.finish==='close')return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:owner,configuration};
   phase='mapping';await click(root+';btnNext');
   const mapping=root+';DerivedVariablesMappingEngineOutputPortWizard';await at(mapping).waitFor({state:'visible',timeout:Math.min(15000,remaining())});
@@ -133,7 +139,7 @@ export async function configureVariablesReplace(page,task,readNode=readPreparedN
     if([...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message,[role="dialog"],.x-window,.bg-dialog')].some(visible))return null;
     const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(mapping+';grdTargetColumns')+']')],g=es.length===1&&Ext.getCmp(es[0].id),s=g?.getStore?.(),rs=s?.getData?.()?.items;
     if(g?.el?.dom!==es[0]||s?.isLoading?.()||!Array.isArray(rs)||s.getCount()!==rs.length||rs.length!==count||rs.length>128)return null;
-    return rs.map((r,index)=>({record_id:String(r.internalId),index,name:r.data.Name,label:r.data.DisplayName,type:({1:'boolean',3:'real',4:'integer',5:'string'})[r.data.DataType]}));
+    return rs.map((r,index)=>({record_id:String(r.internalId),index,name:r.data.Name,label:r.data.DisplayName,type:({1:'boolean',2:'datetime',3:'real',4:'integer',5:'string'})[r.data.DataType]}));
    },{mapping,count:fields.length});
    if(rows&&ready(rows)){const key=JSON.stringify(rows);if(key===previous)return rows;previous=key;}else previous=undefined;
    need(Date.now()<ceiling,'complete output mapping did not settle');await page.waitForTimeout(Math.min(100,remaining()));

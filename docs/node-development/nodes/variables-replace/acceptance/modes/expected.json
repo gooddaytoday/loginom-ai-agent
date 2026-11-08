@@ -1,5 +1,5 @@
 {
-  "status": "proposal_pending_owner_approval",
+  "status": "approved_match_slice",
   "match_modes": {
     "output_node_type": "variables.replace",
     "output_port": 0,
@@ -10,14 +10,13 @@
         "name": "report_date",
         "label": "Дата отчёта",
         "type": "datetime",
-        "value": "2026-11-07T23:59:58.123"
+        "value": "2026-11-07T23:59:58"
       },
       {
         "name": "mixed",
         "label": "Разное",
-        "type": "variant",
-        "value": 7,
-        "value_type": "integer"
+        "type": "integer",
+        "value": 7
       },
       {
         "name": "total",
@@ -56,64 +55,5 @@
         "value": null
       }
     ]
-  },
-  "types_probe": {
-    "output_node_type": "variables.replace",
-    "output_port": 0,
-    "port_kind": "variables",
-    "ordered": true,
-    "variables": [
-      {
-        "name": "report_date",
-        "label": "Дата отчёта",
-        "type": "datetime",
-        "value": "2026-11-07T23:59:58.123"
-      },
-      {
-        "name": "mixed",
-        "label": "Разное",
-        "type": "variant",
-        "value": "seven",
-        "value_type": "string"
-      },
-      {
-        "name": "total",
-        "label": "Итого",
-        "type": "integer",
-        "value": 3
-      },
-      {
-        "name": "Color",
-        "label": "Color",
-        "type": "string",
-        "value": "blue"
-      },
-      {
-        "name": "Code",
-        "label": "Code",
-        "type": "string",
-        "value": "matched"
-      },
-      {
-        "name": "Amount",
-        "label": "Amount",
-        "type": "real",
-        "value": 2.5
-      },
-      {
-        "name": "TextNum",
-        "label": "TextNum",
-        "type": "variant",
-        "value": 7,
-        "value_type": "integer"
-      },
-      {
-        "name": "Other",
-        "label": "Other",
-        "type": "string",
-        "value": "default"
-      }
-    ]
-  },
-  "types_probe_persistence": "not_verified_native_open_error_active_variant"
+  }
 }

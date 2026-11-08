@@ -28,7 +28,28 @@ export function auditVariablesReplaceHistory(events,initial,updated,final){
   &&r.parameters.expressions?.length===1&&r.parameters.expressions[0].target.name==='Color'&&r.parameters.expressions[0].formula==='"blue"'),'SOURCE_PATCH');
  return {status:'PASS',node:a.result.node,executions:found.map(s=>s.output.execution_id)};
 }
+export function auditVariablesReplaceMatch(events,expected){
+ const want=parseExpectedVariableInventory(expected)?.outputs[0];
+ if(want?.node.type!=='variables.replace')throw Error('VARIABLES_REPLACE_MATCH_ORACLE');
+ const found=events.find(e=>e.phase==='node_checkpoint'&&e.result?.status==='SUCCEEDED'&&e.result.cleanup_complete===true
+  &&e.result.execution?.status==='completed'&&e.result.configuration?.readback?.kind==='variables_replace'
+  &&e.result.configuration.readback.mode==='rules'&&(e.result.output?.variable_ports??[]).some(p=>{
+   try{return p.execution_id===e.result.execution.execution_id&&matchVariableInventoryOutput(p,want);}catch{return false;}
+  }));
+ if(!found)throw Error('VARIABLES_REPLACE_MATCH_TYPED_EXECUTION_MISSING');
+ const rules=found.result.configuration.readback.rules;
+ if(!isDeepStrictEqual(rules.map(r=>r.variable.name).sort(),['Amount','Code','Color','Other'])
+  ||rules.find(r=>r.variable.name==='Color').case_sensitive!==false
+  ||!isDeepStrictEqual(rules.find(r=>r.variable.name==='Code').regex_pairs,[{pattern:'^Ab-[0-9]+$',replacement:'matched'}])
+  ||rules.find(r=>r.variable.name==='Amount').precision!==0.1||rules.find(r=>r.variable.name==='Other').other!=='null')
+  throw Error('VARIABLES_REPLACE_MATCH_NATIVE_RULES');
+ return {status:'PASS',node:found.result.node,execution_id:found.result.execution.execution_id};
+}
 if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='variables-replace'){
  const read=p=>JSON.parse(readFileSync(p,'utf8'));
  console.log(JSON.stringify(auditVariablesReplaceHistory(read(process.argv[5]),read(process.argv[3]),read(new URL('../../docs/node-development/nodes/variables-replace/acceptance/expected-updated-run.json',import.meta.url)),read(process.argv[4]))));
+}
+
+if(process.argv[2]==='variables-replace-match'){
+ console.log(JSON.stringify(auditVariablesReplaceMatch(JSON.parse(readFileSync(process.argv[5],'utf8')),JSON.parse(readFileSync(process.argv[4],'utf8')))));
 }

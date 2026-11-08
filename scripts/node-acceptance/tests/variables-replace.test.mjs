@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {auditVariablesReplaceHistory} from '../variables-replace.mjs';
+import {auditVariablesReplaceHistory,auditVariablesReplaceMatch} from '../variables-replace.mjs';
 import {matchVariableInventoryOutput} from '../expected-outputs.mjs';
 const read=name=>JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/variables-replace/acceptance/'+name,import.meta.url)));
 const wants=['expected-initial-run.json','expected-updated-run.json','expected-run.json'].map(read);
@@ -26,4 +26,24 @@ test('replacement real output tolerance is bounded at abs/rel 1e-12',()=>{
  const output=history()[0].result.output.variable_ports[0],want=wants[0].variable_inventory.outputs[0];
  output.variables[1].cell.value+=1e-13;assert.equal(matchVariableInventoryOutput(output,want),true);
  output.variables[1].cell.value+=1e-8;assert.throws(()=>matchVariableInventoryOutput(output,want));
+});
+test('match audit requires full typed execution and observed native mode settings',()=>{
+ const expected=read('modes/expected-run.json'),want=expected.variable_inventory.outputs[0];
+ const nativeRules=[{variable:{name:'Color'},case_sensitive:false},
+  {variable:{name:'Code'},regex_pairs:[{pattern:'^Ab-[0-9]+$',replacement:'matched'}]},
+  {variable:{name:'Amount'},precision:0.1},{variable:{name:'Other'},other:'null'}];
+ const event=history()[0];
+ event.result.configuration.readback={kind:'variables_replace',mode:'rules',rules:nativeRules};
+ const port=event.result.output.variable_ports[0];
+ port.variables=want.variables.map((v,index)=>({id:index,index,...v,cell:{type:v.type,is_null:v.value===null,
+  value:v.type==='integer'?String(v.value):v.value,precision:v.type==='integer'?'exact_integer':v.type==='real'?'17_significant_digits':v.type==='datetime'?'millisecond':'exact_string',...(v.type==='datetime'?{representation:'local_datetime',timezone:'unspecified'}:{})}}));
+ port.count=8;port.completeness={loaded:true,count:8,store_count:8,unique_ids:8};
+ assert.equal(auditVariablesReplaceMatch([event],expected).status,'PASS');
+ for(const corrupt of [e=>e.result.configuration.readback.rules[0].case_sensitive=true,
+  e=>e.result.output.variable_ports[0].variables.reverse(),
+  e=>e.result.output.variable_ports[0].variables[7].cell.value='',
+  e=>e.result.output.variable_ports[0].variables[0].label='report_date',
+  e=>e.result.output.variable_ports[0].execution_id='old']){
+  const changed=structuredClone(event);corrupt(changed);assert.throws(()=>auditVariablesReplaceMatch([changed],expected));
+ }
 });
