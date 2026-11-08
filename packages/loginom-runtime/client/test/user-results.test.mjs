@@ -117,13 +117,16 @@ test('compact Save retains optional arrangement warnings after dropping its inte
     assert.equal(validate(result).valid, true);
   }
 });
-test('initial knowledge bundle omits per-type schemas and cache hashes while retaining revision pins', () => {
+test('initial knowledge bundle omits per-type schemas, cache hashes and repeated handler identities', () => {
   const schema = { type: 'object', required: ['keys'] };
   const result = compactKnowledgeBundle({ session_manifest: { digest: 'pin' }, actions: [{ action_key: 'save', input_schema: schema, revision: '2' }],
-    node_types: [{ type: 'transform.sorting', contract_revision: '1.0.0', modes: ['keys'], parameter_schema: schema, cache_key: 'cache', source: 'internal references' }] });
+    node_types: [{ type: 'transform.sorting', contract_revision: '1.0.0', modes: ['keys'], parameter_schema: schema, cache_key: 'cache', source: 'internal references',
+      candidate_node_apply_available: true, candidate_apply_tool: 'dock_node_apply', configuration_handler: 'sorting-v1', semantics: 'Sort rows.' }] });
   assert.equal(result.session_manifest.digest, 'pin');assert.equal(result.node_types[0].parameter_schema, undefined);
-  assert.equal(result.node_types[0].contract_revision, '1.0.0');
   assert.equal(result.node_types[0].cache_key, undefined);assert.equal(result.node_types[0].source, undefined);
+  // Identical in every type or handler-internal; dock_action_describe keeps them per type.
+  for (const key of ['contract_revision', 'candidate_apply_tool', 'configuration_handler']) assert.equal(result.node_types[0][key], undefined, key);
+  assert.deepEqual(result.node_types[0], { type: 'transform.sorting', candidate_node_apply_available: true, semantics: 'Sort rows.', modes: ['keys'] });
 });
 
 test('user-v1 retains exact scalar representation and an explicitly unverified variant without type guessing',()=>{

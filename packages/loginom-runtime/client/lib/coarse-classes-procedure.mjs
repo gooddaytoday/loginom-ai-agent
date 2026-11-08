@@ -1,10 +1,11 @@
 import {resolveCoarseClassesFields} from './coarse-classes-parameters.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
+import {configureManualCoarseClasses} from './coarse-classes-manual.mjs';
 const need=(v,m)=>{if(!v)throw Error('Coarse classes: '+m);};
 export const coarseClassesReady=s=>s.wizard?.stage==='coarse_classes'&&s.node_coarse_classes?.verified===true;
 export const observeCoarseClasses=(channel,condition,ready=()=>true)=>channel.observe({condition,readCoarseClasses:true,ready:s=>coarseClassesReady(s)&&ready(s)});
 const one=(s,p,m)=>{const es=s.ui.elements.filter(p);need(es.length===1,m);return es[0];};
-const inventory=c=>c.fields.map(({role,...f})=>f);
+const inventory=c=>c.fields.map(({role,frozen,...f})=>f);
 export async function selectCoarseClassesField(channel,baseline,name){
  let s=await observeCoarseClasses(channel,'coarse classes inventory before selection');
  need(JSON.stringify(inventory(s.node_coarse_classes))===JSON.stringify(inventory(baseline)),'field inventory changed');
@@ -31,14 +32,14 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
  if(!applying)for(const f of baseline.fields){
   s=await selectCoarseClassesField(channel,baseline,f.name);
   const role=f.name===wanted.input_field?'input':f.name===wanted.target_field?'target':'unused';
-  if(s.node_coarse_classes.selected.role!==role){
+  if(s.node_coarse_classes.selected.role!==role||role==='input'&&s.node_coarse_classes.selected.frozen){
    await act('cbxColumnPurpose;trg_picker',{verb:'click'},f);
    const owner=s.wizard.root_tid+';CoarseClassesWizard-1;CoarseClassesSettingsFrame;cbxColumnPurpose;boundlist;';
    const label={unused:'Не выбрано',input:'Входное',target:'Выходное'}[role];
    s=await observeCoarseClasses(channel,'coarse classes role option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner)&&e.label===label));
    await channel.perform({condition:'choose coarse classes '+role,initialObservation:s,ready:coarseClassesReady,identity:()=>f,
     resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner)&&e.label===label&&e.allowed_actions.includes('click'),'exact coarse classes role option required').ref})});
-   s=await observeCoarseClasses(channel,'coarse classes role committed',s=>s.node_coarse_classes.selected?.record_id===f.record_id&&s.node_coarse_classes.selected.role===role);
+   s=await observeCoarseClasses(channel,'coarse classes role committed',s=>s.node_coarse_classes.selected?.record_id===f.record_id&&s.node_coarse_classes.selected.role===role&&(role!=='input'||!s.node_coarse_classes.selected.frozen));
   }
   if(role==='input')for(const [key,path] of [['min_class_percent','edtMinimalClassRate;ValueControl'],['max_classes','edtDesiredClassCount;ValueControl'],['uniformity_percent','edtUniformityCoefficient;ValueControl']]){
    if(s.node_coarse_classes.settings[key]===wanted[key])continue;
@@ -63,12 +64,31 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
  }
  need(used('input').length===1&&used('target').length===1,'one predictor and one target required');
  const input=used('input')[0],target=used('target')[0];
- resolveCoarseClassesFields({coarse_classes:{input_field:input.name,target_field:target.name}},fields);
+ resolveCoarseClassesFields({coarse_classes:{input_field:input.name,target_field:target.name,partition:wanted?.partition}},fields);
  s=await selectCoarseClassesField(channel,baseline,target.name);const event=s.node_coarse_classes.settings.event_value;
  need(typeof event==='string'&&event.length>0,'saved exact event label required');
- s=await selectCoarseClassesField(channel,baseline,input.name);const settings=s.node_coarse_classes.settings;
+ s=await selectCoarseClassesField(channel,baseline,input.name);
+ // Rebind after the target's asynchronous event editor has settled. These
+ // controls belong to the selected predictor, never the previous field.
+ if(!applying)for(const [key,path] of [['min_class_percent','edtMinimalClassRate;ValueControl'],['max_classes','edtDesiredClassCount;ValueControl'],['uniformity_percent','edtUniformityCoefficient;ValueControl']]){
+  if(s.node_coarse_classes.settings[key]===wanted[key])continue;
+  await act(path,{verb:'fill',text:String(wanted[key])},input);await act(path,{verb:'press',key:'Tab'},input);
+  need(s.node_coarse_classes.settings[key]===wanted[key],'final predictor setting differs: '+key);
+ }
+ if(wanted?.partition==='manual'&&s.node_coarse_classes.settings.prequanting!==false){
+  await act('chkPreQuanting;ValueControl',{verb:'set_checked',checked:false},input);
+  need(s.node_coarse_classes.settings.prequanting===false,'manual partition requires preliminary quantization off');
+ }
+ if(wanted?.partition==='manual'){
+  // The input checkbox controls X<=cut. The separate port-1 field remains
+  // native false in 7.4.2 and is not a readback of this setting.
+  need(typeof s.node_coarse_classes.settings.include_upper_input==='boolean','selected input boundary checkbox required');
+  if(!s.node_coarse_classes.settings.include_upper_input)await act('chkIncludeHighBounds;ValueControl',{verb:'set_checked',checked:true},input);
+  need(s.node_coarse_classes.settings.include_upper_input===true,'manual partition requires an inclusive upper boundary');
+ }
+ const settings=s.node_coarse_classes.settings;
  need(settings.fine_classes===false,'initial-class bypass is outside this stage');
- const configuration={...s.node_coarse_classes,mode:request.mode,input_field:input.name,target_field:target.name,event_value:event,partition:'automatic',min_class_percent:settings.min_class_percent,max_classes:settings.max_classes,uniformity_percent:settings.uniformity_percent,fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),roles:s.node_coarse_classes.fields.map(({name,role})=>({name,role}))};
+ const configuration={...s.node_coarse_classes,mode:request.mode,input_field:input.name,target_field:target.name,event_value:event,partition:wanted?.partition??'automatic',min_class_percent:settings.min_class_percent,max_classes:settings.max_classes,uniformity_percent:settings.uniformity_percent,fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),roles:s.node_coarse_classes.fields.map(({name,role})=>({name,role}))};
  const next=async(stage,destination)=>{
   await channel.perform({condition:'accept coarse classes '+stage,ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'coarse classes Next required').ref,expected_stage:destination})});
@@ -79,6 +99,7 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
  // the persisted model without retraining a holdout with NULL targets.
  if(applying)return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false,configuration:{...configuration,state:'settings',classes:[],total_iv:null}};
  await next('coarse_classes','coarse_classes_model');
+ if(wanted.partition==='manual')configuration.manual_partition=await configureManualCoarseClasses(channel,wanted);
  await next('coarse_classes_model','output_mapping');await next('output_mapping','binning_ranges_mapping');await next('binning_ranges_mapping','coarse_classes_mapping_2');
  const done=await next('coarse_classes_mapping_2','done');
  return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{...configuration,state:'settings',classes:[],total_iv:null},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};

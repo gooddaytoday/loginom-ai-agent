@@ -18,7 +18,7 @@ export async function coarseClassesBeforeGraphExecute(options,ctx,c,channel){
 }
 export function createCoarseClassesNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
-  type:'preprocessing.coarse_classes',modes:['internal','apply'],revision:'coarse-classes-v1-internal-1',parameterSchema:coarseClassesParametersSchema,
+  type:'preprocessing.coarse_classes',modes:['internal','apply'],revision:'coarse-classes-v2-manual-1',parameterSchema:coarseClassesParametersSchema,
   validate:validateCoarseClassesParameters,validateInput:(p,resolved,native)=>resolveCoarseClassesFields(p,resolved.fields??native.target_fields),readback:coarseClassesConfigurationReadback,
   configurationObservation:{condition:'owned coarse classes field page',readCoarseClasses:true,ready:s=>s.wizard?.stage==='coarse_classes'&&s.node_coarse_classes?.verified===true},
   async beforeOpen(channel,request){

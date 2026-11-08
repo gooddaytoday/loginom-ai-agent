@@ -358,6 +358,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
                     base=None, external=True, expected_name='expected-indices-run.json')
 
+    if name == 'coarse-classes-continuous-manual':
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        return dict(source=src, prompt=src / 'task-continuous-manual.md',
+                    data=src.parent / 'fixtures', base=None, export_count=3,
+                    input_files=['continuous.csv'], expected_name='modes/expected.json')
     if name in ['coarse-classes-train', 'coarse-classes-apply']:
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
         applying = name == 'coarse-classes-apply'
@@ -639,6 +644,10 @@ def scenario(name, case_root=None, *, cases=None):
                           'replace-keep-variant': ('task-result-keep.md', 'expected-result-keep.json')}[name]
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures/extended', input_files=['input.csv'], base=None, expected_name=expected)
+    if name == 'variant-reader-collapse':
+        node = REPO / 'docs/node-development/nodes/variant-reader'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-collapse.md',
+                    data=node / 'fixtures', input_files=['mixed.csv'], base=None, expected_name='expected-collapse.json')
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
