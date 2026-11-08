@@ -106,6 +106,7 @@ export async function configureVariablesColumnUnion(page,task,readNode=readPrepa
  };
  try{
   let state=await inventory();
+  if(task.finish==='close')return {status:'SUCCEEDED',verified:true,effect_possible:false,cleanup_complete:true,node_context:await owned(),configuration:state};
   need(state.sources.length===task.source_fields.length,'input stores must be materialized by the initial union Execute');
   need(state.sources.every((s,i)=>s.type===task.source_fields[i].type&&s.label===task.source_fields[i].label),'complete ordered input schemas changed');
   const project=s=>s.fields.map(f=>{
@@ -138,7 +139,7 @@ export async function configureVariablesColumnUnion(page,task,readNode=readPrepa
     await owned();effect=true;await page.locator('[data-tid='+JSON.stringify(selected.tid)+'][data-recordindex="'+selected.index+'"]:visible').click({timeout:remaining()});
     state=await inventory(s=>s.fields.at(-1)?.source_index===f.source_index);
    }
-   need(same(project(state),requested.fields),'complete ordered manual readback differs');
+   need(same(project(state),requested.fields.map(({input,source,name,label,type})=>({input,source,name,label,type}))),'complete ordered manual readback differs');
   }else if(requested?.mapping==='automatic'&&state.mapping!=='automatic'){
    await click(base+';btnAutoSyncThroughColumns');state=await inventory(s=>s.mapping==='automatic');
   }

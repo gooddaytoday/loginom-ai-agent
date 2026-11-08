@@ -32,6 +32,7 @@ export function validateVariablesColumnUnionParameters(p,mode,r){
   }
  }
  if(!r)return;
+ need(!(r.target.kind==='new'&&p.column_union?.mapping==='manual'&&r.finish==='close'),'new manual union does not support finish close; use done or execute');
  need(r.inputs.length===0&&r.mappings.length===0,'table inputs and custom mappings are unsupported');
  need(r.read.ports.length===0&&(r.read.variable_ports??[]).every(p=>p===0),'read variable output zero, no table ports');
  const inputs=r.variable_inputs??[];
@@ -42,7 +43,7 @@ export function validateVariablesColumnUnionFields(parameters,outputs){
  for(const field of parameters.column_union?.fields??[]){
   const found=outputs[field.input]?.variables.filter(v=>v.name===field.source);
   need(found?.length===1,'unique source required for '+field.source);
-  need(found[0].type===field.type,'Loginom 7.4.2: ручное соответствие не преобразует '+found[0].type+' → '+field.type
+  need(found[0].type===field.type,(found[0].type==='integer'&&field.type==='string'?'Loginom 7.4.2: ручное соответствие не преобразует ':'ручное соответствие этого узла не меняет тип: ')+found[0].type+' → '+field.type
    +'. Источники, узел и связи не изменены. Используйте Калькулятор переменных после Соединения.');
  }
 }

@@ -32,7 +32,7 @@ test('a user label and an existing connection do not acquire automatic-label per
   assert.equal(verifyNodeTargetEffect(f.effect,f.after),null);
  }
 });
-for(const type of ['variables.to_table','variables.column_union'])for(const mode of ['owned','foreign','wrong-guid','other-type'])test('serialized link primitive handles '+type+' caption: '+mode,async()=>{
+for(const type of ['variables.to_table','variables.column_union'])for(const mode of ['owned','foreign','wrong-guid','other-type',...(type==='variables.to_table'?['foreign-dom-caption']:[])])test('serialized link primitive handles '+type+' caption: '+mode,async()=>{
  const f=fixture(),page=linkPage();page.nodes=[];
  if(type==='variables.column_union'){
   const target=f.before.nodes[1];Object.assign(target,{type,label:'Соединение (переменные)',outputs:[],variable_inputs:[0,1].map(port=>({kind:'variables',port,native_index:port,port_guid:port?'other':'target-guid'})),variable_outputs:[{kind:'variables',port:0,native_index:0,port_guid:'out'}]});
@@ -44,6 +44,12 @@ for(const type of ['variables.to_table','variables.column_union'])for(const mode
  f.after.workflow_ref=structuredClone(f.before.workflow_ref);
  const renamed=type==='variables.column_union'?'amount_empty':'В_столбцы:_Количество_Флаг_(+6)';
  page.onDrop=()=>{page.nodes[1].label=renamed;page.edges.push('Source|Output_Var-0|'+renamed+'|Input_Var-0');};
+ if(mode==='foreign-dom-caption'){
+  page.addNode('One',100,400,['Output_Data-0']);
+  // The native graph does not authorize this pre-existing DOM edge to change.
+  page.edges=['One|Output_Data-0|'+defaultTid+'|Input_Data-0'];
+  page.onDrop=()=>{page.nodes[1].label=renamed;page.edges=['One|Output_Data-0|'+renamed+'|Input_Data-0','Source|Output_Var-0|'+renamed+'|Input_Var-0'];};
+ }
  page.nativeGraph=probe=>{
   const g=structuredClone(page.drops?f.after:f.before);
   if(page.drops&&mode==='foreign')g.nodes[0].label='foreign';
@@ -64,9 +70,10 @@ for(const type of ['variables.to_table','variables.column_union'])for(const mode
   request:{document_id:'doc',workflow_ref:f.before.workflow_ref,target:{kind:'new',type}},
   graph_baseline:f.before,graph_probe:{},dom_epoch:1,nodes:[{id:'s',tid:'Source',dom_epoch:2},{id:'t',tid:defaultTid,dom_epoch:3}]
  }});
- assert.equal(result.status,mode==='owned'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result));
+ const accepted=mode==='owned';
+ assert.equal(result.status,accepted?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result));
  assert.equal(page.drops,1);assert.equal(page.upCalls,1);assert.equal(page.down,false);
- if(mode==='owned')assert.equal(result.output.variable_target_label_transition.node_id,'t');
+ if(accepted)assert.equal(result.output.variable_target_label_transition.node_id,'t');
 });
 for(const label of [undefined,'Переменные в таблицу'])test('new VarToData retains an explicit caption after connecting: '+label,async()=>{
  const f=fixture(),workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
