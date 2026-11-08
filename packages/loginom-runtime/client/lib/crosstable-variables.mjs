@@ -127,7 +127,7 @@ export async function readUserVariablesSnapshot(page,task,readNode,openPort,read
   if(recs.length!==1||!(tree instanceof a.WizardTreeNode)||tree.ParentNode!==o.portTree||o.portTree.ParentNode.ParentNode!==o.nodeTree
    ||o.nodeTree.FModelNode!==o.nodeData||o.portTree.FModelNodePort!==o.portData||o.portGuid!==o.port.FGuid||o.port.parent!==o.node
    ||roots.length!==1||m.FView?.el.dom!==roots[0]||!visible(roots[0])||!grid||grid.el.dom!==es[0]||!roots[0].contains(es[0]))throw Error('Owned user value wizard required');
-  if(mode==='inventory')return {port_guid:o.portGuid,...eval('('+recordsCode+')')(grid.getStore(),'values',eval('('+decoderCode+')'))};
+  if(mode==='inventory')return {port_guid:o.portGuid,...eval('('+recordsCode+')')(grid.getStore(),'values',eval('('+decoderCode+')'),task.remove?.length>0)};
   const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw Error('User variable control covered: '+JSON.stringify({target:e.getAttribute('data-tid'),x,y,width:box.width,height:box.height,covering:hit?.closest('[data-tid]')?.getAttribute('data-tid')}));return {x,y};};
   if(mode==='row'){
    const matches=grid.getStore().getData().items.filter(v=>v.data.ID===extra.id&&v.data.Name===extra.name),view=grid.getView();
