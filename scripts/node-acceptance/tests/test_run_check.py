@@ -302,10 +302,10 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
             self.assertNotIn('expected', case['prompt'].read_text())
 
-    def test_datatovar_cycle1_cases_bind_independent_oracle_and_separate_source_copy(self):
+    def test_datatovar_cycle1_cases_bind_independent_oracle_and_typed_csv_inputs(self):
         oracle = runner.read(runner.REPO / 'docs/node-development/nodes/variables-datatovar/acceptance/aggregate-types/expected.json')
         for name, section, files, source in [('variables-from-table-aggregates', 'numeric', ['aggregate-numeric.csv'], 'imports.text'),
-                                             ('variables-from-table-scalars', 'scalar_types', [], 'programming.javascript')]:
+                                             ('variables-from-table-scalars', 'scalar_types', ['aggregate-types.csv'], 'imports.text')]:
             case = runner.scenario(name)
             expected = runner.expected_for(case, '/own/aggregate.lgp')
             self.assertEqual((case['variable_audit'], case['input_files'], expected['package_path']), (name, files, '/own/aggregate.lgp'))
@@ -316,11 +316,10 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
             self.assertNotIn('expected', case['prompt'].read_text())
         scalars = runner.scenario('variables-from-table-scalars')
-        self.assertTrue(scalars['source_package'].is_file())
-        self.assertEqual(runner.source_package_path(scalars, '/own/run-x.lgp'), '/own/run-x-source.lgp')
-        self.assertEqual(runner.source_package_path(runner.scenario('variables-column-union'), '/own/run-x.lgp'), '/own/run-x.lgp')
+        self.assertNotIn('source_package', scalars)
+        self.assertTrue((scalars['data'] / 'aggregate-types.csv').is_file())
 
-    def test_datatovar_scalars_prompt_opens_source_copy_and_saves_run_package(self):
+    def test_datatovar_scalars_prompt_imports_typed_csv_and_saves_run_package(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
@@ -337,29 +336,11 @@ class RunCheckTests(unittest.TestCase):
             with patch.object(instance, 'phase', side_effect=phase):
                 instance.model('variables-from-table-scalars', folder, profile, workspace, '/test/run-x.lgp', {'package_directory': '/test'}, root / 'build')
             task = (folder / 'task.md').read_text()
-            self.assertIn('копию пакета /test/run-x-source.lgp.', task)
+            self.assertIn('Импортируй aggregate-types.csv', task)
+            self.assertNotIn('JavaScript', task)
             self.assertTrue(task.rstrip().endswith('Сохрани пакет как /test/run-x.lgp.'))
             self.assertNotIn('{{PACKAGE_PATH}}', task)
             self.assertEqual(runner.read(folder / 'expected.json')['package_path'], '/test/run-x.lgp')
-
-    def test_datatovar_source_copy_cleanup_removes_only_the_owned_copy(self):
-        with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory)
-            instance = runner.Runner.__new__(runner.Runner)
-            calls = []
-            with patch.object(instance, 'phase', side_effect=lambda name, command, *a, **k: calls.append((name, list(map(str, command))))):
-                instance.current = {'source_copy': '/test/run-x-variables-from-table-scalars-source.lgp'}
-                instance.cleanup_source_copy(folder, {'package_directory': '/test/'}, folder / 'build')
-                for foreign in ['/other/run-x-source.lgp', '/test/run-x.lgp', '/test/../x-source.lgp']:
-                    instance.current = {'source_copy': foreign}
-                    with self.assertRaisesRegex(AssertionError, 'SOURCE_COPY_OUTSIDE_OWNED_PACKAGES'):
-                        instance.cleanup_source_copy(folder, {'package_directory': '/test'}, folder / 'build')
-            self.assertEqual([c[0] for c in calls], ['source-cleanup'])
-            self.assertTrue(calls[0][1][1].endswith('scripts/node-acceptance/d87-cleanup.mjs'))
-            self.assertEqual(runner.read(folder / 'source-cleanup-config.json')['names'], ['run-x-variables-from-table-scalars-source.lgp'])
-            source = (runner.REPO / 'scripts/node-acceptance/d87-cleanup.mjs').read_text()
-            self.assertIn('[A-Za-z0-9_-]+-source\\.lgp', source)
-            self.assertIn('loginomUrl: app', source)
 
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')

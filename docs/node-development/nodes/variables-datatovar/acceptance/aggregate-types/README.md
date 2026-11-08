@@ -2,8 +2,11 @@
 действующих прогонов. Runtime и оснастка не меняются.
 
 - `../task-aggregates.md` + `../../fixtures/aggregate-numeric.csv`: 10 переменных.
-- `../task-scalar-types.md` + новая копия `aggregate-source.lgp`: 28 переменных.
-- `../task-variant.md` + отдельная новая копия того же пакета: 9 переменных,
+- `../task-scalar-types.md` + `../../fixtures/aggregate-types.csv`: 28 переменных.
+  Импорт текста с явной схемой N/K integer, S string, B boolean, D datetime
+  (ISO, миллисекунды); `?` — NULL, `""` — пустая строка. Решение LAB-1111 (б):
+  сценарий проверяет чтение типов узлом, а не допуск чужого JS-источника.
+- `../task-variant.md` + новая копия `aggregate-source.lgp`: 9 переменных,
   **blocked** до решения об общем точном reader Variant.
 - `expected.json` хранит также объединённый discovery-набор из 47 переменных;
   это ожидания от независимых исходных данных, а не сохранённый результат Loginom.

@@ -20,7 +20,7 @@ const {login} = config;
 const app = loginomAddress(login.url);
 const names = config.names ?? [config.name];
 if (!Array.isArray(names) || !names.length || names.some(name => typeof name !== 'string'
-    || !/^(?:(?:[a-f0-9]{64}-(?:[0-9]+-)?)?d87-[A-Za-z0-9_-]+-(?:E[123]\.csv|X1\.xlsx|upload_only\.csv)|[A-Za-z0-9_-]+-source\.lgp)$/.test(name))) throw Error('D87_NAME_INVALID');
+    || !/^(?:[a-f0-9]{64}-(?:[0-9]+-)?)?d87-[A-Za-z0-9_-]+-(?:E[123]\.csv|X1\.xlsx|upload_only\.csv)$/.test(name))) throw Error('D87_NAME_INVALID');
 const directory = login.package_directory.replace(/\/$/, '');
 if (!directory.startsWith('/') || directory.split('/').slice(1).some(p => !p || p === '.' || p === '..')) throw Error('D87_DIRECTORY_INVALID');
 await mkdir(output, {recursive: true, mode: 0o700});

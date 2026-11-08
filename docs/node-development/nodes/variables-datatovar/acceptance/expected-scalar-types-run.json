@@ -2,7 +2,7 @@
   "package_path": "{{PACKAGE_PATH}}",
   "nodes": [
     {
-      "type": "programming.javascript"
+      "type": "imports.text"
     },
     {
       "type": "variables.from_table"

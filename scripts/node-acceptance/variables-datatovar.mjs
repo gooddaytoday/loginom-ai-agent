@@ -37,7 +37,7 @@ export function auditDataToVarHistory(events,initial,final){
 export const DATATOVAR_RESULT_CASES=Object.freeze({
  'variables-from-table-aggregates':{source:'imports.text',fields:[
   ['N',['median','mode','standard_deviation','unique_count','null_count','first','last','only','concat']],['K',['only']]]},
- 'variables-from-table-scalars':{source:'programming.javascript',fields:[
+ 'variables-from-table-scalars':{source:'imports.text',fields:[
   ['S',['count','min','max','mode','unique_count','null_count','first','last','only','concat']],
   ['B',['count','min','max','mode','unique_count','null_count','first','last','only']],
   ['D',['count','min','max','mode','unique_count','null_count','first','last','only']]]},
@@ -46,9 +46,7 @@ export function auditDataToVarResult(name,events,final){
  const spec=DATATOVAR_RESULT_CASES[name],want=parseExpectedVariableInventory(final)?.outputs;
  need(spec&&want?.length===1&&want[0].node.type==='variables.from_table','DATATOVAR_EXPECTED_INVALID');
  const requests=events.filter(e=>e.phase==='node_apply_prepared');
- // The provided JavaScript source may be read, never reconfigured or replaced.
- need(requests.every(e=>e.request?.target?.type==='variables.from_table'||e.request?.target?.type===spec.source
-  &&(spec.source==='imports.text'||e.request.target.kind==='existing'&&Object.keys(e.request.parameters??{}).length===0)),'DATATOVAR_UNEXPECTED_NODE');
+ need(requests.every(e=>[spec.source,'variables.from_table'].includes(e.request?.target?.type)),'DATATOVAR_UNEXPECTED_NODE');
  const checkpoints=events.flatMap((e,index)=>{
   const r=e.result;
   return e.phase==='node_checkpoint'&&r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.node&&r.execution?.status==='completed'

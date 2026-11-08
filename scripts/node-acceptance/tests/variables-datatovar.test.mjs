@@ -49,7 +49,7 @@ test('DataToVar history proves both data sets on the same executable node withou
  }
 });
 
-test('DataToVar cycle-1 audit requires the exact configured fields, typed result and untouched JavaScript source',()=>{
+test('DataToVar cycle-1 audit requires the exact configured fields, typed result and only import plus DataToVar nodes',()=>{
  const root='../../../docs/node-development/nodes/variables-datatovar/acceptance/';
  for(const [name,file] of [['variables-from-table-aggregates','expected-aggregates-run.json'],['variables-from-table-scalars','expected-scalar-types-run.json']]){
   const final=JSON.parse(readFileSync(new URL(root+file,import.meta.url))),w=final.variable_inventory.outputs[0],o=output(w);
@@ -65,10 +65,10 @@ test('DataToVar cycle-1 audit requires the exact configured fields, typed result
    e=>e[1].result.output.variable_ports[0].variables.reverse(),e=>e[1].result.output.variable_ports[0].variables.at(-1).cell.value=0,
    e=>e[1].result.output.variable_ports[0].execution_id='stale',e=>e[0].request.target.type='transform.calculator',
    e=>e.unshift({phase:'node_apply_prepared',request:{target:{kind:'new',type:'programming.javascript'},parameters:{}}})];
-  if(name==='variables-from-table-scalars')corrupt.push(e=>e.unshift({phase:'node_apply_prepared',request:{target:{kind:'existing',type:'programming.javascript'},parameters:{code:'x'}}}),
+  if(name==='variables-from-table-scalars')corrupt.push(e=>e.unshift({phase:'node_apply_prepared',request:{target:{kind:'existing',type:'programming.javascript'},mode:'read_existing_output'}}),
    e=>{const s=e[1].result.output.variable_ports[0].variables.find(v=>v.name==='S_Min');s.cell={type:'string',is_null:true,value:null};});
   for(const c of corrupt){const events=history();c(events);assert.throws(()=>auditDataToVarResult(name,events,final),name);}
-  if(name==='variables-from-table-scalars'){const events=history();events.unshift({phase:'node_apply_prepared',request:{target:{kind:'existing',type:'programming.javascript'},mode:'read_existing_output'}});
-   assert.equal(auditDataToVarResult(name,events,final).status,'PASS');}
+  const imported=history();imported.unshift({phase:'node_apply_prepared',request:{target:{kind:'new',type:'imports.text'},parameters:{}}});
+  assert.equal(auditDataToVarResult(name,imported,final).status,'PASS');
  }
 });
