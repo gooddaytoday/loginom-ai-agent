@@ -35,6 +35,9 @@ export function stoppedImportOpen(operation,fault,{workflowOnly=false}={}) {
   if(open&&fault==='other-question')s.ui.dialogs[0].text='Удалить пакет?';
   if(open&&fault==='busy')s.ui.masks[0].kind='busy';
   if(open&&fault==='changed-path')s.workflow_navigation.current_path.at(-1).label='Other';
+  // The workflow-only receipt caption may overflow, then become observable.
+  if(open&&workflowOnly&&['overflow-visible','overflow-other'].includes(fault))
+   s.workflow_navigation.current_path.push({tid:path.at(-1).tid+'>Source',label:fault==='overflow-other'?'Other':'Source'});
   if(open&&fault==='foreign-control')s.ui.elements[2].signature.dialog_ref='other';
   return s;
  };

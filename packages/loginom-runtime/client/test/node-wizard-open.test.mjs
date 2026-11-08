@@ -11,7 +11,7 @@ const hiddenPendingSources=[
  {name:'variables calculator',icon:'calcvariables',label:'Params',wizard:'CalcVariablesWizard;btnAddExpr',stage:'variables_calculator'},
  {name:'text import',icon:'importtextfile',label:'Import',wizard:'ImportTextFilePreviewWizard;edtFileName',stage:'text_import_file'}];
 for(const source of hiddenPendingSources)
-for(const fault of [null,'node','document','workflow','native','component','label','hidden','question','button','duplicate','parent'])
+for(const fault of [null,'node','document','workflow','native','component','label','hidden','icon','question','button','duplicate','parent'])
 test(source.name+' hidden native pending breadcrumb uses the existing deactivation confirmation: '+fault,async()=>{
  const f=scriptGraphFixture(source.label,'bg-vendor-icon-'+source.icon),{page,body}=f;f.node.FGuid='node';
  const base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');const path=[];let chain='',mode='graph',dialog,mask,crumb;
@@ -29,7 +29,7 @@ test(source.name+' hidden native pending breadcrumb uses the existing deactivati
  const initial=await page.observe(),settings=initial.ui.elements.find(e=>e.wizard_open),binding=wizardOpenBinding(initial),click=page.mouse.click;
  page.mouse.click=async(...args)=>{await click(...args);
   if(mode==='graph'){
-   mode='question';crumb=page.add('a',pending.tid,fault==='label'?'Other':source.label,undefined,panel);crumb.style.display='none';crumb.id='pending-source';if(fault==='hidden')crumb.attrs.hidden='';page.add('span',null,'',undefined,crumb).attrs.class='bg-vendor-icon-'+source.icon;
+   mode='question';crumb=page.add('a',pending.tid,fault==='label'?'Other':source.label,undefined,panel);crumb.style.display='none';crumb.id='pending-source';if(fault==='hidden')crumb.attrs.hidden='';page.add('span',null,'',undefined,crumb).attrs.class='bg-vendor-icon-'+(fault==='icon'?'joindata':source.icon);
    page.context.Ext={getCmp:id=>id===crumb.id&&fault!=='component'?{el:{dom:crumb},_node:{data:{node:native}}}:null};
    mask=page.add('div','MF;TF-1','Загрузка');mask.attrs.class='bg-mask-message';
    dialog=page.add('div',null,'',{x:400,y:200,width:500,height:260});dialog.attrs.class='x-window x-message-box';page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
@@ -81,7 +81,7 @@ test('receipted variables calculator cleanup tolerates only its exact pending ov
  for(const change of [s=>s.workflow_navigation.current_path.at(-1).label='Other',s=>s.workflow_navigation.current_path.push({tid:'other'}),s=>s.workflow_navigation.path=undefined,s=>s.dom_epoch.document='other',s=>s.prepared_node_context.node_id='other',s=>s.ui.elements[0].signature.dialog_ref='other']){
   const bad=structuredClone(state);change(bad);assert.equal(boundWizardDeactivationConfirmation(bad,binding),false);
  }
- const imports=structuredClone(binding);delete imports.release_opening.native_pending_overflow;assert.equal(boundWizardDeactivationConfirmation(state,imports),false);
+ const unflagged=structuredClone(binding);delete unflagged.release_opening.native_pending_overflow;assert.equal(boundWizardDeactivationConfirmation(state,unflagged),false);
 });
 test('question discovery cannot replace button verification',()=>{
  const {state,binding}=fixture();state.ui.elements=[];
