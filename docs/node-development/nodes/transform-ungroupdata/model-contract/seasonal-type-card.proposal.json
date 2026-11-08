@@ -1,0 +1,221 @@
+{
+  "type": "transform.ungroup_data",
+  "title": "Разгруппировка",
+  "palette_group": "Трансформация",
+  "icon_class": "bg-vendor-icon-ungroupdata",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 2,
+  "tabular_outputs": 2,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "shares",
+    "seasonal"
+  ],
+  "semantics": "PROPOSAL, not implemented: retain shares. Seasonal uses two inputs, Group links and one datetime order field on each input, integer Total/Weight and string Item. Select native seasonal method, year x1, 12 indices, rare_density .25, absent_periods 1, novelty_periods 1, max_history_periods 0. Execute recomputes current inputs. Output 0 adds Period, confidence bounds, trend, seasonal factor, value code and text; numeric detail/trend/bounds remain integer for this fixture. Output 1: Item,Group,UngroupQuality,SeasonalIndex1..12 (real metrics). Constant support 1:3 gives 25/75 and unit indices, quality NULL. All-zero support produces zero/excluded code6 and quality1; NULL-only/empty support or empty totals gives empty both ports. Proposed acceptance explicitly projects out confidence bounds; their formula and nonconstant estimator lack an independent oracle. Calendar alternatives/none exist in UI but are outside this initial proposal. Preserve port identity and exact types; no JavaScript substitute. No seasonal support before owner approval and stage1.",
+  "graph_handler": "node_target_v1",
+  "graph_handler_status": "internal_candidate",
+  "configuration_handler": "ungroup-seasonal-proposal",
+  "configuration_status": "stage0_proposal_not_implemented",
+  "candidate_node_apply_available": true,
+  "full_node_apply_available": false,
+  "candidate_apply_tool": "dock_node_apply",
+  "candidate_modes": [
+    "shares",
+    "seasonal"
+  ],
+  "parameter_schema": {
+    "type": "object",
+    "description": "Proposed shares/seasonal settings. Seasonal proposal requires complete ungroup plus seasonality; existing {} preserves supported saved settings.",
+    "properties": {
+      "ungroup": {
+        "type": "object",
+        "description": "Complete role selection; keys are group links only. Seasonal order fields belong to seasonality, not keys.",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "description": "Ordered complete group links: totals input 0 to support input 1. Exact observed names, compatible scalar types. NULL keys match NULL; empty string is distinct. Totals require exactly one row per composite key; duplicates cause native execution refusal.",
+            "items": {
+              "type": "object",
+              "description": "One explicit group link.",
+              "properties": {
+                "total": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Group field on totals input 0."
+                },
+                "support": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Matching group field on support input 1."
+                }
+              },
+              "required": [
+                "total",
+                "support"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "value_field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "One continuous integer/real total field on input 0. NULL totals produce no detail rows."
+          },
+          "item_field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "One string position-name field on input 1; exact technical name, retained in output. NULL names are retained."
+          },
+          "share_field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Exact numeric support field. shares uses supplied fractions; seasonal uses historical values, not ready-made indices."
+          },
+          "rounding": {
+            "type": "object",
+            "description": "Explicit rounding policy; rounds the group total too.",
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "precision",
+                  "multiple"
+                ],
+                "description": "Native rounding: none; precision decimal places; multiple positive integer step. Ties 2.5 -> 2 observed at precision 0."
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647,
+                "description": "Required for precision/multiple, omitted for none. Proposed supported precision 0..12; multiple 1..2147483647. Reject incompatible range before UI."
+              }
+            },
+            "required": [
+              "format"
+            ],
+            "additionalProperties": false
+          },
+          "balance": {
+            "type": "string",
+            "enum": [
+              "none",
+              "last",
+              "proportional",
+              "equal"
+            ],
+            "description": "Native balance method: no correction, all remainder to last item, proportional, or equal. Order is the support order within each totals row. Pin exact examples in acceptance; never normalize silently."
+          }
+        },
+        "required": [
+          "keys",
+          "value_field",
+          "item_field",
+          "share_field",
+          "rounding",
+          "balance"
+        ],
+        "additionalProperties": false
+      },
+      "seasonality": {
+        "type": "object",
+        "description": "Proposal: annual/monthly constant history only. All settings explicit; alternate periods/none and point-depth settings require separate acceptance.",
+        "properties": {
+          "total_order_field": {
+            "type": "string",
+            "description": "Datetime order field on input 0; Period.",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "support_order_field": {
+            "type": "string",
+            "description": "Datetime order field on input 1; Period.",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "period": {
+            "type": "string",
+            "description": "Native annual seasonal period.",
+            "enum": [
+              "year"
+            ]
+          },
+          "multiplier": {
+            "type": "integer",
+            "description": "Native period multiplier.",
+            "enum": [
+              1
+            ]
+          },
+          "index_count": {
+            "type": "integer",
+            "description": "Number of SeasonalIndex columns; UI minimum 3, proposed 12.",
+            "enum": [
+              12
+            ]
+          },
+          "rare_density": {
+            "type": "number",
+            "description": "Native rare-position density.",
+            "enum": [
+              0.25
+            ]
+          },
+          "absent_periods": {
+            "type": "number",
+            "description": "Periods absent before exclusion.",
+            "enum": [
+              1
+            ]
+          },
+          "novelty_periods": {
+            "type": "number",
+            "description": "Periods present for a new position.",
+            "enum": [
+              1
+            ]
+          },
+          "max_history_periods": {
+            "type": "number",
+            "description": "History periods; 0 uses all history.",
+            "enum": [
+              0
+            ]
+          }
+        },
+        "required": [
+          "total_order_field",
+          "support_order_field",
+          "period",
+          "multiplier",
+          "index_count",
+          "rare_density",
+          "absent_periods",
+          "novelty_periods",
+          "max_history_periods"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "sources": {
+    "e2e": [
+      "bg/helpers/workflow/node.ts",
+      "bg/helpers/workflow/ports.ts",
+      "bg/helpers/workflow/links.ts"
+    ],
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/transformation/ungrouping.md"
+  },
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000",
+  "session_manifest": {}
+}

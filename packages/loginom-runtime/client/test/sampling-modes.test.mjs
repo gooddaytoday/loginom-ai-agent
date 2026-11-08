@@ -13,6 +13,12 @@ test('uniform requires distinct group row sizes and validates priority before UI
  assert.throws(()=>validateSamplingParameters({count:6,seed:42},'uniform',s));
  for(const extra of [{test_priority:'yes'},{test_priority_position:'algorithm'},{group_size_rows:1}])assert.throws(()=>validateDataPartitionParameters({train_count:6,test_count:4,seed:42,train_group_size_rows:1,test_group_size_rows:1,...extra},'uniform',p));
  assert.throws(()=>validateDataPartitionParameters({train_count:6,test_count:4,seed:42,train_group_size_rows:1,test_group_size_rows:1,test_priority:true},'uniform',p));
+ const existing=request('preprocessing.data_partition','existing');
+ validateDataPartitionParameters({test_priority:true,test_priority_position:'end'},'uniform',existing);
+ for(const priority of [{},{test_priority:false}]){
+  assert.throws(()=>validateDataPartitionParameters({...priority,test_priority_position:'end'},'uniform',existing),/test_priority_position requires test_priority:true/);
+  assert.throws(()=>validateDataPartitionParameters({train_count:6,test_count:4,seed:42,train_group_size_rows:1,test_group_size_rows:1,...priority,test_priority_position:'beginning'},'uniform',p),/test_priority_position requires test_priority:true/);
+ }
 });
 test('random modes validate explicit seed, strata and complete category factors before UI',()=>{
  for(const [type,validate,sizes] of [

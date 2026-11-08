@@ -2,6 +2,8 @@
 
 LAB-1003, 2026-11-07, mas2. База `v040@35e83289792225b153ce2ffd6f62f708c16800b4`.
 Критерии ниже ждут решения владельца; runtime и поставляемый навык не менялись.
+Внешний режим уточнён в LAB-1102 от 08.11: см. [external.md](external.md).
+Для него исходное предположение о первом дубликате опровергнуто живым UI.
 Исследование — Loginom 7.4.2, только https://app.loginom.ai/app/?testable=true,
 новый собственный черновик worker назначенной пары. Модельных PASS нет.
 
@@ -25,8 +27,10 @@ TF и автоматически формируемая метка узла ме
 Во внешнем исследовании использовался один собственный импорт input.csv на
 обоих входах: Value=Code, Replacement=Status, Information=Keep, Id не используется.
 Это подтвердило совпадения NULL и пустой строки, добавление информации и
-сохранение 8 строк. Приоритет дубликатов и unmatched информационного поля
-на отдельном rules.csv пока `not_checked`; это предложенные критерии, не PASS.
+сохранение 8 строк. В LAB-1102 отдельный rules.csv дал нативный отказ
+«Значение дублируется в таблице замен». На rules-unique.csv подтверждены
+8 строк, три замены, unmatched CodeInfo=NULL и отличие пустой строки от NULL.
+Это ручное наблюдение, не модельный PASS; критерии остаются предложением.
 Для Boolean и mixed исследовались значения Code/Status одного узла; комплекты
 ниже разделяют их, чтобы каждый будущий сценарий проверял одну возможность.
 Режим add остаётся прежним; живое исследование расширений использовало replace.
@@ -48,7 +52,7 @@ runtime или UI. Expected формируются до модельных пр�
 |---|---|---|
 | `task-boolean.md` | `expected.json` | На утверждение: 8×5, Boolean/NULL/false и все флаги |
 | `task-mixed.md` | `expected-mixed.json` | На утверждение: 8×5, exact приоритетнее regex, whole-cell constant |
-| `task-external.md` | `expected-external.json` | На утверждение: 8×6, первый дубликат, NULL/empty, CodeInfo; не join с размножением |
+| `task-external.md` | `expected-external.json` | На утверждение LAB-1102: 8×6, уникальные ключи rules-unique.csv, NULL/empty, CodeInfo=NULL при unmatched |
 | `task-result-keep.md` | `expected-result-keep.json` | На утверждение: 8×5, Variant с явным cell_type у каждой непустой ячейки |
 | `task-regex-type.md` | `expected-regex-type.json` | Условная гипотеза: UI режима не предоставляет; не назначать прогон |
 | `task-groups.md` | `expected-groups.json` | Условная гипотеза: подстановка SKU-$1 с сохранением окружения не найдена; не назначать прогон |
@@ -62,7 +66,9 @@ runtime или UI. Expected формируются до модельных пр�
 точный порядок столбцов через autosync=false, мультимножество строк,
 метки label_any, повторное выполнение того же узла, CSV с ?, Save и cold
 без восстановления настроек из expected. Для внешней таблицы нужны только
-input.csv и rules.csv, для roundtrip — input.csv и rules.tsv, для остальных —
+input.csv и rules-unique.csv; rules.csv — отдельный ручной отрицательный
+пример `task-external-duplicates.md`, без успешного expected и модельного прогона.
+Для roundtrip — input.csv и rules.tsv, для остальных —
 только input.csv. Ни oracle, ни expected, ни proposal-card модели не передавать.
 При Variant CSV — дополнительная проверка; native subtype proof обязателен.
 Это существующий формат expected и критерий точных типов, не новый matcher.
@@ -77,7 +83,7 @@ input.csv и rules.csv, для roundtrip — input.csv и rules.tsv, для ос
 |---|---|---|
 | Boolean | replacement-parameters/context/procedure/output/readback.mjs | 1 цикл, один PR |
 | mixed | replacement-parameters/context/procedure/readback.mjs | 1 цикл, один PR; сохранить незапрошенную группу |
-| external | replacement-preflight/parameters/context/procedure/output/readback.mjs | 2 цикла, по одному PR с новым живым сценарием; роли, повторное чтение, сохранение |
+| external | replacement-node/preflight/parameters/context/procedure/output/readback.mjs | 2 цикла в одном срезе/PR с новым живым сценарием между ними; уточнение LAB-1102 в external.md |
 | keep при result_type | replacement-parameters/context/output/readback.mjs | 1 цикл, один PR, если существующего native Variant reader достаточно; иначе blocked до общей правки |
 | Regex type / группы | — | 0: UI возможности не обнаружены, нужна граница от владельца |
 | Файлы правил / сортировка / получение значений | — | 0: удобства UI без отдельной семантики результата |
@@ -93,3 +99,7 @@ capability уже находится в node-port-output.mjs / variant-native-re
 `node-type.proposal.json` — суммарное предложение, а не установленная карточка;
 все hash-поля — 64 нуля. `skill-node.proposal.md` заменяет файл узла целиком.
 Расчёт размеров и воспроизведение — в новых разделах двух подпланов.
+Для изолированного внешнего режима актуальны external-node-type.proposal.json
+и external-skill-node.proposal.md: они основаны на текущей v040, не добавляют
+keep→Variant и не меняют поставляемые файлы. Суммарная старая карточка выше —
+историческое предложение нескольких расширений, не размер карточки LAB-1102.
