@@ -27,6 +27,20 @@ test('cached mapping ties duplicate labels to distinct source identities',()=>{
  const r=fixture().read();assert.equal(r.verified,true);assert.equal(r.inventory_complete,true);
  assert.deepEqual(Array.from(r.target_fields,t=>t.source.name),['A','B']);assert.equal(r.settings_applied,false);
 });
+test('secondary PCA mapping requires its unique owned factor wizard and both native cards',()=>{
+ for(const fault of [null,'missing','foreign','duplicate','third']){
+  const f=fixture({grouped:true}),root=f.el('MF;TF;WizrdMCF');f.root.parent=root;
+  for(const e of f.all)if(e.tid?.includes('DerivedDataSourceOutputSocketWizard'))e.tid=e.tid.replace('DerivedDataSourceOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard-1');
+  f.el('MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard','',root);
+  if(fault!=='missing')f.el('MF;TF;WizrdMCF;FactorAnalysisWizard','',fault==='foreign'?null:root);
+  if(fault==='duplicate')f.el('MF;TF;WizrdMCF;FactorAnalysisWizard','',root);
+  if(fault==='third')f.el('MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard-2','',root);
+  // Hidden primary card remains in the native inventory.
+  f.all.find(e=>e.tid==='MF;TF;WizrdMCF;DerivedDataSourceMappingEngineOutputPortWizard').checkVisibility=()=>false;
+  const r=f.read();assert.equal(r.verified,!fault,String(fault));
+  if(!fault)assert.equal(r.mapping_wizard,'DerivedDataSourceMappingEngineOutputPortWizard-1');
+ }
+});
 test('cached mapping refuses foreign connections, filtered stores and inconsistent rendered rows',()=>{
  const changes=[f=>{f.target[0].data.ConnectedRecord={...f.source[0]};},f=>{f.source[0].data.ConnectedRecord=f.target[1];},
   f=>{f.target[1].data.ConnectedRecord=f.source[0];},f=>{f.stores[0].getTotalCount=()=>3;},

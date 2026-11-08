@@ -12,10 +12,11 @@ export function alignFactorAnalysisOutput(columns,expected){
  need(columns.length===expected.length&&columns.every((c,i)=>['name','label','type'].every(k=>c[k]===expected[i][k])),'schema or field order differs');
  return columns.map((c,i)=>({...c,data_kind:expected[i].data_kind}));
 }
-export function factorAnalysisInlineSources(c,native){
+export function factorAnalysisInlineSources(c,native,port=0){
+ need(port===0||port===1,'conditional PCA port differs');
  need(native?.verified===true&&native.inventory_complete===true&&native.source_identity_verified===true
-  &&native.mapping_wizard==='DerivedDataSourceMappingEngineOutputPortWizard','owned complete conditional PCA output required');
- const expected=factorAnalysisOutputColumns(c,0),count=c.fields.filter(f=>f.usage_type===3).length;
+  &&native.mapping_wizard==='DerivedDataSourceMappingEngineOutputPortWizard'+(port?'-1':''),'owned complete conditional PCA output required');
+ const expected=factorAnalysisOutputColumns(c,port),count=c.fields.filter(f=>f.usage_type===3).length;
  need(native.source_fields.length===expected.length&&expected.every(e=>native.source_fields.some(f=>['name','label','type'].every(k=>f[k]===e[k]))),'conditional PCA source schema differs');
  const obsolete=[];
  for(const field of native.target_fields){
@@ -29,7 +30,8 @@ export function factorAnalysisInlineSources(c,native){
   const source=native.source_fields.find(f=>f.record_id===field.source?.record_id);
   need(source&&expected.some(e=>['name','label','type'].every(k=>field[k]===e[k]&&source[k]===e[k])),'retained PCA source link differs');
  }
- need(c.fields.every(f=>native.target_fields.some(t=>t.name===f.name&&t.source)),'original PCA input fields must remain linked');
+ const retained=port?expected.filter(f=>!/^Factor[1-9][0-9]*$/.test(f.name)):c.fields;
+ need(retained.every(f=>native.target_fields.some(t=>t.name===f.name&&t.source)),'original PCA input or loadings metadata fields must remain linked');
  return obsolete;
 }
 export async function configureFactorAnalysisOutputs(channel,c,p,mappings,finishWizard){

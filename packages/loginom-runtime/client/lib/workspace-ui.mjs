@@ -873,7 +873,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return workflowAncestor ? 'workflow' : 'global';
     };
     const wizardForms=all.filter(element=>getTid(element)===workflow?.prefix+';WizrdMCF' && visible(element) && !sensitive(element));
-    let wizard={status:wizardForms.length?'ambiguous':'absent'};
+    let wizard={status:wizardForms.length?'ambiguous':'absent'},factorWizard=false;
     if (wizardForms.length===1) {
       const form=wizardForms[0],base=getTid(form);
       const matching=suffix=>(tids.get(base+suffix)??[]).filter(element=>form.contains(element) && visible(element) && !sensitive(element));
@@ -882,6 +882,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // distinguishes its -1 page from Binning's two-card ranges wizard.
       const qualityPages=[0,1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard'+(port?'-'+port:''));
       const qualityWizard=qualityPages.every(name=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name)+']')];return es.length===1&&form.contains(es[0]);});
+      // PCA owns exactly two derived-output cards; the hidden factor form
+      // distinguishes its loadings card from the historical Binning stage.
+      const owned=name=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name)+']')];return es.length===1&&form.contains(es[0]);};
+      factorWizard=['FactorAnalysisWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].every(owned)
+        &&!document.querySelectorAll('[data-tid='+JSON.stringify(base+';DerivedDataSourceMappingEngineOutputPortWizard-2')+']').length;
       const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>{
         if(key==='coarse_classes_mapping_2'&&!(tids.get(base+';CoarseClassesWizard-1')??[]).some(element=>form.contains(element)))return [];
         const counts=[suffixes].flat().map(suffix=>key==='binning_ranges_mapping'&&qualityWizard||key==='output_mapping'&&!qualityWizard&&/Wizard-[1-4];/.test(suffix)?0:matching(suffix).length);
@@ -1432,7 +1437,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       }
     }
     scanStage='output_definitions';
-    if(wizard.status==='observed' && ['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)) {
+    const factorLoadingsMapping=factorWizard&&wizard.stage==='binning_ranges_mapping';
+    if(wizard.status==='observed' && (['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)||factorLoadingsMapping)) {
       const reform=wizard.stage==='field_parameters',columnsKey=reform?'reform_columns':'output_columns';
       const mappingForms=[...[1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard-'+port),'ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
         (tids.get(wizard.root_tid+';'+name+';'+(name==='TuneDataSourceInputPortWizard'?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(visible).length===1);
@@ -1480,7 +1486,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     }
     if(wizard.output_columns) {
       let coverage={status:'partial',source_identity_verified:false};
-      const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
+      const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard',...(factorWizard?['DerivedDataSourceMappingEngineOutputPortWizard-1']:[])].filter(name=>
         (tids.get(wizard.root_tid+';'+name+';'+(name==='TuneDataSourceInputPortWizard'?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e)).length===1);
       const base=wizard.root_tid+';'+(forms.length===1?forms[0]:'__unobserved__')+';';
       const unique=key=>{const es=tids.get(base+key)??[];return es.length===1 && wizardForms[0].contains(es[0])
@@ -1589,7 +1595,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const view=globalThis.Ext?.getCmp?.(boundId),store=view?.el?.dom===body?view.getStore?.():null;
           const records=store?.$className==='Ext.data.Store' && !store.isBufferedStore && !store.isLoading?.()
             ?store.getData?.()?.items:null;
-          const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard'].includes(forms[0]),groupIndices=new Map();
+          const grouped=['DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','DerivedDataSourceMappingEngineOutputPortWizard-1'].includes(forms[0]),groupIndices=new Map();
           // Grouped CollectionProxy totals count active fields or retain the
           // last load after a local removal. Accept only a complete unfiltered
           // local cache; the rendered record identities are still checked below.
@@ -2724,7 +2730,7 @@ function readRenderedInputMapping(observation) {
       }
     }
     const outputColumnCells=new Map();
-    if(['output_mapping','input_mapping'].includes(wizard.stage) && !wizard.column_parameters
+    if((['output_mapping','input_mapping'].includes(wizard.stage)||factorLoadingsMapping) && !wizard.column_parameters
       &&(wizard.output_columns?.page?.status==='complete_definition_page'
         ||wizard.output_columns?.definition_coverage?.status==='complete_configured_rows')) {
       for(const field of wizard.output_columns.fields??[])if(field.status==='observed') {

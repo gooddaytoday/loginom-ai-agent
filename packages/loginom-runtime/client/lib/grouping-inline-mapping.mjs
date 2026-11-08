@@ -50,17 +50,18 @@ export function verifyGroupingInlineSync(configuration,before,after,missing){
 }
 // Both grouping and sorting expose this same conditional native output page
 // after their input-derived schema changes. Each supplies its source contract.
-export async function configureDerivedInlineMapping(channel,configuration,validateSources,verifySync=verifyCalculatorInlineSync,{sourceOf=f=>f.source,nextStage='done'}={}){
- const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true
-  &&s.node_mapping.mapping_wizard==='DerivedDataSourceMappingEngineOutputPortWizard';
+// PCA's second card supplies its own native family and existing stage name.
+export async function configureDerivedInlineMapping(channel,configuration,validateSources,verifySync=verifyCalculatorInlineSync,{sourceOf=f=>f.source,nextStage='done',mappingWizard='DerivedDataSourceMappingEngineOutputPortWizard',stage='output_mapping'}={}){
+ const ready=s=>s.wizard?.stage===stage&&s.node_mapping?.verified===true
+  &&s.node_mapping.mapping_wizard===mappingWizard;
  let state=await channel.observe({condition:'grouping conditional output inventory',readMappings:true,ready});
  const before=state.node_mapping,removed=[];
  for(const obsolete of validateSources(configuration,before)){
   state=await channel.observe({condition:'obsolete grouping field before removal',readMappings:true,ready});
   const baseline=state.node_mapping,field=baseline.target_fields.find(f=>f.record_id===obsolete.record_id);
   need(field&&same(retained(field),retained(obsolete)),'Obsolete grouping field changed');
-  const definitions=await readOutputDefinitionPages(channel,{expectedCount:baseline.target_fields.length});
-  state=await observeOutputDefinitionPage(channel,{offset:Math.floor(field.index/8)*8,schemaId:definitions.schema_id,total:definitions.total_columns,field});
+  const definitions=await readOutputDefinitionPages(channel,{expectedCount:baseline.target_fields.length,stage});
+  state=await observeOutputDefinitionPage(channel,{offset:Math.floor(field.index/8)*8,schemaId:definitions.schema_id,total:definitions.total_columns,field,stage});
   const rowOf=s=>s.wizard?.output_columns?.fields?.find(f=>f.index===field.index&&f.name===field.name&&f.label===field.label);
   const root=state.wizard.root_ref;
   await channel.perform({condition:'select obsolete grouping output',initialObservation:state,ready:s=>s.wizard?.root_ref===root&&!!rowOf(s),identity:()=>field,
@@ -81,13 +82,13 @@ export async function configureDerivedInlineMapping(channel,configuration,valida
  const missing=baseline.source_fields.filter(f=>!linked.includes(f.record_id));
  if(missing.length){
   await channel.perform({condition:'synchronize requested grouping fields',initialObservation:state,ready,identity:()=>baseline.node_context,
-   resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;btnSyncThroughColumns'&&e.allowed_actions.includes('click'));need(es.length===1,'Grouping synchronization unavailable');return {verb:'click',ref:es[0].ref};}});
+   resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+mappingWizard+';btnSyncThroughColumns'&&e.allowed_actions.includes('click'));need(es.length===1,'Grouping synchronization unavailable');return {verb:'click',ref:es[0].ref};}});
   state=await channel.observe({condition:'requested grouping fields synchronized',readMappings:true,ready});
   verifySync(baseline,state.node_mapping,missing);
  }
  const changed=state.node_mapping;
  if(changed.autosync!==before.autosync){
-  await configureOutputAutosync(channel,before.autosync);
+  await configureOutputAutosync(channel,before.autosync,{mappingWizard,stage});
   state=await channel.observe({condition:'grouping autosync restored after pruning',readMappings:true,ready});
   verifyGroupingAutosyncRestore(changed,state.node_mapping,before.autosync);
  }

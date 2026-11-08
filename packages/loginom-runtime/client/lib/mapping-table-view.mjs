@@ -2,10 +2,10 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const need=(v,m)=>{if(!v)throw Error(m);};
 const checked=e=>e?.signature?.check_state?.kind==='radio'&&e.signature.check_state.source==='loginom_ext'
  ?e.signature.check_state.checked:null;
-export function mappingLinksView(state){
+export function mappingLinksView(state,stage){
  const prefix=state.wizard?.root_tid+';';
  const links=(state.ui?.elements??[]).filter(e=>e.tid?.startsWith(prefix)&&e.tid.endsWith(';rbLinks;DisplayEl'));
- return ['output_mapping','input_mapping'].includes(state.wizard?.stage)&&links.length===1&&checked(links[0])===true;
+ return (stage?state.wizard?.stage===stage:['output_mapping','input_mapping'].includes(state.wizard?.stage))&&links.length===1&&checked(links[0])===true;
 }
 
 // The view switch is technical UI state. Preserve the complete native mapping
