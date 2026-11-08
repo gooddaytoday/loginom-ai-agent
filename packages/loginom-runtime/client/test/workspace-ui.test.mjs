@@ -8210,16 +8210,18 @@ test('Excel input0 overflow retains typed Close only for its native input1 owner
  }
 });
 
-test('reform literal node cache picker uses the existing owned wizard choice protocol',async()=>{
+for(const suffix of ['', '-1'])test('reform literal node cache picker uses the existing owned wizard choice protocol '+suffix,async()=>{
  const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1)),stem=base+'ReformColumnsWizard;';
  page.add('div',stem+'grdTargetColumns;tbl','',undefined,form);
  const owner=page.add('div',stem+'pedDataSourceCachingMethod;ValueControl','',undefined,form);
  const input=page.add('input',null,'',undefined,owner);input.value='Отключено';input.readOnly=true;
  page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;trg_picker','',undefined,owner);
- const list=page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist','',{x:600,y:300,width:160,height:40});
- page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist;Выбранные_поля','Выбранные поля',{x:605,y:305,width:150,height:25},list);
+ const list=page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist'+suffix,'',{x:600,y:300,width:160,height:40});
+ page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist'+suffix+';Выбранные_поля','Выбранные поля',{x:605,y:305,width:150,height:25},list);
  const full=await page.observe(),option=full.ui.elements.find(e=>e.wizard_combo?.kind==='option');
  assert.ok(option);assert.equal(option.wizard_combo.field.scope,'reform_node');
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ assert.ok(roots.output.ui.elements.some(e=>e.ref===option.wizard_combo.list_ref));
  const narrow=await page.execute({mode:'observe',root_ref:option.wizard_combo.list_ref});
  const selected=narrow.output.ui.elements.find(e=>e.ref===option.ref);
  assert.equal(selected?.wizard_combo?.field?.scope,'reform_node');
