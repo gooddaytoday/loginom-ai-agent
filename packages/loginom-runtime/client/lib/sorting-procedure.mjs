@@ -77,9 +77,13 @@ export async function configureSorting(channel,p,{newNode=false}={}){
     resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===tid+';trg_picker'&&e.allowed_actions.includes('click'));need(es.length===1,'Sorting maximum picker unavailable');return {verb:'click',ref:es[0].ref};}});
    const label=p.max_threads===0?'Автоопределение':String(p.max_threads);
    const choice=s=>s.ui.elements.filter(e=>e.tid===tid+';boundlist;'+label&&e.wizard_combo?.kind==='option'
-    &&e.wizard_combo.field.scope==='sorting'&&e.wizard_combo.field.name==='max_threads'&&e.label===label&&e.allowed_actions.includes('select_wizard_option'));
-   const opened=await channel.observe({condition:'sorting maximum choices',readSorting:true,ready:s=>ready(s)&&choice(s).length===1});
-   await channel.perform({condition:'select sorting literal maximum',initialObservation:opened,ready:s=>ready(s)&&choice(s).length===1,
+    &&e.wizard_combo.field.scope==='sorting'&&e.wizard_combo.field.name==='max_threads'&&e.wizard_combo.label===label&&e.allowed_actions.includes('select_wizard_option'));
+   // An expanded native combo can temporarily return null; keep the scalar reader strict.
+   // The option still needs the same verified wizard/node and exact combo owner.
+   const pickerReady=s=>s.wizard?.stage==='sorting'&&s.prepared_node_context?.verified===true
+    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===baseline.node_context[k])&&choice(s).length===1;
+   const opened=await channel.observe({condition:'sorting maximum choices',readSorting:true,ready:pickerReady});
+   await channel.perform({condition:'select sorting literal maximum',initialObservation:opened,ready:pickerReady,
     identity:()=>({max_threads:p.max_threads}),resolve:s=>({verb:'select_wizard_option',ref:choice(s)[0].ref})});
    s=await observe('sorting maximum applied');
    need(s.node_sorting.options.cbxMaxThreadCount.value===p.max_threads&&s.node_sorting.options.cbxMaxThreadCount.switch_pressed===false,'Sorting maximum threads differs');

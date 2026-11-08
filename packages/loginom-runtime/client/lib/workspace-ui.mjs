@@ -2173,7 +2173,8 @@ function readRenderedInputMapping(observation) {
     }
     if(wizard.status==='observed'&&wizard.stage==='sorting'){
       const ownerTid=wizard.root_tid+';SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl';
-      const owners=tids.get(ownerTid)??[],inputs=owners.length===1?[...owners[0].querySelectorAll('input')].filter(visible):[];
+      // The boundlist is an observation root; its exact native owner is outside that subtree.
+      const owners=[...document.querySelectorAll('[data-tid='+JSON.stringify(ownerTid)+']')],inputs=owners.length===1?[...owners[0].querySelectorAll('input')].filter(visible):[];
       if(owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&enabled(inputs[0])&&!sensitive(owners[0])&&!sensitive(inputs[0])){
         const value=String(inputs[0].value??'');
         if(value.length<=256){
@@ -2678,7 +2679,7 @@ function readRenderedInputMapping(observation) {
         if(!tid.startsWith(prefix) || !tid.slice(prefix.length) || tid.slice(prefix.length).includes(';'))continue;
         const lists=(tids.get(ownerTid+';boundlist')??[]).filter(visible);
         if(lists.length!==1 || !lists[0].contains(element) || sensitive(lists[0]))return null;
-        const label=textOf(element,true),formatted=label.replace(/\s/g,'_').replace(/,/g,'');
+        const displayed=textOf(element,true),label=field.scope==='sorting'&&field.name==='max_threads'&&displayed==='Автоопределение (0)'?'Автоопределение':displayed,formatted=label.replace(/\s/g,'_').replace(/,/g,'');
         if(!label || label.length>=240 || tid!==prefix+formatted)return null;
         if(field.scope==='import_column' && !(field.name==='type'
           ? ['Целый','Вещественный','Строковый','Логический','Дата/Время','Переменный']
