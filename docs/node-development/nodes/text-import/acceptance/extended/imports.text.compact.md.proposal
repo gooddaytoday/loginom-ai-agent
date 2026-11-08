@@ -6,7 +6,10 @@ for the file before Execute/read: a read adds a visualizer table to the package
 even if configuration is refused. After `NOT_APPLIED` with `effect_possible=false`
 do no baseline/Save for cleanup: report the refusal and ask for the CSV.
 
-Server text preview: `preview_only` as in its schema. Set known
+Server text preview: `dock_node_apply` for `imports.text`,
+`parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
+`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}` returns
+`output.server_profile` and closes the draft without Execute. Set known
 `settings.source.encoding`, e.g. `CP1251`; if UTF-8 mangles Cyrillic, refresh
 `dock_storage_source` and retry `CP1251`; mojibake is not file data. A closed
 empty node needs full sample Import settings from the local profile.
