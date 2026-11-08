@@ -12,9 +12,9 @@ function fixture(fn,bit){
  const names=['sum','count','min','max','average','median','mode','standard_deviation','unique_count','null_count','first','last','only','concat'];
  let editor=null;const actions=[];
  const combos={separator:{tid:'W;FactorEditDialog;cntCheckboxes;fs;cbxConcatSeparator',editable:true,choices:[{value:',',label:'Запятая (,)'}]},
-  wrapper:{tid:'W;FactorEditDialog;cntCheckboxes;fs;cbxConcatWrapper',editable:false,choices:[{value:'',label:'Без ограничителя строк'},{value:'"',label:'Двойная кавычка'},{value:"'",label:'Одинарная кавычка'}]},
-  order:{tid:'W;FactorEditDialog;cntCheckboxes;fs;fc;cbxConcatSort',editable:false,choices:[{value:0,label:'Без сортировки'},{value:1,label:'По возрастанию'},{value:2,label:'По убыванию'}]}};
- const comboValue=key=>key==='order'?editor.concat.sort?editor.concat.direction+1:0:editor.concat[key];
+  wrapper:{tid:'W;FactorEditDialog;cntCheckboxes;fs;cbxConcatWrapper',editable:false,choices:[{value:'"',label:'Кавычки (")'},{value:"'",label:'Одинарные кавычки'},{value:'',label:'Без ограничителя строк'}]},
+  order:{tid:'W;FactorEditDialog;cntCheckboxes;fs;fc;cbxConcatSort',editable:false,choices:[{value:'NONE',label:'Без сортировки'},{value:'ASC',label:'По возрастанию'},{value:'DESC',label:'По убыванию'}]}};
+ const comboValue=key=>key==='order'?editor.concat.sort?editor.concat.direction===1?'DESC':'ASC':'NONE':editor.concat[key];
  const state=()=>({wizard:{stage:'grouping',root_tid:'W',factor_editor:editor?{status:'rendered_factor_options',selected_field:{field_key:'Amount'},
   options:names.map((aggregation,i)=>({aggregation,checked:(editor.mask&(1<<i))!==0,enabled:true,display_ref:'bit'+i}))}:undefined},
   node_grouping:{...structuredClone(native),...(editor?{factor_concat:Object.fromEntries(Object.entries(combos).map(([key,c])=>[key,{...c,value:comboValue(key)}]))}:{})},ui:{elements:[{ref:'key',grouping_field:{field_key:'Region',role:'group'},allowed_actions:['click']},{ref:'amount',grouping_field:{field_key:'Amount',role:'measure'},allowed_actions:['click','double_click']},
@@ -27,13 +27,22 @@ function fixture(fn,bit){
   else if(action.verb==='double_click')editor={mask:input_fields[1].functions,concat:structuredClone(input_fields[1].concat),index:0};
   else if(action.verb==='fill')editor.concat[action.ref]=action.text;
   else if(action.verb==='press'){
-   if(action.key==='Home')editor.index=0;
-   if(action.key==='ArrowDown')editor.index++;
-   if(action.key==='Enter'){
-    const value=combos[action.ref].choices[editor.index].value;
-    if(action.ref==='order'){editor.concat.sort=value!==0;editor.concat.direction=value===2?1:0;}
+   const choices=combos[action.ref].choices;
+   const commit=value=>{
+    if(action.ref==='order'){editor.concat.sort=value!=='NONE';editor.concat.direction=value==='DESC'?1:0;}
     else editor.concat[action.ref]=value;
+   };
+   if(['ArrowDown','ArrowUp'].includes(action.key)){
+    if(editor.popup!==action.ref){editor.popup=action.ref;editor.index=choices.findIndex(o=>o.value===comboValue(action.ref));}
+    else editor.index=(editor.index+(action.key==='ArrowDown'?1:-1)+choices.length)%choices.length;
    }
+   // Native trace :1602-1617: Home changes ASC to NONE, then the two
+   // Down presses and Enter commit ASC. Reopening starts at the selection.
+   if(action.key==='Home'){
+    editor.index=0;
+    if(action.ref==='order'){commit(choices[0].value);editor.popup=null;}
+   }
+   if(action.key==='Enter'){commit(choices[editor.index].value);editor.popup=null;}
   }
   else if(action.ref==='unique')editor.concat.unique=action.checked;
   else if(action.verb==='set_checked'){
@@ -112,3 +121,12 @@ for(const combo of ['cbxConcatSeparator','cbxConcatWrapper','fc;cbxConcatSort'])
   else await assert.rejects(read(),/blocked by a mask or dialog/);
  });
 }
+
+for(const from of ['none','ASC','DESC'])for(const to of ['none','ASC','DESC'])test(`Grouping concat order ${from} -> ${to} starts from the observed native selection`,async()=>{
+ const f=fixture('concat',8192);f.native.measures[0].functions=8192;
+ f.native.measures[0].concat={separator:'|',wrapper:'',unique:false,sort:from!=='none',direction:from==='DESC'?1:0};
+ f.parameters.measures[0].concat={separator:'|',wrapper:'',unique:false,order:to};
+ await configureGrouping(f.channel,f.parameters);
+ assert.equal(f.native.measures[0].concat.sort,to!=='none');
+ if(to!=='none')assert.equal(f.native.measures[0].concat.direction,to==='DESC'?1:0);
+});

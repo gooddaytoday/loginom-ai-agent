@@ -81,9 +81,10 @@ export async function configureGrouping(channel,p){
      s=await channel.observe({condition:'concat separator edited',readGrouping:true,ready:editorReady});
      await channel.perform({condition:'commit concat separator',initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,key,value}),resolve:state=>({verb:'press',ref:element(state).ref,key:'Tab'})});
     }else{
-     const index=c.choices.findIndex(o=>o.value===wanted);
+     const index=c.choices.findIndex(o=>o.value===wanted),current=c.choices.findIndex(o=>o.value===c.value);
+     need(current>=0,'Current concat option is unavailable: '+key);
      await channel.perform({condition:'open concat '+key,initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,key,value}),resolve:state=>({verb:'press',ref:element(state).ref,key:'ArrowDown'})});
-     for(const keypress of ['Home',...Array(index).fill('ArrowDown'),'Enter']){
+     for(const keypress of [...Array(Math.abs(index-current)).fill(index>current?'ArrowDown':'ArrowUp'),'Enter']){
       s=await channel.observe({condition:'select native concat '+key,readGrouping:true,ready:editorReady});
       await channel.perform({condition:'choose concat '+key,initialObservation:s,ready:editorReady,identity:()=>({record_id:field.record_id,key,value}),resolve:state=>({verb:'press',ref:element(state).ref,key:keypress})});
      }
