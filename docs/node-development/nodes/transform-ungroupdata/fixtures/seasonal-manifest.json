@@ -1,0 +1,50 @@
+{
+  "encoding": "UTF-8",
+  "delimiter": ",",
+  "null": "?",
+  "columns": {
+    "Group": "string",
+    "Period": "datetime",
+    "Item": "string",
+    "Total": "integer",
+    "Weight": "integer"
+  },
+  "ordered": true,
+  "files": [
+    {
+      "file": "seasonal-constant-support.csv",
+      "bytes": 1249,
+      "row_count": 72
+    },
+    {
+      "file": "seasonal-empty-support.csv",
+      "bytes": 25,
+      "row_count": 0
+    },
+    {
+      "file": "seasonal-empty-totals.csv",
+      "bytes": 19,
+      "row_count": 0
+    },
+    {
+      "file": "seasonal-null-support.csv",
+      "bytes": 1249,
+      "row_count": 72
+    },
+    {
+      "file": "seasonal-support.csv",
+      "bytes": 1249,
+      "row_count": 72
+    },
+    {
+      "file": "seasonal-totals.csv",
+      "bytes": 53,
+      "row_count": 2
+    },
+    {
+      "file": "seasonal-zero-support.csv",
+      "bytes": 1249,
+      "row_count": 72
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+|Сезонность и доли|`transform.ungroup_data` / shares, seasonal|[читать](references/nodes/transform.ungroup_data.md)|
