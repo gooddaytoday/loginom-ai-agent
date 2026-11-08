@@ -1487,12 +1487,13 @@ test('Calculator document read distinguishes empty, multiline and offscreen text
   assert.equal(record.calculator_editor.document.full_text_verified,false);
 });
 
-test('Calculator replacement requires selected field, expression mode and writable owned document',async()=>{
+test('Calculator replacement requires selected field, a known language and writable owned document',async()=>{
   const page=new Page(),c=calculatorDocument(page);
   const read=async()=>(await page.observe()).ui.elements.find(e=>e.tid===c.base+'cmpExpression');
   c.row.attrs.class='';assert.deepEqual((await read()).allowed_actions,[]);
   c.row.attrs.class='x-grid-item-selected';c.state.readOnly=true;assert.deepEqual((await read()).allowed_actions,[]);
-  c.state.readOnly=false;c.icon.attrs.class='bg-TBGCalcMode-cmJavaScript';assert.deepEqual((await read()).allowed_actions,[]);
+  c.state.readOnly=false;c.icon.attrs.class='bg-TBGCalcMode-cmJavaScript';assert.deepEqual((await read()).allowed_actions,['replace_expression']);
+  c.icon.attrs.class='';assert.deepEqual((await read()).allowed_actions,[]);
   c.icon.attrs.class='bg-TBGCalcMode-cmExpression';c.wrapper.CodeMirror.getWrapperElement=()=>c.editor;
   assert.deepEqual((await read()).allowed_actions,[]);
   assert.throws(()=>validateUiAction({verb:'replace_expression',ref:'ui-1',text:'a\rb'}),/LF/);

@@ -26,7 +26,7 @@ RULES = (
     ((C + 'calculator-*.mjs', C + 'grouping-*.mjs', C + 'sorting-*.mjs', C + 'filter-*.mjs'), ('live-ui',), ('s1', 'sorting-locale')),
     ((C + 'variables-datatovar-*.mjs', 'docs/node-development/nodes/variables-datatovar/acceptance/**', 'scripts/node-acceptance/variables-datatovar.mjs'), ('live-ui',), ('variables-datatovar', 'variables-datatovar-null', 'variables-datatovar-empty')),
     ((C + 'calculator-*.mjs', 'docs/node-development/nodes/calculator/acceptance/**'),
-     ('live-ui',), ('calculator-vars', 'calculator-vars-update', 'calculator-expression-options')),
+     ('live-ui',), ('calculator-vars', 'calculator-vars-update', 'calculator-expression-options', 'calculator-javascript')),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/modes/**'), ('live-ui',), ('grouping-median',)),
     ((C + 'filter-*.mjs', 'docs/node-development/nodes/row-filter/acceptance/**'), ('live-ui',), ('row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none')),

@@ -72,9 +72,10 @@ test('calculator readback has its own public shape and cannot masquerade as text
  expressions:[{index:0,name:'R',label:'R',type:'real',formula:'A * 2',replace:false,intermediate:false,cached:false,description:''}],
  input_fields:[{name:'A',label:'A',type:'real'}],syntax_validation:'accepted_by_loginom_next',output_mapping:{port:0,autosync:true,fields:[{index:0,name:'R',label:'R',type:'real',data_kind:'Непрерывный',source_name:'R',excluded:false}]},package_persistence_verified:false}};
  assert.equal(validate(r).valid,true);
- for(const change of [v=>v.kind='text_import',v=>v.mode='javascript',v=>v.package_persistence_verified=true,v=>v.receipt_ids.pop(),v=>delete v.expressions[0].formula]){
+ for(const change of [v=>v.kind='text_import',v=>v.mode='javascript',v=>v.package_persistence_verified=true,v=>v.receipt_ids.pop(),v=>delete v.expressions[0].formula,v=>v.syntax='python']){
   const invalid=structuredClone(r);change(invalid.configuration.readback);assert.equal(validate(invalid).valid,false);
  }
+ for(const syntax of ['expression','javascript']){const ok=structuredClone(r);ok.configuration.readback.syntax=syntax;assert.equal(validate(ok).valid,true,syntax);}
 });
 
 test('reform readback has a registered shape with input identities and preservation evidence',()=>{
