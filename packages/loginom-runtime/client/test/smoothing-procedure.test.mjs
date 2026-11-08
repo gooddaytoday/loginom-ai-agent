@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureSmoothing} from '../lib/smoothing-procedure.mjs';
 import {validateUiAction} from '../lib/workspace-ui.mjs';
-function fixture(wavelet=false){
+function fixture(wavelet=false,transition=false){
+ let editor=false;
  const fields=[{index:0,record_id:'x',name:'X',label:'X',type:'integer',data_kind:'Непрерывный',used:false,algorithm:0},{index:1,record_id:'r',name:'R',label:'R',type:'real',data_kind:'Непрерывный',used:true,algorithm:0}];
  if(wavelet)for(const f of fields)f.algorithm=1;
  const inputMapping={verified:true,inventory_complete:true,target_fields:[...structuredClone(fields),{name:'Tag',label:'Tag',type:'string',data_kind:'Дискретный'}]};
@@ -11,9 +12,10 @@ function fixture(wavelet=false){
  const base='W;SmoothingWizard;';
  function refresh(){
   const selected=state.node_smoothing.selected;state.node_smoothing.settings=selected?.used?settings.get(selected.record_id):null;
-  state.ui.elements=fields.flatMap(f=>['field','used'].map(part=>({tid:base+(part==='field'?'colDisplayName_':'colUsable_')+f.name,ref:'ui-'+f.record_id+'-'+part,smoothing_cell:{part,record_id:f.record_id},allowed_actions:['click']})));
-  if(selected?.used&&wavelet)for(const key of ['edtWaveletOrder','edtDecompositionLevel'])state.ui.elements.push({tid:base+key+';ValueControl',ref:'ui-'+key,allowed_actions:['fill','press']});
-  if(selected?.used&&!wavelet)for(const title of ['Lambda','Period'])for(const kind of ['rb','edt']){
+  state.ui.elements=fields.flatMap(f=>(transition?['field','used','algorithm']:['field','used']).map(part=>({tid:base+(part==='field'?'colDisplayName_':part==='algorithm'?'colAlgorithm_':'colUsable_')+f.name,ref:'ui-'+f.record_id+'-'+part,smoothing_cell:{part,record_id:f.record_id},allowed_actions:part==='algorithm'?['click','double_click']:['click']})));
+  if(editor)state.ui.elements.push({tid:base+'grdColumnsSettings;tbl;celleditor;cbx;boundlist;Вейвлет-сглаживание',ref:'ui-wavelet-option',allowed_actions:['click']});
+  if(selected?.used&&(wavelet||selected.algorithm===1))for(const key of ['edtWaveletOrder','edtDecompositionLevel'])state.ui.elements.push({tid:base+key+';ValueControl',ref:'ui-'+key,allowed_actions:['fill','press']});
+  if(selected?.used&&!wavelet&&selected.algorithm===0)for(const title of ['Lambda','Period'])for(const kind of ['rb','edt']){
    const key=kind+title+';ValueControl'+(kind==='rb'?';DisplayEl':'');
    state.ui.elements.push({tid:base+key,identity:{anchor_tid:base+key},ref:'ui-'+key.replaceAll(';','-'),allowed_actions:kind==='rb'?['click']:['fill','press']});
   }
@@ -21,9 +23,11 @@ function fixture(wavelet=false){
  const channel={async observe(options){refresh();assert.ok(options.ready(state),options.condition);return structuredClone(state);},async perform(options){
   refresh();assert.ok(options.ready(state),options.condition);const action=options.resolve(state);validateUiAction(action,state);actions.push(action);
   const cell=state.ui.elements.find(e=>e.ref===action.ref)?.smoothing_cell;
-  if(cell){state.node_smoothing.selected=fields.find(f=>f.record_id===cell.record_id);if(cell.part==='used')state.node_smoothing.selected.used=!state.node_smoothing.selected.used;}
+  if(cell?.part==='algorithm')editor=true;
+  else if(action.ref==='ui-wavelet-option'){const selected=state.node_smoothing.selected;selected.algorithm=1;settings.set(selected.record_id,{family:'daubechies',order:1,depth:1,boundary:'symmetric'});editor=false;}
+  else if(cell){state.node_smoothing.selected=fields.find(f=>f.record_id===cell.record_id);if(cell.part==='used')state.node_smoothing.selected.used=!state.node_smoothing.selected.used;}
   else {
-   const setting=settings.get(state.node_smoothing.selected.record_id),key=wavelet?(action.ref.includes('Order')?'order':'depth'):action.ref.includes('Lambda')?'lambda':'period';
+   const setting=settings.get(state.node_smoothing.selected.record_id),key=(wavelet||state.node_smoothing.selected.algorithm===1)?(action.ref.includes('Order')?'order':'depth'):action.ref.includes('Lambda')?'lambda':'period';
    if(action.verb==='click')setting.strength=key;
    if(action.verb==='fill'){setting[key]=Number(action.text);if(key==='lambda'&&setting.lambda===1)setting.period=6;}
   }
@@ -55,4 +59,13 @@ test('Haar procedure changes depth on the same field and preserves omitted rules
  const kept=await configureSmoothing(f.channel,{}, {...f,mode:'wavelet'});
  assert.equal(kept.configuration.fields[0].depth,2);
  assert.equal(f.actions.filter(a=>a.verb==='fill').length,1);
+});
+
+test('native algorithm double click already opens the owned boundlist without a picker gesture',async()=>{
+ const f=fixture(false,true),rule={field:'X',family:'daubechies',order:1,depth:2,boundary:'symmetric'};
+ const result=await configureSmoothing(f.channel,{smoothing:[rule]},{...f,mode:'wavelet'});
+ assert.equal(result.configuration.fields.find(f=>f.name==='X').algorithm,1);
+ assert.equal(result.configuration.fields.find(f=>f.name==='X').depth,2);
+ assert.equal(f.actions.some(a=>a.ref.includes('trg_picker')),false);
+ assert.equal(f.actions.filter(a=>a.ref==='ui-wavelet-option').length,1);
 });

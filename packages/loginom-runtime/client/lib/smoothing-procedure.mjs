@@ -47,9 +47,11 @@ export async function configureSmoothing(channel,p,{inputMapping,mode='hodrick_p
     const cell=one(s,e=>e.smoothing_cell?.record_id===field.record_id&&e.smoothing_cell.part==='algorithm'&&e.allowed_actions.includes('double_click'),'exact algorithm cell unavailable');
     await channel.perform({condition:'open smoothing algorithm',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'double_click',ref:cell.ref})});
     s=await observe(channel,'smoothing algorithm editor');
-    await act(s,'grdColumnsSettings;tbl;celleditor;cbx;trg_picker',{verb:'click'});s=await observe(channel,'smoothing algorithm options');
-    const label=algorithm===1?'Вейвлет-сглаживание':'Ходрика–Прескотта';
-    const option=one(s,e=>e.tid?.startsWith(s.wizard.root_tid+';SmoothingWizard;grdColumnsSettings;tbl;celleditor;cbx;boundlist;')&&(algorithm===1?e.tid.endsWith(';Вейвлет-сглаживание'):!e.tid.endsWith(';Вейвлет-сглаживание'))&&e.allowed_actions.includes('click'),'algorithm option unavailable: '+label);
+    const label=algorithm===1?'Вейвлет-сглаживание':'Фильтр_Ходрика-Прескотта';
+    const optionMatches=e=>e.tid===s.wizard.root_tid+';SmoothingWizard;grdColumnsSettings;tbl;celleditor;cbx;boundlist;'+label&&e.allowed_actions.includes('click');
+    // Native double click can open the list directly and occlude its picker.
+    if(!s.ui.elements.some(optionMatches)){await act(s,'grdColumnsSettings;tbl;celleditor;cbx;trg_picker',{verb:'click'});s=await observe(channel,'smoothing algorithm options');}
+    const option=one(s,optionMatches,'algorithm option unavailable: '+label);
     await channel.perform({condition:'choose smoothing algorithm',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'click',ref:option.ref})});
     s=await observe(channel,'smoothing algorithm committed');
     need(s.node_smoothing.selected.algorithm===algorithm,'algorithm differs');
