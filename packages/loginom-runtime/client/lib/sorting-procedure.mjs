@@ -80,11 +80,24 @@ export async function configureSorting(channel,p,{newNode=false}={}){
     &&e.wizard_combo.field.scope==='sorting'&&e.wizard_combo.field.name==='max_threads'&&e.wizard_combo.label===label&&e.allowed_actions.includes('select_wizard_option'));
    // An expanded native combo can temporarily return null; keep the scalar reader strict.
    // The option still needs the same verified wizard/node and exact combo owner.
-   const pickerReady=s=>s.wizard?.stage==='sorting'&&s.prepared_node_context?.verified===true
-    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===baseline.node_context[k])&&choice(s).length===1;
+   const owned=s=>s.wizard?.stage==='sorting'&&s.prepared_node_context?.verified===true
+    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===baseline.node_context[k]);
+   const pickerReady=s=>owned(s)&&choice(s).length===1;
    const opened=await channel.observe({condition:'sorting maximum choices',readSorting:true,ready:pickerReady});
    await channel.perform({condition:'select sorting literal maximum',initialObservation:opened,ready:pickerReady,
     identity:()=>({max_threads:p.max_threads}),resolve:s=>({verb:'select_wizard_option',ref:choice(s)[0].ref})});
+   if(p.max_threads===0){
+    // The native editable combo exposes string "0" until blur; Tab commits
+    // numeric 0 and its Auto display. Do not relax the strict scalar reader.
+    const field=choice(opened)[0].wizard_combo.field;
+    const editor=s=>s.ui.elements.filter(e=>e.ref===s.wizard?.settings?.fields?.max_threads?.input_ref&&e.allowed_actions.includes('press'));
+    const editorReady=s=>{const f=s.wizard?.settings?.fields?.max_threads;return owned(s)&&f?.status==='observed'&&!f.truncated
+     &&[label,'0'].includes(f.value)&&f.owner_ref===field.owner_ref&&f.input_ref===field.input_ref&&editor(s).length===1;};
+    const draft=await channel.observe({condition:'sorting automatic maximum editor',readSorting:false,ready:editorReady});
+    await channel.perform({condition:'commit sorting automatic maximum',initialObservation:draft,ready:editorReady,
+     identity:s=>({node:s.prepared_node_context,owner_ref:field.owner_ref,input_ref:field.input_ref,max_threads:0}),
+     resolve:s=>({verb:'press',ref:editor(s)[0].ref,key:'Tab'})});
+   }
    s=await observe('sorting maximum applied');
    need(s.node_sorting.options.cbxMaxThreadCount.value===p.max_threads&&s.node_sorting.options.cbxMaxThreadCount.switch_pressed===false,'Sorting maximum threads differs');
   }

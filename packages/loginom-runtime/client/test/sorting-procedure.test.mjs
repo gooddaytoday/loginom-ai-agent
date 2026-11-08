@@ -41,18 +41,21 @@ function fixture({newNode=false,locale=true}={}) {
  const node_context={verified:true,document_id:'doc',workflow_id:'flow',node_id:'sort',surface:'wizard'};
  const configuration={verified:true,node_context,input_fields:fields,keys:[{...fields[0],record_id:'a',order:0,direction:'ASC'}],selections:{selected:[]},options:{chkLocaleAware:{value:locale,switch_pressed:false},chkBufferWhole:{value:false},cbxMaxThreadCount:{value:0,switch_pressed:false}}};
  const gestures=[];const flags={};
- const snapshot=()=>({prepared_node_context:{...node_context,...(flags.foreignPicker&&flags.pickerOpen?{node_id:'foreign'}:{})},wizard:{stage:'sorting',root_tid:'root'},node_sorting:{...structuredClone(configuration),...(flags.pickerOpen&&flags.openChoiceUnknown?{verified:false,reason:'sorting_option'}:{})},ui:{elements:[
+ const snapshot=()=>({prepared_node_context:{...node_context,...(flags.foreignPicker&&flags.pickerOpen?{node_id:'foreign'}:{})},wizard:{stage:'sorting',root_tid:'root',settings:{fields:{max_threads:{status:'observed',truncated:false,value:String(configuration.options.cbxMaxThreadCount.value),owner_ref:flags.foreignCommitOwner&&flags.uncommittedAuto?'foreign':'max-owner',input_ref:'max-input'}}}},node_sorting:{...structuredClone(configuration),...(flags.pickerOpen&&flags.openChoiceUnknown||flags.uncommittedAuto?{verified:false,reason:'sorting_option'}:{})},ui:{elements:[
   ...configuration.keys.flatMap(k=>['field','direction','delete',...(k.type==='string'?['case']:[])].map(part=>({ref:k.name+':'+part,tid:part,sorting_field:{field_key:k.name,record_id:k.record_id,role:'selected',part},allowed_actions:['click']}))),
   ...configuration.input_fields.filter(f=>!configuration.keys.some(k=>k.name===f.name)).map(f=>({ref:f.name+':available',tid:'available',sorting_field:{field_key:f.name,record_id:'input-'+f.name,role:'available',part:'field'},allowed_actions:['click']})),
+  {ref:'max-input',tid:null,allowed_actions:['press']},
   {ref:'threads',tid:'root;SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl;trg_picker',allowed_actions:['click']},
-  ...[0,1,2,4,8,16,32].map(n=>({ref:'threads:'+n,tid:'root;SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl;boundlist;'+(n||'Автоопределение'),label:n?String(n):'Автоопределение',wizard_combo:{kind:'option',label:n?String(n):'Автоопределение',field:{scope:'sorting',name:'max_threads'}},allowed_actions:['select_wizard_option']})),
+  ...[0,1,2,4,8,16,32].map(n=>({ref:'threads:'+n,tid:'root;SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl;boundlist;'+(n||'Автоопределение'),label:n?String(n):'Автоопределение',wizard_combo:{kind:'option',label:n?String(n):'Автоопределение',field:{scope:'sorting',name:'max_threads',owner_ref:'max-owner',input_ref:'max-input'}},allowed_actions:['select_wizard_option']})),
   {ref:'locale',tid:'root;SortingWizard;SortingColumnCollection;chkLocaleAware;ValueControl;DisplayEl',allowed_actions:['set_checked']}
  ]}});
  const channel={observe:async spec=>{const s=snapshot();if(!spec.ready(s))throw Error('Readiness refused');return s;},perform:async spec=>{
   const action=spec.resolve(snapshot());gestures.push(action);
   if(flags.failBeforeGesture)throw Error('ownership changed before gesture');
+  if(action.ref==='max-input'&&action.verb==='press'&&action.key==='Tab')flags.uncommittedAuto=false;
   if(action.ref==='threads')flags.pickerOpen=true;
   if(action.ref.startsWith('threads:'))flags.pickerOpen=false;
+  if(action.ref==='threads:0'&&flags.autoNeedsCommit)flags.uncommittedAuto=true;
   if(action.ref.startsWith('threads:')&&!flags.lostThreads)configuration.options.cbxMaxThreadCount.value=Number(action.ref.split(':')[1]);
   if(action.ref==='locale')configuration.options.chkLocaleAware.value=action.checked;
   const key=configuration.keys.find(k=>action.ref.startsWith(k.name+':'));
@@ -115,8 +118,8 @@ test('sorting changes the maximum on the same node and explicitly selects zero-a
   const r=await f.run({max_threads});assert.equal(r.configuration.options.cbxMaxThreadCount.value,max_threads);
   assert.equal(r.configuration.options.chkLocaleAware.value,true);assert.equal(r.configuration.options.chkBufferWhole.value,false);
  }
- assert.deepEqual(f.gestures.map(a=>a.ref),['threads','threads:1','threads','threads:2','threads','threads:0']);
- await f.run({max_threads:0});assert.equal(f.gestures.length,6);
+ assert.deepEqual(f.gestures.map(a=>a.ref),['threads','threads:1','threads','threads:2','threads','threads:0','max-input']);
+ await f.run({max_threads:0});assert.equal(f.gestures.length,7);
 });
 test('sorting refuses variable-driven or unconfirmed maximum without blind retries',async()=>{
  const f=fixture();f.configuration.options.cbxMaxThreadCount.switch_pressed=true;
@@ -141,4 +144,12 @@ test('sorting selects an owned open picker while native literal value is tempora
  assert.deepEqual(f.gestures.map(a=>a.ref),['threads','threads:1']);
  const g=fixture();g.flags.openChoiceUnknown=true;g.flags.foreignPicker=true;
  await assert.rejects(g.run({max_threads:2}),/Readiness/);assert.deepEqual(g.gestures.map(a=>a.ref),['threads']);
+});
+
+test('sorting commits native zero with Tab before requesting the strict literal readback',async()=>{
+ const f=fixture();f.configuration.options.cbxMaxThreadCount.value=2;f.flags.autoNeedsCommit=true;
+ const r=await f.run({max_threads:0});assert.equal(r.configuration.options.cbxMaxThreadCount.value,0);
+ assert.deepEqual(f.gestures.map(a=>[a.verb,a.ref,a.key]),[['click','threads',undefined],['select_wizard_option','threads:0',undefined],['press','max-input','Tab']]);
+ const g=fixture();g.configuration.options.cbxMaxThreadCount.value=2;g.flags.autoNeedsCommit=true;g.flags.foreignCommitOwner=true;
+ await assert.rejects(g.run({max_threads:0}),/Readiness/);assert.equal(g.gestures.some(a=>a.verb==='press'),false);
 });
