@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {prepareGroupingInput} from '../lib/grouping-node.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'group'};
-function fixture({active=false,lost=false,foreign=false,incomplete=false}={}){
- let opened=false,launched=false,menu=false,selected=false;
+function fixture({active=false,lost=false,foreign=false,incomplete=false,deselected=false}={}){
+ let opened=false,launched=false,menu=false,selected=false,graphSelected=!deselected;
  const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,signature:{tid},enabled:true,allowed_actions});
  const state=()=>({prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'graph',tid:'graph-node',locked:false},wizard:{status:'absent'},navigation_context:{status:'observed'},
-  node_outputs:{verified:true,node_selected:true,ports:(incomplete?[]:[0]).map(index=>({index,active:active||launched}))},
+  node_outputs:{verified:true,node_selected:graphSelected,ports:(incomplete||!graphSelected?[]:[0]).map(index=>({index,active:active||launched}))},
   node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[
    {process_id:'1',record_id:'group',parent_id:null,state:'completed',error:false,children_loaded:true,expanded:true,rendered:true},
    {process_id:'1.1',record_id:'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row'}]:[]},
-  ui:{elements:[el('MF;cntMain;tlbMainToolbar;btnProgress'),{...el('graph-node'),graph_node:{part:'body'}},
+  ui:{elements:[el('MF;cntMain;tlbMainToolbar;btnProgress'),{...el('graph-node'),graph_node:{part:'body'},interaction:{state:'point_observed'}},
    {...el('execute',['execute_graph_node']),graph_execution:{node_id:node.node_id,mode:'execute'}},
    ...(opened?[el('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click']),el('ConsoleForm;btnClose'),el('child-row',['right_click'])]:[]),
    ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
@@ -18,6 +18,7 @@ function fixture({active=false,lost=false,foreign=false,incomplete=false}={}){
   const s=state();assert.ok(o.ready(s),o.condition);const a=o.resolve(s);actions.push(a);
   if(a.ref==='MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
   if(a.ref==='ConsoleForm;btnClose')opened=false;
+  if(a.verb==='click'&&a.ref==='graph-node')graphSelected=true;
   if(a.verb==='right_click'){menu=true;if(a.ref==='child-row')selected=true;}
   if(a.verb==='press'||a.verb==='show_process_node')menu=false;
   if(a.verb==='execute_graph_node'){launched=true;if(lost)throw Error('Unknown launch reply');}
@@ -55,4 +56,12 @@ test('S-small preserved Grouping execution never launches a preliminary schema c
 for(const options of [{foreign:true},{incomplete:true}])test('preserved Grouping execution retains the output ownership/activity guard '+JSON.stringify(options),async()=>{
  const f=fixture(options);f.options.operation.nodeApply.request.parameters={};
  await assert.rejects(f.run());assert.deepEqual(f.actions,[]);
+});
+test('LAB-1165 released Grouping reselects its hidden output port before the preserved-execution activity guard',async()=>{
+ // After operation_recover released a stopped wizard, the node is deselected:
+ // Loginom hides its native port shapes, so node_outputs.ports is empty.
+ const f=fixture({deselected:true});f.options.operation.nodeApply.request.parameters={};
+ f.options.operation.nodeApply.request.mappings=[{direction:'output',port:0,autosync:false,fields:[{source:{kind:'configured_field',name:'Region'}}]}];
+ await f.run();
+ assert.equal(f.actions.filter(a=>a.verb==='click'&&a.ref==='graph-node').length,1);
 });
