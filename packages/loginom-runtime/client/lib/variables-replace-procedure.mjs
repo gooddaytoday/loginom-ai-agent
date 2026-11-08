@@ -24,7 +24,8 @@ export function makeVariablesReplaceConfigureCode(binding,options){
 export async function configureVariablesReplace(page,task,readNode=readPreparedNodeContext,readContext=readVariablesReplaceContext,readBrowser=readVariablesReplaceBrowser,locate=variablesReplaceLocator,reveal=revealVariablesReplaceControl){
  let effect=false,phase='inventory',lastAction='read';
  const need=(ok,message)=>{if(!ok)throw Error('Variables replacement '+message);};
- const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),b=task.binding,root=b.workflow_ref.prefix+';WizrdMCF',base=root+';ReplaceVariablesWizard';
+ const stable=v=>Array.isArray(v)?v.map(stable):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])])):v;
+ const same=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b)),b=task.binding,root=b.workflow_ref.prefix+';WizrdMCF',base=root+';ReplaceVariablesWizard';
  const at=tid=>locate(page,tid);
  const remaining=()=>{const n=task.deadline-Date.now();need(n>0,'original deadline expired');return n;};
  let owner;

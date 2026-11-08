@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {validateVariablesReplaceParameters,resolveVariablesReplaceParameters} from '../lib/variables-replace-parameters.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
+import {configureVariablesReplace} from '../lib/variables-replace-procedure.mjs';
 const rule=(name,type,extra)=>({variable:{kind:'input_variable',name},type,pairs:[],other:'keep',...extra});
 const rules=[rule('Color','string',{pairs:[{from:'red',to:'blue'}],case_sensitive:false}),
  rule('Code','string',{regex_pairs:[{pattern:'^Ab-[0-9]+$',replacement:'matched'}],case_sensitive:true}),
@@ -24,4 +25,15 @@ test('registered rules uses the production handler and preserves settings on unc
  const handlers=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyHandlers;
  assert.ok(handlers.get('variables.replace').modes.includes('rules'));
  assert.equal(isUnchangedTransformExecution(request),true);
+});
+test('native rule readback ignores JSON object key order in model requests',async()=>{
+ const owner={verified:true,surface:'wizard',document_id:'d',workflow_id:'w',node_id:'n'};
+ const rule={variable:{name:'Other',kind:'input_variable'},type:'string',pairs:[],case_sensitive:true,other:'null'};
+ const page={waitForTimeout:async()=>{},locator:()=>assert.fail('No gesture needed for this saved rule')};
+ const state={verified:true,inventory_complete:true,node_context:owner,selected:'Other',
+  input_fields:[{name:'Other',label:'Other',type:'string',mode:'manual'}],pairs:[],other:{mode:'null'},case_sensitive:true};
+ const result=await configureVariablesReplace(page,{binding:{workflow_ref:{prefix:'MF;TF'}},mode:'rules',
+  parameters:{rules:[rule]},new_node:false,finish:'close',deadline:Date.now()+5000},async()=>owner,async()=>state);
+ assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(result.configuration.rules,[rule]);
 });
