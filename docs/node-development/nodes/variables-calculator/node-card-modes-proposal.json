@@ -12,7 +12,7 @@
   ],
   "variable_inputs": 1,
   "variable_outputs": 1,
-  "semantics": "Proposal pending owner approval; not current runtime support. Scalar expression mode with integer/real/string/boolean/datetime/variant. Use bare names, e.g. base+1; not Expr./Field. Intermediate expressions feed later expressions but are excluded from output variables 0. replace=true requires an exact input-variable name and intermediate=false; total+10 reads incoming total and replaces its value and label at the same output position, preserving all other inputs. expression_order is a complete name permutation of saved expressions and preserves existing output mapping. Omitted properties retain their saved values. Civil datetime preserves milliseconds without UTC conversion; Variant retains declared type and runtime subtype. Execute/read variable_ports:[0], ports:[], Save separately.",
+  "semantics": "Proposal pending owner approval; not current runtime support. Scalar expression mode with integer/real/string/boolean/datetime/variant. Refer to an earlier expression as Expr.base+1; a bare name reads an input variable of that name first (replacement total+10). Intermediate expressions feed later expressions but are excluded from output variables 0. replace=true requires an exact input-variable name and intermediate=false; total+10 reads incoming total and replaces its value and label at the same output position, preserving all other inputs. expression_order is a complete name permutation of saved expressions and preserves existing output mapping. Omitted properties retain their saved values. Civil datetime preserves milliseconds without UTC conversion; Variant retains declared type and runtime subtype. Execute/read variable_ports:[0], ports:[], Save separately.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "variables-calculator-v1",
@@ -129,7 +129,7 @@
             },
             "formula": {
               "type": "string",
-              "description": "Native Loginom expression. Use bare earlier names, e.g. base+1; Expr./Field. prefixes are unsupported in Loginom 7.4.2. Civil datetime: EncodeDateTime; Variant retains its runtime subtype.",
+              "description": "Native Loginom expression. Earlier expression: Expr.base+1; a bare name reads a same-named input variable first. Civil datetime: EncodeDateTime; Variant retains its runtime subtype.",
               "maxLength": 2048,
               "minLength": 1,
               "allOf": [

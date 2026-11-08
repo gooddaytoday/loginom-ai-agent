@@ -187,6 +187,21 @@ def expectations():
     return result
 
 
+def same(authored, computed):
+    # libm erfc/exp may differ in the last ulp between platforms; --check
+    # compares structure exactly and floats to 1e-12 relative, far below the
+    # 1e-7 run-check tolerances, so any real change of an expectation fails.
+    if isinstance(computed, float) and isinstance(authored, (int, float)) and not isinstance(authored, bool):
+        return math.isclose(authored, computed, rel_tol=1e-12, abs_tol=1e-15)
+    if isinstance(computed, dict):
+        return isinstance(authored, dict) and authored.keys() == computed.keys() and all(
+            same(authored[k], computed[k]) for k in computed)
+    if isinstance(computed, list):
+        return isinstance(authored, list) and len(authored) == len(computed) and all(
+            same(a, c) for a, c in zip(authored, computed))
+    return type(authored) is type(computed) and authored == computed
+
+
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check',action='store_true')
@@ -196,7 +211,7 @@ if __name__ == '__main__':
         path=HERE/name/'expected.json'
         text=json.dumps(value,ensure_ascii=False,indent=2,allow_nan=False)+'\n'
         if args.check:
-            assert path.read_text()==text, path
+            assert same(json.loads(path.read_text()), json.loads(text)), path
         else:
             path.parent.mkdir(parents=True,exist_ok=True)
             path.write_text(text)

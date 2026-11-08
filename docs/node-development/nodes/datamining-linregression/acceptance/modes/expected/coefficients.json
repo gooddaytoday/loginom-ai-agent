@@ -210,11 +210,13 @@
         },
         {
           "name": "DisplayName",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "UniqueValues",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Y_coefficients",
@@ -230,7 +232,8 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-10
-          }
+          },
+          "label_any": true
         },
         {
           "name": "Y_TStat",
@@ -238,7 +241,8 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-10
-          }
+          },
+          "label_any": true
         },
         {
           "name": "Y_PValue",
@@ -246,7 +250,8 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-10
-          }
+          },
+          "label_any": true
         },
         {
           "name": "Y_lowerBound",
@@ -254,7 +259,8 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-10
-          }
+          },
+          "label_any": true
         },
         {
           "name": "Y_upperBound",
@@ -262,7 +268,8 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-10
-          }
+          },
+          "label_any": true
         }
       ],
       "rows": [

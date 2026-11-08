@@ -217,9 +217,12 @@ def expected(rows, b, fields, *, full_statistics=False, summary=False, train_row
                   ['imports.text', 'datamining.lin_regression', 'exports.text']], outputs=[
         dict(output_node_type='datamining.lin_regression', output_port=0, columns=columns,
              rows=forecast, ordered=True),
+        # Only Name/Y_coefficients labels are observed (discovery.md); the
+        # other seven native labels are not, and the task does not set them.
         dict(output_node_type='datamining.lin_regression', output_port=1,
              columns=[dict(name=k, type='string' if k in ['Name', 'DisplayName', 'UniqueValues'] else 'real',
-                           **({'tolerance': TOL} if k not in ['Name', 'DisplayName', 'UniqueValues'] else {})) for k in coeff[0]],
+                           **({'tolerance': TOL} if k not in ['Name', 'DisplayName', 'UniqueValues'] else {}),
+                           **({} if k in ['Name', 'Y_coefficients'] else {'label_any': True})) for k in coeff[0]],
              rows=coeff, ordered=True)])
     if summary:
         result['variable_inventory'] = dict(outputs=[dict(node=dict(type='datamining.lin_regression'),

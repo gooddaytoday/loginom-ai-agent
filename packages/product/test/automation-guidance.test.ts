@@ -101,3 +101,12 @@ test("relocated large-file and JavaScript rules stay reachable from the entry", 
   expect(skill).toContain("Существующие JS-узлы не удаляй автоматически")
   expect(javascript).toContain("не являются таким пробелом")
 })
+
+test("variables calculator dependencies use the Expr. prefix accepted in Loginom 7.4.2", async () => {
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/variables.calculator.md", import.meta.url)).text()
+  const schema = await Bun.file(new URL("../../loginom-runtime/client/lib/variables-calculator-schema.mjs", import.meta.url)).text()
+  // `Expr.limit - Expr.skip` passed variables-calculator 3/3 (LAB-873); no negative prefix probe exists.
+  expect(settings).toContain("Для зависимости используй Expr.name")
+  expect(schema).toContain("Expr.name refers to an earlier expression")
+  expect(settings).not.toMatch(/Expr\.[^\n]*не поддерж/)
+})
