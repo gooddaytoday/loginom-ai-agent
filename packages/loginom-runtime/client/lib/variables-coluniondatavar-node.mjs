@@ -7,7 +7,17 @@ import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
+import {makeVariablesColumnUnionNextDialogCode} from './variables-coluniondatavar-context.mjs';
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
+export async function captureVariablesColumnUnionNextDialog(options,binding,error){
+ if(options.operation.parameters.target.type!=='variables.column_union'||error?.receipt?.error?.code!=='WIZARD_STEP_NOT_CONFIRMED')return;
+ try{
+  const snapshot=await options.execute(makeVariablesColumnUnionNextDialogCode(binding));
+  await options.onRecord({phase:'node_variables_union_next_dialog',operation_id:options.operation.id,snapshot});
+ }catch{
+  await options.onRecord({phase:'node_variables_union_next_dialog_unavailable',operation_id:options.operation.id,reason:'snapshot_unavailable'}).catch(()=>{});
+ }
+}
 export function createVariablesColumnUnionNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
   type:'variables.column_union',mode:'append_variables',revision:'variables-column-union-inputs-v2',parameterSchema:variablesColumnUnionParametersSchema,
@@ -27,6 +37,14 @@ export function createVariablesColumnUnionNodeSupport(config){
   },
  });
  return {...support,nodeApplyDriverFactory:options=>{const drivers=support.nodeApplyDriverFactory(options);return {...drivers,
+  async configureCalculator(ctx,parameters){
+   try{return await drivers.configureCalculator(ctx,parameters);}
+   catch(error){
+    const request=options.operation.parameters;
+    await captureVariablesColumnUnionNextDialog(options,{document_id:request.document_id,workflow_ref:request.workflow_ref,node:ctx.node},error);
+    throw error;
+   }
+  },
   async openWizard(ctx){
    const request=options.operation.parameters;
    if(request.target.kind==='new'&&request.parameters.column_union?.mapping==='manual'){
