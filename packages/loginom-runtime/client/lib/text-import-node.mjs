@@ -1,6 +1,6 @@
 import {verifyUploadLineage,verifiedLocalDelivery} from './upload-lineage.mjs';
 import {validateImportSource} from './storage-policy.mjs';
-import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
+import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
 import {autoTypesRequested,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError} from './text-import-procedure.mjs';
@@ -282,6 +282,13 @@ export function deferredImportOutput(configured,native,mappings) {
   return configured.columns.filter(c=>c.used).map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:true}));
 }
 
+// Only «Только новые» with autosync off and no requested mappings: outputs of new
+// source fields are added natively instead of asking the caller for mappings.
+export function shouldResyncNewOutputs(configured,native) {
+  return configured?.format?.fields?.auto_detect_columns?.value==='Только новые'
+    &&native?.verified===true&&native.autosync===false&&outputsOutOfSync(native);
+}
+
 export function bindIdentityOutputColumns(configured,actual) {
   const expected=configured.filter(c=>c.used);
   requireValue(actual.fields.length===expected.length&&actual.total_columns===expected.length
@@ -501,6 +508,11 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           return verified({effect_possible:true,mapping:{fields:[]},native_mapping:native,deferred_output:true,completion:done.wizard.completion,changes:[],source_identity_verified:true});
         }
         const changes=[];
+        // «Только новые» adds source fields, but their outputs appear only through native synchronization.
+        if(!mappings.length&&shouldResyncNewOutputs(configured,native)) {
+          const resync=await resyncOutputFields(channel,native);
+          changes.push(resync);native=resync.native_mapping;
+        }
         if(mappings.length) {
           const mapping=one(mappings,'One import output mapping required');
           const resolved=resolveConfiguredOutputMapping(mapping,configured.columns,native);
