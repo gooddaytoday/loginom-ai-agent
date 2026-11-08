@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import {configureSampling} from '../lib/sampling-procedure.mjs';
 function fixture(partition=false,{clipped=false,scrollFault=null}={}){
  const base='MF;TF-1;WizrdMCF;'+(partition?'PartitionComponentWizard':'SamplingComponentWizard')+';',owner={verified:true,document_id:'d',workflow_id:'w',node_id:'n'};
- const state={stage:partition?'data_partition':'sampling',counts:partition?[0,0]:[0],groups:partition?['train','test','unused']:['sample','unused'],selected:null,draft:null,method:'Последовательный',seed:7,generation:0,units:partition?['rows','rows']:['rows']},actions=[];
+ const state={stage:partition?'data_partition':'sampling',counts:partition?[0,0]:[0],groups:partition?['train','test','unused']:['sample','unused'],selected:null,draft:null,method:'Последовательный',seed:7,generation:0,units:partition?['rows','rows']:['rows'],groupCounts:partition?[2,3]:[2],testPriority:false,priorityPosition:'algorithm'},actions=[];
  const labels={sample:'Выбранные',unused:'Неиспользуемые',train:'Обучающее множество',test:'Тестовое множество'};
  let top=0;
  const scroll=()=>({ref:'pane',top,max_top:47});
  const seed=()=>({ref:'seed',identity:{anchor_tid:base+'RandSeedEdit;edtRandSeed;ValueControl',path:[1,0,0,0]},allowed_actions:['fill','press'],enabled:true,scroll:scroll(),bounding_box:{x:338,y:760-top,width:136,height:21},interaction:clipped&&top<47?{state:'point_not_observed',point:null,covering:[{anchor_tid:'MF;TF-1;WizrdMCF;rgpBottom'}]}:{state:'point_observed',point:{x:406,y:770.5-top}}});
  const editor=i=>base+'SizeGridForm;colAbsoluteSize;FloatPropEdit'+(i?'-'+i:'')+';PropContainer;ValueContainer;ValueControl';
- const snapshot=()=>({geometry:{viewport:{width:1280,height:800}},prepared_node_context:owner,wizard:{stage:state.stage,root_tid:'W'},node_sampling:{verified:true,inventory_complete:true,node_context:owner,base,kind:partition?'data_partition':'sampling',method:state.method,seed:state.seed,test_priority:false,sequence_materialized:state.method==='Последовательный',
+ const snapshot=()=>({geometry:{viewport:{width:1280,height:800}},prepared_node_context:owner,wizard:{stage:state.stage,root_tid:'W'},node_sampling:{verified:true,inventory_complete:true,node_context:owner,base,kind:partition?'data_partition':'sampling',method:state.method,seed:state.seed,test_priority:state.testPriority,test_priority_position:state.priorityPosition,groups_base:base+'RandomUniformMethodForm;SizeGridForm',group_units:state.groupCounts.map((n,i)=>({unit:'rows',absolute_size:n,absolute_control_tid:base+'RandomUniformMethodForm;SizeGridForm;colAbsoluteSize;editor'+i})),sequence_materialized:state.method==='Последовательный',
   strata:{base:base+'StratifiedMethodForm',rows:['RowID','X','Noise','Target','Note'].map(name=>({record_id:name,values:{Name:name,UsageFlag:name==='RowID'}}))},
   sizes:state.counts.map((_,index)=>({record_id:'size'+index,values:{SizePath:'Sampling.'+index}})),units:state.counts.map((count,index)=>({record_id:'size'+index,icon_ref:'unit'+index,absolute_size:count,absolute_control_tid:editor(index),unit:state.units[index],text:'',title:'',tooltip:'',class_name:''})),
   sequence:(state.method==='Последовательный'?state.groups:[]).map(group=>({record_id:group+':'+state.generation,text:labels[group],values:{Name:labels[group]},tids:[base+'group_'+group],selected:state.selected===group}))},
-  ui:{elements:[{ref:'method',tid:base+'pedSamplingMethod;ValueControl;trg_picker',allowed_actions:['click']},{ref:'sequential',tid:base+'pedSamplingMethod;ValueControl;boundlist;Последовательный',role:'option',label:'Последовательный',allowed_actions:['click']},...['Случайный','Стратифицированный','Отбор со смещением'].map((label,i)=>({ref:'mode'+i,tid:base+'pedSamplingMethod;ValueControl;boundlist;'+label,role:'option',label,allowed_actions:['click']})),seed(),
+  ui:{elements:[...state.groupCounts.map((_,i)=>({ref:'g-edit'+i,tid:base+'RandomUniformMethodForm;SizeGridForm;colAbsoluteSize;editor'+i,allowed_actions:['fill','press']})),{ref:'priority',tid:base+'cntTestPriority;cnt;chb;InputEl',allowed_actions:['click']},{ref:'priority-picker',tid:base+'pedTestPriorityPosition;ValueControl;trg_picker',allowed_actions:['click']},...['beginning','end'].map((v,i)=>({ref:v,tid:base+'pedTestPriorityPosition;ValueControl;boundlist;'+['В_начале_набора','В_конце_набора'][i],allowed_actions:['click']})),{ref:'method',tid:base+'pedSamplingMethod;ValueControl;trg_picker',allowed_actions:['click']},{ref:'sequential',tid:base+'pedSamplingMethod;ValueControl;boundlist;Последовательный',role:'option',label:'Последовательный',allowed_actions:['click']},...['Случайный','Стратифицированный','Отбор со смещением','Равномерный случайный'].map((label,i)=>({ref:'mode'+i,tid:base+'pedSamplingMethod;ValueControl;boundlist;'+label,role:'option',label,allowed_actions:['click']})),seed(),
    {ref:'foreign',tid:'OTHER;StratifiedMethodForm;txtStratifiedFilter',enabled:true,interaction:{state:'point_observed'},scroll:scroll(),allowed_actions:['scroll']},
    {ref:'anchor',identity:{anchor_tid:base+'StratifiedMethodForm;txtStratifiedFilter',path:[1,0,0,0]},enabled:true,interaction:{state:'point_observed',point:{x:653,y:507.5}},scroll:scrollFault==='foreign'?{ref:'other',top:0,max_top:47}:scroll(),allowed_actions:scrollFault==='missing'?[]:['scroll']},...state.counts.flatMap((_,index)=>[
    // Partition's summary repeats colSizeType_1, so the actual second-row
@@ -29,10 +29,14 @@ function fixture(partition=false,{clipped=false,scrollFault=null}={}){
   if(['fill','press'].includes(a.verb)&&a.ref==='seed')assert.equal(seed().interaction.state,'point_observed','seed is obscured by rgpBottom');
   if(a.verb==='fill'&&a.ref==='seed')state.draftSeed=Number(a.text);
   if(a.verb==='press'&&a.ref==='seed')state.seed=state.draftSeed;
-  if(a.verb==='fill'&&a.ref!=='seed'){assert.equal(state.units[Number(a.ref.slice(4))],'rows');state.draft={index:Number(a.ref.slice(4)),count:Number(a.text)};}
-  if(a.verb==='press'&&a.ref!=='seed'){assert.equal(a.key,'Tab');state.counts[state.draft.index]=state.draft.count;}
+  if(a.verb==='fill'&&a.ref.startsWith('g-edit'))state.groupDraft={i:Number(a.ref.slice(6)),n:Number(a.text)};
+  if(a.verb==='press'&&a.ref.startsWith('g-edit'))state.groupCounts[state.groupDraft.i]=state.groupDraft.n;
+  if(a.verb==='click'&&a.ref==='priority')state.testPriority=!state.testPriority;
+  if(a.verb==='click'&&['beginning','end'].includes(a.ref))state.priorityPosition=a.ref;
+  if(a.verb==='fill'&&a.ref!=='seed'&&!a.ref.startsWith('g-edit')){assert.equal(state.units[Number(a.ref.slice(4))],'rows');state.draft={index:Number(a.ref.slice(4)),count:Number(a.text)};}
+  if(a.verb==='press'&&a.ref!=='seed'&&!a.ref.startsWith('g-edit')){assert.equal(a.key,'Tab');state.counts[state.draft.index]=state.draft.count;}
   if(a.verb==='click'&&state.groups.includes(a.ref))state.selected=a.ref;
-  if(a.verb==='click'&&a.ref.startsWith('mode'))state.method=['Случайный','Стратифицированный','Отбор со смещением'][Number(a.ref.slice(4))];
+  if(a.verb==='click'&&a.ref.startsWith('mode'))state.method=['Случайный','Стратифицированный','Отбор со смещением','Равномерный случайный'][Number(a.ref.slice(4))];
   if(a.verb==='click'&&a.ref==='sequential')state.method='Последовательный';
   if(a.verb==='click'&&a.ref.startsWith('unit'))state.units[Number(a.ref.slice(4))]='rows';
   if(a.verb==='click'&&a.ref==='up'){const at=state.groups.indexOf(state.selected);[state.groups[at-1],state.groups[at]]=[state.groups[at],state.groups[at-1]];state.generation++;}
@@ -94,5 +98,18 @@ test('random S/P switch method, commit seed and retain omitted parameters withou
   assert.equal(f.actions.some(a=>a.ref==='up'),false);
   assert.equal(f.actions.filter(a=>a.ref==='seed'&&a.verb==='press').length,1);
   f.state.stage=partition?'data_partition':'sampling';const retained=await f.run({},'execute','random');assert.equal(retained.configuration.seed,42);
+ }
+});
+
+test('uniform configures group editors, seed and test priority on the same node',async()=>{
+ for(const partition of [false,true]){
+  const f=fixture(partition),p=partition?{train_count:6,test_count:4,train_group_size_rows:1,test_group_size_rows:1,test_priority:true,test_priority_position:'beginning'}:{count:6,group_size_rows:1};
+  const r=await f.run({...p,seed:42},'execute','uniform');
+  assert.deepEqual(r.configuration.counts,partition?[6,4]:[6]);assert.deepEqual(r.configuration.group_units.map(u=>u.absolute_size),partition?[1,1]:[1]);
+  assert.equal(r.configuration.seed,42);assert.equal(r.configuration.mode,'uniform');
+  f.state.stage=partition?'data_partition':'sampling';
+  const again=await f.run(partition?{test_priority_position:'end'}:{},'execute','uniform');
+  assert.deepEqual(again.configuration.group_units.map(u=>u.absolute_size),partition?[1,1]:[1]);
+  if(partition){assert.equal(again.configuration.test_priority,true);assert.equal(again.configuration.test_priority_position,'end');}
  }
 });

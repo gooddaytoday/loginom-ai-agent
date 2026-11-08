@@ -18,6 +18,14 @@ test('Grouping readback admits concat settings while retaining legacy measures',
  readback.measures[0].concat.unique=1;assert.equal(validate(r).valid,false);
  delete readback.measures[0].concat;readback.measures[0].functions=1024;assert.equal(validate(r).valid,true);
 });
+
+test('uniform readback publishes observed group sizes and native test priority',()=>{
+ const r=result();r.configuration={status:'applied',readback:{kind:'data_partition',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:{document_id:'d',workflow_id:'w',node_id:'n'},receipt_ids:['i','c','s','m','f'],mode:'uniform',counts:[6,4],groups:[],seed:42,group_size_rows:[1,1],strata_fields:[],bias_field:null,bias_factors:[],test_priority:true,test_priority_position:'beginning',output_mappings:[],package_persistence_verified:false}};
+ assert.equal(validate(r).valid,true);
+ for(const change of [v=>v.mode='unsupported',v=>delete v.group_size_rows,v=>v.test_priority='true',v=>v.test_priority_position='middle']){
+  const invalid=structuredClone(r);change(invalid.configuration.readback);assert.equal(validate(invalid).valid,false);
+ }
+});
 test('REST readback admits optional observed response Content-Type without changing legacy results',()=>{
  const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
  const connection={name:'Status',base_url:'https://httpbin.org/status/200',method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,query_parameters:['RequestId'],reference_node_id:'connection'};
