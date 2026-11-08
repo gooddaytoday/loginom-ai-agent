@@ -821,6 +821,12 @@ Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1
 нативное восстановление ставит используемые поля перед сохранёнными ID.
 Оба порядка проверяются явно; остальные перестановки запрещены.
 
+`binning-datetime-manual`: DateTime When из modes.csv, count=2, затем ручные
+граница 02.01 и Early/Late на том же обученном узле без повторного Train.
+Задание task-datetime-manual.md; неизменный modes/expected.json проверяет
+146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
+Модель получает только task и modes.csv; oracle остаётся в оснастке.
+
 `replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
 на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
 прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
