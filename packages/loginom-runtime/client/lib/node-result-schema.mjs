@@ -257,7 +257,7 @@ const clusteringGmeansConfigurationReadback=object({kind:values('clustering'),sc
  receipt_ids:clusteringConfigurationReadback.properties.receipt_ids,mode:values('g_means'),features:clusteringConfigurationReadback.properties.features,min_clusters:{type:'integer',minimum:1,maximum:1000},max_clusters:{type:'integer',minimum:1,maximum:1000},threshold:{type:'number',exclusiveMinimum:0},seed:clusteringConfigurationReadback.properties.seed,normalization:clusteringConfigurationReadback.properties.normalization,
  training:clusteringConfigurationReadback.properties.training,package_persistence_verified:{const:false}});
 const factorAnalysisConfigurationReadback=object({kind:values('factor_analysis'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,
- receipt_ids:clusteringConfigurationReadback.properties.receipt_ids,mode:values('pca_fixed'),features:{...array(str),minItems:2,maxItems:128},factors:{type:'integer',minimum:1,maximum:128},rotation:values('none'),training:clusteringConfigurationReadback.properties.training,
+ receipt_ids:clusteringConfigurationReadback.properties.receipt_ids,mode:values('pca_fixed'),features:{...array(str),minItems:2,maxItems:128},factors:{type:'integer',minimum:1,maximum:128},rotation:values('none','varimax','quartimax'),training:clusteringConfigurationReadback.properties.training,
  output_mappings:array(object({port:integer,fields:array(object({index:integer,name:str,label:str,type:str,data_kind:str,source_name:str}))})),package_persistence_verified:{const:false}});
 const factorAnalysisModesConfigurationReadback=object({...factorAnalysisConfigurationReadback.properties,
  mode:values('pca_fixed','pca_eigenvalue','pca_variance'),criterion:values('fixed','eigenvalue','variance'),

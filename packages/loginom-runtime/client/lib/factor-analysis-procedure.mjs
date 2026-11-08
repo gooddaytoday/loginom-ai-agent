@@ -70,8 +70,9 @@ export async function configureFactorAnalysis(channel,p,{inputMapping,request}){
  need(radio!==2||Number.isSafeInteger(value)&&value>=1&&value<=features.length,'factor count exceeds selected feature count');
  need(radio!==0||Number.isFinite(value)&&value>=0.1&&value<=1.5,'eigenvalue must be 0.1..1.5');
  need(radio!==1||Number.isFinite(value)&&value>=1&&value<=100,'variance_percent must be 1..100');
- need(a.rotation!==undefined||old.rotation===0,'existing rotation unsupported; provide rotation none');
- for(const [name,wanted,controlKey] of [['criterion',radio,'pedSignificanceCriterion;ValueControl;radiofield'+(radio?'-'+radio:'')+';DisplayEl'],['rotation',0,'pedRotationType;ValueControl;radiofield;DisplayEl']]){
+ const rotations=['none','varimax','quartimax'],rotation=a.rotation===undefined?old.rotation:rotations.indexOf(a.rotation);
+ need(Number.isSafeInteger(rotation)&&rotation>=0&&rotation<rotations.length,'unsupported saved or requested rotation');
+ for(const [name,wanted,controlKey] of [['criterion',radio,'pedSignificanceCriterion;ValueControl;radiofield'+(radio?'-'+radio:'')+';DisplayEl'],['rotation',rotation,'pedRotationType;ValueControl;radiofield'+(rotation?'-'+rotation:'')+';DisplayEl']]){
   state=await observe('PCA '+name+' before edit');if(state.node_factor_analysis[name]===wanted)continue;
   await act(state,controlKey,{verb:'set_checked',checked:true});state=await observe('PCA '+name+' readback');need(state.node_factor_analysis[name]===wanted,'PCA '+name+' differs');
  }
@@ -92,11 +93,11 @@ export async function configureFactorAnalysis(channel,p,{inputMapping,request}){
  if(state.node_factor_analysis.output_cap!==output_cap)await act(state,'cntOutFactorsMax;cnt;chb;InputEl',{verb:'set_checked',checked:output_cap});
  if(output_cap)await setNumber('pedNOutFactorsMax',output_factors);
  const after=(await observe('complete PCA readback')).node_factor_analysis;
- need(after.criterion===radio&&after.rotation===0&&after.output_cap===output_cap,'PCA settings differ');
+ need(after.criterion===radio&&after.rotation===rotation&&after.output_cap===output_cap,'PCA settings differ');
  need((key==='pedNFactors'?after.factors:after.values[key])===value&&(!output_cap||after.values.pedNOutFactorsMax===output_factors),'PCA threshold/count or output limit differs');
  const changed=new Set([key,...(typeof a.output_factors==='number'?['pedNOutFactorsMax']:[])]);
  need(['pedNFactors','pedEigenValuesThreshold','pedCumDispersion','pedNOutFactorsMax'].filter(k=>!changed.has(k)).every(k=>same(k==='pedNFactors'?after.factors:after.values[k],k==='pedNFactors'?old.factors:old.values[k])),'unrequested PCA settings changed');
- const configuration={...roles.configuration,mode,factors:after.factors,rotation:'none',criterion,...(radio!==2?{[parameter]:value}:{}),output_cap,output_factors:output_cap?output_factors:false,
+ const configuration={...roles.configuration,mode,factors:after.factors,rotation:rotations[after.rotation],criterion,...(radio!==2?{[parameter]:value}:{}),output_cap,output_factors:output_cap?output_factors:false,
   output_schema_changed:Math.min(features.length,old.output_cap?old.values.pedNOutFactorsMax:features.length)!==Math.min(features.length,output_cap?output_factors:features.length)};
  await next('factor_analysis',['output_mapping','done']);
  const destination=await channel.observe({condition:'PCA validated destination',ready:s=>['output_mapping','done'].includes(s.wizard?.stage)});
