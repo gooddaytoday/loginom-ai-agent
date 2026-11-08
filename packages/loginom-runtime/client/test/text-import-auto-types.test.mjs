@@ -10,9 +10,9 @@ const source={source_path:'/test/typed.csv',encoding:'UTF-8',rows_to_skip:0,firs
 const format={delimiter:';',text_qualifier:'"',null_marker:'NULL',decimal_separator:'.'};
 
 // Minimal native wizard: «Автоопределение столбцов» combo, rows field and both refresh buttons.
-function fixture({existing=true,retained=native().slice(0,5)}={}) {
+function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет'}={}) {
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
- let stage='text_import_file',mode='Нет',rows='25',opened=false,columns=existing?structuredClone(retained):native();
+ let stage='text_import_file',mode=initialMode,rows='25',opened=false,columns=existing?structuredClone(retained):native();
  const gestures=[],initial=structuredClone(columns);
  const field=(value,extra={})=>({status:'observed',truncated:false,value,...extra});
  const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
@@ -80,6 +80,19 @@ test('auto_detect_columns=all with output mappings or autosync is refused before
   }
  const request={target:{kind:'existing'},finish:'done',inputs:[],mappings:[{direction:'output',port:0,autosync:true}],read:{ports:[]}};
  validateTextImportNodeParameters(p('existing',{format:{auto_detect_columns:'new'}}),'delimited',request);
+});
+
+test('a column patch of an existing «Все» import without an explicit mode is refused before any settings gesture',async()=>{
+ for(const patch of [{columns:[{name:'Amount',type:'string'}]},{source:{rows_to_skip:1},columns:[{name:'Amount',type:'string'}]}]) {
+  const f=fixture({initialMode:'Все'});
+  await assert.rejects(configureTextImportPatch(f.channel,patch,f.owner,'/test/typed.csv'),/auto_detect_columns=all/);
+  assert.deepEqual(f.gestures.filter(g=>g.verb!=='wizard_step'),[],JSON.stringify(patch));
+ }
+ // An explicit new mode passes this guard (the fixture has no column editor, so it fails later).
+ const f=fixture({initialMode:'Все'});
+ await assert.rejects(configureTextImportPatch(f.channel,{format:{auto_detect_columns:'new'},columns:[{name:'Amount',type:'string'}]},f.owner,'/test/typed.csv'),
+  error=>!/auto_detect_columns=all/.test(error.message));
+ assert.equal(f.mode,'Только новые');
 });
 
 test('native detection adds new fields while retained manual types win by name',()=>{

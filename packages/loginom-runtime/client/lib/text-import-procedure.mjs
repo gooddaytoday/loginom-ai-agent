@@ -395,6 +395,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     await read('text_import_format','existing file parsing completed',state=>
       state.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout');
     formatBaseline=(await read('text_import_format')).wizard.settings;
+    // An existing «Все» node owns its schema natively; refuse before any settings gesture.
+    requireValue(!(parameters.columns?.length&&parameters.format.auto_detect_columns===undefined
+      &&formatBaseline.fields.auto_detect_columns?.value===autoDetectLabels.all),allModeColumns);
     columnBaseline=await readImportDefinitionPages(channel,{ready:state=>same(identity(state.wizard?.owner_context),identity(currentOwner))});
   };
   // Read the existing schema before changing parsing options: Loginom may
