@@ -563,6 +563,13 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
                     expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
                     variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name in ['variables-from-table-aggregates', 'variables-from-table-scalars']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        scalars = name == 'variables-from-table-scalars'
+        expected = 'expected-scalar-types-run.json' if scalars else 'expected-aggregates-run.json'
+        return dict(source=src, prompt=src / ('task-scalar-types.md' if scalars else 'task-aggregates.md'), data=src.parent / 'fixtures',
+                    input_files=['aggregate-types.csv' if scalars else 'aggregate-numeric.csv'], base=None, expected_name=expected, variable_initial_name=expected,
+                    variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',

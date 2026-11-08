@@ -119,6 +119,35 @@ def source_code(data):
             'for (const row of ' + rows + ') { OutputTable.Append(); ["N","K","S","B","D","V"].forEach((n,i)=>OutputTable.Set(n,row[i])); }')
 
 
+TYPED_CSV = [('N', 'integer'), ('K', 'integer'), ('S', 'string'), ('B', 'boolean'), ('D', 'datetime')]
+
+
+def typed_csv():
+    # Explicit schema, no type detection: ? is NULL, a quoted "" is an empty string.
+    with (FIXTURES / 'aggregate-types.csv').open(encoding='utf-8', newline='') as stream:
+        reader = csv.reader(stream, quoting=csv.QUOTE_MINIMAL)
+        header, *rows = list(reader)
+    assert header == [name for name, _ in TYPED_CSV]
+    raw = (FIXTURES / 'aggregate-types.csv').read_text(encoding='utf-8').splitlines()[1:]
+
+    def parse(text, datatype, quoted):
+        if text == '?' and not quoted:
+            return None
+        if datatype == 'integer':
+            return int(text)
+        if datatype == 'boolean':
+            return {'true': True, 'false': False}[text]
+        if datatype == 'datetime':
+            moment = datetime.strptime(text, '%Y-%m-%dT%H:%M:%S.%f')
+            return moment.strftime('%Y-%m-%dT%H:%M:%S.') + '%03d' % (moment.microsecond // 1000)
+        return text
+
+    return {'columns': [{'name': name, 'type': datatype} for name, datatype in TYPED_CSV],
+            'rows': [[parse(text, datatype, cell.startswith('"'))
+                      for text, cell, (_, datatype) in zip(row, line.split(','), TYPED_CSV)]
+                     for row, line in zip(rows, raw)]}
+
+
 def check_inputs(data):
     assert [column['name'] for column in data['columns']] == ['N', 'K', 'S', 'B', 'D', 'V']
     assert [column['type'] for column in data['columns']] == ['integer', 'integer', 'string', 'boolean', 'datetime', 'variant']
@@ -126,6 +155,8 @@ def check_inputs(data):
     with (FIXTURES / 'aggregate-numeric.csv').open(encoding='utf-8', newline='') as stream:
         rows = list(csv.reader(stream))
     assert rows == [['N', 'K']] + [[str(row[0]) if row[0] is not None else '?', str(row[1])] for row in data['rows']]
+    typed = typed_csv()
+    assert typed['rows'] == [row[:5] for row in data['rows']], 'Typed text-import fixture differs from authored inputs'
     with ZipFile(FIXTURES / 'aggregate-source.lgp') as package:
         engines = list(ElementTree.fromstring(package.read('Unit_0/Unit.xml')).iter('Engine'))
         types = [engine.attrib.get('{http://www.w3.org/2001/XMLSchema-instance}type') for engine in engines]
@@ -141,7 +172,7 @@ def main():
     result = {'status': 'proposal_pending_owner_approval',
               'native_subtypes_verified': False,
               'numeric': inventory(data, ['N', 'K']),
-              'scalar_types': inventory(data, ['S', 'B', 'D']),
+              'scalar_types': inventory(typed_csv(), ['S', 'B', 'D']),
               'variant': inventory(data, ['V']),
               'discovery_combined': inventory(data, ['N', 'K', 'S', 'B', 'D', 'V'])}
     text = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
