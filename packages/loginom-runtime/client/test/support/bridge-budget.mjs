@@ -137,7 +137,12 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
     assert.equal(node.cache_key,undefined);
     const described=parse(await call('dock_action_describe',{node_types:[node.type]})).node_types[0];
     assert.match(described.cache_key,/^[a-f0-9]{64}$/);
-    for(const key of Object.keys(node))assert.deepEqual(node[key],described[key],node.type+': '+key);
+    for(const key of Object.keys(node)){
+     // Describe delivers duplicate JS limitations once in javascript_knowledge.
+     const value=node.type==='programming.javascript'&&key==='limitations'&&!Object.hasOwn(described,key)
+      ?described.javascript_knowledge?.limitations:described[key];
+     assert.deepEqual(node[key],value,node.type+': '+key);
+    }
    }
    const imported=parse(await call('dock_action_describe',{node_types:['imports.text']})).node_types[0];
    assert.ok(imported.parameter_schema);
