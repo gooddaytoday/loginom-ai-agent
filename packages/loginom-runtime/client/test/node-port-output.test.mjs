@@ -505,7 +505,15 @@ test('shared ordinary output refuses reordered fields and cells even when every 
 test('typedVariants read failure names its real cause while ordinary reads keep the generic reason',async()=>{
  const rows=[['x']],typed=fixture({rows,types:[6]}),plain=fixture({rows,types:[6]});
  const bad=await typed.run({port:0,execution,sampleRows:1,requireExactNumbers:true,typedVariants:true});
- assert.equal(bad.verified,false);assert.match(bad.reason,/^read_failed: \w+: .+/);assert.ok(bad.reason.length<=220);
+ assert.equal(bad.verified,false);assert.match(bad.reason,/^read_failed: \w+: .+/);assert.ok(bad.reason.length<=480);
  const ordinary=await plain.run({port:0,execution,sampleRows:1,requireExactNumbers:false});
  assert.equal(ordinary.verified,true);
+});
+test('typedVariants refusal lists every unreadable Variant cell with its ordinary value kind',async()=>{
+ const rows=[['a'],[null],['c']],f=fixture({rows,types:[6]});
+ const variant={read:'async()=>({pending:0,unsettled:false,read:async row=>{if(row===1)throw Error("unknown/interface tag 0 frame 60");return {tag:8};}})',
+  decode:'()=>({})',adapt:'()=>({type:"variant",is_null:false,value:"x",cell_type:"string",precision:"exact_native"})',collect:'()=>({})',pins:{}};
+ const result=await readNodePortOutput(f.page,f.binding,{port:0,execution,sampleRows:3,requireExactNumbers:true,typedVariants:true},{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000},undefined,undefined,undefined,undefined,null,variant);
+ assert.equal(result.verified,false);assert.equal(result.cleanup_complete,true);
+ assert.match(result.reason,/variant_cells r1c0 null unknown\/interface tag 0 frame 60$/);
 });
