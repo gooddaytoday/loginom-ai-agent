@@ -705,6 +705,12 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-coefficients`: C7, Enter с `linear_regression.statistics:"full"`,
+утверждённые task-coefficients.md, design.csv и expected/coefficients.json.
+Порт 1 — девять native-столбцов (Name…Y_upperBound), NULL сохраняются;
+метки только у Name/Y_coefficients, остальные `label_any`. CSV прогнозов,
+Save, cold без перенастройки и Teach, cleanup.
+
 
 
 `logreg-apply`: обучение Enter на train.csv, затем замена источника того же

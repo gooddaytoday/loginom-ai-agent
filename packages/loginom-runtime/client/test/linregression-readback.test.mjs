@@ -43,3 +43,12 @@ test('Ridge readback reports observed manual lambda without aliasing configurati
  assert.equal(result.epsilon,1e-10);assert.equal(result.training.status,'trained');
  configuration.regularization.lambda_l2=2;assert.equal(result.regularization.lambda_l2,1);
 });
+test('Enter readback reports the requested coefficient statistics and observed confidence level',()=>{
+ const input=candidate(),configuration=input.phases[1].value.configuration;
+ assert.equal(linRegressionConfigurationReadback(input).statistics,'coefficients');
+ Object.assign(configuration,{statistics:'full',confidence_level:95});
+ const result=linRegressionConfigurationReadback(input);
+ assert.equal(result.statistics,'full');assert.equal(result.confidence_level,95);
+ Object.assign(configuration,{mode:'ridge',regularization:{setup:'manual',lambda_l2:1},epsilon:1e-10});
+ assert.equal(linRegressionConfigurationReadback(input).statistics,undefined);
+});
