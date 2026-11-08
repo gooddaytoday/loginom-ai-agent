@@ -139,7 +139,8 @@ test('an empty native mapping is deferred to execution only for auto-detect all 
  assert.deepEqual(deferredImportOutput(configured('Все'),empty,[]).map(c=>c.name),['Id','Note']);
  assert.equal(deferredImportOutput(configured('Нет'),empty,[]),null);
  assert.equal(deferredImportOutput(configured('Только новые'),empty,[]),null);
- assert.equal(deferredImportOutput(configured('Все'),{...empty,target_fields:[{}]},[]),null);
+ assert.equal(deferredImportOutput(configured('Все'),{...empty,target_fields:[{name:'Old'}]},[]).length,2);
+ assert.equal(deferredImportOutput(configured('Все'),{...empty,source_fields:[{name:'A'}]},[]),null);
  assert.equal(deferredImportOutput(configured('Все'),{...empty,verified:false},[]),null);
  assert.throws(()=>deferredImportOutput(configured('Все'),empty,[{direction:'output',port:0}]),/auto_detect_columns=all/);
  const phase=(name,value)=>({phase:name,status:'verified',receipt_id:'op:'+name,value:{verified:true,cleanup_complete:true,...value}});
@@ -152,6 +153,8 @@ test('an empty native mapping is deferred to execution only for auto-detect all 
   phase('finish',{settings_applied:true,mode:'execute'})]};
  const readback=textImportConfigurationReadback(input);
  assert.deepEqual(readback.output_mapping.fields,[]);
+ input.phases[1].value.native_mapping.target_fields=[{name:'Old',source:null}];
+ assert.deepEqual(textImportConfigurationReadback(input).output_mapping.fields,[]);
  input.phases[1].value.deferred_output=false;
- assert.throws(()=>textImportConfigurationReadback(input),/output inventory differs/);
+ assert.throws(()=>textImportConfigurationReadback(input));
 });

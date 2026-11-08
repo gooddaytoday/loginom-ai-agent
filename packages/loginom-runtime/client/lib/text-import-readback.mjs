@@ -35,7 +35,7 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
     &&m.source_identity_verified===true&&typeof n.autosync==='boolean'
     &&Array.isArray(n.source_fields)&&Array.isArray(n.target_fields)
     &&n.target_fields.length<=1000,'unverified mapping inventory');
-  const output=n.target_fields.map((f,i)=>{
+  const output=m.deferred_output===true?[]:n.target_fields.map((f,i)=>{
     const matches=n.source_fields.filter(s=>s.record_id===f.source?.record_id);
     requireValue(matches.length===1&&JSON.stringify(matches[0])===JSON.stringify(f.source)
       &&f.index===i&&['name','label','type','data_kind'].every(k=>typeof f[k]==='string'&&f[k].length<=120),

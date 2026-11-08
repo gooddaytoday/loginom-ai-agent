@@ -271,11 +271,12 @@ export async function readNativeImportMapping(channel,condition,ready) {
 }
 
 // «Автоопределение: Все» creates the output fields when the node executes, so the
-// cached native mapping is legitimately empty at the mapping stage. Only that exact
-// state is deferred to the executed port read; any other empty mapping stays refused.
+// cached native source mapping is legitimately empty at the mapping stage (an executed
+// node can still carry its previous targets). Only that state is deferred to the
+// executed port read; a mapping with sources keeps the full verification.
 export function deferredImportOutput(configured,native,mappings) {
   const mode=configured?.format?.fields?.auto_detect_columns?.value;
-  if(mode!=='Все'||native?.verified!==true||native.source_fields?.length!==0||native.target_fields?.length!==0
+  if(mode!=='Все'||native?.verified!==true||native.source_fields?.length!==0||!Array.isArray(native.target_fields)
     ||!configured.columns.some(c=>c.used))return null;
   requireValue(mappings.length===0,'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
   return configured.columns.filter(c=>c.used).map(c=>({name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:true}));
