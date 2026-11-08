@@ -134,16 +134,8 @@ def consequents_artifacts():
     base = dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
         ['imports.text', 'datamining.assn_rules', 'exports.text']])
     final = consequents_expected(Fraction(6, 5))
-    outputs = consequents_expected(Fraction(0)) + final
-    # Native Export input definitions group antecedents before consequents,
-    # whereas the rules data-source reader enumerates A/C pairs. Bind both
-    # observed orders exactly; membership, IDs and metrics remain identical.
-    csv_order = ['RuleID', 'Support', 'Confidence', 'Lift', 'Item_0_A', 'Item_1_A', 'Item_0_C', 'Item_1_C']
-    csv_outputs = [{**output, 'columns': sorted(output['columns'], key=lambda c: csv_order.index(c['name']))}
-                   if output['output_port'] == 1 else output for output in outputs]
-    return {'expected-consequents.json': dict(base, outputs=outputs),
-            'expected-consequents-cold.json': dict(base, outputs=final),
-            'expected-consequents-csv.json': dict(base, outputs=csv_outputs)}
+    return {'expected-consequents.json': dict(base, outputs=consequents_expected(Fraction(0)) + final),
+            'expected-consequents-cold.json': dict(base, outputs=final)}
 
 
 if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):

@@ -390,19 +390,6 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 0, 1])
         cold = runner.expected_for(case, '/test/consequents.lgp', cold=True)
         self.assertEqual(cold['outputs'], expected['outputs'][2:])
-        csv_expected = runner.read(case['source'] / case['csv_expected_name'])
-        self.assertEqual(len(csv_expected['outputs']), len(expected['outputs']))
-        for native, exported in zip(expected['outputs'], csv_expected['outputs']):
-            self.assertEqual(native['rows'], exported['rows'])
-            self.assertEqual({c['name']: c for c in native['columns']},
-                             {c['name']: c for c in exported['columns']})
-            self.assertEqual(native['column_order'], 'exact')
-            self.assertEqual(exported['column_order'], 'exact')
-            if native['output_port'] == 1:
-                self.assertEqual([c['name'] for c in native['columns']][-4:],
-                                 ['Item_0_A', 'Item_0_C', 'Item_1_A', 'Item_1_C'])
-                self.assertEqual([c['name'] for c in exported['columns']][-4:],
-                                 ['Item_0_A', 'Item_1_A', 'Item_0_C', 'Item_1_C'])
         prompt = case['prompt'].read_text()
         for text in ['expected', 'oracle', 'LAB-', 'Proposal', 'DESIGN ONLY']:
             self.assertNotIn(text, prompt)

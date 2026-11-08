@@ -637,10 +637,7 @@ max_items=3, max_consequents=2, min_lift=0 → 1.2 с явным Teach того 
 Четыре CSV в порядке портов 0/1 обоих расчётов; Fraction-oracle генерирует
 expected-consequents.json, cold сверяется с двумя итоговыми портами из
 expected-consequents-cold.json. Нативный порядок A0/C0/A1/C1, RuleID и NULL
-связаны reader до прогонов. CSV отдельно проверяется по точному порядку
-нативного входа Экспорта A0/A1/C0/C1 (`expected-consequents-csv.json`);
-порядок самого порта остаётся A0/C0/A1/C1, значения oracle одинаковы.
-Модели передаются только task и train.csv.
+связаны reader до прогонов; модели передаются только task и train.csv.
 Save, cold без настройки и cleanup обязательны.
 
 `assnrules-basic` и `assnrules-length`: частые наборы и правила FP-Growth,
