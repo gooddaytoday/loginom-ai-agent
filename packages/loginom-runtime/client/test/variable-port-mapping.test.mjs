@@ -77,7 +77,7 @@ function mappingFixture({delay=240,cover=null,drift=false,readback=false,unstabl
  const graph=async()=>({verified:true,surface:'graph',locked:false});
  const open=async()=>({status:'SUCCEEDED',effect_possible:true});
  const run=async()=>{context.page=page;context.task=task;context.read=graph;context.open=open;context.decode=decodePortCell;return vm.runInContext('('+configureVariablePortMapping.toString()+')(page,task,read,open,decode)',context);};
- return {run,clicks,task,clock,node,wizard,record,source,preparation,closed:()=>closed};
+ return {run,clicks,task,clock,node,port,wizard,record,source,preparation,closed:()=>closed};
 }
 
 test('variable mapping retains ownership across coherent existing-workflow receipts and refuses conflicts',async()=>{
@@ -212,4 +212,13 @@ test('mapping writer stops before opening a port on a foreign or locked graph',a
   const r=await configureVariablePortMapping({waitForTimeout:async()=>{}},{binding,mapping,deadline:Date.now()+1},async()=>graph,()=>assert.fail('No port opening'));
   assert.equal(r.status,'NOT_APPLIED');assert.equal(r.cleanup_complete,true);assert.equal(r.effect_possible,false);
  }
+});
+
+test('serialized control W1 readback Cancels without Done or changing native values and identity',async()=>{
+ const f=mappingFixture({readback:true});f.task.mapping.kind='control';f.port.FSubType=4;
+ const before=JSON.stringify(f.record);
+ const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);
+ assert.equal(r.verified,true);assert.equal(r.cleanup_complete,true);
+ assert.equal(r.mapping.kind,'control');assert.equal(r.mapping.port_guid,'port');
+ assert.deepEqual(f.clicks,['MF;TF-1;WizrdMCF;btnClose']);assert.equal(JSON.stringify(f.record),before);assert.notEqual(f.closed(),null);
 });

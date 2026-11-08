@@ -79,13 +79,14 @@ test('table reread uses only its confirmed Save continuation through the browser
  const request={...f.request,operation_id:'initial',target:{kind:'existing',type:'transform.filter_data',ref:node},mode:'conditions',parameters:{},
   finish:'execute',read:{ports:[0],sample_rows:1,require_exact_numbers:true}};
  const initial=await runtime.runNodeApply(request);assert.equal(initial.status,'SUCCEEDED',JSON.stringify(initial));
+ const initialExecutes=executes;assert.equal(initialExecutes,1,'unchanged initial Filter executes through its read lifecycle');
  const saved=await runtime.run('package.save_checkpoint',{path:'/user/report.lgp',conflict_policy:'fail'},{operationId:'save'});
  assert.equal(saved.status,save.status,JSON.stringify(saved));
  f.crumb.textContent='Saved';f.crumb.getAttribute=()=>next.navigation_path.at(-1).tid;
  await runtime.startNodeRead({operation_id:'reread',source_operation_id:'initial'});
  const result=await runtime.waitNodeApply('reread',{timeoutMs:1000});
  assert.equal(result.outcome.status,fault?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(result));
- assert.equal(executes,fault?0:1);assert.deepEqual(f.clicks,[]);
+ assert.equal(executes-initialExecutes,fault?0:1);assert.deepEqual(f.clicks,[]);
  assert.deepEqual(request.workflow_ref,old,'the completed source keeps its original immutable request');
 });
 test('an active workflow preserves source-before-workflow order without a gesture',async()=>{
