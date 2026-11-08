@@ -55,7 +55,6 @@ export async function prepareImportBinding(options,ctx,config,settings){
  }
 }
 async function readImportBindingSource(options,ctx,config,{saved=false,expectedPath}={}){
- if(saved&&typeof options.isBoundFileInput!=='function')return null;
  const r=options.operation.parameters;
  const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
  need(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id,'BINDING_SOURCE_UNVERIFIED');
@@ -67,20 +66,10 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
  const nodes=graph.nodes.filter(n=>n.ref.node_id===(link.source?.node_id??link.source));
  if(saved&&(nodes.length!==1||nodes[0].type!=='variables.user'||link.output!==4))return null;
  let mapping,name=r.bindings?.[0]?.variable.name;
- if(r.target.kind==='existing'){
+ if(r.target.kind==='existing'&&!saved){
   const target=importBindingChannel(options,ctx,config,r.target.ref);
-  if(saved){
-   const s=await readImportBindingField(target);
-   const f=s.wizard.import_source.fields.source_path;
-   if(f.variable_mode!==true)return null;
-   const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
-   need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
-   const fields=mapping.fields.filter(v=>f.variable_caption===v.label||f.variable_caption?.startsWith(v.label+' ( '));
-   need(fields.length===1,'BINDING_VARIABLE_MISSING');name=fields[0].name;
-  }else{
-   const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
-   need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
-  }
+  const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
+  need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
  }
  need(nodes.length===1&&nodes[0].type==='variables.user'&&link.output===4,'BINDING_SOURCE_UNVERIFIED');
  const source=nodes[0],channel=importBindingChannel(options,ctx,config,source.ref);
@@ -92,6 +81,23 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
  need(saved||proof?.source_active===true,'BINDING_SOURCE_UNVERIFIED: execute variables.to_table from source output 4 before configuring Import; do not reopen source values');
  if(saved){
   need(proof?.verified===true&&proof.cleanup_complete===true&&proof.independent_readback===true,'BINDING_SOURCE_UNVERIFIED');
+  // Opening either Import editor can deactivate an executed node. Establish
+  // our input-file scope from the source preview before opening either W1.
+  const scoped=proof.variables?.some(v=>v.type==='string'&&v.cell?.type==='string'&&v.cell.is_null===false&&typeof v.cell.value==='string'&&options.isBoundFileInput(v.cell.value));
+  if(!scoped){
+   // Retain the existing NULL/empty refusal without opening an Import editor.
+   const invalid=proof.variables?.find(v=>v.type==='string'&&(v.cell?.is_null===true||v.cell?.value===''));
+   if(invalid)resolveImportBindingValue(proof,invalid.name);
+   return null;
+  }
+  const target=importBindingChannel(options,ctx,config,r.target.ref);
+  const s=await readImportBindingField(target);
+  const f=s.wizard.import_source.fields.source_path;
+  if(f.variable_mode!==true)return null;
+  const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
+  need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');mapping=mapped.mapping;
+  const fields=mapping.fields.filter(v=>f.variable_caption===v.label||f.variable_caption?.startsWith(v.label+' ( '));
+  need(fields.length===1,'BINDING_VARIABLE_MISSING');name=fields[0].name;
   const sourceName=mapping.fields.find(f=>f.name===name)?.source?.name??name;
   const values=proof.variables?.filter(v=>v.name===sourceName);
   // Scope before imposing our file/path policy. A different directory retains

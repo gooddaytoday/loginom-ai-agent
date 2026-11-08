@@ -14,6 +14,7 @@ function savedImport(kind='bound',active=true,pathOverride){
  const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{ref:source,type:kind==='other-source'?'variables.calculator':'variables.user',variable_outputs:[{kind:'variables',port:4,port_guid:'source-port'}]}],
   variable_links:kind==='no-variables'?[]:[{source:'vars',target:'import',kind:'variables',input:0,output:4,target_port_guid:'input'}]};
  const mapping={kind:'variables',port:0,port_guid:'input',fields:[{name:'CsvPath',label:'CsvPath',id:7,type:5,source:{name:'CsvPath',id:7,type:5}}]};
+ const variables=[{id:7,name:'CsvPath',type:'string',cell:{type:'string',is_null:path===null,value:path}}];
  const owner={status:'observed',node:{tid:'flow>Import',label:'Import'},path:[...workflow.navigation_path,{tid:'node',label:'Import'},{tid:'settings',label:'Settings'}]};
  const actions=[];let opened=false,pending,witnesses=0,available=false;
  const state=()=>({origin:'https://app.loginom.ai',loginom_build:'7.4.2',workflow_ref:workflow,scan:{complete:true},dom_epoch:{document:'dom',revision:1},
@@ -32,7 +33,7 @@ function savedImport(kind='bound',active=true,pathOverride){
    if(action.verb.startsWith('user_')||action.verb==='variable_mapping_read'){
     const output={verified:true,cleanup_complete:true,effect_possible:false,independent_readback:true,
      node_context:action.verb==='variable_mapping_read'?node:source,
-     ...(action.verb==='variable_mapping_read'?{mapping}:{source_active:active,variables:[{id:7,name:'CsvPath',type:'string',cell:{type:'string',is_null:path===null,value:path}}]})};
+     ...(action.verb==='variable_mapping_read'?{mapping}:{source_active:active,variables:structuredClone(variables)})};
     if(action.verb==='user_runtime_read'&&!active){output.independent_readback=false;delete output.variables;}
     return {status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'node.variables.'+action.verb+'.internal',cleanup_complete:true,effect_possible:false,output};
    }
@@ -41,19 +42,42 @@ function savedImport(kind='bound',active=true,pathOverride){
   }};
  const ctx={document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000};
  const support=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
- return {options,operation,r,actions,ctx,driver:()=>support.nodeApplyDriverFactory(options),allowWitness:()=>{available=true;},witnesses:()=>witnesses};
+ return {options,operation,r,actions,ctx,mapping,variables,driver:()=>support.nodeApplyDriverFactory(options),allowWitness:()=>{available=true;},witnesses:()=>witnesses};
 }
 
-for(const kind of ['no-variables','literal','other-source','outside'])test('legacy saved '+kind+' has no binding guard without the private session-input capability',()=>{
- const f=savedImport(kind);delete f.options.isBoundFileInput;
- assert.equal(f.driver().beforeTarget,undefined);
- assert.equal(f.witnesses(),0);assert.deepEqual(f.actions,[]);
-});
 for(const kind of ['no-variables','literal','other-source','outside'])test('saved '+kind+' keeps legacy Execute without a Files witness',async()=>{
  const f=savedImport(kind);await f.driver().beforeTarget?.(f.ctx);
  assert.equal(f.witnesses(),0);assert.equal(f.operation.importBindingInventory,undefined);
  assert.ok(!f.actions.includes('user_values'),'an active foreign source must not be deactivated');
  if(['no-variables','other-source'].includes(kind))assert.deepEqual(f.actions,[]);
+});
+test('literal Import with a linked user output outside inputs reaches legacy Execute without any W1 or Values opening',async()=>{
+ const f=savedImport('literal',true,'/shared/a.csv');
+ await f.driver().beforeTarget(f.ctx);
+ assert.deepEqual(f.actions,['user_runtime_read']);
+ assert.equal(f.witnesses(),0);assert.equal(f.operation.importBindingInventory,undefined);
+});
+test('unsupported input extension bypasses W1 and binding witness before native Execute',async()=>{
+ const f=savedImport('literal',true,'/own/inputs/a.exe');
+ f.options.isBoundFileInput=()=>false;
+ await f.driver().beforeTarget(f.ctx);
+ assert.deepEqual(f.actions,['user_runtime_read']);assert.equal(f.witnesses(),0);
+});
+test('source preview precedes both W1 reads and resolves a renamed mapped variable among unrelated values',async()=>{
+ const f=savedImport();f.allowWitness();
+ f.mapping.fields[0].source.name='ActualPath';f.variables[0].name='ActualPath';
+ f.variables.unshift({id:8,name:'Unrelated',type:'string',cell:{type:'string',is_null:false,value:'/shared/other.csv'}});
+ await f.driver().beforeTarget(f.ctx);
+ assert.equal(f.actions[0],'user_runtime_read');assert.equal(f.witnesses(),1);
+ assert.equal(f.operation.importBindingInventory[0].variable.name,'CsvPath');
+ assert.equal(f.operation.importBindingInventory[0].source.variable_id,7);
+});
+test('an unrelated admissible path cannot apply the file guard to a mapped path outside inputs',async()=>{
+ const f=savedImport('outside');
+ f.variables.push({id:8,name:'Unrelated',type:'string',cell:{type:'string',is_null:false,value:'/own/inputs/other.csv'}});
+ await f.driver().beforeTarget(f.ctx);
+ assert.equal(f.actions[0],'user_runtime_read');assert.equal(f.witnesses(),0);
+ assert.equal(f.operation.importBindingInventory,undefined);assert.ok(!f.actions.includes('user_values'));
 });
 for(const active of [true,false])for(const bindings of [undefined,[]])test('our saved binding still requires a fresh witness on Execute, empty bindings; active='+active+', omitted='+(bindings===undefined),async()=>{
  const f=savedImport('bound',active);f.r.bindings=bindings;
@@ -66,8 +90,9 @@ for(const active of [true,false])for(const bindings of [undefined,[]])test('our 
 
 for(const value of [null,''])test('our saved string binding refuses '+(value===null?'NULL':'empty')+' before Execute',async()=>{
  const f=savedImport('bound',false,value);
+ f.variables.push({id:8,name:'Sentinel',type:'integer',cell:{type:'integer',is_null:false,value:'17'}});
  await assert.rejects(f.driver().beforeTarget(f.ctx),value===null?/BINDING_NULL_UNSUPPORTED/:/BINDING_VALUE_INVALID/);
- assert.equal(f.witnesses(),0);
+ assert.equal(f.witnesses(),0);assert.ok(!f.actions.includes('begin_wizard'));
 });
 for(const type of ['imports.excel','transform.filter_data','transform.sorting','integration.rest_request'])test('private Import capability adds no beforeTarget to another type: '+type,()=>{
  const f=savedImport();f.r.target.type=type;f.r.mode='read_existing_output';

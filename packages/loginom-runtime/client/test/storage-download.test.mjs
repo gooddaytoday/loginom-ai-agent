@@ -80,6 +80,21 @@ test('Import binding consumes its observed file witness after Files returns to t
  assert.notEqual(stale.status,'SUCCEEDED');assert.match(stale.error.message,/BINDING_SOURCE_UNVERIFIED/);assert.equal(checked,1);
 });
 
+test('production Import input scope accepts only Files-supported extensions inside session inputs',async t=>{
+ const node={document_id:'d',workflow_id:'flow',node_id:'import'},workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
+ const graph={complete:true,document_id:'d',workflow_ref:workflow,nodes:[{ref:node,type:'imports.text',label:'Source',inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+ const ok=async()=>({verified:true,cleanup_complete:true,effect_possible:false});let scope;
+ const f=await sourceNavigation(t,undefined,{
+  nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,reconcile:ok,activateWorkflow:async()=>({...await ok(),status:'SUCCEEDED',document_id:'d',workflow_ref:workflow})}),
+  nodeApplyHandlers:new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:ok}]]),
+  nodeApplyDriverFactory:context=>{scope=context.isBoundFileInput;return {verifySource:ok,mapPorts:ok,openWizard:ok,finish:async mode=>({...await ok(),mode,settings_applied:true,execution_started:false}),waitExecution:ok,readOutput:ok,verifyContinuation:async()=>true};},
+ });
+ const result=await f.runtime.runNodeApply({operation_id:'scope',contract_revision:'1.0.0',document_id:'d',workflow_ref:workflow,target:{kind:'existing',type:'imports.text',ref:node},inputs:[],mode:'delimited',parameters:{settings:{}},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(typeof scope,'function');
+ for(const ext of ['csv','TSV','txt','XLSX','lgd'])assert.equal(scope('/worker/a.'+ext),true,ext);
+ for(const path of ['/worker/a.exe','/worker/a.csv.bak','/worker/a','/outside/a.csv','/worker/../foreign/a.csv'])assert.equal(scope(path),false,path);
+});
+
 for(const change of ['unchanged','bytes','mtime'])test('import retry after released STALE reopens Files and rechecks the original native witness: '+change,async t=>{
  const node={document_id:'doc',workflow_id:'flow',node_id:'import'},workflow={workflow_id:'flow',prefix:'MF;TF-1',
   tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
