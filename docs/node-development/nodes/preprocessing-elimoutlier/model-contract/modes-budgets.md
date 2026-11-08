@@ -35,11 +35,11 @@ Production тест базы: **184/184**, `model_tool_bytes=8051`,
 |---|---:|---:|
 | Сжатый dock_node_apply | 8051 Б | 20000 Б |
 | Полная inline схема | 72136 Б | только измерение |
-| Карточка outlier, pins + все guidance | 7581 Б | 12000 Б |
+| Карточка outlier, pins + все guidance | 7475 Б | 12000 Б |
 | Карточка Quality, pins + весь guidance | 8528 Б | 12000 Б |
 | Индекс SKILL.md после двух замен маршрутов | 28829 Б | 40000 Б |
 | Строка маршрутизации outlier / Quality | 137 / 153 Б | около 200 Б |
-| Файл outlier / Quality | 3451 / 5667 Б | 6000 Б каждый |
+| Файл outlier / Quality | 3346 / 5667 Б | 6000 Б каждый |
 
 Quality остаётся profile с расширением допустимых входных типов. Hidden actions
 и apply не имеют выдуманной схемы. Outlier предлагает detect/edit; скрытый

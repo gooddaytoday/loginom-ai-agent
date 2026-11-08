@@ -1,5 +1,5 @@
 {
-  "claim": "наблюдение, не заявляется",
+  "claim": "частично: только UngroupQuality — наблюдение, не заявляется",
   "observation": "UngroupQuality=null при положительной опоре: в DOM `&nbsp;`, NULL против NaN не прочитан",
   "package_path": "{{PACKAGE_PATH}}",
   "nodes": [

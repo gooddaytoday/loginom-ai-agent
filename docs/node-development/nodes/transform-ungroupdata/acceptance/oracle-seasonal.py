@@ -88,7 +88,8 @@ def expected(case):
                                           **({'tolerance': dict(abs=1e-12, rel=1e-12)}
                                              if kind == 'real' else {}))
                                      for name, kind in columns], rows=values))
-    return dict(claim=CLAIM, observation=OBSERVED_NOT_CLAIMED[case],
+    return dict(claim=('частично: только UngroupQuality — ' + CLAIM) if case == 'constant' else CLAIM,
+                observation=OBSERVED_NOT_CLAIMED[case],
                 package_path='{{PACKAGE_PATH}}', nodes=[dict(type='imports.text'),
                 dict(type='imports.text'), dict(type='transform.ungroup_data'),
                 dict(type='exports.text'), dict(type='exports.text')], outputs=outputs)
