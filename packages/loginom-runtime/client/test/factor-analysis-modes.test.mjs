@@ -6,6 +6,7 @@ import {factorAnalysisOutputColumns} from '../lib/factor-analysis-output.mjs';
 import {factorAnalysisConfigurationReadback} from '../lib/factor-analysis-readback.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
+import {factorAnalysisParametersSchema} from '../lib/node-api.mjs';
 
 const request={target:{kind:'new'},inputs:[{input:0}],mappings:[],read:{ports:[0,1]}};
 const features=['X','Y','Z'];
@@ -24,7 +25,7 @@ test('automatic PCA criteria validate thresholds before UI and cap is independen
  validateFactorAnalysisParameters({factor_analysis:{output_factors:false}},'pca_fixed',{...request,target:{kind:'existing'}});
 });
 
-function fixture(initial={}){
+function fixture(initial={},faults={}){
  const node={verified:true,document_id:'doc',workflow_id:'wf',node_id:'pca'};
  const source_fields=fields.map((f,index)=>({...f,record_id:'source'+index}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,input_port:{port:0}},source_fields,
@@ -41,7 +42,7 @@ function fixture(initial={}){
  const state=()=>({prepared_node_context:node,wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'root',...(['output_mapping','binning_ranges_mapping'].includes(stage)?{output_columns:columns()}: {})},...(['output_mapping','binning_ranges_mapping'].includes(stage)?{node_mapping:structuredClone(inline())}:{}),ui:{elements:[{tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']},
   ...(['output_mapping','binning_ranges_mapping'].includes(stage)?inline().target_fields.map(f=>({ref:f.record_id,allowed_actions:['click','press']})):[]),
   ...(['output_mapping','binning_ranges_mapping'].includes(stage)?[{tid:'wizard;'+inline().mapping_wizard+';btnAutoSyncThroughColumns',ref:'auto',allowed_actions:['click']}]:[]),
-  ...['pedSignificanceCriterion;ValueControl;radiofield;DisplayEl','pedSignificanceCriterion;ValueControl;radiofield-1;DisplayEl','pedSignificanceCriterion;ValueControl;radiofield-2;DisplayEl','pedRotationType;ValueControl;radiofield;DisplayEl','cntOutFactorsMax;cnt;chb;InputEl',
+  ...['pedSignificanceCriterion;ValueControl;radiofield;DisplayEl','pedSignificanceCriterion;ValueControl;radiofield-1;DisplayEl','pedSignificanceCriterion;ValueControl;radiofield-2;DisplayEl','pedRotationType;ValueControl;radiofield;DisplayEl','pedRotationType;ValueControl;radiofield-1;DisplayEl','pedRotationType;ValueControl;radiofield-2;DisplayEl','cntOutFactorsMax;cnt;chb;InputEl',
    'pedNFactors;ValueControl','pedEigenValuesThreshold;ValueControl','pedCumDispersion;ValueControl','pedNOutFactorsMax;ValueControl'].map(key=>({tid:'wizard;FactorAnalysisWizard;'+key,ref:key,allowed_actions:['set_checked','fill','press']}))]},
   node_factor_analysis:stage==='input_mapping'?{verified:true,inventory_complete:true,node_context:node,fields}:{verified:true,kind:'parameters',...structuredClone(native)}});
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},async perform(task){const s=state();assert.equal(task.ready(s),true);const a=task.resolve(s);actions.push(a);
@@ -57,15 +58,64 @@ function fixture(initial={}){
   if(['output_mapping','binning_ranges_mapping'].includes(stage)&&a.verb==='press'&&a.key==='Delete'){
    const m=inline();m.autosync=false;m.target_fields=m.target_fields.filter(f=>f.record_id!==selected).map((f,index)=>({...f,index,group_index:index}));selected=null;
   }
-  if(a.verb==='fill'){const key=a.ref.split(';')[0];native.values[key]=Number(a.text);if(key==='pedNFactors')native.factors=Number(a.text);}
+  if(a.verb==='fill'){const key=a.ref.split(';')[0];native.values[key]=Number(a.text);if(key==='pedNFactors')native.factors=Number(a.text);if(faults.resetRotationOnFill)native.rotation=0;}
   if(a.verb==='set_checked'){
    if(a.ref.startsWith('pedSignificanceCriterion'))native.criterion=a.ref.includes('radiofield-2')?2:a.ref.includes('radiofield-1')?1:0;
-   if(a.ref.startsWith('pedRotationType'))native.rotation=0;
+   if(a.ref.startsWith('pedRotationType')&&!faults.ignoreRotationChange)native.rotation=a.ref.includes('radiofield-2')?2:a.ref.includes('radiofield-1')?1:0;
    if(a.ref.startsWith('cntOutFactorsMax'))native.output_cap=a.checked;
   }
   return {verified:true};}};
  return {channel,inputMapping,actions,native,node,mappings};
 }
+
+test('Kaiser rotations validate for every PCA criterion and reject unsupported normalization',()=>{
+ assert.deepEqual(factorAnalysisParametersSchema.properties.factor_analysis.properties.rotation.enum,['none','varimax','quartimax']);
+ for(const rotation of ['none','varimax','quartimax'])for(const [mode,selection] of [['pca_fixed',{factors:2}],['pca_eigenvalue',{eigenvalue:1.1}],['pca_variance',{variance_percent:90}]]){
+  const p={factor_analysis:{features,rotation,...selection}};
+  validateFactorAnalysisParameters(p,mode,request);
+  assert.throws(()=>validateFactorAnalysisParameters({factor_analysis:{...p.factor_analysis,normalization:'none'}},mode,request));
+  const missing=structuredClone(p);delete missing.factor_analysis.rotation;
+  assert.throws(()=>validateFactorAnalysisParameters(missing,mode,request));
+ }
+ for(const rotation of ['promax','Varimax',null,1])assert.throws(()=>validateFactorAnalysisParameters({factor_analysis:{features,factors:2,rotation}},'pca_fixed',request));
+});
+
+test('native rotation radio edits and omission preserve all unrelated PCA settings',async()=>{
+ const rotations=['none','varimax','quartimax'];
+ for(const old of [0,1,2])for(const wanted of [undefined,0,1,2]){
+  const f=fixture({rotation:old,output_cap:true});
+  const before=structuredClone(f.native);
+  const result=await configureFactorAnalysis(f.channel,wanted===undefined?{}:{factor_analysis:{rotation:rotations[wanted]}},
+   {inputMapping:f.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}});
+  assert.equal(result.configuration.rotation,rotations[wanted??old]);
+  assert.deepEqual(f.native,{...before,rotation:wanted??old});
+  const edits=f.actions.filter(a=>a.verb==='set_checked');
+  assert.deepEqual(edits.map(a=>a.ref),wanted===undefined||wanted===old?[]:['pedRotationType;ValueControl;radiofield'+(wanted?'-'+wanted:'')+';DisplayEl']);
+  assert.equal(result.configuration.node_context.node_id,'pca');
+ }
+ const invalid=fixture({rotation:3});
+ await assert.rejects(()=>configureFactorAnalysis(invalid.channel,{}, {inputMapping:invalid.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}}));
+});
+
+test('rotation readback rejects when native set_checked leaves rotation unchanged',async()=>{
+ const f=fixture({}, {ignoreRotationChange:true});
+ await assert.rejects(()=>configureFactorAnalysis(f.channel,{factor_analysis:{rotation:'varimax'}},
+  {inputMapping:f.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}}),/PCA rotation differs/);
+ assert.equal(f.native.rotation,0);
+ assert.deepEqual(f.actions.filter(a=>a.verb==='set_checked').map(a=>a.ref),['pedRotationType;ValueControl;radiofield-1;DisplayEl']);
+ assert.equal(f.actions.some(a=>a.verb==='wizard_step'&&Array.isArray(a.expected_stage)),false);
+});
+
+test('final PCA readback rejects when a numeric fill resets native rotation',async()=>{
+ const f=fixture({rotation:1}, {resetRotationOnFill:true});
+ await assert.rejects(()=>configureFactorAnalysis(f.channel,{factor_analysis:{rotation:'quartimax',factors:3}},
+  {inputMapping:f.inputMapping,request:{...request,target:{kind:'existing'},mode:'pca_fixed'}}),/PCA settings differ/);
+ assert.equal(f.native.rotation,0);
+ assert.equal(f.native.factors,3);
+ assert.deepEqual(f.actions.filter(a=>a.verb==='set_checked'||a.verb==='fill').map(a=>a.ref),[
+  'pedRotationType;ValueControl;radiofield-2;DisplayEl','pedNFactors;ValueControl']);
+ assert.equal(f.actions.some(a=>a.verb==='wizard_step'&&Array.isArray(a.expected_stage)),false);
+});
 
 test('native criterion switching writes only the selected threshold and preserves output cap on omission',async()=>{
  for(const [mode,selection,key,criterion] of [['pca_eigenvalue',{eigenvalue:1.1},'pedEigenValuesThreshold',0],['pca_variance',{variance_percent:90},'pedCumDispersion',1]]){
@@ -165,6 +215,13 @@ test('automatic readback includes the observed criterion, threshold and output l
  const result={operation_id,status:'SUCCEEDED',effect_possible:true,phases:[],node,execution:{status:'not_requested',execution_id:null},
   output:{status:'not_refreshed',evidence_ref:null,ports:[]},configuration:{status:'applied',readback:actual},package_saved:false,cleanup_complete:true,warnings:[]};
  assert.equal(validate(result).valid,true);
+ for(const rotation of ['none','varimax','quartimax'])for(const mode of ['pca_fixed','pca_variance']){
+  const rotated=structuredClone(phases);
+  Object.assign(rotated[1].value.configuration,{rotation,mode,criterion:mode==='pca_fixed'?'fixed':'variance',output_cap:mode!=='pca_fixed'});
+  const readback=factorAnalysisConfigurationReadback({node,phases:rotated,operation_id});
+  assert.equal(readback.rotation,rotation);
+  assert.equal(validate({...result,configuration:{status:'applied',readback}}).valid,true);
+ }
  const invalid=structuredClone(result);invalid.configuration.readback.output_factors=0;
  assert.equal(validate(invalid).valid,false);
  const bad=structuredClone(phases);bad[1].value.configuration.variance_percent=101;

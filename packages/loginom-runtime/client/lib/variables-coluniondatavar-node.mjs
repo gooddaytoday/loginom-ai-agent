@@ -1,32 +1,58 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {variablesColumnUnionParametersSchema,validateVariablesColumnUnionParameters,resolveVariablesColumnUnionInputs} from './variables-coluniondatavar-parameters.mjs';
 import {variablesColumnUnionConfigurationReadback} from './variables-coluniondatavar-readback.mjs';
-import {preflightVariablesColumnUnion} from './variables-coluniondatavar-preflight.mjs';
+import {preflightVariablesColumnUnion,verifyVariablesColumnUnionTopology} from './variables-coluniondatavar-preflight.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
+import {makeVariablesColumnUnionNextDialogCode} from './variables-coluniondatavar-context.mjs';
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
+export async function captureVariablesColumnUnionNextDialog(options,binding,error){
+ if(options.operation.parameters.target.type!=='variables.column_union'||error?.receipt?.error?.code!=='WIZARD_STEP_NOT_CONFIRMED')return;
+ try{
+  const snapshot=await options.execute(makeVariablesColumnUnionNextDialogCode(binding));
+  await options.onRecord({phase:'node_variables_union_next_dialog',operation_id:options.operation.id,snapshot});
+ }catch{
+  await options.onRecord({phase:'node_variables_union_next_dialog_unavailable',operation_id:options.operation.id,reason:'snapshot_unavailable'}).catch(()=>{});
+ }
+}
 export function createVariablesColumnUnionNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
-  type:'variables.column_union',mode:'append_variables',revision:'variables-column-union-v1',parameterSchema:variablesColumnUnionParametersSchema,
+  type:'variables.column_union',mode:'append_variables',revision:'variables-column-union-inputs-v2',parameterSchema:variablesColumnUnionParametersSchema,
   validate:validateVariablesColumnUnionParameters,readback:variablesColumnUnionConfigurationReadback,preflight:preflightVariablesColumnUnion,
   configureInputs:async()=>verified({not_applicable:true,mappings:[]}),
   configureAllOutputs:async(_channel,configuration)=>verified({not_applicable:true,node_context:configuration.node_context}),
+  async afterDone(_channel,request,_configured,{readGraph,options}){
+   const proof=options.operation.variablesColumnUnionPreflight;if(!proof?.graph_before)return;
+   const after=await readGraph();let verified;
+   try{verified=verifyVariablesColumnUnionTopology(proof.graph_before,after,request,proof.inputs);}
+   catch(error){await options.onRecord({phase:'node_variables_union_topology_failed',operation_id:options.operation.id,before:proof.graph_before,after});throw error;}
+   await options.onRecord({phase:'node_variables_union_topology_verified',operation_id:options.operation.id,...verified});return verified;
+  },
   configurationObservation:{condition:'owned variables union automatic mapping',readVariablesColumnUnion:true,ready:s=>s.wizard?.stage==='variables_column_union'&&s.node_variables_column_union?.verified===true},
   async configure(channel,parameters,{request}){
    const state=await channel.observe({condition:'variables union mapping before native Next',readVariablesColumnUnion:true,ready:s=>s.node_variables_column_union?.verified===true});
    const configuration=state.node_variables_column_union;
    if(parameters.column_union?.mapping==='manual'||configuration.mapping!=='automatic')return channel.configureVariablesColumnUnion({parameters,finish:request.finish});
    if(request.finish==='close')return verified({configuration});
-   await channel.perform({condition:'accept variables union automatic mapping',initialObservation:state,ready:s=>s.wizard?.stage==='variables_column_union',identity:()=>configuration.node_context,
+   await channel.perform({condition:'accept variables union automatic mapping',initialObservation:state,
+    variablesUnionInputChange:request.target.kind==='existing'&&(request.variable_inputs?.some(i=>i.input===2)||parameters.column_union?.disconnect_input===2),ready:s=>s.wizard?.stage==='variables_column_union',identity:()=>configuration.node_context,
     resolve:s=>{const controls=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));if(controls.length!==1)throw Error('Variables union Next unavailable');return {verb:'wizard_step',ref:controls[0].ref,expected_stage:'done'};}});
    await channel.observe({condition:'variables union automatic mapping accepted',ready:s=>s.wizard?.stage==='done'});
    return verified({configuration});
   },
  });
  return {...support,nodeApplyDriverFactory:options=>{const drivers=support.nodeApplyDriverFactory(options);return {...drivers,
+  async configureCalculator(ctx,parameters){
+   try{return await drivers.configureCalculator(ctx,parameters);}
+   catch(error){
+    const request=options.operation.parameters;
+    await captureVariablesColumnUnionNextDialog(options,{document_id:request.document_id,workflow_ref:request.workflow_ref,node:ctx.node},error);
+    throw error;
+   }
+  },
   async openWizard(ctx){
    const request=options.operation.parameters;
    if(request.target.kind==='new'&&request.parameters.column_union?.mapping==='manual'){
@@ -64,7 +90,7 @@ export function createVariablesColumnUnionNodeSupport(config){
     const edge=graph.variable_links.find(e=>e.target===ctx.node.node_id&&e.kind==='variables'&&e.input===input.input);
     return {...input,source_port_guid:edge.source_port_guid,target_port_guid:edge.target_port_guid};
    });
-   return {...value,inputs,source_fields:options.operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]};
+   return {...value,inputs,verify_topology:!!options.operation.variablesColumnUnionPreflight?.graph_before,source_fields:options.operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type,cell:v.cell})))??[]};
   }
  };}};
 }

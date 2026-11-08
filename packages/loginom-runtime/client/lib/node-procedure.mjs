@@ -1155,7 +1155,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw error;
       }
     },
-    async act(action,processControl,{preserveJoinMapping=false}={}) {
+    async act(action,processControl,{preserveJoinMapping=false,variablesUnionInputChange=false}={}) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
       if(ownedErrorToast){
@@ -1171,6 +1171,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ||operation.parameters.target.type!=='transform.join_data'||action.verb!=='wizard_step'||action.expected_stage!=='join'
         ||snapshot.wizard?.stage!=='input_mapping'||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port))
         throw Error('Preserved Join navigation requires its unchanged node read');
+      if(variablesUnionInputChange){
+        const r=operation.parameters;
+        if(r.target.type!=='variables.column_union'||r.target.kind!=='existing'||r.mode!=='append_variables'||r.finish!=='execute'
+          ||(r.parameters.column_union?.mapping??'automatic')!=='automatic'||!((r.variable_inputs?.length===3&&r.variable_inputs.every((v,i)=>v.input===i&&v.kind==='variables'))
+            ||r.parameters.column_union?.disconnect_input===2&&r.variable_inputs?.length===0)
+          ||action.verb!=='wizard_step'||action.expected_stage!=='done'||snapshot.wizard?.stage!=='variables_column_union'
+          ||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port)
+          throw Error('Lost-links answer requires the owned automatic union input change');
+        if(operation.variablesUnionInputChangeDispatched)throw Error('Union lost-links policy may dispatch only once per operation');
+      }
       validateUiAction(action, snapshot);
       try {assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);}
       catch(error){
@@ -1189,18 +1199,18 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const launchStartedAt=now();
       snapshot = null;
       const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[]),
-        ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[])]);
+        ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[]),...(variablesUnionInputChange?[{variables_union_input_change:true}]:[])]);
       const processCode=processControl?makeNodeProcessControlCode(preparedNodeContext,before,action,processControl,
         {operation_id:id,deadline:operation.deadline,origin:targetOrigin,build:targetBuild}):null;
       // This write must be durable before the browser receives the mutation.
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
         action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature,
         ...(processControl?{process_control:structuredClone(processControl)}:{}),
-        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}) });
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),...(variablesUnionInputChange?{variables_union_input_change:true}:{}) });
       evidenceSnapshot = null;
       if (!persisted || JSON.stringify(persisted.action) !== JSON.stringify(action)
         || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)
-        ||preserveJoinMapping&&persisted.preserve_join_mapping!==true) throw new Error('Prepared step was not durably preserved after redaction');
+        ||preserveJoinMapping&&persisted.preserve_join_mapping!==true||variablesUnionInputChange&&persisted.variables_union_input_change!==true) throw new Error('Prepared step was not durably preserved after redaction');
       lastPreparedStep = structuredClone(persisted);
       preparedSteps.push({ step: persisted.step, internal_operation_id: persisted.internal_operation_id, signature: persisted.signature, verb: action.verb });
       if (preparedSteps.length > 512) { preparedSteps.shift(); preparedStepsTrimmed = true; }
@@ -1215,7 +1225,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
         ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),
-        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),...(variablesUnionInputChange?{variables_union_input_change:true}:{}),
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
@@ -1231,6 +1241,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         return (${code})(page);
       }`:code, { id, signature, action_key: 'ui.act' });
       let result;
+      if(variablesUnionInputChange)operation.variablesUnionInputChangeDispatched=true;
       try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000 }); }
       catch (error) {
         operation.transportUncertain = true;
@@ -1265,7 +1276,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     // input never contains a resolver or a recipe. Only a durably recorded,
     // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, refreshGraphBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, refreshGraphBusy, processControl, settleProcessConsole, preserveJoinMapping=false, variablesUnionInputChange=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -1359,7 +1370,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw new Error('Node procedure recovery target or intent changed');
         }
         binding = nextBinding; intent = nextIntent;
-        try { return await channel.act(action,processControl,{preserveJoinMapping}); }
+        try { return await channel.act(action,processControl,{preserveJoinMapping,variablesUnionInputChange}); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
           if (r?.status !== 'NOT_APPLIED'

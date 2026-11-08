@@ -1,3 +1,11 @@
+`factor-rotation` uses the approved factor-analysis `modes/task-rotation.md`
+and only `fixtures/rotation.csv`. The intermediate full typed Varimax round
+is checked by `factor-initial-signs`; the final Quartimax round must belong
+to the same node with unchanged X/Y/Z features and two trained factors.
+The independent Kaiser oracle checks both ports, exact field order and Factor3
+(NULL scores, zero loadings). Stock final CSV, Save, cold and cleanup apply.
+Oracle and expected values never reach the model.
+
 `corr-ranks` uses the approved `research-corranalysis/acceptance/modes/task-ranks.md`
 and ranks.csv only. The stage-0 oracle stays outside the model workspace. Full
 production checkpoints verify Spearman followed by Kendall tau-b on the same
@@ -12,6 +20,13 @@ update on the same Import, and saved-package reopen. The private oracle verifies
 fresh typed rows, field order, variable identities and retained Sentinel; cold
 independently reads the filename binding and W1 mapping before execution.
 Only the business task and the two input files reach the model.
+
+`acf-nonzero` uses the approved LAB-1144 edge task and
+fixtures under `research-autocorrelation/acceptance/edges`. Count12 on N8 must
+return all lags 0…7. The Fraction oracle stays private. Singleton is only an
+unclaimed observation and has no registered acceptance scenario.
+Exact types/field order/NULL, real abs=1e-8/rel=1e-10,
+CSV, Save, cold execution and cleanup use the stock matchers.
 
 `join-full-no-keys` and `join-cross` use the approved full-without-keys and
 Cartesian business tasks under `nodes/join/acceptance`, the two original CSVs
@@ -558,6 +573,13 @@ abs=1e-8 только для real, метки через label_any.
 `docs/node-development/nodes/date-time/acceptance`. Только соответствующий CSV
 из fixtures передаётся модели; 13/0 строк, 12 полей в точном порядке, CSV/Save/cold/cleanup.
 
+`date-time-formats`: строковые представления года, даты и времени и свой формат с
+числовыми маркерами (%Y %Q %m %d %H %i %s %u) на двух datetime-полях в «Дата и время».
+Утверждённые `task-string-formats.md`, `fixtures/formats.csv` и независимый expected из
+`docs/node-development/nodes/date-time/acceptance/modes`; модели передаются только
+задание и CSV. Порядок полей и строк точный, Raw не разбирается, Keep не меняется,
+пропуски остаются NULL; CSV/Save/cold/cleanup. Полночь с миллисекундами в проходном datetime CSV Loginom пишет датой — учитывается как D76 `midnight_date` (LAB-1101), остальные ячейки строгие.
+
 `logreg-forward`, `logreg-backward`, `logreg-stepwise` проверяют нативный отбор
 со стандартными критерием и порогами Loginom (Deviance, включение 0.05, исключение 0.1).
 Пользовательские критерии и пороги в v0.3.9 не поддерживаются; прежние
@@ -738,6 +760,14 @@ CSV в порядке задания, cold Execute проверяет после
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
 
+`variables-union-inputs`: на одном native Соединении сначала два входа, затем
+третий, затем удаление только третьей связи. Три независимых Variables Calculator
+берут точные имена/метки/типы/значения из modes.json. Полный ordered variable
+output 0 после каждого шага; тот же GUID и первые две GUID-пары сохраняются.
+Control не подменяется обычным входом. Только task-inputs.md и modes.json
+передаются модели; oracle/expected приватны. Save, stock typed cold с точными
+сохранёнными связями и проверкой GUID узла, Close/logout обязательны.
+
 `text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
 задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
 Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
@@ -789,3 +819,8 @@ supplies the private initial/final W1 expectations. Two typed execution variable
 retain civil milliseconds, IDs, types and order; native configuration retains
 three expressions, intermediate base and every property except base formula 2→4.
 Save, independent cold execution and confirmed package close/logout are required.
+
+`smoothing-haar` and `smoothing-haar-depth2` use the approved Haar tasks and
+immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
+`fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
+real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.
