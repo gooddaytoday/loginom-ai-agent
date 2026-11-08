@@ -57,6 +57,7 @@ function fixture({newNode=false,locale=true}={}) {
   if(available&&action.verb==='double_click')configuration.keys.push({...available,record_id:'added-'+available.name,order:configuration.keys.length,direction:'ASC',case_sensitive:true});
   if(flags.changeCache)configuration.options.chkBufferWhole.value=true;
   if(flags.changeBinding)configuration.options.chkLocaleAware.binding={name:'Other'};
+  if(flags.bindDuringEdit)configuration.options.chkLocaleAware.switch_pressed=true;
  }};
  return {configuration,flags,gestures,run:(p,options={})=>configureSorting(channel,p,{newNode,...options})};
 }
@@ -118,9 +119,16 @@ test('literal locale with a saved binding refuses before even a requested key ge
  }
 });
 test('bound locale skips literal toggles and refuses changed binding metadata',async()=>{
- const f=fixture({locale:false});Object.assign(f.configuration.options.chkLocaleAware,{switch_pressed:true,binding:{name:'Flag'}});
- await f.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{bound:true});
- assert.ok(!f.gestures.some(g=>g.ref==='locale'));assert.equal(f.configuration.options.chkLocaleAware.value,false);
+ for(const newNode of [false,true]){
+  const f=fixture({newNode,locale:false});Object.assign(f.configuration.options.chkLocaleAware,{switch_pressed:true,binding:{name:'Flag'}});
+  await f.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{bound:true});
+  assert.ok(!f.gestures.some(g=>g.ref==='locale'));assert.equal(f.configuration.options.chkLocaleAware.value,false);
+ }
  const g=fixture();Object.assign(g.configuration.options.chkLocaleAware,{switch_pressed:true,binding:{name:'Flag'}});g.flags.changeBinding=true;
  await assert.rejects(g.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{bound:true}),/Sorting locale differs/);
+});
+test('Sorting refuses a variable-mode race after key gestures before touching locale',async()=>{
+ const f=fixture();f.flags.bindDuringEdit=true;
+ await assert.rejects(f.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}],compare_with_locale:false}),/Variable-driven/);
+ assert.ok(!f.gestures.some(g=>g.ref==='locale'));
 });
