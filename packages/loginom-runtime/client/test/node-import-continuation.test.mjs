@@ -85,3 +85,31 @@ test('a paused execution permits progress changes but binds the same launch and 
   const f=structuredClone(completed);mutate(f);assert.equal(verify(f),false,String(mutate));
  }
 });
+
+test('mapped continuation reads back every observed import format field, including detection mode and analysis rows',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const {readRetainedImportFormatBrowser,verifyMappedImportContinuation}=await import('../lib/node-import-continuation.mjs');
+ const page=new Page(),rootTid='MF;TF-1;WizrdMCF',form=page.add('div',rootTid),p=rootTid+';ImportTextFileParamsWizard;';
+ const input=(tid,value)=>{const owner=page.add('div',p+tid,'',undefined,form);page.add('input',null,'',undefined,owner).value=value;};
+ page.add('div',p+'edtValueNull','',undefined,form);
+ for(const [tid,value] of [['edtDelimiterChar',';'],['edtTextQualifier','"'],['edtValueNull','NULL'],['edtDecimalSeparator','.'],['edtDateFormat','yyyy-mm-dd'],['edtDateSeparator','Дефис (-)']])input(tid+';ValueControl',value);
+ input('cbbAutoDetectColumnsMode;ValueControl','Только новые');input('ColumnDefsTuning;seReadRowCount','25');
+ const multiple=page.add('div',p+'edtMultipleDelimiters;ValueControl','',undefined,form);page.add('div',p+'edtMultipleDelimiters;ValueControl;DisplayEl','',undefined,multiple).attrs.class='x-form-checkbox';
+ const gridTid=p+'ColumnDefsTuning;grdSettings;grd-1',grid=page.add('div',gridTid,'',undefined,form),header=page.add('div',gridTid+';normalHeaderCt','',undefined,grid),body=page.add('div',gridTid+';tbl','',undefined,grid);
+ page.add('div',gridTid+';normalHeaderCt;0','',undefined,header).attrs.class='x-column-header x-column-header-first x-column-header-last';
+ ['A','Amount','Вещественный','Непрерывный'].forEach((text,row)=>page.add('div',gridTid+';normalHeaderCt;0_'+row,text,undefined,body));
+ page.add('div',null,'',undefined,page.add('div',gridTid+';normalHeaderCt;0_4','',undefined,body)).attrs.class='x-grid-checkcolumn x-grid-checkcolumn-checked';
+ const format=(await page.observe()).wizard.settings;
+ assert.equal(format.fields.auto_detect_columns.value,'Только новые');assert.equal(format.fields.analysis_rows.value,'25');
+ const oldDocument=globalThis.document;let read;
+ try{globalThis.document=page.document;read=readRetainedImportFormatBrowser({rootTid});}finally{globalThis.document=oldDocument;}
+ assert.equal(read.verified,true,read.reason);
+ const configured=fixture(),context={...configured.node,verified:true,surface:'wizard'};
+ configured.configured.format=format;configured.configured.columns=structuredClone(read.fields);
+ const mapping={verified:true,node_context:context,autosync:false,target_fields:[{name:'A',source:{record_id:'source'}}]};
+ const completion={ready:true,fields:{label:{status:'observed',value:'Import'}}};
+ const base={node:configured.node,configured:configured.configured,source:configured.source,retained:{...read,node_context:context},
+  surface:{prepared_node_context:context,wizard:{stage:'done',completion:structuredClone(completion)},node_mapping:structuredClone(mapping)},mapped:{native_mapping:mapping,completion}};
+ assert.equal(verifyMappedImportContinuation(base),true);
+ for(const key of ['auto_detect_columns','analysis_rows']){const f=structuredClone(base);f.retained.values[key]='changed';assert.equal(verifyMappedImportContinuation(f),false,key);}
+});

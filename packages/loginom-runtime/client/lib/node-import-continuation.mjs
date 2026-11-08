@@ -64,6 +64,14 @@ export function readRetainedImportFormatBrowser({rootTid}) {
     const value=inputs[0].value;if(typeof value!=='string'||value.length>256||/[\0\r\n]/.test(value))return fail('format_value');
     values[key]=value;
   }
+  // Optional page controls, read exactly when present: the format snapshot keeps them only when observed.
+  for(const [key,suffix] of Object.entries({auto_detect_columns:'cbbAutoDetectColumnsMode;ValueControl',analysis_rows:'ColumnDefsTuning;seReadRowCount'})) {
+    const owners=exact(base+suffix);if(!owners.length)continue;
+    const inputs=owners.length===1?[...owners[0].querySelectorAll('input:not([type="hidden"]):not([type="password"])')]:[];
+    if(owners.length!==1||!root.contains(owners[0])||inputs.length!==1)return fail('format_control');
+    const value=inputs[0].value;if(typeof value!=='string'||value.length>256||/[\0\r\n]/.test(value))return fail('format_value');
+    values[key]=value;
+  }
   const checkboxOwners=exact(base+'edtMultipleDelimiters;ValueControl'),displays=exact(base+'edtMultipleDelimiters;ValueControl;DisplayEl');
   if(checkboxOwners.length!==1||displays.length!==1||!root.contains(checkboxOwners[0])||!checkboxOwners[0].contains(displays[0])||!displays[0].matches('.x-form-checkbox'))return fail('format_checkbox');
   values.multiple_delimiters=checkboxOwners[0].classList.contains('x-form-cb-checked');
