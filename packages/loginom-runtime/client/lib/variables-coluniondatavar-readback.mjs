@@ -11,6 +11,12 @@ export function variablesColumnUnionConfigurationReadback({node,phases,operation
   return {kind:'variables_column_union',mode:'append_variables',mapping:'manual',input_count:inputs.length,node:structuredClone(node),scope:'observed_after_verified_finish',values_are:'observed_ui_values',receipt_ids:[configured.receipt_id,finished.receipt_id],inputs,
    fields:c.fields,output_names:c.fields.map(f=>f.name),mapping_fields:c.fields.map(f=>({input:f.input,source_name:f.source,output_name:f.name})),package_persistence_verified:false};
  }
+ if(receipt('input_mapping').value.verify_topology){
+  if(!read||!Array.isArray(sources)||read.variables.length!==sources.length||read.variables.some((v,i)=>{
+   const cell=sources[i].cell;
+   return !cell||!v.cell||v.cell.type!==cell.type||v.cell.is_null!==cell.is_null||v.cell.value!==cell.value;
+  }))throw Error('Variables union complete ordered output value differs after topology change');
+ }
  if(read&&(!Array.isArray(sources)||read.variables.length!==sources.length||read.variables.some((v,i)=>v.type!==sources[i].type||v.label!==sources[i].label)))throw Error('Variables union native output order/type/label differs from both complete inputs');
  return {kind:'variables_column_union',mode:'append_variables',mapping:'automatic',input_count:inputs.length,node:structuredClone(node),
   scope:'observed_after_verified_finish',values_are:'observed_ui_values',receipt_ids:[configured.receipt_id,finished.receipt_id],

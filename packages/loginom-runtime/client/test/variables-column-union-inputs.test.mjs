@@ -4,6 +4,7 @@ import {validateVariablesColumnUnionParameters,resolveVariablesColumnUnionInputs
 import {prepareNodeTarget,verifyNodeTargetEffect} from '../lib/node-target.mjs';
 import {variablesColumnUnionConfigurationReadback} from '../lib/variables-coluniondatavar-readback.mjs';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
+import {verifyVariablesColumnUnionTopology} from '../lib/variables-coluniondatavar-preflight.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
@@ -31,6 +32,28 @@ test('resolution retains the first two reciprocal GUID pairs and ignores only an
 test('three complete inventories retain typed zero and false',()=>{
  const outputs=inputs().map(()=>({complete:true,count:1,variables:[{type:'integer',cell:{type:'integer',is_null:false,value:'0',precision:'exact_integer'}}]}));
  validateVariablesColumnUnionInventory(outputs);outputs[2].complete=false;assert.throws(()=>validateVariablesColumnUnionInventory(outputs));
+});
+test('post-Done topology verifies retained ports and every reciprocal link before execution',()=>{
+ const before=graph(),after=structuredClone(before),r=request();
+ after.nodes.at(-1).variable_inputs.push({kind:'variables',port:2,port_guid:'in2'});
+ after.variable_links.push({source:'s2',target:'u',kind:'variables',input:2,output:0,source_port_guid:'out',target_port_guid:'in2'});
+ const verify=g=>verifyVariablesColumnUnionTopology(before,g,r,inputs());
+ assert.equal(verify(after).verified,true);
+ for(const change of [g=>g.nodes.at(-1).ref.node_id='other',g=>g.nodes.at(-1).variable_inputs[0].port_guid='new',g=>g.nodes.at(-1).variable_outputs[0].port_guid='new',g=>g.variable_links[0].source_port_guid='new',g=>g.variable_links[1].input=0,g=>g.variable_links.shift(),g=>g.variable_links.push({...g.variable_links[0]}),g=>g.nodes[0].variable_outputs[0].port_guid='new']){
+  const bad=structuredClone(after);change(bad);assert.throws(()=>verify(bad),/topology/);
+ }
+ r.variable_inputs=[];r.parameters={column_union:{mapping:'automatic',disconnect_input:2}};
+ const disconnected=structuredClone(after);disconnected.variable_links.pop();
+ assert.equal(verifyVariablesColumnUnionTopology(after,disconnected,r,inputs().slice(0,2)).verified,true);
+});
+test('topology readback refuses any changed ordered value including typed zero, false and empty',()=>{
+ const phase=(phase,value)=>({phase,status:'verified',receipt_id:'op:'+phase,value:{verified:true,...value}}),node=ref('u');
+ const sources=[{input:0,name:'a',label:'a',type:'integer',cell:{type:'integer',is_null:false,value:'0'}},{input:1,name:'b',label:'b',type:'boolean',cell:{type:'boolean',is_null:false,value:false}},{input:2,name:'c',label:'c',type:'string',cell:{type:'string',is_null:false,value:''}}];
+ const phases=[phase('input_mapping',{inputs:inputs(),source_fields:sources,verify_topology:true}),phase('configure',{configuration:{mapping:'automatic',node_context:{...node,verified:true}}}),phase('finish',{settings_applied:true}),phase('read',{variable_ports:[{variables:structuredClone(sources)}]})];
+ const read=()=>variablesColumnUnionConfigurationReadback({node,phases,operation_id:'op'});assert.equal(read().input_count,3);
+ phases[3].value.variable_ports[0].variables[0].cell.value='1';assert.throws(read,/value/);
+ phases[3].value.variable_ports[0].variables=structuredClone(sources);phases[3].value.variable_ports[0].variables[1].cell.value=true;assert.throws(read,/value/);
+ phases[3].value.variable_ports[0].variables=structuredClone(sources);phases[3].value.variable_ports[0].variables[2].cell.value=null;assert.throws(read,/value/);
 });
 test('three-input native readback fits the public result and binds the complete ordered source schema',()=>{
  const node=ref('u'),source_fields=inputs().map(i=>({input:i.input,name:'x'+i.input,label:'x'+i.input,type:'integer'}));
