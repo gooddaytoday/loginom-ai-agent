@@ -731,3 +731,8 @@ Cluster/Distance/RowID/X/Y/Txn/Item, точный cold-порядок —
 Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1083-g1:
 нативное восстановление ставит используемые поля перед сохранёнными ID.
 Оба порядка проверяются явно; остальные перестановки запрещены.
+
+`replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
+на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
+прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
+typed matcher native reader, порядок, CSV/Save/cold/cleanup.
