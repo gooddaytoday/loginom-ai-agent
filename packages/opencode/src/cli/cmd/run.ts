@@ -515,6 +515,9 @@ export const RunCommand = effectCmd({
               action: "deny",
               pattern: "*",
             },
+            ...(process.env.LOGINOM_AI_AGENT_CLI_ROOT
+              ? [{ permission: "todowrite", action: "deny" as const, pattern: "*" }]
+              : []),
           ]
 
       function title() {

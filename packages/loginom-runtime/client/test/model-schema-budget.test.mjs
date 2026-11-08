@@ -44,7 +44,7 @@ test('every registered user-v1 node card fits its type budget',async t=>{
   for(const modes of [undefined,...original.modes.map(mode=>[mode]),original.modes]){
    description.node_types=await loader.describeNodes([original],modes);
    const reply={content:[{type:'text',text:JSON.stringify(description)}]};
-   if(['programming.javascript','imports.text','transform.filter_data'].includes(type))t.diagnostic(JSON.stringify({type,modes,card_bytes:bytes(description.node_types[0]),wire_bytes:bytes(reply)}));
+   if(['programming.javascript','imports.text','transform.filter_data','transform.ungroup_data'].includes(type))t.diagnostic(JSON.stringify({type,modes,card_bytes:bytes(description.node_types[0]),wire_bytes:bytes(reply)}));
    assert.equal(boundedUserToolReply(reply,{tool:'dock_action_describe'}),reply,type+': '+modes);
    const card=description.node_types[0];
    assert.equal(typeof card.guidance,'string');
@@ -63,7 +63,6 @@ test('every registered user-v1 node card fits its type budget',async t=>{
   const size=bytes(card),budget=NODE_CARD_BUDGET_EXCEPTIONS[card.type]??12000;
   if(card.type==='transform.group_data')t.diagnostic(JSON.stringify({grouping_card_bytes:size}));
   if(card.type==='datamining.lin_regression')t.diagnostic(JSON.stringify({lin_regression_card_bytes:size}));
-  if(card.type==='datamining.clustering')t.diagnostic(JSON.stringify({clustering_card_bytes:size}));
   if(['datamining.log_regression','exports.text'].includes(card.type))t.diagnostic(JSON.stringify({type:card.type,card_bytes:size}));
   if(card.type==='transform.union_data')t.diagnostic(JSON.stringify({union_card_bytes:size}));
   assert.ok(size<=budget,`${card.type}: ${size} bytes; budget ${budget} bytes; headroom ${budget-size} bytes`);

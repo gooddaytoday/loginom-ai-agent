@@ -5,10 +5,14 @@ export async function preflightBuiltinBindings(options,ctx,config,source){
  const channelFor=node=>createNodeProcedure({operation,execute,record:onRecord,now,...config,maxSteps:1024,signal:ctx.signal,
   preparedNodeContext:{document_id:r.document_id,workflow_ref:r.workflow_ref,node},
   wrapMutation:(code,p)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(p.id,p.action_key,p.signature),operation_id:p.id})});
- // Empty Close uses the existing independent user-values reader and Cancels
- // both untouched drafts. It preserves dirty state and every variable ID.
- const result=await channelFor(source).configureUserVariables([],'close');
- if(result.verified!==true||result.cleanup_complete!==true||result.independent_readback!==true||result.settings_applied!==false)throw Error('BINDING_SOURCE_UNVERIFIED');
+ const channel=channelFor(source.ref),ports=source.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===4);
+ if(ports?.length!==1)throw Error('BINDING_SOURCE_UNVERIFIED');
+ // Values/Cancel deactivates an active builtin. Preview first; open Values
+ // only for an already inactive source, retaining the existing typed reader.
+ let result=await channel.readBuiltinVariablesPreview({port_guid:ports[0].port_guid});
+ if(result.verified!==true||result.cleanup_complete!==true||typeof result.source_active!=='boolean')throw Error('BINDING_SOURCE_UNVERIFIED');
+ if(result.source_active===false)result=await channel.configureUserVariables([],'close');
+ if(result.verified!==true||result.cleanup_complete!==true||result.independent_readback!==true||result.settings_applied===true)throw Error('BINDING_SOURCE_UNVERIFIED');
  let savedMapping;
  if(r.target.kind==='existing'){
   const read=await channelFor(r.target.ref).readVariablePortMapping({direction:'input',kind:'control',port:0});
@@ -16,11 +20,11 @@ export async function preflightBuiltinBindings(options,ctx,config,source){
   savedMapping=read.mapping;
  }
  validateBuiltinBindingSource(result,r,savedMapping);
- return {...result,source};
+ return {...result,source:source.ref,settings_applied:false,...(savedMapping?{mapping:savedMapping}:{})};
 }
 
 export function validateBuiltinBindingSource(result,r,savedMapping){
- for(const b of r.bindings){
+ for(const b of r.bindings??[]){
   const mapping=r.mappings.find(m=>m.kind==='control'&&m.port===0),field=(mapping?.fields??mapping?.changes??[]).find(f=>f.name===b.variable.name);
   const saved=savedMapping?.fields.find(f=>f.name===b.variable.name);
   const name=field?.source?.name??saved?.source?.name??b.variable.name,vs=result.variables.filter(v=>v.name===name&&(field||!saved||v.id===saved.source?.id));

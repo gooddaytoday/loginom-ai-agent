@@ -6,8 +6,8 @@ import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {validateUiAction} from '../lib/workspace-ui.mjs';
 const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
-test('ungroup registers two native inputs/outputs and only shares with bounded model schemas',()=>{
- const type=NODE_TYPES['transform.ungroup_data'];assert.equal(type.tabular_inputs,2);assert.equal(type.tabular_outputs,2);assert.deepEqual(type.modes,['shares']);
+test('ungroup registers two native inputs/outputs and shares/computed with bounded model schemas',()=>{
+ const type=NODE_TYPES['transform.ungroup_data'];assert.equal(type.tabular_inputs,2);assert.equal(type.tabular_outputs,2);assert.deepEqual(type.modes,['shares','computed']);
  const tool=nodeApiTools.find(t=>t.name==='dock_node_apply'),compact=userNodeTool(tool),card=describeNodeTypes(['transform.ungroup_data'],{},new Map(),support.nodeApplyHandlers)[0];
  assert.ok(Buffer.byteLength(JSON.stringify({name:compact.name,description:compact.description,inputSchema:compact.inputSchema}))<=20000);
  assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
@@ -22,8 +22,9 @@ test('ungroup public dispatch rejects seasonality, port 1 and unknown fields bef
   mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:600000,execute_ms:120000,total_ms:600000}};
  let count=0;const runtime={tools:nodeApiTools,startNodeApply:args=>{validateNodeApplyRequest(args,support.nodeApplyHandlers);count++;return {};}};
  await dispatchNodeApi(runtime,'dock_node_apply',r);assert.equal(count,1);
+ await dispatchNodeApi(runtime,'dock_node_apply',{...r,mode:'computed',read:{...r.read,ports:[0,1]}});assert.equal(count,2);
  for(const change of [{mode:'seasonal'},{read:{...r.read,ports:[1]}},{parameters:{...r.parameters,variables:{}}}])await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,...change}));
- assert.equal(count,1);
+ assert.equal(count,2);
 });
 test('ungroup may advance only its observed owned wizard through conditional output/done',()=>{
  const action={verb:'wizard_step',ref:'ui-next',expected_stage:['output_mapping','done']};

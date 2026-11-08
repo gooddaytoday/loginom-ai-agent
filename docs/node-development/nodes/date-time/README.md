@@ -8,6 +8,8 @@
 
 Зарегистрирован `transform.date_time` / `calendar`. calendar: year, quarter, month, day_of_month, hour, minute, second, year_start/end, quarter_start/end, month_start/end, date. ISO-операции в calendar: iso_year, iso_week, iso_week_start, day_of_week.
 
+LAB-1101: строковые представления — `string_year` (`%Y`), `string_date` (`%Y-%m-%d`), `string_time` (`%H:%i:%s`) и `string_custom` (свой `format`, один на поле; числовые маркеры `%Y %Q %m %d %H %i %s %u`). Выход — string, NULL сохраняется; разбор строк и часовой пояс узлу не приписываются. Сценарий `date-time-formats`, [задание](acceptance/task-string-formats.md).
+
 Ограничения: iso_week_end не поддержан из-за ограничения Loginom. LAB-716: minute/second на непустой таблице 3/3 PASS; отдельный date-time-minsec-empty не проверен — сценарий/fixture отсутствовал на принятом SHA.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [date-time-node.mjs](../../../../packages/loginom-runtime/client/lib/date-time-node.mjs):1–38; [date-time-parameters.mjs](../../../../packages/loginom-runtime/client/lib/date-time-parameters.mjs):1–46; [transform.date_time.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.date_time.md):1–28. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.

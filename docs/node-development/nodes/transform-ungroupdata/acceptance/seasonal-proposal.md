@@ -11,15 +11,26 @@
 новых предикатов или ослабления точности. Такое ограничение объёма требует
 решения владельца до этапа 1; оно не согласовано этим PR.
 
-| Сценарий (ещё не зарегистрирован) | Task | Expected | Строки 0 / 1 |
-|---|---|---|---:|
-| ungroup-seasonal | task-seasonal.md | expected-seasonal.json | 4 / 2 |
-| ungroup-seasonal-zero | task-seasonal-zero.md | expected-seasonal-zero.json | 4 / 2 |
-| ungroup-seasonal-null | task-seasonal-null.md | expected-seasonal-null.json | 0 / 0 |
-| ungroup-seasonal-empty-support | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | 0 / 0 |
-| ungroup-seasonal-empty-totals | task-seasonal-empty-totals.md | expected-seasonal-empty-totals.json | 0 / 0 |
+| Сценарий (ещё не зарегистрирован) | Task | Expected | Строки 0 / 1 | Статус |
+|---|---|---|---:|---|
+| ungroup-seasonal | task-seasonal.md | expected-seasonal.json | 4 / 2 | доли, тренд, индексы вычислены и проверяются; UngroupQuality=null — наблюдение, не заявляется (`claim` «частично») |
+| ungroup-seasonal-zero | task-seasonal-zero.md | expected-seasonal-zero.json | 4 / 2 | наблюдение, не заявляется |
+| ungroup-seasonal-null | task-seasonal-null.md | expected-seasonal-null.json | 0 / 0 | наблюдение, не заявляется |
+| ungroup-seasonal-empty-support | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | 0 / 0 | наблюдение, не заявляется |
+| ungroup-seasonal-empty-totals | task-seasonal-empty-totals.md | expected-seasonal-empty-totals.json | 0 / 0 | наблюдение, не заявляется |
 
-Во всех сценариях два CSV: totals и support из `oracle-seasonal.py:CASES`;
+LAB-1166 (решение оркестратора пересмотрено): исходы zero/null/empty
+(OutputVT=6 «Исключено», UngroupQuality=1 при нулевой опоре, пустые порты)
+и UngroupQuality=null при положительной опоре — переписанное native-наблюдение
+этапа 0, а не вычисление oracle. Каждый такой expected несёт поля
+`"claim": "наблюдение, не заявляется"` и `observation` (что именно наблюдено;
+run-check читает только `package_path`, `nodes`, `outputs`). Они не являются
+критерием PASS, пока native typed-read или решение владельца не подтвердит их.
+Задания не называют исход: в них нет фраз о пустом качестве и пустых выходах.
+
+Во всех сценариях два входных CSV: totals и support из `oracle-seasonal.py:CASES`;
+выгрузки названы в task: `seasonal-details.csv` — порт 0, `seasonal-quality.csv` — порт 1
+(порядок `outputs` в expected), даты экспорта — `yyyy-mm-dd hh:mm:ss`, NULL входа — `?`;
 пустые файлы импортируются с явно заданной схемой, без определения типов
 по отсутствующим строкам. Два экспорта, новый чат/профиль/пакет, стандартные
 CSV/Save/cold/cleanup, 2/3 и независимые 2/3 на одном SHA. При пустых входах
@@ -43,9 +54,10 @@ python3 docs/node-development/nodes/transform-ungroupdata/acceptance/oracle-seas
 python3 docs/node-development/nodes/transform-ungroupdata/acceptance/oracle-seasonal.py null
 python3 docs/node-development/nodes/transform-ungroupdata/acceptance/oracle-seasonal.py empty-support
 python3 docs/node-development/nodes/transform-ungroupdata/acceptance/oracle-seasonal.py empty-totals
+python3 -I docs/node-development/nodes/transform-ungroupdata/acceptance/oracle-seasonal.py --check
 ```
 
-Вывод побайтно совпадает с соответствующим expected. Сопоставление с live DOM
+Вывод побайтно совпадает с соответствующим expected; `--check` сверяет все пять. Сопоставление с live DOM
 этапа 0 не означает PASS runtime или cold: они не запускались, CLI не собирался.
 Невозможно объявить полный сезонный режим принятым по этому ограниченному
 комплекту без отдельного решения о чередующемся ряде и доверительных границах.

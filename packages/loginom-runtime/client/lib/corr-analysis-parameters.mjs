@@ -8,12 +8,13 @@ export function validateCorrAnalysisParameters(p,mode,r){
  need(r.mappings.length===0,'mapping overrides are unsupported');
  need(r.read.ports.every(i=>i===0),'only output port 0 exists');
 }
-export function resolveCorrAnalysisSets(p,fields){
+export function resolveCorrAnalysisSets(p,fields,mode='pearson'){
  const result=fields.map(f=>({...f,...Object.fromEntries(['first_set','second_set'].map(k=>[k,p[k]===undefined?f[k]:p[k].includes(f.name)]))}));
  for(const key of ['first_set','second_set']){
   if(p[key])need(p[key].every(n=>fields.some(f=>f.name===n)),key+' contains an unknown input field');
   const selected=result.filter(f=>f[key]);
-  need(selected.length>0&&selected.every(f=>['integer','real'].includes(f.type)),key+' requires numeric input fields');
+  need(selected.length>0,key+' requires selected input fields');
+  for(const f of selected)need((mode==='pearson'?['integer','real']:['integer','real','string']).includes(f.type),mode+' '+key+': '+f.name+' ('+f.type+') is unsupported; use '+(mode==='pearson'?'integer/real; text requires spearman or kendall':'integer/real/string')+' fields');
  }
  return result;
 }

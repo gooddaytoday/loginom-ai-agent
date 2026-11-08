@@ -10,7 +10,7 @@
   "modes": [
     "scalar"
   ],
-  "semantics": "Параметры полей Proposal: resolve a complete cyclic rename on one input baseline using an unoccupied temporary name, then remove every temporary name. Optional caching sets disabled/on_activation/on_access/selected_fields. Per-field cache applies only under selected_fields. Lossy real-to-integer rounds to nearest; this fixture excludes ties. Preserve all omitted settings.",
+  "semantics": "Параметры полей: resolve a complete cyclic rename A→B, B→A in one call on one input baseline; the client picks and removes the temporary name. Optional caching sets disabled/on_activation/on_access/selected_fields. Per-field cache applies only under selected_fields. Lossy real-to-integer rounds to nearest. Preserve all omitted settings.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "reform-v3-internal-2",

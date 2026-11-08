@@ -1,24 +1,29 @@
-# Редактирование выбросов — предложение LAB-1103
+# Редактирование выбросов (`preprocessing.elim_outlier`)
 
-Это проект этапа 1; текущая поставка поддерживает только detect.
-Используй штатный узел `preprocessing.elim_outlier`, один табличный вход.
+Используй `dock_node_apply` со штатным `preprocessing.elim_outlier`, один табличный вход.
 Обрабатывай только выбранные непрерывные integer/real поля; остальные сохраняй.
-NULL не участвует в статистике. Читай все три порта одного выполнения:
+NULL не участвует в статистике. `finish:execute`, `read.ports:[0,1,2]`:
 0 — результат обработки, 1 — исходные выбросы без экстремумов,
 2 — исходные экстремальные строки. Боковые выходы сохраняют исходные значения.
 Затем CSV каждого выхода, Save, повторное открытие и cleanup.
+Эту операцию выполняй данным узлом; Калькулятор и JavaScript
+для её самостоятельного вычисления не нужны.
 
 <!-- mode: detect -->
-`mode:detect`, `parameters.outlier`: `fields`, `method:sd|iqr`,
-явные `outlier_factor`, `extreme_factor` и `ordered` для нового узла.
+`mode:detect`, `parameters.outlier`: `fields` (технические имена только
+непрерывных числовых полей), `method:sd|iqr`, явные `outlier_factor`,
+`extreme_factor` (не меньше первого) и `ordered` для нового узла.
 Входной флаг ordered не сортирует данные. Оба действия — keep.
 Перед Execute обучи на текущем входе. Patch сохраняет неуказанные настройки.
-IQR-предложение: Q(p)=sorted_non_null[min(floor(n*p),n-1)], строгие границы
+IQR: Q(p)=sorted_non_null[min(floor(n*p),n-1)], строгие границы
 Q1−k*(Q3−Q1), Q3+k*(Q3−Q1); квантили не интерполируются.
 <!-- /mode -->
 
 <!-- mode: edit -->
-`mode:edit` дополнительно задаёт независимые `outlier_policy` и
+`mode:edit`, `parameters.outlier`: `fields` (технические имена), `method:sd|iqr`,
+явные `outlier_factor`, `extreme_factor` (не меньше первого) и `ordered` для нового узла.
+Перед Execute обучи на текущем входе.
+Дополнительно задай независимые `outlier_policy` и
 `extreme_policy`: keep, delete, mean, median, most_probable, constant, limit.
 При constant нужны отдельные `outlier_constant`/`extreme_constant`.
 Для новых узлов укажи обе политики явно; patch сохраняет пропущенное.
@@ -26,11 +31,10 @@ Q1−k*(Q3−Q1), Q3+k*(Q3−Q1); квантили не интерполирую
 На исследованных SD 1/2 mean считается по нормальным значениям;
 median — верхнее среднее наблюдение всей non-NULL выборки,
 most_probable — центр первого самого частого интервала Sturges всей выборки.
-Обобщение limit на произвольные множители требует отдельного native preflight;
-не обещай его только по rounded preview.
+Не обещай limit для иных множителей по rounded preview.
 <!-- /mode -->
 
 Quality-переключатель скрыт в Loginom 7.4.2 (`display:none`). Не предлагай
-quality и не нажимай скрытый control. Отдельный saved-model apply не подтверждён:
-после смены файла пересчитывались границы даже в «Всегда выполнять».
-Не называй такой Execute применением старой модели. Variables не входят в проект.
+quality и не нажимай скрытый control. Применения сохранённой модели нет:
+после смены входа Execute пересчитывает границы даже в «Всегда выполнять».
+Не называй такой Execute применением старой модели.

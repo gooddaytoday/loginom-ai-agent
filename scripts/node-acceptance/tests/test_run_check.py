@@ -22,6 +22,22 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_variables_calculator_modes_use_three_expressions_and_two_execution_outputs(self):
+        case = runner.scenario('variables-calculator-modes')
+        self.assertTrue(case['variable_only'])
+        self.assertEqual(case['variable_read_path'], 'execution')
+        self.assertEqual(case['variable_audit'], 'variables-calculator-modes')
+        self.assertEqual(case['prompt'].name, 'task-datetime-intermediate.md')
+        self.assertNotIn('input_files', case)
+        before = runner.read(case['source'] / case['variable_initial'])
+        after = runner.expected_for(case, '/own/modes.lgp')
+        for expected, total in [(before, 3), (after, 5)]:
+            variables = expected['variable_inventory']['outputs'][0]['variables']
+            self.assertEqual([v['name'] for v in variables], ['report_date', 'total'])
+            self.assertEqual([v['type'] for v in variables], ['datetime', 'integer'])
+            self.assertEqual(variables[0]['value'], '2026-11-07T23:59:58.123')
+            self.assertEqual(variables[1]['value'], total)
+
     def test_variables_replace_match_order_policy(self):
         case = runner.scenario('variables-replace-match')
         initial = runner.read(case['source'] / case['variable_initial'])
@@ -386,6 +402,20 @@ class RunCheckTests(unittest.TestCase):
             if kind == 'threshold':
                 self.assertIn('для I выбери замену средним', case['prompt'].read_text())
 
+    def test_variables_totable_switch_catalog_isolates_task_and_typed_phases(self):
+        case = runner.scenario('variables-totable-switch')
+        self.assertEqual(case['prompt'].name, 'task-switch-run.md')
+        self.assertEqual(case['input_files'], ['modes.json'])
+        self.assertTrue((case['data'] / 'modes.json').is_file() and case['variable_only'])
+        self.assertNotIn('oracle', case['prompt'].read_text().lower())
+        expected = runner.expected_for(case, '/test/switch.lgp')
+        self.assertEqual(expected['package_path'], '/test/switch.lgp')
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['amount', 'enabled', 'missing', 'rate'])
+        phases = json.loads((case['source'] / case['variable_initial']).read_text())
+        self.assertEqual(expected['outputs'][0], phases['switch_back_columns'])
+        self.assertEqual([c['name'] for c in phases['changed_rows']['columns']], ['Name', 'DisplayName', 'Value'])
+        self.assertEqual(expected['nodes'], [{'type': 'variables.user'}, {'type': 'variables.to_table'}])
+
     def test_variables_columns_catalog_uses_original_fixture_and_exact_typed_oracle(self):
         case = runner.scenario('variables-columns')
         self.assertEqual(case['source'].name, 'acceptance')
@@ -393,6 +423,7 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(case['prompt'].name, 'task.md')
         self.assertIsNone(case['base'])
         self.assertEqual(case['input_files'], [])
+        self.assertTrue(case['source_package'].is_file())  # the task opens a prepared package
         expected = runner.expected_for(case, '/test/variables-columns.lgp')
         self.assertEqual(expected['package_path'], '/test/variables-columns.lgp')
         output = expected['outputs'][0]
@@ -474,7 +505,8 @@ class RunCheckTests(unittest.TestCase):
 
     def test_replacement_boolean_and_mixed_use_only_approved_task_and_input(self):
         for name, task, expected_name in [('replace-boolean', 'task-boolean.md', 'expected.json'),
-                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json')]:
+                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json'),
+                                          ('replace-keep-variant', 'task-result-keep.md', 'expected-result-keep.json')]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['expected_name'], expected_name)

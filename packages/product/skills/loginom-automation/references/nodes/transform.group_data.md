@@ -3,6 +3,8 @@
 <!-- mode: aggregate -->
 В `dock_node_apply` выбирай `transform.group_data`, режим `aggregate`. При изменении `measures` existing узла передай полный `group_by`, `measures` и связь входа 0 в `inputs`. `parameters: {}` сохраняет настройки. Полные дубли: ключи по всем полям, `measures: []`; NULL отличается от пустой строки.
 
+В output mapping `configured_field.name` — текущее выходное имя: после apply с `measures` это `name` меры (например `Metric`) или имя ключа; не составляй имя из поля и функции (`Amount_Median`), если узел его не выдал.
+
 Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Прочитай карточку через `dock_action_describe`. Агрегаты выполняй Группировкой, не Калькулятором/JS.
 
 - `median`: integer → real; без NULL, полностью NULL → NULL.

@@ -12,7 +12,7 @@ export function validateFactorAnalysisParameters(p,mode,r){
  if(a?.eigenvalue!==undefined)need(Number.isFinite(a.eigenvalue)&&a.eigenvalue>=0.1&&a.eigenvalue<=1.5,'eigenvalue must be 0.1..1.5');
  if(a?.variance_percent!==undefined)need(Number.isFinite(a.variance_percent)&&a.variance_percent>=1&&a.variance_percent<=100,'variance_percent must be 1..100');
  if(a?.output_factors!==undefined)need(a.output_factors===false||Number.isSafeInteger(a.output_factors)&&a.output_factors>=1&&a.output_factors<=128,'output_factors must be false or 1..128');
- need(a?.rotation===undefined||a.rotation==='none','only rotation none is supported');
+ need(a?.rotation===undefined||['none','varimax','quartimax'].includes(a.rotation),'rotation must be none, varimax or quartimax (Kaiser normalization)');
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&(r.target.kind==='existing'||r.inputs.length===1),'one input at port 0 required');
  need(r.mappings.length===0,'explicit stable native output mappings are managed by this handler');
  need(r.read.ports.every(p=>p===0||p===1),'scores port 0 and loadings port 1 only');

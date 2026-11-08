@@ -35,19 +35,19 @@
           "type": "number",
           "minimum": 0,
           "maximum": 50,
-          "description": "Minimum class weight in percent, not a fraction; acceptance uses 5."
+          "description": "Minimum class weight in percent, not a fraction."
         },
         "max_classes": {
           "type": "integer",
           "minimum": 1,
           "maximum": 1000,
-          "description": "Upper limit on classes, not a promised exact count; acceptance uses 2."
+          "description": "Upper limit on classes, not a promised exact count."
         },
         "uniformity_percent": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "UI uniformity percentage; 0 maximizes IV, 100 favors equal class weights. Acceptance uses 0."
+          "description": "UI uniformity percentage; 0 maximizes IV, 100 favors equal class weights."
         },
         "continuous": {
           "type": "object",
@@ -144,7 +144,7 @@
         "uniformity_percent"
       ],
       "additionalProperties": false,
-      "description": "Proposal: existing discrete training/apply plus continuous/external/manual/frozen classes. Unknown/NULL categories and zero-frequency behavior require observed native evidence."
+      "description": "Existing discrete training/apply plus continuous/external/manual/frozen classes. Unknown/NULL categories and zero-frequency smoothing are unsupported."
     }
   },
   "required": [],

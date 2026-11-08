@@ -49,6 +49,10 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['docs/node-development/nodes/transform-crosstable/acceptance/modes/README.md','crosstable-datetime'],
+ ['docs/node-development/nodes/transform-crosstable/acceptance/task-numeric-aggregates.md','crosstable-numeric'],
+ ['docs/node-development/nodes/transform-crosstable/acceptance/task-scalar-aggregates.md','crosstable-scalar'],
+ ['docs/node-development/nodes/transform-crosstable/acceptance/task-null-cells.md','crosstable-null-cells'],
  ['packages/loginom-runtime/client/lib/calculator-context.mjs','calculator-vars-update'],
  ['packages/loginom-runtime/client/lib/workspace-ui.mjs','s5'],
  ['packages/loginom-runtime/client/lib/observation-pages.mjs','s5'],
@@ -62,12 +66,13 @@ for(const [path,scenario] of [
  ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],
  ['packages/loginom-runtime/client/lib/date-time-parameters.mjs','date-time-iso'],
  ['packages/loginom-runtime/client/lib/date-time-removal.mjs','date-time-iso-empty'],
+ ['packages/loginom-runtime/client/lib/date-time-procedure.mjs','date-time-formats'],
  ['packages/loginom-runtime/client/lib/text-export-node.mjs','s8'],
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();
  assert.ok(ids(text).includes('live-ui'));assert.match(text,/run-check.py start/);
  assert.ok(text.includes(scenario));
- if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator --pair/);
+ if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator,variables-calculator-modes --pair/);
  assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
 });

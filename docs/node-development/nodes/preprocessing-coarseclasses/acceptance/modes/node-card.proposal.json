@@ -11,7 +11,7 @@
     "internal",
     "apply"
   ],
-  "semantics": "Proposal: internal trains the current binary target; apply preserves saved classes without Train. Continuous/manual/frozen partitions and canonical external class tables require observed native settings. External input 1 uses ColumnName, ClassNumber and UniqueValue for discrete groups; use the ready partition, and report native output numbering, which can change. Read all three table outputs [0,1,2], preserving Variant boundary types. Unknown/NULL mixtures and additive alpha=0.5 remain outside the accepted slice; do not invent a smoothing parameter.",
+  "semantics": "Internal trains the current binary target; apply preserves saved classes without Train. Continuous/manual/frozen partitions and canonical external class tables require observed native settings. External input 1 uses ColumnName, ClassNumber and UniqueValue for discrete groups; use the ready partition, and report native output numbering, which can change. Read all three table outputs [0,1,2], preserving Variant boundary types. Unknown/NULL mixtures and additive alpha=0.5 remain outside the accepted slice; do not invent a smoothing parameter.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "coarse-classes-v1-internal-1",
@@ -72,19 +72,19 @@
             "type": "number",
             "minimum": 0,
             "maximum": 50,
-            "description": "Minimum class weight in percent, not a fraction; acceptance uses 5."
+            "description": "Minimum class weight in percent, not a fraction."
           },
           "max_classes": {
             "type": "integer",
             "minimum": 1,
             "maximum": 1000,
-            "description": "Upper limit on classes, not a promised exact count; acceptance uses 2."
+            "description": "Upper limit on classes, not a promised exact count."
           },
           "uniformity_percent": {
             "type": "number",
             "minimum": 0,
             "maximum": 100,
-            "description": "UI uniformity percentage; 0 maximizes IV, 100 favors equal class weights. Acceptance uses 0."
+            "description": "UI uniformity percentage; 0 maximizes IV, 100 favors equal class weights."
           },
           "continuous": {
             "type": "object",
@@ -181,7 +181,7 @@
           "uniformity_percent"
         ],
         "additionalProperties": false,
-        "description": "Proposal: existing discrete training/apply plus continuous/external/manual/frozen classes. Unknown/NULL categories and zero-frequency behavior require observed native evidence."
+        "description": "Existing discrete training/apply plus continuous/external/manual/frozen classes. Unknown/NULL categories and zero-frequency smoothing are unsupported."
       }
     },
     "required": [],

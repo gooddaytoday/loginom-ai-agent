@@ -23,3 +23,18 @@ print('PASS')`;
  const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
+
+test('computed weights catalog uses the approved two-output Fraction oracle privately',()=>{
+ const script=`import importlib.util,json,subprocess,sys
+from pathlib import Path
+s=importlib.util.spec_from_file_location('run_check',Path('scripts/node-acceptance/run-check.py'));m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('ungroup-weights');e=m.expected_for(c,'/own/test.lgp')
+assert c['export_count']==2 and c['input_files']==['weights-totals.csv','weights-support.csv']
+assert c['prompt'].name=='task-weights.md' and c['oracle'].name=='oracle-weights.py'
+assert [o['output_port'] for o in e['outputs']]==[0,1]
+assert [len(o['rows']) for o in e['outputs']]==[4,0]
+assert all(f.endswith('.csv') for f in c['input_files'])
+assert json.loads(subprocess.check_output([sys.executable,str(c['oracle'])]))==json.loads((c['source']/c['expected_name']).read_text())`;
+ const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});

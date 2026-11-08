@@ -5814,6 +5814,87 @@ test('saved Join Next preserves links only for its exact owned question, with no
   assert.equal(result.trace.filter(e=>e.event==='saved_join_mapping_preserved').length,['none','delayed','repeat'].includes(fault)?1:0,fault);
  }
 });
+test('union input-change Next deletes only the exact owned lost-links question once',async()=>{
+ for(const fault of ['none','delayed','no-policy','other-question','foreign-node','foreign-owner','port','busy','lost-reply','repeat','epoch']){
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=wizardStepFixture(page);
+  c.form.box={x:48,y:71,width:1232,height:729};c.button.box={x:1208,y:380,width:64,height:64};
+  page.app.Version='7.4.2';page.context.innerWidth=1280;page.context.innerHeight=800;page.viewportSize=()=>({width:1280,height:800});
+  c.marker.attrs['data-tid']=c.base+';DerivedVariablesMappingEngineOutputPortWizard;btnAutoSyncThroughColumns';
+  const panel=page.add('div','MF;TF-1;NavigationBar;NavigationPanel','',{x:48,y:35,width:1232,height:36});let path='';
+  for(const [label,icon] of [['Сервер',''],['Пакеты',''],['Package1',''],['Модуль1',''],['Сценарий','maptree-icon-workflow'],['Union','bg-vendor-icon-unionvariables'],['Настройка','maptree-icon-wizard']]){
+   path+=(path?'>':'')+label;const crumb=page.add('a','MF;TF-1;cnrNaviMode;b.s_'+path,label,{x:50+panel.children.length*100,y:40,width:90,height:22},panel);if(icon)page.add('span',null,'',undefined,crumb).attrs.class=icon;
+  }
+  let prompt,clicks=0,pendingPrompt=false;
+  const native=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:fault==='foreign-node'&&prompt?'other':'node',surface:'wizard',tid:c.base,...(fault==='port'?{input_port:{port:0}}:{})});
+  const execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:'7.4.2',expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},native));
+  const snapshot=(await execute({mode:'observe'})).output,next=snapshot.ui.elements.find(e=>e.wizard_step);
+  const showPrompt=()=>{prompt=lostLinksPrompt(page,fault==='other-question'?'lost_links_text':'lost_links');prompt.children[0].ownText='Loginom 7.4.2';c.form.attrs.class='bg-mask-message';
+   if(fault==='foreign-owner')panel.children.at(-2).ownText='Other';if(fault==='busy')page.add('div',null,'Loading').attrs.class='x-mask-msg';};
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);clicks++;
+   if(clicks===1){if(fault==='delayed')pendingPrompt=true;else showPrompt();}
+   else{const yes=page.document.querySelectorAll('[data-tid="msgbox;tlb;yes"]')[0];assert.ok(args[0]>=yes.box.x&&args[0]<=yes.box.x+yes.box.width,'authorized answer must be Yes');
+    if(fault==='lost-reply')throw Error('Lost Yes reply');if(fault==='repeat')return;
+    prompt.remove();c.form.attrs.class='';c.marker.remove();page.add('div',c.base+';DoneWizard;edtDisplayName','',undefined,c.form);}
+  };
+  page.waitForTimeout=async ms=>{clock.advance(ms);if(pendingPrompt){pendingPrompt=false;showPrompt();}};
+  if(fault==='epoch'){const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>{if(prompt&&fn.toString().includes('state.captureMutations(state.observer.takeRecords());')&&fn.toString().includes('return {document:state.epoch'))page.mutationObserver.pending.push({type:'attributes',target:prompt,attributeName:'class'});return evaluate(fn,arg);};}
+  const result=await execute({mode:'act',operation_id:'union-next',snapshot,action:{verb:'wizard_step',ref:next.ref,expected_stage:'done'},...(fault==='no-policy'?{}:{variables_union_input_change:true})});
+  assert.equal(result.status,['none','delayed'].includes(fault)?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(clicks,['none','delayed','lost-reply','repeat'].includes(fault)?2:1,fault);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_lost_links_deleted').length,['none','delayed','repeat'].includes(fault)?1:0,fault);
+ }
+});
+test('union continues the observed unmapped-variable warning with one fresh Next after its only Yes',async()=>{
+ for(const fault of ['none','no-policy','warning-without-yes','other-warning','missing-error','wrong-next-tip','foreign-owner','foreign-node','changed-epoch','second-question','still-warning','lost-next-reply']){
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=wizardStepFixture(page);
+  c.form.box={x:48,y:71,width:1232,height:729};c.button.box={x:1208,y:380,width:64,height:64};
+  page.app.Version='7.4.2';page.context.innerWidth=1280;page.context.innerHeight=800;page.viewportSize=()=>({width:1280,height:800});
+  c.marker.attrs['data-tid']=c.base+';DerivedVariablesMappingEngineOutputPortWizard;btnAutoSyncThroughColumns';
+  const panel=page.add('div','MF;TF-1;NavigationBar;NavigationPanel','',{x:48,y:35,width:1232,height:36});let path='';
+  for(const [label,icon] of [['Сервер',''],['Пакеты',''],['Package1',''],['Модуль1',''],['Сценарий','maptree-icon-workflow'],['Union','bg-vendor-icon-unionvariables'],['Настройка','maptree-icon-wizard']]){
+   path+=(path?'>':'')+label;const crumb=page.add('a','MF;TF-1;cnrNaviMode;b.s_'+path,label,{x:50+panel.children.length*100,y:40,width:90,height:22},panel);if(icon)page.add('span',null,'',undefined,crumb).attrs.class=icon;
+  }
+  let prompt,clicks=0,answered=false,error;
+  const native=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:fault==='foreign-node'&&answered?'other':'node',surface:'wizard',tid:c.base});
+  const execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:'7.4.2',expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},native));
+  const snapshot=(await execute({mode:'observe'})).output,next=snapshot.ui.elements.find(e=>e.wizard_step);
+  page.context.Ext={getCmp:id=>{const element=page.document.all().find(e=>e.id===id);return element?{el:{dom:element}}:undefined;}};
+  c.button.id='union-native-next';c.form.checkVisibility=()=>true;c.button.checkVisibility=()=>true;
+  const showWarning=()=>{
+    if(fault!=='missing-error'){error=page.add('button',c.base+';btnError','',{x:52,y:71,width:66,height:64},c.form);error.id='union-native-error';
+     error.checkVisibility=()=>true;error.attrs['data-qtip']=fault==='other-warning'?'Не удалось соединиться с сервером':'1. Выходной переменной amount не сопоставлена входная переменная\n2. Выходной переменной Ноль не сопоставлена входная переменная';}
+    c.button.attrs['data-qtip']=fault==='wrong-next-tip'?'Далее':'Всё равно далее';
+    if(fault==='foreign-owner')panel.children.at(-2).ownText='Other';
+  };
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);clicks++;
+   if(clicks===1){
+    if(fault==='warning-without-yes'){showWarning();return;}
+    prompt=lostLinksPrompt(page);prompt.children[0].ownText='Loginom 7.4.2';c.form.attrs.class='bg-mask-message';
+   }else if(clicks===2&&fault!=='warning-without-yes'){
+    const yes=page.document.querySelectorAll('[data-tid="msgbox;tlb;yes"]')[0];assert.ok(args[0]>=yes.box.x&&args[0]<=yes.box.x+yes.box.width);
+    answered=true;prompt.remove();c.form.attrs.class='';showWarning();
+   }else{
+    assert.ok(args[0]>=c.button.box.x&&args[0]<=c.button.box.x+c.button.box.width,'repeat only the same native Next');
+    if(fault==='lost-next-reply')throw Error('Lost second Next reply');
+    if(fault==='second-question'){prompt=lostLinksPrompt(page);prompt.children[0].ownText='Loginom 7.4.2';c.form.attrs.class='bg-mask-message';return;}
+    if(fault==='still-warning')return;
+    c.marker.remove();error?.remove();page.add('div',c.base+';DoneWizard;edtDisplayName','',undefined,c.form);
+   }
+  };
+  page.waitForTimeout=async ms=>clock.advance(ms);
+  if(fault==='changed-epoch'){const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>{if(answered&&fn.toString().includes('state.captureMutations(state.observer.takeRecords());')&&fn.toString().includes('return {document:state.epoch'))page.mutationObserver.pending.push({type:'attributes',target:c.form,attributeName:'class'});return evaluate(fn,arg);};}
+  const result=await execute({mode:'act',operation_id:'union-warning-next',snapshot,action:{verb:'wizard_step',ref:next.ref,expected_stage:'done'},...(fault==='no-policy'?{}:{variables_union_input_change:true})});
+  const repeated=['none','second-question','still-warning','lost-next-reply'].includes(fault);
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(clicks,repeated?3:['no-policy','warning-without-yes'].includes(fault)?1:2,fault);
+  assert.equal(result.trace.filter(e=>e.event==='wizard_lost_links_deleted').length,['no-policy','warning-without-yes'].includes(fault)?0:1,fault);
+  assert.equal(result.trace.filter(e=>e.event==='variables_union_next_repeated_after_lost_links').length,repeated&&fault!=='lost-next-reply'?1:0,fault);
+ }
+});
 async function inputPortFinishFixture(mode='valid') {
   const clock=fixtureClock(),f=await inputMappingLiveFixture(false,clock.Date),{page,owner,base,nodes}=f;
   const {inputPortBreadcrumbs}=await import('./input-port-breadcrumbs.fixture.mjs');
@@ -8202,5 +8283,30 @@ test('Excel input0 overflow retains typed Close only for its native input1 owner
   const yes=r.output?.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
   assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,mode==='valid',mode);
   assert.deepEqual(page.events,[]);
+ }
+});
+
+test('date string-format cell is clicked away from its checkbox image, never on it',async()=>{
+ for(const mode of ['center_image','full_image']){
+  const page=new Page(),base='MF;TF-1;WizrdMCF;DateReformWizard;';
+  page.context.innerWidth=1000;page.context.innerHeight=800;page.viewportSize=()=>({width:1000,height:800});
+  const form=page.add('div','MF;TF-1;WizrdMCF','',{x:10,y:80,width:1000,height:600});
+  const root=page.add('div',base.slice(0,-1),'',{x:20,y:90,width:900,height:500},form);
+  const grid=page.add('div',base+'grdDataFormat;tbl','',{x:30,y:100,width:800,height:400},root);grid.attrs.id='date-grid';grid.id='date-grid';
+  const row=page.add('table',null,'',{x:35,y:120,width:700,height:23},grid);Object.assign(row.attrs,{class:'x-grid-item','data-recordindex':'0','data-recordid':'r0','data-boundview':'date-grid'});
+  const cell=page.add('td',base+'colDoString_0','',{x:400,y:120,width:215,height:23},row);
+  const image=page.add('img',null,'',mode==='full_image'?{x:400,y:120,width:215,height:23}:{x:499.5,y:123.5,width:16,height:16},cell);image.attrs.class='x-grid-checkcolumn x-grid-checkcolumn-checked';
+  const record={isModel:true,internalId:'r0',data:{Func:18,ISO8601:false,DoDateTimeFirst:false,DoDateTimeLast:false,DoNumber:false,DoString:true,StringFmt:''}};
+  page.context.Ext={getCmp:id=>id==='date-grid'?{el:{dom:grid},getStore:()=>({$className:'Ext.data.Store',isLoading:()=>false,getData:()=>({items:[record]})})}:undefined};
+  const s=await page.observe(),formats=s.ui.elements.filter(e=>e.date_time_cell?.role==='format_cell');
+  assert.equal(formats.length,1,mode+JSON.stringify(s.ui.elements.map(e=>({tid:e.tid,role:e.date_time_cell}))));
+  assert.equal(formats[0].date_time_cell.record_id,'r0');assert.equal(formats[0].date_time_cell.string_format,'');
+  if(mode==='full_image'){assert.equal(formats[0].interaction.state,'point_not_observed');assert.ok(!formats[0].allowed_actions.includes('click'));continue;}
+  const point=formats[0].interaction.point;
+  assert.equal(formats[0].interaction.state,'point_observed');assert.ok(formats[0].allowed_actions.includes('click'));
+  assert.ok(point.x<499.5||point.x>515.5||point.y<123.5||point.y>139.5,'point avoids the checkbox: '+JSON.stringify(point));
+  const result=await page.act({verb:'click',ref:formats[0].ref},s);
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.deepEqual(page.clickedPoints,[{...point,clickCount:1}]);
  }
 });

@@ -12,8 +12,9 @@ MAPPINGS = [('main.csv', [('RowID', 'RowID', 'integer'), ('Code', 'MainCode', 's
 
 
 def expected(determining):
-    tables, columns = [], []
+    tables, columns, names = [], [], []
     for filename, fields in MAPPINGS:
+        names.append([dest for _, dest, _ in fields])
         with (ROOT / 'fixtures' / filename).open(newline='', encoding='utf-8') as stream:
             raw = list(csv.DictReader(stream))
         tables.append([{dest: {'integer': int, 'real': float, 'string': str}[kind](row[src])
@@ -25,10 +26,14 @@ def expected(determining):
     rows = []
     for i in range(count):
         row = {}
-        for table in tables:
-            # These fixtures are nonempty; general empty/padding cases stay in the existing kit.
+        for table, keys in zip(tables, names):
+            # These fixtures are nonempty; general empty cases stay in the existing kit.
             assert table
-            row.update(table[i % len(table)] if not determining else table[i])
+            if not determining:
+                row.update(table[i % len(table)])
+            else:
+                # A table shorter than the determining one is padded with NULL.
+                row.update(table[i] if i < len(table) else dict.fromkeys(keys))
         rows.append(row)
     return {'package_path': '{{PACKAGE_PATH}}',
             'nodes': [{'type': 'imports.text'}, {'type': 'transform.col_union_data'}, {'type': 'exports.text'}],

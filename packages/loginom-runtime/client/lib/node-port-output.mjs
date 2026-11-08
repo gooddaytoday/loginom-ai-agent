@@ -237,8 +237,9 @@ export function decodePortCell(raw,type) {
 
 export function makeNodePortOutputCode(binding,request,options,quality=null) {
  validatePreparedNodeContext(binding);
- if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>k!=='typedVariants').sort().join(','))
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull'].includes(k)).sort().join(','))
   ||Object.hasOwn(request,'typedVariants')&&typeof request.typedVariants!=='boolean'
+  ||Object.hasOwn(request,'variantEmptyIsNull')&&(request.variantEmptyIsNull!==true||request.typedVariants!==true)
   ||!Number.isInteger(request.port)||request.port<0||request.port>99
   ||!Number.isInteger(request.sampleRows)||request.sampleRows<0||request.sampleRows>100
   ||Object.hasOwn(request,'rowOffset')&&(!Number.isSafeInteger(request.rowOffset)||request.rowOffset<0)
@@ -351,9 +352,12 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    const sample=[],values=[],limits=new Set(),requested=Math.min(rowCount-offset,q.sampleRows,Math.floor(10000/total));
    // Private opt-in: existing ordinary reads, including Variant NULL and the
    // full Collapse/CrossTable path, keep their previous envelopes and calls.
+   const variantFailures=[];
    const exactVariants=q.typedVariants===true&&requested>0&&schema.some(c=>c.type==='variant');
-   const nativeDecode=exactVariants?eval('('+variant.decode+')'):null,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
-   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},nativeDecode,eval('('+variant.collect+')'),variant.pins);
+   const baseDecode=exactVariants?eval('('+variant.decode+')'):null;
+   // Replacement-only opt-in: a VT_EMPTY frame (tag 0) is the NULL that keep carries over from the source; every other path refuses it.
+   const nativeDecode=exactVariants&&q.variantEmptyIsNull===true?(payload,size)=>payload[0]===0&&payload[1]===0?baseDecode([1,...payload.slice(1)],size):baseDecode(payload,size):baseDecode,adaptNative=exactVariants?eval('('+variant.adapt+')'):null;
+   if(exactVariants)nativeReader=await eval('('+variant.read+')')(dataSource,{deadline:o.deadline,stable:()=>{live();stable();}},(p,s)=>{try{return nativeDecode(p,s);}catch(e){e.variantDecode=true;throw e;}},eval('('+variant.collect+')'),variant.pins);
    const moda=quality?await eval('('+quality.read+')')({source:dataSource,node:baseline.node,port:baseline.port,portIndex:q.port,rowCount,rows:requested,schema,bindingId:quality.binding_id,deadline:o.deadline,stable:()=>{live();stable();}},eval('('+quality.decode+')')):null;
    const helper=sourceBaseline.helper;
    let limited=requested<Math.min(rowCount-offset,q.sampleRows);
@@ -361,7 +365,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     const rawValues=[],nativeCells=[];
     for(let column=0;column<total;column++){
      if(exactVariants&&schema[column].type==='variant'){
-      const cell=await nativeReader.read(row,column);
+      let cell;
+      try{cell=await nativeReader.read(row,column);}
+      catch(error){
+       // Only a decoder refusal (positively marked) may continue; guard, transport and deadline failures keep their exact cause and stop at once.
+       if(!error?.variantDecode||nativeReader.unsettled||Date.now()>=o.deadline)throw error;
+       // Diagnostic only, for decoder refusals: scan the rest so the refusal names every cell and its ordinary value kind.
+       let kind;try{live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();kind=raw===null||raw===undefined?'null':typeof raw;}catch(cause){if(reason!=='read_failed')throw cause;kind='unread';}
+       variantFailures.push('r'+row+'c'+column+' '+kind+' '+String(error?.message).slice(0,48));rawValues.push(null);continue;
+      }
       nativeCells[column]=adaptNative(cell,schema[column],{dateProfile:'loginom-7.4.2-native-oadate',civilTime:cell.civilTime},nativeDecode);
       rawValues.push(null);continue;
      }
@@ -369,6 +381,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');
      rawValues.push(raw);
     }
+    if(variantFailures.length)continue;
     // Settle every started full-text RPC before refusing or disposing its column.
     const fullValues=await Promise.allSettled(rawValues.map(async(raw,column)=>{
      if(!['string','variant'].includes(schema[column].type)||typeof raw!=='string'||raw.length<5000&&!raw.endsWith('…'))return raw;
@@ -383,6 +396,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     decoded.forEach(item=>item.limitations.forEach(limit=>limits.add(limit)));
     values.push(rowValues);sample.push(cells);
    }
+   if(variantFailures.length)throw Error('variant_cells '+variantFailures.slice(0,12).join('; '));
    live();stable();
    result={port:q.port,port_guid:baseline.portGuid,fresh:true,execution_id:q.execution.execution_id,freshness_basis:'completed_execution_port_source',schema,row_count:rowCount,sample,sample_rows:sample.length,sample_complete:offset===0&&sample.length===rowCount,
     precision:{numbers_verified:!limits.has('numeric_display_precision')&&!limits.has('variant_display_precision'),limitations:[...limits],strings:'data source text; existing secret redaction applies; original byte encoding is not attested'},...(limited?{read_limit:'preview_cell_or_byte_budget'}: {})};
@@ -393,7 +407,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      execution_id:q.execution.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}});
    }
    need(new TextEncoder().encode(JSON.stringify(result)).length<=(target.kind==='tree'?1024*1024:4*1024*1024),'response_byte_budget');
-  }catch(error){qualityNativeUncertain=error?.qualityNativeUncertain===true;if(reason==='read_failed'&&error?.message?.startsWith('Variant read:'))reason=error.message;if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;readDiagnostic=error?.treeReadDiagnostic;result=undefined;
+  }catch(error){qualityNativeUncertain=error?.qualityNativeUncertain===true;if(reason==='read_failed'&&error?.message?.startsWith('Variant read:'))reason=error.message;if(reason==='read_failed'&&target.kind==='tree'&&/^(?:tree_|integer_|unsupported_type)/.test(error?.message??''))reason=error.message;if(reason==='read_failed'&&q.typedVariants===true){const text=error?.message??error?.get_message?.();reason='read_failed: '+String(error?.name??'Error').slice(0,40)+': '+String(text).slice(0,420);}readDiagnostic=error?.treeReadDiagnostic;result=undefined;
   }finally{
    // A timed-out fixed321 request still owns its buffers. Retain its source
    // handles until the owning browser is closed; never claim native cancel.
