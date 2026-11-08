@@ -1,4 +1,8 @@
 import {configureGroupingInlineMapping} from './grouping-inline-mapping.mjs';
+import {booleanBindingSchema} from './variable-binding-parameters.mjs';
+import {preflightBooleanBindings,prepareBooleanBindingInput,preflightBuiltinBindings} from './variable-binding-source.mjs';
+import {configureBooleanBinding} from './variable-binding-procedure.mjs';
+import {readBooleanBindings} from './variable-binding-readback.mjs';
 import {preflightGroupingSource} from './grouping-preflight.mjs';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {validateGroupingParameters} from './grouping-parameters.mjs';
@@ -9,10 +13,20 @@ import {groupingParametersSchema} from './node-api.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 export function createGroupingNodeSupport(config){return createTabularTransformNodeSupport(config,{
  type:'transform.group_data',mode:'aggregate',revision:'grouping-v3-internal-1',readback:groupingConfigurationReadback,parameterSchema:groupingParametersSchema,
- validate:validateGroupingParameters,preflight:preflightGroupingSource,
+ bindingSchema:booleanBindingSchema('transform.group_data'),validate:validateGroupingParameters,
+ async preflight(options,ctx,c){await preflightBooleanBindings(options,ctx,c);return preflightGroupingSource(options,ctx,c);},
  beforeInput:prepareGroupingInput,
  configurationObservation:{condition:'grouping configuration page',readGrouping:true,ready:s=>s.wizard?.stage==='grouping'&&s.node_grouping?.verified===true},
- async configure(channel,p,{request}){
+ async afterDone(channel,request,configured,{readGraph,options,ctx}){
+  if(!request.bindings?.length)return;
+  const proof=options.operation.variableBindingSource;
+  const sourceProof=proof?await preflightBuiltinBindings(options,ctx,config,proof.source):undefined;
+  const bindings=await readBooleanBindings(channel,{type:'transform.group_data',node:ctx.node,readGraph,sourceProof});
+  if(bindings.length!==request.bindings.length||bindings.some((b,i)=>b.parameter!==request.bindings[i].parameter||b.variable.name!==request.bindings[i].variable.name))throw Error('BINDING_SOURCE_UNVERIFIED');
+  return bindings;
+ },
+ async configure(channel,p,{request,bindingSource,bindingMapping}){
+  if(request.finish!=='close')await configureBooleanBinding(channel,{type:'transform.group_data',bindings:request.bindings,bindingSource,bindingMapping});
   const changed=await configureGrouping(channel,p);if(request.finish==='close')return changed;
   await channel.perform({condition:'validate grouping and advance',ready:s=>s.wizard?.stage==='grouping',identity:()=>changed.configuration.node_context,
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));if(es.length!==1)throw Error('Grouping Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:['output_mapping','done']};}});
@@ -24,6 +38,7 @@ export function createGroupingNodeSupport(config){return createTabularTransformN
 });}
 
 export async function prepareGroupingInput(options,ctx,{channel}){
+ await prepareBooleanBindingInput(options,ctx,{channel});
  const request=options.operation.nodeApply.request;
  if(request.target.kind!=='existing'||request.finish!=='execute'||request.inputs.length!==0)return;
  // Empty parameters/mappings preserve the just-configured chain. Its owned

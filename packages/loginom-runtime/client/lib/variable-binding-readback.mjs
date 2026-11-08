@@ -1,6 +1,55 @@
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
+import {advanceSortingInputColumns} from './sorting-procedure.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message.startsWith('BINDING_')?message:'Binding readback: '+message);};
+// Called inside the owning wizard's synchronous browser read. A hidden literal
+// is never the value of an active binding; the selected native record is.
+export function readBooleanBindingBrowser(base,root){
+ const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';VariableControl')+']')].filter(e=>root.contains(e)&&e.checkVisibility({checkVisibilityCSS:true}));
+ const c=es.length===1?globalThis.Ext?.getCmp?.(es[0].id):null,store=c?.getStore?.(),rows=store?.getData?.()?.items;
+ if(c?.el?.dom!==es[0]||store?.isLoading?.()||!Array.isArray(rows)||!rows.length||rows.length>1000)return null;
+ const selected=rows.filter(r=>r.data?.field1===c.getValue?.());
+ if(selected.length!==1)return null;
+ const r=selected[0],v=r.get?.(r.getFields?.()[2]?.getName?.());
+ if(!v||v.DataType!==1||typeof v.DisplayName!=='string'||!Number.isSafeInteger(v.Index)||typeof v.IsNull!=='boolean')return null;
+ return {record_id:String(r.internalId),name:v.DisplayName,index:v.Index,type:'boolean',is_null:v.IsNull,value:v.Value??null};
+}
+export function booleanBindingInventory(native,mapping,graph,node,sourceProof,type){
+ const grouping=type==='transform.group_data',parameter=grouping?'/sort_result':'/compare_with_locale';
+ const option=native.options?.[grouping?'pedSortResult':'chkLocaleAware'];
+ need(native.verified===true&&native.inventory_complete===true&&['document_id','workflow_id','node_id'].every(k=>native.node_context?.[k]===node[k]),'node owner');
+ if(!option?.switch_pressed)return [];
+ const v=option.binding;need(v&&v.type==='boolean','BINDING_TYPE_MISMATCH');
+ need(mapping?.kind==='control'&&mapping.port===0&&typeof mapping.port_guid==='string','complete owned mapping');
+ const fields=mapping.fields.filter(f=>f.name===v.name&&f.index===v.index);need(fields.length===1,'unique mapped name/index');
+ const f=fields[0];need(f.type===1&&f.source?.type===1,'BINDING_TYPE_MISMATCH');
+ need(Number.isSafeInteger(f.id)&&Number.isSafeInteger(f.source?.id),'connected variable IDs');
+ const links=(graph.variable_links??[]).filter(l=>l.target===node.node_id&&l.kind==='control'&&l.input===0);
+ need(links.length===1&&links[0].target_port_guid===mapping.port_guid,'source endpoint');
+ const sources=graph.nodes.filter(n=>n.ref.node_id===links[0].source);need(sources.length===1,'source owner');
+ if(sourceProof){
+  need(sourceProof.verified===true&&sourceProof.independent_readback===true&&sourceProof.cleanup_complete===true&&sourceProof.source?.node_id===links[0].source,'independent source');
+  const vs=sourceProof.variables.filter(x=>x.id===f.source.id&&x.name===f.source.name);need(vs.length===1,'source variable identity');
+  need(vs[0].type==='boolean'&&vs[0].cell?.type==='boolean','BINDING_TYPE_MISMATCH');
+  need(vs[0].cell.is_null===false,'BINDING_NULL_UNSUPPORTED');need(typeof vs[0].cell.value==='boolean','BINDING_TYPE_MISMATCH');
+ }else need(v.is_null===false&&f.is_null===false,'BINDING_NULL_UNSUPPORTED');
+ return [{parameter,mode:'variable',row_id:v.record_id,variable:{kind:'control',input:0,id:f.id,name:f.name,type:'boolean',is_null:false},
+  source:{ref:sources[0].ref,type:sources[0].type,output:links[0].output,variable_id:f.source.id},input_port_guid:mapping.port_guid,connected:true,verified:true}];
+}
+export async function readBooleanBindings(channel,{type,readGraph,sourceProof,node:target}){
+ const graph=await readGraph(),grouping=type==='transform.group_data',key=grouping?'node_grouping':'node_sorting',stage=grouping?'grouping':'sorting';
+ await openPreparedWizard(channel);
+ let native,node;
+ try{
+  if(!grouping)await advanceSortingInputColumns(channel,{target:{kind:'existing',ref:target}});
+  const s=await channel.observe({condition:'independent saved boolean binding',...(grouping?{readGrouping:true}:{readSorting:true}),ready:s=>s.wizard?.stage===stage&&s[key]?.verified===true});
+  native=s[key];node=s.prepared_node_context;
+ }finally{const close=await closePreparedWizard(channel);need(close.verified===true&&close.cleanup_complete===true,'Cancel');}
+ if(!native.options[grouping?'pedSortResult':'chkLocaleAware'].switch_pressed)return [];
+ const mapped=await channel.readVariablePortMapping({direction:'input',kind:'control',port:0});
+ need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'independent mapping');
+ return booleanBindingInventory(native,mapped.mapping,graph,node,sourceProof,type);
+}
 export function filterBindingVariables(native,mapping,proof,names){
  need(proof?.verified===true&&proof.independent_readback===true&&Array.isArray(proof.variables),'independent source');
  return native.control_variables.map(v=>{

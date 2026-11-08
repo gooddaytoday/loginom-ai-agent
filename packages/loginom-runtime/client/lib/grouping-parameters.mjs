@@ -1,3 +1,4 @@
+import {validateBooleanBinding} from './variable-binding-parameters.mjs';
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
 export const GROUPING_FUNCTIONS=Object.freeze({sum:{bit:1,suffix:'Sum',label:'Сумма'},count:{bit:2,suffix:'Count',label:'Количество'},min:{bit:4,suffix:'Min',label:'Минимум'},max:{bit:8,suffix:'Max',label:'Максимум'},avg:{bit:16,suffix:'Avg',label:'Среднее'},median:{bit:32,suffix:'Median',label:'Медиана'},mode:{bit:64,suffix:'Mode',label:'Мода'},stddev:{bit:128,suffix:'Std',label:'Стандартное откл.'},unique_count:{bit:256,suffix:'Uniq',label:'Кол-во уникальных'},null_count:{bit:512,suffix:'Null',label:'Кол-во пропусков'}});
 const supportedMask=Object.values(GROUPING_FUNCTIONS).reduce((mask,f)=>mask|f.bit,0);
@@ -10,7 +11,9 @@ const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 const field=v=>v&&Object.keys(v).sort().join(',')==='kind,name'&&v.kind==='input_field'&&name(v.name);
 export function validateGroupingParameters(p,mode,r) {
  requireValue(mode==='aggregate','Grouping supports aggregate mode');
- requireValue(p&&Object.keys(p).every(k=>['group_by','measures'].includes(k)),'Invalid grouping parameters');
+ validateBooleanBinding(p,r);
+ requireValue(p&&Object.keys(p).every(k=>['group_by','measures','sort_result'].includes(k)),'Invalid grouping parameters');
+ requireValue(p.sort_result===undefined||typeof p.sort_result==='boolean','Boolean sort_result required');
  const preserved=p.group_by===undefined&&p.measures===undefined;
  requireValue(!preserved||r.target.kind==='existing','New grouping requires complete keys and measures');
  if(!preserved){

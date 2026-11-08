@@ -27,4 +27,5 @@
 `case_sensitive` задаётся отдельно у каждого строкового ключа: «регистр не учитывай» — `false`. Без локали регистр игнорируется только у латиницы, кириллица остаётся различной.
 Добавь однозначный вторичный ключ (например RowID). NULL и пустая строка — разные значения: не сортируй текст «NULL».
 Идентификатор локали узел не отдаёт: порядок проверяй по полному чтению результата.
+Управление compare_with_locale переменной выполняй этим же узлом, режим `keys`. В `dock_node_apply` добавь верхнеуровневый `bindings: [{parameter: "/compare_with_locale", variable: {kind: "control", input: 0, name: "Flag"}}]`, а literal `compare_with_locale` из `parameters` убери. Подключи `variables.user` выход 4 через `variable_inputs` к control input 0. Flag — boolean, не NULL; другой тип → `BINDING_TYPE_MISMATCH`, NULL → `BINDING_NULL_UNSUPPORTED`, literal вместе с binding → `BINDING_CONFLICT`. После изменения только Flag в источнике выполни прежний GUID с `parameters: {}`, `inputs: []`, `mappings: []`, `finish: "execute"`; настройки узла не применяй заново. Проверяй `configuration.bindings`, полный результат, Save и повторное открытие.
 <!-- /mode -->

@@ -18,7 +18,7 @@ export async function advanceSortingInputColumns(channel,request){
   resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));
    need(es.length===1,'Owned Sorting input-columns Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:'sorting'};}});
 }
-export async function configureSorting(channel,p,{newNode=false}={}){
+export async function configureSorting(channel,p,{newNode=false,bound=false}={}){
  const ready=s=>s.wizard?.stage==='sorting'&&s.node_sorting?.verified===true;
  const observe=condition=>channel.observe({condition,readSorting:true,ready});
  const initial=await observe('complete sorting configuration'),baseline=initial.node_sorting;
@@ -63,13 +63,13 @@ export async function configureSorting(channel,p,{newNode=false}={}){
   }
  }
  const locale=p.compare_with_locale??(newNode?true:baseline.options.chkLocaleAware.value);
- let s=await observe('sorting locale before change');need(!s.node_sorting.options.chkLocaleAware.switch_pressed,'Variable-driven sorting locale unsupported');
- if(s.node_sorting.options.chkLocaleAware.value!==locale){
+ let s=await observe('sorting locale before change');need(bound||!s.node_sorting.options.chkLocaleAware.switch_pressed,'Variable-driven sorting locale unsupported');
+ if(!bound&&s.node_sorting.options.chkLocaleAware.value!==locale){
   await channel.perform({condition:'set sorting locale explicitly',initialObservation:s,ready,identity:()=>({locale}),resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';SortingWizard;SortingColumnCollection;chkLocaleAware;ValueControl;DisplayEl'&&e.allowed_actions.includes('set_checked'));need(es.length===1,'Sorting locale control unavailable');return {verb:'set_checked',ref:es[0].ref,checked:locale};}});
  }
  const after=(await observe('complete final sorting configuration')).node_sorting;
  need(same(after.keys.map(k=>k.name),plan.map(k=>k.name))&&after.keys.every((k,i)=>!k.missing_input&&k.direction===plan[i].direction&&(plan[i].case_sensitive===undefined||k.case_sensitive===plan[i].case_sensitive)),'Final sorting keys differ');
  need(same(after.input_fields,baseline.input_fields)&&same(after.options.chkBufferWhole,baseline.options.chkBufferWhole)&&same(after.options.cbxMaxThreadCount,baseline.options.cbxMaxThreadCount),'Unrequested sorting settings changed');
- need(after.options.chkLocaleAware.value===locale,'Sorting locale differs');
+ need(bound?same(after.options.chkLocaleAware,baseline.options.chkLocaleAware):after.options.chkLocaleAware.value===locale,'Sorting locale differs');
  return {verified:true,cleanup_complete:true,effect_possible:true,configuration:after,preservation:{input_identity:true,cache:true,threads:true}};
 }

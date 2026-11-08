@@ -5,7 +5,16 @@ const control=(s,suffix,verb='click')=>{const es=s.ui.elements.filter(e=>e.tid==
 export async function configureGrouping(channel,p){
  const ready=s=>s.wizard?.stage==='grouping'&&s.node_grouping?.verified===true;
  const observe=condition=>channel.observe({condition,readGrouping:true,ready});
- const before=await observe('complete grouping inventory'),baseline=before.node_grouping;
+ let before=await observe('complete grouping inventory');
+ if(p.sort_result!==undefined){
+  need(!before.node_grouping.options.pedSortResult.switch_pressed,'Grouping option requires a literal boolean');
+  if(before.node_grouping.options.pedSortResult.value!==p.sort_result){
+   await channel.perform({condition:'set grouping sort_result explicitly',initialObservation:before,ready,identity:s=>s.prepared_node_context,
+    resolve:s=>({verb:'set_checked',ref:control(s,';GroupDataWizard;pedSortResult;ValueControl;DisplayEl','set_checked').ref,checked:p.sort_result})});
+   before=await observe('grouping sort_result applied');need(before.node_grouping.options.pedSortResult.value===p.sort_result,'Grouping sort_result differs');
+  }
+ }
+ const baseline=before.node_grouping;
  if(p.group_by===undefined){
   need(baseline.keys.length&&Array.isArray(baseline.measures)&&baseline.measures.every(supportedGroupingMeasure),'Existing grouping contains unsupported or incomplete aggregation');
   return {verified:true,cleanup_complete:true,effect_possible:false,configuration:baseline,preservation:{unchanged:true}};

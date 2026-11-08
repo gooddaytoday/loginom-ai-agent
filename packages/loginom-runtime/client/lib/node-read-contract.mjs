@@ -13,6 +13,7 @@ export function isUnchangedTransformExecution(request){
   &&Array.isArray(request.mappings)&&request.mappings.length===0
   &&p&&typeof p==='object'&&!Array.isArray(p)
   &&(type==='variables.from_table'&&request.mode==='aggregate'&&Object.keys(p).length===0&&!(request.variable_inputs?.length)
+   ||['transform.group_data','transform.sorting'].includes(type)&&request.mode===(type==='transform.group_data'?'aggregate':'keys')&&Object.keys(p).length===0&&!(request.bindings?.length)&&!(request.variable_inputs?.length)
    ||type==='research.quality'&&request.mode==='profile'&&Object.keys(p).length===0
    ||type==='transform.filter_data'&&request.mode==='conditions'&&Object.keys(p).length===0&&!(request.bindings?.length)&&!(request.variable_inputs?.length)
    ||type==='variables.replace'&&['exact','rules'].includes(request.mode)&&Object.keys(p).length===0&&!(request.variable_inputs?.length)

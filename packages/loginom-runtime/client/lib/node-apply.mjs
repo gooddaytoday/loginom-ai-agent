@@ -525,7 +525,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       try{
         result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
         const bindings=state.phases.find(p=>p.phase==='node_finish')?.value?.bindings;
-        if(result.configuration.readback.kind==='row_filter'&&bindings)result.configuration.bindings=structuredClone(bindings);
+        if(['row_filter','grouping','sorting'].includes(result.configuration.readback.kind)&&bindings)result.configuration.bindings=structuredClone(bindings);
       }catch(error){
         // Projection uses only accepted receipts. Its failure cannot make the
         // completed UI phases uncertain or strand a quiet node without a phase.

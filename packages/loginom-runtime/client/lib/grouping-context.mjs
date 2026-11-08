@@ -1,5 +1,6 @@
+import {readBooleanBindingBrowser} from './variable-binding-readback.mjs';
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
-export function makeGroupingContextCode(binding){validatePreparedNodeContext(binding);return `async page=>(${readGroupingContext.toString()})(page,${JSON.stringify(binding)},${readPreparedNodeContext.toString()},${readGroupingBrowser.toString()})`;}
+export function makeGroupingContextCode(binding){validatePreparedNodeContext(binding);return `async page=>(${readGroupingContext.toString()})(page,${JSON.stringify(binding)},${readPreparedNodeContext.toString()},prefix=>(${readGroupingBrowser.toString()})(prefix,${readBooleanBindingBrowser.toString()}))`;}
 export async function readGroupingContext(page,binding,readNode=readPreparedNodeContext,readBrowser=readGroupingBrowser){
  const before=await readNode(page,binding);if(!before.verified||before.surface!=='wizard'||before.input_port||before.output_port)return {verified:false,reason:'grouping_node_surface'};
  const result=await page.evaluate(readBrowser,binding.workflow_ref.prefix),after=await readNode(page,binding);
@@ -9,7 +10,7 @@ export async function readGroupingContext(page,binding,readNode=readPreparedNode
 // The two chained stores share one local source store. Its records carry the
 // complete input inventory; section placeholders exist only in the used chain.
 // Read cached records only, never a proxy load or a Loginom mutation method.
-export function readGroupingBrowser(prefix){
+export function readGroupingBrowser(prefix,readBinding){
  const fail=reason=>({verified:false,reason});
  const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')];
  const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
@@ -48,6 +49,7 @@ export function readGroupingBrowser(prefix){
   const c=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id),s=switches.length===1&&globalThis.Ext?.getCmp?.(switches[0].id);
   if(!c||c.el?.dom!==es[0]||!s||s.el?.dom!==switches[0]||typeof c.getValue?.()!=='boolean')return fail('grouping_option');
   options[k]={value:c.getValue(),switch_pressed:s.pressed===true};
+  if(k==='pedSortResult'&&options[k].switch_pressed){const binding=readBinding?.(base+k,roots[0]);if(!binding)return fail('grouping_binding');options[k].binding=binding;}
  }
  return {verified:true,inventory_complete:true,state_source:'cached_grouping_source_store',input_fields:fields,keys,measures,
   selected_records:selected.map(r=>String(r.internalId)),options,settings_applied:false};
