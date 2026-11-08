@@ -57,6 +57,13 @@ test('literal Import with a linked user output outside inputs reaches legacy Exe
  assert.deepEqual(f.actions,['user_runtime_read']);
  assert.equal(f.witnesses(),0);assert.equal(f.operation.importBindingInventory,undefined);
 });
+for(const value of [null,''])test('literal Import with an unrelated '+(value===null?'NULL':'empty')+' source retains legacy Execute without W1 or Values',async()=>{
+ const f=savedImport('literal',true,value);
+ f.variables.push({id:8,name:'Sentinel',type:'integer',cell:{type:'integer',is_null:false,value:'17'}});
+ await f.driver().beforeTarget(f.ctx);
+ assert.deepEqual(f.actions,['user_runtime_read']);assert.equal(f.witnesses(),0);
+ assert.equal(f.operation.importBindingInventory,undefined);
+});
 test('unsupported input extension bypasses W1 and binding witness before native Execute',async()=>{
  const f=savedImport('literal',true,'/own/inputs/a.exe');
  f.options.isBoundFileInput=()=>false;
@@ -88,8 +95,11 @@ for(const active of [true,false])for(const bindings of [undefined,[]])test('our 
  if(active)assert.ok(!f.actions.includes('user_values'));
 });
 
-for(const value of [null,''])test('our saved string binding refuses '+(value===null?'NULL':'empty')+' before Execute',async()=>{
- const f=savedImport('bound',false,value);
+for(const value of [null,''])test('explicit new string binding refuses '+(value===null?'NULL':'empty')+' before Execute',async()=>{
+ const f=savedImport('bound',true,value);
+ f.r.target={kind:'new',type:'imports.text',label:'Import'};
+ f.r.bindings=[{parameter:'/settings/source/source_path',variable:{kind:'variables',input:0,name:'CsvPath'}}];
+ f.r.variable_inputs=[{kind:'variables',input:0,output:4,source:{document_id:'doc',workflow_id:'wf',node_id:'vars'}}];
  f.variables.push({id:8,name:'Sentinel',type:'integer',cell:{type:'integer',is_null:false,value:'17'}});
  await assert.rejects(f.driver().beforeTarget(f.ctx),value===null?/BINDING_NULL_UNSUPPORTED/:/BINDING_VALUE_INVALID/);
  assert.equal(f.witnesses(),0);assert.ok(!f.actions.includes('begin_wizard'));

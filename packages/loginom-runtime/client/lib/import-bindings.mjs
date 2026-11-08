@@ -84,12 +84,7 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
   // Opening either Import editor can deactivate an executed node. Establish
   // our input-file scope from the source preview before opening either W1.
   const scoped=proof.variables?.some(v=>v.type==='string'&&v.cell?.type==='string'&&v.cell.is_null===false&&typeof v.cell.value==='string'&&options.isBoundFileInput(v.cell.value));
-  if(!scoped){
-   // Retain the existing NULL/empty refusal without opening an Import editor.
-   const invalid=proof.variables?.find(v=>v.type==='string'&&(v.cell?.is_null===true||v.cell?.value===''));
-   if(invalid)resolveImportBindingValue(proof,invalid.name);
-   return null;
-  }
+  if(!scoped)return null;
   const target=importBindingChannel(options,ctx,config,r.target.ref);
   const s=await readImportBindingField(target);
   const f=s.wizard.import_source.fields.source_path;
