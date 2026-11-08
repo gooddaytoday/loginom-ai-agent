@@ -22,6 +22,15 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_variables_replace_match_order_policy(self):
+        case = runner.scenario('variables-replace-match')
+        initial = runner.read(case['source'] / case['variable_initial'])
+        self.assertNotIn('column_order', initial['variable_inventory']['outputs'][0])
+        for cold in [False, True]:
+            output = runner.expected_for(case, '/own/match.lgp', cold=cold)['variable_inventory']['outputs'][0]
+            self.assertEqual(output['column_order'], 'any')
+            self.assertEqual(output['variables'], initial['variable_inventory']['outputs'][0]['variables'])
+
     def test_rest_c1_single_method_scenarios(self):
         for name, method in [('rest-post-body', 'POST'), ('rest-put-body', 'PUT'),
                              ('rest-patch-body', 'PATCH'), ('rest-delete', 'DELETE')]:

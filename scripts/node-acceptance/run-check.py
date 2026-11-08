@@ -413,7 +413,8 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'variables-replace-match':
         src = REPO / 'docs/node-development/nodes/variables-replace/acceptance'
         return dict(source=src / 'modes', prompt=src / 'task-match-modes.md', data=src.parent / 'fixtures', base=None,
-                    expected_name='expected-run.json', input_files=['modes-source.json'], variable_only=True,
+                    expected_name='expected-reopened-run.json', cold_expected_name='expected-reopened-run.json',
+                    input_files=['modes-source.json'], variable_only=True,
                     variable_audit='variables-replace-match', variable_initial='expected-run.json', variable_read_path='execution',
                     oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
     if name == 'variables-replace-exact':

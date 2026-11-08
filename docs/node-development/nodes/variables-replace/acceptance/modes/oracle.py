@@ -34,6 +34,8 @@ run = {'package_path': '{{PACKAGE_PATH}}', 'nodes': [{'type': 'variables.user'},
 for variable in run['variable_inventory']['outputs'][0]['variables']:
     if variable['type'] == 'datetime':
         variable['value'] += '.000'  # W1 civil precision representation of whole seconds.
+reopened = deepcopy(run)
+reopened['variable_inventory']['outputs'][0]['column_order'] = 'any'
 text = json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
 if __name__ == '__main__':
     assert [v['value'] for v in variables[3:6]] == ['blue', 'matched', 2.5]
@@ -42,8 +44,11 @@ if __name__ == '__main__':
     if '--check' in sys.argv:
         assert (HERE / 'expected.json').read_text(encoding='utf-8') == text, 'expected differs from oracle'
         assert json.loads((HERE / 'expected-run.json').read_text(encoding='utf-8')) == run, 'run expected differs from oracle'
+        assert json.loads((HERE / 'expected-reopened-run.json').read_text(encoding='utf-8')) == reopened, 'reopened expected differs from oracle'
         print('replacement modes oracle: PASS')
     else:
         (HERE / 'expected.json').write_text(text, encoding='utf-8')
 
         (HERE / 'expected-run.json').write_text(json.dumps(run, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
+
+        (HERE / 'expected-reopened-run.json').write_text(json.dumps(reopened, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
