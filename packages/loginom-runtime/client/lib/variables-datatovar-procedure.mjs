@@ -115,7 +115,9 @@ export async function configureDataToVar(channel,p,{newNode=false}={}){
   const editor=async()=>{
    const s=await channel.observe({condition:'complete bound table-to-variables factor editor',readDataToVar:true,ready:editorReady});
    need(same(s.node_datatovar.node_context,owner),'factor editor owner changed');
-   need(same(s.node_datatovar.input_fields.map(unchanged),expected),'input identity changed in factor editor');
+   // The open dialog edits this field; its list settings are checked after Apply.
+   const editing=xs=>xs.map(x=>x.record_id===f.record_id?{...x,settings:null}:x);
+   need(same(editing(s.node_datatovar.input_fields.map(unchanged)),editing(expected)),'input identity changed in factor editor');
    const os=s.wizard.factor_editor.options;
    need(os.length===14&&FACTORS.every(a=>os.filter(o=>o.aggregation===a).length===1)
     &&os.every(o=>typeof o.checked==='boolean'&&typeof o.enabled==='boolean'&&typeof o.display_ref==='string')

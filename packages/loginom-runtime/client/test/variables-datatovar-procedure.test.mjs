@@ -6,7 +6,7 @@ const spec=(name='X',aggregations=['sum','count','min','max','avg'])=>({fields:[
 function fixture(){
  const owner={verified:true,surface:'wizard',document_id:'d',workflow_id:'w',node_id:'n'};
  const fields=['RowID','X','Category'].map((name,i)=>({record_id:'r'+i,name,label:name,type:i===2?'string':'integer',role:i===0?'selected':'available',order:i===0?0:-1,functions:i===0?1:0,settings:{Separator:',',Wrapper:'',UniqueOnly:false}}));
- let selected=fields[0],editor=null,moves=0,omit='',done=false,applyHook=null;const mutations=[];
+ let selected=fields[0],editor=null,moves=0,omit='',done=false,applyHook=null,liveSettings=false;const mutations=[];
  const state=()=>{
   const used=fields.filter(f=>f.role==='selected').sort((a,b)=>a.order-b.order);
   return {prepared_node_context:structuredClone(owner),wizard:{root_tid:'W',stage:done?'done':'datatovar',...(editor?{factor_editor:{status:'rendered_factor_options',selected_field:{field_key:editor.name},options:['sum','count','min','max','average','median','mode','standard_deviation','unique_count','null_count','first','last','only','concat'].map((aggregation,i)=>({aggregation,display_ref:'check'+i,checked:!!(editor.draft&(1<<i)),enabled:true}))}}:{})},
@@ -20,7 +20,7 @@ function fixture(){
  const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
   const s=state();assert.ok(o.ready(s),o.condition);const action=o.resolve(s);mutations.push(action);moves++;
   if(action.verb==='wizard_step'){assert.equal(action.ref,'Next');assert.equal(action.expected_stage,'done');done=true;return;}
-  if(action.verb==='set_checked'){const bit=1<<Number(action.ref.slice(5));if(action.checked)editor.draft|=bit;else editor.draft&=~bit;return;}
+  if(action.verb==='set_checked'){const bit=1<<Number(action.ref.slice(5));if(action.checked)editor.draft|=bit;else editor.draft&=~bit;if(liveSettings&&bit===8192)editor.field.settings={...editor.field.settings,Wrapper:'live'};return;}
   if(action.ref==='FactorEditDialog;btnApply'){
    // Observed native behavior to model: enabling «Список» writes its list defaults.
    if((editor.draft^editor.field.functions)&8192)editor.field.settings={...editor.field.settings,UniqueOnly:!!(editor.draft&8192)};
@@ -36,7 +36,7 @@ function fixture(){
   if(action.ref.endsWith('btnUp')){const previous=fields.find(f=>f.role==='selected'&&f.order===selected.order-1);assert.ok(previous);previous.order++;selected.order--;return;}
   selected=fields.find(f=>f.name===action.ref);assert.ok(selected,'summary cannot be selected');
  }};
- return {channel,fields,owner,mutations,moves:()=>moves,omit:name=>omit=name,onApply:hook=>applyHook=hook};
+ return {channel,fields,owner,mutations,moves:()=>moves,omit:name=>omit=name,onApply:hook=>applyHook=hook,liveSettings:()=>liveSettings=true};
 }
 
 test('DataToVar replaces selected fields and applies the exact native function bitset',async()=>{
@@ -99,4 +99,10 @@ test('DataToVar refuses list-setting changes outside the field whose concat Appl
  await assert.rejects(configureDataToVar(f.channel,spec('X',['concat'])),/unrelated settings/);
  const g=fixture();g.onApply(field=>{field.settings={...field.settings,Separator:';'};});
  await assert.rejects(configureDataToVar(g.channel,spec('X',['median'])),/unrelated settings/);
+});
+
+test('DataToVar tolerates list settings bound live by the open dialog and verifies them after Apply',async()=>{
+ const f=fixture();f.liveSettings();
+ const r=await configureDataToVar(f.channel,spec('X',['first','concat']));
+ assert.deepEqual(r.preservation.native_concat_settings[0].settings,{Separator:',',Wrapper:'live',UniqueOnly:true});
 });
