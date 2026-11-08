@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { chmod, copyFile, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { delimiter, join, resolve } from "node:path"
 import { ripgrepArchiveName, ripgrepPinForTarget, ripgrepPins, stageRipgrep } from "../script/ripgrep-resource"
@@ -113,72 +113,91 @@ test("bundled ripgrep is appended to PATH once and never shadows a system rg", (
   expect(windows).toEqual({ Path: ["C:\\Windows", bundled].join(delimiter) })
 })
 
-// The agent's glob resolves rg through packages/core. With the bundled directory
-// on PATH it must neither need a system rg nor reach github.com.
-const systemRipgrep = Bun.which("rg")
-posixTest.skipIf(!systemRipgrep)(
+// The agent's glob resolves rg through packages/core. The rg under test is the one the build
+// stages: the pinned release archive from the build cache, verified against its SHA256 (and
+// fetched into that cache once when absent), so the test does not depend on a system rg.
+const hostPin = (() => {
+  try {
+    return ripgrepPinForTarget(`${process.platform}-${process.arch}`)
+  } catch {
+    return undefined
+  }
+})()
+
+async function globInIsolatedProfile(input: { bundled: boolean }) {
+  const root = await mkdtemp(join(tmpdir(), "loginom-rg-glob-"))
+  try {
+    const resources = join(root, "resources")
+    await stageRipgrep({ resources, pin: hostPin! })
+    const workspace = join(root, "workspace")
+    await mkdir(join(workspace, "src"), { recursive: true })
+    await writeFile(join(workspace, "src/table.csv"), "a,b\n")
+    const emptyBin = join(root, "empty-bin")
+    await mkdir(emptyBin)
+    const script = join(root, "glob.ts")
+    await writeFile(
+      script,
+      [
+        `import { Effect } from ${JSON.stringify(Bun.resolveSync("effect", resolve(import.meta.dir, "../../core/src")))}`,
+        `import { LayerNode } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/effect/layer-node.ts"))}`,
+        `import { Ripgrep } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/ripgrep.ts"))}`,
+        `const files = await Effect.runPromise(Effect.gen(function* () {`,
+        `  return yield* (yield* Ripgrep.Service).glob({ cwd: ${JSON.stringify(workspace)}, pattern: "**/*", limit: 10 })`,
+        `}).pipe(Effect.provide(LayerNode.compile(Ripgrep.node))))`,
+        `console.log(JSON.stringify(files.map((file) => file.path)))`,
+      ].join("\n"),
+    )
+    const closed = "http://127.0.0.1:9"
+    const isolated = {
+      PATH: emptyBin,
+      HOME: join(root, "home"),
+      XDG_CACHE_HOME: join(root, "xdg/cache"),
+      XDG_DATA_HOME: join(root, "xdg/data"),
+      XDG_CONFIG_HOME: join(root, "xdg/config"),
+      XDG_STATE_HOME: join(root, "xdg/state"),
+      HTTPS_PROXY: closed,
+      HTTP_PROXY: closed,
+      https_proxy: closed,
+      http_proxy: closed,
+      NO_PROXY: "",
+    }
+    const child = Bun.spawn([process.execPath, script], {
+      cwd: resolve(import.meta.dir, ".."),
+      env: input.bundled ? withBundledRipgrep(isolated, resources) : isolated,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    // Any rg core fetched at runtime would land under the isolated XDG directories.
+    const downloaded = Bun.spawnSync(["find", join(root, "xdg"), "-name", "rg*"]).stdout.toString()
+    return { stdout, stderr, code, downloaded }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+posixTest.skipIf(!hostPin)(
   "glob uses the bundled rg without a system rg and without network access",
   async () => {
-    const root = await mkdtemp(join(tmpdir(), "loginom-rg-glob-"))
-    try {
-      const resources = join(root, "resources")
-      await mkdir(join(resources, ripgrepDirectory), { recursive: true })
-      await copyFile(systemRipgrep!, join(resources, ripgrepDirectory, "rg"))
-      await chmod(join(resources, ripgrepDirectory, "rg"), 0o755)
-      const workspace = join(root, "workspace")
-      await mkdir(join(workspace, "src"), { recursive: true })
-      await writeFile(join(workspace, "src/table.csv"), "a,b\n")
-      const emptyBin = join(root, "empty-bin")
-      await mkdir(emptyBin)
-      const script = join(root, "glob.ts")
-      await writeFile(
-        script,
-        [
-          `import { Effect } from ${JSON.stringify(Bun.resolveSync("effect", resolve(import.meta.dir, "../../core/src")))}`,
-          `import { LayerNode } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/effect/layer-node.ts"))}`,
-          `import { Ripgrep } from ${JSON.stringify(resolve(import.meta.dir, "../../core/src/ripgrep.ts"))}`,
-          `const files = await Effect.runPromise(Effect.gen(function* () {`,
-          `  return yield* (yield* Ripgrep.Service).glob({ cwd: ${JSON.stringify(workspace)}, pattern: "**/*", limit: 10 })`,
-          `}).pipe(Effect.provide(LayerNode.compile(Ripgrep.node))))`,
-          `console.log(JSON.stringify(files.map((file) => file.path)))`,
-        ].join("\n"),
-      )
-      const closed = "http://127.0.0.1:9"
-      const env = withBundledRipgrep(
-        {
-          PATH: emptyBin,
-          HOME: join(root, "home"),
-          XDG_CACHE_HOME: join(root, "xdg/cache"),
-          XDG_DATA_HOME: join(root, "xdg/data"),
-          XDG_CONFIG_HOME: join(root, "xdg/config"),
-          XDG_STATE_HOME: join(root, "xdg/state"),
-          HTTPS_PROXY: closed,
-          HTTP_PROXY: closed,
-          https_proxy: closed,
-          http_proxy: closed,
-          NO_PROXY: "",
-        },
-        resources,
-      )
-      const child = Bun.spawn([process.execPath, script], {
-        cwd: resolve(import.meta.dir, ".."),
-        env,
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-      const [stdout, stderr, code] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      expect({ code, stderr: code === 0 ? "" : stderr }).toEqual({ code: 0, stderr: "" })
-      expect(JSON.parse(stdout.trim().split("\n").at(-1)!)).toEqual(["src/table.csv"])
-      // No runtime download: core's cache bin directory is never created.
-      const downloaded = Bun.spawnSync(["find", join(root, "xdg"), "-name", "rg*"]).stdout.toString()
-      expect(downloaded).toBe("")
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    const result = await globInIsolatedProfile({ bundled: true })
+    expect({ code: result.code, stderr: result.code === 0 ? "" : result.stderr }).toEqual({ code: 0, stderr: "" })
+    expect(JSON.parse(result.stdout.trim().split("\n").at(-1)!)).toEqual(["src/table.csv"])
+    expect(result.downloaded).toBe("")
+  },
+  60_000,
+)
+
+// The same profile without the bundled directory on PATH reproduces the LAB-1094 failure.
+posixTest.skipIf(!hostPin)(
+  "glob without the bundled rg on PATH fails with ripgrep execution failed",
+  async () => {
+    const result = await globInIsolatedProfile({ bundled: false })
+    expect(result.code).not.toBe(0)
+    expect(result.stderr).toContain("ripgrep execution failed")
   },
   60_000,
 )
