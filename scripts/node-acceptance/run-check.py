@@ -253,6 +253,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'text-multi-file-list':
+        node = REPO / 'docs/node-development/nodes/text-import'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file-list.md',
+                    data=node / 'fixtures/multi-file', input_files=['sales_2026-02.csv', 'sales_2026-01.csv', 'returns_2026-01.csv'],
+                    base=None, expected_name='expected-list.json', oracle=node / 'acceptance/oracle-multi-file.py')
     if name in ['text-auto-types', 'text-auto-update']:
         node = REPO / 'docs/node-development/nodes/text-import'
         update = name == 'text-auto-update'

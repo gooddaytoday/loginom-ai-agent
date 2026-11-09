@@ -6,7 +6,8 @@ export function verifyConfiguredImportContinuation({node,configured,source,forma
   if(!sameNode(source?.node_context)||!sameNode(format?.prepared_node_context)||source.verified!==true
     ||format.wizard?.stage!=='text_import_format'||format.wizard.column_parameters||!schema?.definition_complete
     ||schema.schema_id!==configured.schema_id||schema.fields?.length!==configured.columns?.length)return false;
-  if(!['source_path','connection','encoding','rows_to_skip','first_line_as_title'].every(k=>
+  if(!['source_path','connection','encoding','rows_to_skip','first_line_as_title',
+    ...['file_info','parallel_processing'].filter(k=>configured.source?.fields?.[k]?.status==='observed')].every(k=>
     configured.source?.fields?.[k]?.status==='observed'&&!configured.source.fields[k].truncated
       &&source.values?.[k]===configured.source.fields[k].value))return false;
   if(!Object.entries(configured.format?.fields??{}).every(([k,v])=>v.status==='observed'&&!v.truncated
@@ -36,6 +37,18 @@ export function readRetainedImportSourceBrowser({rootTid}) {
   const tid=base+'edtFirstLineAsTitle;ValueControl',owners=exact(tid),displays=exact(tid+';DisplayEl');
   if(owners.length!==1||!root.contains(owners[0])||displays.length!==1||!owners[0].contains(displays[0])||!displays[0].matches('.x-form-checkbox'))return fail('source_checkbox');
   values.first_line_as_title=owners[0].classList.contains('x-form-cb-checked');
+  const info=exact(base+'cbbFileInfoColumnsType;ValueControl');
+  if(info.length){
+    const inputs=info.length===1?[...info[0].querySelectorAll('input:not([type="hidden"]):not([type="password"])')]:[];
+    if(info.length!==1||!root.contains(info[0])||inputs.length!==1||inputs[0].value.length>256)return fail('file_info');
+    values.file_info=inputs[0].value;
+  }
+  const parallel=exact(base+'chkParallelProcessing;ValueControl');
+  if(parallel.length){
+    const display=exact(base+'chkParallelProcessing;ValueControl;DisplayEl');
+    if(parallel.length!==1||!root.contains(parallel[0])||display.length!==1||!parallel[0].contains(display[0])||!display[0].matches('.x-form-checkbox'))return fail('parallel_processing');
+    values.parallel_processing=parallel[0].classList.contains('x-form-cb-checked');
+  }
   return {verified:true,values,source:'retained_wizard_controls',server_bytes_verified:false};
 }
 

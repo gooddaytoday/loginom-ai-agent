@@ -19,6 +19,14 @@ production checkpoints verify Spearman followed by Kendall tau-b on the same
 node, tied values, exact native types/field order and abs=1e-8/rel=1e-10.
 Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
 
+`text-multi-file-list` uses `text-import/acceptance/task-multi-file-list.md`,
+only the three original `fixtures/multi-file/*.csv` inputs and the independent
+`extended/expected-list.json` from `oracle-multi-file.py`. One native Import
+appends February then January, excludes returns, retains duplicates and adds
+the native FileName field. Full typed output, exact field order, CSV, Save,
+cold reexecution without configuration and cleanup use the stock checks.
+Only task and CSV inputs reach the model.
+
 Run live acceptance without repeatedly reading live logs:
 
 `import-bindings` uses the approved `variables/bindings/acceptance/task-import.md`
