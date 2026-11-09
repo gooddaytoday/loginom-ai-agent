@@ -6,10 +6,14 @@ Native reader Loginom 7.4.2 для `train.csv`, support=50%, confidence=60%,
 max_items=3, max_consequents=2 подтвердил следующие схемы:
 
 - Порт 0: ItemsetID integer, Width integer, Support real, Item_0/Item_1/Item_2 string.
-- Порт 1: RuleID integer, Support/Confidence/Lift real, Item_0_A/Item_0_C/Item_1_A/Item_1_C string, именно в этом порядке.
+- Порт 1 нового узла длины 3: RuleID integer, Support/Confidence/Lift real, Item_0_A/Item_1_A/Item_0_C/Item_1_C string.
 
-Пустые позиции — типизированный NULL. Чередование A/C сохраняется и у
-двух следствий. Привязка перечисления наборов и правил — в
+Пустые позиции — типизированный NULL. Полный native-путь нового узла
+(Teach → Execute → Save → cold → Teach с min_lift=1.2 → Execute)
+сохраняет группированный порядок A/A/C/C. Ранее наблюдённый путь изменения
+длины 2→3 давал A/C/A/C: reader проверяет имена/типы и возвращает фактический
+порядок данного узла. Stock expected привязан к полному пути нового узла;
+числа, RuleID, ширина и NULL padding не изменены. Привязка перечисления наборов и правил — в
 `consequents_expected()`; она относится только к этому fixture, численные
 метрики и состав правил вычисляются независимым Fraction-oracle.
 При min_lift=0 получаются 7 наборов и 12 правил; после изменения min_lift=1.2

@@ -120,7 +120,10 @@ def consequents_expected(lift):
     set_columns = [column('ItemsetID', 'integer'), column('Width', 'integer'), column('Support', 'real')]
     set_columns += [column('Item_' + str(i), 'string') for i in range(3)]
     rule_columns = [column('RuleID', 'integer')] + [column(n, 'real') for n in ['Support', 'Confidence', 'Lift']]
-    rule_columns += [column('Item_' + str(i) + '_' + side, 'string') for i in range(2) for side in ['A', 'C']]
+    # Fresh max_items=3 node: Teach, Execute, Save, cold and lift retraining
+    # retain grouped A/A/C/C columns (LAB-1239 native cycle 2). Metrics below
+    # remain independent of this native schema binding.
+    rule_columns += [column('Item_' + str(i) + '_' + side, 'string') for side in ['A', 'C'] for i in range(2)]
     return [output(0, set_columns, [dict(ItemsetID=index, Width=len(s['items']), Support=s['support'],
         **{'Item_' + str(i): s['items'][i] if i < len(s['items']) else None for i in range(3)})
         for index, s in enumerate(sets, 1)]),

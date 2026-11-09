@@ -6,7 +6,10 @@ export function assnRulesOutputColumns(configuration,port){
  return names.map((name,index)=>({name,type:index>=(port===0?3:4)?'string':['ItemsetID','Width','RuleID'].includes(name)?'integer':'real'}));
 }
 export function alignAssnRulesOutput(columns,expected){
- if(columns.length!==expected.length||columns.some((c,i)=>c.name!==expected[i].name||c.type!==expected[i].type))throw Error('Association rules: output field order or types differ');
+ // Native field order depends on how the node was configured. Validate the
+ // complete named inventory, then retain this node's schema and row positions.
+ const actual=new Map(columns.map(c=>[c.name,c.type]));
+ if(columns.length!==expected.length||actual.size!==expected.length||expected.some(c=>actual.get(c.name)!==c.type))throw Error('Association rules: output fields or types differ');
  return columns;
 }
 export async function readAssnRulesOutputs(channel,read,ctx,mapped){

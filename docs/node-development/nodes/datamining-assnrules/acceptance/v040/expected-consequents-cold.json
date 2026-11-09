@@ -156,12 +156,12 @@
           "label_any": true
         },
         {
-          "name": "Item_0_C",
+          "name": "Item_1_A",
           "type": "string",
           "label_any": true
         },
         {
-          "name": "Item_1_A",
+          "name": "Item_0_C",
           "type": "string",
           "label_any": true
         },
