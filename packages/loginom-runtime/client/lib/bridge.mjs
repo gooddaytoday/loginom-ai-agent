@@ -811,15 +811,17 @@ export async function createBridge(config, session, { browserTransport: managedB
                 // The reopened package is a new node in a new tab. Bind it like
                 // open_package to an already active package: no gesture, same
                 // document/account/path. The native tab guard stays unchanged.
+                // Nothing to wait for on an active package: keep binding plus
+                // cleanup (30 s) inside the host close budget (45 s).
                 if (reopenedSave && reopenedSave.path === packagePath && reopenedSave.preparation === prepared
                     && !unsavedDraft && !openedPackage) {
                   let bound = null;
                   try {
                     const code = makeWorkspacePrepareCode({loginomUrl:config.loginomUrl, compatibility:pinnedActions.compatibility,
                       sessionId:session.metadata.sessionId, operationId:'cleanup-rebind-'+randomUUID(), intent:'open_package',
-                      packagePath, timeoutMs:10000, bindOpenOnly:true});
+                      packagePath, timeoutMs:5000, bindOpenOnly:true});
                     bound = structuredClone(redactor.redact(parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',
-                      arguments:{code}}, undefined, {timeout:11000}))));
+                      arguments:{code}}, undefined, {timeout:6000}))));
                   } catch {}
                   const accepted = bound?.status === 'READY' && bound.effect_possible === false && bound.created_draft === false
                     && bound.document_id === prepared.state.document_id && bound.loginom_account === prepared.state.loginom_account

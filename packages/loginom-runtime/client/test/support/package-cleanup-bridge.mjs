@@ -28,7 +28,7 @@ class ExternalClient {
   async connect(t){this.transport=t;}
   async close(){this.f.events.push(this.browser?'browser-close':'remote-close');this.transport?.onclose?.();}
   async listTools(){return {tools:[{name:this.browser?'browser_run_code_unsafe':'read',inputSchema:{type:'object'}}]};}
-  async callTool(request){
+  async callTool(request,_schema,options){
     if(!this.browser){
       assert.equal(request.name,'read');
       const text=this.f.catalog.files.get(request.arguments.uris[0]);assert.equal(typeof text,'string');
@@ -53,6 +53,7 @@ class ExternalClient {
         // already active package can issue a receipt for its new tab.
         const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1));
         this.f.events.push('prepare:'+o.intent+(o.bindOpenOnly?':bind':''));
+        if(o.bindOpenOnly)this.f.bindBudget={timeoutMs:o.timeoutMs,timeout:options?.timeout};
         value={...value,operation_id:o.operationId,created_draft:false,ownership_verified:false,effect_possible:false,
           workflow_ref:{...value.workflow_ref,tab_tid:this.f.activeTab,prefix:'MF;TF-5'},package_ref:{path:o.packagePath,persisted:true},
           ...(o.bindOpenOnly?this.f.rebind:{})};
@@ -579,12 +580,14 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
 
 // LAB-1331: Save As closes the package and reopens it in a new tab. Cleanup
 // rebinds only that already active package; the tab guard stays native.
-for(const scenario of ['reopened','reopened-then-checkpoint','reopened-reprepared','reopened-rebind-effect','reopened-rebind-path'])
+const rebindFaults={'reopened-rebind-effect':{effect_possible:true},'reopened-rebind-path':{package_ref:{path:secondPath,persisted:true}},
+ 'reopened-rebind-document':{document_id:'other-doc'},'reopened-rebind-account':{loginom_account:'foreign'},'reopened-rebind-not-ready':{status:'NOT_READY'}};
+for(const scenario of ['reopened','reopened-then-checkpoint','reopened-reprepared',...Object.keys(rebindFaults)])
  test('normal shutdown after Save As reopened the package: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-reopened-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),catalog,reopen:true,
-    rebind:scenario==='reopened-rebind-effect'?{effect_possible:true}:scenario==='reopened-rebind-path'?{package_ref:{path:secondPath,persisted:true}}:{}};
+    rebind:rebindFaults[scenario]??{}};
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
   const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
@@ -616,6 +619,10 @@ for(const scenario of ['reopened','reopened-then-checkpoint','reopened-reprepare
    // A model preparation after the reopen already owns the new tab: no extra binding.
    assert.deepEqual(f.events.filter(e=>e.startsWith('prepare:')),
     scenario==='reopened-reprepared'?['prepare:open_package']:['prepare:open_package:bind']);
+   // The package is already active: the binding must not spend the host close budget (45 s) waiting for readiness.
+   if(scenario!=='reopened-reprepared'){
+    assert.ok(f.bindBudget.timeoutMs<=5000,JSON.stringify(f.bindBudget));assert.ok(f.bindBudget.timeout<=6000,JSON.stringify(f.bindBudget));
+   }
    assert.equal(f.events.filter(e=>e==='package-cleanup').length,accepted?1:0);
    if(accepted){
     assert.equal(f.cleanupOptions.tabTid,f.activeTab);assert.equal(f.cleanupOptions.packagePath,path);

@@ -200,6 +200,10 @@ test('bindOpenOnly binds the active saved package without any package gesture',a
   assert.deepEqual(fixture.events,['navigate']);
   const receipt=fixture.context.__loginomDockPreparationV1.receipts.get('cleanup-rebind-1');
   assert.equal(receipt.phase,'verified');assert.equal(receipt.tab,fixture.tabs[0]);
+  // A rebinding never replays or adopts an existing receipt, even its own.
+  const replay=await execute(fixture,{intent:'open_package',operationId:'cleanup-rebind-1',packagePath:'/user/B.lgp',timeoutMs:500,bindOpenOnly:true});
+  assert.equal(replay.status,'NOT_READY');assert.equal(replay.reason,'OPERATION_CONFLICT');assert.equal(replay.effect_possible,false);
+  assert.deepEqual(fixture.events,['navigate']);
 });
 
 for(const situation of ['home','other-package','blank-page'])test('bindOpenOnly refuses without a package gesture: '+situation,async()=>{
@@ -217,7 +221,8 @@ test('bindOpenOnly is limited to an exact open_package binding without login',()
   const base={loginomUrl:'http://loginom.example/app',compatibility:{profile_id:'tested-ui',loginom_build:build,platform:'macos',browser:'chromium'},platform:'darwin'};
   assert.doesNotThrow(()=>makeWorkspacePrepareCode({...base,intent:'open_package',packagePath:'/user/B.lgp',bindOpenOnly:true}));
   for(const changed of [{intent:'new_draft'},{intent:'open_package',packagePath:'/user/B.lgp',allowTestLogin:true,testLoginUser:'test-account'},
-    {intent:'open_package',packagePath:'/user/B.lgp',recoverOnly:true},{intent:'open_package',packagePath:'/user/B.lgp',bindOpenOnly:'yes'}])
+    {intent:'open_package',packagePath:'/user/B.lgp',recoverOnly:true},{intent:'open_package',packagePath:'/user/B.lgp',identityOnly:true},
+    {intent:'open_package',packagePath:'/user/B.lgp',bindOpenOnly:'yes'}])
     assert.throws(()=>makeWorkspacePrepareCode({...base,bindOpenOnly:true,...changed}),/bind/i);
 });
 
