@@ -3,6 +3,7 @@ import {
   collectNewSessionDeepLinks,
   collectOpenProjectDeepLinks,
   drainPendingDeepLinks,
+  parseDashboardDeepLink,
   parseDeepLink,
   parseNewSessionDeepLink,
 } from "./deep-links"
@@ -78,6 +79,27 @@ describe("layout deep links", () => {
     expect(result).toEqual(["/a", "/c"])
   })
 
+  test("receives a dashboard snapshot and the requested action from Loginom", () => {
+    const id = "9465655a-84c2-4fd3-bcfe-a2c4024168e2"
+    expect(parseDashboardDeepLink(`loginom-ai-agent://dashboard?action=edit&id=${id}`)).toEqual({ id, action: "edit" })
+  })
+
+  test("rejects noncanonical dashboard targets and extra instructions", () => {
+    const base = "loginom-ai-agent://dashboard"
+    const query = "?id=9465655a-84c2-4fd3-bcfe-a2c4024168e2&action=create"
+    for (const input of [
+      base + "?id=latest&action=edit",
+      base + query + "&directory=/tmp",
+      base + query + "&action=edit",
+      base + ":9000" + query,
+      base + "/publish" + query,
+      "loginom-ai-agent://user@dashboard" + query,
+      base + query + "#extra",
+    ]) {
+      expect(parseDashboardDeepLink(input)).toBeUndefined()
+    }
+  })
+
   test("parses new-session deep links with optional prompt", () => {
     expect(parseNewSessionDeepLink("loginom-ai-agent://new-session?directory=/tmp/demo")).toEqual({
       directory: "/tmp/demo",
@@ -100,6 +122,17 @@ describe("layout deep links", () => {
       "loginom-ai-agent://new-session?directory=/c&prompt=ship%20it",
     ])
     expect(result).toEqual([{ directory: "/a" }, { directory: "/c", prompt: "ship it" }])
+  })
+
+  test("a dashboard waits for the addressed draft and is delivered once", async () => {
+    const { dashboardRoute, deliverDashboard, takeDashboard } = await import("./dashboard-handoff")
+    const first = dashboardRoute("local", "/new-session", "A")
+    const second = dashboardRoute("local", "/new-session", "B")
+    const item = { type: "dashboard", id: "A", action: "edit", nodeName: "ROI" } as const
+    deliverDashboard(first, item)
+    expect(takeDashboard(second)).toBeUndefined()
+    expect(takeDashboard(first)).toEqual(item)
+    expect(takeDashboard(first)).toBeUndefined()
   })
 
   test("drains global deep links once", () => {

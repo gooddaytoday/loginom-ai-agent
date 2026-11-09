@@ -30,6 +30,17 @@ export const parseNewSessionDeepLink = (input: string) => {
   return { directory, prompt }
 }
 
+export const parseDashboardDeepLink = (input: string) => {
+  const url = parseUrl(input)
+  if (url?.host !== "dashboard" || url.pathname || url.username || url.password || url.hash) return
+  if (url.searchParams.size !== 2) return
+  const id = url.searchParams.get("id")
+  const action = url.searchParams.get("action")
+  if (!id || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) return
+  if (action !== "create" && action !== "edit") return
+  return { id, action } as const
+}
+
 export const collectOpenProjectDeepLinks = (urls: string[]) =>
   urls.map(parseDeepLink).filter((directory): directory is string => !!directory)
 

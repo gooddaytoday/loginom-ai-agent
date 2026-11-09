@@ -71,9 +71,8 @@ import {
 import {
   collectNewSessionDeepLinks,
   collectOpenProjectDeepLinks,
-  deepLinkEvent,
-  drainPendingDeepLinks,
 } from "./layout/deep-links"
+import { useDashboardDeepLinks } from "./layout/dashboard-links"
 import { createInlineEditorController } from "./layout/inline-editor"
 import {
   LocalWorkspace,
@@ -147,7 +146,7 @@ export default function LegacyLayout(props: ParentProps) {
   const currentDir = createMemo(() => route().dir)
 
   const [state, setState] = createStore({
-    autoselect: !initialDirectory,
+    autoselect: !initialDirectory && !window.__LOGINOM_AI_AGENT__?.coldDashboard,
     busyWorkspaces: {} as Record<string, boolean>,
     hoverProject: undefined as string | undefined,
     scrollSessionKey: undefined as string | undefined,
@@ -1270,17 +1269,7 @@ export default function LegacyLayout(props: ParentProps) {
     }
   }
 
-  onMount(() => {
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ urls: string[] }>).detail
-      const urls = detail?.urls ?? []
-      if (urls.length === 0) return
-      handleDeepLinks(urls)
-    }
-
-    handleDeepLinks(drainPendingDeepLinks(window))
-    makeEventListener(window, deepLinkEvent, handler as EventListener)
-  })
+  useDashboardDeepLinks(handleDeepLinks)
 
   async function renameProject(project: LocalProject, next: string) {
     const current = displayName(project)
