@@ -26,3 +26,13 @@ test('three-item rules accept two consequents and lift patches on the existing t
  for(const patch of [{max_items:2.5},{max_items:1},{max_consequents:0},{max_consequents:3},{max_consequents:1.5},{min_lift:Infinity},{min_lift:'1.2'}])
   assert.throws(()=>validateAssnRulesParameters({...p,...patch},'fp_growth',request),/Association rules/);
 });
+
+test('selected auxiliary items and support exclusion validate patches on the same node',()=>{
+ const filters={selected_item_field:'Item',contain_selected_items:true,exclude_support_above_pct:90};
+ validateAssnRulesParameters({...p,...filters},'fp_growth',{...request,inputs:[{input:0},{input:1}]});
+ validateAssnRulesParameters({exclude_support_above_pct:90},'fp_growth',{...request,target:{kind:'existing'},inputs:[]});
+ for(const patch of [{selected_item_field:''},{contain_selected_items:'true'},{exclude_support_above_pct:101},{exclude_support_above_pct:-1},{exclude_support_above_pct:NaN}])
+  assert.throws(()=>validateAssnRulesParameters({...p,...filters,...patch},'fp_growth',{...request,inputs:[{input:0},{input:1}]}),/Association rules/);
+ for(const inputs of [[{input:1}],[{input:0},{input:2}],[{input:0},{input:1},{input:1}]])
+  assert.throws(()=>validateAssnRulesParameters({...p,...filters},'fp_growth',{...request,inputs}),/Association rules/);
+});

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readAssnRulesBrowser,readAssnRulesContext} from '../lib/assn-rules-context.mjs';
 
-function fixture(count=5) {
- const base='MF;TF;WizrdMCF;TuneDataSourceInputPortWizard;',elements=[],components={};
+function fixture(count=5,auxiliary=false) {
+ const base='MF;TF;WizrdMCF;TuneDataSourceInputPortWizard'+(auxiliary?'-1':'')+';',elements=[],components={};
  const element=(tid,parent)=>{const e={id:'e'+elements.length,tid,parent,checkVisibility:()=>true,contains(x){return x===this||x.parent===this;}};elements.push(e);return e;};
  const root=element(base.slice(0,-1));
  const records=Array.from({length:count},(_,i)=>({isModel:true,internalId:'r'+i,data:{ID:i,Index:i,Name:'F'+i,DisplayName:'Одинаковая метка',DataType:5,DataKind:2,UsageType:0,DefaultUsageType:0,GroupField:"",OriginType:0,Broken:false,ReverseBroken:false}}));
@@ -41,3 +41,10 @@ test('assn-rules ownership must remain stable across the complete read',async()=
  for(const extra of [{input_port:{}},{output_port:{}},{surface:'graph'}])assert.equal((await readAssnRulesContext({}, {},async()=>({verified:true,surface:'wizard',...extra}))).reason,'assn_rules_node_surface');
 });
 
+
+test('auxiliary role reader proves the complete typed inventory, not only its count',()=>{
+ const f=fixture(2,true);f.records[0].data.UsageType=7;
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.kind,'auxiliary');
+ assert.equal(r.inventory_complete,true);assert.equal(r.fields[0].usage_type,7);
+ f.proxy.pendingOperations={read:{}};assert.equal(f.read().verified,false);
+});

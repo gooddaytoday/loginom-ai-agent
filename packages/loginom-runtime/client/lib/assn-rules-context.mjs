@@ -15,11 +15,7 @@ export async function readAssnRulesContext(page,binding,readNode=readPreparedNod
 
 export function readAssnRulesBrowser(prefix) {
  const auxiliaryBase=prefix+';WizrdMCF;TuneDataSourceInputPortWizard-1',auxiliaryRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(auxiliaryBase)+']')];
- if(auxiliaryRoots.length===1&&auxiliaryRoots[0].checkVisibility({checkVisibilityCSS:true})){
-  const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(auxiliaryBase+';grdTargetColumns')+']')],grid=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id),store=grid?.getStore?.(),records=store?.getData?.()?.items;
-  if(grid?.el?.dom!==es[0]||store?.$className!=='Ext.data.Store'||store.isLoading?.()||!Array.isArray(records)||store.getCount?.()!==records.length)return {verified:false,reason:'assn_rules_auxiliary'};
-  return {verified:true,kind:'auxiliary',field_count:records.length};
- }
+ const auxiliary=auxiliaryRoots.length===1&&auxiliaryRoots[0].checkVisibility({checkVisibilityCSS:true});
  const parameterBase=prefix+';WizrdMCF;AssnRulesWizard;',parameterRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(parameterBase.slice(0,-1))+']')];
  if(parameterRoots.length===1&&parameterRoots[0].checkVisibility({checkVisibilityCSS:true})){
   const values={},switches={};
@@ -34,7 +30,7 @@ export function readAssnRulesBrowser(prefix) {
   if(!['pedExcludeLargeSupportItems','pedSelectColumn','pedExcludeSingleItems'].every(k=>typeof values[k]==='boolean')||!['pedMinSupport','pedMaxSupport','pedNItemsMax','pedMinConfidence','pedMinLift','pedNConsequentMax'].every(k=>typeof values[k]==='number'&&Number.isFinite(values[k])))return {verified:false,reason:'assn_rules_initializing'};
   return {verified:true,kind:'parameters',values,switches};
  }
- const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;TuneDataSourceInputPortWizard;';
+ const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;TuneDataSourceInputPortWizard'+(auxiliary?'-1':'')+';';
  const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
  const roots=exact(base.slice(0,-1)),root=roots[0];
  if(roots.length!==1||!root.checkVisibility({checkVisibilityCSS:true}))return fail('assn_rules_root');
@@ -64,5 +60,5 @@ export function readAssnRulesBrowser(prefix) {
   fields.push({index,record_id:id,field_id:String(d.ID),name:d.Name,label:d.DisplayName,type:types[d.DataType],
    data_kind:kinds[d.DataKind],usage_type:d.UsageType,origin_type:d.OriginType,selected:selection.includes(r)});
  }
- return {verified:true,inventory_complete:true,roles:{transaction:roles.utTransaction,item:roles.utItem},state_source:'cached_assn_rules_role_store',fields,settings_applied:false,source_identity_verified:false};
+ return {verified:true,kind:auxiliary?'auxiliary':'roles',field_count:fields.length,inventory_complete:true,roles:{transaction:roles.utTransaction,item:roles.utItem},state_source:'cached_assn_rules_role_store',fields,settings_applied:false,source_identity_verified:false};
 }

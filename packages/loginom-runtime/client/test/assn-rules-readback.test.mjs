@@ -35,3 +35,12 @@ test('Done commits settings without claiming training and foreign settings refus
  input.phases[1].value.configuration.node_context={...node,node_id:'foreign'};
  assert.throws(()=>assnRulesConfigurationReadback(input),/configuration owner/);
 });
+
+test('readback proves both trained inputs and retained selected-item filters',()=>{
+ const input=candidate();Object.assign(input.phases[1].value.configuration,{auxiliary:{fields:[{name:'Item',usage_type:7}],roles:{item:7}},contain_selected_items:true,exclude_support_above_pct:90});
+ input.phases.at(-1).value.training.source.push({node:{...node,node_id:'selected'},output:0,input:1});
+ const result=assnRulesConfigurationReadback(input);
+ assert.equal(result.selected_item_field,'Item');assert.equal(result.contain_selected_items,true);assert.equal(result.exclude_support_above_pct,90);
+ input.phases.at(-1).value.training.source[0].input=1;
+ assert.throws(()=>assnRulesConfigurationReadback(input),/training on the connected source/);
+});

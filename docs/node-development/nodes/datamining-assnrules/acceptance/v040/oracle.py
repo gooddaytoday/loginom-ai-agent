@@ -141,10 +141,35 @@ def consequents_artifacts():
             'expected-consequents-cold.json': dict(base, outputs=final)}
 
 
-if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):
-    for name, value in consequents_artifacts().items():
+def filters_artifacts():
+    # Bind the already established 7.4.2 enumeration; membership and metrics
+    # are independently computed from the original CSVs, never actual output.
+    source = baskets('train.csv')
+    selected = selected_items('selected-items.csv')
+    def outputs(exclude):
+        tables = consequents_expected(Fraction(0))
+        sets = itemsets(source, selected=selected, exclude_above=exclude)
+        found = rules(source, Fraction(0), 2, selected=selected, exclude_above=exclude)
+        tables[0]['rows'] = [row for row in tables[0]['rows']
+            if any([v for k, v in row.items() if k.startswith('Item_') and v is not None] == s['items'] for s in sets)]
+        tables[1]['rows'] = [row for row in tables[1]['rows'] if any(
+            [row['Item_' + str(i) + '_A'] for i in range(2) if row['Item_' + str(i) + '_A'] is not None] == r['antecedent'] and
+            [row['Item_' + str(i) + '_C'] for i in range(2) if row['Item_' + str(i) + '_C'] is not None] == r['consequent'] for r in found)]
+        for table, key in zip(tables, ['ItemsetID', 'RuleID']):
+            for index, row in enumerate(table['rows'], 1): row[key] = index
+        assert [len(t['rows']) for t in tables] == ([4, 10] if exclude is None else [2, 2])
+        return tables
+    base = dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
+        ['imports.text', 'imports.text', 'datamining.assn_rules', 'exports.text']])
+    final = outputs(MAX_SUPPORT)
+    return {'expected-filters.json': dict(base, outputs=outputs(None) + final),
+            'expected-filters-cold.json': dict(base, outputs=final)}
+
+
+if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents'], ['--write-filters'], ['--check-filters']):
+    for name, value in (filters_artifacts() if sys.argv[1].endswith('filters') else consequents_artifacts()).items():
         path = Path(__file__).with_name(name)
-        if sys.argv[1:] == ['--write-consequents']:
+        if sys.argv[1].startswith('--write-'):
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         else:
             assert json.loads(path.read_text(encoding='utf-8')) == value, name

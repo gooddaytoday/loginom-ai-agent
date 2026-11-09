@@ -126,9 +126,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     action_key: operation.action.action_key, action_revision: operation.action.revision,
     phase, internal_provenance: 'client_node_procedure_v1', ...details });
   const allowedDialog=(d,dialog)=>dialog && d.identity?.anchor_tid===dialog.table.table_tid+';ModalWindow_Browse'+(dialog.kind==='format'?'Format':'Filter');
-  const allowedOutputEditor=(dialog,state)=>['output_mapping','input_mapping'].includes(state.wizard?.stage)
+  const allowedOutputEditor=(dialog,state)=>['output_mapping','input_mapping','assn_rules_auxiliary'].includes(state.wizard?.stage)
     &&state.wizard.column_parameters?.status==='observed'&&state.wizard.column_parameters.portal_bound===true
-    &&state.wizard.column_parameters.root_tid===(state.wizard.stage==='input_mapping'?'EditTuneColumnDefForm':'EditColumnDefForm')
+    &&state.wizard.column_parameters.root_tid===(['input_mapping','assn_rules_auxiliary'].includes(state.wizard.stage)?'EditTuneColumnDefForm':'EditColumnDefForm')
     &&state.wizard.column_parameters.selected_column?.status==='observed'
     &&dialog.ref===state.wizard.column_parameters.root_ref&&dialog.identity?.anchor_tid===state.wizard.column_parameters.root_tid;
   const allowedExpressionEditor=(dialog,state)=>state.wizard?.stage==='calculator'
@@ -600,7 +600,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           wizardConfirmation??=wizardCloseBinding(roots.output);
         }
         const portals = wizard?.status === 'observed' ? (roots.output.ui?.elements??[]).filter(e =>
-          (e.tid?.startsWith(wizard.root_tid + ';') || wizard.stage==='table_tree' && e.tid?.startsWith('EditDataTreeNodeDefForm;') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && e.tid.endsWith(';boundlist')) : [];
+          (e.tid?.startsWith(wizard.root_tid + ';') || wizard.stage==='table_tree' && e.tid?.startsWith('EditDataTreeNodeDefForm;') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || ['input_mapping','assn_rules_auxiliary'].includes(wizard.stage) && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && e.tid.endsWith(';boundlist')) : [];
         if(portals.length>1)throw new Error('Node procedure dropdown owner is ambiguous');
         // Dropdowns live outside the wizard subtree. Reading the unique
         // portal plus fixed wizard guards avoids scanning unrelated file tabs.
@@ -614,7 +614,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const navigationRoot=readNavigation&&preparedNodeContext?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';NavigationBar;NavigationPanel')?.ref:undefined;
         const graphRoot=preparedNodeContext?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;cmpDiagram')?.ref:undefined;
         if(readNavigation&&!navigationRoot)throw Error('Prepared workflow navigation region unavailable');
-        const outputEditors=['output_mapping','input_mapping'].includes(wizard?.stage)?(roots.output.ui?.elements??[]).filter(e=>e.tid===(wizard.stage==='input_mapping'?'EditTuneColumnDefForm':'EditColumnDefForm')):[];
+        const outputEditors=['output_mapping','input_mapping','assn_rules_auxiliary'].includes(wizard?.stage)?(roots.output.ui?.elements??[]).filter(e=>e.tid===(['input_mapping','assn_rules_auxiliary'].includes(wizard.stage)?'EditTuneColumnDefForm':'EditColumnDefForm')):[];
         if(outputEditors.length>1)throw Error('Output field editor is ambiguous');
         const editorSuffix=wizard?.stage==='calculator'?';ExprDataEditForm':['grouping','datatovar'].includes(wizard?.stage)?';FactorEditDialog':null;
         const expressionEditors=editorSuffix?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+editorSuffix):wizard?.stage==='field_parameters'?(roots.output.ui?.elements??[]).filter(e=>['EditReformColumnDefForm',wizard.root_tid+';EditReformColumnDefForm'].includes(e.tid)):[];
@@ -637,7 +637,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(crossTableEditors.length>1)throw Error('CrossTable editor is ambiguous');
         const samplingFactorEditors=readSampling&&['sampling','data_partition'].includes(wizard?.stage)?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';FactorEditDialog'):[];
         if(samplingFactorEditors.length>1)throw Error('Sampling factor editor is ambiguous');
-        const rolePortal=wizard?.stage==='input_mapping'&&portals[0]?.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist'?portals[0].ref:undefined;
+        const rolePortal=['input_mapping','assn_rules_auxiliary'].includes(wizard?.stage)&&portals[0]?.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist'?portals[0].ref:undefined;
         const produceMenus=readMappings&&wizard?.stage==='output_mapping'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;btnProduceType;mn'||e.tid===wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnProduceType;mn'):[];
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
         const calculatorModeMenus=readCalculator&&wizard?.stage==='calculator'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';CalcDataWizard;btnCalcMode;mn'):[];

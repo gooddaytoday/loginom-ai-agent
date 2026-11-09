@@ -2,7 +2,7 @@ const need=(v,m)=>{if(!v)throw Error('Association rules: '+m);};
 export function validateAssnRulesParameters(p,mode,request){
  need(mode==='fp_growth','only fp_growth training is supported');
  const required=['transaction_field','item_field','min_support_pct','min_confidence_pct','max_items'];
- const keys=[...required,'max_consequents','min_lift'];
+ const keys=[...required,'max_consequents','min_lift','selected_item_field','contain_selected_items','exclude_support_above_pct'];
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>keys.includes(k)),'unsupported parameter');
  need(request.target.kind==='existing'||required.every(k=>p[k]!==undefined),'new nodes require all five parameters');
  for(const k of ['transaction_field','item_field'])if(p[k]!==undefined)need(typeof p[k]==='string'&&p[k].length>0&&p[k].length<=128,'exact technical field names required');
@@ -12,7 +12,10 @@ export function validateAssnRulesParameters(p,mode,request){
  need(p.max_consequents===undefined||[1,2].includes(p.max_consequents),'max_consequents must be 1 or 2');
  need(p.max_items===undefined||p.max_consequents===undefined||p.max_consequents<p.max_items,'max_consequents must be less than max_items');
  need(p.min_lift===undefined||typeof p.min_lift==='number'&&Number.isFinite(p.min_lift)&&p.min_lift>=0,'min_lift must be a finite nonnegative ratio');
- need(request.inputs.length<=1&&request.inputs.every(i=>i.input===0)&&(request.target.kind==='existing'||request.inputs.length===1),'one main input is required; auxiliary input is unsupported');
+ need(p.selected_item_field===undefined||typeof p.selected_item_field==='string'&&p.selected_item_field.length>0&&p.selected_item_field.length<=128,'selected_item_field must name an auxiliary discrete string field');
+ need(p.contain_selected_items===undefined||typeof p.contain_selected_items==='boolean','contain_selected_items must be boolean');
+ need(p.exclude_support_above_pct===undefined||p.exclude_support_above_pct===null||typeof p.exclude_support_above_pct==='number'&&Number.isFinite(p.exclude_support_above_pct)&&p.exclude_support_above_pct>=0&&p.exclude_support_above_pct<=100,'exclude_support_above_pct must be 0..100 or null to disable');
+ need(request.inputs.length<=2&&request.inputs.every(i=>i.input===0||i.input===1)&&new Set(request.inputs.map(i=>i.input)).size===request.inputs.length&&(request.target.kind==='existing'||request.inputs.some(i=>i.input===0)),'main input 0 required; optional selected-items input 1');
  need(request.mappings.length===0,'mapping overrides are unsupported');
  need(request.read.ports.every(p=>p===0||p===1),'recommendation port 2 is not supported yet; read itemsets 0 and rules 1');
 }

@@ -379,12 +379,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl"]',
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl;DisplayEl"]',
-      ...['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].flatMap(form=>
+      ...['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1'].flatMap(form=>
         ['grdTargetColumns;tbl','TargetFilter','rbTable','rbLinks','btnAutoSyncThroughColumns'].flatMap(name=>{
           const owner='[data-tid$=";WizrdMCF;'+form+';'+name+'"]';return [owner,owner+' input'];})),
       '[data-tid*=";WizrdMCF;ColumnsMappingEngineOutputPortWizard;grdTargetColumns;tbl;celleditor"]',
       ...['edtDisplayName','cbxNodeTitleMode'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;DoneWizard;'+name+'"]';return [owner,owner+' input'];}),
-      ...['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard','ReformColumnsWizard'].flatMap(form=>
+      ...['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1','ReformColumnsWizard'].flatMap(form=>
         ['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colUsageType_','colSourceDisplayName_','colCachingMethod_','colExcluded_'].map(key=>'[data-tid*=";WizrdMCF;'+form+';'+key+'"]')),
       '[data-tid$=";WizrdMCF;EditReformColumnDefForm"]','[data-tid="EditReformColumnDefForm"]',
       ...['edtName','edtDisplayName','cbxDataType','cbxDataKind','cbxUsageType','cntMain;cbxCachingMethod','cntMain;chbExcluded','cntMain;chbExcluded;DisplayEl'].flatMap(name=>{const owner='[data-tid="EditReformColumnDefForm;'+name+'"]';return [owner,owner+' input'];}),
@@ -1460,10 +1460,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     }
     scanStage='output_definitions';
     const factorLoadingsMapping=factorWizard&&wizard.stage==='binning_ranges_mapping';
-    if(wizard.status==='observed' && (['output_mapping','input_mapping','field_parameters'].includes(wizard.stage)||factorLoadingsMapping)) {
+    if(wizard.status==='observed' && (['output_mapping','input_mapping','assn_rules_auxiliary','field_parameters'].includes(wizard.stage)||factorLoadingsMapping)) {
       const reform=wizard.stage==='field_parameters',columnsKey=reform?'reform_columns':'output_columns';
-      const mappingForms=[...[1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard-'+port),'ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].filter(name=>
-        (tids.get(wizard.root_tid+';'+name+';'+(name==='TuneDataSourceInputPortWizard'?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(visible).length===1);
+      const mappingForms=[...[1,2,3,4].map(port=>'DerivedDataSourceMappingEngineOutputPortWizard-'+port),'ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1'].filter(name=>
+        (tids.get(wizard.root_tid+';'+name+';'+(['TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1'].includes(name)?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(visible).length===1);
       const base=wizard.root_tid+';'+(reform?'ReformColumnsWizard':mappingForms.length===1?mappingForms[0]:'__unobserved__')+';';
       const cells=all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colName_') && wizardForms[0].contains(e)
         && visible(e) && !sensitive(e) && !e.closest('.x-grid-row-summary');});
@@ -1481,7 +1481,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               .filter(([kind])=>icons.length===1 && icons[0].classList.contains('bg-TBGDataType-dt'+kind));
             if(keys.filter(k=>k===key).length!==1 || labels.length!==1 || types.length!==1 || !name || name.length>=240 || label.length>=240)
               return {status:'ambiguous',field_key:key.slice(0,240)};
-            const extras=Object.fromEntries(Object.entries({data_kind:'colDataKind_',usage:wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_',...(reform?{caching:'colCachingMethod_'}:{})}).map(([name,prefix])=>{
+            const extras=Object.fromEntries(Object.entries({data_kind:'colDataKind_',usage:['input_mapping','assn_rules_auxiliary'].includes(wizard.stage)?'colUsageType_':'colDefaultUsageType_',...(reform?{caching:'colCachingMethod_'}:{})}).map(([name,prefix])=>{
               const cells=(tids.get(base+prefix+key)??[]).filter(e=>e.closest('table')===row && !e.closest('.x-grid-row-summary') && visible(e) && !sensitive(e));
               const text=cells.length===1?textOf(cells[0],true):null;return [name,text && text.length<240?text:null];
             }));
@@ -1508,13 +1508,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     }
     if(wizard.output_columns) {
       let coverage={status:'partial',source_identity_verified:false};
-      const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard',...(factorWizard?['DerivedDataSourceMappingEngineOutputPortWizard-1']:[])].filter(name=>
-        (tids.get(wizard.root_tid+';'+name+';'+(name==='TuneDataSourceInputPortWizard'?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e)).length===1);
+      const forms=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1',...(factorWizard?['DerivedDataSourceMappingEngineOutputPortWizard-1']:[])].filter(name=>
+        (tids.get(wizard.root_tid+';'+name+';'+(['TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1'].includes(name)?'grdTargetColumns':'btnAddMappingColumn'))??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e)).length===1);
       const base=wizard.root_tid+';'+(forms.length===1?forms[0]:'__unobserved__')+';';
       const unique=key=>{const es=tids.get(base+key)??[];return es.length===1 && wizardForms[0].contains(es[0])
         && visible(es[0]) && !sensitive(es[0])?es[0]:null;};
       const body=unique('grdTargetColumns;tbl'),filter=unique('TargetFilter'),tableMode=unique('rbTable'),linksMode=unique('rbLinks');
-      const roleGrid=forms[0]==='TuneDataSourceInputPortWizard';
+      const roleGrid=['TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1'].includes(forms[0]);
       const auto=unique('btnAutoSyncThroughColumns');
       wizard.output_columns.auto_sync=auto?{status:'observed',value:auto.classList.contains('x-btn-pressed'),ref:refOf(auto)}:{status:'unobserved'};
       if(body && filter && tableMode && linksMode) {
@@ -1553,7 +1553,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
                 || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed'
                 || nameCells.length!==1)return false;
               const key=getTid(nameCells[0]).slice((base+'colName_').length);
-              return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
+              return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',['input_mapping','assn_rules_auxiliary'].includes(wizard.stage)?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
                 const es=tids.get(base+prefix+key)??[];
                 return es.length===1 && row.contains(es[0]) && inside(es[0],row);
               });
@@ -1601,7 +1601,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
                 || row.getAttribute('data-boundview')!==boundId || !nativeInside(row,container,1)
                 || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed' || names.length!==1)return false;
               const key=getTid(names[0]).slice((base+'colName_').length);
-              return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
+              return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',['input_mapping','assn_rules_auxiliary'].includes(wizard.stage)?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
                 const es=tids.get(base+prefix+key)??[];return es.length===1 && row.contains(es[0]) && nativeInside(es[0],row);
               });
             }) && geometryCheck(boxOf(rows.at(-1)).y+boxOf(rows.at(-1)).height,cb.y+cb.height,'rows_end',rows.at(-1));
@@ -1647,7 +1647,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               && rows.every((row,i)=>{
                 charge();const index=first+i,r=records[index],f=fields[i],b=boxOf(row),previous=i?boxOf(rows[i-1]):null;
                 const cells=[...row.querySelectorAll('[data-tid]')];
-                const completeCells=cells.length<=32 && ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
+                const completeCells=cells.length<=32 && ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',['input_mapping','assn_rules_auxiliary'].includes(wizard.stage)?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
                   const matches=cells.filter(e=>getTid(e)===base+prefix+r.data.Name);
                   return matches.length===1 && nativeInside(matches[0],row);
                 });
@@ -2111,8 +2111,8 @@ function readRenderedInputMapping(observation) {
       }
     }
 
-    if(wizard.status==='observed' && ['output_mapping','input_mapping'].includes(wizard.stage)) {
-      const editorForm=wizard.stage==='input_mapping'?'EditTuneColumnDefForm':'EditColumnDefForm';
+    if(wizard.status==='observed' && ['output_mapping','input_mapping','assn_rules_auxiliary'].includes(wizard.stage)) {
+      const editorForm=['input_mapping','assn_rules_auxiliary'].includes(wizard.stage)?'EditTuneColumnDefForm':'EditColumnDefForm';
       const forms=[...(tids.get(wizard.root_tid+';'+editorForm)??[]),...(tids.get(editorForm)??[])].filter(e=>visible(e) && !sensitive(e));
       const base=forms.length===1?getTid(forms[0]):wizard.root_tid+';'+editorForm;
       // Loginom 7.4 also hosts this editor as a global modal. Its one native
@@ -2121,7 +2121,7 @@ function readRenderedInputMapping(observation) {
       if(!portalBound && forms.length===1) {
         const form=forms[0],native=globalThis.Ext?.getCmp?.(form.id)?.Controller;
         const active=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
-        const grids=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard']
+        const grids=['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1']
           .flatMap(form=>tids.get(wizard.root_tid+';'+form+';grdTargetColumns;tbl')??[])
           .filter(grid=>wizardForms[0].contains(grid)&&visible(grid));
         const view=grids.length===1?globalThis.Ext?.getCmp?.(grids[0].id):null,store=view?.getStore?.();
@@ -2149,7 +2149,7 @@ function readRenderedInputMapping(observation) {
             if(['name','label'].includes(name) && selection && value.length<=256 && enabled(input) && !input.readOnly)
               wizardFields.set(input,{name,scope:'output_column',max_length_utf16:Math.min(nativeMax,256),stage:wizard.stage,
                 root_ref:refOf(forms[0]),wizard_root_ref:wizard.root_ref,owner_ref:refOf(owners[0]),selected_column:selection});
-            if((name==='type_label'||name==='usage'&&wizard.stage==='input_mapping'&&(tids.get(wizard.root_tid+';TuneDataSourceInputPortWizard;grdTargetColumns;tbl')??[]).some(visible)) && selection && value.length<=256 && enabled(input))
+            if((name==='type_label'||name==='usage'&&['input_mapping','assn_rules_auxiliary'].includes(wizard.stage)&&['TuneDataSourceInputPortWizard','TuneDataSourceInputPortWizard-1'].some(form=>(tids.get(wizard.root_tid+';'+form+';grdTargetColumns;tbl')??[]).some(visible))) && selection && value.length<=256 && enabled(input))
               wizardCombos.set(base+';'+key,{name,scope:'output_column',owner_ref:refOf(owners[0]),input_ref:refOf(input),
                 root_ref:wizard.root_ref,parameter_root_ref:refOf(forms[0]),selected_column:selection,value});
             return [name,{status:'observed',value:value.slice(0,256),value_length_utf16:value.length,truncated:value.length>256,
@@ -2806,7 +2806,7 @@ function readRenderedInputMapping(observation) {
       }
     }
     const outputColumnCells=new Map();
-    if((['output_mapping','input_mapping'].includes(wizard.stage)||factorLoadingsMapping) && !wizard.column_parameters
+    if((['output_mapping','input_mapping','assn_rules_auxiliary'].includes(wizard.stage)||factorLoadingsMapping) && !wizard.column_parameters
       &&(wizard.output_columns?.page?.status==='complete_definition_page'
         ||wizard.output_columns?.definition_coverage?.status==='complete_configured_rows')) {
       for(const field of wizard.output_columns.fields??[])if(field.status==='observed') {

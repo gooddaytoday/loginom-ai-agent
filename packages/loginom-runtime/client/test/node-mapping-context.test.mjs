@@ -190,7 +190,7 @@ test('Transaction/Item remain refused for every other node type and unbound inpu
  const f=fixture({input:true});f.target[0].data.UsageType=8;
  assert.equal(f.read().reason,'mapping_input_usage');
  for(const input_port of [undefined,{direction:'output',port:0,node_icon_class:'bg-vendor-icon-assnrules'},
-  {direction:'input',port:1,node_icon_class:'bg-vendor-icon-assnrules'}]) {
+  {direction:'input',port:2,node_icon_class:'bg-vendor-icon-assnrules'}]) {
   const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
   assert.equal((await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port}))).reason,'mapping_input_usage');
  }
@@ -533,4 +533,16 @@ test('saved ungroup share role is bound only to its native support input',async(
   const result=await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port:{direction,port,node_icon_class:icon}}));
   assert.equal(result.reason,'mapping_input_usage',JSON.stringify({direction,port,icon,role}));
  }
+});
+
+test('auxiliary input retains the Item role on the owned association-rules port 1',async()=>{
+ const f=fixture({input:true});f.target[0].data.UsageType=8;f.target[1].data.UsageType=9;
+ const owner={verified:true,surface:'wizard',node_id:'association',input_port:{direction:'input',port:1,node_icon_class:'bg-vendor-icon-assnrules'}};
+ const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+ const read=()=>readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>owner);
+ const result=await read();assert.equal(result.verified,true);
+ assert.deepEqual(Array.from(result.target_fields,x=>x.usage_type),[8,9]);
+ f.target[0].data.UsageType=10;assert.equal((await read()).reason,'mapping_input_usage');
+ f.target[0].data.UsageType=8;f.target[0].data.ReverseBroken=true;
+ assert.equal((await read()).reason,'mapping_input_usage');
 });

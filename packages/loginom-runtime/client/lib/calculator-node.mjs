@@ -134,7 +134,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      try{
       const changed=await implementation.configure(channel,p,{request:operation.nodeApply.request,inputMapping:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.native_mapping,preconfiguration,
        ...(implementation.bindingSchema?{bindingSource:operation.variableBindingSource,bindingMapping:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.variable_mappings?.find(m=>m.kind==='control')??operation.variableBindingMapping}:{}),
-       ...(implementation.type==='transform.col_union_data'?{inputMappings:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.ports}:{}),
+       ...(['transform.col_union_data','datamining.assn_rules'].includes(implementation.type)?{inputMappings:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.ports}:{}),
        ...(implementation.inspectConfigure?{progress:configureProgress}:{})});configured=changed.configuration;return changed;
      }catch(error){
       if(implementation.inspectConfigure&&configureProgress.pending){
