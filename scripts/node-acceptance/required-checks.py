@@ -31,6 +31,7 @@ RULES = (
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/modes/**'), ('live-ui',), ('grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result')),
     ((C + 'filter-*.mjs', 'docs/node-development/nodes/row-filter/acceptance/**'), ('live-ui',), ('row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none')),
+    ((C + 'variable-binding-*.mjs', 'scripts/node-acceptance/bindings-grouping-sort.mjs', 'docs/node-development/variables/bindings/acceptance/cycle3/**'), ('live-ui',), ('bindings-grouping-sort', 'bindings-sorting-locale')),
     ((C + 'variable-binding-*.mjs', C + 'filter-bindings.mjs', 'docs/node-development/variables/bindings/**', 'scripts/node-acceptance/filter-bindings.mjs'), ('live-ui',), ('filter-bindings',)),
     ((C + 'import-bindings.mjs', 'scripts/node-acceptance/import-bindings.mjs', 'docs/node-development/variables/bindings/acceptance/import/**'), ('live-ui',), ('import-bindings',)),
     ((C + 'duplicates-*.mjs',), ('live-ui',), ('s2',)),

@@ -91,6 +91,14 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['bindings-grouping-sort', 'bindings-sorting-locale']:
+        node = 'grouping' if name == 'bindings-grouping-sort' else 'sorting'
+        src = REPO / 'docs/node-development/variables/bindings/acceptance/cycle3'
+        return dict(source=src, prompt=src / ('task-' + node + '.md'),
+                    data=REPO / ('docs/node-development/nodes/' + node + '/fixtures'), base=None,
+                    input_files=['modes.csv'], export_count=3, boolean_binding=node,
+                    binding_initial=node + '/expected-initial.json', expected_name=node + '/expected.json', oracle=src / 'oracle.py')
+
     if name in ['duplicates-typed', 'duplicates-empty', 'duplicates-singleton']:
         root = REPO / 'docs/node-development/nodes/duplicates'
         kind = 'keys' if name == 'duplicates-typed' else name.removeprefix('duplicates-')
@@ -824,6 +832,9 @@ def expected_for(case, package, cold=False):
     if case.get('factor_mode'):
         expected = read(src / 'expected.json')['cases'][case['factor_mode']]
         return dict(expected, package_path=package)
+    if case.get('grouping_case'):
+        stages = read(src / 'expected.json')['cases'][case['grouping_case']]['stages']
+        return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}], outputs=[stages[-1]])
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
                     outputs=[sorting_stages(case)[-1]], **(dict(sorting_mode=case['sorting_case'], sorting_stages=sorting_stages(case)) if case['sorting_case'] != 'locale' else {}))
@@ -1662,10 +1673,11 @@ class Runner:
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
             if spec.get('filter_initial'): prompt += ' Порядок CSV: первоначальные подходящие, первоначальные остальные, обновлённые подходящие, обновлённые остальные.'
             if spec.get('export_count') == 5: prompt += ' Порядок файлов: выходной набор (порт 0), выбросы (порт 1), экстремальные значения (порт 2), пропуски (порт 3), итоговая таблица (порт 4).'
+            if spec.get('binding_initial'): prompt += ' Порядок файлов: Flag=false, Flag=true, Flag=true после повторного открытия пакета.'
             if spec.get('import_initial'): prompt += ' Порядок файлов: первый импорт, второй импорт, второй импорт после повторного открытия пакета.'
             if spec.get('sampling_uniform'):
                 prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
-            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and spec.get('grouping_mode') != 'concat' and not spec.get('import_initial'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and not spec.get('import_initial') and not spec.get('binding_initial') and spec.get('grouping_mode') != 'concat': prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
@@ -1698,6 +1710,12 @@ class Runner:
             expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter='/groups/0/0/value',
                 mode='variable', variable=dict(kind='control', input=0, name='Limit', type='integer', is_null=False),
                 source=dict(type='variables.user', output=4))]
+        if spec.get('boolean_binding'):
+            grouping = spec['boolean_binding'] == 'grouping'
+            for output in expected['outputs']: output['column_order'] = 'exact'
+            expected['binding_inventory'] = [dict(node=dict(type='transform.group_data' if grouping else 'transform.sorting'),
+                parameter='/sort_result' if grouping else '/compare_with_locale', mode='variable',
+                variable=dict(kind='control', input=0, name='Flag', type='boolean', is_null=False), source=dict(type='variables.user', output=4))]
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
@@ -1767,6 +1785,12 @@ class Runner:
             write(folder / 'binding-events.json', evidence)
             self.phase('import-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/import-bindings.mjs',
                 src / spec['import_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
+        if spec.get('boolean_binding'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'binding-events.json', evidence)
+            self.phase('boolean-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/bindings-grouping-sort.mjs',
+                src / spec['binding_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
         if case == 'filter-bindings':
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -2179,7 +2203,10 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (text_update_stages(spec)[index] if spec.get('text_update')
+            csv_expected = (read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('binding_initial')
+                            else expected['outputs'][0] if spec.get('grouping_case')
+                            else text_update_stages(spec)[index] if spec.get('text_update')
                             else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
