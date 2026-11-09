@@ -61,7 +61,7 @@ export async function configureAssnRules(channel,p,{request,inputMapping}){
  let state=await observe('initialized FP-Growth parameters');const old=state.node_assn_rules;
  need(Object.values(old.switches).every(v=>v===false),'variable-driven parameters are unsupported');
  need(old.values.pedExcludeLargeSupportItems===false&&old.values.pedSelectColumn===false&&old.values.pedExcludeSingleItems===false,'unsupported saved filters');
- const wanted={pedMinSupport:p.min_support_pct??old.values.pedMinSupport,pedMinConfidence:p.min_confidence_pct??old.values.pedMinConfidence,pedNItemsMax:p.max_items??(request.target.kind==='new'?2:old.values.pedNItemsMax),pedMinLift:p.min_lift??old.values.pedMinLift,pedNConsequentMax:p.max_consequents??old.values.pedNConsequentMax};
+ const wanted={pedMinSupport:p.min_support_pct??old.values.pedMinSupport,pedMinConfidence:p.min_confidence_pct??old.values.pedMinConfidence,pedNItemsMax:p.max_items??(request.target.kind==='new'?2:old.values.pedNItemsMax),pedMinLift:p.min_lift??(request.target.kind==='new'?0:old.values.pedMinLift),pedNConsequentMax:p.max_consequents??old.values.pedNConsequentMax};
  need([2,3].includes(wanted.pedNItemsMax),'existing max_items must be 2 or 3, or explicitly set');
  need([1,2].includes(wanted.pedNConsequentMax)&&wanted.pedNConsequentMax<wanted.pedNItemsMax,'max_consequents must be 1 or 2 and less than max_items');
  const act=async(s,condition,key,action)=>channel.perform({condition,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,parameters:s.node_assn_rules}),
