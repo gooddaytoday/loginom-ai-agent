@@ -199,7 +199,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      }
      enter(ctx);
      if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
-     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard);
+     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,...(implementation.type==='transform.col_union_data'?[{inputCount:operation.colUnionInputCount}]:[]));
      const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);
      const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true;

@@ -179,8 +179,10 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
   need(stepwise||wanted[disabledKey]===undefined||state.node_linregression.values[disabledControl]===wanted[disabledKey],'disabled cutoff differs from requested assertion');
   selection={criterion:criteria[state.node_linregression.values.pedRegSelQuality],...(criterion===0?{add_significance:state.node_linregression.values.pedAddSignificance,remove_significance:state.node_linregression.values.pedRemoveSignificance}: {})};
  }
- const details=state.node_linregression;
+ const details=state.node_linregression,enter=!preserve&&!ridge&&!lasso&&!selecting,statistics=p.linear_regression?.statistics??'coefficients';
+ // The native level stays as saved; full statistics are approved only at 95%.
+ if(enter&&statistics==='full')need(details.values.pedPredictionIntervalLevel===95,'full coefficient statistics require the native 95% confidence level');
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{statistics,confidence_level:details.values.pedPredictionIntervalLevel}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

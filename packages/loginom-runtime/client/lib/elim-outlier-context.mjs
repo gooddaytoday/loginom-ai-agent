@@ -55,6 +55,6 @@ export function readElimOutlierBrowser(prefix){
  const method=radios[0]?'sd':'iqr';
  return {verified:true,binding_ready:true,inventory_complete:true,state_source:'cached_elim_outlier_store',fields,selected,values,switches,
   ordered:values.pedOrderedSample,quality:values.pedUseQuality,
-  settings:selected?.used?{method,outlier_factor:values[method==='sd'?'pedDetectOSko':'pedDetectOKvartil'],extreme_factor:values[method==='sd'?'pedDetectESko':'pedDetectEKvartil'],outlier_policy:values.pedActionOut===1?'keep':'unsupported',extreme_policy:values.pedActionExtr===1?'keep':'unsupported'}:null,
+  settings:selected?.used?{method,outlier_factor:values[method==='sd'?'pedDetectOSko':'pedDetectOKvartil'],extreme_factor:values[method==='sd'?'pedDetectESko':'pedDetectEKvartil'],outlier_policy:({1:'keep',3:'mean',4:'median',5:'most_probable'})[values.pedActionOut]??'unsupported',extreme_policy:({1:'keep',3:'mean',4:'median',5:'most_probable'})[values.pedActionExtr]??'unsupported'}:null,
   settings_applied:false};
 }

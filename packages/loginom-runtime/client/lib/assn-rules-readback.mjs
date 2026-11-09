@@ -8,5 +8,5 @@ export function assnRulesConfigurationReadback({node,phases,operation_id}){
  need(finished.value.mode!=='execute'||training.status==='trained'&&training.execution_id!==finished.value.execution_id&&training.source?.length===1,'training on the connected source must complete before Execute');
  return {kind:'assn_rules',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:'fp_growth',
   transaction_field:c.fields.find(f=>f.usage_type===c.roles.transaction)?.name,item_field:c.fields.find(f=>f.usage_type===c.roles.item)?.name,
-  min_support_pct:c.min_support_pct,min_confidence_pct:c.min_confidence_pct,max_items:c.max_items,min_lift:0,singletons:true,consequence_limit:1,training:structuredClone(training),package_persistence_verified:false};
+  min_support_pct:c.min_support_pct,min_confidence_pct:c.min_confidence_pct,max_items:c.max_items,min_lift:c.min_lift,singletons:true,consequence_limit:c.max_consequents,training:structuredClone(training),package_persistence_verified:false};
 }

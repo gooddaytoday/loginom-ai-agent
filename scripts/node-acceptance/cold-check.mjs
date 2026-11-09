@@ -4,6 +4,7 @@ import {observeSortingSaved} from './sorting-modes.mjs';
 import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clustering-apply.mjs';
 import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
 import {observeLogregNormalizationSaved} from './logreg-normalization.mjs';
+import {observeReformCacheSaved} from './reform-cache.mjs';
 import {inspectSavedLgd} from './lgd-cold.mjs'
 import {observeImportBindingInventory} from './import-bindings.mjs';
 import {observeFilterBindingInventory} from './filter-bindings.mjs';
@@ -299,6 +300,12 @@ page = context.pages()[0]
    if(nodes.length!==1)throw Error('LOGREG_NORMALIZATION_ONE_SAVED_NODE');
    const settings=await observeLogregNormalizationSaved({load,channel:channelFor(nodes[0].ref,'logreg-normalization-saved')});
    await record({phase:'logreg_normalization_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.reform_cache){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.reform_columns');
+   if(nodes.length!==1)throw Error('REFORM_CACHE_ONE_SAVED_NODE');
+   const settings=await observeReformCacheSaved({load,channel:channelFor(nodes[0].ref,'reform-cache-saved'),target:nodes[0],expected});
+   await record({phase:'reform_cache_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.clustering_apply||expected.clustering_normalized||expected.clustering_gmeans){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.clustering');

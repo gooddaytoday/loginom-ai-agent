@@ -61,12 +61,12 @@ export async function readQualityModa({source,node,port,portIndex,rowCount,rows,
     const bytes=response.$FData,size=response.$FDataSize;
     need(bytes instanceof Uint8Array&&Number.isInteger(size)&&size>=60&&size<=65536&&size<=bytes.length&&size<=1048576-op.receivedBytes,'frame bounds');op.receivedBytes+=size;
     const payload=Array.from(bytes.subarray(12,size)),d=decode(payload,size);
-    need([1,5,8,20].includes(d.tag),'unsupported Moda subtype');
+    need([1,5,8,11,20].includes(d.tag),'unsupported Moda subtype');
     const value=d.type==='null'?null:d.type==='integer'?d.decimal:d.type==='real'?d.representation:d.value;
     const cell={type:'variant',cell_type:d.type,is_null:d.type==='null',value,precision:'exact_native',
-     representation:d.type==='real'?'binary64_decimal':d.type==='integer'?'decimal_integer':d.type==='null'?'native_null':'native_string',
+     representation:d.type==='real'?'binary64_decimal':d.type==='integer'?'decimal_integer':d.type==='null'?'native_null':d.type==='boolean'?'native_boolean':'native_string',
      ...(['real','integer'].includes(d.type)?{decimal:value}:{}),
-     native:{tag:d.tag,encoding:{1:'null',5:'ieee754-binary64-le',8:'utf8',20:'signed-int64-le'}[d.tag],...(d.tag===8?{utf8_hex:Array.from(new TextEncoder().encode(d.value)).map(n=>n.toString(16).padStart(2,'0')).join('')}:{}),...(d.tag===20?{bits:64,bytes_le:payload.slice(2,10).map(n=>n.toString(16).padStart(2,'0')).join('')}:{}),...(d.bytes_le?{bits:d.bits,bytes_le:d.bytes_le}:{} )}};
+     native:{tag:d.tag,encoding:{1:'null',5:'ieee754-binary64-le',8:'utf8',11:'boolean8',20:'signed-int64-le'}[d.tag],...(d.tag===11?{bytes_le:d.value?'01':'00'}:{}),...(d.tag===8?{utf8_hex:Array.from(new TextEncoder().encode(d.value)).map(n=>n.toString(16).padStart(2,'0')).join('')}:{}),...(d.tag===20?{bits:64,bytes_le:payload.slice(2,10).map(n=>n.toString(16).padStart(2,'0')).join('')}:{}),...(d.bytes_le?{bits:d.bits,bytes_le:d.bytes_le}:{} )}};
     op.serializedBytes+=new TextEncoder().encode(JSON.stringify(cell)).length;need(op.serializedBytes<=1048576,'serialized byte bound');cells.push(cell);
    }finally{releaseResponse(response);if(!callbackOwns)releaseRequest();}
   }

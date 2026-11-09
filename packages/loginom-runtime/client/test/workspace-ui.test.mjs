@@ -3411,7 +3411,7 @@ test('field parameters read row types caching and exclusion separately from port
 });
 
 test('reform editor reads seven native parameters including disabled cache and owner checkbox state',async()=>{
-  for(const mode of ['global','global_duplicate','global_impostor','global_foreign_wizard','valid','checked','missing_display','duplicate_display','duplicate_form','long_name','combo','combo_enable_kind','combo_wrong_kind','combo_excluded','combo_cache','combo_busy','combo_lost']) {
+  for(const mode of ['global','global_duplicate','global_impostor','global_foreign_wizard','valid','checked','missing_display','duplicate_display','duplicate_form','long_name','combo','combo_enable_kind','combo_wrong_kind','combo_excluded','combo_cache','cache_picker','combo_busy','combo_lost']) {
     const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1)),stem=base+'ReformColumnsWizard;';
     page.add('div',stem+'grdTargetColumns;tbl','',undefined,form);
     const row=page.add('table',null,'',undefined,form);row.attrs.class='x-grid-item-selected';
@@ -3424,7 +3424,7 @@ test('reform editor reads seven native parameters including disabled cache and o
     const root=dialogBase+'EditReformColumnDefForm;',inputs={};
     for(const [key,value] of [['edtName',mode==='long_name'?'x'.repeat(257):'QuantitySum'],['edtDisplayName','QuantitySum'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано'],['cntMain;cbxCachingMethod','Отключено']]) {
       const owner=page.add('div',root+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);input.value=value;inputs[key]=input;
-      if(key.endsWith('cbxCachingMethod'))input.disabled=true;
+      if(key.endsWith('cbxCachingMethod'))input.disabled=mode!=='cache_picker';
     }
     const owner=page.add('div',root+'cntMain;chbExcluded','',undefined,dialog);owner.attrs.class=mode==='checked'?'x-form-cb-checked':'';
     const hidden=page.add('input',null,'',undefined,owner);hidden.checked=false;
@@ -3432,6 +3432,11 @@ test('reform editor reads seven native parameters including disabled cache and o
     if(mode==='duplicate_display')page.add('span',root+'cntMain;chbExcluded;DisplayEl','',undefined,owner).attrs.class='x-form-checkbox';
     if(mode==='duplicate_form' || mode==='global_duplicate')page.add('div',base+'EditReformColumnDefForm');
     if(mode==='combo_enable_kind'){inputs.cbxDataType.value='Строковый';inputs.cbxDataKind.disabled=true;}
+    if(mode==='cache_picker'){
+      page.add('div',root+'cntMain;cbxCachingMethod;trg_picker','',undefined,dialog);
+      const full=await page.observe();
+      assert.ok(full.ui.elements.some(e=>e.wizard_combo?.field?.name==='caching'&&e.wizard_combo.kind==='picker'));continue;
+    }
     if(mode.startsWith('combo')) {
       const list=page.add('div',root+'cbxDataType;boundlist','',{x:600,y:300,width:140,height:40});
       page.add('div',root+'cbxDataType;boundlist;Вещественный','Вещественный',{x:605,y:305,width:130,height:25},list);
@@ -8363,6 +8368,26 @@ test('Excel input0 overflow retains typed Close only for its native input1 owner
   assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,mode==='valid',mode);
   assert.deepEqual(page.events,[]);
  }
+});
+
+for(const suffix of ['', '-1'])test('reform literal node cache picker uses the existing owned wizard choice protocol '+suffix,async()=>{
+ const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1)),stem=base+'ReformColumnsWizard;';
+ page.add('div',stem+'grdTargetColumns;tbl','',undefined,form);
+ const owner=page.add('div',stem+'pedDataSourceCachingMethod;ValueControl','',undefined,form);
+ const input=page.add('input',null,'',undefined,owner);input.value='Отключено';input.readOnly=true;
+ page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;trg_picker','',undefined,owner);
+ const list=page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist'+suffix,'',{x:600,y:300,width:160,height:40});
+ page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist'+suffix+';Выбранные_поля','Выбранные поля',{x:605,y:305,width:150,height:25},list);
+ const full=await page.observe(),option=full.ui.elements.find(e=>e.wizard_combo?.kind==='option');
+ assert.ok(option);assert.equal(option.wizard_combo.field.scope,'reform_node');
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ assert.ok(roots.output.ui.elements.some(e=>e.ref===option.wizard_combo.list_ref));
+ const narrow=await page.execute({mode:'observe',root_ref:option.wizard_combo.list_ref});
+ const selected=narrow.output.ui.elements.find(e=>e.ref===option.ref);
+ assert.equal(selected?.wizard_combo?.field?.scope,'reform_node');
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();input.value='Выбранные поля';};
+ const r=await page.act({verb:'select_wizard_option',ref:selected.ref},narrow.output);
+ assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
 });
 
 test('date string-format cell is clicked away from its checkbox image, never on it',async()=>{
