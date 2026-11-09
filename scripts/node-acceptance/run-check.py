@@ -1216,6 +1216,18 @@ def ports(value, receipt=None):
         for item in value: yield from ports(item, receipt)
 
 
+def check_coarse_frozen_trainings(replies):
+    owners = {o['execution']['execution_id']: o for _, reply in replies for o, _ in ports(reply)
+              if o.get('status') == 'SUCCEEDED'
+              and o.get('configuration', {}).get('readback', {}).get('kind') == 'coarse_classes'
+              and o.get('execution', {}).get('status') == 'completed'}
+    trained = list(owners.values())
+    assert len(trained) >= 2, 'COARSE_FROZEN_TWO_TRAININGS'
+    assert len({o['node']['node_id'] for o in trained}) == 1, 'COARSE_FROZEN_SAME_NODE'
+    assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in trained), 'COARSE_FROZEN_LOCKED'
+    assert len({json.dumps(o['configuration']['readback']['training'].get('source'), sort_keys=True) for o in trained}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
+
+
 def port_path(reply, port):
     if reply.get('cleanup_complete') is not True:
         return None
@@ -2088,15 +2100,7 @@ class Runner:
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
         if spec.get('coarse_frozen'):
-            from_node = [o for _, o in replies if o.get('status') == 'SUCCEEDED'
-                         and o.get('configuration', {}).get('readback', {}).get('kind') == 'coarse_classes'
-                         and o.get('execution', {}).get('status') == 'completed']
-            assert len(from_node) >= 2, 'COARSE_FROZEN_TWO_TRAININGS'
-            assert len({o['node']['node_id'] for o in from_node}) == 1, 'COARSE_FROZEN_SAME_NODE'
-            assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in from_node), 'COARSE_FROZEN_LOCKED'
-            assert len({json.dumps(o['configuration']['readback']['training'].get('source'), sort_keys=True) for o in from_node}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
-            expected = {**expected, 'coarse_frozen': True}
-            write(folder / 'expected.json', expected)
+            check_coarse_frozen_trainings(replies)
         if expected.get('clustering_apply'):
             write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
             self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
