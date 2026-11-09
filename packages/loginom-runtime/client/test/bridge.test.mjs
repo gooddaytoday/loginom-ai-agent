@@ -126,6 +126,10 @@ test('observation usage is a separate bounded hint and never changes the authori
   assert.deepEqual(JSON.parse(actionReply(ambiguous, { observe: true }).content[1].text).root_read_arguments, []);
 });
 
+// The contract child is CPU-bound (~6 s alone). Keep it below the 60 s
+// per-test timeout of the CI suite so a stuck child still reports here.
+const childBudgetMs = 50000;
+
 // Module mocks are isolated to this child process, so actual SDK and bridge
 // imports used by the other suites retain their original implementations.
 for (const fault of ['initialize-one', 'list-one', 'read-one', 'list-two', 'read-two', 'list-semantic']) {
@@ -134,7 +138,7 @@ for (const fault of ['initialize-one', 'list-one', 'read-one', 'list-two', 'read
     delete environment.NODE_TEST_CONTEXT;
     const result = await promisify(execFile)(process.execPath, ['--experimental-test-module-mocks', '--test',
       fileURLToPath(new URL('./support/bridge-contract.mjs', import.meta.url))],
-    { timeout: 30000, env: environment });
+    { timeout: childBudgetMs, env: environment });
     assert.match(result.stdout, /pass 1/); assert.match(result.stdout, /fail 0/);
   });
 }
@@ -145,7 +149,7 @@ test('bridge keeps application feedback recoverable over the MCP protocol', asyn
   let result;
   try {
     result = await promisify(execFile)(process.execPath, ['--experimental-test-module-mocks', '--test',
-      fileURLToPath(new URL('./support/bridge-contract.mjs', import.meta.url))], { timeout: 30000, env: environment });
+      fileURLToPath(new URL('./support/bridge-contract.mjs', import.meta.url))], { timeout: childBudgetMs, env: environment });
   } catch (error) {
     const redactor = createRedactor();
     const diagnostic = redactor.text(`stdout:\n${String(error.stdout ?? '')}\nstderr:\n${String(error.stderr ?? '')}`).slice(0, 16000);
