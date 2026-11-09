@@ -188,6 +188,39 @@ test('server-path opening from the exact native Files directory preserves the ex
   assert.equal(fixture.events.includes('create_draft'),false);
 });
 
+// LAB-1331: cleanup after Save As rebinds the package it reopened. This binding
+// may only adopt that already active package; it never opens, logs in or navigates.
+test('bindOpenOnly binds the active saved package without any package gesture',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true});
+  await fixture.page.goto('http://loginom.example/app?testable=true');
+  fixture.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node.PackageFileName='/user/B.lgp';
+  const state=await execute(fixture,{intent:'open_package',operationId:'cleanup-rebind-1',packagePath:'/user/B.lgp',timeoutMs:500,bindOpenOnly:true});
+  assert.equal(state.status,'READY',JSON.stringify(state));assert.equal(state.effect_possible,false);assert.equal(state.created_draft,false);
+  assert.equal(state.package_ref.path,'/user/B.lgp');assert.equal(state.workflow_ref.tab_tid,fixture.tabs[0].tid);
+  assert.deepEqual(fixture.events,['navigate']);
+  const receipt=fixture.context.__loginomDockPreparationV1.receipts.get('cleanup-rebind-1');
+  assert.equal(receipt.phase,'verified');assert.equal(receipt.tab,fixture.tabs[0]);
+});
+
+for(const situation of ['home','other-package','blank-page'])test('bindOpenOnly refuses without a package gesture: '+situation,async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:situation!=='home'});
+  if(situation!=='blank-page')await fixture.page.goto('http://loginom.example/app?testable=true');
+  if(situation==='other-package')fixture.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node.PackageFileName='/user/A.lgp';
+  const before=[...fixture.events];
+  const state=await execute(fixture,{intent:'open_package',operationId:'cleanup-rebind-2',packagePath:'/user/B.lgp',timeoutMs:500,bindOpenOnly:true});
+  assert.equal(state.status,'NOT_READY');assert.equal(state.effect_possible,false);
+  assert.equal(state.reason,situation==='blank-page'?'DOCUMENT_LOST':'PACKAGE_NOT_ACTIVE');
+  assert.deepEqual(fixture.events,before);
+});
+
+test('bindOpenOnly is limited to an exact open_package binding without login',()=>{
+  const base={loginomUrl:'http://loginom.example/app',compatibility:{profile_id:'tested-ui',loginom_build:build,platform:'macos',browser:'chromium'},platform:'darwin'};
+  assert.doesNotThrow(()=>makeWorkspacePrepareCode({...base,intent:'open_package',packagePath:'/user/B.lgp',bindOpenOnly:true}));
+  for(const changed of [{intent:'new_draft'},{intent:'open_package',packagePath:'/user/B.lgp',allowTestLogin:true,testLoginUser:'test-account'},
+    {intent:'open_package',packagePath:'/user/B.lgp',recoverOnly:true},{intent:'open_package',packagePath:'/user/B.lgp',bindOpenOnly:'yes'}])
+    assert.throws(()=>makeWorkspacePrepareCode({...base,bindOpenOnly:true,...changed}),/bind/i);
+});
+
 test('opening from Files refuses a changed storage account before the open gesture',async()=>{
   const fixture=pageFixture({authenticated:true,workflow:true});
   const identity=await execute(fixture,{identityOnly:true});fixture.openFiles();
