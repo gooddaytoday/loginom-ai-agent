@@ -146,6 +146,15 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
           const { loginomManagement } = await import("./loginom-management")
           try {
             await loginomManagement(host, "connect", { stdinJSON: false, acknowledge: false })
+          } catch (error) {
+            if (
+              !(error instanceof Error) ||
+              !["LOGINOM_CLOUD_ACCESS_DENIED", "LOGINOM_CLOUD_EXPIRED", "LOGINOM_CLOUD_UNAVAILABLE"].includes(error.message)
+            )
+              throw error
+            process.stderr.write(
+              `Не удалось подключиться к Loginom AI: ${error.message}. Можно продолжить обычный чат без подключения.\n`,
+            )
           } finally {
             process.stdin.resume()
           }

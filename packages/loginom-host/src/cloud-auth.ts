@@ -82,6 +82,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
   let loginWrite: number | undefined
   let login: AbortController | undefined
   let polling: Promise<void> | undefined
+  const credentials = () => saved
   function status(): Loginom.CloudStatus {
     return {
       connected: !!saved,
@@ -140,7 +141,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       )
     )
       throw Error("access_revoked")
-    if (!response.ok) throw Error("LOGINOM_CLOUD_UNAVAILABLE")
+    if (!response.ok) throw Object.assign(Error("LOGINOM_CLOUD_UNAVAILABLE"), { retryable: false })
     const result = Schema.decodeUnknownOption(schema)(parsed)
     if (Option.isNone(result)) throw Error("LOGINOM_CLOUD_PROTOCOL_INVALID")
     return result.value
@@ -180,6 +181,16 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
     })
     if (failure === "LOGINOM_STORE_READ_FAILED" || failure === "LOGINOM_STORE_WRITE_FAILED") failure = undefined
   }
+  async function revokeInstallation(key: string, deadline = now() + 5000) {
+    if (deadline <= now()) throw Error("LOGINOM_CLOUD_REVOKE_UNCONFIRMED")
+    const response = await request(new URL("/api/agent/connections/current", options.endpoints.site).href, {
+      method: "DELETE",
+      redirect: "error",
+      headers: { "X-API-Key": key },
+      signal: AbortSignal.timeout(Math.max(1, Math.ceil(deadline - now()))),
+    })
+    if (response.status !== 204) throw Error("LOGINOM_CLOUD_REVOKE_UNCONFIRMED")
+  }
   function cancel() {
     // A joined cancellation must still supersede replacement login requests.
     loginRequest++
@@ -194,7 +205,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       if (cancellation !== epoch) return
       pending = undefined
       if (discard) await clear()
-      if (failure !== "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" && failure !== "LOGINOM_STORE_WRITE_FAILED" && failure !== "LOGINOM_STORE_READ_FAILED")
+      if (failure !== "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" && failure !== "LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED" && failure !== "LOGINOM_STORE_WRITE_FAILED" && failure !== "LOGINOM_STORE_READ_FAILED")
         failure = undefined
       options.changed()
     })().finally(() => {
@@ -222,7 +233,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
   return {
     status,
     cancel,
-    credentials: () => saved,
+    credentials,
     revision: () => revision,
     async start() {
       if (closing) throw Error("LOGINOM_HOST_CLOSED")
@@ -284,6 +295,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
               interval += 5000
               return pollToken()
             }
+            if (error instanceof Error && "retryable" in error && error.retryable === false) throw error
             if (
               error instanceof Error &&
               ["authorization_pending", "LOGINOM_CLOUD_UNAVAILABLE"].includes(error.message)
@@ -294,6 +306,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
         }
         const token = await pollToken()
         let exchanged = false
+        let installationKey: string | undefined
         try {
           const value = await json(
             "/api/agent/connections",
@@ -303,6 +316,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
             { Authorization: `Bearer ${token.access_token}` },
             expiresAt,
           )
+          installationKey = value.installationKey
           if (controller.signal.aborted || attempt !== epoch) return
           const record: CloudCredentials = {
             kind: "loginom-cloud-v1",
@@ -318,18 +332,23 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
           exchanged = true
           options.changed()
         } finally {
-          if (!exchanged)
+          if (!exchanged) {
+            const deadline = now() + 5000
+            if (installationKey && credentials()?.installationKey !== installationKey)
+              await revokeInstallation(installationKey, deadline).catch(() => {
+                if (login === controller) failure = "LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED"
+              })
             await json(
               "/api/auth/revoke-session",
               { token: token.access_token },
               Schema.Struct({ status: Schema.Literal(true) }),
               new AbortController().signal,
               { Authorization: `Bearer ${token.access_token}` },
-              now() + 5000,
+              deadline,
             ).catch(() => {
-              if (login === controller) failure = "LOGINOM_CLOUD_REVOKE_UNCONFIRMED"
-              throw Error("LOGINOM_CLOUD_REVOKE_UNCONFIRMED")
+              if (login === controller) failure = "LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED"
             })
+          }
         }
       })().catch((error: unknown) => {
         if (attempt !== epoch) return
@@ -393,24 +412,18 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       revision++
       pending = undefined
       options.changed()
-      await cancelled
-      await clear()
-      if (previous)
-        await request(new URL("/api/agent/connections/current", options.endpoints.site).href, {
-          method: "DELETE",
-          redirect: "error",
-          headers: { "X-API-Key": previous.installationKey },
-          signal: AbortSignal.timeout(5000),
-        })
-          .then((response) => {
-            if (response.status !== 204) throw Error("LOGINOM_CLOUD_REVOKE_UNCONFIRMED")
-          })
-          .catch(() => {
+      try {
+        await cancelled
+        await clear()
+      } finally {
+        if (previous)
+          await revokeInstallation(previous.installationKey).catch(() => {
             if (attempt === epoch) {
-              failure = "LOGINOM_CLOUD_REVOKE_UNCONFIRMED"
+              if (failure !== "LOGINOM_STORE_WRITE_FAILED") failure = "LOGINOM_CLOUD_REVOKE_UNCONFIRMED"
               options.changed()
             }
           })
+      }
     },
     close() {
       closing ??= (async () => {

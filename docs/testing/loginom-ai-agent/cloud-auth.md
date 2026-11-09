@@ -468,3 +468,69 @@ staging в этом исправлении не запускались. Исто
 Сбой первоначального временного headless probe был вызван абсолютным импортом
 пакета Effect, после исправления пути probe прошёл без изменения продукта.
 Полные установленные сборки, GUI и native Windows/macOS не запускались.
+
+## Исправления дополнительного ревью входа и ключей от 2026-11-09
+
+База исправлений — `618a85f953`, план
+`docs/superpowers/plans/2026-11-09-cloud-auth-followup.md` независимо одобрен.
+Оба P2 воспроизведены и исправлены. Для каждого изменённого поведения получен
+RED, затем GREEN через существующие интерфейсы.
+
+- Bootstrap cleanup больше не заменяет исходную ошибку обмена или записи.
+  Новый fixture погашает сессию при обмене, revoke-session получает401.
+  HTML/терминальный403 сохраняют PROTOCOL_INVALID/UNAVAILABLE, ошибка записи
+  сохраняет STORE_WRITE_FAILED. Отменённый вход с неподтверждённой очисткой
+  получает LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED, который не использует
+  сообщение успешного локального logout.
+- Полученный, но не сохранённый installation key отзывается authenticated DELETE.
+  Эта очистка и bootstrap revoke используют общий предел5 секунд.
+  Подтверждённая чтением новая запись после fsync failure сохраняет свой ключ.
+  Сетевая ошибка вспомогательной очистки сохраняет первичную ошибку входа;
+  возможный остаточный bootstrap доступ ограничен серверным TTL (§4).
+- При ошибке удаления cloud.json выполняется bounded DELETE, даже если локальный
+  выход остался недолговечным. Успех/ошибка DELETE не заменяют storage error.
+- Сохранённый custom key допускает preserve только для того же нормализованного
+  origin. Смена протокола/хоста/порта требует явного непустого replace до
+  runtime.check и любого сетевого обращения к новому endpoint. UI очищает draft
+  key и маску, CLI убирает предложение Enter-preserve. Возврат к сохранённому
+  origin снова допускает preserve, его path/query могут меняться.
+- После ACCESS_DENIED/EXPIRED/UNAVAILABLE при добровольном входе TUI показывает
+  безопасную причину и открывает обычный чат. Ctrl+C, ошибки протокола/хранилища
+  и cleanup сохраняют завершение и правила profile guard.
+- При смене cloud revision во время startup нового поколения устаревший child
+  подтверждённо закрывается и запускается повторно в исходном deadline.
+  Промежуточная устарелость не отвергает admission. Проверены гонки до start ACK
+  и во время получения каталога, clean exit и отсутствие browser/reserve перехода.
+- Неожиданный терминальный4xx device/token завершает polling сразу с безопасной
+  ошибкой. Pending/slow_down/429 и временные5xx/сетевые отказы сохраняют retry.
+- Срок кода форматируется по выбранной локали и местному времени с часовым поясом.
+  Настоящий source renderer в pinned Chromium подтвердил RU/EN, очистку ключа
+  при смене origin, исчезновение маски и её возврат для сохранённого origin.
+
+Help extra arguments проверены read-only по canonical `services/loginom-ai`.
+search.session_id является поддерживаемым параметром, target directories
+перезаписываются из проверенного target_uri; path variables имеют календарный
+provider. Подтверждённого обхода области нет, whitelist аргументов не добавлен.
+
+Завершившиеся проверки на исправленных исходниках с pinned Node24.19.0/Bun1.3.14
+и временными данными в `$HOME/storage/tmp/`.
+
+- Host auth/store/proxy — 96 PASS.
+- Host migration/validation/node-host — 18/21/28 PASS, 1 compiled opt-in SKIP.
+- Host cloud recovery/readiness/connection-readiness — 59 PASS.
+- Desktop loginom suite — 48 PASS, app controller — 36 PASS.
+- CLI management — 16 PASS, 1 compiled opt-in SKIP.
+- TUI expected failures и Ctrl+C/cleanup — 15 PASS.
+- Package-local typechecks Host, Desktop, app и opencode прошли.
+- Source browser, GUI script syntax и git diff --check прошли.
+
+В расширенном Host прогоне88 PASS/3 FAIL все три отказа относятся к прежним
+prepare-startup retry/twice/deadline cases. Они отдельно воспроизведены на
+неизменённом `618a85f953` в изолированной копии, к текущим исправлениям не относятся.
+Первоначальные5s timeout fsync-heavy тестов при параллельной нагрузке
+не повторились в полном Desktop/migration прогоне с test budget20s.
+Результаты перекрывающихся запусков не суммируются.
+
+Независимые ревью auth, readiness, origin/UI/CLI и TUI завершены без новых
+замечаний. Установленный GUI, compiled CLI и native Windows/macOS не запускались.
+Существующий settings-ux.mjs дополнен регрессиями для будущего installed прогона.

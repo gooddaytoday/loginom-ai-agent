@@ -41,6 +41,63 @@ test("stdin setup admits explicit custom credentials while ignoring a legacy key
   expect(setupCandidate('{"mode":"custom","apiKey":""}', current).apiKey).toEqual({ operation: "empty" })
 })
 
+test.skipIf(process.platform === "win32")(
+  "interactive setup never offers to preserve a key for another origin",
+  async () => {
+    const output = { text: "", step: 0 }
+    const prompt = Promise.withResolvers<string>()
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "-e",
+        `
+    import {loginomManagement} from './src/cli/loginom-management.ts';
+    try {
+      await loginomManagement({request:async()=>(${JSON.stringify(current)})},'setup',{stdinJSON:false,acknowledge:false});
+    } finally { process.exit(0) }
+  `,
+      ],
+      {
+        cwd: `${import.meta.dir}/../..`,
+        env: { ...process.env, TERM: "xterm-256color" },
+        terminal: {
+          data(terminal, data) {
+            output.text += new TextDecoder().decode(data)
+            if (output.step === 0 && output.text.includes("Сервер Loginom AI")) {
+              output.step++
+              terminal.write("\r")
+            }
+            if (output.step === 1 && output.text.includes("MCP endpoint")) {
+              output.step++
+              terminal.write("\u0015https://typo.test/mcp\r")
+            }
+            if (output.step === 2 && output.text.includes("Ключ сервера")) {
+              output.step++
+              prompt.resolve(output.text)
+              terminal.write("\u0003")
+            }
+          },
+        },
+      },
+    )
+    const timer = setTimeout(() => {
+      prompt.reject(Error("INTERACTIVE_PROMPT_TIMEOUT: " + output.text))
+      child.kill()
+    }, 3000)
+    try {
+      const text = await prompt.promise
+      expect(text).toContain("│  https://typo.test/mcp\r\n")
+      expect(text).not.toContain("Enter — сохранить текущий")
+      await child.exited
+    } finally {
+      clearTimeout(timer)
+      child.kill()
+      child.terminal?.close()
+      await child.exited
+    }
+  },
+)
+
 test("cloud setup saves Loginom settings without attempting browser verification before sign-in", async () => {
   const child = Bun.spawn(
     [

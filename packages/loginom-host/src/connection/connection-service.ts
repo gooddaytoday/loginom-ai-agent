@@ -287,6 +287,13 @@ export async function connectionService(
         const address = new URL(endpoint)
         if (!["http:", "https:"].includes(address.protocol) || address.username || address.password)
           throw Error("LOGINOM_ENDPOINT_INVALID")
+        if (
+          (!current?.endpoint ||
+            !URL.canParse(current.endpoint) ||
+            address.origin !== new URL(current.endpoint).origin) &&
+          (candidate.apiKey?.operation !== "replace" || !candidate.apiKey.value.trim())
+        )
+          throw Error("LOGINOM_API_KEY_REQUIRED")
         if (!apiKey.trim()) throw Error("LOGINOM_API_KEY_REQUIRED")
       }
       const record = {

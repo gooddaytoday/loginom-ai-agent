@@ -146,6 +146,36 @@ test.each(["connection.cloud-cancel", "connection.cloud-disconnect"])(
   15_000,
 )
 
+test("custom credential validation reaches CLI callers through private IPC", async () => {
+  const host = await launchNodeHost({
+    node: fixture.node,
+    entry: fixture.entry,
+    root: join(fixture.directory, "custom-key-required"),
+    resources: join(fixture.directory, "absent-runtime"),
+    headless: true,
+    environment: {},
+  })
+  try {
+    for (const [endpoint, error] of [
+      ["https://typo.test/mcp", "LOGINOM_API_KEY_REQUIRED"],
+      ["not-an-endpoint", "LOGINOM_ENDPOINT_INVALID"],
+    ])
+      await expect(
+        host.request("connection.check", {
+          mode: "custom",
+          endpoint,
+          revision: 0,
+          url: "https://example.test/app/",
+          username: "user",
+          password: { operation: "preserve" },
+        }),
+      ).rejects.toThrow(error)
+    expect(await host.request("connection.status", {})).toMatchObject({ generation: 0, state: "unconfigured" })
+  } finally {
+    await host.close()
+  }
+})
+
 test("private cloud start returns only pending login and status/cancel do not call the site", async () => {
   const calls: string[] = []
   const canaries = ["DEVICE-CANARY", "SESSION-CANARY", "INSTALLATION-CANARY", "PRIMARY-CANARY", "RESERVE-CANARY"]

@@ -110,6 +110,11 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       (state.passwordMode === "empty") !== !state.baseline.hasPassword)
   const disabled = () => !state.baseline || busy() || state.cloudBusy || pending()
   const canSave = () => !disabled() && (dirty() || !!state.view?.failure || state.view?.state === "recoverable-error")
+  const canPreserveApiKey = (endpoint = state.endpoint) =>
+    !!state.baseline?.hasApiKey &&
+    URL.canParse(endpoint) &&
+    URL.canParse(state.baseline.endpoint ?? "") &&
+    new URL(endpoint).origin === new URL(state.baseline.endpoint!).origin
 
   function error(value: unknown) {
     if (!disposed) setState({ failed: true, message: loginomError(value) })
@@ -177,7 +182,22 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       >
     >,
   ) {
-    setState({ ...values, message: undefined, checkedHelp: undefined, checkedBrowser: undefined, failed: false })
+    const changedOrigin =
+      values.endpoint !== undefined &&
+      values.endpoint !== state.endpoint &&
+      (!URL.canParse(values.endpoint) ||
+        !URL.canParse(state.endpoint) ||
+        new URL(values.endpoint).origin !== new URL(state.endpoint).origin)
+    setState({
+      ...(changedOrigin
+        ? { apiKey: "", apiKeyMode: canPreserveApiKey(values.endpoint) ? ("preserve" as const) : ("empty" as const) }
+        : {}),
+      ...values,
+      message: undefined,
+      checkedHelp: undefined,
+      checkedBrowser: undefined,
+      failed: false,
+    })
   }
   function requestClose() {
     if (busy()) return false
@@ -347,6 +367,7 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
     dirty,
     disabled,
     canSave,
+    canPreserveApiKey,
     load,
     refresh,
     edit,

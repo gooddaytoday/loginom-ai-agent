@@ -77,6 +77,58 @@ test("safe views expose defaults and presence flags only; a successful save surv
   }
 })
 
+test("changing custom origin cannot send the saved key to another server", async () => {
+  const checked: { endpoint?: string; apiKey: string }[] = []
+  const f = await fixture({
+    async check(record) {
+      checked.push({ endpoint: record.endpoint, apiKey: record.apiKey })
+      return { help: { state: "ready" }, browser: { state: "unknown" } }
+    },
+    async prepare() {
+      return {
+        observeHelp(listener) {
+          listener({ state: "ready" })
+        },
+        async close() {},
+      }
+    },
+  })
+  try {
+    await save(f.service)
+    for (const endpoint of ["http://typo.test/mcp", "https://example.test/mcp", "http://example.test:8080/mcp"])
+      for (const apiKey of [
+        undefined,
+        { operation: "preserve" as const },
+        { operation: "empty" as const },
+        { operation: "replace" as const, value: " " },
+      ]) {
+        const input = { ...candidate, revision: 1, endpoint, apiKey }
+        if (!apiKey) delete input.apiKey
+        await expect(f.service.api.check(input)).rejects.toThrow("LOGINOM_API_KEY_REQUIRED")
+      }
+    expect(checked).toEqual([{ endpoint: candidate.endpoint, apiKey: "private-api-key" }])
+    await f.service.api.check({
+      ...candidate,
+      revision: 1,
+      endpoint: "http://EXAMPLE.test:80/other?test=1",
+      apiKey: { operation: "preserve" },
+    })
+    await f.service.api.check({
+      ...candidate,
+      revision: 1,
+      endpoint: "http://typo.test/mcp",
+      apiKey: { operation: "replace", value: "new-server-key" },
+    })
+    expect(checked.slice(1)).toEqual([
+      { endpoint: "http://EXAMPLE.test:80/other?test=1", apiKey: "private-api-key" },
+      { endpoint: "http://typo.test/mcp", apiKey: "new-server-key" },
+    ])
+    expect(await f.store.read()).toMatchObject({ endpoint: candidate.endpoint, apiKey: "private-api-key", revision: 1 })
+  } finally {
+    await f.close()
+  }
+})
+
 test("automation query stays out of saved settings and restored public views", async () => {
   const f = await fixture()
   try {

@@ -67,6 +67,30 @@ function setup(initial: Partial<Loginom.View> = {}) {
 }
 
 describe("Loginom settings", () => {
+  test("editing another custom origin clears draft credentials and restoring the saved origin preserves its key", async () => {
+    const f = setup()
+    try {
+      await f.form.load()
+      expect(f.form.canPreserveApiKey()).toBe(true)
+      f.form.edit({ apiKey: "draft-key", apiKeyMode: "replace" })
+      f.form.edit({ endpoint: "http://LOGINOM.test:80/other" })
+      expect(f.form.state.apiKey).toBe("draft-key")
+      f.form.edit({ endpoint: "http://typo.test/mcp" })
+      expect(f.form.state.apiKey).toBe("")
+      expect(f.form.state.apiKeyMode).toBe("empty")
+      expect(f.form.canPreserveApiKey()).toBe(false)
+      await f.form.submit(false)
+      expect(f.checks[0].apiKey).toEqual({ operation: "empty" })
+      f.form.edit({ endpoint: "http://LOGINOM.test:80/other" })
+      expect(f.form.state.apiKey).toBe("")
+      expect(f.form.state.apiKeyMode).toBe("preserve")
+      expect(f.form.canPreserveApiKey()).toBe(true)
+      await f.form.submit(false)
+      expect(f.checks[1].apiKey).toEqual({ operation: "preserve" })
+    } finally {
+      f.dispose()
+    }
+  })
   test("Connect opens the full pending login URL exactly once", async () => {
     const f = setup({ mode: "cloud" })
     const opened: string[] = []

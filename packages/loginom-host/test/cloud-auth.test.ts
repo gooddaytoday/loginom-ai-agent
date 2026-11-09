@@ -51,6 +51,7 @@ async function fixture(route?: (request: Request) => Response | Promise<Response
       if (path === "/api/auth/device/token")
         return Response.json({ access_token: "bootstrap-secret", token_type: "Bearer", expires_in: 600 })
       if (path === "/api/agent/connections") return Response.json(pair)
+      if (path === "/api/agent/connections/current" && request.method === "DELETE") return new Response(null, { status: 204 })
       return new Response(null, { status: 404 })
     },
   })
@@ -257,6 +258,26 @@ test("access_denied terminates polling with a safe code", async () => {
   } finally {
     await auth.close()
     await f.cleanup()
+  }
+})
+
+test("terminal device token HTTP failures stop polling before device expiry", async () => {
+  for (const status of [400, 401, 404]) {
+    let clock = Date.now()
+    const f = await fixture(request => request.url.endsWith("/device/token")
+      ? Response.json({ error: "invalid_grant" }, { status }) : undefined)
+    const ended = gate()
+    const auth = await createCloudAuth({ store: f.store, endpoints: f.endpoints,
+      now: () => clock, wait: async ms => { clock += ms },
+      changed() { if (!auth.status().pending) ended.resolve() },
+    })
+    try {
+      await auth.start()
+      await ended.promise
+      expect(auth.status()).toEqual({ connected: false, failure: "LOGINOM_CLOUD_UNAVAILABLE" })
+      expect(f.calls.filter(call => call.path.endsWith("/device/token"))).toHaveLength(1)
+      expect(f.calls.some(call => call.path.endsWith("/connections"))).toBe(false)
+    } finally { await auth.close(); await f.cleanup() }
   }
 })
 
@@ -474,7 +495,7 @@ test("cancel revokes the exact received bootstrap session with a bounded authent
   }
 })
 
-test("unreachable bootstrap cleanup remains bounded and reports unconfirmed revoke", async () => {
+test("unreachable bootstrap cleanup remains bounded and keeps the exchange failure", async () => {
   const f = await fixture((request) =>
     request.url.endsWith("/revoke-session")
       ? new Promise<Response>(() => {})
@@ -496,7 +517,7 @@ test("unreachable bootstrap cleanup remains bounded and reports unconfirmed revo
     await auth.start()
     await ended.promise
     expect(Date.now() - began).toBeLessThan(6500)
-    expect(auth.status().failure).toBe("LOGINOM_CLOUD_REVOKE_UNCONFIRMED")
+    expect(auth.status().failure).toBe("LOGINOM_CLOUD_UNAVAILABLE")
     expect(await f.store.read()).toBeUndefined()
   } finally {
     await auth.close()
@@ -541,6 +562,60 @@ test("redirect rejection keeps credentials from a second listener", async () => 
     second.stop(true)
     await f.cleanup()
   }
+})
+
+test("a consumed bootstrap session cannot replace the original exchange failure", async () => {
+  for (const [response, expected] of [
+    [() => new Response("<html>private-canary</html>"), "LOGINOM_CLOUD_PROTOCOL_INVALID"],
+    [() => new Response(null, { status: 403 }), "LOGINOM_CLOUD_UNAVAILABLE"],
+  ] as const) {
+    let sessionActive = true
+    const f = await fixture(request => {
+      if (request.url.endsWith("/connections")) { sessionActive = false; return response() }
+      if (request.url.endsWith("/revoke-session")) {
+        expect(sessionActive).toBe(false)
+        return new Response(null, { status: 401 })
+      }
+      return undefined
+    })
+    const ended = gate()
+    const auth = await createCloudAuth({ store: f.store, endpoints: f.endpoints, wait: async () => {}, changed() {
+      if (!auth.status().pending) ended.resolve()
+    } })
+    try {
+      await auth.start()
+      await ended.promise
+      expect(auth.status()).toEqual({ connected: false, failure: expected })
+      expect(await f.store.read()).toBeUndefined()
+    } finally { await auth.close(); await f.cleanup() }
+  }
+})
+
+test("a failed local login write revokes its issued installation after the site consumes the session", async () => {
+  let consumed = false
+  const f = await fixture(request => {
+    if (request.url.endsWith("/connections")) consumed = true
+    if (request.url.endsWith("/revoke-session")) return new Response(null, { status: consumed ? 401 : 200 })
+    if (request.method === "DELETE") return new Response(null, { status: 204 })
+    return undefined
+  })
+  const ended = gate()
+  const auth = await createCloudAuth({
+    store: { ...f.store, async write() { throw Error("write-private-canary") } },
+    endpoints: f.endpoints,
+    wait: async () => {},
+    changed() { if (!auth.status().pending) ended.resolve() },
+  })
+  try {
+    await auth.start()
+    await ended.promise
+    expect(auth.status()).toEqual({ connected: false, failure: "LOGINOM_STORE_WRITE_FAILED" })
+    expect(await f.store.read()).toBeUndefined()
+    const deleted = f.calls.filter(call => call.path.endsWith("/connections/current"))
+    expect(deleted).toHaveLength(1)
+    expect(deleted[0]?.headers.get("x-api-key")).toBe(pair.installationKey)
+    expect(deleted[0]?.headers.get("authorization")).toBeNull()
+  } finally { await auth.close(); await f.cleanup() }
 })
 
 test("malformed exchanges never persist a partial pair or expose server data", async () => {
@@ -1194,7 +1269,7 @@ test("cancel reports a failed bootstrap cleanup without hiding the revoke result
     const cancelling = auth.cancel()
     exchange.resolve(Response.json(pair))
     await cancelling
-    expect(auth.status()).toEqual({ connected: false, failure: "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" })
+    expect(auth.status()).toEqual({ connected: false, failure: "LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED" })
   } finally {
     await auth.close()
     await f.cleanup()
@@ -1348,8 +1423,8 @@ test("failed deletion of a cancelled login is reported without certifying durabl
   }
 })
 
-test("disconnect deletion failure disables cloud calls and returns only a safe storage code", async () => {
-  const f = await fixture()
+test.each([204, 503])("disconnect deletion failure still attempts remote revoke and preserves its storage error: %s", async status => {
+  const f = await fixture(request => request.method === "DELETE" ? new Response(null, { status }) : undefined)
   await f.store.write({
     kind: "loginom-cloud-v1",
     installationKey: pair.installationKey,
@@ -1376,7 +1451,9 @@ test("disconnect deletion failure disables cloud calls and returns only a safe s
     expect(changes).toContain(1)
     expect(auth.status()).toEqual({ connected: false, failure: "LOGINOM_STORE_WRITE_FAILED" })
     expect(await f.store.read()).toBeDefined()
-    expect(f.calls).toHaveLength(0)
+    expect(f.calls).toHaveLength(1)
+    expect(f.calls[0]?.path).toBe("/api/agent/connections/current")
+    expect(f.calls[0]?.headers.get("x-api-key")).toBe(pair.installationKey)
   } finally {
     await auth.close()
     await f.cleanup()

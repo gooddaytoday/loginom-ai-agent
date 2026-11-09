@@ -263,12 +263,18 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)(
 )
 
 test.each([
-  { accept: false, connected: false, generation: 1 },
-  { accept: true, connected: false, generation: 1 },
-  { accept: true, connected: true, generation: 0 },
+  { accept: false, connected: false, generation: 1, failure: "", exit: 0 },
+  { accept: true, connected: false, generation: 1, failure: "", exit: 0 },
+  { accept: true, connected: true, generation: 0, failure: "", exit: 0 },
+  { accept: true, connected: false, generation: 1, failure: "LOGINOM_CLOUD_ACCESS_DENIED", exit: 0 },
+  { accept: true, connected: false, generation: 1, failure: "LOGINOM_CLOUD_EXPIRED", exit: 0 },
+  { accept: true, connected: false, generation: 1, failure: "LOGINOM_CLOUD_UNAVAILABLE", exit: 0 },
+  { accept: true, connected: false, generation: 1, failure: "LOGINOM_CLOUD_PROTOCOL_INVALID", exit: 1 },
+  { accept: true, connected: false, generation: 1, failure: "LOGINOM_STORE_WRITE_FAILED", exit: 1 },
+  { accept: true, connected: false, generation: 1, failure: "LOGINOM_CLOUD_REVOKE_UNCONFIRMED", exit: 1 },
 ])(
   "TUI offers cloud sign-in only when disconnected and hands off cancellation: %j",
-  async ({ accept, connected, generation }) => {
+  async ({ accept, connected, generation, failure, exit }) => {
     const directory = await mkdtemp(join(tmpdir(), "tui-cloud-startup-"))
     const bundle = join(directory, "bundle")
     const profile = join(directory, "profile")
@@ -281,13 +287,18 @@ test.each([
       `
     import {appendFileSync} from 'node:fs';
     let connected=${connected};
+    let failure;
     const generation=${generation};
     process.on('message', m => {
       appendFileSync(${JSON.stringify(calls)},JSON.stringify(m.method)+'\\n');
       if(m.method==='start') return process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
       if(m.method==='close') return process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
-      if(m.method==='connection.cloud-start')connected=true;
-      process.send({id:m.id,result:{mode:'cloud',hasApiKey:false,server:'primary',help:{state:connected&&generation?'ready':'connection-required'},cloud:{connected},revision:1,generation,url:'https://example.test/app/',username:'user',folder:'/user',hasPassword:false,state:generation?(connected?'ready':'connection-required'):'unconfigured'}});
+      if(m.method==='connection.cloud-start'){
+        failure=${JSON.stringify(failure)};
+        if(failure==='LOGINOM_CLOUD_UNAVAILABLE')return process.send({id:m.id,error:failure});
+        connected=!failure;
+      }
+      process.send({id:m.id,result:{mode:'cloud',hasApiKey:false,server:'primary',help:{state:connected&&generation?'ready':'connection-required'},cloud:{connected,...(failure?{failure}:{})},revision:1,generation,url:'https://example.test/app/',username:'user',folder:'/user',hasPassword:false,state:generation?(connected?'ready':'connection-required'):'unconfigured'}});
     });`,
     )
     const child = Bun.spawn(
@@ -331,8 +342,14 @@ test.each([
     const timer = setTimeout(() => child.kill("SIGKILL"), 20_000)
     try {
       expect({ exit: await child.exited, errors: await errors }).toEqual({
-        exit: 0,
-        errors: connected || accept ? "" : "Для входа позже выйдите из TUI, выполните loginom connect и откройте TUI снова.\n",
+        exit,
+        errors: exit
+          ? "CLI_RUN_FAILED\n"
+          : failure
+            ? `Не удалось подключиться к Loginom AI: ${failure}. Можно продолжить обычный чат без подключения.\n`
+            : connected || accept
+              ? ""
+              : "Для входа позже выйдите из TUI, выполните loginom connect и откройте TUI снова.\n",
       })
       const rows = (await output)
         .trim()
@@ -346,7 +363,7 @@ test.each([
           signal: true,
           guard: true,
         },
-        { tui: true, signal: false, guard: true },
+        ...(exit ? [] : [{ tui: true, signal: false, guard: true }]),
       ])
       const operations = (await readFile(calls, "utf8"))
         .trim()
@@ -354,6 +371,7 @@ test.each([
         .map((row) => JSON.parse(row))
       expect(operations.filter((operation) => operation === "start")).toHaveLength(1)
       expect(operations.filter((operation) => operation === "connection.cloud-start")).toHaveLength(accept && !connected ? 1 : 0)
+      expect(operations.filter((operation) => operation === "connection.cloud-cancel")).toHaveLength(failure ? 1 : 0)
       expect(operations.at(-1)).toBe("close")
       await expect(access(join(profile, ".writer"))).rejects.toMatchObject({ code: "ENOENT" })
     } finally {

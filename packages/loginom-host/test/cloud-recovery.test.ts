@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events"
 import { loginomHostPort } from "../src/host-port"
 import { transport } from "../src/transport"
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
@@ -271,6 +271,113 @@ test("primary 401 refreshes the full pair once and retries the same Dock", async
     expect(f.reserve.requests).toHaveLength(0)
     expect((await cloudStore(join(f.options.root, "connection"), credentials("linux")).read())?.dock).toEqual({ primary: { apiKey: "new-primary" }, reserve: { apiKey: "new-reserve" } })
   } finally { await f.close() }
+}, 240000)
+
+test("saving a cloud generation retries initial Help admission after another generation refreshes credentials", async () => {
+  const entered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const starts: { generation: number; deadline: number }[] = []
+  const closed: number[] = []
+  let held = false
+  let refreshes = 0
+  const f = await fixture({ async request(body, _request, response) {
+    if (!held || refreshes || !body || typeof body !== "object" || !("method" in body) || body.method !== "tools/call") return false
+    response.writeHead(401); response.end(); return true
+  } }, {}, async request => {
+    const url = new URL(request.url)
+    if (url.pathname === "/start") {
+      starts.push({ generation: Number(url.searchParams.get("generation")), deadline: Number(url.searchParams.get("deadline")) })
+      if (held && starts.at(-1)!.generation === 2 && starts.filter(start => start.generation === 2).length === 2) {
+        entered.resolve()
+        await release.promise
+      }
+      return new Response()
+    }
+    if (url.pathname === "/closed") { closed.push(Number(url.searchParams.get("generation"))); return new Response() }
+    if (url.pathname !== "/api/agent/dock-credentials") return new Response(null, { status: 404 })
+    refreshes++
+    return Response.json({ dock: { primary: { apiKey: "p-secret" }, reserve: { apiKey: "rotated-reserve" } } })
+  }, `
+    const gate = GATE_URL;
+    const send = process.send.bind(process);
+    let start;
+    process.on('message', message => { if (message.operation === 'start') start = message.input; });
+    process.send = (message, ...args) => {
+      if (message.result?.started) {
+        void fetch(gate + '/start?generation=' + start.generation + '&deadline=' + start.deadline).then(() => send(message, ...args));
+        return true;
+      }
+      if (message.result?.closed) {
+        void fetch(gate + '/closed?generation=' + start.generation).then(() => send(message, ...args));
+        return true;
+      }
+      return send(message, ...args);
+    };
+    await import(${JSON.stringify(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url).href)});
+  `)
+  try {
+    await f.host.settled(); await f.host.catalog(1)
+    const status = await f.host.api.status()
+    const checked = await f.host.api.check({ revision: status.revision, mode: "cloud", url: status.url,
+      username: status.username, password: { operation: "preserve" }, verifyBrowser: false })
+    held = true
+    await f.host.api.save({ revision: status.revision, validationId: checked.validationId })
+    await entered.promise
+    const read = f.host.callKnowledge(1, { run: "old", id: "read", name: "read",
+      arguments: { uris: ["viking://resources/loginom-dock/help"] } },
+      { deadline: Date.now() + 4000, signal: new AbortController().signal })
+    expect(await read).toMatchObject({ content: expect.any(Array) })
+    expect(refreshes).toBe(1)
+    release.resolve()
+    await f.host.settled()
+    expect(await f.host.api.status()).toMatchObject({ generation: 2, revision: 2, browser: { state: "unknown" } })
+    expect(await f.host.catalog(2)).toMatchObject({ tools: expect.any(Array) })
+    expect((await f.host.api.status()).help.state).toBe("ready")
+    expect(starts.filter(start => start.generation === 2)).toHaveLength(3)
+    expect(starts.filter(start => start.generation === 2).slice(1).map(start => start.deadline)).toEqual([starts.at(-1)!.deadline, starts.at(-1)!.deadline])
+    expect(closed.filter(generation => generation === 2)).toHaveLength(2)
+    expect(f.reserve.requests).toHaveLength(0)
+  } finally { release.resolve(); await f.close() }
+}, 240000)
+
+test("cloud validation retires a stale catalog and retries after another generation refreshes credentials", async () => {
+  const entered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  let lists = 0
+  let refreshes = 0
+  const f = await fixture({
+    async list() {
+      if (++lists === 2) { entered.resolve(); await release.promise }
+      return { tools: f.primary.tools }
+    },
+    async request(body, _request, response) {
+      if (refreshes || !body || typeof body !== "object" || !("method" in body) || body.method !== "tools/call") return false
+      response.writeHead(401); response.end(); return true
+    },
+  }, {}, () => {
+    refreshes++
+    return Response.json({ dock: { primary: { apiKey: "p-secret" }, reserve: { apiKey: "rotated-reserve" } } })
+  })
+  try {
+    await f.host.settled(); await f.host.catalog(1)
+    const status = await f.host.api.status()
+    const checked = f.host.api.check({ revision: status.revision, mode: "cloud", url: status.url,
+      username: status.username, password: { operation: "preserve" }, verifyBrowser: false })
+    void checked.catch(() => {})
+    await entered.promise
+    expect(await f.host.callKnowledge(1, { run: "old", id: "read", name: "read",
+      arguments: { uris: ["viking://resources/loginom-dock/help"] } },
+      { deadline: Date.now() + 4000, signal: new AbortController().signal })).toMatchObject({ content: expect.any(Array) })
+    release.resolve()
+    expect(await checked).toMatchObject({ help: { state: "ready" }, browser: { state: "unknown" } })
+    expect(lists).toBe(4)
+    const directory = join(f.options.root, "knowledge", "2")
+    const cleanups = await Promise.all((await readdir(directory)).filter(name => name.startsWith("runtime-close-"))
+      .map(name => Bun.file(join(directory, name)).json()))
+    expect(cleanups).toHaveLength(2)
+    expect(cleanups.every(cleanup => cleanup.closed_ack && cleanup.exit_code === 0 && cleanup.exit_signal === null)).toBe(true)
+    expect(f.reserve.requests).toHaveLength(0)
+  } finally { release.resolve(); await f.close() }
 }, 240000)
 
 test("reserve retries an unavailable Help read without replaying browser work", async () => {

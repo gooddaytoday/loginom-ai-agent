@@ -175,21 +175,38 @@ try {
   await page.keyboard.press("ArrowRight")
   await expect(form.getByRole("radio", { name: customName })).toBeChecked()
   const key = () => form.getByLabel(/^(Loginom AI key|Ключ Loginom AI)$/)
+  const endpoint = () => form.getByLabel(/Loginom AI server URL|Адрес сервера Loginom AI/)
   await expect(key()).toHaveAttribute("type", "password")
   await expect(key()).toHaveValue("")
   await expect(key()).toHaveAttribute("placeholder", "••••••••")
-  await expect(form.getByLabel(/Loginom AI server URL|Адрес сервера Loginom AI/)).toHaveValue("https://custom.test/mcp")
+  await expect(endpoint()).toHaveValue("https://custom.test/mcp")
   await key().fill("draft-fixture-key")
   await page.screenshot({ path: join(evidence, "custom-card.png") })
   await form.getByText(cloudName).click()
   await form.getByText(customName).click()
   await expect(key()).toHaveValue("draft-fixture-key")
+  await endpoint().fill("https://typo.test/mcp")
+  await expect(key()).toHaveValue("")
+  await expect(key()).not.toHaveAttribute("placeholder", "••••••••")
+  await endpoint().fill("https://CUSTOM.test:443/other")
+  await expect(key()).toHaveValue("")
+  await expect(key()).toHaveAttribute("placeholder", "••••••••")
   assert.equal((await counters()).starts, 0)
   await footerClose().click()
   await form.getByRole("button", { name: discardName }).click()
   await open()
   await form.getByRole("button", { name: connectName }).click()
   await expect(form.getByText(/TEST-CODE/)).toBeVisible()
+  const expiry = await page.evaluate(async () =>
+    new Date((await window.api.loginom.status()).cloud.pending.expiresAt).toLocaleString(
+      document.documentElement.lang,
+      {
+        dateStyle: "medium",
+        timeStyle: "long",
+      },
+    ),
+  )
+  await expect(form.locator('[data-component="loginom-cloud-card"]')).toContainText(expiry)
   await expect(form.getByRole("button", { name: "https://loginom.ai/device", exact: true })).toBeVisible()
   await form.getByRole("button", { name: "https://loginom.ai/device", exact: true }).click()
   assert.deepEqual((await counters()).links, ["https://loginom.ai/device"])

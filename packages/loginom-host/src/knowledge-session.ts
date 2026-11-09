@@ -69,7 +69,7 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
     })
     return retirement
   }
-  async function connect(budget: CallBudget, route: { server: "primary" | "reserve" }) {
+  async function connect(budget: CallBudget, route: { server: "primary" | "reserve" }): Promise<void> {
     await withinBudget(retirement, budget)
     if (closed || options.signal.aborted) {
       admission.reject(Error("LOGINOM_HOST_CLOSED"))
@@ -153,7 +153,7 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
     })()
       .catch(async (error: unknown) => {
         if (error instanceof RuntimeStartupError && !error.cleanupConfirmed) cleanupFailed = true
-        if (current()) {
+        if (currentAttempt === attempt) {
           const previous = child
           child = undefined
           await previous?.close().catch(() => {
@@ -162,6 +162,9 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
           if (current()) options.changed({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
         }
         const failure = cleanupFailed ? Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: error }) : error
+        // Another generation may refresh credentials while this startup is still pending.
+        if (!cleanupFailed && !closed && !options.signal.aborted && currentAttempt === attempt
+          && options.connection.mode === "cloud" && revision !== options.cloud.revision()) return
         if (currentAttempt === attempt) admission.reject(failure)
         throw failure
       })
@@ -170,7 +173,11 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
         if (controller === cancellation) controller = undefined
       })
     loading = pending
-    return pending
+    await pending
+    return connect(budget, route).catch((error: unknown) => {
+      if (currentAttempt === attempt) admission.reject(error)
+      throw error
+    })
   }
   async function recover<T>(budget: CallBudget, operation: (route: { server: "primary" | "reserve" }) => Promise<T>, failed?: () => typeof child): Promise<T> {
     const route = { server: options.selected() }

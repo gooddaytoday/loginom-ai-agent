@@ -194,10 +194,16 @@ async function interactiveSetup(current: Loginom.View): Promise<Loginom.Candidat
         })
       : undefined
   if (connectionMode === "custom" && typeof endpoint !== "string") throw new Error("CLI_CANCELLED")
+  const preserveKey =
+    current.hasApiKey &&
+    typeof endpoint === "string" &&
+    URL.canParse(endpoint) &&
+    URL.canParse(current.endpoint ?? "") &&
+    new URL(endpoint).origin === new URL(current.endpoint!).origin
   const key =
     connectionMode === "custom"
       ? await password({
-          message: current.hasApiKey ? "Ключ сервера (Enter — сохранить текущий)" : "Ключ сервера",
+          message: preserveKey ? "Ключ сервера (Enter — сохранить текущий)" : "Ключ сервера",
           output: process.stderr,
         })
       : undefined
@@ -231,7 +237,7 @@ async function interactiveSetup(current: Loginom.View): Promise<Loginom.Candidat
   return setupCandidate(
     JSON.stringify({
       mode: connectionMode,
-      ...(connectionMode === "custom" ? { endpoint, ...(key || !current.hasApiKey ? { apiKey: key } : {}) } : {}),
+      ...(connectionMode === "custom" ? { endpoint, ...(key || !preserveKey ? { apiKey: key } : {}) } : {}),
       url,
       username,
       ...(mode === "preserve" ? {} : { password: secret }),

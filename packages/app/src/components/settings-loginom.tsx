@@ -129,12 +129,12 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                           label={language.t("loginom.ai.apiKey")}
                           type="password"
                           value={form.state.apiKey}
-                          placeholder={form.state.baseline?.hasApiKey ? "••••••••" : undefined}
+                          placeholder={form.canPreserveApiKey() ? "••••••••" : undefined}
                           autocomplete="new-password"
                           onChange={(apiKey) =>
                             form.edit({
                               apiKey,
-                              apiKeyMode: apiKey ? "replace" : form.state.baseline?.hasApiKey ? "preserve" : "empty",
+                              apiKeyMode: apiKey ? "replace" : form.canPreserveApiKey() ? "preserve" : "empty",
                             })
                           }
                         />
@@ -158,7 +158,10 @@ export function SettingsLoginom(props: { onSaved?: () => void; onLater?: () => v
                                 <p>
                                   {language.t("loginom.ai.pending", {
                                     code: pending().userCode,
-                                    expiry: new Date(pending().expiresAt).toISOString(),
+                                    expiry: new Date(pending().expiresAt).toLocaleString(language.intl(), {
+                                      dateStyle: "medium",
+                                      timeStyle: "long",
+                                    }),
                                   })}
                                 </p>
                                 <Button
