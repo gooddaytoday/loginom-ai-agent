@@ -58,7 +58,30 @@ test('Haar wavelet validates exact mode-specific rules before touching UI',async
   validateSmoothingParameters(p,'wavelet',request);
   assert.equal(resolveSmoothingParameters(p,fields).find(f=>f.name==='X').depth,depth);
   assert.throws(()=>validateSmoothingParameters(p,'hodrick_prescott',request));
-  for(const patch of [{family:'coiflet'},{order:2},{depth:3},{depth:1.5},{boundary:'zero'},{lambda:1}])
+  for(const patch of [{family:'unknown'},{order:3},{depth:3},{depth:1.5},{boundary:'periodic'},{lambda:1}])
    assert.throws(()=>validateSmoothingParameters({smoothing:[{...p.smoothing[0],...patch}]},'wavelet',request));
  }
+});
+
+test('db2, coif1 and CDF rules pass published schema and production preflight',async()=>{
+ const {smoothingParametersSchema}=await import('../lib/node-api.mjs');
+ const {validateActionParameters}=await import('../lib/action-catalog.mjs');
+ for(const family of ['daubechies','coiflet','cdf_9_7'])for(const boundary of ['symmetric','zero','reflect'])for(const depth of [1,2]){
+  const rule={field:'X',family,...(family==='cdf_9_7'?{}:{order:family==='daubechies'?2:1}),depth,boundary},p={smoothing:[rule]};
+  validateActionParameters(smoothingParametersSchema,p);validateSmoothingParameters(p,'wavelet',request);
+  assert.equal(resolveSmoothingParameters(p,fields).find(f=>f.name==='X').family,family);
+  for(const patch of [family==='cdf_9_7'?{order:1}:{order:3},{boundary:'constant'},{depth:0},{depth:3}]){
+   assert.throws(()=>validateSmoothingParameters({smoothing:[{...rule,...patch}]},'wavelet',request));
+   assert.throws(()=>validateActionParameters(smoothingParametersSchema,{smoothing:[{...rule,...patch}]}));
+  }
+ }
+});
+
+test('smoothing semantics say omission keeps rules while a provided list replaces them',async()=>{
+ const {NODE_TYPES}=await import('../lib/node-contracts.mjs');
+ const semantics=NODE_TYPES['preprocessing.smoothing'].semantics;
+ assert.doesNotMatch(semantics,/omitted rules persist/i);
+ assert.match(semantics,/omit smoothing to keep (its )?rules/i);
+ assert.match(semantics,/list replaces/i);
+ assert.match(semantics,/\[\] disables/);
 });

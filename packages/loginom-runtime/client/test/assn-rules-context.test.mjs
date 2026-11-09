@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readAssnRulesBrowser,readAssnRulesContext} from '../lib/assn-rules-context.mjs';
 
-function fixture(count=5,auxiliary=false) {
- const base='MF;TF;WizrdMCF;TuneDataSourceInputPortWizard'+(auxiliary?'-1':'')+';',elements=[],components={};
+function fixture(count=5) {
+ const base='MF;TF;WizrdMCF;TuneDataSourceInputPortWizard;',elements=[],components={};
  const element=(tid,parent)=>{const e={id:'e'+elements.length,tid,parent,checkVisibility:()=>true,contains(x){return x===this||x.parent===this;}};elements.push(e);return e;};
  const root=element(base.slice(0,-1));
  const records=Array.from({length:count},(_,i)=>({isModel:true,internalId:'r'+i,data:{ID:i,Index:i,Name:'F'+i,DisplayName:'Одинаковая метка',DataType:5,DataKind:2,UsageType:0,DefaultUsageType:0,GroupField:"",OriginType:0,Broken:false,ReverseBroken:false}}));
@@ -41,26 +41,3 @@ test('assn-rules ownership must remain stable across the complete read',async()=
  for(const extra of [{input_port:{}},{output_port:{}},{surface:'graph'}])assert.equal((await readAssnRulesContext({}, {},async()=>({verified:true,surface:'wizard',...extra}))).reason,'assn_rules_node_surface');
 });
 
-
-test('auxiliary role reader proves the complete typed inventory, not only its count',()=>{
- const f=fixture(2,true);f.records[0].data.UsageType=7;
- const r=f.read();assert.equal(r.verified,true);assert.equal(r.kind,'auxiliary');
- assert.equal(r.inventory_complete,true);assert.equal(r.fields[0].usage_type,7);
- f.proxy.pendingOperations={read:{}};assert.equal(f.read().verified,false);
-});
-
-test('selected-item filter reads every native selection flag before claiming a configured filter',()=>{
- const prefix='MF;TF',base=prefix+';WizrdMCF;AssnRulesWizard;',elements=[],components={};
- const add=(tid,c={})=>{const e={id:'p'+elements.length,tid,getAttribute:key=>key==='data-tid'?tid:null,checkVisibility:()=>true,contains:()=>true};elements.push(e);components[e.id]={...c,el:{dom:e}};return e;};
- add(base.slice(0,-1));
- for(const [name,value] of Object.entries({pedMinSupport:50,pedExcludeLargeSupportItems:false,pedMaxSupport:90,pedSelectColumn:true,pedExcludeSingleItems:false,pedNItemsMax:3,pedMinConfidence:60,pedMinLift:0,pedNConsequentMax:2}))add(base+name+';ValueControl',{getValue:()=>value});
- const records=[{isModel:true,internalId:'b',data:{Name:'Item',DataType:5,UsageType:9,Selected:false}}];
- const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,getTotalCount:()=>records.length,isLoading:()=>false};
- add(base+'grdSelectedColumns',{getStore:()=>store});const selected=add(base+'grdSelectedColumns;headercontainer;Selected_Item');
- selected.querySelectorAll=()=>[{classList:{contains:key=>key==='x-grid-checkcolumn-checked'&&records[0].data.Selected}}];
- const context={bg:{TBGUsageType:{utItem:9}},Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q==='[data-tid]'?elements:[]}};
- const read=()=>vm.runInNewContext('('+readAssnRulesBrowser.toString()+')("MF;TF")',context).selected_columns;
- assert.equal(read().verified,true);assert.equal(read().columns[0].all_selected,false);
- records[0].data.Selected=true;assert.equal(read().columns[0].all_selected,true);
- store.getTotalCount=()=>2;assert.equal(read().verified,false);
-});

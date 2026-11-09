@@ -9,6 +9,11 @@ import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
+import {preflightBooleanBindings} from '../lib/variable-binding-source.mjs';
+import {booleanBindingSchema} from '../lib/variable-binding-parameters.mjs';
+import {validateGroupingParameters} from '../lib/grouping-parameters.mjs';
+import {validateSortingParameters} from '../lib/sorting-parameters.mjs';
 for(const cleanup of [true,false])test('proved native error uses NODE_EXECUTION_FAILED and standard release; cleanup='+cleanup,async()=>{
  const f=fixture(),message='Количество строк (2) в обучающем наборе не должно быть меньше количества коэффициентов (4) модели';
  f.drivers.finish=async()=>{throw Object.assign(Error(message),{nodeExecutionFailure:{code:'NODE_EXECUTION_FAILED',message,native:{source:'loginom_error_toast'}}});};
@@ -42,6 +47,42 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+for(const [type,mode,parameter] of [['transform.group_data','aggregate','/sort_result'],['transform.sorting','keys','/compare_with_locale']])
+test(type+' target preflight retains the builtin source node required by v040',async()=>{
+ const f=fixture(),p=request(),source={document_id:'doc',workflow_id:'workflow',node_id:'variables'},table={...source,node_id:'table'};
+ p.target={kind:'new',type};p.mode=mode;
+ p.parameters=type==='transform.group_data'?{group_by:[{kind:'input_field',name:'Region'}],measures:[{field:{kind:'input_field',name:'Amount'},function:'sum',name:'Metric',label:'Metric'}]}:{keys:[{field:{kind:'input_field',name:'Region'},direction:'ASC',case_sensitive:false}]};
+ p.inputs=[{source:table,output:0,input:0}];
+ p.bindings=[{parameter,variable:{kind:'control',input:0,name:'Flag'}}];
+ p.variable_inputs=[{source,output:4,input:0,kind:'control'}];
+ f.handlers.set(type,{...f.handlers.get('imports.text'),modes:[mode],binding_schema:booleanBindingSchema(type),validate:type==='transform.group_data'?validateGroupingParameters:validateSortingParameters});
+ const sourceNode={ref:source,type:'variables.user',variable_outputs:[{kind:'variables',port:4,port_guid:'runtime-port'}]};
+ f.operation.parameters=p;
+ f.operation.action={action_key:'node.apply',revision:'1.0.0'};
+ f.operation.nodeTargetAdapter={observe:async()=>({complete:true,document_id:p.document_id,workflow_ref:p.workflow_ref,nodes:[sourceNode,{ref:table,type:'imports.text',outputs:[0]}]})};
+ let previews=0,preflightError;
+ const options={operation:f.operation,now:()=>1,onRecord:async e=>{f.records.push(structuredClone(e));return e;},receiptOptions:()=>({}),execute:async code=>{
+  previews++;assert.ok(code.includes('runtime-port'));assert.ok(code.includes('variables'));
+  const prepared=f.records.at(-1);
+  return {status:'SUCCEEDED',operation_id:prepared.internal_operation_id,action_key:'node.variables.user_runtime_read.internal',effect_possible:false,cleanup_complete:true,
+   output:{verified:true,cleanup_complete:true,independent_readback:true,source_active:true,settings_applied:false,node_context:source,
+    variables:[{id:7,name:'Flag',type:'boolean',cell:{type:'boolean',is_null:false,value:false}}]}};
+ }};
+ const prepare=f.drivers.prepareTarget;
+ f.drivers.prepareTarget=async(graph,ctx)=>{
+  assert.deepEqual(Object.keys(graph).sort(),['document_id','inputs','target','variable_inputs','workflow_ref']);
+  validateNodeTargetRequest(graph);
+  f.operation.deadline=ctx.deadline;
+  try{await preflightBooleanBindings(options,ctx,{targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});}
+  catch(error){preflightError=error.stack;throw error;}
+  return prepare(graph,ctx);
+ };
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error)+'\n'+(preflightError??''));
+ assert.equal(previews,1);assert.deepEqual(f.operation.variableBindingSource.source,source);
+ assert.ok(f.records.some(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='target'));
+ assert.deepEqual(sourceNode.variable_outputs,[{kind:'variables',port:4,port_guid:'runtime-port'}]);
+});
 for(const fault of [null,'type','transport','receipt','question','button','journal'])test('variables calculator deactivation refusal automatically releases only its owned question: '+fault,async()=>{
  const f=fixture({failJournal:fault==='journal'?'node_operation_released':undefined}),p=request();p.target.type=fault==='type'?'imports.text':'variables.calculator';p.mode='expressions';f.handlers.set(p.target.type,{...f.handlers.get('imports.text'),modes:['expressions']});
  const n={document_id:'doc',workflow_id:'workflow',node_id:'node1',verified:true,surface:'graph',tid:'MF;TF-1;Graph;Source',locked:false,pending_wizard_node:{tid:p.workflow_ref.navigation_path.at(-1).tid+'>Source',label:'Source'}};
@@ -109,7 +150,7 @@ test('full shell orders configuration before execution and binds empty fresh out
  assert.equal(r.package_saved,false);assert.equal(r.persisted_package_verified,false);assert.equal(f.records.at(-1).phase,'node_checkpoint');
 });
 
-for(const [type,mode,preserve] of [['preprocessing.coarse_classes','apply',true],['preprocessing.coarse_classes','internal',false],['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','apply',true],['datamining.clustering','k_means',false]])
+for(const [type,mode,preserve] of [['datamining.assn_rules','apply',true],['datamining.assn_rules','fp_growth',false],['preprocessing.coarse_classes','apply',true],['preprocessing.coarse_classes','internal',false],['preprocessing.binning','apply',true],['datamining.lin_regression','apply',true],['preprocessing.binning','internal',false],['datamining.clustering','apply',true],['datamining.clustering','k_means',false]])
 for(const close of [true,false])test('saved-model intermediate finish guard '+type+'/'+mode+' close='+close,async()=>{
  const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
  p.target={kind:'existing',type,ref:node};p.mode=mode;
@@ -431,6 +472,13 @@ function separateFixture(){
  f.drivers.finishGraph=async mode=>{f.calls.push('graph-'+mode);return {verified:true,cleanup_complete:true,effect_possible:mode==='execute',mode,settings_applied:true,execution_started:mode==='execute',execution_id:mode==='execute'?'execution1':null};};
  return f;
 }
+for(const kind of ['grouping','sorting'])test(kind+' projects independent binding receipts into configuration.bindings',async()=>{
+ const f=separateFixture(),bindings=[{parameter:kind==='grouping'?'/sort_result':'/compare_with_locale',mode:'variable',verified:true,variable:{name:'Flag',type:'boolean',id:5}}];
+ f.handlers.get('imports.text').configurationReadback=()=>({kind});
+ const finish=f.drivers.finish;f.drivers.finish=async mode=>({...await finish(mode),bindings});
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED');assert.deepEqual(result.configuration.bindings,bindings);
+ bindings[0].variable.name='changed';assert.equal(result.configuration.bindings[0].variable.name,'Flag');
+});
 for(const mode of ['done','execute','close'])test('separate output wizard preserves complete '+mode+' lifecycle',async()=>{
  const f=separateFixture(),p=request();p.finish=mode;if(mode!=='execute')p.read.ports=[];
  const r=await f.run(p);assert.equal(r.status,'SUCCEEDED');

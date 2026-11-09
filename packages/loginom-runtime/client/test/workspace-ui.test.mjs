@@ -3411,7 +3411,7 @@ test('field parameters read row types caching and exclusion separately from port
 });
 
 test('reform editor reads seven native parameters including disabled cache and owner checkbox state',async()=>{
-  for(const mode of ['global','global_duplicate','global_impostor','global_foreign_wizard','valid','checked','missing_display','duplicate_display','duplicate_form','long_name','combo','combo_enable_kind','combo_wrong_kind','combo_excluded','combo_cache','combo_busy','combo_lost']) {
+  for(const mode of ['global','global_duplicate','global_impostor','global_foreign_wizard','valid','checked','missing_display','duplicate_display','duplicate_form','long_name','combo','combo_enable_kind','combo_wrong_kind','combo_excluded','combo_cache','cache_picker','combo_busy','combo_lost']) {
     const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1)),stem=base+'ReformColumnsWizard;';
     page.add('div',stem+'grdTargetColumns;tbl','',undefined,form);
     const row=page.add('table',null,'',undefined,form);row.attrs.class='x-grid-item-selected';
@@ -3424,7 +3424,7 @@ test('reform editor reads seven native parameters including disabled cache and o
     const root=dialogBase+'EditReformColumnDefForm;',inputs={};
     for(const [key,value] of [['edtName',mode==='long_name'?'x'.repeat(257):'QuantitySum'],['edtDisplayName','QuantitySum'],['cbxDataType','Целый'],['cbxDataKind','Непрерывный'],['cbxUsageType','Не задано'],['cntMain;cbxCachingMethod','Отключено']]) {
       const owner=page.add('div',root+key,'',undefined,dialog),input=page.add('input',null,'',undefined,owner);input.value=value;inputs[key]=input;
-      if(key.endsWith('cbxCachingMethod'))input.disabled=true;
+      if(key.endsWith('cbxCachingMethod'))input.disabled=mode!=='cache_picker';
     }
     const owner=page.add('div',root+'cntMain;chbExcluded','',undefined,dialog);owner.attrs.class=mode==='checked'?'x-form-cb-checked':'';
     const hidden=page.add('input',null,'',undefined,owner);hidden.checked=false;
@@ -3432,6 +3432,11 @@ test('reform editor reads seven native parameters including disabled cache and o
     if(mode==='duplicate_display')page.add('span',root+'cntMain;chbExcluded;DisplayEl','',undefined,owner).attrs.class='x-form-checkbox';
     if(mode==='duplicate_form' || mode==='global_duplicate')page.add('div',base+'EditReformColumnDefForm');
     if(mode==='combo_enable_kind'){inputs.cbxDataType.value='Строковый';inputs.cbxDataKind.disabled=true;}
+    if(mode==='cache_picker'){
+      page.add('div',root+'cntMain;cbxCachingMethod;trg_picker','',undefined,dialog);
+      const full=await page.observe();
+      assert.ok(full.ui.elements.some(e=>e.wizard_combo?.field?.name==='caching'&&e.wizard_combo.kind==='picker'));continue;
+    }
     if(mode.startsWith('combo')) {
       const list=page.add('div',root+'cbxDataType;boundlist','',{x:600,y:300,width:140,height:40});
       page.add('div',root+'cbxDataType;boundlist;Вещественный','Вещественный',{x:605,y:305,width:130,height:25},list);
@@ -8365,6 +8370,26 @@ test('Excel input0 overflow retains typed Close only for its native input1 owner
  }
 });
 
+for(const suffix of ['', '-1'])test('reform literal node cache picker uses the existing owned wizard choice protocol '+suffix,async()=>{
+ const page=new Page(),base='MF;TF-1;WizrdMCF;',form=page.add('div',base.slice(0,-1)),stem=base+'ReformColumnsWizard;';
+ page.add('div',stem+'grdTargetColumns;tbl','',undefined,form);
+ const owner=page.add('div',stem+'pedDataSourceCachingMethod;ValueControl','',undefined,form);
+ const input=page.add('input',null,'',undefined,owner);input.value='Отключено';input.readOnly=true;
+ page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;trg_picker','',undefined,owner);
+ const list=page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist'+suffix,'',{x:600,y:300,width:160,height:40});
+ page.add('div',stem+'pedDataSourceCachingMethod;ValueControl;boundlist'+suffix+';Выбранные_поля','Выбранные поля',{x:605,y:305,width:150,height:25},list);
+ const full=await page.observe(),option=full.ui.elements.find(e=>e.wizard_combo?.kind==='option');
+ assert.ok(option);assert.equal(option.wizard_combo.field.scope,'reform_node');
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ assert.ok(roots.output.ui.elements.some(e=>e.ref===option.wizard_combo.list_ref));
+ const narrow=await page.execute({mode:'observe',root_ref:option.wizard_combo.list_ref});
+ const selected=narrow.output.ui.elements.find(e=>e.ref===option.ref);
+ assert.equal(selected?.wizard_combo?.field?.scope,'reform_node');
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();input.value='Выбранные поля';};
+ const r=await page.act({verb:'select_wizard_option',ref:selected.ref},narrow.output);
+ assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
 test('date string-format cell is clicked away from its checkbox image, never on it',async()=>{
  for(const mode of ['center_image','full_image']){
   const page=new Page(),base='MF;TF-1;WizrdMCF;DateReformWizard;';
@@ -8388,47 +8413,4 @@ test('date string-format cell is clicked away from its checkbox image, never on 
   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
   assert.deepEqual(page.clickedPoints,[{...point,clickCount:1}]);
  }
-});
-
-test('auxiliary association role selection binds its own grid and native dialog',async()=>{
- for(const fault of [false,true]) {
-  const page=new Page(),base='MF;TF-1;WizrdMCF;',wizard=page.add('div',base.slice(0,-1)),stem=base+'TuneDataSourceInputPortWizard-1;';
-  page.add('div',stem+'grdTargetColumns','',undefined,wizard);
-  const grid=page.add('div',stem+'grdTargetColumns;tbl','',undefined,wizard);grid.id='roles-view';grid.attrs.id=grid.id;
-  const row=page.add('table',null,'',undefined,grid);row.attrs={class:'x-grid-item-selected','data-recordindex':'0','data-recordid':'r1','data-boundview':grid.id};
-  page.add('td',stem+'colName_A','A',undefined,row);const label=page.add('td',stem+'colDisplayName_A','A',undefined,row);
-  page.add('span',null,'',undefined,label).attrs.class='bg-TBGDataType-dtInteger';
-  page.add('td',stem+'colDataKind_A','Дискретный',undefined,row);page.add('td',stem+'colUsageType_A','Не задано',undefined,row);
-  const form=page.add('div','EditTuneColumnDefForm');form.id='role-editor';form.attrs.class='x-window';const inputs={};
-  page.add('div','EditTuneColumnDefForm;header','Редактировать столбец',undefined,form);
-  for(const [key,value] of [['edtName','A'],['edtDisplayName','A'],['cbxDataType','Целый'],['cbxDataKind','Дискретный'],['cbxUsageType','Не задано']]) {
-   const owner=page.add('div','EditTuneColumnDefForm;'+key,'',undefined,form),input=page.add('input',null,'',undefined,owner);input.value=value;inputs[key]=input;
-   if(key!=='cbxUsageType'){input.disabled=true;input.attrs.disabled='';}
-  }
-  const record={isModel:true,internalId:'r1'},store={$className:'Ext.data.Store',isLoading:()=>false,getAt:i=>i===0?record:null};
-  const native={FView:{el:{dom:form}},FAddMode:false,Records:[record]};
-  page.context.Ext={getCmp:id=>id===form.id?{Controller:native}:id===grid.id?{el:{dom:grid},getStore:()=>store}:null};
-  page.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FView:{el:{dom:wizard}}}}})}}}}};
-  const list=page.add('div','EditTuneColumnDefForm;cbxUsageType;boundlist','',{x:600,y:300,width:140,height:40});
-  page.add('div','EditTuneColumnDefForm;cbxUsageType;boundlist;Элемент','Элемент',{x:605,y:305,width:130,height:25},list);
-  const first=await page.observe();assert.equal(first.wizard.stage,'assn_rules_auxiliary');assert.equal(first.wizard.column_parameters.portal_bound,true);
-  const read=await page.execute({mode:'observe',root_ref:first.ui.elements.find(e=>e.wizard_combo?.kind==='option').wizard_combo.list_ref});
-  const option=read.output.ui.elements.find(e=>e.wizard_combo?.kind==='option');assert.ok(option,JSON.stringify({wizard:read.output.wizard,combos:read.output.ui.elements.filter(e=>e.wizard_combo)}));
-  assert.equal(read.output.ui.elements.some(e=>e.wizard_field?.scope==='output_column'),false);
-  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();inputs.cbxUsageType.value='Элемент';if(fault)inputs.edtName.value='Other';};
-  const result=await page.act({verb:'select_wizard_option',ref:option.ref},read.output);
-  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));assert.equal(page.events.filter(e=>e==='click').length,1);
- }
-});
-
-test('association selected-field checkbox is exposed only on its parameter page',async()=>{
- const page=new Page(),base='MF;TF-1;WizrdMCF',wizard=page.add('div',base);
- const marker=page.add('div',base+';AssnRulesWizard;pedMinSupport','',undefined,wizard);
- const flag=page.add('td',base+';AssnRulesWizard;grdSelectedColumns;headercontainer;Selected_Item','Item',undefined,wizard);
- let snapshot=await page.observe();assert.equal(snapshot.wizard.stage,'assn_rules');
- const control=snapshot.ui.elements.find(e=>e.tid===flag.attrs['data-tid']);
- assert.ok(control?.allowed_actions.includes('click'));
- assert.equal((await page.act({verb:'click',ref:control.ref},snapshot)).status,'SUCCEEDED');
- marker.remove();page.add('div',base+';DoneWizard;edtDisplayName','',undefined,wizard);
- snapshot=await page.observe();assert.equal(snapshot.ui.elements.some(e=>e.tid===flag.attrs['data-tid']),false);
 });

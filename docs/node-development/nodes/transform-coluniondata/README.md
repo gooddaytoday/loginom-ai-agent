@@ -6,11 +6,11 @@
 
 ## Текущий срез v0.4.0
 
-Зарегистрирован `transform.col_union_data` / `positional`. Ровно две таблицы по позиции: row_count minimum/maximum/input; determining_input main/attached; padding null/repeat/last; выход 0.
+Зарегистрирован `transform.col_union_data` / `positional`. Две или три таблицы по позиции (main=0, attached=1, third=2): row_count minimum/maximum/input; determining_input main/attached/third; padding null/repeat/last; выход 0.
 
-Ограничения: Без третьего входа, переменных и apply; пустой источник при repeat/last дополняется NULL. Это позиционное соединение, не Слияние по ключам.
+Ограничения: Без переменных, apply и пустых случаев трёх входов; для двух входов пустой источник при repeat/last дополняется NULL. Это позиционное соединение, не Слияние по ключам.
 
-Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [col-union-node.mjs](../../../../packages/loginom-runtime/client/lib/col-union-node.mjs):1–25; [col-union-parameters.mjs](../../../../packages/loginom-runtime/client/lib/col-union-parameters.mjs):1–48; [transform.col_union_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.col_union_data.md):1–23. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+База цикла третьего входа: `origin/v040@e2bc67a91827fabe4a134b99c7adb8119f352fa6`; [col-union-node.mjs](../../../../packages/loginom-runtime/client/lib/col-union-node.mjs):1–25; [col-union-parameters.mjs](../../../../packages/loginom-runtime/client/lib/col-union-parameters.mjs):1–48; [transform.col_union_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.col_union_data.md):1–23. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
 ## Исторические материалы и план расширений
 

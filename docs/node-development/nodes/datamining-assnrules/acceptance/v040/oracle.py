@@ -141,42 +141,66 @@ def consequents_artifacts():
             'expected-consequents-cold.json': dict(base, outputs=final)}
 
 
-def filters_artifacts():
-    # Bind the already established 7.4.2 enumeration; membership and metrics
-    # are independently computed from the original CSVs, never actual output.
-    source = baskets('train.csv')
-    selected = selected_items('selected-items.csv')
-    def outputs(exclude):
-        tables = consequents_expected(Fraction(0))
-        sets = itemsets(source, selected=selected, exclude_above=exclude)
-        found = rules(source, Fraction(0), 2, selected=selected, exclude_above=exclude)
-        tables[0]['rows'] = [row for row in tables[0]['rows']
-            if any([v for k, v in row.items() if k.startswith('Item_') and v is not None] == s['items'] for s in sets)]
-        tables[1]['rows'] = [row for row in tables[1]['rows'] if any(
-            [row['Item_' + str(i) + '_A'] for i in range(2) if row['Item_' + str(i) + '_A'] is not None] == r['antecedent'] and
-            [row['Item_' + str(i) + '_C'] for i in range(2) if row['Item_' + str(i) + '_C'] is not None] == r['consequent'] for r in found)]
-        for table, key in zip(tables, ['ItemsetID', 'RuleID']):
-            for index, row in enumerate(table['rows'], 1): row[key] = index
-        assert [len(t['rows']) for t in tables] == ([4, 10] if exclude is None else [2, 2])
-        return tables
-    base = dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
-        ['imports.text', 'imports.text', 'datamining.assn_rules', 'exports.text']])
-    final = outputs(MAX_SUPPORT)
-    return {'expected-filters.json': dict(base, outputs=outputs(None) + final),
-            'expected-filters-cold.json': dict(base, outputs=final)}
+def recommend_artifact():
+    source = baskets('recommend-train.csv')
+    found = rules(source, Fraction(0), 1, max_items=2)
+    assert [(r['antecedent'], r['consequent']) for r in found] == [(['A'], ['B']), (['B'], ['A'])]
+    column = lambda name, kind: dict(name=name, type=kind, label_any=True,
+        **(dict(tolerance=dict(abs=1e-10, rel=1e-10)) if kind == 'real' else {}))
+    # Native source-field inventory of a fresh recommendations port places
+    # Transaction first. Rule IDs share port 1 enumeration; metrics are Fraction-derived.
+    columns = [column('RuleID', 'integer')] + [column(n, 'real') for n in ['Support', 'Confidence', 'Lift']]
+    items = [column('Item_0_' + side, 'string') for side in ['A', 'C']]
+    row = lambda index, r: dict(RuleID=index, Support=r['support'], Confidence=r['confidence'],
+        Lift=r['lift'], Item_0_A=r['antecedent'][0], Item_0_C=r['consequent'][0])
+    recommendations = [dict(row(index, r), Transaction=t)
+        for t, basket in source.items() for index, r in enumerate(found, 1)
+        if set(r['antecedent']) <= basket and not set(r['consequent']) & basket]
+    assert recommendations == [dict(RuleID=1, Support=.75, Confidence=.75, Lift=1.,
+        Transaction='T4', Item_0_A='A', Item_0_C='B')]
+    output = lambda port, schema, rows: dict(output_node_type='datamining.assn_rules', output_port=port,
+        ordered=False, column_order='exact', columns=schema, rows=rows)
+    return dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
+        ['imports.text', 'datamining.assn_rules', 'exports.text']], outputs=[
+        output(1, columns + items, [row(i, r) for i, r in enumerate(found, 1)]),
+        output(2, [column('Transaction', 'string')] + columns + items, recommendations)])
 
 
-if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents'], ['--write-filters'], ['--check-filters']):
-    for name, value in (filters_artifacts() if sys.argv[1].endswith('filters') else consequents_artifacts()).items():
+def holdout_artifact():
+    # Fixed train rules; only the transaction baskets change. Relearning must
+    # fail this oracle because holdout alone produces no rules.
+    artifact = recommend_artifact()
+    found = rules(baskets('recommend-train.csv'), Fraction(0), 1, max_items=2)
+    assert rules(baskets('recommend-holdout.csv'), Fraction(0), 1, max_items=2) == []
+    rows = [dict(artifact['outputs'][0]['rows'][index], Transaction=t)
+        for t, basket in baskets('recommend-holdout.csv').items() for index, rule in enumerate(found)
+        if set(rule['antecedent']) <= basket and not set(rule['consequent']) & basket]
+    assert rows == [dict(RuleID=1, Support=.75, Confidence=.75, Lift=1.,
+        Transaction='H1', Item_0_A='A', Item_0_C='B')]
+    artifact['outputs'][1]['rows'] = rows
+    return artifact
+
+
+if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):
+    for name, value in consequents_artifacts().items():
         path = Path(__file__).with_name(name)
-        if sys.argv[1].startswith('--write-'):
+        if sys.argv[1:] == ['--write-consequents']:
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         else:
             assert json.loads(path.read_text(encoding='utf-8')) == value, name
     print('PASS: independent consequent tables, native enumeration, NULL padding and final cold expectations')
 elif __name__ == '__main__':
     value = expected()
-    if sys.argv[1:] == ['--check']:
+    if sys.argv[1:] == ['--write-recommend']:
+        Path(__file__).with_name('expected-recommend.json').write_text(json.dumps(recommend_artifact(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    elif sys.argv[1:] == ['--write-holdout']:
+        Path(__file__).with_name('expected-holdout.json').write_text(json.dumps(holdout_artifact(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    elif sys.argv[1:] == ['--check']:
+        assert json.loads(Path(__file__).with_name('expected-holdout.json').read_text()) == holdout_artifact()
+        assert json.loads(Path(__file__).with_name('expected-recommend.json').read_text()) == recommend_artifact()
+        task = Path(__file__).with_name('task-recommend.md').read_text()
+        assert 'recommend-train.csv' in task and 'recommend-holdout.csv' not in task
+        assert 'T4' not in task and '.75' not in task
         assert json.loads(Path(__file__).with_name('expected.json').read_text()) == value
         print('PASS: exhaustive subsets, lift, multi-consequence, selected-item exclusion and holdout sensitivity')
     else:

@@ -49,6 +49,9 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['scripts/node-acceptance/assnrules-holdout.mjs','assnrules-holdout'],
+ ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-recommendations.md','assnrules-holdout'],
+ ['packages/product/skills/loginom-automation/references/nodes/datamining.assn_rules.md','assnrules-holdout'],
  ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-consequents.md','assnrules-consequents'],
  ['docs/node-development/nodes/datamining-assnrules/fixtures/v040/train.csv','assnrules-consequents'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/modes/README.md','crosstable-datetime'],

@@ -6,13 +6,14 @@ const need=(ok,message)=>{if(!ok)throw Error(message);};
 // No input/configuration/mapping edit is requested. Execute the saved node
 // through the existing read lifecycle, rather than committing its wizards
 // after a preliminary execution (which would deactivate that result).
-export function isUnchangedTransformExecution(request){
+export function isUnchangedTransformExecution(request,handler){
  const type=request?.target?.type,p=request?.parameters;
  return request?.target?.kind==='existing'&&request.finish==='execute'
   &&Array.isArray(request.inputs)&&request.inputs.length===0
   &&Array.isArray(request.mappings)&&request.mappings.length===0
   &&p&&typeof p==='object'&&!Array.isArray(p)
   &&(type==='variables.from_table'&&request.mode==='aggregate'&&Object.keys(p).length===0&&!(request.variable_inputs?.length)
+   ||handler?.binding_schema&&['transform.group_data','transform.sorting'].includes(type)&&request.mode===(type==='transform.group_data'?'aggregate':'keys')&&Object.keys(p).length===0&&!(request.bindings?.length)&&!(request.variable_inputs?.length)
    ||type==='research.quality'&&request.mode==='profile'&&Object.keys(p).length===0
    ||type==='transform.filter_data'&&request.mode==='conditions'&&Object.keys(p).length===0&&!(request.bindings?.length)&&!(request.variable_inputs?.length)
    ||type==='variables.replace'&&['exact','rules'].includes(request.mode)&&Object.keys(p).length===0&&!(request.variable_inputs?.length)

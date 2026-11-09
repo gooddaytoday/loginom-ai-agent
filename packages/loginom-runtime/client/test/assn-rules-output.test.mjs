@@ -57,6 +57,23 @@ test('both outputs retain native precision, NULL padding and completed execution
  const result=await readAssnRulesOutputs(channel,{ports:[0,1],sample_rows:100,require_exact_numbers:true},ctx,mapped);
  assert.equal(result.ports[0].sample[0][4],null);assert.equal(result.ports[1].sample[0][2],2/3);
  assert.ok(calls.every(c=>c.execution===ctx.portExecution&&c.requireExactNumbers===true));
- await assert.rejects(readAssnRulesOutputs(channel,{ports:[2]},ctx,mapped),/not supported yet/);
+ await assert.rejects(readAssnRulesOutputs(channel,{ports:[3]},ctx,mapped),/unsupported output port/);
 });
 }
+
+test('recommendation reader binds the native transaction role and full typed schema',async()=>{
+ const config={fields:[{name:'Basket',usage_type:6},{name:'Product',usage_type:7}],roles:{transaction:6,item:7},max_items:2,max_consequents:1};
+ const schema=[{name:'Basket',type:'string'},{name:'RuleID',type:'integer'},...['Support','Confidence','Lift'].map(name=>({name,type:'real'})),
+  ...['Product_0_A','Product_0_C'].map(name=>({name,type:'string'}))];
+ assert.deepEqual(assnRulesOutputColumns(config,2),schema);
+ const sample=[['T4',1,.75,.75,1,'A','B']],native={port:2,port_guid:'recommendations',schema,sample,sample_complete:true};
+ const ctx={portExecution:{execution_id:'fresh'},execution:{execution_id:'fresh'},receipt_id:'receipt'};
+ const channel={async readOutputPort(options){assert.equal(options.port,2);assert.equal(options.execution,ctx.portExecution);assert.equal(options.requireExactNumbers,true);return {output:native};}};
+ const result=await readAssnRulesOutputs(channel,{ports:[2],sample_rows:100,require_exact_numbers:true},ctx,{ports:[{port:2,schema}]});
+ assert.equal(result.ports[0],native);
+ assert.deepEqual(result.ports[0].sample,sample);
+ for(const columns of [schema.slice(1),schema.map(f=>f.name==='Basket'?{...f,type:'integer'}:f)])
+  assert.throws(()=>alignAssnRulesOutput(columns,schema),/field.*types/);
+ assert.throws(()=>assnRulesOutputColumns({...config,fields:config.fields.slice(1)},2),/transaction field missing/);
+ assert.throws(()=>assnRulesOutputColumns(config,3),/unsupported output port/);
+});

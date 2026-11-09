@@ -41,9 +41,36 @@ test('wavelet reader owns exact family/order/depth/boundary controls and refuses
  };
  const value=fixture(wavelet);assert.equal(value.verified,true);
  assert.deepEqual(value.settings,{family:'daubechies',order:1,depth:2,boundary:'symmetric'});
- for(const boundary of ['Антисимметричное','Симметричное без крайней точки']){
+ for(const boundary of ['Антисимметричное']){
   const result=fixture(f=>{wavelet(f);f.components['edtEdgeExtension;ValueControl'].getRawValue=()=>boundary;});
   assert.equal(result.verified,true);assert.equal(result.settings.boundary,boundary);assert.notEqual(result.settings.boundary,'symmetric');
  }
  for(const fault of [f=>f.components['edtWaveletOrder;SwitchButton'].pressed=true,f=>f.components['edtDecompositionLevel;ValueControl'].getValue=()=>NaN,f=>f.wizard[f.queue].IsEmpty=false])assert.equal(fixture(f=>{wavelet(f);fault(f);}).verified,false);
+});
+
+test('CDF reopened empty order and canonical zero/reflect boundaries are read without invented order',()=>{
+ for(const [family,index,order] of [['daubechies',0,2],['coiflet',1,1],['cdf_9_7',2,null]])for(const [label,boundary] of [['Симметричное','symmetric'],['Нулями','zero'],['Симметричное без крайней точки','reflect']]){
+  const result=fixture(f=>{
+   f.record.data.Algorithm=1;
+   for(const key of ['pedWaveletType','edtWaveletOrder','edtDecompositionLevel','edtEdgeExtension'])f.add(key+';SwitchButton',{pressed:false});
+   for(const [i,suffix] of ['','-1','-2'].entries())f.add('pedWaveletType;ValueControl;radiofield'+suffix,{getValue:()=>i===index});
+   f.add('edtWaveletOrder;ValueControl',{getValue:()=>order});f.add('edtDecompositionLevel;ValueControl',{getValue:()=>1});
+   f.add('edtEdgeExtension;ValueControl',{getRawValue:()=>label});
+  });
+  assert.equal(result.verified,true,JSON.stringify(result));assert.deepEqual(result.settings,{family,order,depth:1,boundary});
+ }
+});
+
+test('wavelet boundary readback uses the anchored trimmed labels of the procedure',()=>{
+ const read=label=>fixture(f=>{
+  f.record.data.Algorithm=1;
+  for(const key of ['pedWaveletType','edtWaveletOrder','edtDecompositionLevel','edtEdgeExtension'])f.add(key+';SwitchButton',{pressed:false});
+  for(const [i,suffix] of ['','-1','-2'].entries())f.add('pedWaveletType;ValueControl;radiofield'+suffix,{getValue:()=>i===0});
+  f.add('edtWaveletOrder;ValueControl',{getValue:()=>1});f.add('edtDecompositionLevel;ValueControl',{getValue:()=>1});
+  f.add('edtEdgeExtension;ValueControl',{getRawValue:()=>label});
+ }).settings.boundary;
+ for(const label of ['Нулями','Продолжение нулями',' продолжение нулями ','НУЛЯМИ\n'])assert.equal(read(label),'zero',label);
+ assert.equal(read(' Симметричное '),'symmetric');
+ assert.equal(read('Симметричное без крайней точки '),'reflect');
+ for(const label of ['Не нулями','Нулями слева','Продолжение  нулями'])assert.notEqual(read(label),'zero',label);
 });

@@ -35,12 +35,13 @@ test('Done commits settings without claiming training and foreign settings refus
  input.phases[1].value.configuration.node_context={...node,node_id:'foreign'};
  assert.throws(()=>assnRulesConfigurationReadback(input),/configuration owner/);
 });
-
-test('readback proves both trained inputs and retained selected-item filters',()=>{
- const input=candidate();Object.assign(input.phases[1].value.configuration,{auxiliary:{fields:[{name:'Item',usage_type:7}],roles:{item:7}},contain_selected_items:true,exclude_support_above_pct:90});
- input.phases.at(-1).value.training.source.push({node:{...node,node_id:'selected'},output:0,input:1});
+test('apply requires discarded settings and rejects any training claim',()=>{
+ const input=candidate();input.phases[1].value.configuration.mode='apply';
+ Object.assign(input.phases[2].value,{settings_applied:false,draft_discarded:true});
+ input.phases.at(-1).value.settings_applied=false;delete input.phases.at(-1).value.training;
  const result=assnRulesConfigurationReadback(input);
- assert.equal(result.selected_item_field,'Item');assert.equal(result.contain_selected_items,true);assert.equal(result.exclude_support_above_pct,90);
- input.phases.at(-1).value.training.source[0].input=1;
- assert.throws(()=>assnRulesConfigurationReadback(input),/training on the connected source/);
+ assert.equal(result.mode,'apply');assert.equal(result.training.status,'not_requested');
+ for(const alter of [v=>v.phases[2].value.settings_applied=true,v=>v.phases[2].value.draft_discarded=false,v=>v.phases.at(-1).value.settings_applied=true,v=>v.phases.at(-1).value.training={status:'trained'}]){
+  const bad=structuredClone(input);alter(bad);assert.throws(()=>assnRulesConfigurationReadback(bad));
+ }
 });

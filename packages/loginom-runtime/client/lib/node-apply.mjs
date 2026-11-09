@@ -322,8 +322,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
       const replacementClosed=refusal?.proof?.closed;
-      const regressionRefusal=['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering'].includes(request.target.type)&&request.mode==='apply'
-        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='datamining.clustering'?'clustering_apply_preserved':request.target.type==='preprocessing.coarse_classes'?'coarse_classes_apply_preserved':request.target.type==='preprocessing.binning'?'binning_apply_preserved':request.target.type==='datamining.log_regression'?'logregression_apply_preserved':'linregression_apply_preserved')
+      const regressionRefusal=['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering','datamining.assn_rules'].includes(request.target.type)&&request.mode==='apply'
+        &&['configure','output_mapping'].includes(name)&&refusal?.verification===(request.target.type==='datamining.assn_rules'?'assn_rules_apply_preserved':request.target.type==='datamining.clustering'?'clustering_apply_preserved':request.target.type==='preprocessing.coarse_classes'?'coarse_classes_apply_preserved':request.target.type==='preprocessing.binning'?'binning_apply_preserved':request.target.type==='datamining.log_regression'?'logregression_apply_preserved':'linregression_apply_preserved')
         &&replacementClosed?.verified===true&&replacementClosed.cleanup_complete===true
         &&replacementClosed.draft_discarded===true&&replacementClosed.settings_applied===false
         &&replacementClosed.node_context?.verified===true
@@ -379,7 +379,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
   };
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request,handler);
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
@@ -435,7 +435,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
     if(separateOutput&&request.finish!=='close')await phase('node_finish',ctx=>drivers.finish('done',ctx),{verify:value=>{
-      if(['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
+      if(['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering','datamining.assn_rules'].includes(request.target.type)&&request.mode==='apply')requireValue(value.mode==='close'
         &&value.settings_applied===false&&value.draft_discarded===true&&value.execution_started===false&&value.execution_id==null,
         'Applying a saved regression must discard the inspected draft without committing or training');
       else if(request.target.type==='programming.javascript')requireValue(value.mode==='done'
@@ -525,7 +525,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       try{
         result.configuration.readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});
         const bindings=state.phases.find(p=>p.phase==='node_finish')?.value?.bindings;
-        if(result.configuration.readback.kind==='row_filter'&&bindings)result.configuration.bindings=structuredClone(bindings);
+        if(['row_filter','grouping','sorting'].includes(result.configuration.readback.kind)&&bindings)result.configuration.bindings=structuredClone(bindings);
       }catch(error){
         // Projection uses only accepted receipts. Its failure cannot make the
         // completed UI phases uncertain or strand a quiet node without a phase.
@@ -643,7 +643,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const verified=name=>state.phases.some(p=>p.phase===name);
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
   const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request,handler);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
   const exportRelease=['exports.text','exports.excel','exports.lgd'].includes(request.target.type);

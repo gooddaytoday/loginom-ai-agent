@@ -134,7 +134,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      try{
       const changed=await implementation.configure(channel,p,{request:operation.nodeApply.request,inputMapping:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.native_mapping,preconfiguration,
        ...(implementation.bindingSchema?{bindingSource:operation.variableBindingSource,bindingMapping:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.variable_mappings?.find(m=>m.kind==='control')??operation.variableBindingMapping}:{}),
-       ...(['transform.col_union_data','datamining.assn_rules'].includes(implementation.type)?{inputMappings:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.ports}:{}),
+       ...(implementation.type==='transform.col_union_data'?{inputMappings:operation.nodeApply.phases.find(p=>p.phase==='input_mapping')?.value?.ports}:{}),
        ...(implementation.inspectConfigure?{progress:configureProgress}:{})});configured=changed.configuration;return changed;
      }catch(error){
       if(implementation.inspectConfigure&&configureProgress.pending){
@@ -199,7 +199,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
      }
      enter(ctx);
      if(implementation?.beforeInput)await implementation.beforeInput(options,ctx,{targetOrigin,targetBuild,channel,finishWizard});
-     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard);
+     if(implementation?.configureInputs)return implementation.configureInputs(channel,mappings,ctx,operation.nodeApply.request,finishWizard,...(implementation.type==='transform.col_union_data'?[{inputCount:operation.colUnionInputCount}]:[]));
      const recoveryGraph=(!implementation||implementation.inputMappingRecovery)?await graphForInput():null;
      await channel.openInputPort(0);
      const ready=s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true;

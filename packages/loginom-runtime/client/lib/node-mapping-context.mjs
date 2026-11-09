@@ -20,7 +20,7 @@ export async function readNodeMapping(page,binding,readNode=readPreparedNodeCont
     return {verified:false,reason:'mapping_editor_owner'};
   // Only the native, receipt-bound input owner selects the extra role set.
   const nodeType=before.input_port?.direction!=='input'?undefined
-    :[0,1].includes(before.input_port.port)&&before.input_port.node_icon_class==='bg-vendor-icon-assnrules'?'datamining.assn_rules'
+    :before.input_port.port===0&&before.input_port.node_icon_class==='bg-vendor-icon-assnrules'?'datamining.assn_rules'
     :before.input_port.port===1&&before.input_port.node_icon_class==='bg-vendor-icon-ungroupdata'?'transform.ungroup_data':undefined;
   const result=await page.evaluate(readBrowser,editor||nodeType?{prefix:binding.workflow_ref.prefix,editor,node_type:nodeType}:binding.workflow_ref.prefix);
   const after=await readNode(page,binding);

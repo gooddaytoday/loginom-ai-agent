@@ -420,6 +420,24 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in case['data'].iterdir()), case['input_files'])
             self.assertNotIn('expected', case['prompt'].read_text())
 
+    def test_assnrules_recommend_keeps_oracle_private_and_matches_both_native_ports(self):
+        case = runner.scenario('assnrules-recommend')
+        self.assertEqual(case['data'], runner.REPO / 'docs/node-development/nodes/datamining-assnrules/fixtures/v040')
+        self.assertEqual(case['input_files'], ['recommend-train.csv'])
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['prompt'].name, 'task-recommend.md')
+        expected = runner.expected_for(case, '/test/recommend.lgp')
+        self.assertEqual([o['output_port'] for o in expected['outputs']], [1, 2])
+        self.assertEqual([len(o['rows']) for o in expected['outputs']], [2, 1])
+        rules, recommendations = expected['outputs']
+        rule = next(r for r in rules['rows'] if r['Item_0_A'] == 'A' and r['Item_0_C'] == 'B')
+        self.assertEqual(recommendations['rows'], [dict(rule, Transaction='T4')])
+        self.assertEqual([c['name'] for c in recommendations['columns']],
+            ['Transaction', 'RuleID', 'Support', 'Confidence', 'Lift', 'Item_0_A', 'Item_0_C'])
+        self.assertEqual(runner.expected_for(case, '/test/recommend.lgp', cold=True), expected)
+        for text in ['expected', 'oracle', 'T4', 'recommend-holdout.csv', '.75']:
+            self.assertNotIn(text, case['prompt'].read_text())
+
     def test_assnrules_consequents_has_exact_input_boundary_and_final_cold(self):
         case = runner.scenario('assnrules-consequents')
         self.assertEqual(case['data'], runner.REPO / 'docs/node-development/nodes/datamining-assnrules/fixtures/v040')
@@ -1758,6 +1776,17 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'B', 'A', 'R', 'S'])
         self.assertEqual([r['R'] for r in expected['outputs'][0]['rows']], [2, -3, 0])
 
+    def test_reform_cache_requires_private_settings_audit_and_one_export(self):
+        case = runner.scenario('reform-cache')
+        self.assertEqual(case['prompt'].name, 'task-cache.md')
+        self.assertEqual(case['input_files'], ['reform.csv'])
+        self.assertEqual(case['export_count'], 1)
+        expected = runner.expected_for(case, '/own/cache.lgp')
+        self.assertEqual(expected['reform_cache']['caching']['value'], 3)
+        self.assertEqual([f['caching_method'] for f in expected['reform_cache']['fields']], [0, 1, 2, 0, 0])
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'A', 'B', 'R', 'S'])
+        self.assertEqual(runner.expected_for(case, '/own/cache.lgp', cold=True), expected)
+
     def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
         case = runner.scenario('rest-get-plain')
         self.assertIsNone(case['base'])
@@ -1935,6 +1964,26 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 for column in output['columns']: fields.update(column)
         self.assertEqual(len(names), 87)
         self.assertEqual(fields, {'name', 'label', 'type', 'types', 'tolerance', 'label_any', 'name_any', 'category_labels_any'})
+
+    def test_outlier_edit_scenarios_expose_only_the_selected_fixture(self):
+        for name, task, expected_name, fixture in [
+            ('outlier-replacement-mean', 'task-replacement-discriminator.md', 'expected-replacement-mean.json', 'replacement-discriminator.csv'),
+            ('outlier-replacement-median', 'task-replacement-median.md', 'expected-replacement-median.json', 'replacement-discriminator.csv'),
+            ('outlier-replacement-most-probable', 'task-replacement-most-probable.md', 'expected-replacement-most-probable.json', 'replacement-discriminator.csv'),
+            ('outlier-quartile-boundaries', 'task-quartile-boundaries.md', 'expected-quartile-boundaries.json', 'quartile-boundaries.csv'),
+        ]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['expected_name'], expected_name)
+            self.assertEqual(case['input_files'], [fixture])
+            self.assertEqual(case['data'].name, 'fixtures')
+            self.assertTrue((case['data'] / fixture).is_file())
+            self.assertEqual(case['export_count'], 3)
+            expected = runner.expected_for(case, '/test.lgp')
+            self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 2])
+            if name == 'outlier-replacement-mean':
+                row = next(r for r in expected['outputs'][0]['rows'] if r['RowID'] == 8)
+                self.assertAlmostEqual(row['X'], 19 / 7)
 
     def test_outlier_scenarios_resolve_frozen_tasks_and_all_three_ports(self):
         for name, method, counts in [('outlier-sd', 'стандартного отклонения', [22, 0, 1]),
@@ -2432,5 +2481,23 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             path.write_text('SKU,Count\nA,2\nB,999\n')
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'): runner.check_csv(path, expected)
 
+
+    def test_save_as_v2_verified_receipt_confirms_save_in_every_scenario(self):
+        # LAB-1250 main-execution-events.jsonl:795: reform-rename-lossy save_as v2 receipt without save_completed.
+        package = '/own/reform.lgp'
+        save = {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'action_revision': '2', 'phase': 'verified',
+                'cleanup_complete': True, 'error': None,
+                'output': {'package_ref': {'kind': 'package', 'path': package, 'active_identity': package}, 'reopened': True}}
+        for case in [runner.scenario('reform-rename-lossy'), {}]:
+            self.assertTrue(runner.save_confirmed(case, save, package))
+            for mutate in [lambda r: r.update(status='FAILED'), lambda r: r.update(phase='completed'),
+                           lambda r: r.update(action_revision='1'), lambda r: r.pop('cleanup_complete'),
+                           lambda r: r['output'].pop('reopened'), lambda r: r['output'].update(reopened=False),
+                           lambda r: r['output']['package_ref'].update(path='/other.lgp'),
+                           lambda r: r['output']['package_ref'].update(active_identity='/other.lgp')]:
+                receipt = copy.deepcopy(save)
+                mutate(receipt)
+                self.assertFalse(runner.save_confirmed(case, receipt, package))
+            self.assertFalse(runner.save_confirmed(case, save, '/other.lgp'))
 
 if __name__ == '__main__': unittest.main()
