@@ -128,10 +128,18 @@
           sample, parameters:available});
         if (overlay !== section) return;
         title.textContent = snapshot.nodeName;
+        const chat = document.createElement('a');
+        chat.href = 'loginom-ai-agent://dashboard?id=' + encodeURIComponent(snapshot.id) + '&action=' + (lookup.exists ? 'edit' : 'create');
         if (!lookup.exists) {
-          note.textContent = 'Цель для чата: ' + snapshot.nodeName + '. Опишите в Codex, какой dashboard вам нужен. После публикации вернитесь к сценарию и откройте Dashboard.';
+          chat.textContent = 'Открыть чат в Desktop';
+          note.replaceChildren('Опишите пульт для узла «' + snapshot.nodeName + '» в чате. ', chat);
+          // A long first execution can outlive the browser's user gesture. The same link remains clickable.
+          chat.click();
           return;
         }
+        chat.textContent = 'Изменить в чате';
+        chat.style.color = 'white';
+        back.before(chat);
         const state = async () => {
           const params = await parameters();
           const error = errors.get(lookup.key) ?? null;
