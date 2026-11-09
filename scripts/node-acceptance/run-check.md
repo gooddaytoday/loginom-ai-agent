@@ -871,6 +871,14 @@ Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1
 146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
 Модель получает только task и modes.csv; oracle остаётся в оснастке.
 
+`binning-auto` и `binning-sd` используют task-auto.md/task-sd.md и только
+fixtures/numeric-modes.csv; expected_name=modes/expected-auto.json либо
+modes/expected-sd.json, два экспорта. Auto — count=2 без ручных пределов;
+SD — ±1 СКО с открытыми хвостами, без округления. Метки меняются на том же
+обученном узле без повторного Train. Оба полных порта, точные типы/порядок,
+CSV, Save, cold без перенастройки и cleanup проверяются штатно.
+Oracle и expected остаются вне модельного контекста.
+
 `replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
 на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
 прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
