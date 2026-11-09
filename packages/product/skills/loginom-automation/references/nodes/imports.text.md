@@ -40,6 +40,10 @@ or get fresh `dock_storage_source` refs. Set `source.kind:"verified_sources"`,
 string FileName outside CSV `columns` (or `"none"`). No Calculator/JS. Preserve
 the existing node; inspect all output fields and Save separately.
 
+Mask: `source_mask`, `*` in the basename of one owned directory, never with
+`source_path(s)`. Before each Execute observe all matches via
+`dock_storage_source` and pass their proofs; a new match joins on rerun.
+
 ## Auto-detected types
 
 Data-driven types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),

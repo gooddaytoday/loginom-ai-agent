@@ -266,6 +266,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'text-mask':
+        node = REPO / 'docs/node-development/nodes/text-import'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file.md',
+                    data=node / 'fixtures/multi-file', input_files=['sales_2026-01.csv', 'sales_2026-02.csv', 'returns_2026-01.csv'],
+                    base=None, export_count=2, lgd_initial='expected-mask.json', expected_name='expected-mask-new-month.json',
+                    oracle=node / 'acceptance/oracle-multi-file.py', text_mask=True)
     if name == 'text-multi-file-list':
         node = REPO / 'docs/node-development/nodes/text-import'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file-list.md',
@@ -839,7 +845,32 @@ def check_text_multi_file_list(replies):
     assert source.get('file_info') == 'Имя файла' and source.get('parallel_processing') is False, 'TEXT_LIST_SERVICE_SETTINGS'
 
 
-def check_text_update_ports(replies, destinations, stages, node_binary='node'):
+def check_text_mask(replies):
+    imports = [owner for _, reply in replies for owner, port in ports(reply)
+               if owner.get('status') == 'SUCCEEDED' and port.get('port') == 0
+               and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
+    assert imports, 'TEXT_MASK_IMPORT_MISSING'
+    saved = imports[0]['configuration']['readback']
+    for owner in imports:
+        current = owner['configuration']['readback']
+        assert owner['node']['node_id'] == imports[0]['node']['node_id'], 'TEXT_MASK_IMPORT_RECREATED'
+        assert current['source']['source_path'].endswith('/sales_*.csv'), 'TEXT_MASK_NATIVE_MASK_MISSING'
+        assert current['source'].get('file_info') == 'Имя файла' and current['source'].get('parallel_processing') is False, 'TEXT_MASK_SERVICE_SETTINGS'
+        assert all(current[k] == saved[k] for k in ['source', 'format', 'columns', 'output_mapping']), 'TEXT_MASK_SETTINGS_CHANGED'
+
+
+def model_replies(events):
+    replies = []
+    for n, event in events:
+        state = event.get('part', {}).get('state', {})
+        if event.get('type') != 'tool_use' or state.get('status') != 'completed': continue
+        try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
+        except (ValueError, TypeError): continue
+        if isinstance(reply, dict): replies.append((n, reply))
+    return replies
+
+
+def check_text_update_ports(replies, destinations, stages, node_binary='node', *, same_node_id=False):
     assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
     previous, node = -1, None
     tables = []
@@ -855,7 +886,7 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node'):
         assert reads, 'TEXT_UPDATE_PORT_MISSING'
         _, owner, port = reads[-1]
         identity = owner.get('node')
-        assert identity and (node is None or identity == node), 'TEXT_UPDATE_IMPORT_CHANGED'
+        assert identity and (node is None or (identity['node_id'] == node['node_id'] if same_node_id else identity == node)), 'TEXT_UPDATE_IMPORT_CHANGED'
         node = identity
         assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
         assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
@@ -1675,6 +1706,21 @@ class Runner:
                     file.unlink()
             self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
 
+    def text_mask_inputs(self, spec, folder, login, build, *, late=False):
+        name = self.out.name + '-mask'
+        directory = login['package_directory'].rstrip('/') + '/' + name
+        files = [spec['data'] / 'variants/sales_2026-03.csv'] if late else [spec['data'] / f for f in spec['input_files']]
+        books = [dict(fixture=str(f), destination=directory + '/' + f.name) for f in files]
+        phase = 'text-mask-new-month-input' if late else 'text-mask-inputs'
+        write(folder / (phase + '.json'), dict(login=login, overwrite='reject', books=books,
+                                             text_mask_directory=dict(name=name, create=not late)))
+        self.phase(phase, [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
+                          build / 'resources/loginom', folder / (phase + '.json'), folder / phase], folder, timeout=300)
+        delivered = read(folder / phase / 'result.json')
+        assert [d['destination'] for d in delivered['delivered']] == [b['destination'] for b in books], 'TEXT_MASK_INPUT_DELIVERY_MISSING'
+        assert all(delivered['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'TEXT_MASK_INPUT_CLEANUP_MISSING'
+        return books
+
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
         spec = (self.prepared_case if isinstance(case, str) and case in D87 and not getattr(self, 'options', {}).get('case_root') else
                 dict(source=case, prompt=case / 'task.md', data=case / 'data')
@@ -1725,6 +1771,7 @@ class Runner:
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
         if spec.get('text_update'): exports = ['text-update-1.csv', 'text-update-2.csv']
+        if spec.get('text_mask'): exports = ['text-mask-initial.csv', 'text-mask-final.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
@@ -1747,6 +1794,8 @@ class Runner:
             routes = dict(zip(exports, destinations))
             names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
+        if spec.get('text_mask'):
+            prompt += '\nВыгрузи и скачай первоначальную таблицу в ' + destinations[0] + '. Новая выгрузка придёт следующим сообщением.'
         if not spec.get('upload_only'):
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
@@ -1796,6 +1845,11 @@ class Runner:
         if spec.get('local_file'):
             if spec['attachment'] == 'file': command += ['--file', spec['local_file']]
             files = []  # No multi-GiB workspace copy, and no --file for the path case.
+        if spec.get('text_mask'):
+            self.current['new_month'] = 'NOT_RUN'
+            books = self.text_mask_inputs(spec, folder, login, build)
+            prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
+            files = []
         if spec.get('text_list_sources'):
             # FileName is the physical server basename. Both inline and small
             # local-path admission prefix names; seed the original inputs via
@@ -1821,13 +1875,26 @@ class Runner:
         self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
-        replies = []
-        for n, event in events:
-            state = event.get('part', {}).get('state', {})
-            if event.get('type') != 'tool_use' or state.get('status') != 'completed': continue
-            try: reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
-            except (ValueError, TypeError): continue
-            if isinstance(reply, dict): replies.append((n, reply))
+        replies = model_replies(events)
+        if spec.get('text_mask'):
+            check_text_mask(replies)
+            assert any(save_confirmed(spec, reply, package) for _, reply in replies), 'TEXT_MASK_INITIAL_SAVE_MISSING'
+            cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
+            assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
+                                   and not c.get('unsaved_changes_discarded') for c in cleanups), 'TEXT_MASK_INITIAL_CLEANUP_MISSING'
+            initial_csv = downloaded_csv(profile, destinations[0])
+            check_csv(initial_csv, read(src / spec['lgd_initial'])['outputs'][0], null_marker=None,
+                      export_events=events, destination=destinations[0])
+            books = self.text_mask_inputs(spec, folder, login, build, late=True)
+            self.current['new_month'] = 'DELIVERED'
+            continuation = (REPO / 'scripts/node-acceptance/scenarios/text-mask/task-new-month.md').read_text()
+            continuation = continuation.replace('{{PACKAGE_PATH}}', package).replace('{{SOURCE_PATH}}', books[0]['destination']).replace('{{CSV_PATH}}', destinations[1])
+            (folder / 'task-new-month.md').write_text(continuation)
+            self.phase('model-new-month', command + ['--session', session, '--', continuation], folder, timeout=1800, env=env, cwd=workspace)
+            assert any(save_confirmed(spec, reply, package) for _, reply in model_replies(list(records(folder / 'model-new-month.stdout')))), 'TEXT_MASK_FINAL_SAVE_MISSING'
+            offset = events[-1][0] + 1
+            events += [(n + offset, event) for n, event in records(folder / 'model-new-month.stdout')]
+            replies = model_replies(events)
         if spec.get('lgd_case'):
             for n, event in events:
                 state = event.get('part', {}).get('state', {})
@@ -2259,6 +2326,10 @@ class Runner:
         header = spec.get('csv_header', 'names')
         if case == 'text-multi-file-list':
             check_text_multi_file_list(replies)
+        if spec.get('text_mask'):
+            check_text_mask(replies)
+            check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
+            self.current['new_month'] = 'PASS'
         if spec.get('text_update'):
             check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):

@@ -28,7 +28,7 @@ const choice=(...values)=>({type:'string',enum:values});
 const boolean={type:'boolean'};
 const array=(items,maxItems,minItems=0)=>({type:'array',items,maxItems,minItems});
 const ref=object({document_id:id,workflow_id:id,node_id:id});
-const sourceSettings=object({source_path:text(2048),source_paths:array({type:'string',maxLength:2048},16,1),file_info:choice('none','name'),encoding:text(80),rows_to_skip:integer(0,1000000),first_line_as_title:boolean},[]);
+const sourceSettings=object({source_path:text(2048),source_paths:array({type:'string',maxLength:2048},16,1),source_mask:text(2048),file_info:choice('none','name'),encoding:text(80),rows_to_skip:integer(0,1000000),first_line_as_title:boolean},[]);
 const textImportSourceSchema={oneOf:[...importSourceSchema.oneOf,object({kind:{const:'verified_sources'},sources:array(importSourceSchema,16,1)})]};
 const format=object({delimiter:{type:'string',minLength:1,maxLength:1},decimal_separator:choice('.',','),
  null_marker:{type:'string',maxLength:256},text_qualifier:{type:'string',maxLength:1},multiple_delimiters:boolean,date_format:choice('dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'),date_separator:choice('.','/','\\','-'),auto_detect_columns:choice('none','new','all')},[]);
