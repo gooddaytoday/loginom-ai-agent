@@ -28,7 +28,7 @@ export async function configureSmoothing(channel,p,{inputMapping,mode='hodrick_p
  resolveSmoothingParameters(p,inputs);
  const before=[];
  for(const field of baseline.fields){const s=await selectSmoothingField(channel,baseline,field.name);before.push({...field,...s.node_smoothing.settings});}
- const rules=p.smoothing??before.filter(f=>f.used).map(f=>f.algorithm===1?{field:f.name,family:f.family,order:f.order,depth:f.depth,boundary:f.boundary}:{field:f.name,[f.strength]:f[f.strength]});
+ const rules=p.smoothing??before.filter(f=>f.used).map(f=>f.algorithm===1?{field:f.name,family:f.family,...(f.family==='cdf_9_7'?{}:{order:f.order}),depth:f.depth,boundary:f.boundary}:{field:f.name,[f.strength]:f[f.strength]});
  validateSmoothingParameters({smoothing:rules},mode,{target:{kind:'existing'},mappings:[]});
  resolveSmoothingParameters({smoothing:rules},inputs);
  const act=async(s,key,action)=>channel.perform({condition:'set smoothing '+key,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,field:s.node_smoothing.selected.record_id}),
@@ -57,17 +57,17 @@ export async function configureSmoothing(channel,p,{inputMapping,mode='hodrick_p
     need(s.node_smoothing.selected.algorithm===algorithm,'algorithm differs');
    }
    if(algorithm===1){
-    if(s.node_smoothing.settings.family!=='daubechies'){await act(s,'pedWaveletType;ValueControl;radiofield;DisplayEl',{verb:'click'});s=await observe(channel,'wavelet family readback');}
-    for(const [key,value] of [['edtWaveletOrder',rule.order],['edtDecompositionLevel',rule.depth]])if(s.node_smoothing.settings[key==='edtWaveletOrder'?'order':'depth']!==value){
+    if(s.node_smoothing.settings.family!==rule.family){await act(s,'pedWaveletType;ValueControl;radiofield'+({'daubechies':'','coiflet':'-1','cdf_9_7':'-2'}[rule.family])+';DisplayEl',{verb:'click'});s=await observe(channel,'wavelet family readback');}
+    for(const [key,value] of [...(rule.family==='cdf_9_7'?[]:[['edtWaveletOrder',rule.order]]),['edtDecompositionLevel',rule.depth]])if(s.node_smoothing.settings[key==='edtWaveletOrder'?'order':'depth']!==value){
      await act(s,key+';ValueControl',{verb:'fill',text:String(value)});s=await observe(channel,'wavelet value before blur');
      await act(s,key+';ValueControl',{verb:'press',key:'Tab'});s=await observe(channel,'wavelet value committed');
     }
-    if(s.node_smoothing.settings.boundary!=='symmetric'){
+    if(s.node_smoothing.settings.boundary!==rule.boundary){
      await act(s,'edtEdgeExtension;ValueControl;trg_picker',{verb:'click'});s=await observe(channel,'wavelet boundary options');
-     const option=one(s,e=>e.tid?.startsWith(s.wizard.root_tid+';SmoothingWizard;edtEdgeExtension;ValueControl;boundlist;')&&/симметрич/i.test(e.label??'')&&!/анти|без/i.test(e.label??'')&&e.allowed_actions.includes('click'),'symmetric boundary option unavailable');
-     await channel.perform({condition:'choose symmetric boundary',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'click',ref:option.ref})});s=await observe(channel,'wavelet boundary committed');
+     const option=one(s,e=>e.tid?.startsWith(s.wizard.root_tid+';SmoothingWizard;edtEdgeExtension;ValueControl;boundlist;')&&({symmetric:/^симметричное$/i,zero:/^(продолжение )?нулями$/i,reflect:/^симметричное без крайней точки$/i}[rule.boundary]).test((e.label??'').trim())&&e.allowed_actions.includes('click'),'requested boundary option unavailable: '+rule.boundary);
+     await channel.perform({condition:'choose requested wavelet boundary',initialObservation:s,ready,identity:()=>field,resolve:()=>({verb:'click',ref:option.ref})});s=await observe(channel,'wavelet boundary committed');
     }
-    need(s.node_smoothing.settings.family===rule.family&&s.node_smoothing.settings.order===rule.order&&s.node_smoothing.settings.depth===rule.depth&&s.node_smoothing.settings.boundary===rule.boundary,'wavelet settings differ');
+    need(s.node_smoothing.settings.family===rule.family&&s.node_smoothing.settings.order===(rule.family==='cdf_9_7'?null:rule.order)&&s.node_smoothing.settings.depth===rule.depth&&s.node_smoothing.settings.boundary===rule.boundary,'wavelet settings differ');
    }else{
    const strength=rule.lambda===undefined?'period':'lambda',title=strength==='lambda'?'Lambda':'Period';
    if(s.node_smoothing.settings.strength!==strength){await act(s,'rb'+title+';ValueControl;DisplayEl',{verb:'click'});s=await observe(channel,'smoothing strength mode readback');}

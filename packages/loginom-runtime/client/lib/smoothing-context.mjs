@@ -38,8 +38,8 @@ export function readSmoothingBrowser(prefix){
    const radios=['','-1','-2'].map(suffix=>cmp('pedWaveletType;ValueControl;radiofield'+suffix)?.getValue?.());
    const order=cmp('edtWaveletOrder;ValueControl')?.getValue?.(),depth=cmp('edtDecompositionLevel;ValueControl')?.getValue?.();
    const boundary=cmp('edtEdgeExtension;ValueControl')?.getRawValue?.();
-   if(radios.some(v=>typeof v!=='boolean')||radios.filter(Boolean).length!==1||!Number.isInteger(order)||!Number.isInteger(depth)||typeof boundary!=='string'||!boundary)return fail('smoothing_wavelet_settings');
-   settings={family:['daubechies','coiflet','cdf_9_7'][radios.indexOf(true)],order,depth,boundary:boundary.toLowerCase().includes('симметрич')&&!boundary.toLowerCase().includes('анти')&&!boundary.toLowerCase().includes('без')?'symmetric':boundary};
+   if(radios.some(v=>typeof v!=='boolean')||radios.filter(Boolean).length!==1||(radios[2]?![null,''].includes(order)&&!Number.isInteger(order):!Number.isInteger(order))||!Number.isInteger(depth)||typeof boundary!=='string'||!boundary)return fail('smoothing_wavelet_settings');
+   settings={family:['daubechies','coiflet','cdf_9_7'][radios.indexOf(true)],order:radios[2]?null:order,depth,boundary:/^симметричное$/i.test(boundary)?'symmetric':/нулями/i.test(boundary)?'zero':/^симметричное без крайней точки$/i.test(boundary)?'reflect':boundary};
   }else{
   for(const key of ['rbLambda','rbPeriod','edtLambda','edtPeriod'])if(cmp(key+';SwitchButton')?.pressed!==false)return fail('smoothing_variable_unsupported');
   const lambda=cmp('edtLambda;ValueControl')?.getValue?.(),period=cmp('edtPeriod;ValueControl')?.getValue?.();
