@@ -180,7 +180,8 @@ test('retrain reads saved Transaction/Item roles on the owned association-rules 
 
 test('Transaction/Item remain refused for every other node type and unbound input owners',async()=>{
  for(const icon of [...Object.values(NODE_TYPES).filter(t=>t.type!=='datamining.assn_rules').map(t=>t.icon_class),undefined,'bg-vendor-icon-unknown']) {
-  for(const role of [8,9]) {
+  // Seasonal ungroup totals input 0 keeps its order role 8 (test below).
+  for(const role of icon==='bg-vendor-icon-ungroupdata'?[9]:[8,9]) {
    const f=fixture({input:true});f.target[0].data.UsageType=role;
    const owner={verified:true,surface:'wizard',input_port:{direction:'input',port:0,node_icon_class:icon}};
    const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
@@ -527,10 +528,21 @@ for(const [mode,value,type] of [['computed','Weight',4],['shares','Share',3]])te
 
 test('saved ungroup share role is bound only to its native support input',async()=>{
  for(const [direction,port,icon,role] of [['input',0,'bg-vendor-icon-ungroupdata',9],['input',2,'bg-vendor-icon-ungroupdata',9],
-  ['output',1,'bg-vendor-icon-ungroupdata',9],['input',1,'bg-vendor-icon-calculator',9],['input',1,'bg-vendor-icon-ungroupdata',8],['input',1,'bg-vendor-icon-ungroupdata',10]]){
+  ['output',1,'bg-vendor-icon-ungroupdata',9],['input',1,'bg-vendor-icon-calculator',9],['input',0,'bg-vendor-icon-calculator',8],['input',0,'bg-vendor-icon-ungroupdata',10],['input',1,'bg-vendor-icon-ungroupdata',10]]){
   const f=fixture({input:true});f.target[0].data.UsageType=role;
   const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
   const result=await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port:{direction,port,node_icon_class:icon}}));
   assert.equal(result.reason,'mapping_input_usage',JSON.stringify({direction,port,icon,role}));
+ }
+});
+
+// LAB-1314 seasonal-read-corrected execution-events:989-1018: the saved
+// seasonal order field keeps usage 8 on totals input 0 (and on support 1).
+test('saved seasonal ungroup order role is admitted on both native inputs only',async()=>{
+ for(const port of [0,1]){
+  const f=fixture({input:true});f.target[0].data.UsageType=8;
+  const page={evaluate:async(fn,arg)=>vm.runInNewContext('('+fn.toString()+')('+JSON.stringify(arg)+')',f.context)};
+  const result=await readNodeMapping(page,{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',input_port:{direction:'input',port,node_icon_class:'bg-vendor-icon-ungroupdata'}}));
+  assert.equal(result.verified,true,JSON.stringify({port,reason:result.reason}));
  }
 });
