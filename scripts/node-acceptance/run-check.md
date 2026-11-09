@@ -879,3 +879,8 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
 передаётся модели. Все 8 строк, RowID,X,Tag,X_S, real abs 1e-8 / rel 1e-10,
 CSV, Save, cold без перенастройки и cleanup; CDF сохраняется без order.
+
+`linreg-elastic`: C10, утверждённая независимая точка (1,3) на shifted.csv.
+Только task-elastic.md и CSV передаются модели; frozen KKT oracle из
+8c1b6ac415645227d8977c3d9f7d3194e7e9b4b2 остаётся приватным. Оба typed-порта,
+прогнозный CSV, Save/cold без перенастройки и cleanup; abs=1e-8, rel=1e-10.

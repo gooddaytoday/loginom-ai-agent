@@ -1,39 +1,40 @@
 # Линейная регрессия (`datamining.lin_regression`)
 
-<!-- mode: enter apply -->
-`enter` (пере)обучает; прогноз на новых данных — `mode:"apply"` на обученном узле с теми же `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`.
+Выбирай native-узел в `dock_node_apply`, без Калькулятора/JS. `input_fields`/`target_field` — точные технические имена непрерывных числовых полей; остальные поля сохраняются вне обучения.
+Сохраняй исходные типы и значения. Целые X и идентификаторы импортируй Integer: `type:"integer", data_kind:"Непрерывный"`; непрерывный вид не требует Real. В Real импортируй дробное поле или явно запрошенный отклик Y. После импорта проверь все поля полным чтением.
+Обучающие режимы используют все строки, константу, без нормализации/валидации; `finish:"execute"` явно обучает текущий вход, затем исполняет. Каждое изменение того же узла требует Teach; не пересоздавай узел.
+Читай `read.ports:[0,1]`, `sample_rows:100`, `require_exact_numbers:true`: порт 0 — прогнозы и исходные поля, порт 1 — коэффициенты с константой. CSV прогнозов — `exports.text` от порта 0 в названный файл; сохрани пакет. Cold выполняет сохранённый граф без настройки.
 
-Полная таблица коэффициентов (SE, t, p, 95% границы) — `mode:"enter"`, `linear_regression:{statistics:"full"}`: порт 1 из 9 native-столбцов (по умолчанию `coefficients`). Без Калькулятора/JS. Целые X — Integer, Y — real; `read.ports:[0,1]`. Коэффициенты показывай чтением; CSV прогнозов — `exports.text` от порта 0 в названный файл.
+<!-- mode: enter apply -->
+`enter` (пере)обучает. Прогноз новых данных — `mode:"apply"` на том же обученном Enter-узле: прежние `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`. Apply сохраняет модель и настройки без Teach.
+Полная статистика коэффициентов (SE, t, p, 95% границы) — `mode:"enter"`, `linear_regression:{statistics:"full"}`: порт 1 из 9 native-столбцов, включая NULL. По умолчанию `statistics:"coefficients"`: Name и Y_coefficients. Покажи коэффициенты чтением обоих портов.
 <!-- /mode -->
 
 <!-- mode: forward backward stepwise -->
-Перед импортом сохрани исходные типы числовых полей: целочисленный предиктор передавай в `imports.text` как `type:"integer", data_kind:"Непрерывный"`. Непрерывный вид данных не требует преобразования Integer в Real. Идентификаторы оставляй Integer; в Real преобразуй только явно запрошенный отклик либо дробное поле. После импорта проверь типы полным чтением. Сохраняй исходные технические имена и значения.
-
-`input_fields`/`target_field` — технические имена непрерывных числовых полей; прочие поля сохраняются вне обучения.
-
-R² (`r2`) пока недоступен: native-приёмка не подтверждена. Запрос с `criterion:"r2"`, в том числе с порогами 0/1, отклоняется до эффекта с `NOT_APPLIED`, `effect_possible:false`. Сообщи пользователю причину; не подменяй требуемый R² другим критерием или Калькулятором/JS.
-
-Все строки для обучения, без нормализации и валидации, с константой; точность решателя 0.0000000001. `finish:"execute"` сначала обучает native-модель, затем исполняет её. Читай `read.ports:[0,1]`: прогнозы и коэффициенты; число выбранных факторов определяется критерием. Для CSV подключи `exports.text` к порту 0, затем сохрани пакет.
+R² (`r2`) недоступен: native-приёмка не подтверждена. `criterion:"r2"`, включая пороги 0/1, отклоняется до эффекта: `NOT_APPLIED`, `effect_possible:false`. Сообщи причину; не подменяй R² другим критерием или Калькулятором/JS.
+`parameters.linear_regression.selection.criterion`: `f`, `adjusted_r2`, `aic`, `aicc`, `bic`, `hqc`. По умолчанию F; число выбранных факторов определяется критерием. Пороги значимости только для F, строго 0..1.
 <!-- /mode -->
 
 <!-- mode: forward -->
-Для пошагового включения факторов выбирай `datamining.lin_regression`, `mode:"forward"` в `dock_node_apply`.
-
-Критерий: `parameters.linear_regression.selection.criterion` = `f`, `adjusted_r2`, `aic`, `aicc`, `bic` или `hqc`. По умолчанию F, `add_significance:0.05`. Для F можно задать порог включения; исключение в Forward отключено мастером, `remove_significance` только проверяет сохранённый порог (обычно 0.1). Другие критерии не принимают пороги значимости.
+Пошаговое включение — `mode:"forward"`. F: `add_significance:0.05` редактирует включение; отключённый `remove_significance:0.1` только проверяет сохранённое значение. Для остальных критериев пороги не передавай.
 <!-- /mode -->
 
 <!-- mode: backward -->
-Для исключения факторов выбирай `mode:"backward"`, `linear_regression.selection.criterion:"f"`. `remove_significance:0.1` — порог исключения строго 0..1; `add_significance:0.05` — проверка отключённого порога добавления. Для adjusted_r2/aic/aicc/bic/hqc пороги не передавай.
+Пошаговое исключение — `mode:"backward"`. F: `remove_significance:0.1` редактирует исключение; отключённый `add_significance:0.05` только проверяет сохранённый порог. Для остальных критериев пороги не передавай.
 <!-- /mode -->
 
 <!-- mode: stepwise -->
-Для включения и исключения выбирай `mode:"stepwise"`, `linear_regression.selection:{criterion:"f",add_significance:0.05,remove_significance:0.1}`. Оба порога редактируются, строго 0..1; добавление меньше исключения. Для остальных критериев пороги не передавай.
+Включение/исключение — `mode:"stepwise"`, `linear_regression.selection:{criterion:"f",add_significance:0.05,remove_significance:0.1}`. Оба порога редактируются, добавление меньше исключения. Для остальных критериев пороги не передавай.
 <!-- /mode -->
 
 <!-- mode: ridge -->
-Use native `datamining.lin_regression` in `dock_node_apply`, `mode:"ridge"`, instead of Calculator/JS. Set `parameters:{input_fields:["X1","X2","X3"],target_field:"Y",linear_regression:{lambda_l2:1}}`. Manual L2 only; no auto-selection or bindings. Import Y as real/continuous, retain other source types. All rows train with intercept, no normalization/validation. `finish:"execute"` trains then executes; `read.ports:[0,1]` reads predictions and coefficients. Export port 0 with `exports.text`, Save; cold executes the saved graph.
+Manual Ridge: `mode:"ridge"`, `parameters:{input_fields:["X1","X2","X3"],target_field:"Y",linear_regression:{lambda_l2:1}}`. L2 — конечное число ≥0. Автоподбор и привязки не поддерживаются; сообщи причину.
 <!-- /mode -->
 
 <!-- mode: lasso -->
-Для LASSO используй native `datamining.lin_regression` вместо Калькулятора/JS: `dock_node_apply`, `mode:"lasso"`, `parameters:{input_fields:["X1","X2","X3"],target_field:"Y",linear_regression:{lambda_l1:1}}`. Ручной L1 — конечное число ≥0. Точность 1e-10. Штраф RSS+λΣ|β| включает константу. Автоподбор λ и привязки не поддерживаются; сообщи причину. Строгая точность коэффициентов на коррелированных данных не гарантируется. Y импортируй real/continuous, остальные типы сохраняй; все строки обучающие, константа, без нормализации/валидации. `finish:"execute"` явно обучает, затем исполняет; повторная настройка того же узла также требует обучения. Читай `read.ports:[0,1]`, экспортируй порт 0 через `exports.text`, сохрани пакет.
+LASSO: `mode:"lasso"`, `linear_regression:{lambda_l1:1}`. Ручной L1 — конечное число ≥0. Штраф RSS+λΣ|β| включает константу. Автоподбор λ и привязки не поддерживаются; сообщи причину. Строгая точность на коррелированных данных не гарантируется.
+<!-- /mode -->
+
+<!-- mode: elastic -->
+Elastic Net: `mode:"elastic"`, `parameters:{input_fields:["X1","X2","X3"],target_field:"Y",linear_regression:{lambda_l1:1,lambda_l2:3}}`. Оба UI-коэффициента задаются вручную: конечные ≥0, сумма >0. Автоматический выбор метода/λ и привязки не поддерживаются. После изменения λ того же узла `finish:"execute"` снова обучает его; читай оба порта. Порт 1 — Name и Y_coefficients, включая константу и X3. Строгая точность на коррелированных данных не гарантируется.
 <!-- /mode -->

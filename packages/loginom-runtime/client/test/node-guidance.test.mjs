@@ -13,7 +13,7 @@ test('each supported regression selection mode delivers complete import and outp
  const source=await createBundledSkillFixture(t);
  const loader=createSkillLoader({resources:source.resources});
  const card={type:'datamining.lin_regression',modes:NODE_TYPES['datamining.lin_regression'].modes};
- for(const mode of ['forward','backward','stepwise'].filter(mode=>card.modes.includes(mode))){
+ for(const mode of ['forward','backward','stepwise','elastic'].filter(mode=>card.modes.includes(mode))){
   const [description]=await loader.describeNodes([card],[mode]);
   assert.match(description.guidance,/type:"integer", data_kind:"Непрерывный"/,mode);
   assert.match(description.guidance,/read\.ports:\[0,1\]/,mode);
@@ -22,6 +22,9 @@ test('each supported regression selection mode delivers complete import and outp
   assert.doesNotMatch(description.guidance,/как в forward выше/,mode);
   assert.match(description.guidance,new RegExp('mode:"'+mode+'"'),mode);
  }
+ const [elastic]=await loader.describeNodes([card],['elastic']);
+ assert.match(elastic.guidance,/lambda_l1:1,lambda_l2:3/);
+ assert.doesNotMatch(elastic.guidance,/ε|epsilon|1e-12/);
  const [enter]=await loader.describeNodes([card],['enter']);
  assert.match(enter.guidance,/`mode:"enter"`, `linear_regression:\{statistics:"full"\}`/);
  assert.match(enter.guidance,/read\.ports:\[0,1\]/);
