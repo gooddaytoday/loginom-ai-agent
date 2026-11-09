@@ -857,6 +857,13 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
 проверяется принятым `replace-keep-variant`.
 
+`colunion-third-determining`: `transform-coluniondata/acceptance/v040/task-third-determining.md`,
+три CSV из `v040/fixtures`, один экспорт и `expected-third.json` (одна строка).
+`col_union_settings` требует readback `row_count=input`, `determining_input=third`,
+`padding=null` на том же узле до Save; cold читает сохранённые настройки через
+production `readColUnion` и отменяет мастер без применения изменений. CSV без
+этого аудита не даёт PASS: `minimum` возвращает ту же строку.
+
 `colunion-third-repeat`: утверждённый `transform-coluniondata/acceptance/v040/task-third.md`,
 три CSV из `acceptance/v040/fixtures`, maximum/repeat, полный mapping семи полей.
 Stock CSV, Save, cold без перенастройки существующего узла и cleanup.

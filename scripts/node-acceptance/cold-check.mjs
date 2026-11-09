@@ -1,5 +1,6 @@
 import {verifyN18JavascriptStep} from './n18-cold.mjs';
 import {observeSortingSaved} from './sorting-modes.mjs';
+import {observeColUnionSavedSettings} from './col-union-settings.mjs';
 
 import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clustering-apply.mjs';
 import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
@@ -286,6 +287,12 @@ page = context.pages()[0]
     if(matches.length!==1)throw Error('COLD_TREE_NODE_AMBIGUOUS');
     reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
    }
+  }
+  if(expected.col_union_settings){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.col_union_data');
+   if(nodes.length!==1)throw Error('COL_UNION_ONE_SAVED_NODE');
+   const settings=await observeColUnionSavedSettings({load,channel:channelFor(nodes[0].ref,'col-union-saved'),expected});
+   await record({phase:'col_union_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.sorting_mode){
    const nodes=graph.nodes.filter(n=>n.type==='transform.sorting');

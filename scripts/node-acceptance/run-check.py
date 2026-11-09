@@ -423,11 +423,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
-    if name == 'colunion-third-repeat':
+    if name in ['colunion-third-repeat', 'colunion-third-determining']:
         src = REPO / 'docs/node-development/nodes/transform-coluniondata/acceptance/v040'
-        return dict(source=src, prompt=src / 'task-third.md', data=src / 'fixtures',
+        determining = name == 'colunion-third-determining'
+        return dict(source=src, prompt=src / ('task-third-determining.md' if determining else 'task-third.md'), data=src / 'fixtures',
                     input_files=['main.csv', 'attached.csv', 'third.csv'], base=None,
-                    expected_name='expected.json', export_count=1)
+                    expected_name='expected-third.json' if determining else 'expected.json', export_count=1)
     colunion_part = re.fullmatch(r'colunion-matrix-(regular|reverse)-(a|b|c)|colunion-matrix-(empty-main|empty-attached|both-empty)-(minimum|maximum|main|attached)', name)
     if colunion_part or name in ['colunion-edit', 'colunion-repeat', 'colunion-matrix-regular', 'colunion-matrix-reverse',
                 'colunion-matrix-empty-main', 'colunion-matrix-empty-attached', 'colunion-matrix-both-empty']:
@@ -2132,6 +2133,11 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('col_union_settings'):
+            write(folder / 'col-union-replies.json', [o for _, o in replies])
+            self.phase('col-union-settings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/col-union-settings.mjs',
+                folder / 'expected.json', folder / 'col-union-replies.json', folder / 'col-union-settings-proof.json'], folder, timeout=60)
+            self.current['col-union-settings'] = 'PASS'
         if expected.get('sorting_mode'):
             write(folder / 'sorting-replies.json', [o for _, o in replies])
             self.phase('sorting-modes-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sorting-modes.mjs',

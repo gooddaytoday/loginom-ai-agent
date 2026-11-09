@@ -10,6 +10,10 @@
 
 `parameters.col_union.row_count`: `minimum`, `maximum` или `input`.
 Для `input` обязательно `determining_input:"main"`, `"attached"` или `"third"` (при входе 2).
+Если размер задаёт вторая присоединённая таблица, передай в `dock_node_apply`
+`parameters:{col_union:{row_count:"input",determining_input:"third",padding:"null"}}`
+при дополнении пропусками. Проверь эти три значения в `configuration.readback.settings`:
+совпадение таблицы само по себе не подтверждает выбранный определяющий вход.
 `padding`: `null` — пропуски; `repeat` — циклически весь короткий набор;
 `last` — последняя запись. Пустой набор нечем повторять: его поля дают NULL.
 Существующие NULL сохраняются; пустая строка, 0 и false — отдельные значения.
