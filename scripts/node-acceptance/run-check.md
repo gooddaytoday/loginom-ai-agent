@@ -892,3 +892,9 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
 передаётся модели. Все 8 строк, RowID,X,Tag,X_S, real abs 1e-8 / rel 1e-10,
 CSV, Save, cold без перенастройки и cleanup; CDF сохраняется без order.
+
+`colunion-third-repeat`: утверждённый `transform-coluniondata/acceptance/v040/task-third.md`,
+три CSV из `acceptance/v040/fixtures`, maximum/repeat, полный mapping семи полей.
+Stock CSV, Save, cold без перенастройки существующего узла и cleanup.
+Oracle/expected остаются вне контекста модели. Регрессия: `colunion-edit`,
+`colunion-repeat`, `union-auto-match`.
