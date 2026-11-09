@@ -19,6 +19,17 @@ production checkpoints verify Spearman followed by Kendall tau-b on the same
 node, tied values, exact native types/field order and abs=1e-8/rel=1e-10.
 Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
 
+`text-mask` uses the approved `text-import/acceptance/task-multi-file.md` and
+the original January/February/returns files in a unique owned subdirectory.
+After the initial CSV and Save, verified delivery adds only
+`fixtures/multi-file/variants/sales_2026-03.csv` to that directory. A continuation
+executes the saved mask on the same Import. Both complete typed tables and CSVs
+are checked against unchanged `expected-mask.json` (five rows) and
+`expected-mask-new-month.json` (six rows). Settings/identity, final Save, cold
+without configuration and cleanup are required; missing delivery is NOT_RUN
+for the new-month stage. The delivered input is never counted as an export.
+Only tasks and source paths reach the model; oracle/expected stay private.
+
 `text-multi-file-list` uses `text-import/acceptance/task-multi-file-list.md`,
 only the three original `fixtures/multi-file/*.csv` inputs and the independent
 `extended/expected-list.json` from `oracle-multi-file.py`. One native Import
