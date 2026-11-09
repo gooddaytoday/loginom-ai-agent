@@ -1,5 +1,6 @@
 import {verifyN18JavascriptStep} from './n18-cold.mjs';
 import {observeSortingSaved} from './sorting-modes.mjs';
+import {observeColUnionSavedSettings} from './col-union-settings.mjs';
 
 import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clustering-apply.mjs';
 import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
@@ -294,6 +295,12 @@ page = context.pages()[0]
    if(nodes.length!==1)throw Error('SORTING_MODES_ONE_SAVED_NODE');
    const settings=await observeSortingSaved({load,channel:channelFor(nodes[0].ref,'sorting-saved'),mode:expected.sorting_mode});
    await record({phase:'sorting_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.col_union_settings){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.col_union_data');
+   if(nodes.length!==1)throw Error('COL_UNION_ONE_SAVED_NODE');
+   const settings=await observeColUnionSavedSettings({load,channel:channelFor(nodes[0].ref,'col-union-saved'),expected});
+   await record({phase:'col_union_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.logreg_normalization){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');

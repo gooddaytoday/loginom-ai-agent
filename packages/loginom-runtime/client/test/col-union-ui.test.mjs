@@ -14,6 +14,13 @@ function fixture(){
  page.add('div',ownerTid+';boundlist;Повторять_набор_данных','Повторять набор данных',{x:205,y:205,width:210,height:20},list);
  return{page,fields,list};
 }
+test('determining selector exposes the third source row while refusing a fourth',async()=>{
+ const {page}=fixture(),base='MF;TF-1;WizrdMCF;ColUnionDataWizard';
+ for(const i of [0,1,2,3])page.add('div',base+';colDisplayText_'+i,'source '+i);
+ const snapshot=await page.observe();
+ for(const i of [0,1,2])assert.ok(snapshot.ui.elements.some(e=>e.tid===base+';colDisplayText_'+i&&e.allowed_actions.includes('click')),'missing input '+i);
+ assert.equal(snapshot.ui.elements.some(e=>e.tid===base+';colDisplayText_3'),false);
+});
 test('positional union selection confirms the changed native label in its original settings field',async()=>{
  const {page,fields,list}=fixture(),snapshot=await page.observe();
  assert.equal(snapshot.wizard.stage,'col_union');
