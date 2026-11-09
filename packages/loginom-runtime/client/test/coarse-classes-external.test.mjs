@@ -92,3 +92,14 @@ test('external links page reader returns owned grid kinds and names',()=>{
  delete records[1].data.InputRangesColumnKind;
  assert.deepEqual(read(),{verified:false,reason:'coarse_classes_external_link',record_keys:['Index','Name']});
 });
+
+test('coarse classes add_input consumes its single native Input_Add (LAB-1324 events:439)',async()=>{
+ const {verifyNodeTargetEffect}=await import('../lib/node-target.mjs');
+ const ref={document_id:'d',workflow_id:'w',node_id:'cc'};
+ const graph=(inputs,other_ports,type='preprocessing.coarse_classes')=>({complete:true,document_id:'d',workflow_ref:{prefix:'MF;TF-1',workflow_id:'w'},dom_epoch:1,foreign_links:[],links:[],
+  nodes:[{ref,type,label:'Конечные классы',dom_epoch:2,position:{x:400,y:208},inputs,outputs:[0,1,2],other_ports,locked:false}]});
+ const effect=(before)=>({kind:'add_input',parameters:{ref,input:1},before});
+ assert.deepEqual(verifyNodeTargetEffect(effect(graph([0],['Input_Add'])),graph([0,1],[])),{});
+ assert.equal(verifyNodeTargetEffect(effect(graph([0],['Input_Add'])),graph([0,1],['Input_Var-1'])),null);
+ assert.equal(verifyNodeTargetEffect(effect(graph([0],['Input_Add'],'transform.col_union_data')),graph([0,1],[],'transform.col_union_data')),null);
+});
