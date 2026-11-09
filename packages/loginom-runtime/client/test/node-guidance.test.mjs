@@ -49,11 +49,11 @@ test('text Import delimited guidance keeps every rule in compact English',async 
  const loader=createSkillLoader({resources:source.resources});
  const [description]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
  const text=description.guidance.replace(/\s+/g,' ');
- for(const rule of [/confirmed source CSV/,/visualizer table/,/effect_possible=false/,/preview_only:true/,/server_profile/,
-  /CP1251/,/mojibake/,/rare types/,/download\/sampling/,/full sample Import settings/,/settings\.columns`; add no Reform/,/order/,/overwrite=reject/,
-  /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
+ for(const rule of [/confirmed source CSV/,/visualizer/,/effect_possible=false/,/preview_only:true/,/server_profile/,
+  /CP1251/,/garbled/,/rare types/,/download\/sampling/,/full sample settings/,/settings\.columns`, no Reform/,/order/,/overwrite=reject/,
+  /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved.node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
   /variant_as_general_type:true/,/redetect strings/,/auto_detect_columns/,/only after Execute/,/output `mappings`/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
-  /Calculator\/JS/,/Export\/Save outside the mask directory/,/max 16/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/])assert.match(text,rule);
+  /Calculator\/JS/,/Export\/Save outside the mask directory/,/max 16/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/,/parallel_processing:false\/true/,/max_threads:"auto"\|2\|4\|8\|16\|32/,/full row multisets\/duplicates\/NULL/])assert.match(text,rule);
  assert.doesNotMatch(description.guidance.replace(/^# .*\n/,'').replace(/\(\.\.\/large-files\.md#[^)]*\)/,''),/[А-Яа-яЁё]/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);
 });
@@ -141,8 +141,8 @@ test('acceptance review rules reach the model: describe after reopen, import all
  const source=await createBundledSkillFixture(t);
  const loader=createSkillLoader({resources:source.resources});
  const [text]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
- assert.match(text.guidance,/`all`: fields appear only after Execute[^.]*pass no `columns` or\s+output `mappings`/);
- assert.match(text.guidance,/to control fields use `new`\/`none`/);
+ assert.match(text.guidance,/`all`: fields\/types appear only after Execute[^.]*omit `columns`\/output `mappings`/);
+ assert.match(text.guidance,/For manual fields use `new`\/`none`/);
  const [rules]=await loader.describeNodes([{type:'variables.replace',modes:NODE_TYPES['variables.replace'].modes}],['rules']);
  assert.match(rules.guidance,/без табличных `inputs` и `mappings`/);
  assert.match(rules.guidance,/только через `variable_inputs`/);
