@@ -898,9 +898,9 @@ def save_confirmed(case, receipt, package):
     output = receipt.get('output', {})
     if output.get('save_completed') is True:
         return True
-    # This scenario also accepts the verified save_as v2 receipt (which has
-    # no save_completed field). Require the complete reopened path identity.
-    return (case.get('logreg_normalization') is True and receipt.get('action_key') == 'package.save_as'
+    # The verified save_as v2 receipt has no save_completed field (LAB-1298).
+    # Require the complete reopened path identity in every scenario.
+    return (receipt.get('action_key') == 'package.save_as'
             and receipt.get('action_revision') == '2' and receipt.get('phase') == 'verified'
             and receipt.get('cleanup_complete') is True and output.get('reopened') is True
             and output.get('package_ref') == dict(kind='package', path=package, active_identity=package))

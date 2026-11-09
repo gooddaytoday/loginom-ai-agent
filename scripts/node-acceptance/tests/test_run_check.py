@@ -2417,4 +2417,22 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'): runner.check_csv(path, expected)
 
 
+    def test_save_as_v2_verified_receipt_confirms_save_in_every_scenario(self):
+        # LAB-1250 main-execution-events.jsonl:795: reform-rename-lossy save_as v2 receipt without save_completed.
+        package = '/own/reform.lgp'
+        save = {'status': 'SUCCEEDED', 'action_key': 'package.save_as', 'action_revision': '2', 'phase': 'verified',
+                'cleanup_complete': True, 'error': None,
+                'output': {'package_ref': {'kind': 'package', 'path': package, 'active_identity': package}, 'reopened': True}}
+        for case in [runner.scenario('reform-rename-lossy'), {}]:
+            self.assertTrue(runner.save_confirmed(case, save, package))
+            for mutate in [lambda r: r.update(status='FAILED'), lambda r: r.update(phase='completed'),
+                           lambda r: r.update(action_revision='1'), lambda r: r.pop('cleanup_complete'),
+                           lambda r: r['output'].pop('reopened'), lambda r: r['output'].update(reopened=False),
+                           lambda r: r['output']['package_ref'].update(path='/other.lgp'),
+                           lambda r: r['output']['package_ref'].update(active_identity='/other.lgp')]:
+                receipt = copy.deepcopy(save)
+                mutate(receipt)
+                self.assertFalse(runner.save_confirmed(case, receipt, package))
+            self.assertFalse(runner.save_confirmed(case, save, '/other.lgp'))
+
 if __name__ == '__main__': unittest.main()
