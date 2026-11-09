@@ -983,3 +983,9 @@ Oracle/expected остаются вне контекста модели. Рег�
 Только `acceptance/v040/task-recommend.md` и CSV передаются модели.
 Независимый `oracle.py --check` проверяет правила и рекомендации порта 2,
 совпадающий RuleID, все native поля, типы и порядок; два CSV, Save/cold/cleanup.
+
+`assnrules-holdout`: `task-recommendations.md`, только recommend-train.csv и
+recommend-holdout.csv из fixtures/v040. Oracle сохраняет правила train и
+проверяет H1→B (.75/.75/1); переобучение holdout даёт ноль правил.
+Аудит требует обучение и apply одного GUID, без повторного Train;
+оба полных typed-порта 1/2, два CSV, Save, cold без настройки и cleanup.

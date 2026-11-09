@@ -35,3 +35,13 @@ test('Done commits settings without claiming training and foreign settings refus
  input.phases[1].value.configuration.node_context={...node,node_id:'foreign'};
  assert.throws(()=>assnRulesConfigurationReadback(input),/configuration owner/);
 });
+test('apply requires discarded settings and rejects any training claim',()=>{
+ const input=candidate();input.phases[1].value.configuration.mode='apply';
+ Object.assign(input.phases[2].value,{settings_applied:false,draft_discarded:true});
+ input.phases.at(-1).value.settings_applied=false;delete input.phases.at(-1).value.training;
+ const result=assnRulesConfigurationReadback(input);
+ assert.equal(result.mode,'apply');assert.equal(result.training.status,'not_requested');
+ for(const alter of [v=>v.phases[2].value.settings_applied=true,v=>v.phases[2].value.draft_discarded=false,v=>v.phases.at(-1).value.settings_applied=true,v=>v.phases.at(-1).value.training={status:'trained'}]){
+  const bad=structuredClone(input);alter(bad);assert.throws(()=>assnRulesConfigurationReadback(bad));
+ }
+});
