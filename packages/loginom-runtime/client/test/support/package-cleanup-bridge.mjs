@@ -28,7 +28,7 @@ class ExternalClient {
   async connect(t){this.transport=t;}
   async close(){this.f.events.push(this.browser?'browser-close':'remote-close');this.transport?.onclose?.();}
   async listTools(){return {tools:[{name:this.browser?'browser_run_code_unsafe':'read',inputSchema:{type:'object'}}]};}
-  async callTool(request){
+  async callTool(request,_schema,options){
     if(!this.browser){
       assert.equal(request.name,'read');
       const text=this.f.catalog.files.get(request.arguments.uris[0]);assert.equal(typeof text,'string');
@@ -48,6 +48,16 @@ class ExternalClient {
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
       if(this.f.failedDraft)value={...value,reason:'NATIVE_MESSAGE_BOX_BLOCKED',created_draft:true};
+      if(this.f.activeTab){
+        // After Save As reopened the package, only an Open binding of that
+        // already active package can issue a receipt for its new tab.
+        const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1));
+        this.f.events.push('prepare:'+o.intent+(o.bindOpenOnly?':bind':''));
+        if(o.bindOpenOnly)this.f.bindBudget={timeoutMs:o.timeoutMs,timeout:options?.timeout};
+        value={...value,operation_id:o.operationId,created_draft:false,ownership_verified:false,effect_possible:false,
+          workflow_ref:{...value.workflow_ref,tab_tid:this.f.activeTab,prefix:'MF;TF-5'},package_ref:{path:o.packagePath,persisted:true},
+          ...(o.bindOpenOnly?this.f.rebind:{})};
+      }
       if(this.f.drafts){
         // Browser receipt semantics of prepareWorkspace: a known operation ID
         // replays its own draft, an unknown one creates another package tab.
@@ -77,6 +87,9 @@ class ExternalClient {
       this.f.cleanupOptions=options;
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario.endsWith('native-blocked')?'BLOCKED':'SUCCEEDED',package_closed:!this.f.scenario.endsWith('native-blocked'),
         logged_out:!this.f.scenario.endsWith('native-blocked'),account:'test-2',package_path:this.f.path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
+      // Mirrors the native tab guard (package-cleanup.mjs: no own receipt for this node and tab).
+      if(this.f.activeTab&&options.tabTid!==this.f.activeTab)value={...value,status:'BLOCKED',package_closed:false,logged_out:false,
+        packages_after:1,reason:'TAB_IDENTITY_CHANGED'};
       if(this.f.scenario==='foreign-path')value.package_path=secondPath;
       if(this.f.scenario==='foreign-account')value.account='foreign';
       if(this.f.scenario==='discard-receipt')value.unsaved_changes_discarded=true;
@@ -142,6 +155,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
       const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
+      if(f.reopen&&key==='package.save_as'){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
       f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
     inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -563,6 +577,63 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
     }
   }finally{try{await client?.close();await bridge?.close();}finally{await rm(directory,{recursive:true,force:true});}}
 });
+
+// LAB-1331: Save As closes the package and reopens it in a new tab. Cleanup
+// rebinds only that already active package; the tab guard stays native.
+const rebindFaults={'reopened-rebind-effect':{effect_possible:true},'reopened-rebind-path':{package_ref:{path:secondPath,persisted:true}},
+ 'reopened-rebind-document':{document_id:'other-doc'},'reopened-rebind-account':{loginom_account:'foreign'},'reopened-rebind-not-ready':{status:'NOT_READY'}};
+for(const scenario of ['reopened','reopened-then-checkpoint','reopened-reprepared',...Object.keys(rebindFaults)])
+ test('normal shutdown after Save As reopened the package: '+scenario,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-reopened-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),catalog,reopen:true,
+    rebind:rebindFaults[scenario]??{}};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+   mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'reopened-cleanup',version:'1'});
+  try{
+   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+   assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{}})).isError,true);
+   const saved=JSON.parse((await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_as',parameters:{path},operation_id:'own-save'}})).content[0].text);
+   assert.equal(saved.status,'SUCCEEDED');assert.equal(saved.output.reopened,true);
+   let expectedSave='own-save';
+   if(scenario==='reopened-then-checkpoint'){
+    await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path},operation_id:'later-save'}});
+    expectedSave='later-save';
+   }
+   if(scenario==='reopened-reprepared'){
+    const again=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:path,operation_id:'prepare-reopened'}});
+    assert.notEqual(again.isError,true,JSON.stringify(again));
+   }
+   const closed=await bridge.close();
+   const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+   const accepted=['reopened','reopened-then-checkpoint','reopened-reprepared'].includes(scenario);
+   assert.equal(closed.browser_transport_closed,true);
+   assert.equal(cleanup.status,accepted?'SUCCEEDED':'BLOCKED',JSON.stringify(cleanup));
+   assert.equal(cleanup.package_closed===true,accepted);assert.equal(cleanup.logged_out===true,accepted);
+   assert.equal(cleanup.save_operation_id,expectedSave);assert.equal(cleanup.package_path,path);
+   assert.equal(cleanup.policy,'last_confirmed_own_save');
+   // A model preparation after the reopen already owns the new tab: no extra binding.
+   assert.deepEqual(f.events.filter(e=>e.startsWith('prepare:')),
+    scenario==='reopened-reprepared'?['prepare:open_package']:['prepare:open_package:bind']);
+   // The package is already active: the binding must not spend the host close budget (45 s) waiting for readiness.
+   if(scenario!=='reopened-reprepared'){
+    assert.ok(f.bindBudget.timeoutMs<=5000,JSON.stringify(f.bindBudget));assert.ok(f.bindBudget.timeout<=6000,JSON.stringify(f.bindBudget));
+   }
+   assert.equal(f.events.filter(e=>e==='package-cleanup').length,accepted?1:0);
+   if(accepted){
+    assert.equal(f.cleanupOptions.tabTid,f.activeTab);assert.equal(f.cleanupOptions.packagePath,path);
+    assert.equal(f.cleanupOptions.documentId,'own-doc');assert.equal(f.cleanupOptions.account,'test-2');
+   }else assert.equal(cleanup.reason,'REOPENED_PACKAGE_UNBOUND');
+   const journal=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+   const binding=journal.filter(row=>row.phase==='reopened_package_cleanup_binding');
+   assert.equal(binding.length,scenario==='reopened-reprepared'?0:1);
+   if(binding.length)assert.equal(binding[0].accepted,accepted);
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+ });
 
 for(const scenario of ['generated-id','reconciled-own','reconciled-older','reconciled-not-admitted','noeffect-retry','validation-retry','changed-document-reconciled',
  'foreign-id','wrong-path','wrong-action','unresolved-inspection','unclean-inspection','unknown-inspection'])
