@@ -11,7 +11,6 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize,preserveConfig
  if(ports.some(p=>p.port_kind==='tree'||p.exact_table||p.read_coverage||p.cell_precision))return;
  // Keep native summary ports intact without blocking ordinary sibling previews.
  const previews=ports.filter(p=>!p.sample?.some(r=>r.some(c=>c.precision==='exact_native')));
- if(!previews.length)return;
  for(const port of previews)for(const row of port.sample??[])for(const cell of row){
   // Decimal is the already verified round-trip binary64 value. Remove only
   // equivalent display/number duplicates, never infer numbers from UI text.

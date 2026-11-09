@@ -209,3 +209,10 @@ test('native cells alone exceeding the wait budget still refuse without dropping
  assert.equal(JSON.parse(reply.content[0].text).error.code,'USER_RESPONSE_BUDGET');
  assert.deepEqual(source,before);
 });
+
+test('a reply without output ports retains configuration summary budgeting',()=>{
+ const reply={output:{},configuration:{verified:true,readback:{details:'x'.repeat(50000)}},limitations:[]};
+ budgetUserPreview(reply);
+ assert.equal(reply.configuration.readback_summary,true);
+ assert.ok(previewWireSize(reply)<=46000);
+});
