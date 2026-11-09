@@ -44,6 +44,9 @@ th, td { padding: 13px 8px; }
 thead th { padding-block: 10px; border-block: 1px solid #e0e6dd; background: #f6f8f3; color: #536258; font-size: 12px; font-weight: 500; }
 th:first-child { text-align: left; padding-left: 24px; }
 th:last-child, td:last-child { padding-right: 24px; }
+thead button { padding: 4px 0; border: 0; background: transparent; font: inherit; text-align: inherit; }
+thead button span { color: #65786a; }
+thead th[aria-sort] button { color: #284d34; font-weight: 650; }
 tbody tr + tr { border-top: 1px solid #e6ebe4; }
 tbody th { font-weight: 550; }
 td.return { color: #2c5943; font-weight: 600; }
