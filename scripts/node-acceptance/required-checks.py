@@ -125,7 +125,7 @@ RULES = (
     ((C + 'collapse-*.mjs', 'docs/node-development/nodes/collapse-columns/acceptance/**',
       'scripts/node-acceptance/tests/collapse-variant.test.mjs',
       'packages/product/skills/loginom-automation/references/nodes/transform.collapse_columns.md'),
-     ('live-ui',), ('collapse-null', 'collapse-null-ignore', 'collapse-header', 'collapse-header-ignore', 'collapse-ignore', 'collapse-variant', 'collapse-mixed')),
+     ('live-ui',), ('collapse-null', 'collapse-null-ignore', 'collapse-header', 'collapse-header-ignore', 'collapse-ignore', 'collapse-variant', 'collapse-mixed', 'variant-reader-collapse')),
     ((C + 'variant-native-*.mjs', C + 'node-port-output.mjs', C + 'node-procedure.mjs', 'docs/node-development/nodes/variant-reader/acceptance/**'),
      ('live-ui',), ('variant-reader-collapse', 'collapse-variant', 'collapse-mixed', 'replace-keep-variant', 'replace-boolean', 'variables-rows', 'lgd-import-empty-variant')),
     ((C + 'crosstable-*.mjs', 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real/**'),
