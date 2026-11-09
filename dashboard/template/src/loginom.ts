@@ -1,5 +1,6 @@
 export type DashboardState = {
   value: number | null
+  parameters: { name: string; value: number | null }[]
   table: {
     schema: { name: string; type: number }[]
     rows: (string | number | boolean | null)[][]
@@ -9,7 +10,7 @@ export type DashboardState = {
 
 type Dashboard = {
   state(): Promise<DashboardState>
-  change(value: number): Promise<DashboardState>
+  change(value: number, name?: string): Promise<DashboardState>
   run(): Promise<DashboardState>
 }
 
