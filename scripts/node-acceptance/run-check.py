@@ -1329,7 +1329,8 @@ def check_coarse_frozen_trainings(replies):
     assert len(trained) >= 2, 'COARSE_FROZEN_TWO_TRAININGS'
     assert len({o['node']['node_id'] for o in trained}) == 1, 'COARSE_FROZEN_SAME_NODE'
     assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in trained), 'COARSE_FROZEN_LOCKED'
-    assert len({json.dumps(o['configuration']['readback'].get('training', {}).get('source'), sort_keys=True) for o in trained}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
+    sources = {json.dumps(o['configuration']['readback'].get('training', {}).get('source'), sort_keys=True) for o in trained}
+    assert len(sources) == 1 and 'null' not in sources, 'COARSE_FROZEN_SAME_IMPORT'
 
 
 def port_path(reply, port):

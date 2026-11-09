@@ -129,7 +129,9 @@ test('observation usage is a separate bounded hint and never changes the authori
 
 // The contract child is CPU-bound (~6 s alone). Each child stays below the
 // 60 s per-test timeout, and all seven sequential children together stay
-// within the outer `timeout 5m` of the CI client suite even if every one hangs.
+// within the outer `timeout 5m` of the CI step even if every one hangs. That
+// outer limit covers the whole client suite (`test/*.test.mjs`,
+// `--test-concurrency=2`), not bridge.test alone.
 const childBudgetMs = 40000;
 const catalogFaults = ['initialize-one', 'list-one', 'read-one', 'list-two', 'read-two', 'list-semantic'];
 
