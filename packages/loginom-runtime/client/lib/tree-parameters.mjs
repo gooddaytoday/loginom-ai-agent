@@ -1,6 +1,6 @@
 const text=(description,maxLength=128)=>({type:'string',minLength:1,maxLength,description});
 export const jsonToTreeParametersSchema={type:'object',properties:{json_field:text('Exact input string column containing one JSON object.'),
- root_mode:{type:'string',enum:['auto'],description:'Automatic root; one repeated object branch only.'}},required:[],additionalProperties:false};
+ root_mode:{type:'string',enum:['auto'],description:'Automatic root; nested objects and nonempty object arrays in one repeated branch.'}},required:[],additionalProperties:false};
 export const treeToTableParametersSchema={type:'object',properties:{
  selected_paths:{type:'array',minItems:1,maxItems:64,items:text('JSON Pointer schema leaf path, without array indexes.',512),description:'Replace the complete leaf selection in native schema order.'},
  repeat_parents:{type:'boolean',description:'Repeat selected ancestors on every child row.'},
@@ -50,35 +50,48 @@ export function validateTreeJsonScope(text){
   if(token===','){top.key=true;continue;}if(token===':'){top.key=false;continue;}
   if(top.key&&token.startsWith('"')){const key=JSON.parse(token);if(top.keys.has(key))throw Error('Duplicate JSON keys are outside tree stage 1');top.keys.add(key);top.key=false;}
  }
- let arrays=0,nodes=0;const leafNames=new Set();
- const walk=(value,depth,inArray=false)=>{
+ let nodes=0;const arrays=new Set(),kinds=new Map(),leafNames=new Map();
+ const walk=(value,depth,path='')=>{
   if(++nodes>256||depth>16)throw Error('Tree JSON exceeds 256 nodes or depth 16');
   if(value===null||numbers.has(value)||['string','boolean'].includes(typeof value)){
    if(typeof value==='string'&&/^\d{4}-\d\d-\d\d(?:T|$)/.test(value))throw Error('Tree stage 1 does not support inferred dates');return;
   }
   if(Array.isArray(value)){
-   if(++arrays!==1||!value.length||value.some(v=>!v||typeof v!=='object'||Array.isArray(v)||numbers.has(v)))throw Error('Tree stage 1 requires one nonempty repeated object branch');
-   const kinds=new Map();
-   for(const record of value)for(const [key,cell] of Object.entries(record)){
-    const kind=cell===null?'null':numbers.has(cell)?'number':typeof cell;
-    if(kind==='object'||kind==='undefined')throw Error('Nested containers in repeated records are outside tree stage 1');
-    if(kind!=='null'&&kinds.has(key)&&kinds.get(key)!==kind)throw Error('Mixed Variant fields are outside tree stage 1');
-    if(kind!=='null')kinds.set(key,kind);
-   }
-   for(const key of kinds.keys()){if(leafNames.has(key))throw Error('Colliding leaf names are outside tree stage 1');leafNames.add(key);}
-   for(const record of value)walk(record,depth+1,true);return;
+   if(!value.length||value.some(v=>!v||typeof v!=='object'||Array.isArray(v)||numbers.has(v)))throw Error('Tree stage 1 requires one nonempty repeated object branch');
+   arrays.add(path);validateJsonArrayPaths([...arrays]);
+   for(const record of value)walk(record,depth+1,path);return;
   }
   if(!value||typeof value!=='object')throw Error('Tree stage 1 requires an object document');
   for(const [key,cell] of Object.entries(value)){
    if(!key||key.length>128)throw Error('Tree field name exceeds stage 1 scope');
+   const child=path+'/'+key.replaceAll('~','~0').replaceAll('/','~1');
+   const kind=cell===null?'null':numbers.has(cell)?'number':Array.isArray(cell)?'array':typeof cell;
+   if(kind!=='null'&&kinds.has(child)&&kinds.get(child)!==kind)throw Error('Mixed Variant fields are outside tree stage 1');
+   if(kind!=='null')kinds.set(child,kind);
    const scalar=cell===null||numbers.has(cell)||typeof cell!=='object';
-   if(scalar&&!inArray){if(leafNames.has(key))throw Error('Colliding leaf names are outside tree stage 1');leafNames.add(key);}
-   walk(cell,depth+1);
+   if(scalar){if(leafNames.has(key)&&leafNames.get(key)!==child)throw Error('Colliding leaf names are outside tree stage 1');leafNames.set(key,child);}
+   walk(cell,depth+1,child);
   }
  };
  if(!root||typeof root!=='object'||Array.isArray(root)||numbers.has(root))throw Error('Tree stage 1 requires one JSON object');
- walk(root,0);if(arrays!==1)throw Error('Tree stage 1 requires one repeated object branch');
+ walk(root,0);if(!arrays.size)throw Error('Tree stage 1 requires one repeated object branch');
  return {verified:true,node_count:nodes};
+}
+
+function validateJsonArrayPaths(paths){
+ if(paths.some((path,i)=>paths.slice(0,i).some(parent=>path!==parent&&!path.startsWith(parent+'/')&&!parent.startsWith(path+'/'))))
+  throw Error('Tree stage 1 requires one nonempty repeated object branch; sibling arrays are unsupported');
+}
+
+export function validateJsonTreeSchema(schema){
+ if(!Array.isArray(schema)||!schema.length||schema.length>256||schema[0].is_array||!schema[0].is_container)
+  throw Error('JSON tree requires one object root');
+ const arrays=schema.filter(n=>n.is_array);if(!arrays.length)throw Error('JSON tree requires a repeated object branch');
+ validateJsonArrayPaths(arrays.map(n=>n.path));
+ const leaves=schema.filter(n=>!n.is_container);
+ if(arrays.some(n=>!n.is_container)||new Set(leaves.map(n=>n.name)).size!==leaves.length
+  ||leaves.some(n=>!['integer','real','string','boolean'].includes(n.type)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
+ return true;
 }
 
 export function validateSelectedTreePaths(schema,paths,indexPaths){

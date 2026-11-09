@@ -1,6 +1,6 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
-import {jsonToTreeParametersSchema,treeToTableParametersSchema,validateTreeParameters,validateTreeJsonScope,validateSelectedTreePaths} from './tree-parameters.mjs';
+import {jsonToTreeParametersSchema,treeToTableParametersSchema,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths} from './tree-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
  ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -135,7 +135,7 @@ export function createTreeNodeSupport(config,{json}){
   async readOutputs(channel,read,ctx,mapped){
    need(same(read.ports,[0]),'Tree stage 1 reads output 0');
    const {output}=await channel.readOutputPort({port:0,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:true});
-   if(json){need(output.port_kind==='tree'&&output.tree?.complete===true,'Complete native tree required');validateSelectedTreePaths(output.tree.schema);}
+   if(json){need(output.port_kind==='tree'&&output.tree?.complete===true,'Complete native tree required');validateJsonTreeSchema(output.tree.schema);}
    else{
     need(output.port_kind!=='tree'&&output.sample_complete===true,'Tree table must be read completely');
     const names=mapped.configuration.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.name);
