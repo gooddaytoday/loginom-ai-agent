@@ -36,6 +36,12 @@ export async function readAutoCorrelationRowCount({execute,binding,port,deadline
   await delay(250);
  }
 }
+// Reopen or a Done-only Import replacement leaves the source inactive. Keep the
+// refusal and the empty-input guard; name the source Execute recovery step.
+export function autoCorrelationInactiveSource(){
+ const error=Error('auto_correlation preflight requires an active source output. No node was changed. First execute the node feeding input 0 (the Import, if it feeds input 0 directly) via dock_node_apply with its existing ref, inputs:[] and finish:"execute"; wait for success, then repeat the same existing auto_correlation apply with a NEW operation_id.');
+ error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
+}
 export async function preflightAutoCorrelationSource(options,ctx,config,{preflight=preflightTabularSource}={}){
  const request=options.operation.parameters,field=request.parameters.autocorrelation?.field!==undefined;
  const plain=()=>preflight(options,ctx,config,{required:field,resolve:resolveAutoCorrelationField,label:'auto_correlation'});
@@ -44,7 +50,7 @@ export async function preflightAutoCorrelationSource(options,ctx,config,{preflig
  if(!input&&request.target.kind==='existing')
   input=autoCorrelationExistingSource(request,await options.operation.nodeTargetAdapter.observe(request,ctx.deadline,ctx.signal));
  if(!input)return plain();
- return preflight(options,ctx,config,{required:true,existingSource:true,input,label:'auto_correlation',
+ return preflight(options,ctx,config,{required:true,existingSource:true,input,label:'auto_correlation',inactiveSource:request.target.kind==='existing'?autoCorrelationInactiveSource:undefined,
   // Existing input mappings are validated by the input wizard, as before.
   resolve:(p,fields)=>{if(request.target.kind==='new')resolveAutoCorrelationField(p,fields);},
   inspect:async({binding,port})=>{

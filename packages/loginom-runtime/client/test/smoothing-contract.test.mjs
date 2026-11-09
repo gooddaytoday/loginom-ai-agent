@@ -76,3 +76,12 @@ test('db2, coif1 and CDF rules pass published schema and production preflight',a
   }
  }
 });
+
+test('smoothing semantics say omission keeps rules while a provided list replaces them',async()=>{
+ const {NODE_TYPES}=await import('../lib/node-contracts.mjs');
+ const semantics=NODE_TYPES['preprocessing.smoothing'].semantics;
+ assert.doesNotMatch(semantics,/omitted rules persist/i);
+ assert.match(semantics,/omit smoothing to keep (its )?rules/i);
+ assert.match(semantics,/list replaces/i);
+ assert.match(semantics,/\[\] disables/);
+});
