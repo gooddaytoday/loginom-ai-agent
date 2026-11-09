@@ -36,6 +36,9 @@ if (option === "--init") {
   console.log(sourceDir)
 } else {
   if (await realpath(sourceDir) !== sourceDir) throw Error("Недопустимый путь к исходникам")
+  // A fresh checkout has the app sources but no ignored node_modules link.
+  await symlink(await realpath(join(dashboard, "template/node_modules")), join(sourceDir, "node_modules"), "dir")
+    .catch(error => { if (error.code !== "EEXIST") throw error })
   execFileSync("npm", ["run", "typecheck"], { cwd: sourceDir, stdio: "inherit" })
   execFileSync("npm", ["run", "build"], { cwd: sourceDir, stdio: "inherit" })
   const dist = join(sourceDir, "dist")

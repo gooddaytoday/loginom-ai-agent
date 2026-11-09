@@ -89,7 +89,9 @@
       section.style.cssText = 'position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;background:#fff;font:14px system-ui;color:#242638';
       const header = document.createElement('header');
       header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#393744;color:white';
-      header.textContent = visual.GetDisplayName();
+      const title = document.createElement('strong');
+      title.textContent = 'Dashboard';
+      header.append(title);
       const back = document.createElement('button');
       back.textContent = 'Вернуться к сценарию';
       back.onclick = close;
@@ -123,6 +125,7 @@
         const snapshot = await post('targets', {binding:target, nodeName:await node.get_DisplayName(),
           schema:sample?.schema ?? [], rows:sample?.rows ?? [], parameters:available});
         if (overlay !== section) return;
+        title.textContent = snapshot.nodeName;
         if (!lookup.exists) {
           note.textContent = 'Цель для чата: ' + snapshot.nodeName + '. Опишите в Codex, какой dashboard вам нужен. После публикации вернитесь к сценарию и откройте Dashboard.';
           return;
