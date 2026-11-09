@@ -1,6 +1,6 @@
 const text=(description,maxLength=128)=>({type:'string',minLength:1,maxLength,description});
 export const jsonToTreeParametersSchema={type:'object',properties:{json_field:text('Exact input string column containing one JSON object.'),
- root_mode:{type:'string',enum:['auto'],description:'Automatic root; nested objects and nonempty object arrays in one repeated branch.'}},required:[],additionalProperties:false};
+ root_mode:{type:'string',enum:['auto'],description:'Automatic root; nested objects and object arrays in one repeated branch. Empty arrays require a nonempty object-array witness at the same schema path.'}},required:[],additionalProperties:false};
 export const treeToTableParametersSchema={type:'object',properties:{
  selected_paths:{type:'array',minItems:1,maxItems:64,items:text('JSON Pointer schema leaf path, without array indexes.',512),description:'Replace the complete leaf selection in native schema order.'},
  repeat_parents:{type:'boolean',description:'Repeat selected ancestors on every child row.'},
