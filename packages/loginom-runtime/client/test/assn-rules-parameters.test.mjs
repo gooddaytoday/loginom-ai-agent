@@ -13,7 +13,7 @@ test('association rules register FP-Growth and preserve omitted existing setting
 test('unsupported modes, roles, thresholds and ports refuse before mutation',()=>{
  for(const patch of [{min_support_pct:101},{min_support_pct:NaN},{min_confidence_pct:-1},{max_items:4},{item_field:'Transaction'},{min_lift:-1}])
   assert.throws(()=>validateAssnRulesParameters({...p,...patch},'fp_growth',request),/Association rules/);
- for(const patch of [{inputs:[{input:1}]},{mappings:[{}]},{read:{ports:[2]}}])
+ for(const patch of [{inputs:[{input:1}]},{mappings:[{}]},{read:{ports:[3]}}])
   assert.throws(()=>validateAssnRulesParameters(p,'fp_growth',{...request,...patch}),/Association rules/);
  assert.throws(()=>validateAssnRulesParameters({},'fp_growth',request),/require/);
  assert.throws(()=>validateAssnRulesParameters(p,'apply',request),/fp_growth/);
@@ -25,4 +25,9 @@ test('three-item rules accept two consequents and lift patches on the existing t
  validateAssnRulesParameters({min_lift:1.2},'fp_growth',{...request,target:{kind:'existing'},inputs:[]});
  for(const patch of [{max_items:2.5},{max_items:1},{max_consequents:0},{max_consequents:3},{max_consequents:1.5},{min_lift:Infinity},{min_lift:'1.2'}])
   assert.throws(()=>validateAssnRulesParameters({...p,...patch},'fp_growth',request),/Association rules/);
+});
+
+test('training recommendations accept port 2 with existing-node parameter preservation',()=>{
+ validateAssnRulesParameters({...p,max_consequents:1,min_lift:0},'fp_growth',{...request,read:{ports:[1,2]}});
+ validateAssnRulesParameters({},'fp_growth',{...request,target:{kind:'existing'},inputs:[],read:{ports:[0,1,2]}});
 });
