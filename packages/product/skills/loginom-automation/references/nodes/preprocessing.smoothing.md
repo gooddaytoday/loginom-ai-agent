@@ -26,12 +26,16 @@
 <!-- /mode -->
 
 <!-- mode: wavelet -->
-## Вейвлет Хаара
+## Вейвлет-сглаживание
 
-Для вейвлет-сглаживания Хаара (Добеши порядка 1) выбирай `dock_node_apply`,
+Для вейвлет-сглаживания выбирай `dock_node_apply`,
 `target.type:"preprocessing.smoothing"`, `mode:"wavelet"`,
 `parameters:{smoothing:[{field:"X",family:"daubechies",order:1,depth:1,boundary:"symmetric"}]}`.
-Глубина `depth` — 1 или 2, границы — симметричные. Используй этот узел для
+Семейства: `family:"daubechies"` с `order:1` (Хаар) или `order:2`,
+`family:"coiflet"` с `order:1`, `family:"cdf_9_7"` без параметра `order`.
+Для CDF сохранённый `order:null` в readback означает отсутствие порядка.
+Глубина `depth` — 1 или 2; `boundary:"symmetric"` — симметричное,
+`"zero"` — продолжение нулями, `"reflect"` — симметричное без крайней точки. Используй этот узел для
 сглаживания, не вычисляй вейвлет через Калькулятор или JavaScript.
 Обрабатываются только перечисленные непрерывные integer/real поля;
 исходные значения и порядок строк сохраняются, добавляется вещественное X_S.
