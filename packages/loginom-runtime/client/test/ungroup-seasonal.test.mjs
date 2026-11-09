@@ -48,7 +48,7 @@ function savedSeasonal(balanceDisabled){
  return vm.runInNewContext('('+readUngroupBrowser.toString()+')('+JSON.stringify('MF;TF')+')',{Ext:{getCmp:id=>cs[id]},document:{querySelectorAll:q=>all.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}});
 }
 test('reopened seasonal node: disabled balance is not applied policy; enabled balance is still checked',async()=>{
- const run=async(c,p,balanceDisabled)=>{const actions=[],picker=page+'pedBalanceMethod;ValueControl;trg_picker';
+ const picker=page+'pedBalanceMethod;ValueControl;trg_picker',run=async(c,p,balanceDisabled,actions=[])=>{
   const s={wizard:{stage:'ungroup',root_tid:root},node_ungroup:c,ui:{elements:[{tid:picker,ref:picker,allowed_actions:balanceDisabled?[]:['click']}]}};
   const channel={observe:async o=>{assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{actions.push(o.resolve(s).ref);}};
   const r=await configureUngroup(channel,p,{request:{mode:'seasonal',finish:'execute'}});return {r,actions};};
@@ -58,5 +58,6 @@ test('reopened seasonal node: disabled balance is not applied policy; enabled ba
  const enabled=JSON.parse(JSON.stringify(savedSeasonal(false)));
  assert.equal(enabled.ungroup.balance,'proportional');assert.deepEqual(enabled.balance_native,{value:'proportional',disabled:false});
  await assert.rejects(run(structuredClone(enabled),{},false),/rounding\/balance unsupported/);
- await assert.rejects(run(structuredClone(enabled),{ungroup:u,seasonality:season},false),/ungroup option visible|ready/);
+ const clicks=[];await assert.rejects(run(structuredClone(enabled),{ungroup:u,seasonality:season},false,clicks),{message:'ungroup option visible'});
+ assert.deepEqual(clicks,[picker]);
 });
