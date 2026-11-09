@@ -1188,6 +1188,10 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                 return (math.isfinite(number) and math.isfinite(goal) and number == goal
                         and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
             except (ValueError, InvalidOperation, OverflowError): return False
+        if col['type'] == 'real' and isinstance(target, dict):
+            # v040-nan-exact: expected {"non_finite": ...}; Loginom writes NaN as "Nan".
+            spelled = {'NaN': ['nan'], 'Infinity': ['inf', 'infinity', '+inf', '+infinity'], '-Infinity': ['-inf', '-infinity']}
+            return set(target) == {'non_finite'} and value.strip().lower() in spelled.get(target['non_finite'], [])
         if col['type'] == 'variant':
             return isinstance(target, dict) and set(target) == {'cell_type', 'value'} and equal(value, dict(col, type=target['cell_type']), target['value'])
         if col.get('category_labels_any'): return bool(value.strip())

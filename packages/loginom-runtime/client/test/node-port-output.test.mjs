@@ -278,10 +278,11 @@ test('preserves_native_scalar_values',()=>{
 });
 
 
-test('marks_variant_and_nonfinite_unverified',async()=>{
+test('marks_variant_unverified_and_nonfinite_exact',async()=>{
+ // v040-nan-exact: non-finite binary64 is exact with an explicit marker.
  for(const raw of [NaN,Infinity,-Infinity]){
   const decoded=decodePortCell(raw,'real');
-  assert.deepEqual(decoded,{cell:{type:'real',is_null:false,display_text:String(raw),representation:'formatted_display',precision:'unverified'},limitations:['numeric_display_precision']});
+  assert.deepEqual(decoded,{cell:{type:'real',is_null:false,value:null,non_finite:String(raw),representation:'binary64_non_finite',precision:'exact_non_finite'},limitations:[]});
  }
  for(const [raw,text] of [[1,'1'],[-0,'-0'],['',''],[' \u00a0\r\n',' \u00a0\r\n'],[true,'true'],[false,'false'],[{constructor:{name:'UInt64'},toString:()=> '18446744073709551615'},'18446744073709551615']]){
   assert.deepEqual(decodePortCell(raw,'variant'),{cell:{type:'variant',is_null:false,display_text:text,representation:'formatted_display',precision:'unverified'},limitations:['variant_display_precision']});
@@ -291,10 +292,10 @@ test('marks_variant_and_nonfinite_unverified',async()=>{
  const rows=[[NaN,Infinity,-Infinity,1,unknown,null]],types=[3,3,3,6,6,6];
  const f=fixture({rows,types}),result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:false});
  assert.equal(result.verified,true);assert.equal(result.output.precision.numbers_verified,false);
- assert.deepEqual(result.output.precision.limitations,['numeric_display_precision','variant_display_precision']);
+ assert.deepEqual(result.output.precision.limitations,['variant_display_precision']);
  assert.equal(result.output.precision.strings,'data source text; existing secret redaction applies; original byte encoding is not attested');
  assert.doesNotMatch(JSON.stringify(result),/must not leak/);
- for(const [raw,type] of [[NaN,3],[Infinity,3],[-Infinity,3],[1,6],[unknown,6]]){
+ for(const [raw,type] of [[1,6],[unknown,6]]){
   const strict=await fixture({rows:[[raw]],types:[type]}).run({port:0,execution,sampleRows:1,requireExactNumbers:true});
   assert.equal(strict.verified,false);assert.equal(strict.output,undefined);assert.equal(strict.cleanup_complete,true);
  }
@@ -573,4 +574,16 @@ for(const tag of [1,5,7,8,11,20])test('exact completed-port read keeps value wit
  const cell=read.output.sample[0][1],[,cellType,value]=collapseObserved[tag];
  assert.deepEqual([cell.type,cell.cell_type,cell.value,cell.is_null,cell.precision,cell.native.tag],['variant',cellType,value,tag===1,'exact_native',tag]);
  assert.deepEqual(read.output.sample[0][0].value,'1');assert.deepEqual(read.output.precision.limitations,[]);
+});
+
+// v040-nan-exact (LAB-1314 seasonal UngroupQuality, execution-events:944,2212):
+// a native non-finite Real is an exact marked value, never NULL nor display text.
+test('exact read returns native Real NaN and infinities as marked exact cells, distinct from NULL',async()=>{
+ const f=fixture({rows:[[NaN],[Infinity],[-Infinity],[null],[1.5]],types:[3]});
+ const result=await f.run({port:0,execution,sampleRows:5,requireExactNumbers:true});
+ assert.equal(result.verified,true,result.reason);assert.equal(result.output.precision.numbers_verified,true);assert.deepEqual(result.output.precision.limitations,[]);
+ assert.deepEqual(result.output.sample.map(r=>[r[0].is_null,r[0].value,r[0].non_finite??null,r[0].precision]),
+  [[false,null,'NaN','exact_non_finite'],[false,null,'Infinity','exact_non_finite'],[false,null,'-Infinity','exact_non_finite'],[true,null,null,'exact_null'],[false,1.5,null,'17_significant_digits']]);
+ assert.equal(JSON.stringify(result.output.sample).includes('null,"non_finite":"NaN"'),true);
+ assert.deepEqual(decodePortCell(NaN,'variant').cell.non_finite,'NaN');assert.deepEqual(decodePortCell(2.5,'real').limitations,[]);
 });
