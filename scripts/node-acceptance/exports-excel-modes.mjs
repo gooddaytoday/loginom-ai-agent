@@ -7,7 +7,7 @@ const [root,configPath,output]=process.argv.slice(2);
 process.umask(0o077);await mkdir(output,{recursive:true,mode:0o700});
 const config=JSON.parse(await readFile(configPath,'utf8')),load=name=>import(pathToFileURL(root+'/runtime/'+name).href);
 const {verifyResources}=await load('src/resources.mjs'),resources=await verifyResources(root);
-const {loginBrowser}=await load('src/connection-check.mjs');
+const {loginBrowser,loginomAddress}=await load('src/connection-check.mjs');
 const {makeWorkspacePrepareCode}=await load('client/lib/workspace.mjs');
 const {makeWorkspaceUiCode}=await load('client/lib/workspace-ui.mjs');
 const {makePackageCleanupCode}=await load('client/lib/package-cleanup.mjs');
@@ -19,7 +19,7 @@ const {context}=await loginBrowser({browserPath:resources.browserPath,profile:ou
 const page=context.pages()[0],sessionId=randomUUID(),record=createExecutionJournal({directory:output,metadata:{sessionId},knownSecrets:[config.login.password]});
 const execute=code=>new Function('page',`return (${code})(page)`)(page);
 try{
- const identity=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'excel-seed-workspace',intent:'new_draft'}));
+ const identity=await execute(makeWorkspacePrepareCode({loginomUrl:loginomAddress(config.login.url),compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'excel-seed-workspace',intent:'new_draft'}));
  if(identity.status!=='READY')throw Error('EXCEL_SEED_WORKSPACE');
  const mask=config.text_mask_directory;
  if(mask&&(!/^[A-Za-z0-9_-]{1,100}$/.test(mask.name)||typeof mask.create!=='boolean'))throw Error('TEXT_MASK_DIRECTORY_INVALID');
