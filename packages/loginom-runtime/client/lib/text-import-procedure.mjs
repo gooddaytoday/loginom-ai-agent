@@ -25,6 +25,10 @@ export async function configureTextImportTitle(channel,title) {
   if(title){
     const mode=titleModes[title.mode];
     if(state.wizard.completion.fields.label_mode.value!==mode){
+      // Loginom may replace the custom caption with the file name a tick after
+      // the mode readback; Done must not keep the previous custom caption.
+      const previous=state.wizard.completion.fields.label.value;
+      const captionReady=s=>title.mode!=='automatic'||s.wizard.completion.fields.label.value!==previous;
       const choice=(s,kind)=>{
         const f=s.wizard.completion.fields.label_mode;
         return one(s.ui.elements.filter(e=>e.wizard_combo?.kind===kind
@@ -39,7 +43,7 @@ export async function configureTextImportTitle(channel,title) {
         &&s.ui.elements.some(e=>e.wizard_combo?.field.scope==='node_title'&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===mode)});
       await channel.perform({condition:'Text Import title mode',initialObservation:state,ready:sameOwner,
         identity:s=>s.wizard.owner_context,resolve:s=>({verb:'select_wizard_option',ref:choice(s,'option').ref})});
-      state=await channel.observe({condition:'Text Import title mode readback',ready:s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode});
+      state=await channel.observe({condition:'Text Import title mode readback',ready:s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode&&captionReady(s)});
     }
     if(title.mode==='custom'&&state.wizard.completion.fields.label.value!==title.label){
       const labelReady=s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode;

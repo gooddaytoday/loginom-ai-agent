@@ -14,14 +14,14 @@ const binding={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:'
 // exhausted 500 ms in the controls stage. The page has real Chromium layout;
 // after focus each native geometry/style/hit-test read is charged a fixed
 // page-clock cost, as in storageScrollCostFixture.
-async function fixture(t,{fault,ms=0.25}={}) {
+async function fixture(t,{fault}={}) {
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
  t.after(()=>browser.close());
  const page=await browser.newPage({viewport:{width:1280,height:800}});
  await page.route('http://owner.test/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><body style="margin:0"></body>'}));
  await page.goto('http://owner.test/');
  const fields=Object.entries(EXPORT_FIELDS).filter(([,[card]])=>card==='ExportTextFileParamsWizard');
- await page.evaluate(({binding,root,base,fields,fault,ms})=>{
+ await page.evaluate(({binding,root,base,fields,fault})=>{
   const components=new Map();let ids=0;
   const add=(tag,parent,tid,style)=>{const e=document.createElement(tag);if(tid)e.dataset.tid=tid;e.id='ext-'+ids++;if(style)e.style.cssText=style;parent.append(e);return e;};
   const avatar=add('button',document.body,'MF;cntMain;tlbMainToolbar;btnAvatar');avatar.textContent='user';
@@ -63,7 +63,7 @@ async function fixture(t,{fault,ms=0.25}={}) {
   // Page clock: after focus, each native layout/style/hit-test read costs a
   // fixed amount. Counts are kept per kind for the measurement.
   const realNow=Date.now.bind(Date);let offset=0;Date.now=()=>realNow()+offset;
-  const cost=globalThis.ownerScanCost={charging:false,ms,reads:{},total:0};
+  const cost=globalThis.ownerScanCost={charging:false,ms:0.25,reads:{},total:0};
   const read=kind=>{if(!cost.charging)return;cost.reads[kind]=(cost.reads[kind]??0)+1;cost.total++;offset+=cost.ms;};
   const wrap=(target,key,kind)=>{const original=target[key];target[key]=function(...args){read(kind);return original.apply(this,args);};};
   wrap(Element.prototype,'getBoundingClientRect','box');wrap(globalThis,'getComputedStyle','style');wrap(Document.prototype,'elementFromPoint','hit');
@@ -77,7 +77,7 @@ async function fixture(t,{fault,ms=0.25}={}) {
    if(fault==='mask'){const mask=add('div',wizard,null,'position:absolute;left:900px;top:600px;width:120px;height:30px');mask.className='x-mask-msg';mask.textContent='Загрузка...';}
    if(fault==='owner')node.FGuid='foreign';
   });
- },{binding,root,base,fields,fault,ms});
+ },{binding,root,base,fields,fault});
  const execute=options=>runInNewContext(makeWorkspaceUiCode({expected_origin:'http://owner.test',expected_build:'7.4.2',prepared_node_context:binding,...options}))(page);
  const roots=await execute({mode:'observe',discover_roots:true});
  assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.error));
