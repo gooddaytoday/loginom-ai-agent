@@ -75,7 +75,7 @@ export function validateTreeJsonScope(text){
  };
  if(!root||typeof root!=='object'||Array.isArray(root)||numbers.has(root))throw Error('Tree stage 1 requires one JSON object');
  walk(root,0);if(!arrays.size)throw Error('Tree stage 1 requires one repeated object branch');
- if([...arrays.values()].some(witness=>!witness))throw Error('Tree stage 1 requires an object-array witness for each empty array path');
+ if([...arrays.values()].some(witness=>!witness))throw Error(arrays.size===1?'Tree stage 1 requires one nonempty repeated object branch':'Tree stage 1 requires an object-array witness for each empty array path');
  return {verified:true,node_count:nodes};
 }
 

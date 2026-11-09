@@ -154,6 +154,7 @@ test('JSON output admits nested object arrays while tree-to-table retains its on
 });
 
 test('JSON preflight admits empty record containers only with an object-array witness at the same schema path',async()=>{
+ assert.throws(()=>validateTreeJsonScope('{"items":[]}'),{message:'Tree stage 1 requires one nonempty repeated object branch'});
  const text=await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/fixtures/nested-records/empty.json',import.meta.url),'utf8');
  assert.equal(validateTreeJsonScope(text).verified,true);
  assert.equal((await jsonPreflight([text])).verified,true);
