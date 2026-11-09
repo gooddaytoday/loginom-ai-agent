@@ -428,3 +428,43 @@ Ambient proxy убраны только из окружения тестовых
 Новые сборки, installed CLI/реальный PTY, GUI, native Windows/macOS и внешний
 staging в этом исправлении не запускались. Исторические source/local artifact
 результаты выше относятся к указанным там SHA и сборкам.
+
+## Проверка шести дополнительных замечаний от 2026-11-09
+
+Проверена вершина `bf9c580e94`. План проверки независимо одобрен и сохранён в
+`docs/superpowers/plans/2026-11-09-cloud-review-validation.md`.
+Подтверждённых отклонений от действующего контракта не обнаружено.
+
+1. Disconnect в custom-карточке скрыт по дизайну двух карточек (§3).
+   Проверен путь custom → выбор cloud без Save → Disconnect → custom → discard.
+   Активный режим, baseline, generation/revision и custom credentials сохраняются,
+   облачный аккаунт отключается без check/save. Проверка controller прошла.
+2. Обновление пары при connected → connected не требует фонового restart.
+   KnowledgeSession проверяет cloud revision перед каждым catalog/read,
+   а после401 сам закрывает отказавший child и повторяет запрос в исходном budget.
+   Три recovery-теста и дополнительная HTTP-проверка уже готового Host прошли.
+   Получены один refresh, два initialize, успешный повтор read в прежнем поколении.
+3. При отказе удаления cloud.json disconnect возвращает LOGINOM_STORE_WRITE_FAILED
+   и запрещает cloud-вызовы в текущем Host. Файл остаётся на диске, после нового
+   Host connected снова true — это воспроизведённое последствие неудавшегося выхода.
+   Контракт Task7 явно требует сообщать ошибку удаления и не считать такой выход
+   долговечным. Проверены существующий тест и повторное открытие реального store.
+4. setGlobalProxyFromEnv имеется в закреплённом Node24.19.0 и Node24.15.0 внутри
+   локального Electron42.3.3. Проверены API и hash bundled Node. В runtime без API
+   при явно заданном proxy используется безопасный отказ, сохраняющий запрет
+   прямого обхода proxy. Пять native proxy-тестов прошли, включая NO_PROXY,
+   ALL_PROXY и недоступный proxy без direct fallback.
+5. dock_diagnostics соблюдает отдельный allowlist §5 — прежние безопасные поля
+   View плюс mode/server/help. cloud.connected в контракт этой проекции не входит.
+   Тест model-safe diagnostics прошёл, UI/controller suite дала35 PASS.
+6. unconfigured допускает обычный чат без Loginom. headless управляет браузерным
+   режимом и сохраняет этот путь. Дополнительная проверка через настоящий CLI/Host
+   и локальный model fixture дала ответ модели, exit0 и освобождение profile guard.
+   Automation при отсутствии generation по-прежнему завершается CONFIG_REQUIRED;
+   сохранённый cloud без входа обрабатывается отдельным connection-required gate.
+
+Изменения ограничены планом и этим отчётом, продуктовый код сохранён.
+Все временные проверки выполнялись в `$HOME/storage/tmp/`.
+Сбой первоначального временного headless probe был вызван абсолютным импортом
+пакета Effect, после исправления пути probe прошёл без изменения продукта.
+Полные установленные сборки, GUI и native Windows/macOS не запускались.
