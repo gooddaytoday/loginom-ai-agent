@@ -213,6 +213,18 @@ class RunCheckTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.csv_result({k: v for k, v in output.items() if k != 'header'}, stream.getvalue())
 
+    def test_csv_non_finite_real_matches_loginom_spelling_not_null_or_empty(self):
+        # v040-nan-exact: LAB-1314 actual-2.csv writes native NaN as "Nan".
+        output = dict(columns=[dict(name='Q', type='real', tolerance=dict(abs=1e-12, rel=1e-12))], rows=[dict(Q={'non_finite': 'NaN'})])
+        for text in ['Nan', 'NaN', 'nan']:
+            self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
+        for text in ['""', '?', '0', 'Inf']:
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(dict(output, rows=[dict(Q=None)]), 'Q\nNan\n', null_marker='?')
+        self.csv_result(dict(output, rows=[dict(Q={'non_finite': '-Infinity'})]), 'Q\n-Inf\n', null_marker='?')
+
     def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
         output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
                       rows=[dict(A=1, B=1), dict(A=2, B=3)])

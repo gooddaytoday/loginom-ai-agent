@@ -23,7 +23,7 @@ const execution={anyOf:[object({status:values('not_requested','pending','complet
  object({status:values('failed'),execution_id:str,failure_verified:{type:'boolean',const:true},root_id:str,group_id:str,group_record_id:str})]};
 const receipt=object({phase,receipt_id:str,status:values('pending','verified','not_requested'),effect_possible:bool});
 const legacyCell=object({type:str,is_null:bool,value:{type:['string','number','boolean','null']},decimal:str,
- representation:str,precision:{type:'string',pattern:'^(?!exact_native$)'},display_text:str,timezone:str},['type','is_null','precision']);
+ representation:str,precision:{type:'string',pattern:'^(?!exact_native$)'},display_text:str,timezone:str,non_finite:values('NaN','Infinity','-Infinity')},['type','is_null','precision']);
 const cell={anyOf:[legacyCell,nativeCellSchema]};
 const column=object({index:integer,name:str,label:str,type:str,header_tid:str,data_kind:str},['index','name','label','type'],true);
 const port=object({...nativePortProperties,port:integer,port_guid:str,fresh:bool,freshness_basis:str,execution_id:str,
@@ -33,7 +33,7 @@ const port=object({...nativePortProperties,port:integer,port_guid:str,fresh:bool
  ['port','port_guid','fresh','execution_id','schema','row_count','sample','sample_rows','sample_complete','precision'],true);
 const treeSchemaNode=object({index:integer,parent:nullable(integer),path:str,name:str,label:str,type:str,is_container:bool,is_array:bool,children:array(integer)});
 const treeInstance=object({index:integer,parent:nullable(integer),schema_index:integer,path:str,type:str,children:array(integer),
- is_null:bool,value:{type:['string','number','boolean','null']},precision:str,representation:str,decimal:str,timezone:str},['index','parent','schema_index','path','type']);
+ is_null:bool,value:{type:['string','number','boolean','null']},precision:str,representation:str,decimal:str,timezone:str,non_finite:values('NaN','Infinity','-Infinity')},['index','parent','schema_index','path','type']);
 const treePort=object({port:integer,port_guid:str,port_kind:values('tree'),fresh:bool,freshness_basis:values('completed_execution_port_source'),execution_id:str,
  tree:object({schema:{...array(treeSchemaNode),minItems:1,maxItems:256},instances:{...array(treeInstance),minItems:1,maxItems:256},
  complete:{const:true},node_count:{type:'integer',minimum:1,maximum:256},max_depth:{type:'integer',minimum:0,maximum:16},
