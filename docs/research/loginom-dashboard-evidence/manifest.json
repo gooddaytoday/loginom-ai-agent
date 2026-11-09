@@ -1,0 +1,28 @@
+{
+  "purpose": "temporary isolated Loginom dashboard research",
+  "master_commit": "fe412e7de97270adba53238f1f792d85174a4b26",
+  "gitlab_project_id": 77,
+  "pipeline_id": 204732,
+  "job_id": 1358774,
+  "job_name": "build_staging",
+  "version": "7.5.0-alpha+build.4732",
+  "artifact_sha256": "2b97bd51f43d7c92f4525241d758c2aecc09a82036314e9a4750d44f007d83ce",
+  "server_binary_sha256": "0ee04429c1004cb1a3f12914f0f876c4d410e75ce416e3161f9ef2ef1705fa57",
+  "server_base_image": "loginom-server-master:latest@sha256:3c342e9f8cd95020d31dec5ce83da863c93fa84794ff74a71a46a967082f21f4",
+  "dependency_libraries_source": "$HOME/git/integration/ci/common/install-linux/configs/server/libs",
+  "studio_base_image": "httpd:2.4-alpine",
+  "server_container": "dashboard-research-20261103-server",
+  "studio_container": "dashboard-research-20261103-studio",
+  "network": "dashboard-research-20261103-net",
+  "subnet": "10.254.76.0/28",
+  "urls": {
+    "minified": "http://127.0.0.1:32808/app/?testable=true",
+    "debug": "http://127.0.0.1:32808/app-debug/?testable=true"
+  },
+  "verification": {
+    "http_both": 200,
+    "websocket_both": 101,
+    "mounts_both": []
+  },
+  "credentials": "Unchanged official test accounts from artifact Dist/Server/config/Users.cfg; no remote .env was read. API token read internally from existing authorized integration/e2e token file; never printed."
+}

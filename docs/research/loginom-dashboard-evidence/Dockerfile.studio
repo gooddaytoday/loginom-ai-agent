@@ -1,0 +1,6 @@
+FROM httpd:2.4-alpine
+COPY artifacts/Dist/Client/config/ /usr/local/apache2/conf/
+COPY artifacts/Dist/Client/client/ /usr/local/apache2/htdocs/client/
+COPY artifacts/Dist/ClientDebug/client/ /usr/local/apache2/htdocs/client-debug/
+COPY httpd-research.conf /usr/local/apache2/conf/extra/research.conf
+RUN echo "Include conf/extra/research.conf" >> /usr/local/apache2/conf/httpd.conf
