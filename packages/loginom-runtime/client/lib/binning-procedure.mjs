@@ -37,7 +37,7 @@ async function chooseMethod(channel,baseline,index,code){
  const owner=s.node_binning.method_editor.root_tid+';cbx';
  await channel.perform({condition:'open binning method choices',initialObservation:s,ready:s=>binningReady(s)&&editing(s),identity:()=>record,
   resolve:s=>({verb:'click',ref:one(s,e=>e.tid===owner+';trg_picker'&&e.allowed_actions.includes('click'),'method picker required').ref})});
- const label={0:'<Не определён>',2:'Ширина',3:'Количество',4:'Плитка'}[code];need(label,'unsupported method');
+ const label={0:'<Не определён>',2:'Ширина',3:'Количество',4:'Плитка',5:'Коэффициенты СКО'}[code];need(label,'unsupported method');
  s=await observeBinning(channel,'observed native binning method option',s=>editing(s)&&s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
  await channel.perform({condition:'select native binning method',initialObservation:s,ready:s=>binningReady(s)&&editing(s),identity:()=>record,
   resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'unique method option required').ref})});
@@ -60,7 +60,7 @@ async function chooseMethod(channel,baseline,index,code){
 }
 export async function inspectBinningSettings(channel,baseline,index){
  let s=await selectBinningField(channel,baseline,index);const record=s.node_binning.selected;
- need([2,3,4].includes(record.method_code)&&!record.automatic,'saved model requires a supported fixed numeric method');
+ need([2,3,4,5].includes(record.method_code)&&!record.automatic,'saved model requires a supported fixed numeric method');
  if(!s.node_binning.frame){
   await channel.perform({condition:'expand settings of exact binning field',initialObservation:s,ready:binningReady,identity:()=>record,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';MethodSettingsWizard-1;btnEditMethodSettings'&&e.allowed_actions.includes('click'),'native field settings expander required').ref})});
@@ -81,7 +81,7 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
  const index=fields.findIndex(f=>f.name===field.name),wanted=parameters.binning;
  if(!applying&&!manual){
   for(const f of baseline.fields)if(f.index!==index&&f.method_code!==0)await chooseMethod(channel,baseline,f.index,0);
-  await chooseMethod(channel,baseline,index,{count:3,width:2,frequency:4}[wanted.method]);
+  await chooseMethod(channel,baseline,index,{count:3,width:2,frequency:4,sd:5}[wanted.method]);
  }
  s=await inspectBinningSettings(channel,baseline,index);
  if(manual){
@@ -122,11 +122,19 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
  };
  if(!applying&&!manual){
   const sizeKey={count:'cbbCountBins;ValueControl',width:'edtBinWidth;ValueControl',frequency:'cbbTileCount;ValueControl'}[wanted.method];
-  for(const [key,value] of [[sizeKey,wanted.size],...(wanted.method==='frequency'?[]:[['chkStrictLowerLimit',true],['chkStrictUpperLimit',true],['edtLowerLimit',wanted.limits[0]],['edtUpperLimit',wanted.limits[1]]]),['chkRoundingLevel',false],['chkLowerLimitOpen;ValueControl',false],['chkUpperLimitOpen;ValueControl',false],...(wanted.method==='frequency'?[['chkSummTile;ValueControl',false]]:[])]){
+  for(const [key,value] of [...(sizeKey?[[sizeKey,wanted.size]]:[]),...(['frequency','sd'].includes(wanted.method)?[]:[['chkStrictLowerLimit',wanted.limits!==undefined],['chkStrictUpperLimit',wanted.limits!==undefined],...(wanted.limits?[['edtLowerLimit',wanted.limits[0]],['edtUpperLimit',wanted.limits[1]]]:[])]),['chkRoundingLevel',false],['chkLowerLimitOpen;ValueControl',wanted.method==='sd'],['chkUpperLimitOpen;ValueControl',wanted.method==='sd'],...(wanted.method==='frequency'?[['chkSummTile;ValueControl',false]]:[])]){
    if(s.node_binning.frame.values[key]===value)continue;
    if(typeof value==='boolean')await act(key,{verb:'set_checked',checked:value});
    else {await act(key,{verb:'fill',text:String(value)});await act(key,{verb:'press',key:'Tab'});}
    need(s.node_binning.frame.values[key]===value,'binning control readback differs: '+key);
+  }
+  if(wanted.method==='sd'&&s.node_binning.settings.sd_coefficient!==wanted.sd_coefficient){
+   const key='cbbSDBinsMode;ValueControl',owner=s.node_binning.frame.controls[key],label='+/- '+wanted.sd_coefficient+' СКО';
+   await act(key,{verb:'click'});
+   s=await observeBinning(channel,'native SD coefficient option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
+   await channel.perform({condition:'choose requested SD coefficient',initialObservation:s,ready:binningReady,identity:()=>field,
+    resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'requested SD option required').ref})});
+   s=await observeBinning(channel,'requested SD coefficient readback');
   }
   if(wanted.method==='frequency'&&s.node_binning.settings.ties!==(wanted.ties??'next')){
    const label=wanted.ties==='current'?'Сохранять в текущем':'Добавлять в следующий';
@@ -138,12 +146,13 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
   }
  }
  const c=s.node_binning,q=c.settings;
- need(q&&['count','width','frequency'].includes(q.method)&&Number.isFinite(q.size)&&q.size>0&&!q.rounding&&!q.lower_open&&!q.upper_open&&c.frame.switches.length===0,'supported fixed nonrounded closed settings required');
- need(q.method==='frequency'?['next','current'].includes(q.ties)&&q.sums===false:q.strict_lower&&q.strict_upper&&q.limits.every(v=>field.type==='datetime'?typeof v==='string':Number.isFinite(v))&&q.limits[0]<q.limits[1],'explicit limits or row-frequency next policy required');
- if(!applying&&!manual)need(q.method===wanted.method&&q.size===wanted.size&&same(q.limits,wanted.limits??null)&&(q.method!=='frequency'||q.ties===(wanted.ties??'next')),'final settings differ');
+ need(q&&['count','width','frequency','sd'].includes(q.method)&&!q.rounding&&c.frame.switches.length===0,'supported fixed nonrounded settings required');
+ need(q.method==='sd'?field.type!=='datetime'&&q.size===null&&[1,2,3].includes(q.sd_coefficient)&&q.lower_open&&q.upper_open:Number.isFinite(q.size)&&q.size>0&&!q.lower_open&&!q.upper_open,'valid size and closed ends, or numeric SD with both open tails required');
+ need(q.method==='frequency'?['next','current'].includes(q.ties)&&q.sums===false:q.method==='sd'?q.limits===null:q.strict_lower&&q.strict_upper&&Array.isArray(q.limits)&&q.limits.every(v=>field.type==='datetime'?typeof v==='string':Number.isFinite(v))&&q.limits[0]<q.limits[1]||!q.strict_lower&&!q.strict_upper&&q.limits===null&&field.type!=='datetime','explicit typed limits, numeric automatic limits, SD or row-frequency policy required');
+ if(!applying&&!manual)need(q.method===wanted.method&&q.size===(wanted.size??null)&&same(q.limits,wanted.limits??null)&&(q.method!=='frequency'||q.ties===(wanted.ties??'next'))&&(q.method!=='sd'||q.sd_coefficient===wanted.sd_coefficient),'final settings differ');
  need(c.fields.filter(f=>f.method_code!==0).length===1,'only one binned field allowed');
- const configuration={...c,mode:request.mode,field:field.name,type:field.type,method:q.method,size:q.size,limits:q.limits,
-  fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),rounding:false,open_ends:false,ties:q.method==='frequency'?q.ties:null,...(manual?{manual_edits:true}:{})};
+ const configuration={...c,mode:request.mode,field:field.name,type:field.type,method:q.method,size:q.size,limits:q.limits,sd_coefficient:q.sd_coefficient??null,
+  fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),rounding:false,open_ends:q.method==='sd',ties:q.method==='frequency'?q.ties:null,...(manual?{manual_edits:true}:{})};
  if(applying){
   if(c.state!=='materialized'||!c.intervals.length){
    const closed=await closePreparedWizard(channel);throw binningApplyRefusal('saved intervals are absent; use internal to train current input',closed,'configure');

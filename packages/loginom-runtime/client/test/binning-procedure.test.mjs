@@ -5,7 +5,7 @@ import {validateBinningParameters} from '../lib/binning-parameters.mjs';
 
 async function methodSelection({method='count',replaceEditor=false,closeEditor=false}={}){
  const base='W;MethodSettingsWizard-1',editor=base+';grdColumns;tbl;celleditor',calls=[];
- const code=method==='width'?2:3,label=method==='width'?'Ширина':'Количество',sizeKey=method==='width'?'edtBinWidth;ValueControl':'cbbCountBins;ValueControl';
+ const code={width:2,count:3,sd:5}[method],label={width:'Ширина',count:'Количество',sd:'Коэффициенты СКО'}[method],sizeKey=method==='width'?'edtBinWidth;ValueControl':'cbbCountBins;ValueControl';
  let replacementTicks=0,replacementPending=false;
  const field={index:0,record_id:'record-X',label:'X',type:'real',method_code:0,bins_count:0,automatic:false};
  const c={verified:true,binding_ready:true,fields:[field],selected:field,method_editor:null,frame:null,settings:null,intervals:[],state:'settings'};
@@ -36,6 +36,10 @@ async function methodSelection({method='count',replaceEditor=false,closeEditor=f
     c.frame={record_id:field.record_id,switches:[],controls:{},values:{}};
     c.settings={method,size:2,limits:[0,20],strict_lower:true,strict_upper:true,rounding:false,lower_open:false,upper_open:false};
     Object.assign(c.frame.values,{[sizeKey]:2,chkStrictLowerLimit:true,chkStrictUpperLimit:true,edtLowerLimit:0,edtUpperLimit:20,chkRoundingLevel:false,'chkLowerLimitOpen;ValueControl':false,'chkUpperLimitOpen;ValueControl':false});
+    if(method==='sd'){
+     Object.assign(c.settings,{size:null,limits:null,sd_coefficient:1,lower_open:true,upper_open:true});
+     Object.assign(c.frame.values,{'chkLowerLimitOpen;ValueControl':true,'chkUpperLimitOpen;ValueControl':true});
+    }
     if(replaceEditor){s.ui.elements=[];replacementPending=true;}
    }else if(a.verb==='press'){
     assert.equal(a.ref,replaceEditor?'new-owned-input':'owned-input');assert.equal(a.key,'Enter');c.method_editor=null;
@@ -44,13 +48,18 @@ async function methodSelection({method='count',replaceEditor=false,closeEditor=f
    else assert.fail('Unexpected action '+JSON.stringify(a));
   },
  };
- const result=await configureBinning(channel,{binning:{field:'X',method,size:2,limits:[0,20]}},{request:{mode:'internal'},inputMapping:{target_fields:[{name:'X',label:'X',type:'real'}]}});
+ const result=await configureBinning(channel,{binning:{field:'X',method,...(method==='sd'?{sd_coefficient:1}:{size:2,limits:[0,20]})}},{request:{mode:'internal'},inputMapping:{target_fields:[{name:'X',label:'X',type:'real'}]}});
  return {result,calls,replacementTicks};
 }
 test('native method selection commits its still-open owned CellEditor before advancing',async()=>{
  const {result,calls}=await methodSelection();
  assert.equal(result.verified,true);assert.deepEqual(calls.filter(a=>a.verb==='press'),[{verb:'press',ref:'owned-input',key:'Enter'}]);
  assert.deepEqual(calls.filter(a=>a.verb==='wizard_step').map(a=>a.expected_stage),['output_mapping','binning_ranges_mapping','done']);
+});
+test('SD chooses its native method and returns its observed coefficient and both open tails',async()=>{
+ const {result}=await methodSelection({method:'sd'});
+ assert.equal(result.configuration.method,'sd');assert.equal(result.configuration.sd_coefficient,1);
+ assert.equal(result.configuration.size,null);assert.equal(result.configuration.open_ends,true);
 });
 test('Width waits through an absent input and delayed DOM replacement, then binds the fresh owned input',async()=>{
  const {result,calls,replacementTicks}=await methodSelection({method:'width',replaceEditor:true});
@@ -162,4 +171,51 @@ test('frequency current selects the owned native option and returns observed cur
 test('frequency current refuses stale next readback before accepting the wizard',async()=>{
  const f=await frequencyCurrent({stale:true});await assert.rejects(f.run(),/final settings differ/);
  assert.equal(f.calls.some(a=>a.verb==='wizard_step'),false);
+});
+
+async function automaticMode(method,{stale=false,manual=false}={}){
+ const sd=method==='sd',field={index:0,record_id:'X',label:'X',type:'real',method_code:sd?5:3,bins_count:manual?2:0,automatic:false},calls=[];
+ const values={chkStrictLowerLimit:true,chkStrictUpperLimit:true,edtLowerLimit:0,edtUpperLimit:20,'cbbCountBins;ValueControl':2,
+  'cbbSDBinsMode;ValueControl':1,chkRoundingLevel:false,'chkLowerLimitOpen;ValueControl':false,'chkUpperLimitOpen;ValueControl':false};
+ const c={verified:true,binding_ready:true,fields:[field],selected:field,state:manual?'materialized':'settings',
+  intervals:manual?[{lower:-3,upper:1,lower_included:false,upper_included:false,label:'Low'},{lower:1,upper:15,lower_included:true,upper_included:false,label:'High'}]:[],
+  frame:{record_id:'X',switches:[],values,controls:Object.fromEntries(Object.keys(values).map(k=>[k,'MethodSettingFrame;'+k]))},
+  settings:{method,size:sd?null:2,limits:sd?null:[0,20],sd_coefficient:2,strict_lower:true,strict_upper:true,rounding:false,lower_open:false,upper_open:false}};
+ if(manual)Object.assign(c.settings,{sd_coefficient:1,lower_open:true,upper_open:true});
+ const elements=()=>[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},...Object.keys(values).map(k=>({tid:'MethodSettingFrame;'+k+(typeof values[k]==='boolean'?';DisplayEl':''),ref:k,allowed_actions:[typeof values[k]==='boolean'?'set_checked':'click']}))];
+ const s={wizard:{root_tid:'W',stage:'binning'},node_binning:c,ui:{elements:elements()}};
+ const channel={observe:async o=>{assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
+  assert.ok(o.ready(s));const a=o.resolve(s);calls.push(a);
+  if(a.verb==='set_checked'){
+   values[a.ref]=a.checked;
+   const k={chkStrictLowerLimit:'strict_lower',chkStrictUpperLimit:'strict_upper','chkLowerLimitOpen;ValueControl':'lower_open','chkUpperLimitOpen;ValueControl':'upper_open'}[a.ref];
+   c.settings[k]=a.checked;
+   if(!sd&&!c.settings.strict_lower&&!c.settings.strict_upper)c.settings.limits=null;
+  }else if(a.ref==='cbbSDBinsMode;ValueControl')s.ui.elements=[{tid:'MethodSettingFrame;cbbSDBinsMode;ValueControl;boundlist;one',ref:'sd-one',label:'+/- 1 СКО',allowed_actions:['click']},
+   {tid:'foreign;boundlist;one',ref:'foreign',label:'+/- 1 СКО',allowed_actions:['click']}];
+  else if(a.ref==='sd-one'){if(!stale){c.settings.sd_coefficient=1;values['cbbSDBinsMode;ValueControl']=0;}s.ui.elements=elements();}
+  else if(a.verb==='wizard_step')s.wizard.stage=a.expected_stage;
+  else assert.fail('unexpected automatic mode action '+JSON.stringify(a));
+ }};
+ const wanted=manual?{field:'X',method:'manual',intervals:c.intervals.map(b=>({...b}))}:{field:'X',method,...(sd?{sd_coefficient:1}:{size:2})};
+ return {calls,run:()=>configureBinning(channel,{binning:wanted},{request:{mode:'internal'},[manual?'preconfiguration':'inputMapping']:{target_fields:[{name:'X',label:'X',type:'real'}]}})};
+}
+test('auto turns off both previously explicit limits without writing disabled boundary inputs',async()=>{
+ const f=await automaticMode('count'),r=await f.run();assert.equal(r.configuration.limits,null);
+ assert.deepEqual(f.calls.filter(a=>a.verb==='set_checked').map(a=>[a.ref,a.checked]),[['chkStrictLowerLimit',false],['chkStrictUpperLimit',false]]);
+});
+test('SD selects the owned ±1 option from native default ±2 and opens both tails',async()=>{
+ const f=await automaticMode('sd'),r=await f.run();assert.equal(r.configuration.sd_coefficient,1);
+ assert.deepEqual(f.calls.filter(a=>a.verb==='click').map(a=>a.ref),['cbbSDBinsMode;ValueControl','sd-one']);
+ assert.equal(r.configuration.open_ends,true);
+});
+test('SD refuses a stale coefficient before accepting settings',async()=>{
+ const f=await automaticMode('sd',{stale:true});await assert.rejects(f.run(),/final settings differ/);
+ assert.equal(f.calls.some(a=>a.verb==='wizard_step'),false);
+});
+test('manual preserves saved SD open tails and false outer inclusion without selecting a method',async()=>{
+ const f=await automaticMode('sd',{manual:true}),r=await f.run();
+ assert.equal(r.configuration.manual_edits,true);assert.equal(r.configuration.state,'materialized');
+ assert.equal(r.configuration.intervals[0].lower_included,false);assert.equal(r.configuration.intervals.at(-1).upper_included,false);
+ assert.deepEqual(f.calls.map(a=>a.verb),['wizard_step','wizard_step','wizard_step']);
 });

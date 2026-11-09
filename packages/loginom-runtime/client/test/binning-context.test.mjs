@@ -18,18 +18,29 @@ function fixture(){
  const controller=Object.assign(new MethodSettingsWizard(),{FView:{},FGrdColumns:grid,FInputColumnStore:store,FBinItemsStore:binStore,FBinsReloading:false,FWizardForm:{FView:w},FViewedColumnRecord:records[1],FMethodSettingFrames:{}});
  view['@@TestCmpController']=controller;Object.assign(components,{[root.id]:view,[wizard.id]:w,[gridElement.id]:grid,[binElement.id]:binGrid});
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
- const frequency=ties=>{
-  records[1].data.MethodType=4;
+ const settings=(method,extra)=>{
+  records[1].data.MethodType=method;
   const frame=element('MethodSettingFrame',root);frame.getAttribute=()=> 'MethodSettingFrame';frame.querySelectorAll=()=>[];
   const values={'chkLowerLimitOpen;ValueControl':false,'chkUpperLimitOpen;ValueControl':false,chkRoundingLevel:false,
-   'cbbTileCount;ValueControl':2,'cbbMatchingObservationsMode;ValueControl':ties,'chkSummTile;ValueControl':false};
+   ...extra};
   for(const [key,value] of Object.entries(values)){
    const e=element('MethodSettingFrame;'+key,frame);components[e.id]={el:{dom:e},getValue:()=>value};
   }
   controller.FMethodSettingFrames={frequency:{FInputColumnRecord:records[1],FOwner:controller,FView:{el:{dom:frame}}}};
  };
- return {controller,store,binStore,records,bins,selection,grid,w,frequency,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readBinningBrowser.toString()+')('+JSON.stringify(prefix)+')',context)))};
+ return {controller,store,binStore,records,bins,selection,grid,w,
+  frequency:ties=>settings(4,{'cbbTileCount;ValueControl':2,'cbbMatchingObservationsMode;ValueControl':ties,'chkSummTile;ValueControl':false}),
+  sd:code=>settings(5,{'cbbSDBinsMode;ValueControl':code,'chkLowerLimitOpen;ValueControl':true,'chkUpperLimitOpen;ValueControl':true}),
+  read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readBinningBrowser.toString()+')('+JSON.stringify(prefix)+')',context)))};
 }
+test('SD reads native zero-based coefficient and retains observed false open-tail inclusion',()=>{
+ const f=fixture();f.sd(0);f.bins[0].data.BoundModes=0;f.bins[1].data.BoundModes=1;
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.settings.method,'sd');
+ assert.equal(r.settings.sd_coefficient,1);assert.equal(r.settings.limits,null);
+ assert.equal(r.settings.lower_open,true);assert.equal(r.settings.upper_open,true);
+ assert.equal(r.intervals[0].lower_included,false);assert.equal(r.intervals[1].upper_included,false);
+ for(const code of [1,2]){const f=fixture();f.sd(code);assert.equal(f.read().settings.sd_coefficient,code+1);}
+});
 test('native frequency tie code 1 reads back current without falling back to next',()=>{
  const f=fixture();f.frequency(1);const r=f.read();
  assert.equal(r.verified,true);assert.equal(r.settings.method,'frequency');assert.equal(r.settings.ties,'current');
