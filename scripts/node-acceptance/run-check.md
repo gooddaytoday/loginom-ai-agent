@@ -19,6 +19,16 @@ production checkpoints verify Spearman followed by Kendall tau-b on the same
 node, tied values, exact native types/field order and abs=1e-8/rel=1e-10.
 Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
 
+`tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
+`trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
+and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks
+the unchanged `cases.{null,nested,empty}.proposed_tree_output` directly, including
+full schema, field and instance order, native types and NULL distinct from empty
+string, false and zero. A production tree read, Save, cold reexecution without
+settings changes and cleanup are required. No export/CSV is requested or passed
+to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
+the model; oracle and expected remain private.
+
 Run live acceptance without repeatedly reading live logs:
 
 `reform-cache` uses `field-parameters/acceptance/v040/task-cache.md`, reform.csv
