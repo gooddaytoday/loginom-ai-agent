@@ -1,6 +1,8 @@
+import {validateBooleanBinding} from './variable-binding-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 export function validateSortingParameters(p,mode,r){
+ validateBooleanBinding(p,r);
  need(mode==='keys','Sorting supports keys mode');
  need(p&&typeof p==='object'&&!Array.isArray(p),'Invalid parameters.parameters: sorting settings must be an object');
  const extra=Object.keys(p).find(k=>!['keys','compare_with_locale','max_threads'].includes(k));

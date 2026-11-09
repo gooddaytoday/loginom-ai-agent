@@ -7,11 +7,12 @@ export async function configureColUnion(channel,p,{request,inputMappings}){
  let s=await observe('complete positional union settings');const before=s.node_col_union;
  if(request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:before,draft_edits_skipped:true};
  need(before.binding_ready,'saved determining input is not configured');
- need(inputMappings?.length===2&&inputMappings.every((m,port)=>m.port===port&&m.native_mapping?.verified
-  &&m.native_mapping.node_context?.input_port?.port_guid===before.sources[port].port_guid),'both input port identities required');
+ need([2,3].includes(inputMappings?.length)&&inputMappings.length===before.sources.length&&inputMappings.every((m,port)=>m.port===port&&m.native_mapping?.verified
+  &&m.native_mapping.node_context?.input_port?.port_guid===before.sources[port].port_guid),'all input port identities required');
  const input_fields=inputMappings.map(m=>m.native_mapping.target_fields);
  validateColUnionSchemas(request,input_fields);
  const wanted=resolveColUnionParameters(p,before.settings),changes=[];
+ need(wanted.determining_input!=='third'||before.sources.length===3,'Third determining input requires input 2');
  const one=(s,predicate)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,'exact control unavailable');return es[0];};
  const labels={padding:{null:'Не дополнять',repeat:'Повторять набор данных',last:'Дополнять последней строчкой'},row_count:{minimum:'Минимальному набору',maximum:'Максимальному набору',input:'Определяется набором'}};
  for(const key of ['padding','row_count']){
@@ -26,7 +27,7 @@ export async function configureColUnion(channel,p,{request,inputMappings}){
   need(same(s.node_col_union.sources,before.sources),'input identities changed');
  }
  if(wanted.row_count==='input'&&s.node_col_union.settings.determining_input!==wanted.determining_input){
-  const index=wanted.determining_input==='main'?0:1,tid=s.wizard.root_tid+';ColUnionDataWizard;colDisplayText_'+index;
+  const index=['main','attached','third'].indexOf(wanted.determining_input),tid=s.wizard.root_tid+';ColUnionDataWizard;colDisplayText_'+index;
   await channel.perform({condition:'select determining input by verified port GUID',initialObservation:s,ready:colUnionReady,identity:()=>({node:before.node_context,source:before.sources[index]}),
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===tid&&e.allowed_actions.includes('click')).ref})});
   s=await channel.observe({condition:'determining input applied',readColUnion:true,ready:s=>colUnionReady(s)&&s.node_col_union.binding_ready&&s.node_col_union.settings.determining_input===wanted.determining_input});changes.push('determining_input');

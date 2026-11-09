@@ -27,7 +27,26 @@ the native FileName field. Full typed output, exact field order, CSV, Save,
 cold reexecution without configuration and cleanup use the stock checks.
 Only task and CSV inputs reach the model.
 
+`tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
+`trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
+and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks
+the unchanged `cases.{null,nested,empty}.proposed_tree_output` directly, including
+full schema, field and instance order, native types and NULL distinct from empty
+string, false and zero. A production tree read, Save, cold reexecution without
+settings changes and cleanup are required. No export/CSV is requested or passed
+to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
+the model; oracle and expected remain private.
+
 Run live acceptance without repeatedly reading live logs:
+
+`reform-cache` uses `field-parameters/acceptance/v040/task-cache.md`, reform.csv
+and independent expected-cache.json (one export). Production readbacks prove
+disabled → on_activation → on_access → selected_fields executions on one node,
+unchanged complete typed data, A=on_activation, B=on_access and other fields
+disabled. Cold reads both saved cache levels and cancels without reapplying,
+then stock execution/CSV/Save/cleanup checks apply. Settings codes are pinned in
+oracle.py and expected-cache-settings.json from the initial UI observation.
+Only the approved business task and CSV reach the model.
 
 `import-bindings` uses the approved `variables/bindings/acceptance/task-import.md`
 and both original CSVs. Three exports check the initial file, source-only CsvPath
@@ -74,6 +93,12 @@ typed matcher checks full production receipts before and after the same Import
 and Quality update. Five final CSVs retain explicit port order 0…4; Save/cold
 reexecutes the saved node without configuration. Only Moda/variant uses the
 bounded native decoder; ordinary scalar reading and other node limits are unchanged.
+
+`quality-types` uses the approved `research-quality/acceptance/task-types.md`
+and only `fixtures/types.csv`. The single-round Quality audit and stock typed
+matcher check all five outputs, Boolean Moda, datetime, discrete numeric fields,
+field order and NULL. Five CSVs, Save, cold without configuration and cleanup
+remain required; `oracle-types.py` and `expected-types.json` stay private.
 
 `lgd-import`, `lgd-properties`, `lgd-corrupt`, `lgd-export` используют
 утверждённые задания LGD и бинарные fixtures этапа 0. Ожидания `expected-*-run.json`
@@ -651,6 +676,14 @@ K=2, без вращения. Оба порта: 8 строк факторов �
 `factor_signs` в expected разрешает один общий знак на фактор в обоих портах;
 main использует typed matcher, CSV сверяется с его знаком, cold — тем же matcher.
 Без этого поля сравнение остаётся прежним. CSV/Save/cold/cleanup обязательны.
+`assnrules-consequents`: train.csv из fixtures/v040, support 50%, confidence 60%,
+max_items=3, max_consequents=2, min_lift=0 → 1.2 с явным Teach того же узла.
+Четыре CSV в порядке портов 0/1 обоих расчётов; Fraction-oracle генерирует
+expected-consequents.json, cold сверяется с двумя итоговыми портами из
+expected-consequents-cold.json. Нативный порядок A0/C0/A1/C1, RuleID и NULL
+связаны reader до прогонов; модели передаются только task и train.csv.
+Save, cold без настройки и cleanup обязательны.
+
 `assnrules-basic` и `assnrules-length`: частые наборы и правила FP-Growth,
 поддержка 50%, достоверность 60%, max_items=2; вход Transaction/Item.
 Источник — `datamining-assnrules/acceptance` и `length/`; два CSV, Save,
@@ -736,6 +769,12 @@ current C1 acceptance uses linreg-forward-f and pre-effect R² refusal tests.
 Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.json, оба typed
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
+
+`linreg-coefficients`: C7, Enter с `linear_regression.statistics:"full"`,
+утверждённые task-coefficients.md, design.csv и expected/coefficients.json.
+Порт 1 — девять native-столбцов (Name…Y_upperBound), NULL сохраняются;
+метки только у Name/Y_coefficients, остальные `label_any`. CSV прогнозов,
+Save, cold без перенастройки и Teach, cleanup.
 
 
 
@@ -840,6 +879,14 @@ Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1
 146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
 Модель получает только task и modes.csv; oracle остаётся в оснастке.
 
+`binning-auto` и `binning-sd` используют task-auto.md/task-sd.md и только
+fixtures/numeric-modes.csv; expected_name=modes/expected-auto.json либо
+modes/expected-sd.json, два экспорта. Auto — count=2 без ручных пределов;
+SD — ±1 СКО с открытыми хвостами, без округления. Метки меняются на том же
+обученном узле без повторного Train. Оба полных порта, точные типы/порядок,
+CSV, Save, cold без перенастройки и cleanup проверяются штатно.
+Oracle и expected остаются вне модельного контекста.
+
 `replace-keep-variant` — task-result-keep.md и независимый expected-result-keep.json
 на том же input.csv: Status выходит Variant, совпавшая ячейка — логическая true,
 прочие сохраняют строковый подтип и NULL, Status_Replaced только у совпадений;
@@ -870,6 +917,15 @@ immutable `preprocessing-smoothing/acceptance/modes` expected tables. Only
 `fixtures/wavelet.csv` reaches the model. Depth 1/2, exact RowID,X,Tag,X_S order,
 real X_S (abs 1e-8, rel 1e-10), CSV, Save, cold reexecution and cleanup apply.
 
+`outlier-replacement-mean`, `outlier-replacement-median` и
+`outlier-replacement-most-probable` используют утверждённые `task-replacement-*.md`
+и только `fixtures/replacement-discriminator.csv` узла preprocessing-elimoutlier.
+`outlier-quartile-boundaries` использует `task-quartile-boundaries.md` и только
+`fixtures/quartile-boundaries.csv`. Неизменённые expected/oracle остаются вне
+workspace модели. Штатные проверки сверяют все значения, типы и порядок
+полей портов 0/1/2, три CSV, Save, cold без перенастройки и cleanup.
+Регрессии detect: `outlier-sd`, `outlier-iqr`.
+
 `variant-reader-collapse` — task-collapse.md + mixed.csv общего Variant reader;
 expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Values
 сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
@@ -881,3 +937,9 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
 передаётся модели. Все 8 строк, RowID,X,Tag,X_S, real abs 1e-8 / rel 1e-10,
 CSV, Save, cold без перенастройки и cleanup; CDF сохраняется без order.
+
+`colunion-third-repeat`: утверждённый `transform-coluniondata/acceptance/v040/task-third.md`,
+три CSV из `acceptance/v040/fixtures`, maximum/repeat, полный mapping семи полей.
+Stock CSV, Save, cold без перенастройки существующего узла и cleanup.
+Oracle/expected остаются вне контекста модели. Регрессия: `colunion-edit`,
+`colunion-repeat`, `union-auto-match`.

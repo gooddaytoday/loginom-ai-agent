@@ -28,6 +28,13 @@ test('complete bound native store yields SD/IQR controls and separate field part
  assert.equal(fixture(f=>{f.radios[0]=false;f.radios[1]=true;}).settings.method,'iqr');
  assert.equal(fixture(f=>{f.selection[0]=f.fields[0];f.values.pedDetectOSko=null;}).settings,null);
 });
+test('native replacement codes are read independently for outliers and extremes',()=>{
+ for(const [out,policy] of [[1,'keep'],[3,'mean'],[4,'median'],[5,'most_probable']])for(const [extr,extreme] of [[1,'keep'],[3,'mean'],[4,'median'],[5,'most_probable']]){
+  const s=fixture(f=>{f.values.pedActionOut=out;f.values.pedActionExtr=extr;});
+  assert.equal(s.settings.outlier_policy,policy);assert.equal(s.settings.extreme_policy,extreme);
+ }
+ for(const code of [2,6,7])assert.equal(fixture(f=>f.values.pedActionExtr=code).settings.extreme_policy,'unsupported');
+});
 test('context refuses partial/filtered/loading cache, duplicate identity, ambiguous selection and invalid controls',()=>{
  for(const change of [f=>f.store.getCount=()=>99,f=>f.store.isLoading=()=>true,f=>f.store.getData=()=>({items:f.fields,getSource:()=>({items:[]})}),f=>f.fields[0].data.Name='X',f=>f.fields[0].internalId='f1',f=>f.selection.push(f.fields[0]),f=>f.radios[1]=true,f=>f.values.pedDetectOSko=Infinity,f=>f.values.pedUseQuality=null,f=>f.fields[0].data.ChkUsable=1,f=>f.components.get('grdColumnsSettings').el.dom={}])assert.equal(fixture(change).verified,false);
  assert.equal(fixture(f=>f.components.get('pedOrderedSample;SwitchButton').pressed=true).switches.pedOrderedSample,true);
@@ -48,7 +55,7 @@ test('field selection starts with no selected row and binds the chosen record be
  const result=await selectElimOutlierField({observe:async o=>{assert.equal(o.ready(state),true);return structuredClone(state);},perform:async o=>{assert.deepEqual(o.resolve(state),{verb:'click',ref:'x'});state.node_elim_outlier.selected=field;clicks++;}},baseline,'X');
  assert.equal(clicks,1);assert.equal(result.node_elim_outlier.selected.record_id,field.record_id);
 });
-for(const method of ['sd','iqr'])test('native '+method+' controls use the observed radio display and policy input',async()=>{
+for(const [mode,policies] of [['detect',{}],['edit',{outlier_policy:'mean',extreme_policy:'median'}],['edit',{outlier_policy:'most_probable',extreme_policy:'keep'}],['edit',{outlier_policy:'mean'}],['edit',{extreme_policy:'mean'}]])for(const method of ['sd','iqr'])test('native '+mode+' '+method+' '+JSON.stringify(policies)+' controls use independent policy inputs',async()=>{
  // Native failures: lab552-3-sd/main-1-execution-events.jsonl:453,455;
  // lab552-3-iqr/main-1-execution-events.jsonl:416,418; unused Note retains
  // X's controls: lab552-4-sd/main-1-execution-events.jsonl:458,512,514.
@@ -56,9 +63,11 @@ for(const method of ['sd','iqr'])test('native '+method+' controls use the observ
  const ignored=baseline.fields[2],settings=baseline.settings;
  baseline.fields=[field,ignored];baseline.values.pedActionOut=7;baseline.values.pedActionExtr=7;
  baseline.settings.outlier_policy='unsupported';baseline.settings.extreme_policy='unsupported';
+ for(const [key,name] of [['pedActionOut','outlier_policy'],['pedActionExtr','extreme_policy']])if(mode==='edit'&&!Object.hasOwn(policies,name)){baseline.values[key]=4;baseline.settings[name]='median';}
  const input=key=>({ref:key,tid:null,identity:{anchor_tid:base+key+';ValueControl',path:[1,0,0,0]},allowed_actions:['click']});
  const controls=[...baseline.fields.map(f=>({ref:'select:'+f.name,elim_outlier_cell:{record_id:f.record_id,part:'field'},allowed_actions:['click']})),input('pedActionOut'),input('pedActionExtr'),{ref:'iqr',tid:base+'pedModeOE;ValueControl;radiofield-1;DisplayEl',allowed_actions:['click']},{ref:'next',tid:root+';btnNext',allowed_actions:['wizard_step']}];
  const state={wizard:{stage:'elim_outlier',root_tid:root},node_elim_outlier:baseline,ui:{elements:controls}};
+ const wanted={outlier_policy:mode==='edit'&&!Object.hasOwn(policies,'outlier_policy')?'median':'keep',extreme_policy:mode==='edit'&&!Object.hasOwn(policies,'extreme_policy')?'median':'keep',...policies},native={keep:[1,'Оставить без изменения'],mean:[3,'Заменять средним'],median:[4,'Заменять медианой'],most_probable:[5,'Заменять наиболее вероятным']};
  const chosen=[];
  const channel={observe:async o=>{assert.equal(o.ready(state),true,o.condition);return structuredClone(state);},perform:async o=>{
   const a=o.resolve(state);
@@ -66,13 +75,13 @@ for(const method of ['sd','iqr'])test('native '+method+' controls use the observ
   if(a.ref.startsWith('select:')){baseline.selected=baseline.fields.find(f=>f.name===a.ref.slice(7));baseline.settings=baseline.selected.used?settings:null;return;}
   assert.equal(baseline.selected.name,'X','unused Note must never receive parameter edits');
   if(a.ref==='iqr'){assert.equal(a.verb,'click');baseline.settings.method='iqr';baseline.settings.outlier_factor=baseline.values.pedDetectOKvartil;baseline.settings.extreme_factor=baseline.values.pedDetectEKvartil;return;}
-  const key=a.ref.replace(':keep','');assert.ok(['pedActionOut','pedActionExtr'].includes(key));assert.equal(a.verb,'click');
-  if(a.ref===key){state.ui.elements=[...controls,{ref:key+':keep',tid:base+key+';ValueControl;boundlist;Оставить_без_изменения',label:'Оставить без изменения',allowed_actions:['click']}];return;}
-  chosen.push(key);baseline.values[key]=1;baseline.settings[key==='pedActionOut'?'outlier_policy':'extreme_policy']='keep';state.ui.elements=controls;
+  const key=a.ref.replace(':option',''),name=key==='pedActionOut'?'outlier_policy':'extreme_policy';assert.ok(['pedActionOut','pedActionExtr'].includes(key));assert.equal(a.verb,'click');
+  if(a.ref===key){state.ui.elements=[...controls,{ref:key+':option',tid:base+key+';ValueControl;boundlist;'+native[wanted[name]][1].replaceAll(' ','_'),label:native[wanted[name]][1],allowed_actions:['click']}];return;}
+  chosen.push(key);baseline.values[key]=native[wanted[name]][0];baseline.settings[name]=wanted[name];state.ui.elements=controls;
  }};
- const result=await configureElimOutlier(channel,{outlier:{fields:['X'],method,outlier_factor:method==='sd'?1:1.5,extreme_factor:3}},{inputMapping:{verified:true,inventory_complete:true,target_fields:baseline.fields}});
- assert.deepEqual(chosen,['pedActionOut','pedActionExtr']);assert.equal(result.validation.status,'accepted_by_loginom_next');
- assert.equal(result.configuration.field_settings[0].settings.outlier_policy,'keep');assert.equal(result.configuration.field_settings[0].settings.extreme_policy,'keep');
+ const result=await configureElimOutlier(channel,{outlier:{fields:['X'],method,outlier_factor:method==='sd'?1:1.5,extreme_factor:3,...policies}},{request:{mode},inputMapping:{verified:true,inventory_complete:true,target_fields:baseline.fields}});
+ assert.deepEqual(chosen,['pedActionOut','pedActionExtr'].filter(key=>mode==='detect'||Object.hasOwn(policies,key==='pedActionOut'?'outlier_policy':'extreme_policy')));assert.equal(result.validation.status,'accepted_by_loginom_next');
+ assert.equal(result.configuration.field_settings[0].settings.outlier_policy,wanted.outlier_policy);assert.equal(result.configuration.field_settings[0].settings.extreme_policy,wanted.extreme_policy);
  assert.equal(result.configuration.field_settings[0].settings.method,method);
  assert.deepEqual(result.configuration.field_settings[1],{name:'Note',used:false,settings:null});
 });

@@ -14,10 +14,10 @@ import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
 
-export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor}){
+export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor,handler}){
  const {operation,execute,onRecord,now,receiptOptions}=options;
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
- const unchangedImport=isUnchangedTextImportExecution(request),unchangedTransform=isUnchangedTransformExecution(request);
+ const unchangedImport=isUnchangedTextImportExecution(request),unchangedTransform=isUnchangedTransformExecution(request,handler);
  const unchanged=unchangedImport||unchangedTransform;
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
   node_id:request.target.ref.node_id,operation_id:operation.id,ui_epoch:Date.now()}:null;

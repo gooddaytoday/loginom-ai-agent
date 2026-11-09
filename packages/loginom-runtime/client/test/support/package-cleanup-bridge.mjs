@@ -48,6 +48,14 @@ class ExternalClient {
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
       if(this.f.failedDraft)value={...value,reason:'NATIVE_MESSAGE_BOX_BLOCKED',created_draft:true};
+      if(this.f.drafts){
+        // Browser receipt semantics of prepareWorkspace: a known operation ID
+        // replays its own draft, an unknown one creates another package tab.
+        const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1)),known=this.f.drafts.has(o.operationId);
+        if(!known)this.f.drafts.set(o.operationId,'own-tab'+(this.f.drafts.size?'-'+(this.f.drafts.size+1):''));
+        value={...value,operation_id:o.operationId,session_id:'own-session',replayed:known,package_ref:{path:null,persisted:false},
+          workflow_ref:{...value.workflow_ref,tab_tid:this.f.drafts.get(o.operationId)}};
+      }
     }
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
@@ -73,6 +81,9 @@ class ExternalClient {
       if(this.f.scenario==='foreign-account')value.account='foreign';
       if(this.f.scenario==='discard-receipt')value.unsaved_changes_discarded=true;
       if(['mutated-after-save','opened-dirty','draft-dirty'].includes(this.f.scenario))value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'UNSAVED_CHANGES'};
+      // Mirrors the native close guard (package-cleanup.mjs: PackageNodes.Count !== 1).
+      if(this.f.drafts&&this.f.drafts.size!==1)value={...value,status:'BLOCKED',package_closed:false,logged_out:false,
+        packages_before:this.f.drafts.size,packages_after:this.f.drafts.size,reason:'PACKAGE_INVENTORY_CHANGED'};
     } else throw Error('Unexpected browser code');
     return {content:[{type:'text',text:JSON.stringify(value)}]};
   }
@@ -648,6 +659,41 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     }
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
+
+// LAB-1216 s4: the first dock_prepare reply was refused by USER_RESPONSE_BUDGET
+// after its draft existed; the model retried with a new operation_id.
+test('refused prepare reply: a new-ID retry reuses the same draft and cleanup closes it',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-refused-prepare-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:'draft-clean',events:[],busy:false,saves:0,path:null,receipts:new Map(),catalog,drafts:new Map()};
+  // Substitute an oversized first reply: these entries exceed the user-v1 wire budget.
+  let oversized=true;
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>oversized?Array.from({length:128},(_,i)=>({artifact_id:'input-'+i,name:'x'.repeat(400)+'.csv'})):[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'refused-prepare',version:'1'});
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    const refused=await client.callTool({name:'dock_prepare',arguments:{intent:'new_draft'}});
+    assert.equal(refused.isError,true);
+    assert.equal(JSON.parse(refused.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+    assert.equal(f.drafts.size,1);
+    oversized=false;
+    const retried=await client.callTool({name:'dock_prepare',arguments:{intent:'new_draft',operation_id:'prepare-branches'}});
+    assert.notEqual(retried.isError,true,retried.content[0].text);
+    const delivered=JSON.parse(retried.content[0].text);
+    assert.equal(delivered.prepared,true);
+    assert.equal(f.drafts.size,1,'the retry must not create a second draft');
+    assert.equal(delivered.workspace.workflow_ref.tab_tid,'own-tab');
+    const result=await bridge.close();
+    assert.equal(result.package_cleanup.status,'SUCCEEDED',JSON.stringify(result.package_cleanup));
+    assert.equal(result.package_cleanup.package_closed,true);assert.equal(result.package_cleanup.logged_out,true);
+    assert.equal(result.package_cleanup.policy,'unsaved_draft');
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
 
 for(const dirty of [false,true])test('SIGINT shutdown waits for admitted prepare and protects dirty draft: '+dirty,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-interrupt-'));

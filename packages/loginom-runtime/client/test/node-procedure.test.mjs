@@ -4,6 +4,21 @@ import { createNodeProcedure } from '../lib/node-procedure.mjs';
 import { validateTextImportRequest } from '../lib/text-import-procedure.mjs';
 import { readOutputDefinitionPages } from '../lib/import-definition-pages.mjs';
 
+test('Reform numbered cache dropdown remains a bounded owned portal',async()=>{
+ for(const suffix of ['', '-1']){
+  const base='MF;TF-1;WizrdMCF',state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},dom_epoch:{document:'doc'},scan:{complete:true},
+   wizard:{status:'observed',stage:'field_parameters',root_tid:base,root_ref:'wizard'},
+   ui:{elements:[{tid:base+';ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl;boundlist'+suffix,ref:'choices'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+  let clock=1;const roots=[];
+  const channel=createNodeProcedure({operation:{id:'cache',action:{action_key:'node.apply',revision:'1'},deadline:10000,checkpoint:{document_id:'doc',workflow_ref:state.workflow_ref}},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>clock++,record:async e=>structuredClone(e),execute:async code=>{
+    if(!code.includes('"discover_roots":true'))roots.push(/"root_ref":"([^"]+)"/.exec(code)?.[1]);
+    return {status:'SUCCEEDED',output:structuredClone(state)};
+   }});
+  await channel.observe({condition:'cache portal',ready:()=>true});assert.deepEqual(roots,['choices']);
+ }
+});
+
 test('input definition rediscovery retains its native owner and original deadline without gestures',async()=>{
  for(const fault of [null,'root','stage','port','node','dialog','expired']) {
   let time=1,mutations=0;

@@ -13,7 +13,7 @@ const request={target:{kind:'new'},inputs:[{input:0}],mappings:[],read:{ports:[0
 test('detect contract is registered with three outputs and its own parameter namespace',()=>{
  assert.equal(NODE_TYPES['preprocessing.elim_outlier'].tabular_outputs,3);
  const support=createCandidateNodeSupport({});
- assert.deepEqual(support.nodeApplyHandlers.get('preprocessing.elim_outlier').modes,['detect']);
+ assert.deepEqual(support.nodeApplyHandlers.get('preprocessing.elim_outlier').modes,['detect','edit']);
  const schema=nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema;
  assert.ok(schema.properties.target.properties.type.enum.includes('preprocessing.elim_outlier'));
  assert.ok(schema.properties.mode.enum.includes('detect'));
