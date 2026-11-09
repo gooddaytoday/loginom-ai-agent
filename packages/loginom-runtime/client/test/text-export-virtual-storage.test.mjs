@@ -79,6 +79,13 @@ for(const code of ['UI_SCAN_LIMIT','UI_SCROLL_NOT_CONFIRMED'])for(const fault of
   const result=await run();assert.equal(result.artifact_id,'artifact');assert.equal(retained,true);
   const completed=records.findIndex(e=>e.phase==='export_file_step_completed'&&e.outcome.status==='AMBIGUOUS');assert.ok(completed>=0);
   assert.ok(reads.filter(t=>t.root_ref===ref('MF;TF-2;FileStorageForm;pnlFileStorage;tbl')).length>=3);
- }else{await assert.rejects(run());assert.equal(downloaded,false);assert.equal(retained,false);}
+ }else{
+  // The public refusal is generic after a restored navigation; its journal
+  // keeps the allowlisted cause, so pin both instead of accepting any rejection.
+  await assert.rejects(run(),{document:/Export observation document changed/,mask:/Export file read did not return to its workflow/}[fault]??/downloading was not confirmed/);
+  const failure=records.find(e=>e.phase==='export_file_read_refused_restored')?.proof.failure;
+  if(!['document','mask'].includes(fault))assert.deepEqual(failure,{step:'storage_navigation',code:null,kind:'Error',reason:['unclean','other_code'].includes(fault)?'Export storage gesture requires inspection':null});
+  assert.equal(downloaded,false);assert.equal(retained,false);
+ }
  assert.equal(gestures.filter(a=>a.verb==='scroll').length,1);
 });
