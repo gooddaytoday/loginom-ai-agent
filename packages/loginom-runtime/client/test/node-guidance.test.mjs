@@ -22,6 +22,10 @@ test('each supported regression selection mode delivers complete import and outp
   assert.doesNotMatch(description.guidance,/как в forward выше/,mode);
   assert.match(description.guidance,new RegExp('mode:"'+mode+'"'),mode);
  }
+ const [enter]=await loader.describeNodes([card],['enter']);
+ assert.match(enter.guidance,/`mode:"enter"`, `linear_regression:\{statistics:"full"\}`/);
+ assert.match(enter.guidance,/read\.ports:\[0,1\]/);
+ assert.match(enter.guidance,/CSV прогнозов — `exports\.text` от порта 0/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/datamining.lin_regression.md')))<=6000);
 });
 

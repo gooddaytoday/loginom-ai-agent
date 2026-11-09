@@ -525,6 +525,11 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance/penalty/task-lasso.md',
                     data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
                     expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
+    if name == 'linreg-coefficients':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance/modes/task-coefficients.md',
+                    data=node / 'fixtures/modes', input_files=['design.csv'], base=None,
+                    expected_name='expected/coefficients.json', linreg_forward=True)
     if name in ['linreg-forward-f', 'linreg-forward-r2', 'linreg-forward-r2-cutoffs', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge']:
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         variant = 'forward-r2' if name == 'linreg-forward-r2-cutoffs' else name.removeprefix('linreg-')

@@ -4,9 +4,13 @@ export function validateLinRegressionParameters(p,mode,r){
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','linear_regression'].includes(k)),'use input_fields and target_field');
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(n=>typeof n==='string'&&n.length>0&&n.length<=128),'input_fields must list continuous numeric predictors by their technical names');
  need(typeof p.target_field==='string'&&p.target_field.length>0&&p.target_field.length<=128,'target_field must name one continuous numeric response');
+ if(p.linear_regression?.statistics!==undefined)need(mode==='enter','linear_regression.statistics is supported only in mode enter; '+mode+' has no full coefficient statistics. Refused before any Loginom change');
  if(mode==='ridge')need(p.linear_regression&&typeof p.linear_regression==='object'&&!Array.isArray(p.linear_regression)&&Object.keys(p.linear_regression).length===1&&Number.isFinite(p.linear_regression.lambda_l2)&&p.linear_regression.lambda_l2>=0,'ridge requires linear_regression:{lambda_l2:nonnegative finite number}; no automatic setup, selection or bindings');
  if(mode==='lasso')need(p.linear_regression&&typeof p.linear_regression==='object'&&!Array.isArray(p.linear_regression)&&Object.keys(p.linear_regression).length===1&&Number.isFinite(p.linear_regression.lambda_l1)&&p.linear_regression.lambda_l1>=0,'lasso requires linear_regression:{lambda_l1:nonnegative finite number}; no automatic setup, selection or bindings');
- if(p.linear_regression!==undefined&&mode!=='ridge'&&mode!=='lasso'){
+ if(p.linear_regression!==undefined&&mode==='enter'){
+  const settings=p.linear_regression;
+  need(settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).length===1&&['coefficients','full'].includes(settings.statistics),'enter accepts only linear_regression:{statistics:"coefficients"|"full"}; linear_regression.selection is supported only in forward/backward/stepwise');
+ }else if(p.linear_regression!==undefined&&mode!=='ridge'&&mode!=='lasso'){
   const settings=p.linear_regression;
   need(['forward','backward','stepwise'].includes(mode)&&settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).every(k=>k==='selection'),'linear_regression.selection is supported only in forward/backward/stepwise');
   const selection=settings.selection;
