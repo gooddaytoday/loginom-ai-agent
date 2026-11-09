@@ -4251,7 +4251,7 @@ function readRenderedInputMapping(observation) {
             ||fresh.active_tab_ref!==before.active_tab_ref||!same(fresh.package_identity,before.package_identity)
             ||fresh.observation_root?.ref!==before.observation_root.ref||fresh.file_storage?.status!=='observed'
             ||fresh.file_storage.directory!==before.file_storage.directory||fresh.ui.dialogs.length||fresh.ui.masks.length
-            ||!fresh.ui.elements.some(e=>e.scroll?.ref===moved.owner_ref&&e.scroll.top===moved.to&&e.scroll.max_top===scroll.scroll.max_top))
+            ||!fresh.ui.elements.some(e=>e.scroll?.ref===moved.owner_ref&&e.scroll.top===moved.to&&e.scroll.max_top>=moved.to))
             fail('UI_SCROLL_NOT_CONFIRMED','File-list context or scroll owner changed after its completed scroll');
         }
         if(consoleMenu){
