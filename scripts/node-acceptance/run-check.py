@@ -1101,14 +1101,16 @@ def check_text_export_encodings(replies, destinations):
 
 def export_null_marker(events, destination):
     # Requests identify the exact export file. Existing-node patches can retain
-    # omitted settings, so only their correlated final UI readback is authoritative.
+    # omitted settings, so only the final UI readback of the same nonempty
+    # operation_id is authoritative.
     readbacks = {}
     def collect(value):
         if isinstance(value, dict):
             configuration = value.get('configuration', {})
             if (value.get('status') == 'SUCCEEDED' and configuration.get('status') == 'applied'
-                    and configuration.get('readback', {}).get('kind') == 'text_export'):
-                readbacks[value.get('operation_id')] = configuration['readback']
+                    and configuration.get('readback', {}).get('kind') == 'text_export'
+                    and value.get('operation_id')):
+                readbacks[value['operation_id']] = configuration['readback']
             for item in value.values(): collect(item)
         if isinstance(value, list):
             for item in value: collect(item)
@@ -1145,7 +1147,7 @@ def export_null_marker(events, destination):
             settings = readback.get('settings', {})
             found = readback.get('destination') == destination and 'null_marker' in settings
             marker, node = settings.get('null_marker'), readback.get('node', node)
-    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or correlated patch readback required for ' + str(destination)
+    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or a SUCCEEDED readback with the same operation_id required for ' + str(destination)
     assert isinstance(marker, str) and marker in ['', '?', 'null', 'NULL'], 'CSV_NULL_MARKER_UNSUPPORTED'
     return marker
 

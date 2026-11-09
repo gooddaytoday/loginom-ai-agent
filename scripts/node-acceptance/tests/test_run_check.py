@@ -2539,4 +2539,23 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         for name in ['binning-auto', 'binning-sd']:
             self.assertEqual(runner.scenario(name)['oracle'].name, 'oracle.py')
 
+    def test_export_patch_readback_requires_the_same_nonempty_operation_id(self):
+        def events(request_id='export', readback_id='export', status='SUCCEEDED'):
+            batch = self.export_events(kind='existing', readback='NULL')
+            request = batch[0][1]['part']['state']['input']
+            request['parameters'] = dict(destination='/test/all.csv')
+            if request_id is None: del request['operation_id']
+            outcome = json.loads(batch[1][1]['part']['state']['output'])
+            outcome['status'] = status
+            if readback_id is None: del outcome['operation_id']
+            else: outcome['operation_id'] = readback_id
+            batch[1][1]['part']['state']['output'] = json.dumps(outcome)
+            return batch
+        self.assertEqual(runner.export_null_marker(events(), '/test/all.csv'), 'NULL')
+        for label, batch in [('both without operation_id', events(None, None)),
+                             ('foreign operation_id', events(readback_id='unrelated')),
+                             ('unsuccessful readback', events(status='FAILED'))]:
+            with self.subTest(label), self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING: .*same operation_id'):
+                runner.export_null_marker(batch, '/test/all.csv')
+
 if __name__ == '__main__': unittest.main()
