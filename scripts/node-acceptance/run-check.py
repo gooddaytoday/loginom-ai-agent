@@ -474,6 +474,14 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance' / ('task-wavelet-depth2.md' if depth2 else 'task-wavelet.md'),
                     data=node / 'fixtures', input_files=['wavelet.csv'], export_count=1, base=None,
                     expected_name='expected-depth2.json' if depth2 else 'expected.json')
+    if name in ['smoothing-db2', 'smoothing-db2-depth2', 'smoothing-coif1', 'smoothing-cdf97', 'smoothing-db2-zero', 'smoothing-cdf97-reflect']:
+        node = REPO / 'docs/node-development/nodes/preprocessing-smoothing'
+        variant = {'smoothing-db2': 'db2-symmetric', 'smoothing-db2-depth2': 'db2-depth2',
+                   'smoothing-coif1': 'coif1-symmetric', 'smoothing-cdf97': 'cdf97-symmetric',
+                   'smoothing-db2-zero': 'db2-zero', 'smoothing-cdf97-reflect': 'cdf97-reflect'}[name]
+        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance' / ('task-' + variant + '.md'),
+                    data=node / 'fixtures', input_files=['wavelet.csv'], export_count=1, base=None,
+                    expected_name='expected-' + variant + '.json')
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
