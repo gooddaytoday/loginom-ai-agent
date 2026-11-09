@@ -4668,10 +4668,12 @@ function readRenderedInputMapping(observation) {
             if(['expression_parameter','output_column','reform_column','import_format','export_format'].includes(before.wizard_field.scope)) {
               if(!await first.evaluate(element=>document.activeElement===element))fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
               if(exportCombo) {
-                const list=page.locator('[data-tid='+JSON.stringify(exportCombo.tid.replace(/;trg_picker$/,';boundlist'))+']');
-                if(await list.isVisible()) {
+                // Loginom may keep a hidden stale list with the same test ID.
+                const list=page.locator('[data-tid='+JSON.stringify(exportCombo.tid.replace(/;trg_picker$/,';boundlist'))+']').filter({visible:true});
+                if(await list.count()) {
                   await first.press('Escape',{timeout:timeout()});
-                  if(await list.isVisible() || !await first.evaluate(element=>document.activeElement===element))
+                  if(await list.count())fail('WIZARD_FIELD_CHANGED','Wizard field list stayed open before edit completion');
+                  if(!await first.evaluate(element=>document.activeElement===element))
                     fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
                 }
               }
