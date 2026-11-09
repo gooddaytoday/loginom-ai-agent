@@ -1280,7 +1280,9 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
             except (ValueError, InvalidOperation, OverflowError): return False
         if col['type'] == 'real' and isinstance(target, dict):
             # v040-nan-exact: expected {"non_finite": ...}; Loginom writes NaN as "Nan".
-            spelled = {'NaN': ['nan'], 'Infinity': ['inf', 'infinity', '+inf', '+infinity'], '-Infinity': ['-inf', '-infinity']}
+            # Infinity spellings are unobserved, so they fail closed like the
+            # exact Table reader (table-output-values.mjs).
+            spelled = {'NaN': ['nan']}
             return set(target) == {'non_finite'} and value.strip().lower() in spelled.get(target['non_finite'], [])
         if col['type'] == 'variant':
             return isinstance(target, dict) and set(target) == {'cell_type', 'value'} and equal(value, dict(col, type=target['cell_type']), target['value'])

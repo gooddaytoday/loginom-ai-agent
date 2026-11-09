@@ -223,7 +223,15 @@ class RunCheckTests(unittest.TestCase):
                 self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
         with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
             self.csv_result(dict(output, rows=[dict(Q=None)]), 'Q\nNan\n', null_marker='?')
-        self.csv_result(dict(output, rows=[dict(Q={'non_finite': '-Infinity'})]), 'Q\n-Inf\n', null_marker='?')
+
+    def test_csv_non_finite_infinity_spellings_are_unobserved_and_fail_closed(self):
+        # Only NaN's CSV spelling was observed (LAB-1314); like the exact Table
+        # reader, unobserved infinity spellings are not accepted.
+        for goal, texts in [('Infinity', ['Inf', 'inf', 'Infinity', '+Inf', '+Infinity']), ('-Infinity', ['-Inf', '-inf', '-Infinity'])]:
+            output = dict(columns=[dict(name='Q', type='real')], rows=[dict(Q={'non_finite': goal})])
+            for text in texts:
+                with self.subTest(goal=goal, text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                    self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
 
     def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
         output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
