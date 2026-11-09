@@ -22,8 +22,8 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
  if(configuration.statistics==='full')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
   ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
  // Native autosync regenerates pass-through fields in role order after cold
- // activation. Pin only LASSO's approved prediction layout before training.
- if(configuration.mode==='lasso'){
+ // activation. Pin the approved LASSO/Elastic Net prediction layout before training.
+ if(['lasso','elastic'].includes(configuration.mode)){
   await channel.openOutputPort(0);
   const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
   let state=await observe('complete LASSO prediction mapping');const expected=linRegressionOutputColumns(configuration,0);

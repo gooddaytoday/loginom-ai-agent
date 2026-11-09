@@ -23,6 +23,15 @@ test('positional readback proves all three mappings and refuses a missing third 
  f.phases[0].value.ports.pop();assert.throws(()=>colUnionConfigurationReadback(f));
 });
 
+test('determining readback requires a supported selector bound to an existing input',()=>{
+ for(const [count,selector] of [[3,undefined],[3,null],[3,'fourth'],[2,'third']]){
+  const f=fixture(count);f.phases[1].value.configuration.settings={row_count:'input',padding:'null',determining_input:selector};
+  assert.throws(()=>colUnionConfigurationReadback(f),/determining input/);
+ }
+ const f=fixture(3);f.phases[1].value.configuration.settings={row_count:'input',padding:'null',determining_input:'third'};
+ assert.deepEqual(colUnionConfigurationReadback(f).settings,{row_count:'input',padding:'null',determining_input:'third'});
+});
+
 test('production result schema accepts third-port readback and its determining selector',()=>{
  const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
  const readback=colUnionConfigurationReadback(fixture(3));readback.settings={row_count:'input',padding:'repeat',determining_input:'third'};
