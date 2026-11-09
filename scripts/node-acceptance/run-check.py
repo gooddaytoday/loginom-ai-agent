@@ -158,6 +158,11 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name='modes/expected-run.json', variable_only=True, variable_audit='variables-totable-switch',
                     variable_initial='modes/expected-phases.json', variable_read_path='port',
                     oracle=REPO / 'scripts/node-acceptance/variables-totable-switch.mjs')
+    if name == 'quality-types':
+        node = REPO / 'docs/node-development/nodes/research-quality'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-types.md', data=node / 'fixtures', base=None,
+                    input_files=['types.csv'], export_count=5, expected_name='expected-types.json',
+                    oracle=node / 'acceptance/oracle-types.py')
     if name in ['quality-default', 'quality-spikes']:
         src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
         case = src / 'probe' if name == 'quality-spikes' else src
@@ -1794,11 +1799,13 @@ class Runner:
             write(folder / 'corr-ranks-events.json', evidence)
             self.phase('corr-ranks-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/corr-ranks.mjs',
                 src / 'expected.json', folder / 'corr-ranks-events.json', *(['discrete'] if spec['corr_ranks']=='discrete' else [])], folder, timeout=60)
-        if case in ['quality-default', 'quality-spikes']:
+        if case in ['quality-default', 'quality-spikes', 'quality-types']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'quality-events.json', evidence)
-            self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs', src / spec['quality_initial_name'], src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
+            self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs',
+                *([src / spec['quality_initial_name']] if spec.get('quality_initial_name') else ['--single']),
+                src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
         if case == 'import-bindings':
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
