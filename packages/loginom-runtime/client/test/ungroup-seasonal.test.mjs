@@ -1,4 +1,5 @@
-import test from 'node:test';import assert from 'node:assert/strict';
+import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';
+import {readUngroupBrowser} from '../lib/ungroup-context.mjs';
 import {configureUngroup,configureUngroupSeasonality,supportedUngroupConfiguration} from '../lib/ungroup-procedure.mjs';
 const root='MF;TF;WizrdMCF',page=root+';UngroupDataWizard;';
 const fields=[[['Group','string',6],['Period','datetime',8],['Total','integer',7]],[['Group','string',6],['Period','datetime',8],['Item','string',4],['Weight','integer',9]]]
@@ -31,4 +32,31 @@ test('seasonality page is only observed when it matches and edits one owned nume
  assert.deepEqual(changed.seasonality,{period:'year',multiplier:1,index_count:12,rare_density:0.25,absent_periods:1,novelty_periods:1,max_history_periods:0});
  actions.length=0;const kept=await configureUngroupSeasonality(channel,null);assert.equal(kept.effect_possible,false);assert.deepEqual(actions,[]);
  values.pedSeasonalityPeriod=2;await assert.rejects(configureUngroupSeasonality(channel,null),/only year/);
+});
+// LAB-1385: reopened seasonal node keeps raw balance=proportional in a disabled editor.
+function savedSeasonal(balanceDisabled){
+ const all=[],cs={},base=root+';UngroupDataWizard';
+ const el=(tid,parent=null)=>{const e={id:'e'+all.length,tid,parent,checkVisibility:()=>true,contains(x){return x===this||!!x.parent&&this.contains(x.parent)}};all.push(e);return e;};
+ const wizard=el(root),page0=el(base,wizard),form={},add=(k,v)=>{const e=el(base+';'+k,page0);cs[e.id]={el:{dom:e},...v};};
+ const records=fields.map((fs,port)=>fs.map(f=>({isModel:true,internalId:f.record_id,data:{Name:f.name,DisplayName:f.name,DataType:{string:5,datetime:2,integer:4}[f.type],UsageType:f.usage,Index:f.index,LinkIndex:f.usage===6?0:-1,LinkName:'',GroupField:''}})));
+ const stores=records.map(items=>({$className:'Ext.data.Store',getProxy:()=>({$className:'bg.ext.CollectionProxy'}),getData:()=>({items}),getCount:()=>items.length,getTotalCount:()=>items.length}));
+ for(const [i,k] of ['grdUngroupColumns','grdSupportColumns'].entries())add(k,{getStore:()=>stores[i],getSelectionModel:()=>({getSelection:()=>[]})});
+ for(const k of ['txtUngroupFilterField','txtSupportFilterField'])add(k,{getValue:()=>''});
+ cs[page0.id]={el:{dom:page0},'@@TestCmpController':{constructor:{name:'UngroupDataWizard'},FWizardForm:form,FColumnsStore:stores[0],FSupportColumnsStore:stores[1],FMissingLinks:false}};cs[wizard.id]={el:{dom:wizard},Controller:form};
+ for(const [k,v] of Object.entries({pedUngroupMethod:2,pedRoundFormat:0,pedRoundParam:0,pedBalanceMethod:2})){
+  add(k,{isDisabled:()=>k==='pedBalanceMethod'&&balanceDisabled,Controller:{FLastViewMode:0,FLastValue:v,FLastVariable:null,FInitializing:false}});add(k+';ValueControl',{getValue:()=>v});}
+ return vm.runInNewContext('('+readUngroupBrowser.toString()+')('+JSON.stringify('MF;TF')+')',{Ext:{getCmp:id=>cs[id]},document:{querySelectorAll:q=>all.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}});
+}
+test('reopened seasonal node: disabled balance is not applied policy; enabled balance is still checked',async()=>{
+ const run=async(c,p)=>{const actions=[],picker=page+'pedBalanceMethod;ValueControl;trg_picker';
+  const s={wizard:{stage:'ungroup',root_tid:root},node_ungroup:c,ui:{elements:[{tid:picker,ref:picker,allowed_actions:c.balance_native?.disabled?[]:['click']}]}};
+  const channel={observe:async o=>{assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{actions.push(o.resolve(s).ref);}};
+  const r=await configureUngroup(channel,p,{request:{mode:'seasonal',finish:'execute'}});return {r,actions};};
+ const disabled=JSON.parse(JSON.stringify(savedSeasonal(true)));
+ assert.equal(disabled.method,'seasonal');assert.equal(disabled.ungroup.balance,'none');assert.deepEqual(disabled.balance_native,{value:'proportional',disabled:true});
+ for(const p of [{},{ungroup:u,seasonality:season}]){const {r,actions}=await run(structuredClone(disabled),p);assert.equal(r.verified,true);assert.deepEqual(actions,[]);assert.equal(r.effect_possible,false);}
+ const enabled=JSON.parse(JSON.stringify(savedSeasonal(false)));
+ assert.equal(enabled.ungroup.balance,'proportional');assert.deepEqual(enabled.balance_native,{value:'proportional',disabled:false});
+ await assert.rejects(run(structuredClone(enabled),{}),/rounding\/balance unsupported/);
+ await assert.rejects(run(structuredClone(enabled),{ungroup:u,seasonality:season}),/ungroup option visible|ready/);
 });

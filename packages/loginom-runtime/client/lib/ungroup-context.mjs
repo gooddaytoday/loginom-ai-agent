@@ -63,10 +63,16 @@ export function readUngroupBrowser(prefix){
    ||(key==='pedUngroupMethod'?![0,1,2].includes(value):key==='pedRoundFormat'?![0,1,2].includes(value):key==='pedBalanceMethod'?![0,1,2,3].includes(value):value<0||value>2147483647))return fail('ungroup_option_or_variable');
   values[key]=value;
  }
+ // Native seasonal disables the balance editor but keeps its raw value: report
+ // that value separately; the applied policy is none only for seasonal+disabled.
+ const balanceDisabled=cmp('pedBalanceMethod')?.isDisabled?.();
+ if(typeof balanceDisabled!=='boolean')return fail('ungroup_option_or_variable');
+ const balance=['none','last','proportional','equal'][values.pedBalanceMethod];
  const selected=fields.map((_,i)=>{const rs=cmp(i?'grdSupportColumns':'grdUngroupColumns').getSelectionModel?.()?.getSelection?.();return Array.isArray(rs)&&rs.every(r=>records[i].includes(r))?rs.map(r=>String(r.internalId)):null;});
  if(selected.some(s=>!s))return fail('ungroup_selection');
  const roles=(port,usage)=>fields[port].filter(f=>f.usage===usage).map(f=>f.name);
  const rounding={format:['none','multiple','precision'][values.pedRoundFormat],...(values.pedRoundFormat?{value:values.pedRoundParam}:{})};
  return {verified:true,kind:'ungroup',inventory_complete:true,state_source:'cached_ungroup_stores',input_fields:fields,selected_records:selected,
-  method:['shares','computed','seasonal'][values.pedUngroupMethod],ungroup:{keys,value_fields:roles(0,7),item_fields:roles(1,4),share_fields:roles(1,9),order_fields:[roles(0,8),roles(1,8)],rounding,balance:['none','last','proportional','equal'][values.pedBalanceMethod]},settings_applied:false};
+  method:['shares','computed','seasonal'][values.pedUngroupMethod],ungroup:{keys,value_fields:roles(0,7),item_fields:roles(1,4),share_fields:roles(1,9),order_fields:[roles(0,8),roles(1,8)],rounding,balance:balanceDisabled&&values.pedUngroupMethod===2?'none':balance},
+  balance_native:{value:balance,disabled:balanceDisabled},settings_applied:false};
 }

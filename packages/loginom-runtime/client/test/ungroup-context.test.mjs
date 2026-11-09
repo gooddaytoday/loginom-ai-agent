@@ -11,7 +11,7 @@ function fixture(){
  const owner={constructor:{name:'UngroupDataWizard'},FWizardForm:form,FColumnsStore:stores[0],FSupportColumnsStore:stores[1],FMissingLinks:false};
  components[root.id]={el:{dom:root},'@@TestCmpController':owner};components[wizard.id]={el:{dom:wizard},Controller:form};
  const filters=['txtUngroupFilterField','txtSupportFilterField'].map(k=>add(k,{getValue:()=>''}));
- const props=[];for(const k of ['pedUngroupMethod','pedRoundFormat','pedRoundParam','pedBalanceMethod']){props.push(add(k,{Controller:{FLastViewMode:0,FLastValue:0,FLastVariable:null,FInitializing:false}}));add(k+';ValueControl',{getValue:()=>0});}
+ const props=[];for(const k of ['pedUngroupMethod','pedRoundFormat','pedRoundParam','pedBalanceMethod']){props.push(add(k,{isDisabled:()=>false,Controller:{FLastViewMode:0,FLastValue:0,FLastVariable:null,FInitializing:false}}));add(k+';ValueControl',{getValue:()=>0});}
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>all.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
  return {records,stores,owner,filters,props,read:()=>vm.runInNewContext('('+readUngroupBrowser.toString()+')("MF;TF")',context)};
 }
