@@ -1,3 +1,11 @@
+`text-auto-label` uses the unchanged text-import `task-auto-label.md`,
+`typed.csv` and `typed-update.csv` with their original server basenames.
+The frozen `expected-auto-label.json` and `expected-custom-label.json` check
+both full typed exports. Observed title modes, both automatic basenames and
+custom-caption preservation through both source switches require the SAME
+Import GUID. Final Save, cold execution without configuration and cleanup use
+stock checks. Only task and input paths reach the model.
+
 `text-variant` uses the approved text-import `task-variant.md` and only
 `fixtures/extended/variant.csv`. The unchanged stage-0 `expected-variant.json`
 checks integer/string/real/NULL native cell types before `variant-on.csv`;

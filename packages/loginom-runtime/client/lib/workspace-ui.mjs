@@ -2096,6 +2096,11 @@ function readRenderedInputMapping(observation) {
       wizard.import_source={status:'draft_ui_values',settings_applied:false,file_bytes_verified:false,schema_complete:false,fields};
     }
     const wizardFields=new Map(),wizardCombos=new Map();
+    if(wizard.stage==='done'&&inlineDefinitionIcon==='bg-vendor-icon-importtextfile') {
+      const f=wizard.completion?.fields.label_mode;
+      if(f?.status==='observed'&&!f.truncated&&f.enabled)wizardCombos.set(wizard.root_tid+';DoneWizard;cbxNodeTitleMode',
+        {name:'label_mode',scope:'node_title',root_ref:wizard.root_ref,owner_ref:f.owner_ref,input_ref:f.input_ref,value:f.value});
+    }
     if(wizard.status==='observed'&&wizard.stage==='text_import_file') {
       for(const [name,key] of Object.entries({encoding:'edtCodePage',file_info:'cbbFileInfoColumnsType'})) {
       const f=wizard.import_source?.fields?.[name];
@@ -5217,7 +5222,7 @@ function readRenderedInputMapping(observation) {
               ||!same(observed.ui.dialogs,current.ui.dialogs)||f?.input_ref!==choice.field.input_ref||f?.owner_ref!==choice.field.owner_ref)break;
             timeout();await page.waitForTimeout(Math.min(100,timeout()));observed=await readUi();
           }
-          const field=observed.wizard[sourceOption?'import_source':parameterKey??'settings']?.fields?.[choice.field.name];
+          const field=observed.wizard[sourceOption?'import_source':choice.field.scope==='node_title'?'completion':parameterKey??'settings']?.fields?.[choice.field.name];
           const expected=JSON.parse(JSON.stringify(current.wizard));
           if(expressionParameter)expected[parameterKey].fields[choice.field.name].value=choice.label;
           if(expressionParameter)expected[parameterKey].fields[choice.field.name].value_length_utf16=choice.label.length;

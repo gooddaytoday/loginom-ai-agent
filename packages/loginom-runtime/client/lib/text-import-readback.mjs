@@ -48,9 +48,12 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
   if(service)requireValue(!c.columns.some(f=>f.used&&f.name==='FileName')
     &&output.filter(f=>f.source_name==='FileName'&&f.type==='string').length===1,'missing FileName source');
   requireValue(output.length===(m.deferred_output===true?0:c.columns.filter(f=>f.used).length+service),'output inventory differs');
+  const title=finished.value.node_title?fields(finished.value.node_title,['label_mode','label']):null;
+  if(title)requireValue(['Автоматическая метка','Пользовательская метка'].includes(title.label_mode)&&title.label.length>0,'invalid node title');
   return {kind:'text_import',scope:'observed_before_verified_finish',node:structuredClone(node),
     receipt_ids:[configured.receipt_id,mapped.receipt_id,finished.receipt_id],
     values_are:'observed_ui_values',source,format,
+    ...(title?{node_title:{mode:title.label_mode==='Автоматическая метка'?'automatic':'custom',label:title.label}}:{}),
     columns:c.columns.map(f=>pick(f,['index','name','label','type','data_kind','used'])),
     output_mapping:{port:0,autosync:n.autosync,fields:output},
     package_persistence_verified:false};

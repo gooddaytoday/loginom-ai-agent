@@ -119,7 +119,7 @@ for(const running of [false,true])test('actual bound finish retains the identifi
   node_outputs:{verified:true,node_context:context,ports:[{index:0,port_guid:'output',active:!running}]},
   ui:{elements:[{tid:'N;Label;Label',graph_node:{part:'label',label_text:'Bound'}}]}};
  const execution={node,execution_id:'execution',root_id:'root',group_id:'group',group_record_id:'record'};
- const operation={parameters:{},nodeApply:{request:{}},importBinding:{},nodeTargetAdapter:{observe:async()=>({})}};
+ const operation={parameters:{},nodeApply:{request:{parameters:{settings:{}}}},importBinding:{},nodeTargetAdapter:{observe:async()=>({})}};
  let launches=0,identified=false,captured=false;
  // Run the actual factory method body with its boundary dependencies. This
  // preserves the bound/sourceSwitch branch instead of fabricating a finish.

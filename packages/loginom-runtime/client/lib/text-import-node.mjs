@@ -14,6 +14,7 @@ import {closePreparedWizard} from './node-wizard-close.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
+import {configureTextImportTitle} from './text-import-procedure.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -668,7 +669,10 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         if(mode==='close')return {...await closePreparedWizard(channel),...(configured?.server_profile?{server_profile:configured.server_profile}:{})};
         const executeRequested=mode==='execute'&&!sourceSwitch&&!operation.importBinding,verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
         requireValue(mode!=='execute'||executionDriver,'Execution baseline was not prepared');
+        if(operation.nodeApply.request.parameters.settings.node_title)
+          await configureTextImportTitle(channel,operation.nodeApply.request.parameters.settings.node_title);
         const s=await read('done',mode+' available for the prepared node',s=>s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)));
+        const nodeTitle=structuredClone(s.wizard.completion);
         await channel.perform({condition:'bound import '+mode+' available',initialObservation:s,
           ready:s=>s.wizard?.stage==='done' && s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)),
           resolve:s=>({verb,ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+button),'Unique wizard completion control required').ref}),
@@ -713,7 +717,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true})):null;
         return verified({effect_possible:true,mode,execution_started:executeRequested,settings_applied:true,
           ...(execution?{execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface}:{}),
-          node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:!!operation.importBinding});
+          node_context:graph.prepared_node_context,node_label:label,node_title:nodeTitle,package_saved:false,reopen_performed:!!operation.importBinding});
       },
       async waitExecution(ctx) {
         enter(ctx);requireValue(executionDriver,'Execution driver is unavailable');
