@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -24,16 +24,18 @@ async function stand(t) {
     await new Promise(resolve => server.close(resolve))
     await rm(root, { recursive: true, force: true })
   })
-  return async (path, body) => {
+  const request = async (path, body) => {
     const options = body && {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)}
     const response = await fetch(`http://127.0.0.1:${server.address().port}/dashboard/${path}`, options)
     assert.ok(response.ok, `${path} returned ${response.status}`)
     return response.json()
   }
+  return { request, publishRoot: join(root, "published") }
 }
 
 test("a package path separates applications even when node GUIDs match", async t => {
-  const request = await stand(t)
+  const server = await stand(t)
+  const request = server.request
   const a = await request("lookup", binding)
   const b = await request("lookup", other)
   assert.notEqual(a.key, b.key)
@@ -42,7 +44,8 @@ test("a package path separates applications even when node GUIDs match", async t
 })
 
 test("the first snapshot stays available by ID after opening another node", async t => {
-  const request = await stand(t)
+  const server = await stand(t)
+  const request = server.request
   const data = {
     binding, nodeName: "По убыванию ROI", schema: [{name: "budget", type: 3}], rows: [[500]],
     parameters: [{name: "MinBudget", value: 0}],
@@ -57,4 +60,30 @@ test("the first snapshot stays available by ID after opening another node", asyn
   assert.deepEqual(a.rows, data.rows)
   assert.deepEqual(await request("targets/" + a.id), a)
   assert.deepEqual(await request("current"), b)
+
+  // A fresh session has no live result; the example is scoped to the published binding.
+  await mkdir(join(server.publishRoot, a.key), { recursive: true })
+  await writeFile(join(server.publishRoot, a.key, "binding.json"), JSON.stringify(binding))
+  await writeFile(join(server.publishRoot, a.key, "sample.json"), JSON.stringify({ schema: data.schema, rows: data.rows }))
+  const fresh = await request("targets", { ...data, schema: [], rows: [], sample: null })
+  assert.deepEqual(fresh.schema, data.schema)
+  assert.deepEqual(fresh.rows, data.rows)
+  assert.equal(fresh.tableSource, "published-example")
+  const afterError = await request("targets", { ...data, sample: null })
+  assert.equal(afterError.tableSource, "published-example")
+  assert.deepEqual(afterError.rows, data.rows)
+  const empty = await request("targets", { ...data, sample: { schema: data.schema, rows: [] } })
+  assert.equal(empty.tableSource, "live")
+  assert.deepEqual(empty.rows, [])
+  const absent = await request("targets", { ...data, binding: other, schema: [], rows: [], sample: null })
+  assert.equal(absent.tableSource, "unavailable")
+  assert.deepEqual(absent.schema, [])
+  assert.deepEqual(absent.rows, [])
+  await writeFile(join(server.publishRoot, a.key, "sample.json"), JSON.stringify({ schema: data.schema, rows: [[999]] }))
+  await assert.rejects(request("targets", { ...data, sample: 42 }), /returned 400/)
+  await assert.rejects(request("targets", { ...data, sample: {} }), /returned 400/)
+  await writeFile(join(server.publishRoot, a.key, "binding.json"), JSON.stringify(other))
+  await assert.rejects(request("targets", { ...data, sample: null }), /returned 400/)
+  assert.deepEqual(await request("targets/" + fresh.id), fresh)
+  assert.deepEqual(await request("targets/" + a.id), a)
 })

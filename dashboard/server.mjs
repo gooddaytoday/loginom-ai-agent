@@ -34,12 +34,28 @@ function appKey(binding) {
   ])).digest("hex")
 }
 
-function snapshot(data, projectRoot) {
+async function snapshot(data, projectRoot, publishRoot) {
   const key = appKey(data.binding)
+  // Accept the previous client's payload while bootstrap and Node are rolled out.
+  let sample = data.sample === undefined ? { schema: data.schema, rows: data.rows } : data.sample
+  let tableSource = sample === null ? "unavailable" : "live"
+  if (sample === null) {
+    try {
+      const dir = join(publishRoot, key)
+      const binding = JSON.parse(await readFile(join(dir, "binding.json"), "utf8"))
+      if (appKey(binding) !== key) throw Error("Published example binding differs")
+      sample = JSON.parse(await readFile(join(dir, "sample.json"), "utf8"))
+      tableSource = "published-example"
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error
+    }
+  }
+  const schema = sample === null ? [] : sample.schema
+  const rows = sample === null ? [] : sample.rows
   const scalar = value => value === null || ["string", "number", "boolean"].includes(typeof value)
   if (typeof data.nodeName !== "string" || !data.nodeName ||
-      !Array.isArray(data.schema) || !data.schema.every(c => c && typeof c.name === "string" && ["string", "number"].includes(typeof c.type)) ||
-      !Array.isArray(data.rows) || !data.rows.every(r => Array.isArray(r) && r.length === data.schema.length && r.every(scalar)) ||
+      !Array.isArray(schema) || !schema.every(c => c && typeof c.name === "string" && ["string", "number"].includes(typeof c.type)) ||
+      !Array.isArray(rows) || !rows.every(r => Array.isArray(r) && r.length === schema.length && r.every(scalar)) ||
       !Array.isArray(data.parameters) || !data.parameters.every(p => p && typeof p.name === "string" && scalar(p.value))) {
     throw Error("Invalid node, table or parameters")
   }
@@ -48,7 +64,7 @@ function snapshot(data, projectRoot) {
   const script = join(projectRoot, "dashboard/publish.mjs").replaceAll("'", "'\\''")
   const publish = `node '${script}' ${id}`
   return {
-    id, key, sourceDir, binding: data.binding, nodeName: data.nodeName, schema: data.schema, rows: data.rows,
+    id, key, sourceDir, binding: data.binding, nodeName: data.nodeName, schema, rows, tableSource,
     parameters: data.parameters,
     adapter: "window.frameElement.dashboard.state(), change(value: number, name?: string), run() return Promise<{value: number|null, parameters: {name:string,value:number|null}[], table: {schema: {name: string, type: number|string}[], rows: (string|number|boolean|null)[][]}|null, error: string|null}>. Read the screen's data from this adapter. Snapshot rows are examples. Use native change on Enter/blur or slider release; reject invalid thresholds. Optional name chooses a numeric variable; value is the first variable. Pending submitted values finish in order even if the iframe closes. state() waits for pending Loginom calculations. Use the installed React/TypeScript/Vite/Recharts template. Keep the control editable during recalculation; ignore outdated replies when changes overlap. Show «Идёт расчёт» while waiting. On error, show the actual value plus the last successful table labelled «расчёт при пороге N». On reopen show only state(); offer «Выполнить» if table is null. For ROI use two decimal places and — for an undefined ratio.",
     commands: {init: publish + " --init", typecheck: "npm run typecheck", build: "npm run build", publish},
@@ -95,7 +111,7 @@ export function dashboardServer({projectRoot, publishRoot}) {
         return json(response, 200, {key, exists: existsSync(join(publishRoot, key, "binding.json"))})
       }
       if (request.method === "POST" && path === "/dashboard/targets") {
-        const target = snapshot(await body(request), projectRoot)
+        const target = await snapshot(await body(request), projectRoot, publishRoot)
         snapshots.set(target.id, target)
         current = target
         return json(response, 201, target)

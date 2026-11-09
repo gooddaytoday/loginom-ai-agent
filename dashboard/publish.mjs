@@ -43,6 +43,8 @@ if (option === "--init") {
   execFileSync("npm", ["run", "build"], { cwd: sourceDir, stdio: "inherit" })
   const dist = join(sourceDir, "dist")
   await writeFile(join(dist, "binding.json"), JSON.stringify(snapshot.binding) + "\n")
+  if (snapshot.tableSource === "unavailable") throw Error("В снимке нет примера результата: выполните узел и откройте Dashboard заново")
+  await writeFile(join(dist, "sample.json"), JSON.stringify({ schema: snapshot.schema, rows: snapshot.rows }) + "\n")
 
   const container = "dashboard-master-20261109-server"
   const root = "/workdir/dashboard-app/apps"

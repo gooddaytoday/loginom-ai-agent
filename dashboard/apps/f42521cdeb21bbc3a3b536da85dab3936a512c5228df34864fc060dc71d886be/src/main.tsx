@@ -120,15 +120,19 @@ function App() {
   const input = useRef<HTMLInputElement>(null)
 
   const revision = useRef(0)
+  const draftRevision = useRef(0)
 
   async function calculate(operation: () => Promise<DashboardState>) {
     const request = ++revision.current
+    const draft = draftRevision.current
     setBusy(true)
     setError("")
     try {
       const state = await operation()
       if (request !== revision.current) return
-      if (input.current) input.current.value = state.value === null ? "" : String(state.value)
+      if (input.current && draft === draftRevision.current) {
+        input.current.value = state.value === null ? "" : String(state.value)
+      }
       if (state.error) throw Error(state.error)
       setNeedsRun(state.table === null)
       if (state.table) setData({ channels: channelsFrom(state.table), threshold: state.value })
@@ -165,7 +169,7 @@ function App() {
         <h1>Эффективность маркетинга</h1>
       </div>
       <label className="filter">Минимальный бюджет кампании
-        <input ref={input} type="number" min="0" step="any" required disabled={!dashboard} />
+        <input ref={input} onInput={() => draftRevision.current++} type="number" min="0" step="any" required disabled={!dashboard} />
       </label>
     </header>
     <div className="status" role="status">
