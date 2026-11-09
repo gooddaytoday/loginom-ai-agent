@@ -9,7 +9,8 @@ export function colUnionConfigurationReadback({node,phases,operation_id}){
  const c=configured.value.configuration,m=mapped.value.native_mapping;
  need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.binding_ready===true,'configuration owner');
  need(['minimum','maximum','input'].includes(c.settings?.row_count)&&['null','repeat','last'].includes(c.settings.padding)
-  &&Array.isArray(c.input_fields)&&c.input_fields.length===2,'explicit settings and both input schemas');
+  &&Array.isArray(c.input_fields)&&[2,3].includes(c.input_fields.length)&&c.sources?.length===c.input_fields.length,'explicit settings and all input schemas');
+ if(c.settings.row_count==='input')need(['main','attached','third'].slice(0,c.sources.length).includes(c.settings.determining_input),'determining input must bind an existing source');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context),'validation');
  need(saved.value.settings_applied===true&&saved.value.mode==='done'&&owner(saved.value.node_context)
   &&finished.value.settings_applied===true&&['done','execute'].includes(finished.value.mode)&&owner(finished.value.node_context),'finish');

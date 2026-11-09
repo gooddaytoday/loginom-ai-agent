@@ -4,6 +4,8 @@ import {decodePortCell,readTreePortSource} from '../lib/node-port-output.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeTreeOutputPortSchema} from '../lib/node-result-schema.mjs';
+import {readFile} from 'node:fs/promises';
+import {validateTreeJsonScope} from '../lib/tree-parameters.mjs';
 
 function fixture({count=4,depth=0,precision=false,duplicate=false,nativeContainers=false,absentContainer=false,rows=1,noteType=5}={}){
  const released=[],nodes=[];
@@ -94,4 +96,45 @@ test('tree_io reads datetime leaves as civil milliseconds and still refuses Vari
 test('tree_io still reads exactly one native document: several root rows and an empty tree refuse',async()=>{
  await assert.rejects(read({rows:2,count:2}),/tree_document_count/);
  await assert.rejects(read({rows:0}),/tree_document_count/);
+});
+
+test('nested records use native parent row ranges and object existence, matching the approved tree',async()=>{
+ const base=new URL('../../../../docs/node-development/nodes/trees-jsontotree/',import.meta.url);
+ const expected=JSON.parse(await readFile(new URL('acceptance/nested-records/expected.json',base))).cases.nested.proposed_tree_output;
+ const node=(name,type,children=[],array=false)=>({name,children,array,
+  get_Name:async()=>name,get_DisplayName:async()=>name,get_DataType:async()=>type,
+  get_IsContainer:async()=>children.length>0,get_IsArray:async()=>array,
+  get_SubNodes:async()=>({get_Count:async()=>children.length,getItem:async i=>children[i]})});
+ const root=node('Root',0,[node('batch',5),node('items',0,[node('id',4),
+  node('details',0,[node('code',5),node('active',1)]),node('parts',0,[node('sku',5),node('qty',4)],true)],true)]);
+ const calls=[];
+ class Int64{constructor(value){this.value=value;}toString(){return String(this.value);}}
+ const source={get_RootNodeDef:async()=>root,GetReader:async definitions=>({
+  GetRowCount:async index=>{assert.equal(index,0);return 1;},
+  GetRowRange:async(index,parent,start,size)=>{
+   const name=definitions[index].name;calls.push([name,parent]);
+   const range=name==='items'&&parent===0?[3,2]:name==='parts'&&parent===3?[10,1]:name==='parts'&&parent===4?[11,2]:null;
+   assert.ok(range,'range must belong to the actual parent row');[start.$,size.$]=range;
+  },
+  GetContainerExists:async(index,row)=>{assert.equal(definitions[index].name,'details');assert.ok([3,4].includes(row));return true;},
+  AsVariant:async(index,row)=>{
+   const values={batch:{0:'Бета'},id:{3:9007199254740993n,4:9007199254740994n},code:{3:'A',4:''},
+    active:{3:true,4:false},sku:{10:'a',11:'b',12:'c'},qty:{10:2,11:0,12:null}};
+   const value=values[definitions[index].name][row];assert.notEqual(value,undefined);
+   return typeof value==='bigint'?new Int64(value):value;
+  },
+ })};
+ const tree=await readTreePortSource(source,async fn=>fn(),p=>p,decodePortCell);
+ assert.deepEqual(calls,[['items',0],['parts',3],['parts',4]]);
+ const document=index=>{
+  const n=tree.instances[index];return {path:n.path,type:n.is_null?'null':n.type,
+   ...(n.children?{children:n.children.map(document)}:{value:n.value})};
+ };
+ assert.deepEqual(document(0),expected.document);
+ for(const [path,type] of Object.entries(expected.schema_types)){
+  const n=tree.schema.find(n=>n.path===path);assert.ok(n,path);
+  assert.equal(n.is_array?'object_array':n.type,type,path);
+ }
+ // The production admission path must accept the same document the native reader proves.
+ assert.equal(validateTreeJsonScope(await readFile(new URL('fixtures/nested-records/nested.json',base),'utf8')).verified,true);
 });

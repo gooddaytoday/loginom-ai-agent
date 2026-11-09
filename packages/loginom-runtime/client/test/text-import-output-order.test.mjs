@@ -146,3 +146,62 @@ console.log(JSON.stringify({trace,verified:mapped.verified}));
  assert.equal(result.status,0,result.stderr+result.stdout);
  assert.equal(JSON.parse(result.stdout).verified,true);
 });
+for(const mode of ['no-path','explicit-path'])test('existing import without a saved source skips layout capture: '+mode,()=>{
+ // A discarded first configuration leaves no source and no output layout. Next
+ // on an empty path opens a native error; refuse first or fill the path first.
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks','--input-type=module','-e',`
+import assert from 'node:assert/strict';
+import {mock} from 'node:test';
+const lib=${JSON.stringify(new URL('../lib/',import.meta.url).href)},href=name=>new URL(name,lib).href;
+const real=async name=>({...await import(href(name)+'?empty-source-real')});
+const {resolveTextImportEncoding}=await import(href('text-import-encoding.mjs'));
+const mode=process.argv[1],actions=[],utf8=resolveTextImportEncoding('UTF-8').label;
+const owner={status:'observed',node:{tid:'N'},path:[{tid:'wf',label:'Scenario'}]};
+let stage='graph',path='';
+const field=value=>({status:'observed',value,input_ref:'path',display_ref:'path',owner_ref:'o'});
+const state=()=>({dom_epoch:{document:'doc',revision:1},prepared_node_context:{verified:true,surface:stage==='graph'?'graph':'wizard',tid:'N'},
+ wizard:stage==='graph'?{status:'absent'}:{status:'observed',stage,root_ref:'W',root_tid:'W',owner_context:structuredClone(owner),
+  import_source:{fields:{source_path:field(path),connection:field('Хранилище'),encoding:field(utf8),rows_to_skip:field('0'),first_line_as_title:field(true)}}},
+ ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:'W;btnClose',ref:'close',allowed_actions:['click']}],dialogs:[],masks:[]}});
+const step=a=>{
+ actions.push([a.verb,stage,a.expected_stage,path]);
+ if(stage==='text_import_file'&&path==='')throw Error('Next pressed with an empty source path');
+ throw Error('STOP_AFTER_NEXT');
+};
+const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},
+ perform:async o=>{const s=o.initialObservation??state();assert.ok(o.ready(s),o.condition);const a=o.resolve(s);assert.equal(a.verb,'wizard_step');step(a);},
+ act:async a=>{if(a.verb==='wizard_step')return step(a);actions.push([a.verb,stage,a.text??a.key,path]);if(a.verb==='fill')path=a.text;}};
+mock.module(href('node-procedure.mjs'),{exports:{...await real('node-procedure.mjs'),createNodeProcedure:()=>channel}});
+mock.module(href('node-graph-selection.mjs'),{exports:{...await real('node-graph-selection.mjs'),selectPreparedGraphNode:async()=>{}}});
+mock.module(href('node-wizard-open.mjs'),{exports:{...await real('node-wizard-open.mjs'),openPreparedWizard:async()=>{stage='text_import_file';}}});
+mock.module(href('node-wizard-close.mjs'),{exports:{...await real('node-wizard-close.mjs'),closePreparedWizard:async()=>{actions.push(['close',stage]);stage='graph';return {verified:true};}}});
+const {createTextImportNodeSupport}=await import(href('text-import-node.mjs'));
+const settings=mode==='no-path'?{source:{encoding:'UTF-8'}}:{source:{source_path:'/test/upload.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
+ format:{delimiter:';',decimal_separator:'.',null_marker:'',text_qualifier:'"'},columns:[{name:'Id',label:'Id',type:'integer',data_kind:'Дискретный',used:true}]};
+// A verified local delivery may omit settings.source.source_path.
+const sha='a'.repeat(64),artifact={artifact_id:'a1',bytes:3,sha256:sha};
+const upload={operation_id:'up1',artifact,outcome:{operation_id:'up1',status:'SUCCEEDED',cleanup_complete:true,action_key:'artifact.upload',
+ output:{artifact_id:'a1',destination:'/test/upload.csv',bytes:3,sha256:sha,server_copy_verification:{status:'SUCCEEDED',upload_completion_verified:true,
+  destination:'/test/upload.csv',bytes:3,bytes_verified:true,sha256:sha,verification_id:'v1'}}}};
+const p={source:{artifact_id:'a1',upload_operation_id:'up1'},settings};
+const request={target:{kind:'existing'},finish:'done',inputs:[],mappings:[],read:{ports:[]},bindings:[],parameters:p};
+const operation={id:'op',parameters:request,nodeApply:{request},nodeTargetAdapter:{observe:async()=>({})}};
+const driver=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation,execute:async()=>assert.fail('no browser'),onRecord:()=>{},now:Date.now,receiptOptions:()=>({}),
+ verifiedUploads:()=>[upload]});
+const ctx={signal:new AbortController().signal,deadline:Date.now()+60000,document_id:'d',workflow_ref:{workflow_id:'w'},node:{node_id:'n'}};
+await driver.verifySource(p);await driver.openWizard(ctx);
+if(mode==='no-path'){
+ const error=await driver.configureTextImport(ctx,p).then(()=>assert.fail('configured without a source'),e=>e);
+ assert.match(error.message,/Existing import has no saved source/);
+ assert.equal(error.nodePhaseRefusal?.settings_unchanged,true);
+ assert.deepEqual(actions,[['close','text_import_file']]);
+} else {
+ await assert.rejects(driver.configureTextImport(ctx,p),/STOP_AFTER_NEXT/);
+ assert.deepEqual(actions,[['fill','text_import_file','/test/upload.csv',''],['press','text_import_file','Tab','/test/upload.csv'],
+  ['wizard_step','text_import_file','text_import_format','/test/upload.csv']]);
+}
+console.log(JSON.stringify({verified:true,actions}));
+`,mode],{encoding:'utf8',timeout:30000});
+ assert.equal(result.status,0,result.stderr+result.stdout);
+ assert.equal(JSON.parse(result.stdout).verified,true);
+});

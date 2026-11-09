@@ -13,7 +13,7 @@ test('each supported regression selection mode delivers complete import and outp
  const source=await createBundledSkillFixture(t);
  const loader=createSkillLoader({resources:source.resources});
  const card={type:'datamining.lin_regression',modes:NODE_TYPES['datamining.lin_regression'].modes};
- for(const mode of ['forward','backward','stepwise'].filter(mode=>card.modes.includes(mode))){
+ for(const mode of ['forward','backward','stepwise','elastic'].filter(mode=>card.modes.includes(mode))){
   const [description]=await loader.describeNodes([card],[mode]);
   assert.match(description.guidance,/type:"integer", data_kind:"Непрерывный"/,mode);
   assert.match(description.guidance,/read\.ports:\[0,1\]/,mode);
@@ -22,7 +22,28 @@ test('each supported regression selection mode delivers complete import and outp
   assert.doesNotMatch(description.guidance,/как в forward выше/,mode);
   assert.match(description.guidance,new RegExp('mode:"'+mode+'"'),mode);
  }
+ const [elastic]=await loader.describeNodes([card],['elastic']);
+ assert.match(elastic.guidance,/lambda_l1:1,lambda_l2:3/);
+ assert.doesNotMatch(elastic.guidance,/ε|epsilon|1e-12/);
+ const [enter]=await loader.describeNodes([card],['enter']);
+ assert.match(enter.guidance,/`mode:"enter"`, `linear_regression:\{statistics:"full"\}`/);
+ assert.match(enter.guidance,/read\.ports:\[0,1\]/);
+ assert.match(enter.guidance,/CSV прогнозов — `exports\.text` от порта 0/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/datamining.lin_regression.md')))<=6000);
+});
+
+test('text Import delimited guidance keeps every rule in compact English',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const [description]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
+ const text=description.guidance.replace(/\s+/g,' ');
+ for(const rule of [/confirmed source CSV/,/visualizer table/,/effect_possible=false/,/preview_only:true/,/server_profile/,
+  /CP1251/,/mojibake/,/rare types/,/download\/sampling/,/full sample Import settings/,/settings\.columns`; add no Reform/,/order/,/overwrite=reject/,
+  /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
+  /auto_detect_columns/,/only after Execute/,/output `mappings`/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
+  /Calculator\/JS/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/])assert.match(text,rule);
+ assert.doesNotMatch(description.guidance.replace(/^# .*\n/,'').replace(/\(\.\.\/large-files\.md#[^)]*\)/,''),/[А-Яа-яЁё]/);
+ assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);
 });
 
 test('node guidance uses the prepared bundle and selects common plus requested modes',async t=>{
@@ -108,13 +129,23 @@ test('acceptance review rules reach the model: describe after reopen, import all
  const source=await createBundledSkillFixture(t);
  const loader=createSkillLoader({resources:source.resources});
  const [text]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
- assert.match(text.guidance,/`all`: поля появятся лишь после Execute[^.]*не передавай `columns` и output `mappings`/);
- assert.match(text.guidance,/для управления полями — `new`\/`none`/);
+ assert.match(text.guidance,/`all`: fields appear only after Execute[^.]*pass no `columns` or\s+output `mappings`/);
+ assert.match(text.guidance,/to control fields use `new`\/`none`/);
  const [rules]=await loader.describeNodes([{type:'variables.replace',modes:NODE_TYPES['variables.replace'].modes}],['rules']);
  assert.match(rules.guidance,/без табличных `inputs` и `mappings`/);
  assert.match(rules.guidance,/только через `variable_inputs`/);
  for(const file of ['imports.text','variables.replace'])
   assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/'+file+'.md')))<=6000,file);
+});
+
+test('merged sorting guidance fits the per-file budget and reaches the keys card',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const guide=await readFile(join(source.directory,'references/nodes/transform.sorting.md'),'utf8');
+ assert.ok(Buffer.byteLength(guide)<=6000,`sorting guidance: ${Buffer.byteLength(guide)} > 6000`);
+ const loader=createSkillLoader({resources:source.resources});
+ const [card]=await loader.describeNodes([{type:'transform.sorting',modes:NODE_TYPES['transform.sorting'].modes}],['keys']);
+ for(const rule of ['max_threads','case_sensitive','variable_inputs','BINDING_TYPE_MISMATCH','BINDING_NULL_UNSUPPORTED','BINDING_CONFLICT'])
+  assert.ok(card.guidance.includes(rule),rule);
 });
 
 test('LAB-1162 skill text covers repeated model refusals from live runs',async t=>{

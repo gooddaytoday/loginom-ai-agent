@@ -57,7 +57,7 @@ export async function configureLinRegressionRoles(channel,p,inputMapping,{preser
 }
 
 export async function configureLinRegression(channel,p,{request,inputMapping}){
- const lasso=request.mode==='lasso',ridge=request.mode==='ridge',preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',stepwise=request.mode==='stepwise',selecting=forward||backward||stepwise,method=lasso?5:ridge?4:stepwise?3:backward?2:forward?1:0,methodLabel=ridge?null:stepwise?'Stepwise (Пошаговое включение/исключение)':backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
+ const elastic=request.mode==='elastic',lasso=request.mode==='lasso',ridge=request.mode==='ridge',preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',stepwise=request.mode==='stepwise',selecting=forward||backward||stepwise,method=elastic?6:lasso?5:ridge?4:stepwise?3:backward?2:forward?1:0,methodLabel=ridge?null:stepwise?'Stepwise (Пошаговое включение/исключение)':backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
  const roles=await configureLinRegressionRoles(channel,p,inputMapping,{preserve});
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'regression '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -87,7 +87,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  need(Object.values(state.node_linregression.switches).every(v=>v===false),'variable-driven regression settings are outside stage 1');
  if(preserve)need(state.node_linregression.values.pedAutoMethod===false&&state.node_linregression.values.pedRegressionMethod===0&&state.node_linregression.values.pedDenormalize===true&&state.node_linregression.values.pedUseDetailedSettings===true,'apply requires the saved Enter model with intercept; settings will not be changed');
  if(state.node_linregression.values.pedAutoMethod){await act(state,'disable automatic regression method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual regression method enabled');}
- const methodChoice=ridge||lasso?state.node_linregression.method_choices?.find(c=>c.value===method)?.label:methodLabel;
+ const methodChoice=ridge||lasso||elastic?state.node_linregression.method_choices?.find(c=>c.value===method)?.label:methodLabel;
  need(typeof methodChoice==='string'&&methodChoice.length>0,'native method choice unavailable');
  if(state.node_linregression.values.pedRegressionMethod!==method){
   await act(state,'open regression methods','pedRegressionMethod;ValueControl;trg_picker',{verb:'click'});
@@ -150,6 +150,41 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
   need(state.node_linregression.values.pedLassoSetupMethod===manual[0].value&&state.node_linregression.values.pedIntercept===true&&Object.values(state.node_linregression.switches).every(v=>v===false),'manual Lasso settings changed');
   regularization={setup:'manual',lambda_l1:state.node_linregression.values.pedLambdaLasso};
  }
+ if(elastic){
+  const manualValues={};
+  for(const [setup,lambda,value,choices] of [
+   ['pedLassoSetupMethod','pedLambdaLasso',p.linear_regression.lambda_l1,state.node_linregression.lasso_choices],
+   ['pedRidgeSetupMethod','pedLambdaRidge',p.linear_regression.lambda_l2,state.node_linregression.ridge_choices]]){
+   const manual=choices?.filter(c=>/вручную/i.test(c.label));
+   need(choices?.length===2&&manual?.length===1&&Number.isInteger(manual[0].value)&&new Set(choices.map(c=>c.value)).size===2,'complete native Elastic Net setup choices required');
+   manualValues[setup]=manual[0].value;
+   need(state.node_linregression.disabled[setup]===false,'Elastic Net setup must be editable');
+   if(state.node_linregression.values[setup]!==manual[0].value){
+    await act(state,'open Elastic Net setup',setup+';ValueControl;trg_picker',{verb:'click'});
+    const option=s=>s.ui.elements.filter(e=>e.tid?.startsWith(s.wizard.root_tid+';LinRegressionWizard-1;'+setup+';ValueControl;boundlist;')&&e.label===manual[0].label&&e.allowed_actions.includes('click'));
+    state=await channel.observe({condition:'native manual Elastic Net option',readLinRegression:true,ready:s=>ready('details')(s)&&option(s).length===1});
+    await channel.perform({condition:'select manual Elastic Net coefficient',initialObservation:state,ready:ready('details'),identity:s=>s.prepared_node_context,resolve:s=>({verb:'click',ref:option(s)[0].ref})});
+    state=await observe('details','manual Elastic Net setup readback');
+   }
+   need(state.node_linregression.values[setup]===manual[0].value&&state.node_linregression.disabled[lambda]===false,'manual Elastic Net lambda must be editable');
+   if(state.node_linregression.values[lambda]!==value){
+    const [coefficient,exponent]=String(value).split('e-');
+    const text=exponent?'0.'+'0'.repeat(Number(exponent)-1)+coefficient.replace('.',''):String(value);
+    await act(state,'fill Elastic Net '+lambda,lambda+';ValueControl',{verb:'fill',text});state=await observe('details','Elastic Net numeric input');
+    await act(state,'commit Elastic Net '+lambda,lambda+';ValueControl',{verb:'press',key:'Tab'});state=await observe('details','Elastic Net numeric readback');
+   }
+   need(state.node_linregression.values[lambda]===value,'Elastic Net numeric readback differs: '+lambda);
+  }
+  if(state.node_linregression.values.pedEpsilon!==1e-12){
+   await act(state,'set internal Elastic Net solver accuracy','pedEpsilon;ValueControl',{verb:'fill',text:'0.000000000001'});state=await observe('details','Elastic Net epsilon input');
+   await act(state,'commit internal Elastic Net solver accuracy','pedEpsilon;ValueControl',{verb:'press',key:'Tab'});state=await observe('details','Elastic Net epsilon readback');
+  }
+  need(state.node_linregression.values.pedEpsilon===1e-12,'Elastic Net epsilon readback differs');
+  need(Object.entries(manualValues).every(([key,value])=>state.node_linregression.values[key]===value)
+   &&state.node_linregression.values.pedLambdaLasso===p.linear_regression.lambda_l1&&state.node_linregression.values.pedLambdaRidge===p.linear_regression.lambda_l2
+   &&state.node_linregression.values.pedIntercept===true&&Object.values(state.node_linregression.switches).every(v=>v===false),'manual Elastic Net settings changed');
+  regularization={setup:'manual',lambda_l1:state.node_linregression.values.pedLambdaLasso,lambda_l2:state.node_linregression.values.pedLambdaRidge};
+ }
  let selection;
  if(selecting){
   const wanted=p.linear_regression?.selection??{criterion:'f'},criteria=['f','r2','adjusted_r2','aic','aicc','bic','hqc'];
@@ -179,8 +214,10 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
   need(stepwise||wanted[disabledKey]===undefined||state.node_linregression.values[disabledControl]===wanted[disabledKey],'disabled cutoff differs from requested assertion');
   selection={criterion:criteria[state.node_linregression.values.pedRegSelQuality],...(criterion===0?{add_significance:state.node_linregression.values.pedAddSignificance,remove_significance:state.node_linregression.values.pedRemoveSignificance}: {})};
  }
- const details=state.node_linregression;
+ const details=state.node_linregression,enter=!preserve&&!ridge&&!lasso&&!elastic&&!selecting,statistics=p.linear_regression?.statistics??'coefficients';
+ // The native level stays as saved; full statistics are approved only at 95%.
+ if(enter&&statistics==='full')need(details.values.pedPredictionIntervalLevel===95,'full coefficient statistics require the native 95% confidence level');
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso||elastic?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{statistics,confidence_level:details.values.pedPredictionIntervalLevel}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

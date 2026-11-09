@@ -28,9 +28,9 @@ function replay(criterion,fault,mode='forward'){
   const card=stage==='lin_regression_details'?'LinRegressionWizard-1':'LinRegressionWizard';
   const elements=[{tid:'W;btnNext',ref:'ui-next',allowed_actions:['wizard_step']}];
   for(const key of Object.keys(values))for(const suffix of ['ValueControl','ValueControl;DisplayEl','ValueControl;trg_picker'])elements.push({tid:'W;'+card+';'+key+';'+suffix,ref:'ui-'+key+'-'+suffix.replaceAll(';','-').replaceAll('_','-'),allowed_actions:['fill','press','click','set_checked']});
-  if(picker)for(const [value,label] of (picker==='pedRegressionMethod'?[[0,'Enter (Принудительное включение)'],[1,'Forward (Пошаговое включение)'],[2,'Backward (Пошаговое исключение)'],[3,'Stepwise (Пошаговое включение/исключение)'],[4,'Ridge (L2-регуляризация)'],[5,'LASSO (L1-регуляризация)']]:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?[[0,'Вручную'],[1,'Автоматически']]:criteria.map((c,i)=>[i,'native '+c])))elements.push({tid:'W;'+card+';'+picker+';ValueControl;boundlist;'+label,ref:'ui-option-'+value,label,allowed_actions:['click']});
+  if(picker)for(const [value,label] of (picker==='pedRegressionMethod'?[[0,'Enter (Принудительное включение)'],[1,'Forward (Пошаговое включение)'],[2,'Backward (Пошаговое исключение)'],[3,'Stepwise (Пошаговое включение/исключение)'],[4,'Ridge (L2-регуляризация)'],[5,'LASSO (L1-регуляризация)'],[6,'Elastic-net']]:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?[[0,'Вручную'],[1,'Автоматически']]:criteria.map((c,i)=>[i,'native '+c])))elements.push({tid:'W;'+card+';'+picker+';ValueControl;boundlist;'+label,ref:'ui-option-'+value,label,allowed_actions:['click']});
   return {prepared_node_context:node,wizard:{status:'observed',stage,root_tid:'W',root_ref:'wizard'},ui:{elements},node_linregression:{verified:true,node_context:node,
-   ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:{kind:stage==='lin_regression'?'parameters':'details',values:{...values},switches:{},disabled:{pedLassoSetupMethod:false,pedLambdaLasso:fault==='disabled-lasso'||values.pedLassoSetupMethod!==0,pedRidgeSetupMethod:false,pedLambdaRidge:values.pedRidgeSetupMethod!==0,pedRegSelQuality:false,pedAddSignificance:mode==='backward'||values.pedRegSelQuality>2,pedRemoveSignificance:!['backward','stepwise'].includes(mode)||values.pedRegSelQuality>2},method_choices:[{value:4,label:'Ridge (L2-регуляризация)'},{value:5,label:'LASSO (L1-регуляризация)'}],lasso_choices:[{value:0,label:'Вручную'},{value:1,label:'Автоматически'}],ridge_choices:[{value:0,label:'Вручную'},{value:1,label:'Автоматически'}],selection_choices:criteria.map((c,value)=>({value,label:'native '+c}))})}};
+   ...(stage==='input_mapping'?{inventory_complete:true,fields}:stage==='normalization'?{kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:{kind:stage==='lin_regression'?'parameters':'details',values:{...values},switches:{},disabled:{pedLassoSetupMethod:false,pedLambdaLasso:fault==='disabled-lasso'||values.pedLassoSetupMethod!==0,pedRidgeSetupMethod:false,pedLambdaRidge:fault==='disabled-ridge'||values.pedRidgeSetupMethod!==0,pedRegSelQuality:false,pedAddSignificance:mode==='backward'||values.pedRegSelQuality>2,pedRemoveSignificance:!['backward','stepwise'].includes(mode)||values.pedRegSelQuality>2},method_choices:[{value:4,label:'Ridge (L2-регуляризация)'},{value:5,label:'LASSO (L1-регуляризация)'},{value:6,label:'Elastic-net'}],lasso_choices:[{value:0,label:'Вручную'},{value:1,label:'Автоматически'}],ridge_choices:[{value:0,label:'Вручную'},{value:1,label:'Автоматически'}],selection_choices:criteria.map((c,value)=>({value,label:'native '+c}))})}};
  };
  const channel={async observe({ready}){const s=state();assert.equal(ready(s),true,'ready '+stage);return s;},async perform({ready,resolve}){
   const s=state();assert.equal(ready(s),true);const a=resolve(s);validateUiAction(a,s);actions.push(a);
@@ -38,10 +38,10 @@ function replay(criterion,fault,mode='forward'){
   if(a.ref.startsWith('ui-option-')){values[picker]=Number(a.ref.slice(10));picker=null;return;}
   const key=a.ref.split('-')[1];
   if(a.verb==='set_checked')values[key]=a.checked;
-  if(a.verb==='fill'&&fault!=='stale'&&!(fault==='stale-removal'&&key==='pedRemoveSignificance'))values[key]=Number(a.text);
+  if(a.verb==='fill'&&fault!=='stale'&&!(fault==='stale-removal'&&key==='pedRemoveSignificance')&&!(fault==='stale-ridge'&&key==='pedLambdaRidge')&&!(fault==='stale-epsilon'&&key==='pedEpsilon'))values[key]=Number(a.text);
   if(a.verb==='click'&&a.ref.endsWith('trg-picker'))picker=key;
  }};
- return {actions,run:()=>configureLinRegression(channel,{...p,linear_regression:mode==='lasso'?{lambda_l1:criterion}:mode==='ridge'?{lambda_l2:criterion}:{selection:{criterion,...(criterion==='f'?{add_significance:fault==='addition-mismatch'?0.04:mode==='backward'?0.05:0.03,remove_significance:['backward','stepwise'].includes(mode)?0.12:0.1}:{})}}},{request:{mode,target:{kind:'new'}},inputMapping})};
+ return {actions,run:()=>configureLinRegression(channel,{...p,linear_regression:mode==='elastic'?criterion:mode==='lasso'?{lambda_l1:criterion}:mode==='ridge'?{lambda_l2:criterion}:{selection:{criterion,...(criterion==='f'?{add_significance:fault==='addition-mismatch'?0.04:mode==='backward'?0.05:0.03,remove_significance:['backward','stepwise'].includes(mode)?0.12:0.1}:{})}}},{request:{mode,target:{kind:'new'}},inputMapping})};
 }
 for(const criterion of criteria.filter(c=>c!=='r2'))test('production Forward procedure selects and reads back '+criterion,async()=>{
  const f=replay(criterion),r=await f.run();assert.equal(r.configuration.mode,'forward');
@@ -144,5 +144,31 @@ test('LASSO refuses a disabled native lambda before fill or Done',async()=>{
  const f=replay(1,'disabled-lasso','lasso');
  await assert.rejects(f.run(),/manual Lasso lambda must be editable/);
  assert.equal(f.actions.some(a=>a.verb==='fill'&&a.ref?.startsWith('ui-pedLambdaLasso-')),false);
+ assert.equal(f.actions.some(a=>a.expected_stage==='done'),false);
+});
+
+for(const settings of [{lambda_l1:1,lambda_l2:3},{lambda_l1:3,lambda_l2:0.5},{lambda_l1:0,lambda_l2:2},{lambda_l1:2,lambda_l2:0}])
+test('Elastic Net configures both manual lambdas and internal epsilon '+JSON.stringify(settings),async()=>{
+ assert.doesNotThrow(()=>validateLinRegressionParameters({...p,linear_regression:settings},'elastic'));
+ const f=replay(settings,undefined,'elastic'),r=await f.run();
+ assert.equal(r.configuration.mode,'elastic');
+ assert.deepEqual(r.configuration.regularization,{setup:'manual',...settings});
+ assert.equal(r.configuration.epsilon,1e-12);
+ assert.equal(f.actions.some(a=>a.ref==='ui-option-6'),true);
+ assert.equal(f.actions.filter(a=>a.ref==='ui-option-0').length,2);
+ assert.equal(f.actions.some(a=>a.verb==='fill'&&a.ref.startsWith('ui-pedEpsilon-')&&a.text==='0.000000000001'),true);
+ assert.equal(f.actions.at(-1).expected_stage,'done');
+});
+test('Elastic Net refuses incomplete, zero/zero, nonfinite, automatic, bound or model epsilon settings',()=>{
+ for(const settings of [undefined,{}, {lambda_l1:1},{lambda_l2:3},{lambda_l1:0,lambda_l2:0},
+  ...[-1,NaN,Infinity,'1',{variable:'Alpha'}].flatMap(value=>[{lambda_l1:value,lambda_l2:3},{lambda_l1:1,lambda_l2:value}]),
+  {lambda_l1:1,lambda_l2:3,automatic:true},{lambda_l1:1,lambda_l2:3,epsilon:1e-12},
+  {lambda_l1:1,lambda_l2:3,selection:{criterion:'f'}}])
+  assert.throws(()=>validateLinRegressionParameters({...p,...(settings===undefined?{}:{linear_regression:settings})},'elastic'));
+});
+for(const fault of ['stale','stale-ridge','stale-epsilon','disabled-lasso','disabled-ridge'])
+test('Elastic Net refuses '+fault+' before Done',async()=>{
+ const f=replay({lambda_l1:1,lambda_l2:3},fault,'elastic');
+ await assert.rejects(f.run(),/readback|differs|editable/);
  assert.equal(f.actions.some(a=>a.expected_stage==='done'),false);
 });

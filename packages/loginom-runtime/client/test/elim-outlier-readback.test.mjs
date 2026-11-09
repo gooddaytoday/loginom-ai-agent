@@ -22,3 +22,17 @@ test('readback binds complete keep settings and all three schemas to independent
 test('readback refuses lost receipts, changed owner, clipping, untrained execution and missing port',()=>{
  for(const change of [f=>f.phases.pop(),f=>f.phases[1].value.configuration.node_context.node_id='foreign',f=>f.phases[1].value.configuration.field_settings[0].settings.extreme_policy='clip',f=>f.phases[4].value.training.status='not_requested',f=>f.phases[4].value.training.execution_id='execute',f=>f.phases[3].value.ports.pop(),f=>f.phases[0].value.cleanup_complete=false,f=>f.phases[1].receipt_id='foreign']){const f=fixture();change(f);assert.throws(()=>elimOutlierConfigurationReadback(f));}
 });
+test('edit readback retains distinct class policies and validates the published union',()=>{
+ const schema=nodeApplyResultSchema.properties.configuration.properties.readback;
+ const validate=new AjvJsonSchemaValidator().getValidator(schema);
+ for(const outlier_policy of ['keep','mean','median','most_probable'])for(const extreme_policy of ['keep','mean','median','most_probable']){
+  const f=fixture(),c=f.phases[1].value.configuration;
+  c.mode='edit';Object.assign(c.field_settings[0].settings,{outlier_policy,extreme_policy});
+  const readback=elimOutlierConfigurationReadback(f);
+  assert.equal(readback.mode,'edit');
+  assert.equal(readback.fields[0].outlier_policy,outlier_policy);assert.equal(readback.fields[0].extreme_policy,extreme_policy);
+  assert.equal(validate(readback).valid,true);
+ }
+ const invalid=fixture();invalid.phases[1].value.configuration.field_settings[0].settings.extreme_policy='mean';
+ assert.throws(()=>elimOutlierConfigurationReadback(invalid),'detect never reports replacement');
+});

@@ -66,8 +66,10 @@ function fixture({newNode=false,locale=true}={}) {
   const available=configuration.input_fields.find(f=>action.ref===f.name+':available');
   if(available&&action.verb==='double_click')configuration.keys.push({...available,record_id:'added-'+available.name,order:configuration.keys.length,direction:'ASC',case_sensitive:true});
   if(flags.changeCache)configuration.options.chkBufferWhole.value=true;
+  if(flags.changeBinding)configuration.options.chkLocaleAware.binding={name:'Other'};
+  if(flags.bindDuringEdit)configuration.options.chkLocaleAware.switch_pressed=true;
  }};
- return {configuration,flags,gestures,run:p=>configureSorting(channel,p,{newNode})};
+ return {configuration,flags,gestures,run:(p,options={})=>configureSorting(channel,p,{newNode,...options})};
 }
 
 test('existing empty parameters preserve observed keys and locale without toggles',async()=>{
@@ -107,9 +109,38 @@ test('unconfirmed change never retries a blind direction toggle',async()=>{
 test('foreign ownership and changes to unrelated options cannot succeed',async()=>{
  for(const flag of ['failBeforeGesture','changeCache']){const f=fixture();f.flags[flag]=true;await assert.rejects(f.run({compare_with_locale:false}),/ownership|Unrequested/);}
 });
-test('new node uses explicit locale default and variable-driven locale fails closed',async()=>{
+test('new node uses explicit locale default and existing saved binding is preserved',async()=>{
  const f=fixture({newNode:true,locale:false});await f.run({});assert.equal(f.gestures[0].checked,true);
- const g=fixture();g.configuration.options.chkLocaleAware.switch_pressed=true;await assert.rejects(g.run({}),/Variable-driven/);assert.deepEqual(g.gestures,[]);
+ const g=fixture();g.configuration.options.chkLocaleAware.switch_pressed=true;await g.run({});assert.deepEqual(g.gestures,[]);
+});
+test('existing key replacement preserves a saved locale binding when bindings are omitted or empty',async()=>{
+ for(const bindings of [undefined,[]]){
+  const f=fixture();Object.assign(f.configuration.options.chkLocaleAware,{switch_pressed:true,binding:{name:'Flag',index:0}});
+  const before=structuredClone(f.configuration.options.chkLocaleAware);
+  await f.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{bound:!!bindings?.length});
+  assert.deepEqual(f.configuration.options.chkLocaleAware,before);assert.ok(!f.gestures.some(g=>g.ref==='locale'));
+ }
+});
+test('literal locale with a saved binding refuses before even a requested key gesture',async()=>{
+ for(const bound of [false,true]){
+  const f=fixture();f.configuration.options.chkLocaleAware.switch_pressed=true;
+  await assert.rejects(f.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}],compare_with_locale:false},{bound}),/literal|Variable-driven/);
+  assert.deepEqual(f.gestures,[]);assert.equal(f.configuration.keys[0].direction,'ASC');
+ }
+});
+test('bound locale skips literal toggles and refuses changed binding metadata',async()=>{
+ for(const newNode of [false,true]){
+  const f=fixture({newNode,locale:false});Object.assign(f.configuration.options.chkLocaleAware,{switch_pressed:true,binding:{name:'Flag'}});
+  await f.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{bound:true});
+  assert.ok(!f.gestures.some(g=>g.ref==='locale'));assert.equal(f.configuration.options.chkLocaleAware.value,false);
+ }
+ const g=fixture();Object.assign(g.configuration.options.chkLocaleAware,{switch_pressed:true,binding:{name:'Flag'}});g.flags.changeBinding=true;
+ await assert.rejects(g.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{bound:true}),/Sorting locale differs/);
+});
+test('Sorting refuses a variable-mode race after key gestures before touching locale',async()=>{
+ const f=fixture();f.flags.bindDuringEdit=true;
+ await assert.rejects(f.run({keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}],compare_with_locale:false}),/Variable-driven/);
+ assert.ok(!f.gestures.some(g=>g.ref==='locale'));
 });
 
 test('sorting changes the maximum on the same node and explicitly selects zero-auto',async()=>{
@@ -125,6 +156,20 @@ test('sorting refuses variable-driven or unconfirmed maximum without blind retri
  const f=fixture();f.configuration.options.cbxMaxThreadCount.switch_pressed=true;
  await assert.rejects(f.run({max_threads:2}),/Variable-driven/);assert.deepEqual(f.gestures,[]);
  const g=fixture();g.flags.lostThreads=true;await assert.rejects(g.run({max_threads:2}),/maximum|threads/i);assert.equal(g.gestures.length,2);
+});
+test('sorting changes literal maximum while preserving locale binding on new and existing nodes',async()=>{
+ for(const newNode of [false,true]){
+  const f=fixture({newNode,locale:false});
+  Object.assign(f.configuration.options.chkLocaleAware,{switch_pressed:true,binding:{name:'Flag',index:0}});
+  const locale=structuredClone(f.configuration.options.chkLocaleAware);
+  for(const max_threads of [2,0]){
+   const result=await f.run({max_threads},{bound:newNode});
+   assert.deepEqual(result.configuration.options.chkLocaleAware,locale);
+   assert.equal(result.configuration.options.cbxMaxThreadCount.value,max_threads);
+   assert.equal(result.preservation.threads,false);
+  }
+  assert.ok(!f.gestures.some(action=>action.ref==='locale'));
+ }
 });
 test('variable-driven maximum refuses requested key or locale changes before any gesture',async()=>{
  for(const change of [{keys:[{field:{kind:'input_field',name:'Amount'},direction:'DESC'}]},{compare_with_locale:false}]){

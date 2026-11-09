@@ -161,10 +161,11 @@ test('the installed catalog and request validator admit Enter with both tabular 
  assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l2.minimum,0);
  assert.equal(validateNodeApplyRequest({...request,mode:'lasso',parameters:{...request.parameters,linear_regression:{lambda_l1:1}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
  assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l1.minimum,0);
+ assert.equal(validateNodeApplyRequest({...request,mode:'elastic',parameters:{...request.parameters,linear_regression:{lambda_l1:1,lambda_l2:3}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
 });
 
-for(const mixed of [false,true])test('LASSO freezes prediction field order, mixed='+mixed,async()=>{
- const c={...configuration,mode:'lasso'},predicted=linRegressionOutputColumns(c,0);
+for(const mode of ['lasso','elastic'])for(const mixed of [false,true])test(mode+' freezes prediction field order, mixed='+mixed,async()=>{
+ const c={...configuration,mode},predicted=linRegressionOutputColumns(c,0);
  const prediction={verified:true,inventory_complete:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
   target_fields:predicted.map((f,index)=>({...f,index,record_id:'p'+index,required:false,inherited:false,excluded:false})),source_fields:[]};
  if(mixed){
@@ -196,4 +197,32 @@ for(const mixed of [false,true])test('LASSO freezes prediction field order, mixe
  assert.deepEqual(finished,[0,1]);assert.equal(prediction.autosync,false);assert.equal(actions.filter(a=>a.ref==='auto').length,1);
  assert.equal(actions.some(a=>a.ref==='move'),mixed);assert.deepEqual(prediction.source_fields,originalSources);
  assert.deepEqual(prediction.target_fields.map(f=>f.name),predicted.map(f=>f.name));
+});
+
+const fullNames=['Name','DisplayName','UniqueValues',...['coefficients','stdError','TStat','PValue','lowerBound','upperBound'].map(s=>'Response_'+s)];
+const fullTypes=['string','string','string','real','real','real','real','real','real'];
+const fullOutput=()=>({port:1,port_guid:'p1',sample_complete:true,schema:fullNames.map((name,index)=>({index,name,label:index===0?'Имена входных полей':index===3?'Цель|Коэффициенты':name,type:fullTypes[index]}))});
+test('full statistics keep all nine native coefficient columns without coefficient-wizard gestures',async()=>{
+ const full={...configuration,statistics:'full'};
+ assert.deepEqual(linRegressionOutputColumns(full,1).map(f=>[f.name,f.type]),fullNames.map((n,i)=>[n,fullTypes[i]]));
+ assert.deepEqual(linRegressionOutputColumns(full,0),linRegressionOutputColumns(configuration,0));
+ assert.equal(linRegressionOutputColumns({...configuration,statistics:'coefficients'},1).length,2);
+ const channel={openOutputPort:()=>assert.fail('full statistics must not exclude native columns'),observe:()=>assert.fail('no wizard'),perform:()=>assert.fail('no gestures')};
+ const mapped=await configureLinRegressionOutputs(channel,full,{},[],()=>assert.fail('no coefficient wizard to finish'));
+ assert.equal(mapped.verified,true);assert.equal(mapped.effect_possible,false);
+ const read=await readLinRegressionOutputs({readOutputPort:async()=>({output:fullOutput()})},{ports:[1],sample_rows:10,require_exact_numbers:true},{portExecution:{},execution:{execution_id:'x'},receipt_id:'r'},mapped);
+ assert.deepEqual(read.ports[0].schema.map(f=>f.name),fullNames);
+ for(const change of [o=>o.schema.pop(),o=>o.schema[4].type='string',o=>{[o.schema[4],o.schema[5]]=[o.schema[5],o.schema[4]];o.schema.forEach((f,i)=>f.index=i);}]){
+  const output=fullOutput();change(output);
+  await assert.rejects(readLinRegressionOutputs({readOutputPort:async()=>({output})},{ports:[1],sample_rows:10,require_exact_numbers:true},{portExecution:{},execution:{execution_id:'x'},receipt_id:'r'},mapped),/coefficient/);
+ }
+});
+test('apply reads a saved full coefficient table or the two-column table without reconfiguration',async()=>{
+ const channel={openOutputPort:()=>assert.fail(),observe:()=>assert.fail(),perform:()=>assert.fail()};
+ const mapped=await configureLinRegressionOutputs(channel,{...configuration,mode:'apply'},{},[],()=>assert.fail());
+ const read=output=>readLinRegressionOutputs({readOutputPort:async()=>({output})},{ports:[1],sample_rows:10,require_exact_numbers:true},{portExecution:{},execution:{execution_id:'x'},receipt_id:'r'},mapped);
+ assert.deepEqual((await read(fullOutput())).ports[0].schema.length,9);
+ const two={port:1,port_guid:'p1',sample_complete:true,schema:linRegressionOutputColumns(configuration,1).map((f,index)=>({...f,index}))};
+ assert.deepEqual((await read(two)).ports[0].schema.map(f=>f.name),['Name','Response_coefficients']);
+ const eight=fullOutput();eight.schema.pop();await assert.rejects(read(eight),/unexpected coefficient/);
 });

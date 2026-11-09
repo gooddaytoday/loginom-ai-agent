@@ -10,7 +10,7 @@ const native={verified:true,inventory_complete:true,source_identity_verified:tru
  source_fields:[{record_id:'s0',field_id:'0',name:'Id',label:'Id'},{record_id:'s1',field_id:'1',name:'Sum',label:'Sum'}],
  target_fields:[{record_id:'t0',name:'Id',label:'Id',source:{record_id:'s0',field_id:'0',name:'Id',label:'Id'}},{record_id:'t1',name:'Amount',label:'Amount',source:null}]};
 const state=()=>({prepared_node_context:{surface:stage==='graph'?'graph':'wizard',tid:'N'},
- wizard:stage==='graph'?{status:'absent'}:{status:'observed',stage,root_tid:'W',owner_context:{status:'observed'}},
+ wizard:stage==='graph'?{status:'absent'}:{status:'observed',stage,root_tid:'W',owner_context:{status:'observed'},import_source:{fields:{source_path:{value:'/test/amount.csv'}}}},
  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:'W;btnPrev',ref:'prev',allowed_actions:['wizard_step']}]},node_mapping:structuredClone(native)});
 const channel={observe:async o=>{const s=state();if(!o.ready(s))throw Error('Probe state not ready: '+o.condition);return s;},
  perform:async o=>{const a=o.resolve(o.initialObservation);if(a.verb==='wizard_step')stage=a.expected_stage;},act:async()=>{}};

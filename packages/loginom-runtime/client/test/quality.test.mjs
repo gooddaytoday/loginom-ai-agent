@@ -21,7 +21,7 @@ test('Quality installs profile with an empty parameter object and five outputs',
  for(const mode of ['train','apply','mark'])assert.throws(()=>validateQualityParameters({},mode,request));
  assert.throws(()=>validateQualityParameters({},'profile',{...request,mappings:[{direction:'output',port:0}]}));
 });
-test('Quality accepts only observed continuous numbers and discrete strings',()=>{
+test('Quality accepts observed numeric kinds, continuous datetime and discrete Boolean/string',()=>{
  const fields=[{name:'X',type:'real',data_kind:'Непрерывный'},{name:'S',type:'string',data_kind:'Дискретный'}];
  assert.deepEqual(resolveQualityFields({},fields),fields);
  // execution-events.jsonl:523: Preview has no data_kind; the input mapping
@@ -29,7 +29,13 @@ test('Quality accepts only observed continuous numbers and discrete strings',()=
  const preview=fields.map(({data_kind,...f})=>f);
  assert.deepEqual(resolveQualitySource({},preview),preview);
  assert.throws(()=>resolveQualityFields({},preview));
- for(const f of [{type:'boolean'},{type:'variant'},{type:'datetime'},{type:'integer',data_kind:'Дискретный'}])
+ for(const type of ['integer','real','datetime','boolean','string'])for(const data_kind of ['Непрерывный','Дискретный']){
+  const candidate=[{name:'Typed',type,data_kind}];
+  if(['integer','real'].includes(type)||type==='datetime'&&data_kind==='Непрерывный'||['boolean','string'].includes(type)&&data_kind==='Дискретный')
+   assert.deepEqual(resolveQualityFields({},candidate),candidate);
+  else assert.throws(()=>resolveQualityFields({},candidate));
+ }
+ for(const f of [{type:'variant'},{type:'datetime',data_kind:'Дискретный'},{type:'boolean',data_kind:'Непрерывный'},{type:'string',data_kind:'Непрерывный'},{data_kind:'Неопределенное'}])
   assert.throws(()=>resolveQualityFields({},[{...fields[0],...f}]));
 });
 test('Quality configuration uses observed target kinds; source identities do not expose kinds',async()=>{
@@ -44,6 +50,13 @@ test('Quality configuration uses observed target kinds; source identities do not
  assert.deepEqual(result.configuration.fields,fields);
  assert.deepEqual(steps,['done']);
  fields[0].source.type='string';await assert.rejects(configureQuality(channel,{}, {inputMapping,request:{finish:'execute'}}),/unchanged/);
+});
+test('Quality refuses unsupported input kinds before settings gestures',async()=>{
+ const channel={observe:async()=>{throw Error('unexpected observation')},perform:async()=>{throw Error('unexpected effect')}};
+ for(const [type,data_kind] of [['variant','Дискретный'],['string','Непрерывный'],['boolean','Непрерывный'],['datetime','Дискретный']]){
+  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,target_fields:[{name:'X',type,data_kind}]};
+  await assert.rejects(configureQuality(channel,{}, {inputMapping,request:{finish:'execute'}}),/only integer\/real\/datetime\/boolean\/string|input requires/);
+ }
 });
 test('Quality reads five ports in request order and checks each independent schema',async()=>{
  const fields=[{name:'X',label:'X',type:'real'}];

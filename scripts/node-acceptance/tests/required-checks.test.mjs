@@ -49,6 +49,8 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-consequents.md','assnrules-consequents'],
+ ['docs/node-development/nodes/datamining-assnrules/fixtures/v040/train.csv','assnrules-consequents'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/modes/README.md','crosstable-datetime'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/task-numeric-aggregates.md','crosstable-numeric'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/task-scalar-aggregates.md','crosstable-scalar'],
@@ -90,6 +92,12 @@ test('REST C1 requires four single-method cases and excludes the retired eight-r
  const r=repo(t);r.commit('packages/loginom-runtime/client/lib/rest-request.mjs');const text=r.list();
  for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
  assert.ok(!text.includes('rest-methods-body'));
+});
+test('tree changes require J2 scenarios but not tree-empty-containers until J3',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/client/lib/tree-parameters.mjs');const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['table-tree-json','json-tree-json','tree-null-leaves','tree-nested-records'])assert.ok(text.includes(name));
+ assert.ok(!text.includes('tree-empty-containers'));
 });
 test('empty/unrelated diff, explicit head, subdirectory and uncommitted files',t=>{
  const r=repo(t);assert.deepEqual(ids(r.list()),[]);

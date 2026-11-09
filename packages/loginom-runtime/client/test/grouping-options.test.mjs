@@ -67,3 +67,8 @@ test('Grouping can change both literal options together',async()=>{
  assert.deepEqual(result.configuration.options,{pedDimCache:{value:false,switch_pressed:false},pedSortResult:{value:true,switch_pressed:false}});
  assert.equal(f.actions.length,2);
 });
+test('Grouping refuses a bound sort_result before changing another literal option',async()=>{
+ const f=fixture();f.native.options.pedSortResult.switch_pressed=true;
+ await assert.rejects(configureGrouping(f.channel,{cache_groups:false,sort_result:true}),/literal boolean/);
+ assert.deepEqual(f.actions,[]);assert.equal(f.native.options.pedDimCache.value,true);
+});

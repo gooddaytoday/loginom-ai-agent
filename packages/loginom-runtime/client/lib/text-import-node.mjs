@@ -535,7 +535,10 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           }
           const request=operation.nodeApply.request;
           if(request.target.kind==='existing'&&!sourceSwitch&&!request.mappings.some(m=>m.fields!==undefined)
-            &&(p.settings.analysis?.refresh||p.settings.columns?.some(c=>c.type!==undefined)||!operation.importBinding&&p.settings.source)) {
+            &&(p.settings.analysis?.refresh||p.settings.columns?.some(c=>c.type!==undefined)||!operation.importBinding&&p.settings.source)
+            // A node without a saved source has no output layout; Next on an
+            // empty path would fail natively. The patch refuses or fills first.
+            &&(operation.importBinding||(await read('text_import_file','import source before layout capture',isTextImportSourceReady)).wizard.import_source.fields.source_path.value!=='')) {
             await next('text_import_file','text_import_format');
             await next('text_import_format','output_mapping');
             outputLayout=importOutputLayoutSnapshot((await readNativeImportMapping(channel,'import output layout before configuration',
