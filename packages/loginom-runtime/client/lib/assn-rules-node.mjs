@@ -4,6 +4,7 @@ import {configureAssnRules} from './assn-rules-procedure.mjs';
 import {assnRulesConfigurationReadback} from './assn-rules-readback.mjs';
 import {readAssnRulesOutputs,assnRulesOutputColumns} from './assn-rules-output.mjs';
 import {assnRulesParametersSchema} from './node-api.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('Association rules: '+message);};
@@ -24,6 +25,12 @@ export function createAssnRulesNodeSupport(config){
    const native_mapping=state.node_mapping;
    need(native_mapping.inventory_complete&&native_mapping.source_identity_verified&&native_mapping.target_fields.length>0,'complete incoming fields required');
    if(port===0)resolveAssnRulesRoles(request.parameters,native_mapping.target_fields);
+   if(port===1){
+    // Inspect the existing source correspondence without committing a separate
+    // auxiliary mapping: roles belong to the node's own auxiliary page.
+    const close=await closePreparedWizard(channel);
+    ports.push({port,native_mapping,close});continue;
+   }
    const definition=await readOutputDefinitionPages(channel,{expectedCount:native_mapping.target_fields.length});
    need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===native_mapping.target_fields[i][k])),'incoming definition differs');
    const finish=await finishWizard('done',true,definition);

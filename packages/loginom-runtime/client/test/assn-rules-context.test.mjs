@@ -48,3 +48,18 @@ test('auxiliary role reader proves the complete typed inventory, not only its co
  assert.equal(r.inventory_complete,true);assert.equal(r.fields[0].usage_type,7);
  f.proxy.pendingOperations={read:{}};assert.equal(f.read().verified,false);
 });
+
+test('selected-item filter reads every native selection flag before claiming a configured filter',()=>{
+ const prefix='MF;TF',base=prefix+';WizrdMCF;AssnRulesWizard;',elements=[],components={};
+ const add=(tid,c={})=>{const e={id:'p'+elements.length,tid,getAttribute:key=>key==='data-tid'?tid:null,checkVisibility:()=>true,contains:()=>true};elements.push(e);components[e.id]={...c,el:{dom:e}};return e;};
+ add(base.slice(0,-1));
+ for(const [name,value] of Object.entries({pedMinSupport:50,pedExcludeLargeSupportItems:false,pedMaxSupport:90,pedSelectColumn:true,pedExcludeSingleItems:false,pedNItemsMax:3,pedMinConfidence:60,pedMinLift:0,pedNConsequentMax:2}))add(base+name+';ValueControl',{getValue:()=>value});
+ const records=[{isModel:true,internalId:'b',data:{Item:'B',Selected_Item:false}}];
+ const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,getTotalCount:()=>records.length,isLoading:()=>false};
+ add(base+'grdSelectedColumns',{getStore:()=>store});add(base+'grdSelectedColumns;headercontainer;Selected_Item',{dataIndex:'Selected_Item'});
+ const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q==='[data-tid]'?elements:[]}};
+ const read=()=>vm.runInNewContext('('+readAssnRulesBrowser.toString()+')("MF;TF")',context).selected_columns;
+ assert.equal(read().verified,true);assert.equal(read().columns[0].all_selected,false);
+ records[0].data.Selected_Item=true;assert.equal(read().columns[0].all_selected,true);
+ store.getTotalCount=()=>2;assert.equal(read().verified,false);
+});

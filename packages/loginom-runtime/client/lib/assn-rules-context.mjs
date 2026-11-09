@@ -28,7 +28,19 @@ export function readAssnRulesBrowser(prefix) {
    switches[name]=buttons.length===1&&globalThis.Ext?.getCmp?.(buttons[0].id)?.pressed===true;
   }
   if(!['pedExcludeLargeSupportItems','pedSelectColumn','pedExcludeSingleItems'].every(k=>typeof values[k]==='boolean')||!['pedMinSupport','pedMaxSupport','pedNItemsMax','pedMinConfidence','pedMinLift','pedNConsequentMax'].every(k=>typeof values[k]==='number'&&Number.isFinite(values[k])))return {verified:false,reason:'assn_rules_initializing'};
-  return {verified:true,kind:'parameters',values,switches};
+  let selected_columns={verified:false,reason:'assn_rules_selected_grid'};
+  const grids=[...document.querySelectorAll('[data-tid='+JSON.stringify(parameterBase+'grdSelectedColumns')+']')],grid=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id),store=grid?.getStore?.(),data=store?.getData?.(),records=data?.items;
+  if(grid?.el?.dom===grids[0]&&store?.$className==='Ext.data.Store'&&!store.isLoading?.()&&!store.isBufferedStore
+   &&Array.isArray(records)&&records.length<=1000&&store.getCount?.()===records.length&&store.getTotalCount?.()===records.length
+   &&(!data.getSource?.()||data.getSource().items?.length===records.length)){
+   const headers=[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')?.startsWith(parameterBase+'grdSelectedColumns;headercontainer;Selected_')&&!e.getAttribute('data-tid').slice((parameterBase+'grdSelectedColumns;headercontainer;').length).includes(';'));
+   const columns=headers.map(e=>{const c=globalThis.Ext?.getCmp?.(e.id),key=e.getAttribute('data-tid').split(';').at(-1);
+    return c?.el?.dom===e&&c.dataIndex===key&&records.every(r=>r?.isModel&&typeof r.data?.[key]==='boolean')
+     ?{field:key.slice('Selected_'.length),key,all_selected:records.every(r=>r.data[key]===true)}:null;});
+   selected_columns=columns.length>0&&columns.every(Boolean)?{verified:true,record_count:records.length,columns}
+    :{verified:false,reason:'assn_rules_selected_record',record_fields:Object.keys(records[0]?.data??{}).slice(0,24),header_count:headers.length};
+  }
+  return {verified:true,kind:'parameters',values,switches,selected_columns};
  }
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;TuneDataSourceInputPortWizard'+(auxiliary?'-1':'')+';';
  const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];

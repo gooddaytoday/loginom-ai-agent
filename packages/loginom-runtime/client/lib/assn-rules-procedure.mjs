@@ -98,6 +98,19 @@ export async function configureAssnRules(channel,p,{request,inputMapping,inputMa
   await act(state,'commit '+name,name+';ValueControl',{verb:'press',key:'Tab'});
   state=await observe(name+' readback');need(state.node_assn_rules.values[name]===value,name+' differs');
  }
+ if(wanted.pedSelectColumn){
+  const name=auxiliaryRoles.configuration.fields.find(f=>f.usage_type===auxiliaryRoles.configuration.roles.item)?.name;
+  state=await observe('complete auxiliary item selection');
+  const selected=state.node_assn_rules.selected_columns;
+  need(selected?.verified===true,'selected-item inventory unavailable: '+JSON.stringify(selected));
+  const column=selected.columns.find(c=>c.field===name);
+  need(selected.columns.length===1&&column,'one selected auxiliary item column required');
+  if(!column.all_selected){
+   await act(state,'select every auxiliary item','grdSelectedColumns;headercontainer;'+column.key,{verb:'click'});
+   state=await observe('all auxiliary items selected');
+   need(state.node_assn_rules.selected_columns?.verified===true&&state.node_assn_rules.selected_columns.columns.find(c=>c.field===name)?.all_selected===true,'auxiliary item selection differs');
+  }
+ }
  const after=(await observe('complete FP-Growth readback')).node_assn_rules;
  need(Object.entries(old.values).every(([k,v])=>after.values[k]===(Object.hasOwn(wanted,k)?wanted[k]:v))&&same(after.switches,old.switches),'unrequested parameters changed');
  await next('assn_rules','done');
