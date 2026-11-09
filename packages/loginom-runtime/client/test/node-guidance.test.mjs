@@ -9,6 +9,18 @@ import {nodeApiTools} from '../lib/node-api.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {createBundledSkillFixture,refreshSkillFixtureManifest} from './support/bundled-skill-fixture.mjs';
 
+test('outlier edit guidance delivers native limit behavior for SD and IQR',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const [description]=await loader.describeNodes([{type:'preprocessing.elim_outlier',modes:['detect','edit']}],['edit']);
+ assert.match(description.guidance,/`limit` заменяет выброс ближайшей границей нормального класса/);
+ assert.match(description.guidance,/SD и IQR/);
+ assert.match(description.guidance,/outlier_constant:0, extreme_constant:100/);
+ assert.doesNotMatch(description.guidance,/подтверждён только|не обещается/);
+ assert.doesNotMatch(NODE_TYPES['preprocessing.elim_outlier'].semantics,/established only|no broader guarantee/);
+ assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/preprocessing.elim_outlier.md')))<=6000);
+});
+
 test('each supported regression selection mode delivers complete import and output rules',async t=>{
  const source=await createBundledSkillFixture(t);
  const loader=createSkillLoader({resources:source.resources});

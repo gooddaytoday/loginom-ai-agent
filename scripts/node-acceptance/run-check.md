@@ -930,6 +930,7 @@ preprocessing-elimoutlier/acceptance; только replacement-discriminator.csv
 для limit, policies.csv для остальных из fixtures. Независимые expected/oracle
 модели не передаются. Limit SD с множителями 1/2: RowID 8, X=4.463921244845127
 с допуском 1e-10; delete: семь строк порта 0; constant: обе политики -7.
+Для limit выбран replacement-discriminator.csv: он различает границу по нормальной выборке и по всему входу; task-limit.md/policies.csv остаются отдельным примером.
 Полные typed-порты 0/1/2, три CSV, Save, cold без перенастройки и cleanup.
 
 `smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
