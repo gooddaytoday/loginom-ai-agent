@@ -3876,7 +3876,7 @@ test('import source reads exact controls and Ext checkbox equally in full roots 
   const snapshot=await page.observe(),source=snapshot.wizard.import_source;
   assert.equal(snapshot.wizard.stage,'text_import_file');assert.ok(source);
   assert.deepEqual(Object.fromEntries(Object.entries(source.fields).map(([k,v])=>[k,v.value])),{
-    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',file_info:undefined,first_line_as_title:true,parallel_processing:undefined});
+    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',file_info:undefined,max_threads:undefined,first_line_as_title:true,parallel_processing:undefined});
   assert.equal(source.fields.connection.read_only,true);assert.equal(c.native.checked,false);
   for(const options of [{discover_roots:true},{root_ref:snapshot.wizard.root_ref}]) {
     const read=await page.execute({mode:'observe',...options});assert.deepEqual(read.output.wizard.import_source,source);
@@ -3897,6 +3897,30 @@ test('file list source observes the native filename combo and parallel checkbox'
   assert.equal(fields.file_info.value,'Имя файла');assert.equal(fields.parallel_processing.value,false);
   assert.equal(fields.source_path.value,'/test/feb.csv｜/test/jan.csv');
   assert.equal(fields.parallel_processing.display_ref,snapshot.ui.elements.find(e=>e.tid===display.attrs['data-tid']).ref);
+});
+
+test('text import threads use owned native combo options in full and narrow observations',async()=>{
+ const page=new Page(),c=importSourceFixture(page),tid=c.base+'cbbMaxThreadCount;ValueControl';
+ const owner=page.add('div',tid,'',undefined,c.form),input=owner.append(new Element('input'));input.value='Автоопределение';
+ page.add('div',tid+';trg_picker','',{x:500,y:200,width:20,height:20},owner);
+ const list=page.add('div',tid+';boundlist','',{x:700,y:400,width:180,height:90});
+ page.add('div',tid+';boundlist;2','2',{x:705,y:405,width:170,height:25},list);
+ const full=await page.observe();
+ assert.equal(full.wizard.import_source.fields.max_threads?.value,'Автоопределение');
+ const narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+ assert.deepEqual(narrow.output.wizard.import_source,full.wizard.import_source);
+ const option=full.ui.elements.find(e=>e.wizard_combo?.field.name==='max_threads'&&e.wizard_combo.kind==='option');
+ assert.ok(option);
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);input.value='2';list.remove();};
+ const result=await page.act({verb:'select_wizard_option',ref:option.ref},full);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal((await page.observe()).wizard.import_source.fields.max_threads.value,'2');
+ input.disabled=true;
+ const disabled=await page.observe();
+ assert.equal(disabled.wizard.import_source.fields.max_threads.value,'2');
+ assert.equal(disabled.wizard.import_source.fields.max_threads.enabled,false);
+ assert.ok(!disabled.ui.elements.some(e=>e.wizard_combo?.field.name==='max_threads'));
 });
 
 test('import source fails closed for duplicate hidden missing controls and redacts URL values',async()=>{

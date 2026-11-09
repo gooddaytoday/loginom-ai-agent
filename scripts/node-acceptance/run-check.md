@@ -1,3 +1,11 @@
+`text-parallel` uses the unchanged text-import `task-parallel.md`, original
+January/February filenames and frozen `extended/expected-parallel.json` for
+BOTH `sequential.csv` and `parallel.csv`. Complete typed reads, row multisets,
+NULLs, duplicates and field order are checked before each export. Observed
+sequential → parallel/two threads must keep the same Import GUID and source.
+Stock Save, cold execution without configuration and cleanup apply. Only task
+and input paths reach the model; oracle/expected remain private.
+
 `text-auto-label` uses the unchanged text-import `task-auto-label.md`,
 `typed.csv` and `typed-update.csv` with their original server basenames.
 The frozen `expected-auto-label.json` and `expected-custom-label.json` check
