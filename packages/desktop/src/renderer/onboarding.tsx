@@ -3,7 +3,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ServerConnection, SettingsLoginom, useServer, useSettings, useTabs } from "@opencode-ai/app"
 import { onMount } from "solid-js"
 
-export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoaded: () => void }) {
+export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; dashboardLaunch: boolean; onLoaded: () => void }) {
   const dialog = useDialog()
   const server = useServer()
   const settings = useSettings()
@@ -12,6 +12,7 @@ export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoad
   onMount(() => {
     void runFirstLaunchOnboarding().finally(() => {
       props.onLoaded()
+      if (props.dashboardLaunch) return
       void window.api.loginom.read().then((connection) => {
         if (connection.generation) return
         void dialog.show(() => (
@@ -31,7 +32,7 @@ export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoad
       const existingInstall = await window.api.isOldLayoutEligible()
       settings.general.setOldLayoutEligible(existingInstall)
       settings.general.initializeAgentVisibility(existingInstall)
-      if (!server.isLocal()) return
+      if (props.dashboardLaunch || !server.isLocal()) return
 
       const pending = await window.api.isFirstLaunchOnboardingPending()
       if (!pending) return
