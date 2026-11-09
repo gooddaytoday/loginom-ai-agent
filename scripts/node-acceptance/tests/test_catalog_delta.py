@@ -7,6 +7,23 @@ from unittest.mock import patch
 from test_run_check import runner
 
 
+class DuplicatesCatalogTests(unittest.TestCase):
+    def test_typed_inputs_use_approved_tasks_and_exact_expectations(self):
+        node = runner.REPO / 'docs/node-development/nodes/duplicates'
+        for name, kind, expected in [('duplicates-typed', 'keys', 'expected.json'),
+                                     ('duplicates-empty', 'empty', 'expected-empty.json'),
+                                     ('duplicates-singleton', 'singleton', 'expected-singleton.json')]:
+            with self.subTest(name=name):
+                spec = runner.scenario(name)
+                self.assertEqual(spec['prompt'], node / ('acceptance/task-typed-keys.md' if kind == 'keys' else 'acceptance/task-' + kind + '.md'))
+                self.assertEqual(spec['input_files'], ['typed-' + kind + '.csv'])
+                self.assertEqual(spec['data'], node / 'fixtures')
+                self.assertIsNone(spec['base'])
+                self.assertEqual(spec['oracle'], node / 'acceptance/modes/oracle.py')
+                approved = runner.read(node / 'acceptance/modes' / expected)
+                self.assertEqual(runner.expected_for(spec, '/test/run.lgp'), dict(approved, package_path='/test/run.lgp'))
+
+
 class ExecutionErrorTests(unittest.TestCase):
     def exercise(self, fault=None, name='throw1'):
         with tempfile.TemporaryDirectory() as directory:

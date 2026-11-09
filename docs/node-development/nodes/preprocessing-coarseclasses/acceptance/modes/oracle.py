@@ -1,6 +1,10 @@
 """Independent proposed contingency tables; stdlib, no Loginom or actual output.
 
-Continuous boundaries are authored requirements, not an optimizer prediction.
+The continuous split at 7 is authored, not an optimizer prediction. LAB-1202
+observed unbounded outer limits as Variant NULL and the edited split as
+Variant/real. Boundary membership is defined by <=7/>7, including X=7.
+IncludeUpperBound=False is a native 7.4.2 observation, not a claimed setting;
+the owner approved retaining its observed value for the stock table matcher.
 Unseen->NULL and additive 0.5 smoothing are quarantined hypotheses, not native
 facts or runnable acceptance cases.
 Observations of 7.4.2, not claimed as a contract: the zero-share replacement
@@ -106,10 +110,10 @@ def expected(case):
                 ClassNumber=index, UniqueValue=None if continuous else ("A", "B")[index],
                 ClassMark=("Low", "High")[index] if continuous else ("[A]", "[B]")[index],
                 EventsCount=e, NonEventsCount=n, EventRate=e / len(group), NonEventRate=n / len(group),
-                LowerBound={"cell_type": "integer", "value": (0, 7)[index]} if continuous else None,
-                UpperBound={"cell_type": "integer", "value": (7, 14)[index]} if continuous else None,
+                LowerBound={"cell_type": "real", "value": 7} if continuous and index == 1 else None,
+                UpperBound={"cell_type": "real", "value": 7} if continuous and index == 0 else None,
                 WoE=float(woe), IV=float(iv), Weight=len(group) / len(rows),
-                IncludeUpperBound=True if continuous else None, PreQuantingApplied=False if continuous else None))
+                IncludeUpperBound=False if continuous else None, PreQuantingApplied=False if continuous else None))
         total_iv = sum(c["IV"] for c in classes)
     transformed = []
     for index, group in enumerate(groups):
@@ -127,6 +131,7 @@ def expected(case):
         EventsCount=events, NonEventsCount=non_events, EventRate=events / len(rows),
         NonEventRate=non_events / len(rows), TotalEventsCount=len(rows), IV=total_iv, Significance="Высокая")]
     if continuous:
+        result['observations'] = {'IncludeUpperBound': 'Native field, observation of 7.4.2, not claimed; boundary membership is checked by X=7 in class 0.'}
         for output in result["outputs"][:2]:
             for column in output["columns"]:
                 if column["name"] in ("X_ClassMark", "ClassMark"):
@@ -217,7 +222,8 @@ if __name__ == "__main__":
             path.write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
         if args.check:
             assert json.loads(path.read_text(encoding="utf-8")) == result, path.name
-    assert abs(expected("continuous")["outputs"][2]["rows"][0]["IV"] - float(Decimal(3).ln())) < 1e-14
+    assert abs(expected("continuous")["outputs"][2]["rows"][0]["IV"] - float(Decimal(11) / 20 * Decimal(12).ln())) < 1e-14
+    assert next(r for r in expected('continuous')['outputs'][0]['rows'] if r['X'] == 7)['X_ClassNum'] == 0
     assert all(r["Segment_ClassNum"] is None for r in expected("unseen")["outputs"][0]["rows"][1:])
     assert expected("frozen-zero")["outputs"][1]["rows"][0]["ClassNumber"] == 0
     assert expected("frozen-zero")["outputs"][1]["rows"][0]["UniqueValue"] == "B"

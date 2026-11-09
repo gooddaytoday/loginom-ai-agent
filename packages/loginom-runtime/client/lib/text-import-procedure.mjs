@@ -341,6 +341,27 @@ export function setImportFormatField(channel,initial,name,text) {
     resolve:state=>({verb:'set_wizard_field',ref:state.wizard.settings.fields[name].input_ref,text})});
 }
 
+export async function previousTextImportStep(channel,{from,to,owner,read,ready=()=>true}) {
+  const identity=c=>({node:c?.node?.tid,path:c?.path?.map(x=>({tid:x.tid,label:x.label}))});
+  const owns=state=>{
+    const w=state.wizard;
+    if(w?.status==='observed'&&!same(identity(w.owner_context),identity(owner)))throw Error('Text import wizard owner changed');
+    return w?.status==='observed';
+  };
+  const previousReady=state=>owns(state)&&state.wizard.stage===from&&state.ui.elements.filter(e=>
+    e.tid===state.wizard.root_tid+';btnPrev'&&e.allowed_actions.includes('wizard_step')).length===1;
+  // Complete definitions can precede a late format-card repaint. Confirm an
+  // unchanged epoch across the existing readiness window; never replay Back.
+  const confirmIdentity=state=>state.dom_epoch;
+  const s=await read(from,'Previous control available',previousReady,{confirmIdentity});
+  await channel.perform({condition:from+': Previous control available',initialObservation:s,
+    ready:previousReady,confirmIdentity,
+    identity:state=>({owner:identity(state.wizard.owner_context),root_tid:state.wizard.root_tid,stage:state.wizard.stage}),
+    resolve:state=>({verb:'wizard_step',ref:one(state.ui.elements.filter(e=>
+      e.tid===state.wizard.root_tid+';btnPrev'&&e.allowed_actions.includes('wizard_step')),'Unique Previous required').ref,expected_stage:to})});
+  return read(to,'existing source returned',state=>owns(state)&&ready(state));
+}
+
 async function configureImport(channel, parameters, owner,fieldsOnly,patch,boundSource=false) {
   if(patch?.preserveSchema)requireValue(Object.keys(parameters).join(',')==='source'
     &&Object.keys(parameters.source??{}).join(',')==='source_path',
@@ -417,22 +438,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   if(patch&&Object.keys(parameters.source).length) {
     await next('text_import_file','text_import_format');
     await capturePatchSchema();
-    const previousReady=state=>{
-      const w=state.wizard;
-      if(w?.status==='observed'&&!same(identity(w.owner_context),identity(currentOwner)))throw Error('Text import wizard owner changed');
-      return w?.status==='observed'&&w.stage==='text_import_format'&&state.ui.elements.filter(e=>
-        e.tid===w.root_tid+';btnPrev'&&e.allowed_actions.includes('wizard_step')).length===1;
-    };
-    // Complete definitions can precede a late format-card repaint. Confirm an
-    // unchanged epoch across the existing 200 ms readiness window. A later
-    // no-effect refusal may reacquire this same Back control, never replay it.
-    const confirmIdentity=state=>state.dom_epoch;
-    const s=await read('text_import_format','Previous control available',previousReady,{confirmIdentity});
-    await channel.perform({condition:'text_import_format: Previous control available',initialObservation:s,
-      ready:previousReady,confirmIdentity,
-      identity:state=>({owner:identity(state.wizard.owner_context),root_tid:state.wizard.root_tid,stage:state.wizard.stage}),
-      resolve:state=>({verb:'wizard_step',ref:control(state,'btnPrev','wizard_step'),expected_stage:'text_import_file'})});
-    await read('text_import_file','existing source returned',isTextImportSourceReady);
+    await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner:currentOwner,read,ready:isTextImportSourceReady});
   }
 
   for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title']) {

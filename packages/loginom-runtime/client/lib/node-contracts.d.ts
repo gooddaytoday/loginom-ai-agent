@@ -428,14 +428,14 @@ export interface TreeConfigurationReadback {
   scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; package_persistence_verified: false;
   json_field?: string; root_mode?: 'auto'; auto_structure?: true; strict?: true; exclude_root?: false;
-  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.';
+  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.'; global_index_paths?: string[];
 }
 export interface TreeNodeOutputPort {
   port: number; port_guid: string; port_kind: 'tree'; fresh: true; execution_id: string;
   freshness_basis: 'completed_execution_port_source'; sample_complete: true;
   tree: {complete: true; node_count: number; max_depth: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
     schema: Array<{index: number; parent: number | null; path: string; name: string; label: string; type: string; is_container: boolean; is_array: boolean; children: number[]}>;
-    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string}>};
+    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string; timezone?: string}>};
 }
 export interface AutoCorrelationConfigurationReadback {
  kind: 'auto_correlation'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
@@ -460,7 +460,7 @@ export interface QualityConfigurationReadback {
 }
 export interface CoarseClassesConfigurationReadback {
  kind: 'coarse_classes'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values'; node: NodeRef; receipt_ids: string[];
- mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic';
+ mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic' | 'manual';
  min_class_percent: number; max_classes: number; uniformity_percent: number;
  roles: {name: string; role: 'unused' | 'input' | 'target'}[];
  state: 'settings' | 'materialized'; classes: {number: number; mark: string; woe: number; iv: number}[]; total_iv: number | null;
@@ -531,7 +531,7 @@ export interface VariablesCalculatorConfigurationReadback {
 export interface DataToVarParameters { fields?: Array<{field: {kind: 'input_field'; name: string}; aggregations: Array<'sum'|'count'|'min'|'max'|'avg'>}> }
 export interface DataToVarConfigurationReadback {
  kind: 'variables_from_table'; mode: 'aggregate'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
- node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'; order: number; aggregations: string[]}>;
+ node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'|'string'|'boolean'|'datetime'; order: number; aggregations: string[]}>;
  input_mapping: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string; type: string; source_name: string}>};
  output_port: 0; port_kind: 'variables'; package_persistence_verified: false;
 }
