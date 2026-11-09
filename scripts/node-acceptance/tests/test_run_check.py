@@ -213,6 +213,18 @@ class RunCheckTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.csv_result({k: v for k, v in output.items() if k != 'header'}, stream.getvalue())
 
+    def test_csv_non_finite_real_matches_loginom_spelling_not_null_or_empty(self):
+        # v040-nan-exact: LAB-1314 actual-2.csv writes native NaN as "Nan".
+        output = dict(columns=[dict(name='Q', type='real', tolerance=dict(abs=1e-12, rel=1e-12))], rows=[dict(Q={'non_finite': 'NaN'})])
+        for text in ['Nan', 'NaN', 'nan']:
+            self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
+        for text in ['""', '?', '0', 'Inf']:
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(dict(output, rows=[dict(Q=None)]), 'Q\nNan\n', null_marker='?')
+        self.csv_result(dict(output, rows=[dict(Q={'non_finite': '-Infinity'})]), 'Q\n-Inf\n', null_marker='?')
+
     def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
         output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
                       rows=[dict(A=1, B=1), dict(A=2, B=3)])
@@ -2528,5 +2540,43 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 mutate(receipt)
                 self.assertFalse(runner.save_confirmed(case, receipt, package))
             self.assertFalse(runner.save_confirmed(case, save, '/other.lgp'))
+
+    def test_coarse_frozen_trainings_without_training_readback_fail_with_code(self):
+        def reply(execution, training=True):
+            readback = dict(kind='coarse_classes', frozen_partition=dict(locked=True))
+            if training: readback['training'] = dict(source=dict(file='/test/train.csv'))
+            return (0, dict(status='SUCCEEDED', node=dict(node_id='node'), configuration=dict(readback=readback),
+                            execution=dict(execution_id=execution, status='completed'),
+                            output=dict(ports=[dict(port=0, schema=[], sample=[])])))
+        runner.check_coarse_frozen_trainings([reply('first'), reply('second')])
+        with self.assertRaisesRegex(AssertionError, 'COARSE_FROZEN_SAME_IMPORT'):
+            runner.check_coarse_frozen_trainings([reply('first'), reply('second', training=False)])
+        with self.assertRaisesRegex(AssertionError, 'COARSE_FROZEN_SAME_IMPORT'):
+            runner.check_coarse_frozen_trainings([reply('first', training=False), reply('second', training=False)])
+
+    def test_binning_ties_current_binds_the_oracle_that_reproduces_its_expected(self):
+        self.assertEqual(runner.scenario('binning-ties-current')['oracle'].name, 'oracle-edges.py')
+        self.assertEqual(runner.scenario('binning-ties-current')['expected_name'], 'modes/expected-current.json')
+        for name in ['binning-auto', 'binning-sd']:
+            self.assertEqual(runner.scenario(name)['oracle'].name, 'oracle.py')
+
+    def test_export_patch_readback_requires_the_same_nonempty_operation_id(self):
+        def events(request_id='export', readback_id='export', status='SUCCEEDED'):
+            batch = self.export_events(kind='existing', readback='NULL')
+            request = batch[0][1]['part']['state']['input']
+            request['parameters'] = dict(destination='/test/all.csv')
+            if request_id is None: del request['operation_id']
+            outcome = json.loads(batch[1][1]['part']['state']['output'])
+            outcome['status'] = status
+            if readback_id is None: del outcome['operation_id']
+            else: outcome['operation_id'] = readback_id
+            batch[1][1]['part']['state']['output'] = json.dumps(outcome)
+            return batch
+        self.assertEqual(runner.export_null_marker(events(), '/test/all.csv'), 'NULL')
+        for label, batch in [('both without operation_id', events(None, None)),
+                             ('foreign operation_id', events(readback_id='unrelated')),
+                             ('unsuccessful readback', events(status='FAILED'))]:
+            with self.subTest(label), self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING: .*same operation_id'):
+                runner.export_null_marker(batch, '/test/all.csv')
 
 if __name__ == '__main__': unittest.main()

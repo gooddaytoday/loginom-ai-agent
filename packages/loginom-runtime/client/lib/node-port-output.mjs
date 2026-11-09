@@ -195,6 +195,10 @@ export function decodePortCell(raw,type) {
   return exact(text,'decimal_integer','exact_integer');
  }
  if(type==='real'&&typeof raw==='number'&&Number.isFinite(raw))return exact(raw,'binary64','17_significant_digits',{decimal:Object.is(raw,-0)?'-0':String(raw)});
+ // Owner decision v040-nan-exact: a native non-finite binary64 is an exact
+ // value with an explicit marker, distinct from NULL. JSON cannot carry it.
+ if(['real','variant'].includes(type)&&typeof raw==='number'&&!Number.isFinite(raw))
+  return {cell:{type,is_null:false,value:null,non_finite:Number.isNaN(raw)?'NaN':raw>0?'Infinity':'-Infinity',representation:'binary64_non_finite',precision:'exact_non_finite'},limitations:[]};
  if(type==='string'&&typeof raw==='string')return exact(raw,'data_source_string','source_text');
  if(type==='boolean'&&typeof raw==='boolean')return exact(raw,'data_source_boolean','exact_boolean');
  if((type==='datetime'||type==='variant')&&raw instanceof Date){

@@ -12,6 +12,16 @@ export const autoDetectLabels={none:'Нет',new:'Только новые',all:'
 const autoDetectMode=label=>Object.keys(autoDetectLabels).find(k=>autoDetectLabels[k]===label);
 export const autoTypesRequested=p=>['new','all'].includes(p?.format?.auto_detect_columns)||!!p?.analysis?.refresh;
 export const fileInfoLabels={none:'Нет',name:'Имя файла'};
+export function textImportSourceMask(source) {
+  const mask=source.source_mask;
+  requireValue(typeof mask==='string'&&mask.length<=2048&&mask.startsWith('/')&&!mask.startsWith('//')
+    &&!Object.hasOwn(source,'source_path')&&!Object.hasOwn(source,'source_paths')
+    &&!/[｜|?%\\\x00-\x1f\[\]{}]/.test(mask)
+    &&mask.split('/').slice(1).every(p=>p&&p!=='.'&&p!=='..')
+    &&!mask.slice(0,mask.lastIndexOf('/')).includes('*')&&mask.slice(mask.lastIndexOf('/')+1).includes('*'),
+    'source_mask requires * in the basename of one storage directory; never source_path(s)');
+  return mask;
+}
 export function textImportSourcePaths(source) {
   const list=Object.hasOwn(source,'source_paths');
   requireValue(!list||!Object.hasOwn(source,'source_path'),'Choose source_path or source_paths');
@@ -82,8 +92,9 @@ function validateSettings(p,maxColumns) {
   requireValue(Object.keys(p).filter(k=>k!=='analysis').sort().join(',') === (auto&&!Object.hasOwn(p,'columns')?'format,source':'columns,format,source'), 'Unexpected text import parameters');
   if(Object.hasOwn(p,'analysis'))validateAnalysis(p.analysis);
   requireValue(p.source&&['encoding','first_line_as_title','rows_to_skip'].every(k=>Object.hasOwn(p.source,k))
-    &&Object.keys(p.source).every(k=>['encoding','first_line_as_title','rows_to_skip','source_path','source_paths','file_info'].includes(k)), 'Source parameters are incomplete');
-  textImportSourcePaths(p.source);
+    &&Object.keys(p.source).every(k=>['encoding','first_line_as_title','rows_to_skip','source_path','source_paths','source_mask','file_info'].includes(k)), 'Source parameters are incomplete');
+  if(Object.hasOwn(p.source,'source_mask'))textImportSourceMask(p.source);
+  else textImportSourcePaths(p.source);
   if(Object.hasOwn(p.source,'file_info'))requireValue(Object.hasOwn(fileInfoLabels,p.source.file_info),'Invalid file_info');
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
   requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
@@ -136,7 +147,7 @@ export class ImportInitialSettingsError extends Error {
 export function validateInitialExistingImportSettings(parameters,verifiedSourcePath) {
   try {
     validateTextImportFieldsRequest(parameters);
-    requireValue(textImportSourcePaths(parameters.source).join('｜')===verifiedSourcePath,'Existing source does not match the verified upload');
+    requireValue((Object.hasOwn(parameters.source,'source_mask')?textImportSourceMask(parameters.source):textImportSourcePaths(parameters.source).join('｜'))===verifiedSourcePath,'Existing source does not match the verified upload');
     requireValue(parameters.columns===undefined||parameters.columns.some(c=>c.used),'Import output requires at least one used field');
   } catch(error) {
     throw new ImportInitialSettingsError(error.message);
@@ -152,8 +163,8 @@ export function validateTextImportPatch(p) {
   const format={delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
   for(const [name,defaults] of Object.entries({source,format})) {
     if(!Object.hasOwn(p,name))continue;
-    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='source'&&['source_paths','file_info'].includes(k)||name==='format'&&['multiple_delimiters','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
-    if(name==='source'&&Object.hasOwn(p.source,'source_paths')&&!Object.hasOwn(p.source,'source_path'))delete defaults.source_path;
+    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='source'&&['source_paths','source_mask','file_info'].includes(k)||name==='format'&&['multiple_delimiters','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
+    if(name==='source'&&['source_paths','source_mask'].some(k=>Object.hasOwn(p.source,k))&&!Object.hasOwn(p.source,'source_path'))delete defaults.source_path;
     Object.assign(defaults,p[name]);
   }
   requireValue(!Object.hasOwn(p,'columns') || Array.isArray(p.columns)&&p.columns.length<=1000,'Invalid column patch list');
@@ -386,6 +397,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   const requested=structuredClone(parameters);
   // Serialize only after validation; preflight verifies every path separately.
   if(parameters.source?.source_paths){parameters.source.source_path=textImportSourcePaths(parameters.source).join('｜');delete parameters.source.source_paths;}
+  if(Object.hasOwn(parameters.source??{},'source_mask')){parameters.source.source_path=textImportSourceMask(parameters.source);delete parameters.source.source_mask;}
   requireValue(owner?.status === 'observed' && owner.node?.tid && owner.path?.length, 'An observed wizard owner is required');
   let currentOwner = owner;
   let columnOffset=0;
@@ -458,7 +470,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   }
 
   for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title','file_info','parallel_processing']) {
-    const sequential=name==='parallel_processing'&&requested.source?.source_paths;
+    const sequential=name==='parallel_processing'&&(requested.source?.source_paths||requested.source?.source_mask);
     if(sequential)parameters.source.parallel_processing=false;
     if(['file_info','parallel_processing'].includes(name)&&!Object.hasOwn(parameters.source,name))continue;
     if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;

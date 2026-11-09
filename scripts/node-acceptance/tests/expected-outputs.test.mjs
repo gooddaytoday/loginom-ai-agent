@@ -209,3 +209,16 @@ test('W1 cold variable/control links match exact typed namespaces and reject an 
  assert.equal(matchVariableInventoryLinks(graph,inventory).length,1);graph.variable_links[0].kind='variables';assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
  graph.variable_links[0].kind='control';graph.nodes.push({ref:{node_id:'other'},type:'transform.calculator'});assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
 });
+
+// v040-nan-exact: expected {non_finite} matches only the exact marked typed cell.
+test('expected non-finite Real matches the exact typed marker, never NULL or a number',()=>{
+ const want=v=>({...report({non_finite:v}),columns:[columns[0],{...columns[1],tolerance:{abs:1e-12,rel:1e-12}}]});
+ const marked=(v)=>{const a=actual('nan',0),cell=a.data.sample[0][1];for(const k of Object.keys(cell))delete cell[k];Object.assign(cell,{type:'real',is_null:false,value:null,non_finite:v,representation:'binary64_non_finite',precision:'exact_non_finite'});return a;};
+ for(const v of ['NaN','Infinity','-Infinity'])assert.equal(matchExpectedOutputs([marked(v)],[want(v)]).length,1);
+ assert.throws(()=>matchExpectedOutputs([marked('Infinity')],[want('NaN')]));
+ const nul=actual('null',0);Object.assign(nul.data.sample[0][1],{is_null:true,value:null,precision:'exact_null'});
+ assert.throws(()=>matchExpectedOutputs([nul],[want('NaN')]));
+ assert.throws(()=>matchExpectedOutputs([marked('NaN')],[report(null)]));
+ assert.throws(()=>matchExpectedOutputs([marked('NaN')],[report(1)]));
+ assert.throws(()=>parseExpectedOutputs({package_path:'/t.lgp',nodes:[],outputs:[report({non_finite:'nan'})]}));
+});

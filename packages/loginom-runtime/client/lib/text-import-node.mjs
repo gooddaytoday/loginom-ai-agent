@@ -4,7 +4,7 @@ import {validateImportSource} from './storage-policy.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
-import {autoTypesRequested,textImportSourcePaths,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError,previousTextImportStep} from './text-import-procedure.mjs';
+import {autoTypesRequested,textImportSourcePaths,textImportSourceMask,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError,previousTextImportStep} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
@@ -75,6 +75,7 @@ export function validateTextImportNodeParameters(p,mode,request) {
     'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
   if(p.source)validateTextSource(p.source);
   requireValue(!p.settings.source?.source_paths||p.source?.kind==='verified_sources','source_paths requires verified_sources');
+  requireValue(!Object.hasOwn(p.settings.source??{},'source_mask')||p.source?.kind==='verified_sources','source_mask requires verified_sources');
   requireValue(p.source?.kind!=='verified_sources'||!p.source_switch&&!request.bindings?.length,'Lists cannot use a binding or source_switch');
   if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&(request.finish==='done'&&request.read.ports.length===0
     ||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
@@ -103,6 +104,13 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
       source_path:paths?.[i]??(source.kind==='storage'?storageProof?.[i]?.destination:undefined)}}},uploads,uploadHistory,storageProof?.[i]).source);
     const destinations=sources.map(source=>source.destination);
     textImportSourcePaths({source_paths:destinations});
+    if(Object.hasOwn(declared,'source_mask')){
+      const mask=textImportSourceMask(declared),directory=mask.slice(0,mask.lastIndexOf('/')+1);
+      const pattern=new RegExp('^'+mask.slice(directory.length).split('*').map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*')+'$');
+      requireValue(destinations.every(p=>p.slice(0,p.lastIndexOf('/')+1)===directory&&pattern.test(p.slice(directory.length))),
+        'Every verified source must match source_mask in the same directory');
+      return verified({source:{kind:'verified_sources',destination:mask,sources}});
+    }
     return verified({source:{kind:'verified_sources',destination:destinations.join('｜'),sources}});
   }
   if(s.kind==='storage') {

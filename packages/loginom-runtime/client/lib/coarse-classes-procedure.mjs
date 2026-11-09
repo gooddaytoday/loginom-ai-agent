@@ -87,7 +87,9 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
   need(s.node_coarse_classes.settings.include_upper_input===true,'manual partition requires an inclusive upper boundary');
  }
  const settings=s.node_coarse_classes.settings;
- need(input.frozen||settings.fine_classes===false,'initial-class bypass is outside this stage');
+ // A locked predictor skips fine classes only when frozen was requested or
+ // when apply reuses the saved node; an unrequested lock must not bypass it.
+ need((applying||wanted.frozen)&&input.frozen||settings.fine_classes===false,'initial-class bypass is outside this stage');
  const configuration={...s.node_coarse_classes,mode:request.mode,input_field:input.name,target_field:target.name,event_value:event,partition:wanted?.partition??'automatic',frozen:wanted?.frozen===true,min_class_percent:settings.min_class_percent,max_classes:settings.max_classes,uniformity_percent:settings.uniformity_percent,fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),roles:s.node_coarse_classes.fields.map(({name,role})=>({name,role}))};
  const next=async(stage,destination)=>{
   await channel.perform({condition:'accept coarse classes '+stage,ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,

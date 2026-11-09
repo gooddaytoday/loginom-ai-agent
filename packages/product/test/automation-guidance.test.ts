@@ -119,3 +119,11 @@ test("variables calculator dependencies use the Expr. prefix accepted in Loginom
   expect(schema).toContain("Expr.name refers to an earlier expression")
   expect(settings).not.toMatch(/Expr\.[^\n]*не поддерж/)
 })
+
+test("binning ties guidance keeps the rule without echoing the acceptance task", async () => {
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/preprocessing.binning.md", import.meta.url)).text()
+  expect(settings).toContain('ties:"current"')
+  expect(settings).toContain("совпадения на границе остаются в текущем интервале")
+  expect(settings).not.toContain('size:4,ties:"current"')
+  expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
+})
