@@ -61,3 +61,8 @@ test('an unrequested frozen predictor does not bypass the initial-class check; s
  await assert.rejects(run('internal',{fine_classes:true}),/initial-class bypass is outside this stage/);
  assert.equal((await run('apply',{})).settings_applied,false);
 });
+
+test('an unknown coarse_classes key names frozen among the optional settings',()=>{
+ const c={input_field:'Segment',target_field:'Target',event_value:'yes',partition:'automatic',min_class_percent:5,max_classes:2,uniformity_percent:0,locked:true};
+ assert.throws(()=>validateCoarseClassesParameters({coarse_classes:c},'internal'),/optional manual cut or frozen/);
+});
