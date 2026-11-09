@@ -50,15 +50,15 @@ export function validateTreeJsonScope(text){
   if(token===','){top.key=true;continue;}if(token===':'){top.key=false;continue;}
   if(top.key&&token.startsWith('"')){const key=JSON.parse(token);if(top.keys.has(key))throw Error('Duplicate JSON keys are outside tree stage 1');top.keys.add(key);top.key=false;}
  }
- let nodes=0;const arrays=new Set(),kinds=new Map(),leafNames=new Map();
+ let nodes=0;const arrays=new Map(),kinds=new Map(),leafNames=new Map();
  const walk=(value,depth,path='')=>{
   if(++nodes>256||depth>16)throw Error('Tree JSON exceeds 256 nodes or depth 16');
   if(value===null||numbers.has(value)||['string','boolean'].includes(typeof value)){
    if(typeof value==='string'&&/^\d{4}-\d\d-\d\d(?:T|$)/.test(value))throw Error('Tree stage 1 does not support inferred dates');return;
   }
   if(Array.isArray(value)){
-   if(!value.length||value.some(v=>!v||typeof v!=='object'||Array.isArray(v)||numbers.has(v)))throw Error('Tree stage 1 requires one nonempty repeated object branch');
-   arrays.add(path);validateJsonArrayPaths([...arrays]);
+   if(value.some(v=>!v||typeof v!=='object'||Array.isArray(v)||numbers.has(v)))throw Error('Tree stage 1 requires one nonempty repeated object branch');
+   arrays.set(path,arrays.get(path)===true||value.length>0);validateJsonArrayPaths([...arrays.keys()]);
    for(const record of value)walk(record,depth+1,path);return;
   }
   if(!value||typeof value!=='object')throw Error('Tree stage 1 requires an object document');
@@ -75,6 +75,7 @@ export function validateTreeJsonScope(text){
  };
  if(!root||typeof root!=='object'||Array.isArray(root)||numbers.has(root))throw Error('Tree stage 1 requires one JSON object');
  walk(root,0);if(!arrays.size)throw Error('Tree stage 1 requires one repeated object branch');
+ if([...arrays.values()].some(witness=>!witness))throw Error('Tree stage 1 requires an object-array witness for each empty array path');
  return {verified:true,node_count:nodes};
 }
 
