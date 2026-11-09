@@ -461,7 +461,7 @@ for (const direction of ['input', 'output']) test(`${direction} port ignores hid
  assert.equal((await g.run()).status,'AMBIGUOUS');assert.equal(g.gestures.length,1);
 });
 
-for(const icon of ['bg-vendor-icon-uniondata','bg-vendor-icon-coluniondata'])test(icon+' dynamic SVG creation index is rebound to the native tabular ordinal',async()=>{
+for(const icon of ['bg-vendor-icon-uniondata','bg-vendor-icon-coluniondata','bg-vendor-icon-coarseclasses'])test(icon+' dynamic SVG creation index is rebound to the native tabular ordinal',async()=>{
  const f=fixture('input');f.node.FIconCls=icon;f.portDom.tid='MF;TF;Graph;Node;Input_Data-3';f.portDom.getAttribute=()=>f.portDom.tid;
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.native_index,0);assert.equal(r.port,0);assert.equal(r.port_guid,'port');
  const bad=fixture('input');bad.node.FIconCls=icon;bad.port.FPortIndex=1;assert.equal((await bad.run()).status,'NOT_APPLIED');assert.equal(bad.gestures.length,0);
