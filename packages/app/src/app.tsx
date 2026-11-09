@@ -269,6 +269,7 @@ function LayoutCompatibility(props: ParentProps) {
 declare global {
   interface Window {
     __LOGINOM_AI_AGENT__?: {
+      coldDashboard?: string
       deepLinks?: string[]
     }
     api?: {

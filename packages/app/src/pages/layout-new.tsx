@@ -6,8 +6,10 @@ import { TabsInfoPopup } from "@/components/help-button"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { usePlatform } from "@/context/platform"
 import { setV2Toast, ToastRegion } from "@/utils/toast"
+import { useDashboardDeepLinks } from "./layout/dashboard-links"
 
 export default function NewLayout(props: ParentProps) {
+  useDashboardDeepLinks()
   const platform = usePlatform()
   const [state, setState] = createStore({ debugTools: true })
 

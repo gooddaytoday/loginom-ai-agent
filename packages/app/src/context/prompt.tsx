@@ -1,7 +1,8 @@
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { createSimpleContext } from "@opencode-ai/ui/context"
-import { useParams, useSearchParams } from "@solidjs/router"
-import { createMemo, createResource, createRoot, getOwner, onCleanup } from "solid-js"
+import { useLocation, useParams, useSearchParams } from "@solidjs/router"
+import { createEffect, createMemo, createResource, createRoot, getOwner, onCleanup } from "solid-js"
+import { dashboardRoute, takeDashboard } from "@/pages/layout/dashboard-handoff"
 import { requireServerKey } from "@/utils/session-route"
 import { ServerConnection } from "./server"
 import { useServerSDK } from "./server-sdk"
@@ -76,7 +77,9 @@ export const { use: usePrompt, provider: PromptProvider } = createSimpleContext(
   init: () => {
     const params = useParams<{ serverKey?: string; id?: string }>()
     const sdk = useSDK()
-    const [search] = useSearchParams<{ draftId?: string }>()
+    const location = useLocation()
+    const [search] = useSearchParams<{ draftId?: string; dashboardDraft?: string }>()
+    const draftID = () => search.draftId || search.dashboardDraft
     const serverSDK = useServerSDK()
     const tabs = useTabs()
     const settings = useSettings()
@@ -102,8 +105,10 @@ export const { use: usePrompt, provider: PromptProvider } = createSimpleContext(
     const owner = getOwner()
     const serverKey = () =>
       params.serverKey ? requireServerKey(params.serverKey) : ServerConnection.key(serverSDK().server)
-    const scope = (): PromptScope =>
-      search.draftId ? { draftID: search.draftId } : { dir: base64Encode(sdk().directory), id: params.id }
+    const scope = (): PromptScope => {
+      const id = draftID()
+      return id ? { draftID: id } : { dir: base64Encode(sdk().directory), id: params.id }
+    }
     const load = (scope: PromptScope) => {
       const current = settings.general.newLayoutDesigns() ? selectPromptTab(tabs.store, scope, serverKey()) : undefined
       if (current) return createTabPromptState(tabs, current, serverSDK().scope, scope)
@@ -130,6 +135,12 @@ export const { use: usePrompt, provider: PromptProvider } = createSimpleContext(
     }
 
     const session = createMemo(() => load(scope()))
+    createEffect(() => {
+      const recipient = session()
+      if (!recipient.ready()) return
+      const item = takeDashboard(dashboardRoute(serverKey(), location.pathname, draftID()))
+      if (item) recipient.context.add(item)
+    })
     const pick = (scope?: PromptScope) => (scope ? load(scope) : session())
     const ready = createPromptReady(session)
 
