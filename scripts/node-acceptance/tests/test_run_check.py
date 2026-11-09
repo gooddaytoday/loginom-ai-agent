@@ -233,6 +233,13 @@ class RunCheckTests(unittest.TestCase):
                 with self.subTest(goal=goal, text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                     self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
 
+    def test_types300_csv_non_finite_target_compares_marker_instead_of_raising(self):
+        output = dict(columns=[dict(name='Q', type='real')], rows=[dict(Q={'non_finite': 'NaN'})])
+        self.csv_result(output, 'Q\nNan\n', null_marker='?', scenario_name='types300')
+        for text in ['0', '1E+00', '?']:
+            with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'Q\n' + text + '\n', null_marker='?', scenario_name='types300')
+
     def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
         output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
                       rows=[dict(A=1, B=1), dict(A=2, B=3)])
