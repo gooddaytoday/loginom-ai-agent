@@ -54,12 +54,13 @@ test('selected-item filter reads every native selection flag before claiming a c
  const add=(tid,c={})=>{const e={id:'p'+elements.length,tid,getAttribute:key=>key==='data-tid'?tid:null,checkVisibility:()=>true,contains:()=>true};elements.push(e);components[e.id]={...c,el:{dom:e}};return e;};
  add(base.slice(0,-1));
  for(const [name,value] of Object.entries({pedMinSupport:50,pedExcludeLargeSupportItems:false,pedMaxSupport:90,pedSelectColumn:true,pedExcludeSingleItems:false,pedNItemsMax:3,pedMinConfidence:60,pedMinLift:0,pedNConsequentMax:2}))add(base+name+';ValueControl',{getValue:()=>value});
- const records=[{isModel:true,internalId:'b',data:{Item:'B',Selected_Item:false}}];
+ const records=[{isModel:true,internalId:'b',data:{Name:'Item',DataType:5,UsageType:9,Selected:false}}];
  const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,getTotalCount:()=>records.length,isLoading:()=>false};
- add(base+'grdSelectedColumns',{getStore:()=>store});add(base+'grdSelectedColumns;headercontainer;Selected_Item',{dataIndex:'Selected_Item'});
- const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q==='[data-tid]'?elements:[]}};
+ add(base+'grdSelectedColumns',{getStore:()=>store});const selected=add(base+'grdSelectedColumns;headercontainer;Selected_Item');
+ selected.querySelectorAll=()=>[{classList:{contains:key=>key==='x-grid-checkcolumn-checked'&&records[0].data.Selected}}];
+ const context={bg:{TBGUsageType:{utItem:9}},Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):q==='[data-tid]'?elements:[]}};
  const read=()=>vm.runInNewContext('('+readAssnRulesBrowser.toString()+')("MF;TF")',context).selected_columns;
  assert.equal(read().verified,true);assert.equal(read().columns[0].all_selected,false);
- records[0].data.Selected_Item=true;assert.equal(read().columns[0].all_selected,true);
+ records[0].data.Selected=true;assert.equal(read().columns[0].all_selected,true);
  store.getTotalCount=()=>2;assert.equal(read().verified,false);
 });

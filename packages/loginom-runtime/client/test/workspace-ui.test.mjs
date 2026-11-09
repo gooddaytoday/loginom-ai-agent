@@ -8420,3 +8420,15 @@ test('auxiliary association role selection binds its own grid and native dialog'
   assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));assert.equal(page.events.filter(e=>e==='click').length,1);
  }
 });
+
+test('association selected-field checkbox is exposed only on its parameter page',async()=>{
+ const page=new Page(),base='MF;TF-1;WizrdMCF',wizard=page.add('div',base);
+ const marker=page.add('div',base+';AssnRulesWizard;pedMinSupport','',undefined,wizard);
+ const flag=page.add('td',base+';AssnRulesWizard;grdSelectedColumns;headercontainer;Selected_Item','Item',undefined,wizard);
+ let snapshot=await page.observe();assert.equal(snapshot.wizard.stage,'assn_rules');
+ const control=snapshot.ui.elements.find(e=>e.tid===flag.attrs['data-tid']);
+ assert.ok(control?.allowed_actions.includes('click'));
+ assert.equal((await page.act({verb:'click',ref:control.ref},snapshot)).status,'SUCCEEDED');
+ marker.remove();page.add('div',base+';DoneWizard;edtDisplayName','',undefined,wizard);
+ snapshot=await page.observe();assert.equal(snapshot.ui.elements.some(e=>e.tid===flag.attrs['data-tid']),false);
+});

@@ -33,12 +33,17 @@ export function readAssnRulesBrowser(prefix) {
   if(grid?.el?.dom===grids[0]&&store?.$className==='Ext.data.Store'&&!store.isLoading?.()&&!store.isBufferedStore
    &&Array.isArray(records)&&records.length<=1000&&store.getCount?.()===records.length&&store.getTotalCount?.()===records.length
    &&(!data.getSource?.()||data.getSource().items?.length===records.length)){
-   const headers=[...document.querySelectorAll('[data-tid]')].filter(e=>e.getAttribute('data-tid')?.startsWith(parameterBase+'grdSelectedColumns;headercontainer;Selected_')&&!e.getAttribute('data-tid').slice((parameterBase+'grdSelectedColumns;headercontainer;').length).includes(';'));
-   const columns=headers.map(e=>{const c=globalThis.Ext?.getCmp?.(e.id),key=e.getAttribute('data-tid').split(';').at(-1);
-    return c?.el?.dom===e&&c.dataIndex===key&&records.every(r=>r?.isModel&&typeof r.data?.[key]==='boolean')
-     ?{field:key.slice('Selected_'.length),key,all_selected:records.every(r=>r.data[key]===true)}:null;});
-   selected_columns=columns.length>0&&columns.every(Boolean)?{verified:true,record_count:records.length,columns}
-    :{verified:false,reason:'assn_rules_selected_record',record_fields:Object.keys(records[0]?.data??{}).slice(0,24),header_count:headers.length};
+   const role=globalThis.bg?.TBGUsageType?.utItem,fields=records.filter(r=>r?.data?.UsageType===role);
+   const columns=fields.map(r=>{
+    const d=r.data,key='Selected_'+d.Name,headers=[...document.querySelectorAll('[data-tid='+JSON.stringify(parameterBase+'grdSelectedColumns;headercontainer;'+key)+']')];
+    const images=headers.length===1?headers[0].querySelectorAll('img.x-grid-checkcolumn'):[];
+    return r.isModel&&typeof d.Name==='string'&&d.Name.length>0&&d.Name.length<=128&&d.DataType===5&&typeof d.Selected==='boolean'
+     &&images.length===1&&images[0].classList.contains('x-grid-checkcolumn-checked')===d.Selected
+      ?{field:d.Name,key,record_id:String(r.internalId),all_selected:d.Selected}:null;
+   });
+   selected_columns=Number.isInteger(role)&&columns.length>0&&columns.every(Boolean)&&new Set(columns.map(c=>c.field)).size===columns.length
+    ?{verified:true,record_count:records.length,columns}
+    :{verified:false,reason:'assn_rules_selected_record',record_fields:Object.keys(records[0]?.data??{}).slice(0,24),selected_field_count:fields.length};
   }
   return {verified:true,kind:'parameters',values,switches,selected_columns};
  }
