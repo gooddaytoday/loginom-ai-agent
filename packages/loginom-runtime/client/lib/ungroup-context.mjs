@@ -66,7 +66,7 @@ export function readUngroupBrowser(prefix){
  // Native seasonal disables the balance editor but keeps its raw value: report
  // that value separately; the applied policy is none only for seasonal+disabled.
  const balanceDisabled=cmp('pedBalanceMethod')?.isDisabled?.();
- if(typeof balanceDisabled!=='boolean')return fail('ungroup_option_or_variable');
+ if(typeof balanceDisabled!=='boolean')return fail('ungroup_balance_disabled_state');
  const balance=['none','last','proportional','equal'][values.pedBalanceMethod];
  const selected=fields.map((_,i)=>{const rs=cmp(i?'grdSupportColumns':'grdUngroupColumns').getSelectionModel?.()?.getSelection?.();return Array.isArray(rs)&&rs.every(r=>records[i].includes(r))?rs.map(r=>String(r.internalId)):null;});
  if(selected.some(s=>!s))return fail('ungroup_selection');
