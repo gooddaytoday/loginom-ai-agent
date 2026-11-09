@@ -22,6 +22,21 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_text_variant_keeps_frozen_subtypes_and_final_cold(self):
+        case = runner.scenario('text-variant')
+        self.assertTrue(case['text_variant'])
+        self.assertEqual(case['input_files'], ['variant.csv'])
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['lgd_initial'], 'expected-variant.json')
+        before = runner.read(case['source'] / case['lgd_initial'])['outputs'][0]
+        self.assertEqual(before['columns'][1]['type'], 'variant')
+        self.assertEqual([r['Value']['cell_type'] if r['Value'] is not None else None for r in before['rows']],
+                         ['integer', 'string', 'real', None])
+        after = runner.expected_for(case, '/own/variant.lgp')
+        self.assertEqual(after['outputs'][0]['columns'][1]['type'], 'string')
+        self.assertEqual(runner.expected_for(case, '/own/variant.lgp', cold=True), after)
+        self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-variant.md').read_bytes())
+
     def test_text_update_has_two_named_stages_and_final_only_cold(self):
         case = runner.scenario('text-auto-update')
         self.assertEqual(case.get('export_count'), 2)

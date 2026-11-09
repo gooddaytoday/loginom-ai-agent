@@ -266,7 +266,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async readOutputPort(request) {
       checkBudget();
       const readType=(operation.nodeApply?.request??operation.parameters)?.target?.type;
-      if(['variables.to_table','imports.lgd'].includes(readType))request={...request,typedVariants:true};
+      if(['variables.to_table','imports.lgd','imports.text'].includes(readType))request={...request,typedVariants:true};
       // Exact reads of these ports refused Variant cells as unverified_precision; ordinary reads keep their envelope.
       if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns'].includes(readType))
         request={...request,typedVariants:true,...(readType==='transform.replace_columns'?{variantEmptyIsNull:true}:{})};

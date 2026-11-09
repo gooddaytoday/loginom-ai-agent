@@ -1,3 +1,11 @@
+`text-variant` uses the approved text-import `task-variant.md` and only
+`fixtures/extended/variant.csv`. The unchanged stage-0 `expected-variant.json`
+checks integer/string/real/NULL native cell types before `variant-on.csv`;
+`expected-variant-off.json` checks the same Import after disabling Variant and
+redetecting types, then `variant-off.csv`. Both full typed reads, retained node
+identity and observed checkbox values are required. Final Save, cold execution
+without configuration and cleanup use stock checks. Oracle/expected stay private.
+
 `factor-rotation` uses the approved factor-analysis `modes/task-rotation.md`
 and only `fixtures/rotation.csv`. The intermediate full typed Varimax round
 is checked by `factor-initial-signs`; the final Quartimax round must belong

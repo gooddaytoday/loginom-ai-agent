@@ -2318,6 +2318,13 @@ function readRenderedInputMapping(observation) {
         ?{status:'observed',value:multipleOwners[0].classList.contains('x-form-cb-checked'),owner_ref:refOf(multipleOwners[0]),
           display_ref:refOf(multipleDisplays[0]),root_ref:wizard.root_ref,enabled:enabled(multipleDisplays[0]),value_kind:'loginom_ext_checkbox'}
         :{status:multipleOwners.length>1||multipleDisplays.length>1?'ambiguous':'unobserved'};
+      const variantTid=base+'edtVariantAsGeneralType;ValueControl';
+      const variantOwners=(tids.get(variantTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
+      const variantDisplays=(tids.get(variantTid+';DisplayEl')??[]).filter(e=>variantOwners.length===1&&variantOwners[0].contains(e)&&visible(e)&&!sensitive(e));
+      if(variantOwners.length||variantDisplays.length)wizard.settings.fields.variant_as_general_type=variantOwners.length===1&&variantDisplays.length===1&&variantDisplays[0].matches('.x-form-checkbox')
+        ?{status:'observed',value:variantOwners[0].classList.contains('x-form-cb-checked'),owner_ref:refOf(variantOwners[0]),
+          display_ref:refOf(variantDisplays[0]),root_ref:wizard.root_ref,enabled:enabled(variantDisplays[0]),value_kind:'loginom_ext_checkbox'}
+        :{status:variantOwners.length>1||variantDisplays.length>1?'ambiguous':'unobserved'};
       // E2E sColumnDefsTuning: properties are rows; field identity is a column
       // index. These are rendered draft settings, never complete output schema.
       scanStage='import_definitions';

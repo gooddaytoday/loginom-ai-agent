@@ -12,14 +12,15 @@ const source={source_path:'/test/typed.csv',encoding:'UTF-8',rows_to_skip:0,firs
 const format={delimiter:';',text_qualifier:'"',null_marker:'NULL',decimal_separator:'.'};
 
 // Minimal native wizard: «Автоопределение столбцов» combo, rows field and both refresh buttons.
-function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет'}={}) {
+function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет',initialVariant=false}={}) {
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
+ let variant=initialVariant;
  let stage='text_import_file',mode=initialMode,rows='25',opened=false,columns=existing?structuredClone(retained):native();
  const gestures=[],initial=structuredClone(columns);
  const field=(value,extra={})=>({status:'observed',truncated:false,value,...extra});
  const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
   import_source:{fields:Object.fromEntries(Object.entries({source_path:'/test/typed.csv',connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true}).map(([k,v])=>[k,field(v,{input_ref:k,display_ref:k})]))},
-  settings:{fields:{...Object.fromEntries(Object.entries(format).map(([k,v])=>[k,field(v,{input_ref:k})])),
+  settings:{fields:{variant_as_general_type:field(variant,{display_ref:'variant'}),...Object.fromEntries(Object.entries(format).map(([k,v])=>[k,field(v,{input_ref:k})])),
    auto_detect_columns:field(mode,{owner_ref:'auto-owner',input_ref:'auto-input',enabled:true,read_only:true}),
    analysis_rows:field(rows,{owner_ref:'rows-owner',input_ref:'rows-input',enabled:mode!=='Нет',read_only:false})}},
   import_columns:{initial_layout:{status:'rendered_definition_layout'},fields:columns.slice(offset,offset+8).map((c,i)=>({...c,index:i+offset,status:'observed',cell_refs:{}})),
@@ -33,6 +34,7 @@ function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет
  const channel={observe:async options=>{const s=structuredClone(state(options.importColumnPage?.offset??0));if(!options.ready(s))throw Error('Observation refused: '+options.condition);return s;},
   act:async action=>{
    gestures.push(action);
+   if(action.verb==='set_checked'&&action.ref==='variant'){variant=action.checked;return;}
    if(action.verb==='wizard_step'){stage=action.expected_stage;return;}
    if(action.verb==='click'&&action.ref==='auto-picker'){opened=true;return;}
    if(action.verb==='select_wizard_option'){mode=action.ref.slice('option-'.length);opened=false;return;}
@@ -290,4 +292,13 @@ test('mapPorts passes the previous import schema to resynchronization of a renam
  const result=JSON.parse(child.stdout.trim().split('\n').at(-1));
  assert.equal(result.stop,'probe stop');
  assert.deepEqual(result.calls,[{previousColumns:['Id','Amount'],before_targets:['Id','Amount']}]);
+});
+
+for(const enabled of [true,false])test('Variant toggle precedes native type refresh and retains the same Import: '+enabled,async()=>{
+ const f=fixture({initialMode:'Только новые',initialVariant:!enabled});
+ f.gestures.length=0;
+ const result=await configureTextImportPatch(f.channel,{format:{variant_as_general_type:enabled},analysis:{rows:4,refresh:'types'}},f.owner,'/test/typed.csv');
+ assert.equal(result.format.fields.variant_as_general_type.value,enabled);
+ assert.deepEqual(f.gestures.filter(g=>['variant','refresh-data'].includes(g.ref)).map(g=>g.verb),['set_checked','click']);
+ assert.equal(result.source.fields.source_path.value,'/test/typed.csv');
 });

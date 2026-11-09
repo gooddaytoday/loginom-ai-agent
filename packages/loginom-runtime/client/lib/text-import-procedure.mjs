@@ -101,13 +101,14 @@ function validateSettings(p,maxColumns) {
     && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
   const formatKeys=['delimiter','decimal_separator','null_marker','text_qualifier'];
   requireValue(p.format && formatKeys.every(k=>Object.hasOwn(p.format,k))
-    &&Object.keys(p.format).every(k=>[...formatKeys,'multiple_delimiters','date_format','date_separator','auto_detect_columns'].includes(k)), 'Format parameters are incomplete');
+    &&Object.keys(p.format).every(k=>[...formatKeys,'multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns'].includes(k)), 'Format parameters are incomplete');
   if(Object.hasOwn(p.format,'auto_detect_columns'))requireValue(Object.hasOwn(autoDetectLabels,p.format.auto_detect_columns),'Invalid auto_detect_columns');
   for (const name of formatKeys) {
     const value=p.format[name];
     requireValue(typeof value === 'string' && value.length <= (name === 'null_marker' ? 256 : 1)
       && !/[\x00\r\n]/.test(value), 'Invalid format value: ' + name);
   }
+  if(Object.hasOwn(p.format,'variant_as_general_type'))requireValue(typeof p.format.variant_as_general_type==='boolean','Invalid variant_as_general_type');
   if(Object.hasOwn(p.format,'multiple_delimiters'))requireValue(typeof p.format.multiple_delimiters==='boolean','Invalid multiple_delimiters');
   if(Object.hasOwn(p.format,'date_format'))requireValue(['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'].includes(p.format.date_format),'Invalid date_format');
   if(Object.hasOwn(p.format,'date_separator'))requireValue(['.','/','\\','-'].includes(p.format.date_separator),'Invalid date_separator');
@@ -163,7 +164,7 @@ export function validateTextImportPatch(p) {
   const format={delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
   for(const [name,defaults] of Object.entries({source,format})) {
     if(!Object.hasOwn(p,name))continue;
-    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='source'&&['source_paths','source_mask','file_info'].includes(k)||name==='format'&&['multiple_delimiters','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
+    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='source'&&['source_paths','source_mask','file_info'].includes(k)||name==='format'&&['multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
     if(name==='source'&&['source_paths','source_mask'].some(k=>Object.hasOwn(p.source,k))&&!Object.hasOwn(p.source,'source_path'))delete defaults.source_path;
     Object.assign(defaults,p[name]);
   }
@@ -511,9 +512,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     const text=name==='auto_detect_columns'?autoDetectLabels[requested]:requested;
     let s = await read('text_import_format'); const f = field(s, name);
     if (f.value === text) continue;
-    if(name==='multiple_delimiters'){
+    if(name==='multiple_delimiters'||name==='variant_as_general_type'){
       await act(s,{verb:'set_checked',ref:f.display_ref,checked:text});
-      await read('text_import_format','multiple delimiters applied',state=>state.wizard.settings?.fields[name]?.value===text);
+      await read('text_import_format','format checkbox applied',state=>state.wizard.settings?.fields[name]?.value===text);
       continue;
     }
     // Native editable combo resolves typed NULL to the first case-insensitive

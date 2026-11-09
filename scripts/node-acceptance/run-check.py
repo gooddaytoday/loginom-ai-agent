@@ -266,6 +266,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'text-variant':
+        node = REPO / 'docs/node-development/nodes/text-import'
+        return dict(source=node / 'acceptance/extended', prompt=REPO / 'scripts/node-acceptance/scenarios/text-variant/task.md',
+                    data=node / 'fixtures/extended', input_files=['variant.csv'], base=None, export_count=2,
+                    lgd_initial='expected-variant.json', expected_name='expected-variant-off.json',
+                    oracle=node / 'acceptance/extended/oracle.py', text_variant=True)
     if name == 'text-mask':
         node = REPO / 'docs/node-development/nodes/text-import'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file.md',
@@ -2369,6 +2375,11 @@ class Runner:
             check_text_mask(replies)
             check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             self.current['new_month'] = 'PASS'
+        if spec.get('text_variant'):
+            check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
+            formats = [owner['configuration']['readback']['format'] for _, reply in replies for owner, _ in ports(reply)
+                       if owner.get('status') == 'SUCCEEDED' and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
+            assert formats and formats[0].get('variant_as_general_type') is True and formats[-1].get('variant_as_general_type') is False, 'TEXT_VARIANT_TOGGLE_READBACK'
         if spec.get('text_update'):
             check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):
