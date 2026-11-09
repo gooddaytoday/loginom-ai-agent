@@ -1270,6 +1270,13 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
             oracle = runpy.run_path(str(REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/modes/oracle.py'))
             return oracle['matches_echo'](value, target)
         if limitation(value, col, target): return True
+        if col['type'] == 'real' and isinstance(target, dict):
+            # Before types300: float() of a marker dict would raise TypeError.
+            # v040-nan-exact: expected {"non_finite": ...}; Loginom writes NaN as "Nan".
+            # Infinity spellings are unobserved, so they fail closed like the
+            # exact Table reader (table-output-values.mjs).
+            spelled = {'NaN': ['nan']}
+            return set(target) == {'non_finite'} and value.strip().lower() in spelled.get(target['non_finite'], [])
         if scenario_name == 'types300' and target is not None and col['type'] in ['integer', 'real']:
             try:
                 if col['type'] == 'integer':
@@ -1279,10 +1286,6 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                 return (math.isfinite(number) and math.isfinite(goal) and number == goal
                         and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
             except (ValueError, InvalidOperation, OverflowError): return False
-        if col['type'] == 'real' and isinstance(target, dict):
-            # v040-nan-exact: expected {"non_finite": ...}; Loginom writes NaN as "Nan".
-            spelled = {'NaN': ['nan'], 'Infinity': ['inf', 'infinity', '+inf', '+infinity'], '-Infinity': ['-inf', '-infinity']}
-            return set(target) == {'non_finite'} and value.strip().lower() in spelled.get(target['non_finite'], [])
         if col['type'] == 'variant':
             return isinstance(target, dict) and set(target) == {'cell_type', 'value'} and equal(value, dict(col, type=target['cell_type']), target['value'])
         if col.get('category_labels_any'): return bool(value.strip())
