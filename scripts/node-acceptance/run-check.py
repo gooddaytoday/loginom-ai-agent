@@ -1036,6 +1036,17 @@ def expected_for(case, package, cold=False):
     return expected
 
 
+def bind_source_dir(value, source_dir):
+    # {{SOURCE_DIR}} in expected is the concrete server directory of the
+    # delivered sources. Without one, refuse instead of comparing the literal.
+    if isinstance(value, dict): return {k: bind_source_dir(v, source_dir) for k, v in value.items()}
+    if isinstance(value, list): return [bind_source_dir(v, source_dir) for v in value]
+    if isinstance(value, str) and '{{SOURCE_DIR}}' in value:
+        assert isinstance(source_dir, str) and source_dir.strip('/'), 'EXPECTED_SOURCE_DIR_MISSING'
+        return value.replace('{{SOURCE_DIR}}', source_dir.rstrip('/'))
+    return value
+
+
 def logreg_normalization_exports(destinations):
     assert len(destinations) == 2, 'LOGREG_NORMALIZATION_TWO_EXPORTS_REQUIRED'
     return (f'{destinations[0]} — итоговый прогноз порта 0 после стандартизации; '
@@ -1229,6 +1240,10 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     delimiter = csv_delimiter(path)
     rows = list(csv.reader(io.StringIO(path.read_text(encoding='utf-8-sig')), delimiter=delimiter))
     columns = expected['columns']
+    # v040-c8-filetime: same shape rule as expected-outputs.mjs comparison 'present'.
+    assert all(col.get('comparison') != 'present' or col['type'] == 'datetime'
+               and not any(k in col for k in ['types', 'tolerance', 'category_labels_any', 'name_any'])
+               and all(row[col['name']] is True for row in expected['rows']) for col in columns), 'EXPECTED_COMPARISON_INVALID'
     infer_marker = null_marker is None and any(row[col['name']] is None for row in expected['rows'] for col in columns)
     if infer_marker:
         null_marker = export_null_marker(export_events, destination)
@@ -1261,6 +1276,11 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
         return None
 
     def equal(value, col, target):
+        if col.get('comparison') == 'present':
+            if value == null_marker or not value.strip(): return False
+            try: datetime.fromisoformat(value)
+            except ValueError: return False
+            return re.match(r'\d{4}-\d{2}-\d{2}', value) is not None
         if target is None: return value == null_marker
         if infer_marker and value == null_marker: return False
         if col.get('comparison') == 'json_ast':
@@ -1774,6 +1794,12 @@ class Runner:
     def text_mask_directory(self, login):
         return login['package_directory'].rstrip('/') + '/' + self.out.name + '-mask'
 
+    def source_dir(self, spec, login):
+        # The one server directory whose paths the task receives for its sources.
+        if spec.get('text_mask'): return self.text_mask_directory(login)
+        if spec.get('text_list_sources'): return login['package_directory'].rstrip('/')
+        return None
+
     def text_mask_inputs(self, spec, folder, login, build, *, late=False):
         name = self.out.name + '-mask'
         directory = self.text_mask_directory(login)
@@ -1807,7 +1833,8 @@ class Runner:
             if spec.get('upload_only') and str(spec['local_file']) not in prompt:
                 # Seed identity comes from case.json, never a copied task's old host path.
                 prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
-        expected = expected_for(spec, package)
+        source_dir = self.source_dir(spec, login)
+        expected = bind_source_dir(expected_for(spec, package), source_dir)
         if spec.get('lgd_empty_variant') or spec.get('lgd_export_compression'):
             for fmt in expected['lgd']['formats']:
                 fmt['destination'] = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + fmt['name'] + '.lgd'
@@ -1922,7 +1949,7 @@ class Runner:
             # FileName is the physical server basename. Both inline and small
             # local-path admission prefix names; seed the original inputs via
             # the existing verified delivery protocol, rejecting unequal files.
-            books = [dict(fixture=str(f), destination=login['package_directory'].rstrip('/') + '/' + f.name) for f in files]
+            books = [dict(fixture=str(f), destination=source_dir + '/' + f.name) for f in files]
             write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books))
             self.phase('text-list-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
                        build / 'resources/loginom', folder / 'text-list-inputs.json', folder / 'text-list-inputs'], folder, timeout=300)
@@ -1951,7 +1978,7 @@ class Runner:
             assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
                                    and not c.get('unsaved_changes_discarded') for c in cleanups), 'TEXT_MASK_INITIAL_CLEANUP_MISSING'
             initial_csv = downloaded_csv(profile, destinations[0])
-            check_csv(initial_csv, read(src / spec['lgd_initial'])['outputs'][0], null_marker=None,
+            check_csv(initial_csv, bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], null_marker=None,
                       export_events=events, destination=destinations[0])
             books = self.text_mask_inputs(spec, folder, login, build, late=True)
             self.current['new_month'] = 'DELIVERED'
@@ -2402,7 +2429,7 @@ class Runner:
             check_text_multi_file_list(replies)
         if spec.get('text_mask'):
             check_text_mask(replies, self.text_mask_directory(login) + '/sales_*.csv')
-            check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
+            check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             self.current['new_month'] = 'PASS'
         if spec.get('text_update'):
             check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
@@ -2439,7 +2466,7 @@ class Runner:
                             else expected['outputs'][0] if spec.get('excel_named_initial')
                             else read(src / spec['import_initial'])['outputs'][0] if spec.get('import_initial') and index == 0
                             else expected['outputs'][0] if spec.get('import_initial')
-                            else read(src / spec['lgd_initial'])['outputs'][0] if spec.get('lgd_initial') and index == 0
+                            else bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0] if spec.get('lgd_initial') and index == 0
                             else expected['outputs'][0] if spec.get('lgd_initial')
                             else read(src / spec['filter_initial'])['outputs'][index] if spec.get('filter_initial') and index < 2
                             else expected['outputs'][index % 2] if spec.get('filter_initial') else expected['outputs'][index])
@@ -2523,7 +2550,7 @@ class Runner:
                         cold_expected = stage / 'expected.json'
                         if spec.get('cold_expected_name') or spec.get('grouping_mode') == 'concat':
                             cold_expected = stage / 'expected-cold.json'
-                            write(cold_expected, expected_for(spec, r['package'], cold=True))
+                            write(cold_expected, bind_source_dir(expected_for(spec, r['package'], cold=True), self.source_dir(spec, login)))
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             proof = read(stage / 'variable-oracle.stdout')
                             cold_expected = stage / 'expected-cold.json'

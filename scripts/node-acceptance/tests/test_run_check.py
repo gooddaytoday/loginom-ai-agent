@@ -240,6 +240,29 @@ class RunCheckTests(unittest.TestCase):
             with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 self.csv_result(output, 'Q\n' + text + '\n', null_marker='?', scenario_name='types300')
 
+    def test_csv_present_datetime_requires_a_date_in_every_row_never_its_value(self):
+        # v040-c8-filetime: FileTime is typed datetime and not NULL; its value is not promised.
+        output = dict(column_order='exact', columns=[dict(name='File', type='string'),
+                      dict(name='FileTime', type='datetime', label_any=True, comparison='present')],
+                      rows=[dict(File='a.csv', FileTime=True), dict(File='b.csv', FileTime=True)])
+        for first, second in [('2026-11-09 10:11:00', '1999-01-01T00:00:00.000'), ('2026-11-09', '2026-11-09T10:11')]:
+            self.csv_result(output, f'File,FileTime\na.csv,{first}\nb.csv,{second}\n', null_marker='?')
+        for bad in ['?', '', 'not a date', '10:11']:
+            with self.subTest(bad=bad), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, f'File,FileTime\na.csv,2026-11-09 10:11:00\nb.csv,{bad}\n', null_marker='?')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'File,FileTime\na.csv,2026-11-09\nb.csv,\n')
+        for change in [dict(type='string'), dict(types=['datetime', 'string'])]:
+            bad = copy.deepcopy(output)
+            bad['columns'][1].update(change)
+            with self.subTest(change=change), self.assertRaisesRegex(AssertionError, 'EXPECTED_COMPARISON_INVALID'):
+                self.csv_result(bad, 'File,FileTime\na.csv,2026-11-09\nb.csv,2026-11-09\n')
+        for token in [None, '2026-11-09T10:11:00.000', False]:
+            bad = copy.deepcopy(output)
+            bad['rows'][1]['FileTime'] = token
+            with self.subTest(token=token), self.assertRaisesRegex(AssertionError, 'EXPECTED_COMPARISON_INVALID'):
+                self.csv_result(bad, 'File,FileTime\na.csv,2026-11-09\nb.csv,2026-11-09\n')
+
     def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
         output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
                       rows=[dict(A=1, B=1), dict(A=2, B=3)])
@@ -424,6 +447,43 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue(task.rstrip().endswith('Сохрани пакет как /test/run-x.lgp.'))
             self.assertNotIn('{{PACKAGE_PATH}}', task)
             self.assertEqual(runner.read(folder / 'expected.json')['package_path'], '/test/run-x.lgp')
+
+    def test_expected_source_dir_is_the_delivered_source_directory_or_an_explicit_refusal(self):
+        # C8 expected-absolute-path.json names {{SOURCE_DIR}}/sales_*.csv; never compare that literal.
+        node = runner.REPO / 'docs/node-development/nodes/text-import'
+        spec = dict(runner.scenario('text-multi-file-list'), prompt=node / 'acceptance/task-file-info.md',
+                    expected_name='expected-absolute-path.json')
+        class Stop(Exception): pass
+        def model(spec):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
+                for path in [folder, profile, workspace]: path.mkdir()
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+                phases = []
+                def phase(name, *args, **kwargs):
+                    phases.append(name)
+                    if name == 'model': raise Stop
+                with patch.object(runner, 'scenario', return_value=spec), patch.object(instance, 'phase', side_effect=phase):
+                    try: instance.model('c8-file-info', folder, profile, workspace, '/own/dir/run.lgp', {'package_directory': '/own/dir/'}, root / 'build')
+                    except Stop: pass
+                return phases, runner.read(folder / 'expected.json'), (folder / 'task.md').read_text()
+        phases, expected, task = model(spec)
+        self.assertEqual(phases, ['text-list-inputs', 'model'])
+        self.assertNotIn('{{SOURCE_DIR}}', json.dumps(expected, ensure_ascii=False))
+        names = {row['FileName'] for row in expected['outputs'][0]['rows']}
+        self.assertEqual(names, {'/own/dir/sales_2026-01.csv', '/own/dir/sales_2026-02.csv'})
+        self.assertTrue(all(name in task for name in names))
+        without = {k: v for k, v in spec.items() if k != 'text_list_sources'}
+        with self.assertRaisesRegex(AssertionError, 'EXPECTED_SOURCE_DIR_MISSING'):
+            model(without)
+        self.assertEqual(model(dict(without, expected_name='expected-relative-path.json'))[1]['outputs'][0]['rows'][0]['FileName'],
+                         'sales_2026-01.csv')
+        for directory in [None, '', '/']:
+            with self.subTest(directory=directory), self.assertRaisesRegex(AssertionError, 'EXPECTED_SOURCE_DIR_MISSING'):
+                runner.bind_source_dir({'rows': [{'FileName': '{{SOURCE_DIR}}/a.csv'}]}, directory)
+        self.assertEqual(runner.bind_source_dir({'rows': [{'n': 1, 'FileName': 'a.csv'}]}, None), {'rows': [{'n': 1, 'FileName': 'a.csv'}]})
 
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')

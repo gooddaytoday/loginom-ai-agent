@@ -63,7 +63,11 @@ export function parseExpectedOutputs(expected){
   for(const c of output.columns)if(c.category_labels_any)need(['string','integer','real'].includes(c.type)
    &&output.rows.every(r=>typeof r[c.name]==='string'&&r[c.name].trim().length>0
     ||typeof r[c.name]==='number'&&Number.isFinite(r[c.name])),'EXPECTED_CATEGORIES_INVALID');
-  for(const c of output.columns)if(Object.hasOwn(c,'comparison'))need(c.type==='string'&&['json_ast','rest_echo'].includes(c.comparison),'EXPECTED_COMPARISON_INVALID');
+  // v040-c8-filetime: present = typed non-NULL DateTime in every row; the value
+  // is never compared. Rows carry only the token true.
+  for(const c of output.columns)if(Object.hasOwn(c,'comparison'))need(c.type==='string'&&['json_ast','rest_echo'].includes(c.comparison)
+   ||c.comparison==='present'&&c.type==='datetime'&&!['types','tolerance','category_labels_any','name_any'].some(k=>Object.hasOwn(c,k))
+    &&output.rows.every(r=>r[c.name]===true),'EXPECTED_COMPARISON_INVALID');
   for(const c of output.columns)if(Object.hasOwn(c,'tolerance')){
    const t=c.tolerance;
    need(c.type==='real'&&t&&typeof t==='object'&&!Array.isArray(t)&&Object.keys(t).length>0
@@ -183,6 +187,7 @@ function matchesCell(cell,column,want,coarseBound=false){
  // Keep native provenance mandatory for every other Variant value/path.
 
  if(!cell||!allowsType(column,cell.type))return false;
+ if(column.comparison==='present')return presentDateTime(cell);
  // Exact non-finite Real: never NULL, never a finite value or display text.
  if(column.type==='real'&&want&&typeof want==='object'&&Object.hasOwn(want,'non_finite'))
   return cell.type==='real'&&cell.is_null===false&&cell.value===null&&cell.precision==='exact_non_finite'&&cell.non_finite===want.non_finite;
@@ -256,6 +261,13 @@ function matchesCell(cell,column,want,coarseBound=false){
  if(column.comparison==='rest_echo')return type==='string'&&sameRestEchoValues(value,want);
  if(Object.is(want,-0))return Object.is(value,-0);
  return Object.is(value,want)||value===want;
+}
+// Any civil or native DateTime value; precision and timezone are not promised.
+function presentDateTime(cell){
+ if(cell.type!=='datetime'||cell.is_null!==false)return false;
+ if(cell.precision==='exact_native')return cell.native?.tag===7&&/^[a-f0-9]{16}$/.test(cell.native.bytes_le??'');
+ return typeof cell.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.test(cell.value)
+  &&Number.isFinite(Date.parse(cell.value+'Z'));
 }
 export function alignFactorSigns(actual,outputs,rule){
  if(rule===undefined)return outputs;
