@@ -258,7 +258,8 @@ def scenario(name, case_root=None, *, cases=None):
         update = name == 'text-auto-update'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
-                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
+                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
+                    text_update=update, export_count=2 if update else 1)
     if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
@@ -364,6 +365,11 @@ def scenario(name, case_root=None, *, cases=None):
                     data=src / 'data', base=None, export_count=3,
                     input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
                     expected_name='expected-apply.json' if applying else 'expected.json')
+    if name == 'binning-datetime-manual':
+        node = REPO / 'docs/node-development/nodes/preprocessing-binning'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',
+                    data=node / 'fixtures', base=None, export_count=2, input_files=['modes.csv'],
+                    expected_name='modes/expected.json', oracle=node / 'acceptance/modes/oracle.py')
     if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
                 'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
         src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
@@ -402,11 +408,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
         return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
                     expected_name='expected.json', input_files=['reform.csv'], oracle=src / 'oracle.py')
-    if name == 'acf-nonzero':
+    if name in ['acf-nonzero', 'acf-empty', 'acf-null']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance/edges'
-        return dict(source=src, prompt=src / 'task-nonzero.md',
-                    data=src / 'fixtures', base=None, autocorrelation_edge=True,
-                    input_files=['lab1144-series.csv'])
+        edge = name.removeprefix('acf-')
+        return dict(source=src, prompt=src / ('task-' + edge + '.md'),
+                    data=src / 'fixtures', base=None, autocorrelation_edge=edge,
+                    input_files=['lab1144-series.csv', *([] if edge == 'nonzero' else ['lab1144-' + edge + '.csv'])])
     if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
         task, expected, inputs = {
@@ -751,10 +758,57 @@ def sorting_stages(case):
     return [dict(stage, column_order='exact') for stage in stages]
 
 
+def text_update_stages(case):
+    return [read(case['source'] / name)['outputs'][0] for name in
+            ['expected-auto-update-string.json', 'expected-auto-update.json']]
+
+
+def check_text_update_ports(replies, destinations, stages, node_binary='node'):
+    assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
+    previous, node = -1, None
+    tables = []
+    for destination, stage in zip(destinations, stages):
+        exports = [n for n, reply in replies if reply.get('status') == 'SUCCEEDED'
+                   and reply.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'
+                   and reply['configuration']['readback'].get('destination') == destination]
+        assert exports and exports[-1] > previous, 'TEXT_UPDATE_EXPORT_MISSING_OR_ORDER'
+        reads = [(n, owner, port) for n, reply in replies if previous < n < exports[-1]
+                 for owner, port in ports(reply) if owner.get('status') == 'SUCCEEDED'
+                 and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'
+                 and port.get('port') == 0]
+        assert reads, 'TEXT_UPDATE_PORT_MISSING'
+        _, owner, port = reads[-1]
+        identity = owner.get('node')
+        assert identity and (node is None or identity == node), 'TEXT_UPDATE_IMPORT_CHANGED'
+        node = identity
+        assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
+        assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
+            (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
+        tables.append(dict(actual=dict(node=identity, type='imports.text', output_port=0, data=port), expected=stage))
+        previous = exports[-1]
+    # Use the same typed full-table matcher as cold, including exact numeric and
+    # datetime evidence. Each stage has its own snapshot of the same node.
+    result = subprocess.run([str(node_binary), '--input-type=module', '-e', """
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {matchExpectedOutputs}=await import(pathToFileURL(process.argv[1]));
+for(const stage of JSON.parse(readFileSync(0,'utf8')))
+    matchExpectedOutputs([stage.actual],[stage.expected]);
+""", str(REPO / 'scripts/node-acceptance/expected-outputs.mjs')],
+        input=json.dumps(tables), text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, 'TEXT_UPDATE_PORT_VALUES: ' + result.stderr[:2000]
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
     if case.get('autocorrelation_edge'):
         approved = read(src / 'expected.json')
+        if case['autocorrelation_edge'] in ['empty', 'null']:
+            # Refusal text is fixed before runs: own guard (empty) or native Execute (null).
+            error = (read(src / 'expected-empty.json')['execution_error'] if case['autocorrelation_edge'] == 'empty'
+                     else {'text': approved['native_conventions']['null']['message']})
+            return dict(package_path=package, nodes=[{'type': t} for t in ['imports.text', 'research.auto_correlation']],
+                        outputs=[], execution_error=error)
         output = approved['series']['count12']
         return dict(package_path=package, nodes=[{'type': t} for t in
                     ['imports.text', 'research.auto_correlation', 'exports.text']], outputs=[output])
@@ -1586,6 +1640,7 @@ class Runner:
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('text_update'): exports = ['text-update-1.csv', 'text-update-2.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
@@ -2089,6 +2144,8 @@ class Runner:
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
             expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
+        if spec.get('text_update'):
+            check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)
         sampling_csvs = []
@@ -2113,7 +2170,8 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (sorting_stages(spec)[index] if spec.get('sorting_case')
+            csv_expected = (text_update_stages(spec)[index] if spec.get('text_update')
+                            else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
                             else read(src / spec['import_initial'])['outputs'][0] if spec.get('import_initial') and index == 0

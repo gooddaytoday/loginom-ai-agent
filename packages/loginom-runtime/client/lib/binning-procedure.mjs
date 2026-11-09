@@ -70,7 +70,7 @@ export async function inspectBinningSettings(channel,baseline,index){
  return s;
 }
 export async function configureBinning(channel,parameters,{request,inputMapping,preconfiguration}){
- const applying=request.mode==='apply',fields=(applying?preconfiguration:inputMapping)?.target_fields;
+ const applying=request.mode==='apply',manual=parameters.binning?.method==='manual',fields=(applying||manual?preconfiguration:inputMapping)?.target_fields;
  need(Array.isArray(fields)&&fields.length>0,'complete verified input mapping required');
  let s=await observeBinning(channel,'complete binning configuration'),baseline=s.node_binning;
  need(baseline.fields.every(f=>fields[f.index]?.label===f.label&&fields[f.index]?.type===f.type),'numeric rows differ from input mapping');
@@ -79,18 +79,48 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
   const used=baseline.fields.filter(f=>f.method_code!==0);need(used.length===1,'apply requires exactly one saved numeric method');field=fields[used[0].index];
  }else field=resolveBinningField(parameters,fields);
  const index=fields.findIndex(f=>f.name===field.name),wanted=parameters.binning;
- if(!applying){
+ if(!applying&&!manual){
   for(const f of baseline.fields)if(f.index!==index&&f.method_code!==0)await chooseMethod(channel,baseline,f.index,0);
   await chooseMethod(channel,baseline,index,{count:3,width:2,frequency:4}[wanted.method]);
  }
  s=await inspectBinningSettings(channel,baseline,index);
+ if(manual){
+  need(s.node_binning.state==='materialized'&&s.node_binning.intervals.length===wanted.intervals.length,'manual requires the complete saved materialized intervals');
+  need(wanted.intervals.every((b,i)=>s.node_binning.intervals[i].lower_included===b.lower_included&&s.node_binning.intervals[i].upper_included===b.upper_included),'manual edits preserve observed inclusion flags');
+  // Native boundary edits also move the adjacent bound. Check the entire edit
+  // sequence before opening a cell: an invalid intermediate store is unreadable.
+  const planned=s.node_binning.intervals.map(({lower,upper})=>({lower,upper}));
+  for(const [i,b] of wanted.intervals.entries())for(const key of ['lower','upper']){
+   if(planned[i][key]===b[key])continue;
+   planned[i][key]=b[key];
+   if(key==='lower'&&i>0)planned[i-1].upper=b[key];
+   if(key==='upper'&&i+1<planned.length)planned[i+1].lower=b[key];
+   need(planned.every(b=>b.lower<b.upper),'manual boundary would invalidate an observed interval; move boundaries in smaller steps');
+  }
+  for(const [i,b] of wanted.intervals.entries()){
+   for(const [key,value] of [['lower',b.lower],['upper',b.upper],['label',b.label]]){
+    if(s.node_binning.intervals[i][key]===value)continue;
+    const field={lower:'LowerBoundValue',upper:'UpperBoundValue',label:'BinLabel'}[key],tid=s.wizard.root_tid+';MethodSettingsWizard-1;col'+field+'_'+i;
+    await channel.perform({condition:'edit materialized bin '+i+' '+key,initialObservation:s,ready:binningReady,identity:()=>({field:index,interval:i}),
+     resolve:s=>({verb:'double_click',ref:one(s,e=>e.tid===tid&&e.allowed_actions.includes('double_click'),'materialized interval cell required').ref})});
+    s=await observeBinning(channel,'owned materialized interval editor',s=>s.node_binning.bin_editor?.number===i&&s.node_binning.bin_editor.field===field);
+    const editor=s.node_binning.bin_editor;
+    const input=s=>one(s,e=>e.signature?.tag==='input'&&e.identity?.anchor_tid?.startsWith(editor.root_tid)&&e.allowed_actions.includes('fill'),'unique owned bin editor input required');
+    await channel.perform({condition:'fill materialized bin '+key,initialObservation:s,ready:binningReady,identity:()=>editor,resolve:s=>({verb:'fill',ref:input(s).ref,text:String(value)})});
+    s=await observeBinning(channel,'materialized bin editor filled',s=>s.node_binning.bin_editor?.number===i);
+    await channel.perform({condition:'commit materialized bin '+key,initialObservation:s,ready:binningReady,identity:()=>editor,resolve:s=>({verb:'press',ref:input(s).ref,key:'Enter'})});
+    s=await observeBinning(channel,'manual interval readback',s=>!s.node_binning.bin_editor&&s.node_binning.intervals[i]?.[key]===value);
+   }
+  }
+  need(s.node_binning.intervals.every((b,i)=>Object.entries(wanted.intervals[i]).every(([k,v])=>b[k]===v)),'manual intervals differ from request');
+ }
  const act=async(key,action)=>{
   const owner=s.node_binning.frame.controls[key];need(owner,'bound binning control missing: '+key);
   await channel.perform({condition:'set binning '+key,initialObservation:s,ready:binningReady,identity:s=>({node:s.prepared_node_context,field:s.node_binning.selected.record_id}),
    resolve:s=>({...action,ref:one(s,e=>(e.tid===owner+(action.verb==='set_checked'?';DisplayEl':'')||action.verb!=='set_checked'&&e.tid===null&&e.identity?.anchor_tid===owner&&e.signature?.tag==='input')&&e.allowed_actions.includes(action.verb),'exact binning control required: '+key).ref})});
   s=await observeBinning(channel,'binning '+key+' readback',s=>s.node_binning.frame?.record_id===baseline.fields.find(f=>f.index===index).record_id);
  };
- if(!applying){
+ if(!applying&&!manual){
   const sizeKey={count:'cbbCountBins;ValueControl',width:'edtBinWidth;ValueControl',frequency:'cbbTileCount;ValueControl'}[wanted.method];
   for(const [key,value] of [[sizeKey,wanted.size],...(wanted.method==='frequency'?[]:[['chkStrictLowerLimit',true],['chkStrictUpperLimit',true],['edtLowerLimit',wanted.limits[0]],['edtUpperLimit',wanted.limits[1]]]),['chkRoundingLevel',false],['chkLowerLimitOpen;ValueControl',false],['chkUpperLimitOpen;ValueControl',false],...(wanted.method==='frequency'?[['chkSummTile;ValueControl',false]]:[])]){
    if(s.node_binning.frame.values[key]===value)continue;
@@ -98,21 +128,22 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
    else {await act(key,{verb:'fill',text:String(value)});await act(key,{verb:'press',key:'Tab'});}
    need(s.node_binning.frame.values[key]===value,'binning control readback differs: '+key);
   }
-  if(wanted.method==='frequency'&&s.node_binning.settings.ties!=='next'){
+  if(wanted.method==='frequency'&&s.node_binning.settings.ties!==(wanted.ties??'next')){
+   const label=wanted.ties==='current'?'Сохранять в текущем':'Добавлять в следующий';
    const owner=s.node_binning.frame.controls['cbbMatchingObservationsMode;ValueControl'];
    await act('cbbMatchingObservationsMode;ValueControl',{verb:'click'});
-   s=await observeBinning(channel,'native next-bin tie option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label==='Добавлять в следующий'&&e.allowed_actions.includes('click')));
-   await channel.perform({condition:'choose next bin for ties',initialObservation:s,ready:binningReady,identity:()=>field,resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label==='Добавлять в следующий'&&e.allowed_actions.includes('click'),'next-bin option required').ref})});
-   s=await observeBinning(channel,'next-bin tie readback');
+   s=await observeBinning(channel,'native tie policy option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
+   await channel.perform({condition:'choose requested tie policy',initialObservation:s,ready:binningReady,identity:()=>field,resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'requested tie option required').ref})});
+   s=await observeBinning(channel,'requested tie policy readback');
   }
  }
  const c=s.node_binning,q=c.settings;
  need(q&&['count','width','frequency'].includes(q.method)&&Number.isFinite(q.size)&&q.size>0&&!q.rounding&&!q.lower_open&&!q.upper_open&&c.frame.switches.length===0,'supported fixed nonrounded closed settings required');
- need(q.method==='frequency'?q.ties==='next'&&q.sums===false:q.strict_lower&&q.strict_upper&&q.limits.every(Number.isFinite)&&q.limits[0]<q.limits[1],'explicit limits or row-frequency next policy required');
- if(!applying)need(q.method===wanted.method&&q.size===wanted.size&&same(q.limits,wanted.limits??null),'final settings differ');
+ need(q.method==='frequency'?['next','current'].includes(q.ties)&&q.sums===false:q.strict_lower&&q.strict_upper&&q.limits.every(v=>field.type==='datetime'?typeof v==='string':Number.isFinite(v))&&q.limits[0]<q.limits[1],'explicit limits or row-frequency next policy required');
+ if(!applying&&!manual)need(q.method===wanted.method&&q.size===wanted.size&&same(q.limits,wanted.limits??null)&&(q.method!=='frequency'||q.ties===(wanted.ties??'next')),'final settings differ');
  need(c.fields.filter(f=>f.method_code!==0).length===1,'only one binned field allowed');
  const configuration={...c,mode:request.mode,field:field.name,type:field.type,method:q.method,size:q.size,limits:q.limits,
-  fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),rounding:false,open_ends:false,ties:q.method==='frequency'?'next':null};
+  fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),rounding:false,open_ends:false,ties:q.method==='frequency'?q.ties:null,...(manual?{manual_edits:true}:{})};
  if(applying){
   if(c.state!=='materialized'||!c.intervals.length){
    const closed=await closePreparedWizard(channel);throw binningApplyRefusal('saved intervals are absent; use internal to train current input',closed,'configure');
@@ -126,7 +157,7 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
  };
  await next('binning','output_mapping');await next('output_mapping','binning_ranges_mapping');
  const done=await next('binning_ranges_mapping','done');
- return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{...configuration,state:'settings',intervals:[]},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {verified:true,cleanup_complete:true,effect_possible:true,configuration:manual?configuration:{...configuration,state:'settings',intervals:[]},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
 export function binningApplyRefusal(message,closed,phase){
  const error=Error('Binning apply: '+message+'; no settings changed and no training requested');
