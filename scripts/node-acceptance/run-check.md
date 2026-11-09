@@ -867,3 +867,5 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
 порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
 проверяется принятым `replace-keep-variant`.
+
+`coarse-classes-frozen-zero` uses task-frozen-zero.md and only train.csv plus zero-frequency.csv from preprocessing-coarseclasses/fixtures. The independent modes/expected-frozen-zero.json checks three full ordered outputs, CSV, Save and cold. The same Import and Coarse Classes node must be retained with a locked partition during retraining; reopen readback checks IsLocked before execution.

@@ -200,6 +200,13 @@ page = context.pages()[0]
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
   if(expected.lgd&&!expected.lgd.source_variable&&!expected.lgd.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin});
+  if(expected.coarse_frozen){
+   const nodes=graph.nodes.filter(n=>n.type==='preprocessing.coarse_classes');
+   if(nodes.length!==1)throw Error('COARSE_FROZEN_ONE_SAVED_NODE');
+   const {observeCoarseFrozenSavedSettings}=await import('./coarse-classes-frozen.mjs');
+   const settings=await observeCoarseFrozenSavedSettings({load,channel:channelFor(nodes[0].ref,'coarse-frozen-saved')});
+   await record({phase:'coarse_frozen_saved_settings',node:nodes[0].ref,...settings});
+  }
   let staticSources;
   if(expected.static_sources){
    const {readGraph}=await load('client/lib/node-target-browser.mjs');

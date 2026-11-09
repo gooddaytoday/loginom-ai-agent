@@ -18,10 +18,10 @@ test('coarse classes catalog keeps independent train/apply expectations outside 
 from pathlib import Path
 s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
 r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
-for name,rows in [('coarse-classes-train',20),('coarse-classes-apply',3),('coarse-classes-continuous-manual',9)]:
+for name,rows in [('coarse-classes-train',20),('coarse-classes-apply',3),('coarse-classes-continuous-manual',9),('coarse-classes-frozen-zero',4)]:
  c=r.scenario(name);e=r.expected_for(c,'/owned/coarse.lgp')
  assert c['base'] is None and c['export_count']==3
- assert c['input_files']==(['continuous.csv'] if rows==9 else ['train.csv'] if rows==20 else ['train.csv','holdout.csv'])
+ assert c['input_files']==(['train.csv','zero-frequency.csv'] if rows==4 else ['continuous.csv'] if rows==9 else ['train.csv'] if rows==20 else ['train.csv','holdout.csv'])
  if rows==9:
   assert c['expected_name']=='modes/expected.json'
   assert next(row for row in e['outputs'][0]['rows'] if row['X']==7)['X_ClassNum']==0
