@@ -12,7 +12,7 @@ assert c['prompt'].name=='task-multi-file-list.md' and c['prompt'].is_file()
 assert c['input_files']==['sales_2026-02.csv','sales_2026-01.csv','returns_2026-01.csv']
 assert all((c['data']/f).is_file() for f in c['input_files'])
 assert c['base'] is None and c.get('export_count',1)==1
-assert c['attachment']=='path' # Inline CLI attachments deliberately prefix native filenames.
+assert c['text_list_sources'] is True # Seed original basenames through verified delivery.
 oracle=runpy.run_path(str(c['oracle']))['expected']()
 assert e==dict(oracle,package_path='/own/list.lgp')
 assert r.expected_for(c,'/own/list.lgp',cold=True)==e

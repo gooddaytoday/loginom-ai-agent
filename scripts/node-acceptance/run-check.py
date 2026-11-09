@@ -270,7 +270,7 @@ def scenario(name, case_root=None, *, cases=None):
         node = REPO / 'docs/node-development/nodes/text-import'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file-list.md',
                     data=node / 'fixtures/multi-file', input_files=['sales_2026-02.csv', 'sales_2026-01.csv', 'returns_2026-01.csv'],
-                    base=None, expected_name='expected-list.json', oracle=node / 'acceptance/oracle-multi-file.py', attachment='path')
+                    base=None, expected_name='expected-list.json', oracle=node / 'acceptance/oracle-multi-file.py', text_list_sources=True)
     if name in ['text-auto-types', 'text-auto-update']:
         node = REPO / 'docs/node-development/nodes/text-import'
         update = name == 'text-auto-update'
@@ -1796,6 +1796,16 @@ class Runner:
         if spec.get('local_file'):
             if spec['attachment'] == 'file': command += ['--file', spec['local_file']]
             files = []  # No multi-GiB workspace copy, and no --file for the path case.
+        if spec.get('text_list_sources'):
+            # FileName is the physical server basename. Both inline and small
+            # local-path admission prefix names; seed the original inputs via
+            # the existing verified delivery protocol, rejecting unequal files.
+            books = [dict(fixture=str(f), destination=login['package_directory'].rstrip('/') + '/' + f.name) for f in files]
+            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books))
+            self.phase('text-list-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
+                       build / 'resources/loginom', folder / 'text-list-inputs.json', folder / 'text-list-inputs'], folder, timeout=300)
+            prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
+            files = []
         for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
@@ -1804,8 +1814,6 @@ class Runner:
             if spec.get('lgd') and target.suffix.lower() == '.lgd':
                 # Native binary input uses the existing local-path admission flow.
                 prompt += f'\nИсходный файл LGD: {target}.'
-            elif spec.get('attachment') == 'path':
-                prompt += f'\nИсходный файл: {target}.'
             else:
                 command += ['--file', target]
         (folder / 'task.md').write_text(prompt)

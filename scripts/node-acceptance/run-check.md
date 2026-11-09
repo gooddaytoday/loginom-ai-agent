@@ -26,8 +26,9 @@ appends February then January, excludes returns, retains duplicates and adds
 the native FileName field. Full typed output, exact field order, CSV, Save,
 cold reexecution without configuration and cleanup use the stock checks.
 Only task and CSV inputs reach the model.
-Original local paths use `loginom_file_admit`, preserving the native basename
-for FileName instead of the CLI inline-attachment namespace.
+The existing fixture uploader seeds exact original basenames with reject/equal-byte
+verification. The model receives their server paths and obtains fresh storage
+references. Inline and small local admission otherwise prefix physical filenames.
 
 `tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
 `trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
