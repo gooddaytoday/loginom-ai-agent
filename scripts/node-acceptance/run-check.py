@@ -404,6 +404,10 @@ def scenario(name, case_root=None, *, cases=None):
                                 'corr-age': ('age-pressure-task.md', 'expected-age-pressure.json', 'age-pressure.csv')}[name]
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=[data])
+    if name == 'reform-cache':
+        src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
+        return dict(source=src, prompt=src / 'task-cache.md', data=src / 'fixtures', base=None,
+                    expected_name='expected-cache.json', input_files=['reform.csv'], export_count=1, reform_cache=True, oracle=src / 'oracle.py')
     if name == 'reform-rename-lossy':
         src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
         return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
@@ -873,6 +877,8 @@ def expected_for(case, package, cold=False):
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
     if case.get('logreg_normalization'):
         expected['logreg_normalization'] = True
+    if case.get('reform_cache'):
+        expected['reform_cache'] = read(src / 'expected-cache-settings.json')
     if case.get('linreg_forward'):
         # C1's mathematical oracle omits presentation labels. Bind the three
         # intrinsic labels from linregression-output.mjs; keep all numeric
@@ -2201,6 +2207,10 @@ class Runner:
             write(folder / 'logreg-replies.json', [o for _, o in replies])
             self.phase('logreg-normalization-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',
                 folder / 'expected.json', folder / 'logreg-replies.json', folder / 'logreg-normalization-proof.json'], folder, timeout=60)
+        if expected.get('reform_cache'):
+            write(folder / 'reform-replies.json', [o for _, o in replies])
+            self.phase('reform-cache-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/reform-cache.mjs',
+                folder / 'expected.json', folder / 'reform-replies.json', folder / 'reform-cache-proof.json'], folder, timeout=60)
         if expected.get('clustering_normalized'):
             write(folder / 'clustering-replies.json', [o for _, o in replies])
             self.phase('clustering-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-normalized.mjs',

@@ -21,6 +21,15 @@ Stock final CSV, Save, cold reexecution, graph and cleanup checks apply.
 
 Run live acceptance without repeatedly reading live logs:
 
+`reform-cache` uses `field-parameters/acceptance/v040/task-cache.md`, reform.csv
+and independent expected-cache.json (one export). Production readbacks prove
+disabled → on_activation → on_access → selected_fields executions on one node,
+unchanged complete typed data, A=on_activation, B=on_access and other fields
+disabled. Cold reads both saved cache levels and cancels without reapplying,
+then stock execution/CSV/Save/cleanup checks apply. Settings codes are pinned in
+oracle.py and expected-cache-settings.json from the initial UI observation.
+Only the approved business task and CSV reach the model.
+
 `import-bindings` uses the approved `variables/bindings/acceptance/task-import.md`
 and both original CSVs. Three exports check the initial file, source-only CsvPath
 update on the same Import, and saved-package reopen. The private oracle verifies

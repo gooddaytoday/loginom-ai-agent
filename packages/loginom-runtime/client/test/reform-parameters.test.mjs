@@ -2,6 +2,18 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {validateReformChanges,resolveReformChanges} from '../lib/reform-parameters.mjs';
 const field=name=>({kind:'configured_field',name});
 const baseline=()=>({verified:true,inventory_complete:true,fields:['A','B','C'].map((name,index)=>({name,index,record_id:'r'+index,field_id:String(index),label:'Same',type:'string',data_kind:'Дискретный',usage_type:0,caching_method:2,excluded:false}))});
+test('reform cache patch resolves exact field methods and preserves omitted cache settings',()=>{
+ const b={...baseline(),caching:{value:3,display:'Выбранные поля',variable:false}};
+ const r=resolveReformChanges({changes:[{field:field('A'),cache:'on_activation'},{field:field('B'),cache:'disabled'}]},b);
+ assert.deepEqual(r.fields.map(f=>f.caching_method),[1,0,2]);assert.deepEqual(r.caching,b.caching);
+ assert.deepEqual(resolveReformChanges({changes:[{field:field('A'),label:'Title'}]},b).fields.map(f=>f.caching_method),[2,2,2]);
+ assert.deepEqual(resolveReformChanges({changes:[]},b).caching,b.caching);
+ for(const caching of ['disabled','on_activation','on_access','selected_fields'])assert.doesNotThrow(()=>validateReformChanges({changes:[],caching}));
+ for(const caching of ['disabled','on_activation','on_access'])assert.throws(()=>resolveReformChanges({changes:[{field:field('A'),cache:'on_access'}],caching},b),/selected_fields/);
+ assert.throws(()=>validateReformChanges({changes:[{field:field('A'),cache:'selected_fields'}]}));
+ assert.throws(()=>validateReformChanges({changes:[],caching:1}));
+ b.caching.variable=true;assert.throws(()=>resolveReformChanges({changes:[],caching:'disabled'},b),/variable/);
+});
 test('reform resolves identical labels by exact name and preserves all unrequested properties',()=>{
  const b=baseline(),p={changes:[{field:field('B'),name:'Price',type:'real',usage:'Показатель'}]},saved=structuredClone({b,p});
  const r=resolveReformChanges(p,b);assert.equal(r.changes[0].original.record_id,'r1');assert.equal(r.fields[1].label,'Same');assert.equal(r.fields[1].caching_method,2);assert.equal(r.fields[1].usage_type,7);

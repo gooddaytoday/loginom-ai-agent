@@ -1,5 +1,5 @@
 import {bindReformInput} from './reform-input.mjs';
-import {resolveReformChanges,REFORM_TYPES,REFORM_USAGE} from './reform-parameters.mjs';
+import {resolveReformChanges,REFORM_TYPES,REFORM_USAGE,REFORM_CACHE} from './reform-parameters.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const semantic=fields=>fields.map(({selected,...f})=>f);
@@ -31,6 +31,21 @@ export async function configureReform(channel,parameters,{inputMapping}={}) {
  const plan=resolveReformChanges(parameters,baseline);
  let expected=structuredClone(baseline.fields),edits=0;
  const unique=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
+ const cacheChanged=!same(plan.caching,baseline.caching);
+ if(cacheChanged){
+  let s=await observe('reform literal node cache readiness');
+  need(baseline.caching?.variable===false,'Reform variable caching cannot be replaced');
+  const choice=(e,kind)=>e.wizard_combo?.kind===kind&&e.wizard_combo.field?.scope==='reform_node'&&e.wizard_combo.field.name==='caching';
+  const identity=s=>({node:s.node_reform.node_context,root:s.wizard.root_ref});
+  await channel.perform({condition:'open reform node cache choices',initialObservation:s,ready,identity,
+   resolve:s=>({verb:'click',ref:unique(s,e=>choice(e,'picker')&&e.allowed_actions.includes('click'),'Reform node cache picker unavailable').ref})});
+  s=await channel.observe({condition:'reform node cache choices',readReform:true,
+   ready:s=>ready(s)&&s.ui.elements.some(e=>choice(e,'option')&&e.wizard_combo.label===plan.caching.display)});
+  await channel.perform({condition:'select reform node caching',initialObservation:s,ready,identity,
+   resolve:s=>({verb:'select_wizard_option',ref:unique(s,e=>choice(e,'option')&&e.wizard_combo.label===plan.caching.display&&e.allowed_actions.includes('select_wizard_option'),'Reform node cache option unavailable').ref})});
+  s=await observe('verify reform node cache without collateral edits');
+  need(same(s.node_reform.caching,plan.caching)&&same(semantic(configuration(s).fields),semantic(expected)),'Reform node caching changed unrequested fields or properties');
+ }
  const reveal=async field=>{
   let s=await observe('reform field readiness');
   for(let attempt=0;attempt<130;attempt++) {
@@ -62,13 +77,14 @@ export async function configureReform(channel,parameters,{inputMapping}={}) {
   const usage=Object.keys(REFORM_USAGE).find(k=>REFORM_USAGE[k]===wanted.usage_type);
   // Type first; name can update a linked label, so restore the requested or
   // retained label after blur. Preserve kind/usage even when type defaults vary.
-  const values={type_label:REFORM_TYPES[wanted.type]??'Переменный',name:wanted.name,label:wanted.label,data_kind:wanted.data_kind,usage,excluded:wanted.excluded};
+  const values={type_label:REFORM_TYPES[wanted.type]??'Переменный',name:wanted.name,label:wanted.label,data_kind:wanted.data_kind,usage,excluded:wanted.excluded,
+   ...(wanted.caching_method===original.caching_method?{}:{caching:REFORM_CACHE[Object.keys(REFORM_CACHE)[wanted.caching_method]]})};
   for(const [key,value] of Object.entries(values)) {
    s=await channel.observe({condition:'bound reform '+key+' editor',ready:editorReady});
    const field=s.wizard.reform_parameters.fields[key];need(field?.status==='observed'&&!field.truncated,'Reform editor property unavailable');
    if(field.value===value)continue;
    need(field.enabled,'Requested reform property is disabled');
-   if(['type_label','data_kind','usage'].includes(key)) {
+   if(['type_label','data_kind','usage','caching'].includes(key)) {
     const choice=(e,kind)=>e.wizard_combo?.kind===kind&&e.wizard_combo.field?.scope==='reform_column'&&e.wizard_combo.field.name===key;
     await channel.perform({condition:'open reform '+key+' choices',initialObservation:s,ready:editorReady,identity,
      resolve:s=>({verb:'click',ref:unique(s,e=>choice(e,'picker')&&e.allowed_actions.includes('click'),'Reform picker unavailable').ref})});
@@ -87,10 +103,10 @@ export async function configureReform(channel,parameters,{inputMapping}={}) {
    resolve:s=>({verb:'apply_reform_column',ref:unique(s,e=>e.column_close?.scope==='reform'&&e.allowed_actions.includes('apply_reform_column'),'Reform Apply unavailable').ref})});
   s=await observe('reform record applied');expected=expected.map(f=>f.record_id===original.record_id?{...wanted}:f);
   need(same(semantic(configuration(s).fields),semantic(expected)),'Reform edit changed unrequested fields or properties');
-  need(same(s.node_reform.caching,baseline.caching),'Reform edit changed node caching');edits++;
+  need(same(s.node_reform.caching,plan.caching),'Reform edit changed node caching');edits++;
  }
  const after=configuration(await observe('complete final reform draft'));
- need(same(semantic(after.fields),semantic(plan.fields))&&same(after.caching,baseline.caching),'Final reform draft differs');
- return {verified:true,cleanup_complete:true,effect_possible:edits>0,baseline_configuration:baseline,configuration:after,
+ need(same(semantic(after.fields),semantic(plan.fields))&&same(after.caching,plan.caching),'Final reform draft differs');
+ return {verified:true,cleanup_complete:true,effect_possible:edits>0||cacheChanged,baseline_configuration:baseline,configuration:after,
   preservation:{unrequested_fields:true,unrequested_properties:true,caching:true},applied_editors:edits,settings_applied:false};
 }

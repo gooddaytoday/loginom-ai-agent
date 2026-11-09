@@ -265,7 +265,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
       seenElements.add(element);dom.push(element);
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid$=";ReplaceColumnsWizard;btnTypeChange;mn"],[data-tid$=";CalcDataWizard;btnCalcMode;mn"],[data-tid="mn"],[data-tid="mnUnionGrid"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid$=";ReplaceColumnsWizard;btnTypeChange;mn"],[data-tid$=";CalcDataWizard;btnCalcMode;mn"],[data-tid="mn"],[data-tid="mnUnionGrid"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid*=";WizrdMCF;ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl;boundlist-"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -362,6 +362,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
       '[data-tid$=";WizrdMCF;DataSetOutputSocketWizard;btnAddMappingColumn"]',
+      ...['pedDataSourceCachingMethod;ValueControl','pedDataSourceCachingMethod;SwitchButton'].flatMap(name=>{
+        const owner='[data-tid$=";WizrdMCF;ReformColumnsWizard;'+name+'"]';return [owner,owner+' input'];}),
+      '[data-tid*=";WizrdMCF;ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl;boundlist"]',
       ...Object.entries({ExportNativeParamsWizard:['edtFileName','cbbCompression','cbbWriteChecksum','edtStringCacheMaxSize'],ExportExcelFilePreviewWizard:['edtFileName','edtSheetName','cbbFileType','cbbHeadersRow','cbbFloatFormat','pedDecimalCount','chkDivideThousands'],ExportTextFileParamsWizard:['edtFileName','edtTextQualifier','edtDecimalSeparator','edtDateSeparator','edtTimeSeparator','edtValueTrue','edtValueFalse','edtValueNull','edtDateFormat','edtTimeFormat'],ExportTextFilePreviewWizard:['edtDelimiterChar','edtCodePage','edtWriteBOM','edtLineEnding','edtCaptionType']}).flatMap(([card,fields])=>fields.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
@@ -2094,10 +2097,21 @@ function readRenderedInputMapping(observation) {
       if(f?.status==='observed'&&f.enabled&&!f.truncated)wizardCombos.set(wizard.root_tid+';ImportTextFilePreviewWizard;edtCodePage;ValueControl',
         {name:'encoding',scope:'import_source',owner_ref:f.owner_ref,input_ref:f.input_ref,root_ref:wizard.root_ref,value:f.value});
     }
+    if(wizard.status==='observed'&&wizard.stage==='field_parameters'&&!wizard.reform_parameters){
+      const ownerTid=wizard.root_tid+';ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl';
+      const owners=(tids.get(ownerTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
+      const inputs=owners.length===1?dom.filter(e=>owners[0].contains(e)&&e.matches('input')&&visible(e)&&!sensitive(e)):[];
+      if(inputs.length===1){
+        const input=inputs[0],value=String(input.value??''),owner_ref=refOf(owners[0]),input_ref=refOf(input);
+        wizard.settings={status:'draft_ui_values',applied_verified:false,fields:{caching:{status:'observed',value:value.slice(0,256),value_length_utf16:value.length,
+          truncated:value.length>256,enabled:enabled(input),read_only:input.readOnly===true,owner_ref,input_ref}}};
+        if(enabled(input)&&value.length<=256)wizardCombos.set(ownerTid,{name:'caching',scope:'reform_node',owner_ref,input_ref,root_ref:wizard.root_ref,value});
+      }
+    }
     const reformParams=wizard.reform_parameters;
     if(reformParams?.status==='observed' && reformParams.selected_column && Object.keys(reformParams.fields??{}).length===7
       && Object.values(reformParams.fields).every(f=>f.status==='observed' && !f.truncated)) {
-      for(const [name,key] of Object.entries({type_label:'cbxDataType',data_kind:'cbxDataKind',usage:'cbxUsageType'})) {
+      for(const [name,key] of Object.entries({type_label:'cbxDataType',data_kind:'cbxDataKind',usage:'cbxUsageType',caching:'cntMain;cbxCachingMethod'})) {
        const field=reformParams.fields[name];
        if(field.enabled && !field.read_only)
         wizardCombos.set(reformParams.root_tid+';'+key,{name,scope:'reform_column',
@@ -2725,9 +2739,12 @@ function readRenderedInputMapping(observation) {
       for(const [ownerTid,field] of wizardCombos) {
         if(tid===ownerTid+';trg_picker')return field.scope!=='import_column' || wizard.import_column_editor?.picker_status==='observed' && wizard.import_column_editor.picker_ref===state.ids.get(element)
           ? {kind:'picker',field}:null;
-        const prefix=ownerTid+';boundlist;';
+        const cacheList=field.scope==='reform_node'?/^(boundlist(?:-\d+)?);[^;]+$/.exec(tid.slice(ownerTid.length+1)):null;
+        const prefix=ownerTid+';'+(cacheList?.[1]??'boundlist')+';';
         if(!tid.startsWith(prefix) || !tid.slice(prefix.length) || tid.slice(prefix.length).includes(';'))continue;
-        const lists=(tids.get(ownerTid+';boundlist')??[]).filter(visible);
+        const lists=(cacheList?dom.filter(e=>{
+          const t=getTid(e)??'';return t.startsWith(ownerTid+';')&&/^boundlist(?:-\d+)?$/.test(t.slice(ownerTid.length+1));
+        }):tids.get(ownerTid+';boundlist')??[]).filter(visible);
         if(lists.length!==1 || !lists[0].contains(element) || sensitive(lists[0]))return null;
         const displayed=textOf(element,true),label=field.scope==='sorting'&&field.name==='max_threads'&&displayed==='Автоопределение (0)'?'Автоопределение':displayed,formatted=label.replace(/\s/g,'_').replace(/,/g,'');
         if(!label || label.length>=240 || tid!==prefix+formatted)return null;
