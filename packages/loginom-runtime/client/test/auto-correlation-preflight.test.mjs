@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {createAutoCorrelationNodeSupport} from '../lib/auto-correlation-node.mjs';
 import {AUTO_CORRELATION_EMPTY_INPUT,readAutoCorrelationSourceRowCount} from '../lib/auto-correlation-preflight.mjs';
 
-function sourceFixture({rows,kind='new',finish='execute',parameters={autocorrelation:{field:'X',lag_count:12}}}){
+function sourceFixture({rows,kind='new',finish='execute',active=true,parameters={autocorrelation:{field:'X',lag_count:12}}}){
  const node={document_id:'doc',workflow_id:'flow',node_id:'series'},tid='MF;TF;Graph;Series',root='MF;TF;ModelForm;PreviewWindow';
  const owner={...node,verified:true,surface:'graph',locked:false,tid};
- const port={index:0,native_index:0,port_guid:'series-output',tid:tid+';Output_Data-0',active:true};
+ const port={index:0,native_index:0,port_guid:'series-output',tid:tid+';Output_Data-0',active};
  const fields=[{name:'RowID',label:'RowID',type:'integer'},{name:'X',label:'X',type:'real'}];
  const workflow_ref={workflow_id:'flow',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',navigation_path:[{tid:'path',label:'Scenario'}]};
  const acf={document_id:'doc',workflow_id:'flow',node_id:'acf'};
@@ -86,4 +86,24 @@ test('guard text is the execution error fixed in the acf-empty expected before r
  const {readFile}=await import('node:fs/promises');
  const expected=JSON.parse(await readFile(new URL('../../../../docs/node-development/nodes/research-autocorrelation/acceptance/edges/expected-empty.json',import.meta.url),'utf8'));
  assert.equal(expected.execution_error.text,AUTO_CORRELATION_EMPTY_INPUT);
+});
+
+test('existing Execute on an inactive source names the source Execute step and keeps the empty-input guard',async()=>{
+ const f=sourceFixture({rows:0,kind:'existing',active:false,parameters:{}});
+ await assert.rejects(f.run(),error=>{
+  for(const text of ['auto_correlation preflight requires an active source output','Import','finish:"execute"','same existing','NEW operation_id'])
+   assert.ok(error.message.includes(text),text);
+  assert.deepEqual(error.nodePhaseRefusal,{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+  return true;
+ });
+ assert.equal(f.preview,false);assert.equal(f.reads,0);
+ assert.equal(f.events.some(e=>e.phase==='node_target_effect_prepared'),false);
+});
+
+test('node reference tells to execute the updated Import before repeating the existing node',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const url=new URL('../../../product/skills/loginom-automation/references/nodes/research.auto_correlation.md',import.meta.url);
+ const text=await readFile(url,'utf8');
+ assert.ok(text.includes('перед повторным выполнением существующего узла выполни обновлённый Импорт с `finish:"execute"`'));
+ assert.ok(Buffer.byteLength(text)<=6000);
 });
