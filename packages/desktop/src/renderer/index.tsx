@@ -23,6 +23,7 @@ import { createMemoryHistory, MemoryRouter, type BaseRouterProps } from "@solidj
 import { createEffect, createMemo, createResource, createSignal, onCleanup, Show } from "solid-js"
 import { render } from "solid-js/web"
 import pkg from "../../package.json"
+import type { PendingDeepLinks } from "../preload/types"
 import { t } from "./i18n"
 import { initializationData } from "./initialization"
 import { DesktopFirstLaunchOnboarding } from "./onboarding"
@@ -70,17 +71,19 @@ type DesktopWindowState = {
   id?: string
 }
 
-const emitDeepLinks = (urls: string[]) => {
+const emitDeepLinks = ({ urls, coldDashboard }: PendingDeepLinks) => {
   if (urls.length === 0) return
   window.__LOGINOM_AI_AGENT__ ??= {}
+  if (coldDashboard) window.__LOGINOM_AI_AGENT__.coldDashboard = coldDashboard
   const pending = window.__LOGINOM_AI_AGENT__.deepLinks ?? []
   window.__LOGINOM_AI_AGENT__.deepLinks = [...pending, ...urls]
   window.dispatchEvent(new CustomEvent(deepLinkEvent, { detail: { urls } }))
 }
 
 const listenForDeepLinks = () => {
-  void window.api.consumeInitialDeepLinks().then((urls) => emitDeepLinks(urls))
-  return window.api.onDeepLink((urls) => emitDeepLinks(urls))
+  const consume = () => void window.api.consumeDeepLinks().then(emitDeepLinks)
+  window.api.onDeepLink(consume)
+  consume()
 }
 
 function windowLastActiveUrlKey(windowID: string) {
@@ -169,6 +172,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
   return {
     platform: "desktop",
     loginom: window.api.loginom,
+    getDashboardTarget: window.api.getDashboardTarget,
     os,
     version: pkg.version,
     windowID: windowState.id,

@@ -3,11 +3,12 @@ import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { basename, join } from "node:path"
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from "electron"
-import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
+import type { IpcMainEvent, IpcMainInvokeEvent, WebContents } from "electron"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
-import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
+import type { FatalRendererError, PendingDeepLinks, ServerReadyData, TitlebarTheme } from "../preload/types"
+import { getDashboardTarget } from "./dashboard-target"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations, describePickedFiles } from "./attachment-picker"
@@ -39,7 +40,7 @@ type Deps = {
   killSidecar: () => Promise<void> | void
   relaunch: () => void
   awaitInitialization: () => Promise<ServerReadyData>
-  consumeInitialDeepLinks: () => Promise<string[]> | string[]
+  consumeDeepLinks: (sender: WebContents) => PendingDeepLinks
   getDefaultServerUrl: () => Promise<string | null> | string | null
   setDefaultServerUrl: (url: string | null) => Promise<void> | void
   isFirstLaunchOnboardingPending: () => Promise<boolean> | boolean
@@ -76,7 +77,8 @@ export function registerIpcHandlers(deps: Deps) {
     getStore().set(SYSTEM_PROXY_ENABLED_KEY, enabled === true)
     publishSystemProxyStatus({ ...currentSystemProxyStatus(), enabled: enabled === true })
   })
-  ipcMain.handle("consume-initial-deep-links", () => deps.consumeInitialDeepLinks())
+  ipcMain.handle("consume-deep-links", (event) => deps.consumeDeepLinks(event.sender))
+  ipcMain.handle("get-dashboard-target", (_event, id: string) => getDashboardTarget(id))
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())
   ipcMain.handle("set-default-server-url", (_event: IpcMainInvokeEvent, url: string | null) =>
     deps.setDefaultServerUrl(url),
@@ -313,6 +315,6 @@ export function sendMenuCommand(win: BrowserWindow, id: string) {
   win.webContents.send("menu-command", id)
 }
 
-export function sendDeepLinks(win: BrowserWindow, urls: string[]) {
-  win.webContents.send("deep-link", urls)
+export function notifyDeepLinks(win: BrowserWindow) {
+  win.webContents.send("deep-link")
 }
