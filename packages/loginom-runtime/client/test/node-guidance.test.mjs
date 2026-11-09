@@ -41,7 +41,7 @@ test('text Import delimited guidance keeps every rule in compact English',async 
   /CP1251/,/mojibake/,/rare types/,/download\/sampling/,/full sample Import settings/,/settings\.columns`; add no Reform/,/order/,/overwrite=reject/,
   /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
   /auto_detect_columns/,/only after Execute/,/output `mappings`/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
-  /Calculator\/JS/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/])assert.match(text,rule);
+  /Calculator\/JS/,/Export\/Save outside the mask directory/,/max 16/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/])assert.match(text,rule);
  assert.doesNotMatch(description.guidance.replace(/^# .*\n/,'').replace(/\(\.\.\/large-files\.md#[^)]*\)/,''),/[А-Яа-яЁё]/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);
 });
