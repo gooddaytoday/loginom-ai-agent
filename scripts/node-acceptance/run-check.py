@@ -771,6 +771,17 @@ def text_update_stages(case):
             ['expected-auto-update-string.json', 'expected-auto-update.json']]
 
 
+def check_text_multi_file_list(replies):
+    imports = [(owner, port) for _, reply in replies for owner, port in ports(reply)
+               if owner.get('status') == 'SUCCEEDED'
+               and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
+    assert imports, 'TEXT_LIST_IMPORT_RECEIPT_MISSING'
+    assert len({owner['node']['node_id'] for owner, _ in imports}) == 1, 'TEXT_LIST_IMPORT_RECREATED'
+    source = imports[-1][0]['configuration']['readback']['source']
+    assert [Path(p).name for p in source['source_path'].split('｜')] == ['sales_2026-02.csv', 'sales_2026-01.csv'], 'TEXT_LIST_SOURCE_ORDER'
+    assert source.get('file_info') == 'Имя файла' and source.get('parallel_processing') is False, 'TEXT_LIST_SERVICE_SETTINGS'
+
+
 def check_text_update_ports(replies, destinations, stages, node_binary='node'):
     assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
     previous, node = -1, None
@@ -2152,6 +2163,8 @@ class Runner:
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
             expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
+        if case == 'text-multi-file-list':
+            check_text_multi_file_list(replies)
         if spec.get('text_update'):
             check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):

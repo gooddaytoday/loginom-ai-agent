@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {textImportParametersSchema} from '../lib/node-api.mjs';
-import {verifyTextImportSource,validateTextImportNodeParameters} from '../lib/text-import-node.mjs';
+import {verifyTextImportSource,validateTextImportNodeParameters,textImportOutputFields} from '../lib/text-import-node.mjs';
 import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch} from '../lib/text-import-procedure.mjs';
 import {textImportConfigurationReadback} from '../lib/text-import-readback.mjs';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
@@ -30,6 +30,19 @@ test('list authority never comes from only its first source',()=>{
  for(const proof of [[proofs[0]], [...proofs].reverse(),[proofs[0],{...proofs[1],verified:false}]])
   assert.throws(()=>verifyTextImportSource(parameters(),[],undefined,proof),e=>e.nodePhaseRefusal?.effect_possible===false);
 });
+test('each delivery in a mixed list retains its own bytes and digest witness',()=>{
+ const p=parameters(),digest='a'.repeat(64),destination=paths[1];
+ p.source.sources[1]={kind:'verified_delivery',artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:digest};
+ const upload={operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:digest},
+  outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,
+   output:{artifact_id:'artifact',destination,bytes:15,sha256:digest,server_copy_verification:{verification_id:'verified',status:'SUCCEEDED',
+    bytes_verified:true,upload_completion_verified:true,destination,bytes:15,sha256:digest}}}};
+ assert.equal(verifyTextImportSource(p,[upload],undefined,[proofs[0]]).source.sources[1].sha256,digest);
+ delete p.settings.source.source_paths;
+ assert.equal(verifyTextImportSource(p,[upload],undefined,[proofs[0]]).source.destination,paths.join('｜'));
+ p.source.sources[1].sha256='b'.repeat(64);
+ assert.throws(()=>verifyTextImportSource(p,[upload],undefined,[proofs[0]]),e=>e.nodePhaseRefusal?.effect_possible===false);
+});
 test('invalid lists and service options refuse in production preflight',()=>{
  for(const source of [{source_paths:[]},{source_paths:['','']},{source_paths:['/x.csv｜/y.csv']},
   {source_paths:['/x*.csv']},{source_paths:['/../x.csv']},{source_paths:['https://x/a.csv']},
@@ -44,6 +57,8 @@ test('invalid lists and service options refuse in production preflight',()=>{
 test('existing list patch and file_info-only patch need no replacement settings',()=>{
  validateTextImportPatch({source:{source_paths:paths,file_info:'none'}});
  validateTextImportPatch({source:{file_info:'name'}});
+  const p=parameters();p.settings={source:{file_info:'none'}};
+  assert.equal(verifyTextImportSource(p,[],undefined,proofs).source.destination,paths.join('｜'));
 });
 for(const existing of [false,true])test('production wizard writes the whole list and filename option, existing: '+existing,async()=>{
  const p=parameters().settings,owner={status:'observed',node:{tid:'node'},path:[{tid:'scenario',label:'Scenario'}]};
@@ -91,4 +106,13 @@ test('readback includes observed filename column and rejects a fabricated extra 
  assert.equal(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration)({status:'applied',readback:r}).valid,true);
  m.source_fields.at(-1).name='Fake';m.target_fields.at(-1).source.name='Fake';
  assert.throws(()=>textImportConfigurationReadback(f));
+});
+test('service mapping uses the observed native metadata outside the CSV definitions',()=>{
+ const configured={columns:parameters().settings.columns,source:{fields:{file_info:{status:'observed',value:'Имя файла'}}}};
+ const service={name:'FileName',label:'Имя файла',type:'string',data_kind:'Неопределенное',record_id:'native'};
+ assert.deepEqual(textImportOutputFields(configured,{source_fields:[service]}).map(c=>c.name),['SaleID','FileName']);
+ assert.equal(textImportOutputFields(configured,{source_fields:[service]})[1].data_kind,'Неопределенное');
+ assert.equal(configured.columns.length,1);
+ assert.throws(()=>textImportOutputFields(configured,{source_fields:[]}));
+ assert.throws(()=>textImportOutputFields(configured,{source_fields:[{...service,type:'integer'}]}));
 });

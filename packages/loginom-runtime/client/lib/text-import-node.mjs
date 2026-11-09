@@ -97,10 +97,13 @@ export function verifyTextImportSource(parameters,uploads,uploadHistory,storageP
   const s=parameters.source;
   validateTextSource(s);
   if(s.kind==='verified_sources') {
-    const paths=textImportSourcePaths(parameters.settings.source);
-    requireValue(!Object.hasOwn(parameters.settings.source,'source_path')&&paths.length===s.sources.length,'One verified source per ordered source_path required');
-    const sources=s.sources.map((source,i)=>verifyTextImportSource({source,settings:{source:{source_path:paths[i]}}},uploads,uploadHistory,storageProof?.[i]).source);
-    return verified({source:{kind:'verified_sources',destination:paths.join('｜'),sources}});
+    const declared=parameters.settings.source??{},paths=Object.hasOwn(declared,'source_paths')?textImportSourcePaths(declared):null;
+    requireValue(!Object.hasOwn(declared,'source_path')&&(!paths||paths.length===s.sources.length),'One verified source per ordered source_path required');
+    const sources=s.sources.map((source,i)=>verifyTextImportSource({source,settings:{source:{
+      source_path:paths?.[i]??(source.kind==='storage'?storageProof?.[i]?.destination:undefined)}}},uploads,uploadHistory,storageProof?.[i]).source);
+    const destinations=sources.map(source=>source.destination);
+    textImportSourcePaths({source_paths:destinations});
+    return verified({source:{kind:'verified_sources',destination:destinations.join('｜'),sources}});
   }
   if(s.kind==='storage') {
     requireValue(storageProof?.verified===true&&storageProof.kind==='storage'&&storageProof.server_source_ref===s.server_source_ref,
@@ -337,7 +340,7 @@ export function textImportOutputFields(configured,native) {
   if(configured.source?.fields?.file_info?.value!=='Имя файла')return columns;
   requireValue(!columns.some(c=>c.name==='FileName'),'CSV FileName collides with the service field');
   const service=one(native.source_fields.filter(c=>c.name==='FileName'),'Observed FileName source required');
-  requireValue(service.type==='string'&&service.data_kind==='Дискретный','Invalid FileName source type');
+  requireValue(service.type==='string','Invalid FileName source type');
   return [...columns,{...service,used:true}];
 }
 
