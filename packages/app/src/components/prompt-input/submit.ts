@@ -107,6 +107,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   if (cmd && input.sync.data.command.find((item) => item.name === cmd)) {
     setBusy()
     try {
+      const attachments = await buildCommandAttachments(tail.join(" "), images, input.draft.context)
       if (!(await wait())) {
         setIdle()
         return false
@@ -117,7 +118,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
         sessionID: input.draft.sessionID,
         id: messageID,
         command: cmd,
-        ...(await buildCommandAttachments(tail.join(" "), images, input.draft.context)),
+        ...attachments,
         agent: input.draft.agent,
         model: {
           id: input.draft.model.modelID,
@@ -279,7 +280,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const [search] = useSearchParams<{ draftId?: string }>()
   const tabs = useTabs()
   const checkDashboard = useDashboardTargetCheck()
-  const verifying = new WeakSet<ReturnType<typeof prompt.capture>>()
   const pendingKey = (sessionID: string) => ScopedKey.from(sdk().scope, sessionID)
 
   const errorMessage = (err: unknown) => {
@@ -328,15 +328,11 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     })
   }
 
-  const handleSubmit = async (event: Event) => {
-    event.preventDefault()
-
-    const target = prompt.capture()
-    const submission = createPromptSubmissionState({
-      target,
-      prompt: target.current(),
-      context: target.context.items().slice(),
-    })
+  const send = async (
+    submission: ReturnType<typeof createPromptSubmissionState>,
+    selected?: Extract<ContextItem, { type: "dashboard" }>,
+  ) => {
+    const target = submission.target()
     const currentPrompt = submission.prompt
     const context = submission.context
     const text = currentPrompt.map((part) => ("content" in part ? part.content : "")).join("")
@@ -371,17 +367,13 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     let sessionDirectory = projectDirectory
     let client = sdk().client
 
-    const selected = mode === "normal" && context.find((item) => item.type === "dashboard")
-    if (selected) {
-      if (verifying.has(target)) return
-      verifying.add(target)
+    const queue = !isNewSession && mode === "normal" && input.shouldQueue?.()
+    if (selected && (isNewSession || queue)) {
       try {
         await checkDashboard(selected.id)
       } catch (err) {
         showToast({ title: errorMessage(err), variant: "error" })
         return
-      } finally {
-        verifying.delete(target)
       }
     }
 
@@ -483,13 +475,18 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       variant,
     }
 
+    let consumed = false
     const clearInput = () => {
+      consumed = true
       submission.clear(mode === "normal")
-      input.setMode("normal")
-      input.setPopover(null)
+      if (submission.current(prompt.capture())) {
+        input.setMode("normal")
+        input.setPopover(null)
+      }
     }
 
     const restoreInput = () => {
+      if (!consumed) return
       const restored = submission.restore()
       if (!restored) return
       restored.target.set(restored.prompt, input.promptLength(restored.prompt))
@@ -510,7 +507,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       })
     }
 
-    if (!isNewSession && mode === "normal" && input.shouldQueue?.()) {
+    if (queue) {
       input.onQueue?.(draft)
       for (const item of target.context.items()) {
         if (item.type === "file" && context.includes(item)) target.context.remove(item.key)
@@ -519,10 +516,26 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
-    input.onSubmit?.()
+    const commandName = text.startsWith("/") && text.split(" ", 1)[0].slice(1)
+    const customCommand = commandName && sync().data.command.find((c) => c.name === commandName)
+    const accept = () => {
+      if (submission.current(prompt.capture())) input.onSubmit?.()
+      if (mode === "normal" && !customCommand) {
+        for (const item of context) {
+          if (item.type === "file" && item.comment?.trim()) submission.target().context.remove(item.key)
+        }
+      }
+      clearInput()
+    }
+    const checkBeforeSend = selected
+      ? async (id: string) => {
+          await checkDashboard(id)
+          accept()
+        }
+      : undefined
+    if (!selected) accept()
 
     if (mode === "shell") {
-      clearInput()
       const eventID = Event.ID.create()
       sdk()
         .api.session.shell({
@@ -542,30 +555,25 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
-    if (text.startsWith("/")) {
-      const [cmdName] = text.split(" ")
-      const commandName = cmdName.slice(1)
-      const customCommand = sync().data.command.find((c) => c.name === commandName)
-      if (customCommand) {
-        clearInput()
-        await sendFollowupDraft({
-          api: sdk().api.session,
-          sync: sync(),
-          serverSync: serverSync(),
-          draft,
-          optimisticBusy: true,
-        }).catch((err) => {
-          showToast({
-            title: language.t("prompt.toast.commandSendFailed.title"),
-            description: formatServerError(err, language.t, language.t("common.requestFailed")),
-          })
-          restoreInput()
+    if (customCommand) {
+      await sendFollowupDraft({
+        api: sdk().api.session,
+        sync: sync(),
+        serverSync: serverSync(),
+        draft,
+        optimisticBusy: true,
+        checkDashboard: checkBeforeSend,
+      }).catch((err) => {
+        showToast({
+          title: consumed ? language.t("prompt.toast.commandSendFailed.title") : errorMessage(err),
+          description: consumed ? formatServerError(err, language.t, language.t("common.requestFailed")) : undefined,
+          variant: "error",
         })
-        return
-      }
+        restoreInput()
+      })
+      return
     }
 
-    const commentItems = context.filter((item) => item.type === "file" && !!item.comment?.trim())
     const messageID = Identifier.ascending("message")
 
     const removeOptimisticMessage = () => {
@@ -575,9 +583,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         messageID,
       })
     }
-
-    for (const item of commentItems) submission.target().context.remove(item.key)
-    clearInput()
 
     const waitForWorktree = async () => {
       const worktree = WorktreeState.get(sdk().scope, sessionDirectory)
@@ -637,7 +642,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return true
     }
 
-    void sendFollowupDraft({
+    const sending = sendFollowupDraft({
       api: sdk().api.session,
       sync: sync(),
       serverSync: serverSync(),
@@ -645,18 +650,35 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       messageID,
       optimisticBusy: sessionDirectory === projectDirectory,
       before: waitForWorktree,
+      checkDashboard: checkBeforeSend,
     }).catch((err) => {
       pending.delete(pendingKey(session.id))
       if (sessionDirectory === projectDirectory) {
         sync().set("session_status", session.id, { type: "idle" })
       }
       showToast({
-        title: language.t("prompt.toast.promptSendFailed.title"),
-        description: errorMessage(err),
+        title: consumed ? language.t("prompt.toast.promptSendFailed.title") : errorMessage(err),
+        description: consumed ? errorMessage(err) : undefined,
+        variant: "error",
       })
       removeOptimisticMessage()
       restoreInput()
     })
+    if (selected) await sending
+  }
+
+  const handleSubmit = (event: Event) => {
+    event.preventDefault()
+    const target = prompt.capture()
+    const submission = createPromptSubmissionState({
+      target,
+      prompt: target.current(),
+      context: target.context.items().slice(),
+    })
+    const selected =
+      input.mode() === "normal" ? submission.context.find((item) => item.type === "dashboard") : undefined
+    if (!submission.claim(!!selected)) return Promise.resolve()
+    return send(submission, selected).finally(submission.release)
   }
 
   return {

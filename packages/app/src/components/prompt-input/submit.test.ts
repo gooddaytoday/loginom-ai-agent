@@ -787,9 +787,16 @@ describe("prompt submit worktree selection", () => {
   })
 })
 
-test("a queued slash command includes its pinned dashboard in the accepted message", async () => {
+function dashboardDraft(prompt: string) {
+  const state = createPromptState({ prompt })
+  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  return state
+}
+
+function sendQueuedReview(checkDashboard?: (id: string) => Promise<void>) {
   commands.push({ name: "review" })
-  await sendFollowupDraft({
+  return sendFollowupDraft({
+    checkDashboard,
     api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
     serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
     sync: { data: { command: commands } } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
@@ -802,6 +809,10 @@ test("a queued slash command includes its pinned dashboard in the accepted messa
       model: { modelID: "m", providerID: "p" },
     },
   })
+}
+
+test("a queued slash command includes its pinned dashboard in the accepted message", async () => {
+  await sendQueuedReview()
   expect(sentCommands[0]).toMatchObject({
     arguments: "chart",
     legacyParts: [
@@ -816,8 +827,7 @@ test("a queued slash command includes its pinned dashboard in the accepted messa
 
 test("a rejected dashboard prompt restores the user's words and target for retry", async () => {
   params = { id: "session-1" }
-  const state = createPromptState({ prompt: "Edit chart" })
-  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  const state = dashboardDraft("Edit chart")
   const submit = dashboardSubmit(state)
   onPrompt = () => {
     throw new Error("request rejected")
@@ -859,15 +869,13 @@ function dashboardSubmit(
 
 test("an expired dashboard keeps the draft and tells the user to reopen it in Loginom", async () => {
   params = { id: "session-1" }
-  const state = createPromptState({ prompt: "Edit chart" })
-  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  const state = dashboardDraft("Edit chart")
   lookupDashboard = async (id) => {
     expect(id).toBe("target-a")
     throw new Error("404")
   }
 
   await dashboardSubmit(state).handleSubmit(new Event("submit"))
-  await Bun.sleep(0)
   expect(promptInputs).toHaveLength(0)
   expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
   expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
@@ -876,8 +884,7 @@ test("an expired dashboard keeps the draft and tells the user to reopen it in Lo
 
 test("queueing a validated dashboard keeps a newer selection and text in the editor", async () => {
   params = { id: "session-1" }
-  const state = createPromptState({ prompt: "Edit first" })
-  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  const state = dashboardDraft("Edit first")
   const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
   lookupDashboard = () => gate.promise
   const queued: import("./submit").FollowupDraft[] = []
@@ -895,25 +902,11 @@ test("queueing a validated dashboard keeps a newer selection and text in the edi
 })
 
 test("an expired queued dashboard rejects delivery without sending its command", async () => {
-  commands.push({ name: "review" })
   const ids: string[] = []
   await expect(
-    sendFollowupDraft({
-      api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
-      serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
-      sync: { data: { command: commands } } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
-      draft: {
-        sessionID: "ses",
-        sessionDirectory: "/repo/main",
-        prompt: [{ type: "text", content: "/review chart", start: 0, end: 13 }],
-        context: [{ type: "dashboard", key: "dashboard", id: "target-a", nodeName: "A", action: "edit" }],
-        agent: "build",
-        model: { modelID: "m", providerID: "p" },
-      },
-      checkDashboard: async (id) => {
-        ids.push(id)
-        throw new Error("dashboard.target.unavailable")
-      },
+    sendQueuedReview(async (id) => {
+      ids.push(id)
+      throw new Error("dashboard.target.unavailable")
     }),
   ).rejects.toThrow("dashboard.target.unavailable")
   expect(ids).toEqual(["target-a"])
@@ -922,8 +915,7 @@ test("an expired queued dashboard rejects delivery without sending its command",
 
 test("repeat Enter during a dashboard lookup submits the captured draft once", async () => {
   params = { id: "session-1" }
-  const state = createPromptState({ prompt: "Edit A" })
-  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  const state = dashboardDraft("Edit A")
   const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
   const ids: string[] = []
   lookupDashboard = (id) => {
@@ -934,21 +926,18 @@ test("repeat Enter during a dashboard lookup submits the captured draft once", a
   const sends = [submit.handleSubmit(new Event("submit")), submit.handleSubmit(new Event("submit"))]
   gate.resolve({ nodeName: "A", directory: "/repo/main" })
   await Promise.all(sends)
-  await Bun.sleep(0)
   expect(ids).toEqual(["target-a"])
   expect(promptInputs).toHaveLength(1)
 })
 
 test("a failed send restores the text and target alongside a newly added file", async () => {
   params = { id: "session-1" }
-  const state = createPromptState({ prompt: "Edit A" })
-  state.context.add({ type: "dashboard", id: "target-a", action: "edit", nodeName: "A" })
+  const state = dashboardDraft("Edit A")
   onPrompt = () => {
     state.context.add({ type: "file", path: "new.txt" })
     throw new Error("network failure")
   }
   await dashboardSubmit(state).handleSubmit(new Event("submit"))
-  await Bun.sleep(0)
   expect(state.current()[0]).toMatchObject({ content: "Edit A" })
   expect(state.context.items()).toEqual(
     expect.arrayContaining([
@@ -960,8 +949,7 @@ test("a failed send restores the text and target alongside a newly added file", 
 
 test("a shell command leaves the selected dashboard for the next model request", async () => {
   params = { id: "session-1" }
-  const state = createPromptState({ prompt: "pwd" })
-  state.context.add({ type: "dashboard", id: "target-a", action: "edit", nodeName: "A" })
+  const state = dashboardDraft("pwd")
   const ids: string[] = []
   lookupDashboard = async (id) => {
     ids.push(id)
@@ -972,4 +960,57 @@ test("a shell command leaves the selected dashboard for the next model request",
   expect(promptInputs).toHaveLength(0)
   expect(ids).toHaveLength(0)
   expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+})
+
+test("repeat Enter while creating a session for a dashboard produces one message", async () => {
+  const gate = Promise.withResolvers<void>()
+  createSessionGate = gate.promise
+  const state = dashboardDraft("Edit A")
+  const submit = dashboardSubmit(state, { info: () => undefined })
+  const first = submit.handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  const repeated = submit.handleSubmit(new Event("submit"))
+  gate.resolve()
+  await Promise.all([first, repeated])
+  expect(createdSessions).toHaveLength(1)
+  expect(promptInputs).toHaveLength(1)
+})
+
+test("a dashboard that expires during session creation stays in the draft", async () => {
+  const gate = Promise.withResolvers<void>()
+  createSessionGate = gate.promise
+  let available = true
+  lookupDashboard = async () => {
+    if (!available) throw new Error("404")
+    return { nodeName: "A", directory: "/repo/main" }
+  }
+  const state = dashboardDraft("Edit A")
+  const sending = dashboardSubmit(state, { info: () => undefined }).handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  available = false
+  gate.resolve()
+  await sending
+  expect(promptInputs).toHaveLength(0)
+  expect(state.current()[0]).toMatchObject({ content: "Edit A" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+})
+
+test("the promoted chat cannot submit the same draft during its final dashboard lookup", async () => {
+  const first = dashboardDraft("Edit A")
+  const chat = createPromptState()
+  const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
+  let reads = 0
+  lookupDashboard = async () => (++reads === 1 ? { nodeName: "A", directory: "/repo/main" } : gate.promise)
+  const original = dashboardSubmit(first, {
+    info: () => undefined,
+    prompt: { ...first, capture: (scope) => (scope ? chat.capture() : first.capture()) },
+  })
+  const sending = original.handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  expect(chat.current()[0]).toMatchObject({ content: "Edit A" })
+  params = { id: "session-1" }
+  const repeated = dashboardSubmit(chat).handleSubmit(new Event("submit"))
+  gate.resolve({ nodeName: "A", directory: "/repo/main" })
+  await Promise.all([sending, repeated])
+  expect(promptInputs).toHaveLength(1)
 })
