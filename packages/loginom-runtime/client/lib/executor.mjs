@@ -3201,6 +3201,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         outcome.trace.push({event:'observation_scope_fallback',requested_scope:scope??'all',
           delivered_scope:'roots',reason:'UI_SCAN_LIMIT'});
       }
+      // Empty nodes/links without an observed active graph (e.g. the Files tab)
+      // are not a complete graph: deliver roots, as for UI_SCAN_LIMIT above.
+      if(cursor===undefined && selectedRoot===undefined && scope==='graph'
+          && outcome.status==='SUCCEEDED' && outcome.output?.graph_identity?.status!=='observed') {
+        signal?.throwIfAborted();
+        outcome=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:observationOperationId,
+          discover_roots:true,expected_build:targetBuild,expected_origin:targetOrigin}),browserOptions());
+        deliveredScope='roots';
+        outcome.trace.push({event:'observation_scope_fallback',requested_scope:'graph',
+          delivered_scope:'roots',reason:'graph_unobserved'});
+      }
       serverSources.retain(outcome);
       await onRecord({operation_id:observationOperationId,phase:'observation_completed',outcome:structuredClone(outcome)});
       outcome.output.operation = view(pending).output;
