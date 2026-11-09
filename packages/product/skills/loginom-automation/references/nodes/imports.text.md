@@ -1,64 +1,54 @@
 # Текстовый файл (`imports.text`)
 
 <!-- mode: delimited -->
-Перед изменением существующего Импорта получи подтверждённый исходный CSV.
-Без него запроси файл до Execute/чтения: чтение добавляет таблицу визуализатора
-в пакет даже при отказе настройки. После `NOT_APPLIED` с `effect_possible=false`
-не делай baseline/Save ради cleanup: сообщи отказ и запроси CSV.
+Before changing an existing Import, get the confirmed source CSV. Without it ask
+for the file before Execute/read: a read adds a visualizer table to the package
+even if configuration is refused. After `NOT_APPLIED` with `effect_possible=false`
+do no baseline/Save for cleanup: report the refusal and ask for the CSV.
 
 Server text preview: `dock_node_apply` for `imports.text`,
 `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
 `finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}` returns
 `output.server_profile` and closes the draft without Execute. Set known
-`settings.source.encoding`, e.g. `CP1251`. If UTF-8 mangles Cyrillic, refresh
-`dock_storage_source` and retry `CP1251`; mojibake is not file data.
-Preview is at most 25 rows, possibly partial: no proof of N or rare types.
-Reuse the ref after download/sampling; a closed empty node needs full sample
-Import settings from the local profile.
+`settings.source.encoding`, e.g. `CP1251`; if UTF-8 mangles Cyrillic, refresh
+`dock_storage_source` and retry `CP1251`; mojibake is not file data. Preview may
+be partial: it proves no rare types. Reuse the ref after download/sampling; a
+closed empty node needs full sample Import settings from the local profile.
 
-Если подготовленная таблица — прямой выход текстового Import и нужны лишь
-переименования/типы полей, меняй `settings.columns` этого Import, не добавляй Reform.
-«Не перенастраивать загрузку CSV» означает сохранить `settings.source`,
-`settings.format`, остальные поля и порядок; запрошенные имена/типы и необходимые
-output mappings меняй на том же Import. Доставь исходное вложение текущей сессии
-с `overwrite=reject`: повтор пути допустим только после сравнения серверных байтов.
-При `UPLOAD_PATH_CONFLICT` не меняй путь или политику перезаписи для обхода,
-даже для активации сохранённого узла.
+If the prepared table is a text Import's direct output and only field
+renames/types are needed, change that Import's `settings.columns`; add no Reform.
+"Do not reconfigure CSV loading" means keep `settings.source`, `settings.format`,
+other fields and order; change requested names/types and needed output mappings
+on the same Import. Deliver this session's original attachment with
+`overwrite=reject`: reuse a path only after comparing server bytes. On
+`UPLOAD_PATH_CONFLICT` never change path or overwrite policy to bypass it, even
+to activate a saved node.
 
-Неизменённый существующий Import выполняй с `mode=delimited`,
-`parameters:{settings:{}}`, `inputs:[]`, `mappings:[]`, `finish=execute`,
-`read:{ports:[0]}`: текущая конфигурация без мастера. Не передавай `source`/старый
-`upload_operation_id`, CSV заново не доставляй.
+In a new Import after delivery `source_path` may be omitted: Dock takes it from
+upload_operation_id. Defaults: UTF-8, header in line 1, skip 0, comma, decimal
+point, empty NULL, double quote; explicit values are kept. You set column types
+and names.
 
-В новом Import после доставки source_path можно опустить: Dock берёт путь по
-upload_operation_id. Defaults: UTF-8, заголовок в первой строке, пропуск 0,
-запятая, десятичная точка, пустой NULL, двойная кавычка; явные значения сохраняются.
-Типы и имена колонок задаёшь ты.
+`source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл);
+no separate Import Execute.
 
-При `source_switch` ([переключение на полный файл](../large-files.md#переключение-на-полный-файл))
-в `settings` передай только `source:{source_path:"<полный файл>"}`, без columns/format/mappings.
-Переключай с `finish:"done"` и `read.ports:[]`, без отдельного Execute импорта.
+## Auto-detected types
 
-## Автоопределение типов
+Data-driven types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),
+`settings.analysis`: `rows`, `refresh` (`all` — fields and types anew, `types` —
+types only). A new node needs no `columns`: the schema is read; check `output`.
+`all`: fields appear only after Execute, Loginom sets types; pass no `columns` or
+output `mappings`; to control fields use `new`/`none`. `new`: manual types (a
+separate call on the same node) survive a `source_path` change. `refresh` erases
+manual types: only on request.
 
-Типы «по данным»: `settings.format.auto_detect_columns`
-(`none`/`new`/`all`), `settings.analysis`: `rows`, `refresh` (`all` — поля и типы
-заново, `types` — только типы). Новому узлу `columns` не нужны: схема читается, сверь
-с `output`. `all`: поля появятся лишь после Execute, типы задаёт Loginom;
-не передавай `columns` и output `mappings`, для управления полями — `new`/`none`. `new`:
-ручные типы (отдельным вызовом того же узла) остаются при смене `source_path`.
-`refresh` стирает ручные типы: только по просьбе.
-<!-- /mode -->
+## Path from variable
 
-<!-- mode: delimited -->
-## Путь из переменной
-
-Use `binding_schema`; `variable_inputs`: `variables.user` 4 → Import 0.
-First execute `variables.to_table`/`columns` (source 4 → variables 0),
-`parameters:{}`, `read:{ports:[0]}`.
-Never reopen UserVars values: Cancel deactivates. No Calculator/JS or literal copy.
-Fresh `dock_storage_source` before EACH Execute and bound Import reread.
-Configure with verified `parameters.source`, omit literal.
-Change only CsvPath; same Import with `parameters:{settings:{}}`, `bindings:[]`,
-empty inputs/mappings, also after Save/reopen. Check `configuration.bindings`.
+Use `binding_schema`; `variable_inputs`: `variables.user` 4 → Import 0. First
+execute `variables.to_table`/`columns` (source 4 → variables 0), `parameters:{}`,
+`read:{ports:[0]}`. Never reopen UserVars values: Cancel deactivates. No
+Calculator/JS or literal copy. Fresh `dock_storage_source` before EACH Execute
+and bound Import reread. Configure with verified `parameters.source`. Change only
+CsvPath; same Import with `parameters:{settings:{}}`, `bindings:[]`, empty
+inputs/mappings, also after Save/reopen. Check `configuration.bindings`.
 <!-- /mode -->

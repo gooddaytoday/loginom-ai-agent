@@ -30,7 +30,8 @@ export function parseExpectedOutputs(expected){
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
  const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination','header'];
  const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
- need(Array.isArray(outputs)&&outputs.length<=32&&(outputs.length>0||multiple&&parseExpectedVariableInventory(expected)?.outputs.length>0),'EXPECTED_OUTPUTS_INVALID');
+ need(Array.isArray(outputs)&&outputs.length<=32&&(outputs.length>0||multiple&&(parseExpectedVariableInventory(expected)?.outputs.length>0
+  ||Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0)),'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
   need(output&&Object.keys(output).every(k=>fields.includes(k))
    &&(!Object.hasOwn(output,'ordered')||typeof output.ordered==='boolean')

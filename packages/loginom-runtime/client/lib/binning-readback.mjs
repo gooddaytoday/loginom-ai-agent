@@ -11,6 +11,6 @@ export function binningConfigurationReadback({node,phases,operation_id}){
  need(!(applying||manual)||model.state==='materialized'&&model.intervals.length>0,'apply requires materialized saved intervals');
  need(mapped.value.ports?.length===2&&mapped.value.ports.every((p,i)=>p.port===i&&p.schema.length>0),'both output mappings required');
  return {kind:'binning',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),
-  mode:applying?'apply':'internal',field:c.field,type:c.type,method:c.method,size:c.size,limits:c.limits??null,rounding:false,open_ends:false,ties:c.method==='frequency'?c.ties??'next':null,
+  mode:applying?'apply':'internal',field:c.field,type:c.type,method:c.method,size:c.size,limits:c.limits??null,sd_coefficient:c.sd_coefficient??null,rounding:false,open_ends:c.method==='sd',ties:c.method==='frequency'?c.ties??'next':null,
   state:model.state,intervals:structuredClone(model.intervals),training:structuredClone(training),output_mappings:mapped.value.ports.map(p=>({port:p.port,fields:p.schema.map((f,index)=>({...f,index,source_name:f.name}))})),package_persistence_verified:false};
 }
