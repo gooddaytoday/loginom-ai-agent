@@ -24,3 +24,28 @@
 Для тренда Ходрика–Прескотта выбирай `preprocessing.smoothing` / `hodrick_prescott`; перед настройкой прочитай [детали параметров, NULL и выходов](preprocessing.smoothing.md). Не заменяй узел Калькулятором или JavaScript.
 После замены файла выполняй прежний узел, не пересоздавай его.
 <!-- /mode -->
+
+<!-- mode: wavelet -->
+## Вейвлет-сглаживание
+
+Для вейвлет-сглаживания выбирай `dock_node_apply`,
+`target.type:"preprocessing.smoothing"`, `mode:"wavelet"`,
+`parameters:{smoothing:[{field:"X",family:"daubechies",order:1,depth:1,boundary:"symmetric"}]}`.
+Семейства: `family:"daubechies"` с `order:1` (Хаар) или `order:2`,
+`family:"coiflet"` с `order:1`, `family:"cdf_9_7"` без параметра `order`.
+Для CDF сохранённый `order:null` в readback означает отсутствие порядка.
+Глубина `depth` — 1 или 2; `boundary:"symmetric"` — симметричное,
+`"zero"` — продолжение нулями, `"reflect"` — симметричное без крайней точки. Используй этот узел для
+сглаживания, не вычисляй вейвлет через Калькулятор или JavaScript.
+Обрабатываются только перечисленные непрерывные integer/real поля;
+исходные значения и порядок строк сохраняются, добавляется вещественное X_S.
+Используй вход без NULL; интерполяция пропусков не подтверждена.
+Новый узел требует правила; на существующем пропуск `smoothing` сохраняет
+настройки, `smoothing:[]` выключает обработку. Меняй глубину на том же узле,
+не пересоздавай его. `finish:"execute"`, `read.ports:[0]`, обучение не нужно.
+Для явного порядка полей обязательно задай
+`mappings:[{direction:"output",port:0,autosync:false,fields:[...]}]`:
+каждое поле с `source:{kind:"configured_field",name:"RowID"}` (аналогично
+X, Tag и X_S) в нужном порядке. Autosync может менять порядок после reopen.
+Прочитай полный выход, экспортируй CSV с исходными типами и сохрани пакет.
+<!-- /mode -->

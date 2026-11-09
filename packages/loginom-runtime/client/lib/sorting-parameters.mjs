@@ -3,9 +3,10 @@ const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
 export function validateSortingParameters(p,mode,r){
  need(mode==='keys','Sorting supports keys mode');
  need(p&&typeof p==='object'&&!Array.isArray(p),'Invalid parameters.parameters: sorting settings must be an object');
- const extra=Object.keys(p).find(k=>!['keys','compare_with_locale'].includes(k));
+ const extra=Object.keys(p).find(k=>!['keys','compare_with_locale','max_threads'].includes(k));
  need(extra===undefined,'Invalid parameters.parameters.'+extra+': unknown sorting setting; case_sensitive belongs to each string/variant key');
  need(p.compare_with_locale===undefined||typeof p.compare_with_locale==='boolean','Boolean locale flag required');
+ need(p.max_threads===undefined||Number.isInteger(p.max_threads)&&[0,1,2,4,8,16,32].includes(p.max_threads),'Invalid parameters.parameters.max_threads: literal 0 (automatic), 1, 2, 4, 8, 16 or 32 required');
  need(p.keys!==undefined||r.target.kind==='existing','New sorting requires complete keys');
  if(p.keys!==undefined){
   need(Array.isArray(p.keys)&&p.keys.length>0&&p.keys.length<=128,'Nonempty ordered sorting keys required');

@@ -270,6 +270,11 @@ def proposals():
     for mode, l1, l2 in [('ridge', 0, 1), ('lasso', 1, 0), ('elastic', 1, 1)]:
         regularized = [b[0]] + [max(Q(0), abs(v)-Q(l1, 32))*(1 if v >= 0 else -1)/(1+Q(l2, 16)) for v in b[1:]]
         cases[mode] = expected(centered, regularized, fields)
+        if mode in ['lasso', 'elastic']:
+            cases[mode] = dict(status='obsolete_invalid_do_not_use',
+                               reason='LAB-972 penalty/intercept assumptions are invalid; not an acceptance oracle.',
+                               replacement='../../penalty/expected.json: cases[shifted-' + ('lasso' if mode == 'lasso' else 'elastic') + '].expected',
+                               **cases[mode])
     # Positive affine normalization, denormalized coefficients: identical OLS.
     for norm in ['minmax', 'minus-one', 'zero-one', 'absolute', 'standard', 'ratio']:
         cases[f'normalization-{norm}'] = expected(design, full, fields)

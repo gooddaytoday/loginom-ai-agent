@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "research.auto_correlation"
+    }
+  ],
+  "outputs": [],
+  "execution_error": {
+    "text": "Во входных данных нет строк"
+  }
+}

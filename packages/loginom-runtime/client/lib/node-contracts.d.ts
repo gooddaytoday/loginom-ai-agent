@@ -143,6 +143,7 @@ export interface SortingParameters {
   /** Full replacement, or omitted to preserve existing keys. */
   keys?: Array<{field: {kind: 'input_field'; name: string}; direction: 'ASC' | 'DESC'; case_sensitive?: boolean}>;
   compare_with_locale?: boolean;
+  max_threads?: 0 | 1 | 2 | 4 | 8 | 16 | 32;
 }
 export interface SortingConfigurationReadback {
   kind: 'sorting'; scope: 'observed_before_verified_finish'; node: NodeRef;
@@ -380,7 +381,7 @@ export interface AssnRulesConfigurationReadback {
 
 export interface LinRegressionConfigurationReadback {
   kind: 'lin_regression'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
-  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward' | 'stepwise' | 'ridge'; regularization?: {setup:'manual';lambda_l2:number}; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10; input_fields: string[]; target_field: string;
+  node: NodeRef; receipt_ids: string[]; mode: 'enter' | 'apply' | 'forward' | 'backward' | 'stepwise' | 'ridge' | 'lasso'; regularization?: {setup:'manual';lambda_l2:number} | {setup:'manual';lambda_l1:number}; selection?: {criterion:'f'|'r2'|'adjusted_r2'|'aic'|'aicc'|'bic'|'hqc';add_significance?:number;remove_significance?:number}; epsilon?: 1e-10; input_fields: string[]; target_field: string;
   intercept: true; normalization: 'none'; package_persistence_verified: false;
   training: ClusteringConfigurationReadback['training'];
 }
@@ -427,14 +428,14 @@ export interface TreeConfigurationReadback {
   scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; package_persistence_verified: false;
   json_field?: string; root_mode?: 'auto'; auto_structure?: true; strict?: true; exclude_root?: false;
-  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.';
+  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.'; global_index_paths?: string[];
 }
 export interface TreeNodeOutputPort {
   port: number; port_guid: string; port_kind: 'tree'; fresh: true; execution_id: string;
   freshness_basis: 'completed_execution_port_source'; sample_complete: true;
   tree: {complete: true; node_count: number; max_depth: number; limits: {max_nodes: 256; max_depth: 16; max_bytes: 1048576};
     schema: Array<{index: number; parent: number | null; path: string; name: string; label: string; type: string; is_container: boolean; is_array: boolean; children: number[]}>;
-    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string}>};
+    instances: Array<{index: number; parent: number | null; schema_index: number; path: string; type: string; children?: number[]; value?: string | number | boolean | null; is_null?: boolean; precision?: string; timezone?: string}>};
 }
 export interface AutoCorrelationConfigurationReadback {
  kind: 'auto_correlation'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
@@ -459,7 +460,7 @@ export interface QualityConfigurationReadback {
 }
 export interface CoarseClassesConfigurationReadback {
  kind: 'coarse_classes'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values'; node: NodeRef; receipt_ids: string[];
- mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic';
+ mode: 'internal' | 'apply'; input_field: string; target_field: string; event_value: string; partition: 'automatic' | 'manual';
  min_class_percent: number; max_classes: number; uniformity_percent: number;
  roles: {name: string; role: 'unused' | 'input' | 'target'}[];
  state: 'settings' | 'materialized'; classes: {number: number; mark: string; woe: number; iv: number}[]; total_iv: number | null;
@@ -470,7 +471,7 @@ export interface CoarseClassesConfigurationReadback {
 export interface FactorAnalysisConfigurationReadback {
   kind: 'factor_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'pca_fixed'; features: string[];
-  factors: number; rotation: 'none'; training: ClusteringConfigurationReadback['training'];
+  factors: number; rotation: 'none' | 'varimax' | 'quartimax'; training: ClusteringConfigurationReadback['training'];
   output_mappings: Array<{port: number; fields: Array<{index: number; name: string; label: string;
     type: string; data_kind: string; source_name: string}>}>;
   package_persistence_verified: false;
@@ -530,7 +531,7 @@ export interface VariablesCalculatorConfigurationReadback {
 export interface DataToVarParameters { fields?: Array<{field: {kind: 'input_field'; name: string}; aggregations: Array<'sum'|'count'|'min'|'max'|'avg'>}> }
 export interface DataToVarConfigurationReadback {
  kind: 'variables_from_table'; mode: 'aggregate'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
- node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'; order: number; aggregations: string[]}>;
+ node: NodeRef; receipt_ids: string[]; fields: Array<{name: string; label: string; type: 'integer'|'real'|'string'|'boolean'|'datetime'; order: number; aggregations: string[]}>;
  input_mapping: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string; type: string; source_name: string}>};
  output_port: 0; port_kind: 'variables'; package_persistence_verified: false;
 }

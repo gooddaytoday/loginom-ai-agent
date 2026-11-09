@@ -5,7 +5,11 @@
       "type": "imports.text"
     },
     {
-      "type": "programming.javascript"
+      "type": "programming.javascript",
+      "alternative_types": [
+        "transform.calculator"
+      ],
+      "alternative_syntax": "javascript"
     },
     {
       "type": "exports.text"
@@ -483,6 +487,7 @@
       "column_order": "exact"
     }
   ],
+  "n18_javascript_step": true,
   "request_constraints": [
     {
       "source": "prompt.md:1",

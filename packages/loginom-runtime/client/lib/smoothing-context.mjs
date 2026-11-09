@@ -33,13 +33,21 @@ export function readSmoothingBrowser(prefix){
  const selected=selection.length===1?fields[rs.indexOf(selection[0])]:null;
  let settings=null;
  if(selected?.used){
-  if(selected.algorithm!==0)return fail('smoothing_wavelet_unsupported');
+  if(selected.algorithm===1){
+   for(const key of ['pedWaveletType','edtWaveletOrder','edtDecompositionLevel','edtEdgeExtension'])if(cmp(key+';SwitchButton')?.pressed!==false)return fail('smoothing_variable_unsupported');
+   const radios=['','-1','-2'].map(suffix=>cmp('pedWaveletType;ValueControl;radiofield'+suffix)?.getValue?.());
+   const order=cmp('edtWaveletOrder;ValueControl')?.getValue?.(),depth=cmp('edtDecompositionLevel;ValueControl')?.getValue?.();
+   const boundary=cmp('edtEdgeExtension;ValueControl')?.getRawValue?.();
+   if(radios.some(v=>typeof v!=='boolean')||radios.filter(Boolean).length!==1||(radios[2]?![null,''].includes(order)&&!Number.isInteger(order):!Number.isInteger(order))||!Number.isInteger(depth)||typeof boundary!=='string'||!boundary)return fail('smoothing_wavelet_settings');
+   settings={family:['daubechies','coiflet','cdf_9_7'][radios.indexOf(true)],order:radios[2]?null:order,depth,boundary:/^симметричное$/i.test(boundary)?'symmetric':/нулями/i.test(boundary)?'zero':/^симметричное без крайней точки$/i.test(boundary)?'reflect':boundary};
+  }else{
   for(const key of ['rbLambda','rbPeriod','edtLambda','edtPeriod'])if(cmp(key+';SwitchButton')?.pressed!==false)return fail('smoothing_variable_unsupported');
   const lambda=cmp('edtLambda;ValueControl')?.getValue?.(),period=cmp('edtPeriod;ValueControl')?.getValue?.();
   const lambdaSelected=cmp('rbLambda;ValueControl')?.getValue?.(),periodSelected=cmp('rbPeriod;ValueControl')?.getValue?.();
   if(!Number.isFinite(lambda)||lambda<0.0625||lambda>102659800000000||!Number.isFinite(period)||period<2||period>20000
    ||typeof lambdaSelected!=='boolean'||typeof periodSelected!=='boolean'||lambdaSelected===periodSelected)return fail('smoothing_strength');
   settings={lambda,period,strength:lambdaSelected?'lambda':'period'};
+  }
  }
  return {verified:true,inventory_complete:true,state_source:'cached_smoothing_store',fields,selected,settings,binding_ready:true,settings_applied:false};
 }

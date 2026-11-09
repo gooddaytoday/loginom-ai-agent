@@ -66,6 +66,7 @@ for(const [path,scenario] of [
  ['packages/loginom-runtime/client/lib/sliding-window-node.mjs','n21'],
  ['packages/loginom-runtime/client/lib/date-time-parameters.mjs','date-time-iso'],
  ['packages/loginom-runtime/client/lib/date-time-removal.mjs','date-time-iso-empty'],
+ ['packages/loginom-runtime/client/lib/date-time-procedure.mjs','date-time-formats'],
  ['packages/loginom-runtime/client/lib/text-export-node.mjs','s8'],
 ]) test(`live reading/node rule: ${path}`,t=>{
  const r=repo(t);r.commit(path);const text=r.list();
@@ -74,6 +75,15 @@ for(const [path,scenario] of [
  if(scenario==='variables-calculator')assert.match(text,/--scenarios variables-calculator,variables-calculator-modes --pair/);
  assert.match(text,/--cold/);assert.match(text,/офлайн-replay не заменяет/);
  if(path.includes('text-export')){assert.ok(ids(text).includes('cold-export'));assert.match(text,/--csv/);}
+});
+
+for(const path of ['docs/node-development/nodes/duplicates/acceptance/task-typed-keys.md',
+ 'docs/node-development/nodes/duplicates/fixtures/typed-empty.csv',
+ 'packages/product/skills/loginom-automation/references/nodes/research.duplicates.md'])
+test(`duplicates typed acceptance paths require all three cases: ${path}`,t=>{
+ const r=repo(t);r.commit(path);const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['duplicates-typed','duplicates-empty','duplicates-singleton'])assert.ok(text.includes(name));
 });
 
 test('REST C1 requires four single-method cases and excludes the retired eight-row example',t=>{

@@ -27,11 +27,29 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
   preparedNodeContext:{document_id:request.document_id,workflow_ref:request.workflow_ref,node},
   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
  const manual=request.parameters.column_union?.mapping==='manual';
+ const topology=request.variable_inputs?.some(i=>i.input===2)||request.parameters.column_union?.disconnect_input===2;
+ if(topology&&manual)throw Error('Third input changes require automatic mapping');
+ if(manual&&inputs.length!==2)throw Error('Manual mapping requires exactly two connected inputs');
+ if(request.parameters.column_union?.disconnect_input===2
+  &&graph.variable_links.filter(e=>e.target===request.target.ref.node_id&&e.kind==='variables'&&e.input===2).length!==1)throw Error('Exactly one observed third input link required');
  if(request.target.kind==='existing'&&!manual){
-  const channel=channelFor(request.target.ref),state=await channel.observe({condition:'owned union before automatic mapping check',ready:s=>s.prepared_node_context?.surface==='graph'});
-  await selectPreparedGraphNode(channel,state,'select union for read-only mapping preflight');await openPreparedWizard(channel);
+  const channel=channelFor(request.target.ref);
+  const deactivate=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===request.target.ref.node_id&&e.graph_execution.mode==='deactivate'&&e.allowed_actions.includes('deactivate_graph_node'));
+  const execute=s=>s.ui.elements.filter(e=>e.graph_execution?.node_id===request.target.ref.node_id&&e.allowed_actions.includes('execute_graph_node'));
+  let state=await channel.observe({condition:'owned union before automatic mapping check',ready:s=>s.prepared_node_context?.surface==='graph'});
+  await selectPreparedGraphNode(channel,state,'select union for read-only mapping preflight');
+  if(topology)state=await channel.observe({condition:'selected union execution control before input change',readOutputs:true,ready:s=>s.prepared_node_context?.surface==='graph'&&(deactivate(s).length===1||execute(s).length===1)});
+  if(topology&&deactivate(state).length===1){
+   // An active union switches native controllers during the wizard's implicit
+   // deactivation confirmation. Settle that graph action before opening it.
+   await channel.perform({condition:'deactivate union before changing inputs',initialObservation:state,ready:s=>deactivate(s).length===1,
+    identity:()=>request.target.ref,resolve:s=>({verb:'deactivate_graph_node',ref:deactivate(s)[0].ref})});
+   state=await channel.observe({condition:'union inactive before input mapping inspection',readOutputs:true,ready:s=>s.prepared_node_context?.surface==='graph'&&execute(s).length===1});
+  }
+  await openPreparedWizard(channel);
   const observed=await channel.observe({condition:'saved union automatic mapping',readVariablesColumnUnion:true,ready:s=>s.node_variables_column_union?.verified===true});
   await closePreparedWizard(channel);
+  if(topology&&observed.node_variables_column_union.mapping!=='automatic')throw Error('Third input changes require a saved automatic union');
  }
  if(request.finish==='close'&&!manual)return {verified:true,inputs,outputs,not_applicable:true};
  for(const input of inputs){
@@ -56,6 +74,29 @@ export async function preflightVariablesColumnUnion(options,ctx,config){
   await onRecord({phase:'node_variables_union_preflight',operation_id:operation.id,graph_before:graph,graph_after:after,outputs,settings_changed:false});
   try{validateVariablesColumnUnionFields(request.parameters,outputs);}catch(error){error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  }
- operation.variablesColumnUnionPreflight={inputs,outputs};
+ operation.variablesColumnUnionPreflight={inputs,outputs,...(topology&&request.target.kind==='existing'?{graph_before:graph}:{})};
  return {verified:true,cleanup_complete:true,effect_possible:!manual,inputs,outputs};
+}
+
+// Check the retained native identities after Done, before the final Execute.
+export function verifyVariablesColumnUnionTopology(before,after,request,inputs){
+ const need=(ok,m)=>{if(!ok)throw Error('Variables union topology: '+m);};
+ const id=request.target.ref.node_id,find=g=>g?.nodes?.filter(n=>n.ref.node_id===id),old=find(before),next=find(after);
+ need(before?.complete===true&&after?.complete===true&&before.document_id===after.document_id
+  &&before.workflow_ref.workflow_id===after.workflow_ref.workflow_id&&old?.length===1&&next?.length===1
+  &&old[0].type==='variables.column_union'&&next[0].type===old[0].type,'owned complete union graph required');
+ const port=p=>[p.kind,p.port,p.port_guid,p.native_index??null];
+ need(old[0].variable_inputs.slice(0,2).length===2&&old[0].variable_inputs.slice(0,2).every((p,i)=>JSON.stringify(port(p))===JSON.stringify(port(next[0].variable_inputs[i]??{})))
+  &&JSON.stringify(old[0].variable_outputs.map(port))===JSON.stringify(next[0].variable_outputs.map(port)),'retained input/output port GUIDs changed');
+ const edge=e=>[e.source,e.target,e.kind,e.input,e.output,e.source_port_guid,e.target_port_guid];
+ const previous=before.variable_links.filter(e=>e.target===id&&e.kind==='variables'&&e.input<2),links=after.variable_links.filter(e=>e.target===id);
+ need(previous.length===2&&[0,1].every(i=>previous.filter(e=>e.input===i).length===1)
+  &&previous.every(e=>links.filter(n=>JSON.stringify(edge(n))===JSON.stringify(edge(e))).length===1),'first two exact links changed');
+ need(links.length===inputs.length&&inputs.every(input=>{
+  const matches=links.filter(e=>e.kind==='variables'&&e.input===input.input&&e.output===input.output&&e.source===input.source.node_id);
+  const source=after.nodes.filter(n=>n.ref.node_id===input.source.node_id),output=source[0]?.variable_outputs?.filter(p=>p.kind==='variables'&&p.port===input.output);
+  return matches.length===1&&source.length===1&&output?.length===1&&matches[0].source_port_guid===output[0].port_guid
+   &&matches[0].target_port_guid===next[0].variable_inputs.find(p=>p.kind==='variables'&&p.port===input.input)?.port_guid;
+ }),'complete reciprocal input links changed');
+ return {verified:true,node_id:id,retained_links:previous,inputs:links};
 }
