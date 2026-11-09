@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,176759,'ca9e779b5a1be9259050b172cb92aefa9aaaf1eb57e023cfbc33a5c7d437bd79'],
+  [nodeApiTools,177150,'70160601be061fdb7928407552731a439eba62af4bb22dfda81893695a8cedff'],
   [nodeApiTools.map(userNodeTool),13183,'03d4f81d1e939ce5aacbdf33a3cb9c09ae7405eed44544cfbc4c91264a4c9623'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -120,6 +120,12 @@ test('complete import and existing patch pass the public schema and installed ha
  await dispatchNodeApi(runtime,'dock_node_apply',short);
  await dispatchNodeApi(runtime,'dock_node_resume',short);
  assert.equal(calls.length,5);
+ for(const node_title of [{mode:'automatic'},{mode:'custom',label:'Ежедневные продажи'}]){
+  await dispatchNodeApi(runtime,'dock_node_apply',{...request,parameters:{...request.parameters,settings:{...request.parameters.settings,node_title}}});
+  await dispatchNodeApi(runtime,'dock_node_apply',{...patch,parameters:{...patch.parameters,settings:{node_title}}});
+ }
+ for(const node_title of [{mode:'custom'},{mode:'automatic',label:'Wrong'}])
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...patch,parameters:{...patch.parameters,settings:{node_title}}}));
 });
 
 test('published JavaScript full UI request requires the bounded exact read window',async()=>{
