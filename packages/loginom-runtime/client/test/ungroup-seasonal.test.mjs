@@ -61,3 +61,6 @@ test('reopened seasonal node: disabled balance is not applied policy; enabled ba
  const clicks=[];await assert.rejects(run(structuredClone(enabled),{ungroup:u,seasonality:season},false,clicks),{message:'ungroup option visible'});
  assert.deepEqual(clicks,[picker]);
 });
+test('balance editor isDisabled() that is not boolean has its own refusal reason',()=>{
+ for(const state of [undefined,1,'yes'])assert.deepEqual(JSON.parse(JSON.stringify(savedSeasonal(state))),{verified:false,reason:'ungroup_balance_disabled_state'});
+});
