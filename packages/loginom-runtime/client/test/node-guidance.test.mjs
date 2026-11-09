@@ -117,6 +117,16 @@ test('acceptance review rules reach the model: describe after reopen, import all
   assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/'+file+'.md')))<=6000,file);
 });
 
+test('merged sorting guidance fits the per-file budget and reaches the keys card',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const guide=await readFile(join(source.directory,'references/nodes/transform.sorting.md'),'utf8');
+ assert.ok(Buffer.byteLength(guide)<=6000,`sorting guidance: ${Buffer.byteLength(guide)} > 6000`);
+ const loader=createSkillLoader({resources:source.resources});
+ const [card]=await loader.describeNodes([{type:'transform.sorting',modes:NODE_TYPES['transform.sorting'].modes}],['keys']);
+ for(const rule of ['max_threads','case_sensitive','variable_inputs','BINDING_TYPE_MISMATCH','BINDING_NULL_UNSUPPORTED','BINDING_CONFLICT'])
+  assert.ok(card.guidance.includes(rule),rule);
+});
+
 test('LAB-1162 skill text covers repeated model refusals from live runs',async t=>{
  const source=await createBundledSkillFixture(t);
  const loader=createSkillLoader({resources:source.resources});

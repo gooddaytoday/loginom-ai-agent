@@ -57,7 +57,7 @@ export async function configureLinRegressionRoles(channel,p,inputMapping,{preser
 }
 
 export async function configureLinRegression(channel,p,{request,inputMapping}){
- const ridge=request.mode==='ridge',preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',stepwise=request.mode==='stepwise',selecting=forward||backward||stepwise,method=ridge?4:stepwise?3:backward?2:forward?1:0,methodLabel=ridge?null:stepwise?'Stepwise (Пошаговое включение/исключение)':backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
+ const lasso=request.mode==='lasso',ridge=request.mode==='ridge',preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',stepwise=request.mode==='stepwise',selecting=forward||backward||stepwise,method=lasso?5:ridge?4:stepwise?3:backward?2:forward?1:0,methodLabel=ridge?null:stepwise?'Stepwise (Пошаговое включение/исключение)':backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
  const roles=await configureLinRegressionRoles(channel,p,inputMapping,{preserve});
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'regression '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -87,7 +87,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  need(Object.values(state.node_linregression.switches).every(v=>v===false),'variable-driven regression settings are outside stage 1');
  if(preserve)need(state.node_linregression.values.pedAutoMethod===false&&state.node_linregression.values.pedRegressionMethod===0&&state.node_linregression.values.pedDenormalize===true&&state.node_linregression.values.pedUseDetailedSettings===true,'apply requires the saved Enter model with intercept; settings will not be changed');
  if(state.node_linregression.values.pedAutoMethod){await act(state,'disable automatic regression method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual regression method enabled');}
- const methodChoice=ridge?state.node_linregression.method_choices?.find(c=>c.value===4)?.label:methodLabel;
+ const methodChoice=ridge||lasso?state.node_linregression.method_choices?.find(c=>c.value===method)?.label:methodLabel;
  need(typeof methodChoice==='string'&&methodChoice.length>0,'native method choice unavailable');
  if(state.node_linregression.values.pedRegressionMethod!==method){
   await act(state,'open regression methods','pedRegressionMethod;ValueControl;trg_picker',{verb:'click'});
@@ -126,6 +126,30 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
   need(state.node_linregression.values.pedRidgeSetupMethod===manual[0].value&&state.node_linregression.values.pedIntercept===true&&Object.values(state.node_linregression.switches).every(v=>v===false),'manual Ridge settings changed');
   regularization={setup:'manual',lambda_l2:state.node_linregression.values.pedLambdaRidge};
  }
+ if(lasso){
+  const choices=state.node_linregression.lasso_choices,manual=choices?.filter(c=>/вручную/i.test(c.label));
+  need(choices?.length===2&&manual?.length===1&&Number.isInteger(manual[0].value)&&new Set(choices.map(c=>c.value)).size===2,'complete native Lasso setup choices required');
+  need(state.node_linregression.disabled.pedLassoSetupMethod===false,'Lasso setup must be editable');
+  if(state.node_linregression.values.pedLassoSetupMethod!==manual[0].value){
+   await act(state,'open Lasso setup','pedLassoSetupMethod;ValueControl;trg_picker',{verb:'click'});
+   const option=s=>s.ui.elements.filter(e=>e.tid?.startsWith(s.wizard.root_tid+';LinRegressionWizard-1;pedLassoSetupMethod;ValueControl;boundlist;')&&e.label===manual[0].label&&e.allowed_actions.includes('click'));
+   state=await channel.observe({condition:'native manual Lasso option',readLinRegression:true,ready:s=>ready('details')(s)&&option(s).length===1});
+   await channel.perform({condition:'select manual Lasso',initialObservation:state,ready:ready('details'),identity:s=>s.prepared_node_context,resolve:s=>({verb:'click',ref:option(s)[0].ref})});
+   state=await observe('details','manual Lasso setup readback');
+  }
+  need(state.node_linregression.values.pedLassoSetupMethod===manual[0].value&&state.node_linregression.disabled.pedLambdaLasso===false,'manual Lasso lambda must be editable');
+  for(const [key,value] of [['pedLambdaLasso',p.linear_regression.lambda_l1],['pedEpsilon',1e-10]]){
+   if(state.node_linregression.values[key]!==value){
+    const [coefficient,exponent]=String(value).split('e-');
+    const text=exponent?'0.'+'0'.repeat(Number(exponent)-1)+coefficient.replace('.',''):String(value);
+    await act(state,'fill Lasso '+key,key+';ValueControl',{verb:'fill',text});state=await observe('details','Lasso numeric input');
+    await act(state,'commit Lasso '+key,key+';ValueControl',{verb:'press',key:'Tab'});state=await observe('details','Lasso numeric readback');
+   }
+   need(state.node_linregression.values[key]===value,'Lasso numeric readback differs: '+key);
+  }
+  need(state.node_linregression.values.pedLassoSetupMethod===manual[0].value&&state.node_linregression.values.pedIntercept===true&&Object.values(state.node_linregression.switches).every(v=>v===false),'manual Lasso settings changed');
+  regularization={setup:'manual',lambda_l1:state.node_linregression.values.pedLambdaLasso};
+ }
  let selection;
  if(selecting){
   const wanted=p.linear_regression?.selection??{criterion:'f'},criteria=['f','r2','adjusted_r2','aic','aicc','bic','hqc'];
@@ -158,5 +182,5 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  const details=state.node_linregression;
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge?{mode:'ridge',regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

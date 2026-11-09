@@ -21,11 +21,22 @@
 
 ## Порядок строк по локали
 
-Порядок строк задаёт «Сортировка» (`dock_node_apply`, тип `transform.sorting`, режим `keys`), а не Калькулятор или JavaScript: не вычисляй веса букв сам.
+Порядок строк задаёт «Сортировка» (`dock_node_apply`, `transform.sorting`, `keys`), не Калькулятор/JS; веса букв не вычисляй.
 `compare_with_locale` — один флаг на весь узел: `true` — сравнение строк по локали пользователя (у нового узла по умолчанию), `false` — бинарное. Просьба «с учётом русской локали» — `true`; «отключи учёт локали» — `false`.
 Смена локали — на том же узле: передай `compare_with_locale` с `keys`, затем выполни и прочитай результат. Без флага существующий узел сохраняет прежнюю локаль.
-`case_sensitive` задаётся отдельно у каждого строкового ключа: «регистр не учитывай» — `false`. Без локали регистр игнорируется только у латиницы, кириллица остаётся различной.
+`case_sensitive` — флаг каждого строкового ключа. Без локали игнорирование регистра действует только для латиницы, не кириллицы.
 Добавь однозначный вторичный ключ (например RowID). NULL и пустая строка — разные значения: не сортируй текст «NULL».
-Идентификатор локали узел не отдаёт: порядок проверяй по полному чтению результата.
-Управление compare_with_locale переменной выполняй этим же узлом, режим `keys`. В `dock_node_apply` добавь верхнеуровневый `bindings: [{parameter: "/compare_with_locale", variable: {kind: "control", input: 0, name: "Flag"}}]`, а literal `compare_with_locale` из `parameters` убери. Подключи `variables.user` выход 4 через `variable_inputs` к control input 0. Flag — boolean, не NULL; другой тип → `BINDING_TYPE_MISMATCH`, NULL → `BINDING_NULL_UNSUPPORTED`, literal вместе с binding → `BINDING_CONFLICT`. После изменения только Flag в источнике выполни прежний GUID с `parameters: {}`, `inputs: []`, `mappings: []`, `finish: "execute"`; настройки узла не применяй заново. Проверяй `configuration.bindings`, полный результат, Save и повторное открытие.
+ID локали недоступен: проверяй полный результат.
+Привязывай `compare_with_locale` на том же узле в `keys`. В `dock_node_apply` добавь верхнеуровневый `bindings: [{parameter: "/compare_with_locale", variable: {kind: "control", input: 0, name: "Flag"}}]`, а literal `compare_with_locale` из `parameters` убери. Подключи `variables.user` выход 4 через `variable_inputs` к control input 0. Flag — boolean, не NULL; другой тип → `BINDING_TYPE_MISMATCH`, NULL → `BINDING_NULL_UNSUPPORTED`, literal вместе с binding → `BINDING_CONFLICT`. После изменения только Flag в источнике выполни прежний GUID с `parameters: {}`, `inputs: []`, `mappings: []`, `finish: "execute"`; настройки узла не применяй заново. Проверяй `configuration.bindings`, полный результат, Save и повторное открытие.
+
+## Регистр и максимум потоков
+
+«С учётом регистра» → `keys` со строковым ключом `case_sensitive:true`, «без учёта» → `false`.
+На том же узле передай полный прежний список `keys` с изменённым флагом, сохрани вторичные ключи и `compare_with_locale:true` для русской локали.
+Меняй максимум на том же узле через existing apply с `max_threads`; «автоопределение» → `max_threads:0`.
+Поддерживаются 0, 1, 2, 4, 8, 16, 32. Это максимум, не фактически работающие потоки.
+Без `max_threads` сохранённый максимум не меняется; existing `parameters:{}` сохраняет ключи и параметры.
+После каждого изменения выполни `finish:"execute"`, прочитай весь результат и выгрузи отдельный CSV; затем сохрани пакет.
+Квитанция `configuration.readback.options.cbxMaxThreadCount` подтверждает literal `value` и `switch_pressed:false`.
+Переменные для максимума не поддерживаются. Потоки и auto сохраняют порядок, значения и кратность строк.
 <!-- /mode -->

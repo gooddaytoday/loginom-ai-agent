@@ -367,7 +367,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         return [owner,owner+' input','[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
       '[data-tid$=";WizrdMCF;FilterDataWizard;FilterDataPanel"]','[data-tid*=";WizrdMCF;FilterDataWizard;FilterDataPanel;tbl;celleditor"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionName_"]','[data-tid*=";WizrdMCF;CalcDataWizard;colExpressionDisplayName_"]','[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnCalcMode"]','[data-tid$=";WizrdMCF;CalcDataWizard;btnReplaceField"]','span.bg-TBGCalcMode-cmExpression,span.bg-TBGCalcMode-cmJavaScript',
-      ...Object.entries({LinRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'],'LinRegressionWizard-1':['pedEpsilon','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance'],LogRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId'], 'LogRegressionWizard-1':['pedEpsilon','pedThreshold','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge']}).flatMap(([card,names])=>names.flatMap(name=>{
+      ...Object.entries({LinRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'],'LinRegressionWizard-1':['pedEpsilon','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedLassoSetupMethod','pedLambdaLasso'],LogRegressionWizard:['pedAutoMethod','pedRegressionMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs','pedEventType','pedEventId'], 'LogRegressionWizard-1':['pedEpsilon','pedThreshold','pedIntercept','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge']}).flatMap(([card,names])=>names.flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;'+card+';'+name+';ValueControl"]';
         return [owner,owner+' input',owner+' [data-tid]', '[data-tid$=";WizrdMCF;'+card+';'+name+';SwitchButton"]'];
       })),
@@ -413,7 +413,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Native fixed queries discover global blockers/context without walking
       // every unrelated subtree in JavaScript. Their synchronous browser cost
       // cannot be preempted; charge immediately after each native operation.
-      const guards=document.querySelectorAll(wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]');
+      const guardSelector=wizardSelectors+',[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"],.x-tab-active[data-tid],[role="dialog"],.x-window,.bg-dialog,.bg-mask-message,.x-mask-msg,[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under,[data-tid$="FileStorageForm;pnlFileStorage;tbl"]';
+      // Checking all ~570 parts against every document element took 114 of
+      // 306 ms per Files read (LAB-1188 profile). A part led by a WizrdMCF tid
+      // matches only that element or its descendant: prefilter those once,
+      // keep other parts verbatim, then apply the full list to candidates.
+      // Same elements, same document order.
+      const guardParts=guardSelector.split(','),plain=value=>value.replace(/"[^"]*"/g,'');
+      const owned=part=>/^\[data-tid[\^$*]?="[^"]*WizrdMCF[^"]*"\]/.test(part)&&!/[>+~:]/.test(plain(part));
+      const guards=guardParts.every(part=>(part.match(/"/g)?.length??0)%2===0)
+        ? [...document.querySelectorAll(['[data-tid*="WizrdMCF"]','[data-tid*="WizrdMCF"] *',...guardParts.filter(part=>!owned(part))].join(','))]
+          .filter(element=>element.matches(guardSelector))
+        : document.querySelectorAll(guardSelector);
       charge();for (const element of guards)if(addressedImportField(element))include(element);
       // Ext renders Table modals in a portal outside the owning BrowseView.
       // Include exact view roots as global identity guards, never their trees.
@@ -2194,6 +2205,19 @@ function readRenderedInputMapping(observation) {
         }
       }
     }
+    if(wizard.status==='observed'&&wizard.stage==='sorting'){
+      const ownerTid=wizard.root_tid+';SortingWizard;SortingColumnCollection;cbxMaxThreadCount;ValueControl';
+      // The boundlist is an observation root; its exact native owner is outside that subtree.
+      const owners=[...document.querySelectorAll('[data-tid='+JSON.stringify(ownerTid)+']')],inputs=owners.length===1?[...owners[0].querySelectorAll('input')].filter(visible):[];
+      if(owners.length===1&&inputs.length===1&&wizardForms[0].contains(owners[0])&&enabled(inputs[0])&&!sensitive(owners[0])&&!sensitive(inputs[0])){
+        const value=String(inputs[0].value??'');
+        if(value.length<=256){
+          const owner_ref=refOf(owners[0]),input_ref=refOf(inputs[0]);
+          wizardCombos.set(ownerTid,{name:'max_threads',scope:'sorting',owner_ref,input_ref,root_ref:wizard.root_ref,value});
+          wizard.settings={status:'draft_ui_values',applied_verified:false,fields:{max_threads:{status:'observed',value,value_length_utf16:value.length,truncated:false,owner_ref,input_ref,enabled:true,read_only:inputs[0].readOnly===true}}};
+        }
+      }
+    }
     if(wizard.status==='observed'&&wizard.stage==='col_union'){
       const fields={};
       for(const [name,key] of [['padding','pedRowsPaddingType'],['row_count','pedTailsAlignType']]){
@@ -2706,7 +2730,7 @@ function readRenderedInputMapping(observation) {
         if(!tid.startsWith(prefix) || !tid.slice(prefix.length) || tid.slice(prefix.length).includes(';'))continue;
         const lists=(tids.get(ownerTid+';boundlist')??[]).filter(visible);
         if(lists.length!==1 || !lists[0].contains(element) || sensitive(lists[0]))return null;
-        const label=textOf(element,true),formatted=label.replace(/\s/g,'_').replace(/,/g,'');
+        const displayed=textOf(element,true),label=field.scope==='sorting'&&field.name==='max_threads'&&displayed==='Автоопределение (0)'?'Автоопределение':displayed,formatted=label.replace(/\s/g,'_').replace(/,/g,'');
         if(!label || label.length>=240 || tid!==prefix+formatted)return null;
         if(field.scope==='import_column' && !(field.name==='type'
           ? ['Целый','Вещественный','Строковый','Логический','Дата/Время','Переменный']
@@ -3243,9 +3267,9 @@ function readRenderedInputMapping(observation) {
       }
       return /;WizrdMCF;SlidingWindowWizard;(?:colDisplayName_[^;]+|pedIncompleteRecordsProcessing;ValueControl;(?:trg_picker|boundlist;[^;]+))$/.test(tid);
     };
-    const binningControl=element=>wizard.stage==='binning'&&((getTid(element)??'').startsWith(wizard.root_tid+';MethodSettingsWizard-1;')&&/;(?:colDisplayName_\d+|colMethodType_\d+|trg_picker|boundlist;[^;]+)$/.test(getTid(element))||(getTid(element)??'').startsWith('MethodSettingFrame;')&&/;(?:DisplayEl|trg_picker|boundlist;[^;]+)$/.test(getTid(element)));
-    const coarseClassesControl=element=>wizard.stage==='coarse_classes'&&(getTid(element)??'').startsWith(wizard.root_tid+';CoarseClassesWizard-1;')&&/;(?:colColumnDisplayName_[^;]+|colColumnPurpose_[^;]+|trg_picker|boundlist;[^;]+|DisplayEl)$/.test(getTid(element)??'');
-    const interesting = element => booleanBindingCells.has(state.ids.get(element)) || !!booleanBindingBase&&(getTid(element)===booleanBindingBase+';SwitchButton'||getTid(element)===booleanBindingBase+';VariableControl;trg_picker') || importBindingCells.has(state.ids.get(element)) || wizard.stage==='text_import_file'&&(getTid(element)??'').startsWith(wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName;')&&/;(?:SwitchButton|trg_picker)$/.test(getTid(element)??'') || ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality|RidgeSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
+    const binningControl=element=>wizard.stage==='binning'&&((getTid(element)??'').startsWith(wizard.root_tid+';MethodSettingsWizard-1;')&&/;(?:colDisplayName_\d+|colMethodType_\d+|colLowerBoundValue_\d+|colUpperBoundValue_\d+|colBinLabel_\d+|trg_picker|boundlist;[^;]+)$/.test(getTid(element))||(getTid(element)??'').startsWith('MethodSettingFrame;')&&/;(?:DisplayEl|trg_picker|boundlist;[^;]+)$/.test(getTid(element)));
+    const coarseClassesControl=element=>wizard.stage==='coarse_classes'&&(getTid(element)??'').startsWith(wizard.root_tid+';CoarseClassesWizard-1;')&&/;(?:colColumnDisplayName_[^;]+|colColumnPurpose_[^;]+|trg_picker|boundlist;[^;]+|DisplayEl)$/.test(getTid(element)??'') || wizard.stage==='coarse_classes_model'&&(getTid(element)??'').startsWith(wizard.root_tid+';CoarseClassesWizard-2;CoarseClassesEditor;')&&/;(?:colColumnUsePrevBinning_[^;]+|colCoarseClassIndex_[0-9]+|colCoarseClassHighBorder_[0-9]+)$/.test(getTid(element)??'');
+    const interesting = element => booleanBindingCells.has(state.ids.get(element)) || !!booleanBindingBase&&(getTid(element)===booleanBindingBase+';SwitchButton'||getTid(element)===booleanBindingBase+';VariableControl;trg_picker') || importBindingCells.has(state.ids.get(element)) || wizard.stage==='text_import_file'&&(getTid(element)??'').startsWith(wizard.root_tid+';ImportTextFilePreviewWizard;edtFileName;')&&/;(?:SwitchButton|trg_picker)$/.test(getTid(element)??'') || ['lin_regression','lin_regression_details'].includes(wizard.stage)&&/;WizrdMCF;LinRegressionWizard(?:-1)?;ped(?:RegressionMethod|RegSelQuality|RidgeSetupMethod|LassoSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || coarseClassesControl(element) || wizard.stage==='table_tree'&&(/;DataToTreeWizard;(?:colNodes_|colFields_|colDelete_)/.test(getTid(element)??'')|| (getTid(element)??'').startsWith('EditDataTreeNodeDefForm;')) || nodeErrorToastObservation&&getTid(element)==='toast;p.h;close'&&errorToast(element.closest('[data-tid="toast"]')) || binningControl(element) || ['table_tree','tree_json','json_tree','tree_table'].includes(wizard.stage)&&/;(?:TreeCheckbox|TreeExpander|trg_picker)$/.test(getTid(element)??'') || /;WizrdMCF;LogRegressionWizard(?:-1)?;ped(?:EventType|EventId|RegressionMethod|RegSelQuality|RidgeSetupMethod|LassoSetupMethod);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || ['sampling','data_partition'].includes(wizard.stage)
       &&(getTid(element)??'').startsWith(wizard.root_tid+';')
       &&(/;(?:pedSamplingMethod|pedTestPriorityPosition);ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'')
         || /;(?:StratifiedMethodForm;grdStratifiedGrid;headercontainer;UsageFlag_[^;]+|BiasedMethodForm;colDisplayName_[^;]+|BiasedMethodForm;colBiasedValue_[^;]+)$/.test(getTid(element)??'')
@@ -5125,6 +5149,7 @@ function readRenderedInputMapping(observation) {
             record('import_column_option_verified',{index:column.index,name:column.name,property:editor.property,
               type:column.type,data_kind:column.data_kind,settings_applied:false});
           } else {
+          const sortingAuto=choice.field.scope==='sorting'&&choice.field.name==='max_threads'&&choice.label==='Автоопределение';
           const parameterKey=choice.field.scope==='expression_parameter'?'expression_parameters':choice.field.scope==='output_column'?'column_parameters':choice.field.scope==='reform_column'?'reform_parameters':null;
           const expressionParameter=parameterKey!==null;
           const sourceOption=choice.field.scope==='import_source';
@@ -5160,7 +5185,7 @@ function readRenderedInputMapping(observation) {
             || observed.wizard.stage!==current.wizard.stage || !same(observed.ui.dialogs,current.ui.dialogs)
             || (expressionParameter?!same(observed.ui.masks,current.ui.masks):observed.ui.masks.length>0)
             || expressionParameter && !same(observed.wizard,expected)
-            || field?.status!=='observed' || field.truncated || field.value!==choice.label
+            || field?.status!=='observed' || field.truncated || field.value!==choice.label&&!(sortingAuto&&field.value==='0')
             || field.input_ref!==choice.field.input_ref || field.owner_ref!==choice.field.owner_ref)
             fail('WIZARD_OPTION_NOT_CONFIRMED','The selected option label was not read back in its original wizard field; inspect before retry');
           record('wizard_option_verified',{field:choice.field.name,label:choice.label,settings_applied:false});

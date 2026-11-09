@@ -99,6 +99,12 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['modes.csv'], export_count=3, boolean_binding=node,
                     binding_initial=node + '/expected-initial.json', expected_name=node + '/expected.json', oracle=src / 'oracle.py')
 
+    if name in ['duplicates-typed', 'duplicates-empty', 'duplicates-singleton']:
+        root = REPO / 'docs/node-development/nodes/duplicates'
+        kind = 'keys' if name == 'duplicates-typed' else name.removeprefix('duplicates-')
+        return dict(source=root / 'acceptance', prompt=root / 'acceptance' / ('task-typed-keys.md' if kind == 'keys' else 'task-' + kind + '.md'),
+                    data=root / 'fixtures', input_files=['typed-' + kind + '.csv'], base=None, oracle=root / 'acceptance/modes/oracle.py',
+                    expected_name='modes/expected.json' if kind == 'keys' else 'modes/expected-' + kind + '.json')
     if name == 'import-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
@@ -260,7 +266,8 @@ def scenario(name, case_root=None, *, cases=None):
         update = name == 'text-auto-update'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
-                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
+                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
+                    text_update=update, export_count=2 if update else 1)
     if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
@@ -349,7 +356,16 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
+    if name == 'trees-to-table-indices':
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
+                    base=None, external=True, expected_name='expected-indices-run.json')
 
+    if name == 'coarse-classes-continuous-manual':
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        return dict(source=src, prompt=src / 'task-continuous-manual.md',
+                    data=src.parent / 'fixtures', base=None, export_count=3,
+                    input_files=['continuous.csv'], expected_name='modes/expected.json')
     if name in ['coarse-classes-train', 'coarse-classes-apply']:
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
         applying = name == 'coarse-classes-apply'
@@ -357,6 +373,11 @@ def scenario(name, case_root=None, *, cases=None):
                     data=src / 'data', base=None, export_count=3,
                     input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
                     expected_name='expected-apply.json' if applying else 'expected.json')
+    if name == 'binning-datetime-manual':
+        node = REPO / 'docs/node-development/nodes/preprocessing-binning'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',
+                    data=node / 'fixtures', base=None, export_count=2, input_files=['modes.csv'],
+                    expected_name='modes/expected.json', oracle=node / 'acceptance/modes/oracle.py')
     if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
                 'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
         src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
@@ -395,11 +416,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
         return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
                     expected_name='expected.json', input_files=['reform.csv'], oracle=src / 'oracle.py')
-    if name == 'acf-nonzero':
+    if name in ['acf-nonzero', 'acf-empty', 'acf-null']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance/edges'
-        return dict(source=src, prompt=src / 'task-nonzero.md',
-                    data=src / 'fixtures', base=None, autocorrelation_edge=True,
-                    input_files=['lab1144-series.csv'])
+        edge = name.removeprefix('acf-')
+        return dict(source=src, prompt=src / ('task-' + edge + '.md'),
+                    data=src / 'fixtures', base=None, autocorrelation_edge=edge,
+                    input_files=['lab1144-series.csv', *([] if edge == 'nonzero' else ['lab1144-' + edge + '.csv'])])
     if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
         task, expected, inputs = {
@@ -454,9 +476,23 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance' / ('task-wavelet-depth2.md' if depth2 else 'task-wavelet.md'),
                     data=node / 'fixtures', input_files=['wavelet.csv'], export_count=1, base=None,
                     expected_name='expected-depth2.json' if depth2 else 'expected.json')
+    if name in ['smoothing-db2', 'smoothing-db2-depth2', 'smoothing-coif1', 'smoothing-cdf97', 'smoothing-db2-zero', 'smoothing-cdf97-reflect']:
+        node = REPO / 'docs/node-development/nodes/preprocessing-smoothing'
+        variant = {'smoothing-db2': 'db2-symmetric', 'smoothing-db2-depth2': 'db2-depth2',
+                   'smoothing-coif1': 'coif1-symmetric', 'smoothing-cdf97': 'cdf97-symmetric',
+                   'smoothing-db2-zero': 'db2-zero', 'smoothing-cdf97-reflect': 'cdf97-reflect'}[name]
+        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance' / ('task-' + variant + '.md'),
+                    data=node / 'fixtures', input_files=['wavelet.csv'], export_count=1, base=None,
+                    expected_name='expected-' + variant + '.json')
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'linreg-lasso':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        return dict(source=REPO / 'scripts/node-acceptance/scenarios/linreg-lasso',
+                    prompt=node / 'acceptance/penalty/task-lasso.md',
+                    data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
+                    expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
     if name in ['linreg-forward-f', 'linreg-forward-r2', 'linreg-forward-r2-cutoffs', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge']:
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         variant = 'forward-r2' if name == 'linreg-forward-r2-cutoffs' else name.removeprefix('linreg-')
@@ -502,11 +538,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['normalization.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py', logreg_normalization=True,
                     cold_expected_name='cold/expected.json', export_count=2)
-    if name == 'sorting-locale':
+    if name in ['sorting-locale', 'sorting-case', 'sorting-threads', 'sorting-auto']:
         node = REPO / 'docs/node-development/nodes/sorting'
         src = node / 'acceptance/modes'
-        return dict(source=src, prompt=src / 'task-locale.md', data=node / 'fixtures', base=None,
-                    input_files=['modes.csv'], export_count=2, sorting_case='locale')
+        return dict(source=src, prompt=src / ('task-' + name.removeprefix('sorting-') + '.md'), data=node / 'fixtures', base=None,
+                    input_files=['modes.csv'], export_count=2, sorting_case=name.removeprefix('sorting-'))
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -561,6 +597,13 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
                     expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
                     variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name in ['variables-from-table-aggregates', 'variables-from-table-scalars']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        scalars = name == 'variables-from-table-scalars'
+        expected = 'expected-scalar-types-run.json' if scalars else 'expected-aggregates-run.json'
+        return dict(source=src, prompt=src / ('task-scalar-types.md' if scalars else 'task-aggregates.md'), data=src.parent / 'fixtures',
+                    input_files=['aggregate-types.csv' if scalars else 'aggregate-numeric.csv'], base=None, expected_name=expected, variable_initial_name=expected,
+                    variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
@@ -618,6 +661,10 @@ def scenario(name, case_root=None, *, cases=None):
                           'replace-keep-variant': ('task-result-keep.md', 'expected-result-keep.json')}[name]
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures/extended', input_files=['input.csv'], base=None, expected_name=expected)
+    if name == 'variant-reader-collapse':
+        node = REPO / 'docs/node-development/nodes/variant-reader'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-collapse.md',
+                    data=node / 'fixtures', input_files=['mixed.csv'], base=None, expected_name='expected-collapse.json')
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -722,10 +769,57 @@ def sorting_stages(case):
     return [dict(stage, column_order='exact') for stage in stages]
 
 
+def text_update_stages(case):
+    return [read(case['source'] / name)['outputs'][0] for name in
+            ['expected-auto-update-string.json', 'expected-auto-update.json']]
+
+
+def check_text_update_ports(replies, destinations, stages, node_binary='node'):
+    assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
+    previous, node = -1, None
+    tables = []
+    for destination, stage in zip(destinations, stages):
+        exports = [n for n, reply in replies if reply.get('status') == 'SUCCEEDED'
+                   and reply.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'
+                   and reply['configuration']['readback'].get('destination') == destination]
+        assert exports and exports[-1] > previous, 'TEXT_UPDATE_EXPORT_MISSING_OR_ORDER'
+        reads = [(n, owner, port) for n, reply in replies if previous < n < exports[-1]
+                 for owner, port in ports(reply) if owner.get('status') == 'SUCCEEDED'
+                 and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'
+                 and port.get('port') == 0]
+        assert reads, 'TEXT_UPDATE_PORT_MISSING'
+        _, owner, port = reads[-1]
+        identity = owner.get('node')
+        assert identity and (node is None or identity == node), 'TEXT_UPDATE_IMPORT_CHANGED'
+        node = identity
+        assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
+        assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
+            (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
+        tables.append(dict(actual=dict(node=identity, type='imports.text', output_port=0, data=port), expected=stage))
+        previous = exports[-1]
+    # Use the same typed full-table matcher as cold, including exact numeric and
+    # datetime evidence. Each stage has its own snapshot of the same node.
+    result = subprocess.run([str(node_binary), '--input-type=module', '-e', """
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {matchExpectedOutputs}=await import(pathToFileURL(process.argv[1]));
+for(const stage of JSON.parse(readFileSync(0,'utf8')))
+    matchExpectedOutputs([stage.actual],[stage.expected]);
+""", str(REPO / 'scripts/node-acceptance/expected-outputs.mjs')],
+        input=json.dumps(tables), text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, 'TEXT_UPDATE_PORT_VALUES: ' + result.stderr[:2000]
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
     if case.get('autocorrelation_edge'):
         approved = read(src / 'expected.json')
+        if case['autocorrelation_edge'] in ['empty', 'null']:
+            # Refusal text is fixed before runs: own guard (empty) or native Execute (null).
+            error = (read(src / 'expected-empty.json')['execution_error'] if case['autocorrelation_edge'] == 'empty'
+                     else {'text': approved['native_conventions']['null']['message']})
+            return dict(package_path=package, nodes=[{'type': t} for t in ['imports.text', 'research.auto_correlation']],
+                        outputs=[], execution_error=error)
         output = approved['series']['count12']
         return dict(package_path=package, nodes=[{'type': t} for t in
                     ['imports.text', 'research.auto_correlation', 'exports.text']], outputs=[output])
@@ -739,7 +833,7 @@ def expected_for(case, package, cold=False):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}], outputs=[stages[-1]])
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
-                    outputs=[sorting_stages(case)[-1]])
+                    outputs=[sorting_stages(case)[-1]], **(dict(sorting_mode=case['sorting_case'], sorting_stages=sorting_stages(case)) if case['sorting_case'] != 'locale' else {}))
     if case.get('sampling_uniform'):
         proposal = read(src / 'expected.json')
         partition = proposal['node_type'] == 'preprocessing.data_partition'
@@ -1560,6 +1654,7 @@ class Runner:
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('text_update'): exports = ['text-update-1.csv', 'text-update-2.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
@@ -2076,6 +2171,8 @@ class Runner:
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
             expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
+        if spec.get('text_update'):
+            check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)
         sampling_csvs = []
@@ -2103,6 +2200,7 @@ class Runner:
             csv_expected = (read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
                             else expected['outputs'][0] if spec.get('binding_initial')
                             else expected['outputs'][0] if spec.get('grouping_case')
+                            else text_update_stages(spec)[index] if spec.get('text_update')
                             else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
@@ -2122,6 +2220,10 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('sorting_mode'):
+            write(folder / 'sorting-replies.json', [o for _, o in replies])
+            self.phase('sorting-modes-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sorting-modes.mjs',
+                folder / 'expected.json', folder / 'sorting-replies.json', folder / 'sorting-proof.json'], folder, timeout=60)
         if expected.get('logreg_normalization'):
             write(folder / 'logreg-replies.json', [o for _, o in replies])
             self.phase('logreg-normalization-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',
