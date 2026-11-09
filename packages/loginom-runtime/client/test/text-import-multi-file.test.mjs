@@ -113,6 +113,9 @@ test('service mapping uses the observed native metadata outside the CSV definiti
  assert.deepEqual(textImportOutputFields(configured,{source_fields:[service]}).map(c=>c.name),['SaleID','FileName']);
  assert.equal(textImportOutputFields(configured,{source_fields:[service]})[1].data_kind,'Неопределенное');
  assert.equal(configured.columns.length,1);
+ const {data_kind,...nativeSource}=service;
+ // Live mapping source descriptors omit kind; the target supplies its observed kind.
+ assert.equal(textImportOutputFields(configured,{source_fields:[nativeSource]})[1].data_kind,undefined);
  assert.throws(()=>textImportOutputFields(configured,{source_fields:[]}));
  assert.throws(()=>textImportOutputFields(configured,{source_fields:[{...service,type:'integer'}]}));
 });

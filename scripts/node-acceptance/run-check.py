@@ -270,7 +270,7 @@ def scenario(name, case_root=None, *, cases=None):
         node = REPO / 'docs/node-development/nodes/text-import'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file-list.md',
                     data=node / 'fixtures/multi-file', input_files=['sales_2026-02.csv', 'sales_2026-01.csv', 'returns_2026-01.csv'],
-                    base=None, expected_name='expected-list.json', oracle=node / 'acceptance/oracle-multi-file.py')
+                    base=None, expected_name='expected-list.json', oracle=node / 'acceptance/oracle-multi-file.py', attachment='path')
     if name in ['text-auto-types', 'text-auto-update']:
         node = REPO / 'docs/node-development/nodes/text-import'
         update = name == 'text-auto-update'
@@ -1804,6 +1804,8 @@ class Runner:
             if spec.get('lgd') and target.suffix.lower() == '.lgd':
                 # Native binary input uses the existing local-path admission flow.
                 prompt += f'\nИсходный файл LGD: {target}.'
+            elif spec.get('attachment') == 'path':
+                prompt += f'\nИсходный файл: {target}.'
             else:
                 command += ['--file', target]
         (folder / 'task.md').write_text(prompt)
