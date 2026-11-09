@@ -281,6 +281,17 @@ class RunCheckTests(unittest.TestCase):
             with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 self.csv_result(output, 'Q\n' + text + '\n', null_marker='?', scenario_name='types300')
 
+    def test_csv_datetime_accepts_hour_without_leading_zero_and_compares_value(self):
+        # LAB-1413 text-auto-label: Loginom export time_format "h:mm:ss" writes 2026-11-11 1:02:03.
+        output = dict(columns=[dict(name='EventAt', type='datetime')], rows=[dict(EventAt='2026-11-11T01:02:03')])
+        for text in ['2026-11-11 1:02:03', '2026-11-11T1:02:03', '2026-11-11 01:02:03']:
+            with self.subTest(text=text):
+                self.csv_result(output, 'EventAt\n' + text + '\n')
+        for text in ['2026-11-11 13:02:03', '2026-11-11 1:02:04', '2026-11-12 1:02:03', '2026-11-11 1:2:03',
+                     '2026-11-11 :02:03', '2026-11-11 1', 'x2026-11-11 1:02:03', '1:02:03', 'garbage']:
+            with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'EventAt\n' + text + '\n')
+
     def test_csv_present_datetime_requires_a_date_in_every_row_never_its_value(self):
         # v040-c8-filetime: FileTime is typed datetime and not NULL; its value is not promised.
         output = dict(column_order='exact', columns=[dict(name='File', type='string'),

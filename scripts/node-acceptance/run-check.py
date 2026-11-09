@@ -1353,6 +1353,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
             except (ValueError, OverflowError):
                 return False
         if col['type'] == 'datetime':
+            # Loginom export time_format "h:mm:ss" writes a one-digit hour: 2026-11-11 1:02:03.
+            value = re.sub(r'^(\d{4}-\d{2}-\d{2}[ T])(\d:)', r'\g<1>0\2', value)
             try: return datetime.fromisoformat(value) == datetime.fromisoformat(target)
             except ValueError: return False
         if isinstance(target, bool): return value.lower() == str(target).lower()
