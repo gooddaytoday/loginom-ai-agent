@@ -17,8 +17,9 @@ function fixture(wavelet=false,transition=false,faults={}){
   if(list)state.ui.elements.push({tid:base+'grdColumnsSettings;tbl;celleditor;cbx;boundlist;Вейвлет-сглаживание',ref:'ui-wavelet-option',allowed_actions:['click']});
   if(selected?.used&&(wavelet||selected.algorithm===1))for(const key of ['edtWaveletOrder','edtDecompositionLevel'])state.ui.elements.push({tid:base+key+';ValueControl',ref:'ui-'+key,allowed_actions:['fill','press']});
   if(selected?.used&&selected.algorithm===1){
+   for(const [i,suffix] of ['', '-1', '-2'].entries())state.ui.elements.push({tid:base+'pedWaveletType;ValueControl;radiofield'+suffix+';DisplayEl',ref:'ui-family-'+i,allowed_actions:['click']});
    state.ui.elements.push({tid:base+'edtEdgeExtension;ValueControl;trg_picker',ref:'ui-boundary-picker',allowed_actions:['click']});
-   if(boundaryList)for(const [index,label] of ['Антисимметричное','Симметричное без крайней точки','Симметричное'].entries())state.ui.elements.push({tid:base+'edtEdgeExtension;ValueControl;boundlist;'+label.replaceAll(' ','_'),label,ref:'ui-boundary-'+index,allowed_actions:['click']});
+   if(boundaryList)for(const [index,label] of ['Антисимметричное','Симметричное без крайней точки','Симметричное','Нулями'].entries())state.ui.elements.push({tid:base+'edtEdgeExtension;ValueControl;boundlist;'+label.replaceAll(' ','_'),label,ref:'ui-boundary-'+index,allowed_actions:['click']});
   }
   if(selected?.used&&!wavelet&&selected.algorithm===0)for(const title of ['Lambda','Period'])for(const kind of ['rb','edt']){
    const key=kind+title+';ValueControl'+(kind==='rb'?';DisplayEl':'');
@@ -31,7 +32,8 @@ function fixture(wavelet=false,transition=false,faults={}){
   if(cell?.part==='algorithm'){editor=true;list=!faults.pickerOnly;}
   else if(action.ref==='ui-algorithm-picker')list=true;
   else if(action.ref==='ui-boundary-picker')boundaryList=true;
-  else if(/^ui-boundary-[012]$/.test(action.ref)){settings.get(state.node_smoothing.selected.record_id).boundary=['Антисимметричное','Симметричное без крайней точки','symmetric'][Number(action.ref.at(-1))];boundaryList=false;}
+  else if(/^ui-boundary-[0123]$/.test(action.ref)){settings.get(state.node_smoothing.selected.record_id).boundary=['Антисимметричное','reflect','symmetric','zero'][Number(action.ref.at(-1))];boundaryList=false;}
+  else if(action.ref.startsWith('ui-family-')){const setting=settings.get(state.node_smoothing.selected.record_id);setting.family=['daubechies','coiflet','cdf_9_7'][Number(action.ref.at(-1))];setting.order=setting.family==='cdf_9_7'?null:1;}
   else if(action.ref==='ui-wavelet-option'){const selected=state.node_smoothing.selected;selected.algorithm=1;settings.set(selected.record_id,{family:'daubechies',order:1,depth:1,boundary:'symmetric'});editor=false;list=false;}
   else if(cell){state.node_smoothing.selected=fields.find(f=>f.record_id===cell.record_id);if(cell.part==='used')state.node_smoothing.selected.used=!state.node_smoothing.selected.used;}
   else {
@@ -109,4 +111,17 @@ for(const boundary of ['Антисимметричное','Симметричн�
  const result=await configureSmoothing(f.channel,{smoothing:[{field:'X',family:'daubechies',order:1,depth:1,boundary:'symmetric'}]},{...f,mode:'wavelet'});
  assert.equal(result.configuration.fields.find(f=>f.name==='X').boundary,'symmetric');
  assert.deepEqual(f.actions.filter(a=>a.ref.startsWith('ui-boundary-')).map(a=>a.ref),['ui-boundary-picker','ui-boundary-2']);
+});
+
+test('wavelet procedure sets db2/coif1/CDF and exact boundaries and preserves reopened CDF',async()=>{
+ for(const [family,order] of [['daubechies',2],['coiflet',1],['cdf_9_7',undefined]])for(const boundary of ['symmetric','zero','reflect']){
+  const f=fixture(true,true),rule={field:'X',family,...(order===undefined?{}:{order}),depth:1,boundary};
+  const result=await configureSmoothing(f.channel,{smoothing:[rule]},{...f,mode:'wavelet'});
+  const actual=result.configuration.fields.find(f=>f.name==='X');
+  assert.equal(actual.family,family);assert.equal(actual.boundary,boundary);assert.equal(actual.order,order??null);
+  if(family==='cdf_9_7'){
+   assert.equal(f.actions.some(a=>a.ref==='ui-edtWaveletOrder'),false);
+   const kept=await configureSmoothing(f.channel,{}, {...f,mode:'wavelet'});assert.equal(kept.configuration.fields[0].order,null);
+  }
+ }
 });
