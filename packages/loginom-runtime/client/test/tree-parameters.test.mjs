@@ -2,7 +2,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {validateTreeJsonScope,validateTreeParameters,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
+import {validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
 import {createTreeNodeSupport,treeConfigurationReadback} from '../lib/tree-node.mjs';
 import {NODE_TYPES,validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 test('tree stage 1 admits the independent acceptance JSON with exact original integer lexemes',async()=>{
@@ -121,17 +121,54 @@ test('JSON tree preflight refuses several JSON documents before mutation and kee
  await assert.rejects(jsonPreflight(['{"a":[{}],"b":[{}]}']),/one nonempty repeated object branch/);
 });
 
-function tableImplementation(){
+function tableImplementation(json=false){
  const need=(v,m)=>{if(!v)throw Error(m);},owned=s=>s.prepared_node_context?.verified&&s.prepared_node_context.surface==='wizard';
  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
  const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
-  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,treeConfigurationReadback,
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeConfigurationReadback,
   need,owned,ready:s=>owned(s)&&s.node_tree?.verified,same:(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b)),
   one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,JSON,
  });
- return factory({}, {json:false});
+ return factory({}, {json});
 }
+
+test('JSON output admits nested object arrays while tree-to-table retains its one-array scope',async()=>{
+ const schema=[{path:'',name:'Root',type:'object',is_container:true,is_array:false},
+  {path:'/items',name:'items',type:'object',is_container:true,is_array:true},
+  {path:'/items/id',name:'id',type:'integer',is_container:false,is_array:false},
+  {path:'/items/parts',name:'parts',type:'object',is_container:true,is_array:true},
+  {path:'/items/parts/sku',name:'sku',type:'string',is_container:false,is_array:false}];
+ const output={port_kind:'tree',tree:{complete:true,schema}};
+ const result=await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},
+  {ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{});
+ assert.equal(result.verified,true);
+ assert.throws(()=>validateSelectedTreePaths(schema),/one object and one repeated branch/);
+ for(const fault of ['sibling','scalar-array','variant','datetime']){
+  const bad=structuredClone(schema);
+  if(fault==='sibling')bad[3].path='/other';
+  if(fault==='scalar-array')bad[3].is_container=false;
+  if(['variant','datetime'].includes(fault))bad[4].type=fault;
+  assert.throws(()=>validateJsonTreeSchema(bad),undefined,fault);
+ }
+});
+
+test('nested JSON keeps sibling/scalar arrays, mixed types, dates and limits outside scope',async()=>{
+ for(const value of [
+  {items:[{parts:[{sku:'a'}],other:[{name:'b'}]}]},
+  {items:[{parts:[1]}]}, {items:[{parts:[]}]},
+  {items:[{details:{code:'A'}},{details:{code:1}}]},
+  {items:[{details:{code:'A'}},{details:'A'}]},
+  {items:[{parts:[{date:'2024-01-01'}]}]},
+  {items:Array.from({length:257},()=>({id:1}))},
+  {items:[{text:'x'.repeat(1024*1024)}]},
+ ])assert.throws(()=>validateTreeJsonScope(JSON.stringify(value)));
+ let deep={code:'A'};for(let i=0;i<17;i++)deep={details:deep};
+ assert.throws(()=>validateTreeJsonScope(JSON.stringify({items:[deep]})));
+ const text=await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/fixtures/nested-records/nested.json',import.meta.url),'utf8');
+ assert.equal(validateTreeJsonScope(text).verified,true);
+ assert.equal(validateTreeJsonScope('{"items":[{"a/b~c":{"parts":[{"sku":"a"}]}}]}').verified,true);
+});
 function tableState(indexed=false){
  const leaf=(path,name)=>({path,name,is_container:false,is_array:false,selected:true,checkbox_tid:name+';TreeCheckbox'});
  return {prepared_node_context:{verified:true,surface:'wizard'},wizard:{stage:'tree_table',root_tid:'W'},
