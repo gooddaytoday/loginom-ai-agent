@@ -2522,4 +2522,15 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 self.assertFalse(runner.save_confirmed(case, receipt, package))
             self.assertFalse(runner.save_confirmed(case, save, '/other.lgp'))
 
+    def test_coarse_frozen_trainings_without_training_readback_fail_with_code(self):
+        def reply(execution, training=True):
+            readback = dict(kind='coarse_classes', frozen_partition=dict(locked=True))
+            if training: readback['training'] = dict(source=dict(file='/test/train.csv'))
+            return (0, dict(status='SUCCEEDED', node=dict(node_id='node'), configuration=dict(readback=readback),
+                            execution=dict(execution_id=execution, status='completed'),
+                            output=dict(ports=[dict(port=0, schema=[], sample=[])])))
+        runner.check_coarse_frozen_trainings([reply('first'), reply('second')])
+        with self.assertRaisesRegex(AssertionError, 'COARSE_FROZEN_SAME_IMPORT'):
+            runner.check_coarse_frozen_trainings([reply('first'), reply('second', training=False)])
+
 if __name__ == '__main__': unittest.main()
