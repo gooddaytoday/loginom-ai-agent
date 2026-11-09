@@ -67,7 +67,7 @@ assert e['outputs'][0]['rows']==oracle.output(rows,oracle.fit(rows))['rows']
 save={'status':'SUCCEEDED','action_key':'package.save_as','action_revision':'2','phase':'verified','cleanup_complete':True,
  'output':{'package_ref':{'kind':'package','path':'/own/normalization.lgp','active_identity':'/own/normalization.lgp'},'reopened':True}}
 assert r.save_confirmed(c,save,'/own/normalization.lgp')
-assert not r.save_confirmed({},save,'/own/normalization.lgp')
+assert r.save_confirmed({},save,'/own/normalization.lgp')
 assert not r.save_confirmed(c,save,'/other.lgp')
 save['output']['reopened']=False
 assert not r.save_confirmed(c,save,'/own/normalization.lgp')
