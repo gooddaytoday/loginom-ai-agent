@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {configureReform,advanceReformInputColumns} from '../lib/reform-procedure.mjs';
-import {REFORM_TYPES,REFORM_USAGE} from '../lib/reform-parameters.mjs';
+import {REFORM_TYPES,REFORM_USAGE,REFORM_CACHE} from '../lib/reform-parameters.mjs';
 const ref=name=>({kind:'configured_field',name});
 function inputColumnsFixture(change=()=>{},lost=false){
  const s={prepared_node_context:{verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'reform'},
@@ -38,21 +38,25 @@ test('lost Reform initial Next reply is never replayed',async()=>{
 });
 function fixture(fault){
  const records=['A','B'].map((name,index)=>({index,name,label:'Same',record_id:'r'+index,field_id:String(index),type:'string',data_kind:'Дискретный',usage_type:0,caching_method:2,excluded:false,selected:false}));
+ const caching={value:3,display:'Выбранные поля',variable:false};
  const initial=structuredClone(records),events=[];let editor=null,choice=null,lastSnapshot;
  const owner={verified:true,document_id:'doc',workflow_id:'flow',node_id:'node'};
  const sources=records.map(f=>({...f,record_id:'source:'+f.record_id}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...owner,input_port:{port:0}},source_fields:sources,target_fields:sources.map(f=>({...f,record_id:'input:'+f.record_id,source:f}))};
  const snapshot=()=>{
   const wizard={stage:'field_parameters',root_ref:'wizard',reform_columns:{fields:records.map(f=>({...f,status:'observed',name_ref:'cell:'+f.name}))}};
+  wizard.settings={fields:{caching:{status:'observed',value:caching.display,enabled:true,input_ref:'node-cache'}}};
   const elements=records.map(f=>({ref:'cell:'+f.name,allowed_actions:['double_click']}));
+  elements.push({ref:'pick:node-cache',allowed_actions:['click'],wizard_combo:{kind:'picker',field:{scope:'reform_node',name:'caching'}}});
+  if(choice==='node-cache')for(const label of Object.values(REFORM_CACHE))elements.push({ref:label,allowed_actions:['select_wizard_option'],wizard_combo:{kind:'option',label,field:{scope:'reform_node',name:'caching'}}});
   if(editor){
-   const values={name:editor.name,label:editor.label,type_label:REFORM_TYPES[editor.type],data_kind:editor.data_kind,usage:Object.keys(REFORM_USAGE).find(k=>REFORM_USAGE[k]===editor.usage_type),excluded:editor.excluded};
+   const values={name:editor.name,label:editor.label,type_label:REFORM_TYPES[editor.type],data_kind:editor.data_kind,caching:REFORM_CACHE[Object.keys(REFORM_CACHE)[editor.caching_method]],usage:Object.keys(REFORM_USAGE).find(k=>REFORM_USAGE[k]===editor.usage_type),excluded:editor.excluded};
    wizard.reform_parameters={status:'observed',portal_bound:true,root_ref:'editor',selected_column:{name:editor.originalName},fields:Object.fromEntries(Object.entries(values).map(([k,value])=>[k,{status:'observed',value,enabled:true,input_ref:k,display_ref:k}]))};
-   for(const name of ['type_label','data_kind','usage'])elements.push({ref:'pick:'+name,allowed_actions:['click'],wizard_combo:{kind:'picker',field:{scope:'reform_column',name}}});
-   if(choice)for(const label of choice==='type_label'?Object.values(REFORM_TYPES):choice==='usage'?Object.keys(REFORM_USAGE):['Неопределенное','Непрерывный','Дискретный'])elements.push({ref:label,allowed_actions:['select_wizard_option'],wizard_combo:{kind:'option',label,field:{scope:'reform_column',name:choice}}});
+   for(const name of ['type_label','data_kind','usage','caching'])elements.push({ref:'pick:'+name,allowed_actions:['click'],wizard_combo:{kind:'picker',field:{scope:'reform_column',name}}});
+   if(choice)for(const label of choice==='type_label'?Object.values(REFORM_TYPES):choice==='usage'?Object.keys(REFORM_USAGE):choice==='caching'?Object.values(REFORM_CACHE).slice(0,3):['Неопределенное','Непрерывный','Дискретный'])elements.push({ref:label,allowed_actions:['select_wizard_option'],wizard_combo:{kind:'option',label,field:{scope:'reform_column',name:choice}}});
    elements.push({ref:'apply',allowed_actions:['apply_reform_column'],column_close:{scope:'reform'}});
   }
-  return {wizard,ui:{elements},node_reform:{verified:true,inventory_complete:true,node_context:owner,fields:structuredClone(records),caching:{value:3,display:'selected',variable:false}}};
+  return {wizard,ui:{elements},node_reform:{verified:true,inventory_complete:true,node_context:owner,fields:structuredClone(records),caching:structuredClone(caching)}};
  };
  const channel={async observe({ready}){const s=snapshot();assert.equal(ready(s),true);lastSnapshot=structuredClone(s);return s;},async perform({resolve,initialObservation}){
   if(initialObservation)assert.deepEqual(initialObservation,lastSnapshot,'Observation receipt must remain unchanged');
@@ -60,7 +64,9 @@ function fixture(fault){
   if(a.verb==='double_click')editor={...records.find(f=>a.ref==='cell:'+f.name),originalName:a.ref.slice(5)};
   else if(a.verb==='click')choice=a.ref.slice(5);
   else if(a.verb==='select_wizard_option'){
-   if(choice==='type_label')editor.type=Object.keys(REFORM_TYPES).find(k=>REFORM_TYPES[k]===a.ref);
+   if(choice==='node-cache'){caching.value=Object.values(REFORM_CACHE).indexOf(a.ref);caching.display=a.ref;}
+   else if(choice==='caching')editor.caching_method=Object.values(REFORM_CACHE).indexOf(a.ref);
+   else if(choice==='type_label')editor.type=Object.keys(REFORM_TYPES).find(k=>REFORM_TYPES[k]===a.ref);
    else if(choice==='usage')editor.usage_type=REFORM_USAGE[a.ref];else editor.data_kind=a.ref;choice=null;
   }else if(a.verb==='set_wizard_field')editor[a.ref]=a.text;
   else if(a.verb==='set_checked')editor.excluded=a.checked;
@@ -104,4 +110,17 @@ test('reform swaps two names through a temporary one that is absent from the fin
  assert.deepEqual(f.records.map(x=>[x.record_id,x.name,x.label,x.type]),[['r0','B','LB','string'],['r1','A','LA','integer']]);
  assert.deepEqual(r.configuration.fields.map(x=>x.name),['B','A']);
  assert.ok(f.records.every(x=>!x.name.startsWith('_reform_tmp')));assert.equal(f.records[0].caching_method,2);
+});
+
+test('reform sets literal node cache before field editors and omitted patches preserve both levels',async()=>{
+ const f=fixture();
+ for(const caching of ['disabled','on_activation','on_access','selected_fields']){
+  const changes=caching==='selected_fields'?[{field:ref('A'),cache:'on_activation'},{field:ref('B'),cache:'disabled'}]:[];
+  const r=await configureReform(f.channel,{changes,caching});
+  assert.equal(r.configuration.caching.display,REFORM_CACHE[caching]);assert.equal(r.effect_possible,true);
+ }
+ assert.deepEqual(f.records.map(f=>f.caching_method),[1,0]);
+ const r=await configureReform(f.channel,{changes:[{field:ref('A'),label:'New title'}]});
+ assert.equal(r.configuration.caching.value,3);assert.deepEqual(f.records.map(f=>f.caching_method),[1,0]);
+ const after=await configureReform(f.channel,{changes:[]});assert.equal(after.effect_possible,false);
 });
