@@ -247,3 +247,16 @@ test('v040-c8-filetime: comparison present accepts any non-NULL DateTime and nev
   o=>{o.rows[0].FileTime=null;},o=>{o.rows[0].FileTime='2026-11-09T10:11:00.000';},o=>{o.rows[0].FileTime=false;}])
   assert.throws(()=>parseExpectedOutputs(variant(change)),/EXPECTED_COMPARISON_INVALID/);
 });
+
+test('v040-c8-filetime: C8 path expectations add FileTime present after FileName and the task asks for the time',()=>{
+ const kit=new URL('../../../docs/node-development/nodes/text-import/acceptance/',import.meta.url);
+ const task=readFileSync(new URL('task-file-info.md',kit),'utf8');
+ assert.match(task,/путь и время/);assert.match(task,/relative-path\.csv/);
+ for(const [name,prefix] of [['absolute-path','/own/dir/'],['relative-path','']]){
+  const text=readFileSync(new URL('extended/expected-'+name+'.json',kit),'utf8').replaceAll('{{SOURCE_DIR}}','/own/dir').replace('{{PACKAGE_PATH}}','/own/dir/run.lgp');
+  const [output]=parseExpectedOutputs(JSON.parse(text)).outputs;
+  assert.deepEqual(output.columns.map(c=>c.name),['SaleID','Month','Amount','Note','FileName','FileTime']);
+  assert.deepEqual(output.columns.at(-1),{name:'FileTime',type:'datetime',label_any:true,comparison:'present'});
+  assert.ok(output.rows.length===5&&output.rows.every(r=>r.FileTime===true&&r.FileName.startsWith(prefix+'sales_2026-0')));
+ }
+});

@@ -77,8 +77,13 @@ def proposals():
         result[name] = module.expected()
     for name, prefix in [('absolute-path', '{{SOURCE_DIR}}/'), ('relative-path', '')]:
         result[name] = module.expected()
-        for row in result[name]['outputs'][0]['rows']:
+        output = result[name]['outputs'][0]
+        # v040-c8-filetime: typed datetime, not NULL in each row; the value is
+        # not compared (equality to a local mtime is not promised).
+        output['columns'].append(dict(name='FileTime', type='datetime', label_any=True, comparison='present'))
+        for row in output['rows']:
             row['FileName'] = prefix + row['FileName']
+            row['FileTime'] = True
     result['mask-new-month'] = module.expected(True)
     spec = importlib.util.spec_from_file_location('file_variable_oracle', ROOT / 'acceptance/file-variable/oracle.py')
     module = importlib.util.module_from_spec(spec)
