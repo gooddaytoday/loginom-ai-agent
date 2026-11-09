@@ -420,6 +420,24 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in case['data'].iterdir()), case['input_files'])
             self.assertNotIn('expected', case['prompt'].read_text())
 
+    def test_assnrules_recommend_keeps_oracle_private_and_matches_both_native_ports(self):
+        case = runner.scenario('assnrules-recommend')
+        self.assertEqual(case['data'], runner.REPO / 'docs/node-development/nodes/datamining-assnrules/fixtures/v040')
+        self.assertEqual(case['input_files'], ['recommend-train.csv'])
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['prompt'].name, 'task-recommend.md')
+        expected = runner.expected_for(case, '/test/recommend.lgp')
+        self.assertEqual([o['output_port'] for o in expected['outputs']], [1, 2])
+        self.assertEqual([len(o['rows']) for o in expected['outputs']], [2, 1])
+        rules, recommendations = expected['outputs']
+        rule = next(r for r in rules['rows'] if r['Item_0_A'] == 'A' and r['Item_0_C'] == 'B')
+        self.assertEqual(recommendations['rows'], [dict(rule, Transaction='T4')])
+        self.assertEqual([c['name'] for c in recommendations['columns']],
+            ['Transaction', 'RuleID', 'Support', 'Confidence', 'Lift', 'Item_0_A', 'Item_0_C'])
+        self.assertEqual(runner.expected_for(case, '/test/recommend.lgp', cold=True), expected)
+        for text in ['expected', 'oracle', 'T4', 'recommend-holdout.csv', '.75']:
+            self.assertNotIn(text, case['prompt'].read_text())
+
     def test_assnrules_consequents_has_exact_input_boundary_and_final_cold(self):
         case = runner.scenario('assnrules-consequents')
         self.assertEqual(case['data'], runner.REPO / 'docs/node-development/nodes/datamining-assnrules/fixtures/v040')

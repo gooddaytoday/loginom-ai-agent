@@ -473,6 +473,7 @@ export interface CoarseClassesConfigurationReadback {
  output_mappings: BinningConfigurationReadback['output_mappings']; package_persistence_verified: false;
 }
 
+export interface CoarseClassesFrozenConfigurationReadback extends CoarseClassesConfigurationReadback { frozen: true; frozen_partition: {input_field: string; locked: true; edited: boolean; classes: {number: number; lower: number | null; upper: number | null}[]}; }
 export interface FactorAnalysisConfigurationReadback {
   kind: 'factor_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'pca_fixed'; features: string[];

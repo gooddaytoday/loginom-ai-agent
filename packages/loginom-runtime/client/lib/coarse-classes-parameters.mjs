@@ -9,7 +9,8 @@ export function validateCoarseClassesParameters(p,mode,r){
  }else{
   need(Object.keys(p).length===1&&p.coarse_classes,'use parameters.coarse_classes');
   const c=p.coarse_classes;
-  need(c&&typeof c==='object'&&!Array.isArray(c)&&keys.every(k=>Object.hasOwn(c,k))&&Object.keys(c).every(k=>keys.includes(k)||k==='cut'),'all seven coarse_classes settings and an optional manual cut are required');
+  need(c&&typeof c==='object'&&!Array.isArray(c)&&keys.every(k=>Object.hasOwn(c,k))&&Object.keys(c).every(k=>keys.includes(k)||['cut','frozen'].includes(k)),'all seven coarse_classes settings and an optional manual cut are required');
+  need(!Object.hasOwn(c,'frozen')||typeof c.frozen==='boolean'&&c.partition==='automatic','frozen requires a Boolean and automatic discrete partition');
   for(const k of ['input_field','target_field','event_value'])need(typeof c[k]==='string'&&c[k].trim().length>0&&c[k].length<=128,k+' must be an exact nonempty string');
   need(c.input_field!==c.target_field,'input and target must differ');
   need(['automatic','manual'].includes(c.partition),'use automatic discrete or manual continuous partition');

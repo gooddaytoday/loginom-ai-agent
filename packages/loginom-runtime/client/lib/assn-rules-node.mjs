@@ -18,9 +18,9 @@ export function createAssnRulesNodeSupport(config){return createTabularTransform
   return configureAssnRules(channel,p,context);
  },
  async configureAllOutputs(channel,configuration){
-  // Both schemas are materialized by native training/Execute. This slice
+  // Native schemas are materialized by native training/Execute. This slice
   // accepts no mapping overrides; read each actual tabular schema afterwards.
-  return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,ports:[0,1].map(port=>({port,schema:assnRulesOutputColumns(configuration,port)}))};
+  return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,ports:[0,1,2].map(port=>({port,schema:assnRulesOutputColumns(configuration,port)}))};
  },
  async beforeGraphExecute(options,ctx,configuration,channel){
   const request={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref};

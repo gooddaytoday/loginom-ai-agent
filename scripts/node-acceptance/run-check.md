@@ -871,6 +871,12 @@ Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1
 146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
 Модель получает только task и modes.csv; oracle остаётся в оснастке.
 
+`binning-ties-current` использует task-ties-current.md и только fixtures/ties-modes.csv:
+frequency, size=4, ties=current, без сумм. Неизменный modes/expected-current.json
+проверяет все 156 значений двух портов, типы/порядок, NULL, два CSV, Save,
+cold без перенастройки и cleanup. `binning-frequency-ties` проверяет прежний
+next по умолчанию; oracle/expected остаются вне модельного контекста.
+
 `binning-auto` и `binning-sd` используют task-auto.md/task-sd.md и только
 fixtures/numeric-modes.csv; expected_name=modes/expected-auto.json либо
 modes/expected-sd.json, два экспорта. Auto — count=2 без ручных пределов;
@@ -931,6 +937,8 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 production `readColUnion` и отменяет мастер без применения изменений. CSV без
 этого аудита не даёт PASS: `minimum` возвращает ту же строку.
 
+`coarse-classes-frozen-zero` uses task-frozen-zero.md and only train.csv plus zero-frequency.csv from preprocessing-coarseclasses/fixtures. The independent modes/expected-frozen-zero.json checks three full ordered outputs, CSV, Save and cold. The same Import and Coarse Classes node must be retained with a locked partition during retraining; reopen readback checks IsLocked before execution.
+
 `smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
 `smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
@@ -947,3 +955,9 @@ Oracle/expected остаются вне контекста модели. Рег�
 Только task-elastic.md и CSV передаются модели; frozen KKT oracle из
 8c1b6ac415645227d8977c3d9f7d3194e7e9b4b2 остаётся приватным. Оба typed-порта,
 прогнозный CSV, Save/cold без перенастройки и cleanup; abs=1e-8, rel=1e-10.
+
+`assnrules-recommend`: обучение и повторное выполнение того же узла на
+`fixtures/v040/recommend-train.csv`, max_items=2, одно следствие, lift=0.
+Только `acceptance/v040/task-recommend.md` и CSV передаются модели.
+Независимый `oracle.py --check` проверяет правила и рекомендации порта 2,
+совпадающий RuleID, все native поля, типы и порядок; два CSV, Save/cold/cleanup.

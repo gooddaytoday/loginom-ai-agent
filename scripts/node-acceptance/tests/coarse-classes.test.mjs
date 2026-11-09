@@ -18,10 +18,10 @@ test('coarse classes catalog keeps independent train/apply expectations outside 
 from pathlib import Path
 s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
 r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
-for name,rows in [('coarse-classes-train',20),('coarse-classes-apply',3),('coarse-classes-continuous-manual',9)]:
+for name,rows in [('coarse-classes-train',20),('coarse-classes-apply',3),('coarse-classes-continuous-manual',9),('coarse-classes-frozen-zero',4)]:
  c=r.scenario(name);e=r.expected_for(c,'/owned/coarse.lgp')
  assert c['base'] is None and c['export_count']==3
- assert c['input_files']==(['continuous.csv'] if rows==9 else ['train.csv'] if rows==20 else ['train.csv','holdout.csv'])
+ assert c['input_files']==(['train.csv','zero-frequency.csv'] if rows==4 else ['continuous.csv'] if rows==9 else ['train.csv'] if rows==20 else ['train.csv','holdout.csv'])
  if rows==9:
   assert c['expected_name']=='modes/expected.json'
   assert next(row for row in e['outputs'][0]['rows'] if row['X']==7)['X_ClassNum']==0
@@ -50,4 +50,37 @@ test('new coarse classes bounds accept typed exact NULL without inventing native
  }
  const native=structuredClone(data);native.sample[0][0]={...cell,cell_type:'null',precision:'exact_native',native:{tag:1}};
  assert.equal(matchesExpectedOutput(native,expected),true);
+});
+
+test('reopen requires native IsLocked readback and discards the inspection draft even on refusal',async()=>{
+ const {observeCoarseFrozenSavedSettings}=await import('../coarse-classes-frozen.mjs');
+ for(const locked of [false,true]){
+  let stage='graph',closed=0;const gestures=[];
+  const state=()=>({wizard:{stage,status:stage==='graph'?'absent':'observed',root_tid:'wizard'},prepared_node_context:{surface:'graph'},
+   node_coarse_classes:{verified:true,fields:[{name:'Segment',role:'input',frozen:true}],model:{input_field:'Segment',locked}},
+   ui:{elements:[{tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']}]}});
+  const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{const a=o.resolve(state());gestures.push(a);stage=a.expected_stage;}};
+  const load=async path=>path.endsWith('node-wizard-open.mjs')?{openPreparedWizard:async()=>{stage='coarse_classes';}}:
+   path.endsWith('node-wizard-close.mjs')?{closePreparedWizard:async()=>{closed++;return {verified:true,cleanup_complete:true,settings_applied:false};}}:{selectPreparedGraphNode:async()=>{}};
+  if(locked){const read=await observeCoarseFrozenSavedSettings({load,channel});assert.equal(read.model.locked,true);assert.equal(read.settings_applied,false);}
+  else await assert.rejects(observeCoarseFrozenSavedSettings({load,channel}),/IS_LOCKED/);
+  assert.equal(closed,1);assert.deepEqual(gestures,[{verb:'wizard_step',ref:'next',expected_stage:'coarse_classes_model'}]);
+ }
+});
+
+test('frozen training proof unwraps production action outcomes and deduplicates their three ports',()=>{
+ const r=spawnSync('python3',['-B','-c',`import importlib.util,copy
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+def reply(execution,node='same'):
+ return {'status':'SUCCEEDED','output':{'status':'SUCCEEDED','node':{'node_id':node},'execution':{'status':'completed','execution_id':execution},'configuration':{'readback':{'kind':'coarse_classes','frozen_partition':{'locked':True},'training':{'source':[{'node':{'node_id':'import'},'output':0,'input':0}]}}},'output':{'ports':[{'port':i,'schema':[],'sample':[]} for i in range(3)]}}}
+a,b=reply('train'),reply('retrain')
+r.check_coarse_frozen_trainings([(1,a),(2,a),(3,b)])
+for replies in [[(1,a)],[(1,a),(2,reply('retrain','other'))]]:
+ try:r.check_coarse_frozen_trainings(replies)
+ except AssertionError:pass
+ else:raise AssertionError('invalid lifecycle accepted')
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
 });

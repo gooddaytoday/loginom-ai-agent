@@ -372,6 +372,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
                     base=None, external=True, expected_name='expected-indices-run.json')
 
+    if name == 'coarse-classes-frozen-zero':
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        return dict(source=src, prompt=src / 'task-frozen-zero.md',
+                    data=src.parent / 'fixtures', base=None, export_count=3,
+                    input_files=['train.csv', 'zero-frequency.csv'], expected_name='modes/expected-frozen-zero.json', coarse_frozen=True)
     if name == 'coarse-classes-continuous-manual':
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
         return dict(source=src, prompt=src / 'task-continuous-manual.md',
@@ -384,12 +389,13 @@ def scenario(name, case_root=None, *, cases=None):
                     data=src / 'data', base=None, export_count=3,
                     input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
                     expected_name='expected-apply.json' if applying else 'expected.json')
-    if name in ['binning-auto', 'binning-sd']:
+    if name in ['binning-auto', 'binning-sd', 'binning-ties-current']:
         node = REPO / 'docs/node-development/nodes/preprocessing-binning'
         kind = name.removeprefix('binning-')
         return dict(source=node / 'acceptance', prompt=node / ('acceptance/task-' + kind + '.md'),
-                    data=node / 'fixtures', base=None, export_count=2, input_files=['numeric-modes.csv'],
-                    expected_name='modes/expected-' + kind + '.json', oracle=node / 'acceptance/modes/oracle.py')
+                    data=node / 'fixtures', base=None, export_count=2,
+                    input_files=['ties-modes.csv'] if kind == 'ties-current' else ['numeric-modes.csv'],
+                    expected_name='modes/expected-' + ('current' if kind == 'ties-current' else kind) + '.json', oracle=node / 'acceptance/modes/oracle.py')
     if name == 'binning-datetime-manual':
         node = REPO / 'docs/node-development/nodes/preprocessing-binning'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',
@@ -559,6 +565,12 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-recommend':
+        node = REPO / 'docs/node-development/nodes/datamining-assnrules'
+        src = node / 'acceptance/v040'
+        return dict(source=src, prompt=src / 'task-recommend.md', data=node / 'fixtures/v040',
+                    base=None, input_files=['recommend-train.csv'], export_count=2,
+                    expected_name='expected-recommend.json')
     if name == 'assnrules-consequents':
         node = REPO / 'docs/node-development/nodes/datamining-assnrules'
         src = node / 'acceptance/v040'
@@ -865,6 +877,8 @@ def expected_for(case, package, cold=False):
     if case.get('tree_only'):
         expected = read(src / 'expected.json')['cases'][case['tree_case']]
         return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
+    if case.get('coarse_frozen'):
+        return {**expected_for({**case, 'coarse_frozen': False}, package, cold=cold), 'coarse_frozen': True}
     if case.get('autocorrelation_edge'):
         approved = read(src / 'expected.json')
         if case['autocorrelation_edge'] in ['empty', 'null']:
@@ -1281,6 +1295,18 @@ def ports(value, receipt=None):
         for item in value.values(): yield from ports(item, receipt)
     if isinstance(value, list):
         for item in value: yield from ports(item, receipt)
+
+
+def check_coarse_frozen_trainings(replies):
+    owners = {o['execution']['execution_id']: o for _, reply in replies for o, _ in ports(reply)
+              if o.get('status') == 'SUCCEEDED'
+              and o.get('configuration', {}).get('readback', {}).get('kind') == 'coarse_classes'
+              and o.get('execution', {}).get('status') == 'completed'}
+    trained = list(owners.values())
+    assert len(trained) >= 2, 'COARSE_FROZEN_TWO_TRAININGS'
+    assert len({o['node']['node_id'] for o in trained}) == 1, 'COARSE_FROZEN_SAME_NODE'
+    assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in trained), 'COARSE_FROZEN_LOCKED'
+    assert len({json.dumps(o['configuration']['readback']['training'].get('source'), sort_keys=True) for o in trained}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
 
 
 def port_path(reply, port):
@@ -2173,6 +2199,8 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if spec.get('coarse_frozen'):
+            check_coarse_frozen_trainings(replies)
         if expected.get('clustering_apply'):
             write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
             self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
