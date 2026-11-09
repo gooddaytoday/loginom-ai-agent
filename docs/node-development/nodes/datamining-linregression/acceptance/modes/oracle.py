@@ -217,9 +217,12 @@ def expected(rows, b, fields, *, full_statistics=False, summary=False, train_row
                   ['imports.text', 'datamining.lin_regression', 'exports.text']], outputs=[
         dict(output_node_type='datamining.lin_regression', output_port=0, columns=columns,
              rows=forecast, ordered=True),
+        # Only Name/Y_coefficients labels are observed (discovery.md); the
+        # other seven native labels are not, and the task does not set them.
         dict(output_node_type='datamining.lin_regression', output_port=1,
              columns=[dict(name=k, type='string' if k in ['Name', 'DisplayName', 'UniqueValues'] else 'real',
-                           **({'tolerance': TOL} if k not in ['Name', 'DisplayName', 'UniqueValues'] else {})) for k in coeff[0]],
+                           **({'tolerance': TOL} if k not in ['Name', 'DisplayName', 'UniqueValues'] else {}),
+                           **({} if k in ['Name', 'Y_coefficients'] else {'label_any': True})) for k in coeff[0]],
              rows=coeff, ordered=True)])
     if summary:
         result['variable_inventory'] = dict(outputs=[dict(node=dict(type='datamining.lin_regression'),
@@ -267,6 +270,11 @@ def proposals():
     for mode, l1, l2 in [('ridge', 0, 1), ('lasso', 1, 0), ('elastic', 1, 1)]:
         regularized = [b[0]] + [max(Q(0), abs(v)-Q(l1, 32))*(1 if v >= 0 else -1)/(1+Q(l2, 16)) for v in b[1:]]
         cases[mode] = expected(centered, regularized, fields)
+        if mode in ['lasso', 'elastic']:
+            cases[mode] = dict(status='obsolete_invalid_do_not_use',
+                               reason='LAB-972 penalty/intercept assumptions are invalid; not an acceptance oracle.',
+                               replacement='../../penalty/expected.json: cases[shifted-' + ('lasso' if mode == 'lasso' else 'elastic') + '].expected',
+                               **cases[mode])
     # Positive affine normalization, denormalized coefficients: identical OLS.
     for norm in ['minmax', 'minus-one', 'zero-one', 'absolute', 'standard', 'ratio']:
         cases[f'normalization-{norm}'] = expected(design, full, fields)

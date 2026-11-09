@@ -11,7 +11,7 @@
     "fp_growth",
     "apply"
   ],
-  "semantics": "DESIGN ONLY: FP-Growth training or existing-model apply; 2 inputs, 3 outputs. Native support/confidence are fractions in outputs, percentages in parameters. Multi-consequence schema observed for max_items=3; auxiliary role binding and cold apply remain to verify.",
+  "semantics": "FP-Growth training or existing-model apply; 2 inputs, 3 outputs. Native support/confidence are fractions in outputs, percentages in parameters.",
   "graph_handler": "node_target_v1",
   "graph_handler_status": "internal_candidate",
   "configuration_handler": "assn-rules-v1-internal-1",
@@ -38,7 +38,7 @@
   "parameter_schema": {
     "type": "object",
     "additionalProperties": false,
-    "description": "DESIGN ONLY: train FP-Growth on input 0 or apply existing model without retrain; auxiliary/filter semantics pending live UI.",
+    "description": "Train FP-Growth on input 0 or apply existing model without retrain.",
     "properties": {
       "transaction_field": {
         "type": "string",

@@ -135,6 +135,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 требуемый шаг доступными стандартными узлами и режимами.
 
 Перед `dock_node_apply` вызови `dock_action_describe` с типом узла и нужными `modes`: правила узла — в `guidance` карточки, параметры — в `parameter_schema`; [разметка правил](references/nodes/README.md).
+После каждого `loginom_dock_prepare` (и `open_package`) карточки сброшены: снова `dock_action_describe` с типом и `modes` перед apply.
 Для вычисляемой формулы или разбора произвольного текста выбирай Калькулятор;
 для словаря соответствий с другим типом результата — Замену.
 На просьбу о неподдерживаемом режиме явно сообщи: «Этот режим пока не поддерживается».
@@ -174,7 +175,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Ассоциативные правила | `datamining.assn_rules` / fp_growth | [читать](references/nodes/datamining.assn_rules.md) |
 | Кросс-таблица | `transform.cross_table` / pivot | [читать](references/nodes/transform.cross_table.md) |
 | Дубликаты и противоречия | `research.duplicates` / mark | [читать](references/nodes/research.duplicates.md) |
-| Пропуски: среднее, медиана, мода, предыдущее, удаление | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |
+| Пропуски: среднее, медиана, мода, предыдущее, линейно, случайное, удаление | `preprocessing.data_recovery` / impute | [читать](references/nodes/preprocessing.data_recovery.md) |
 | Экспорт XLSX | `exports.excel` / xlsx | [читать](references/nodes/exports.excel.md) |
 | Экспорт CSV/TXT | `exports.text` / delimited | [читать](references/nodes/exports.text.md) |
 | Импорт XLSX | `imports.excel` / xlsx | [читать](references/nodes/imports.excel.md) |
@@ -189,7 +190,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 |Доли итогов|`transform.ungroup_data` / shares|[читать](references/nodes/transform.ungroup_data.md)|
 | Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
-| Календарные признаки | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
+| Календарные признаки, строки дат | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
 | Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
 | Сортировка | `transform.sorting` / keys | [читать](references/nodes/transform.sorting.md) |
 | Слияние по ключам | `transform.join_data` / inner, left, right, full, difference | [читать](references/nodes/transform.join_data.md) |

@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Independent SD editing proposal, not an assertion of unobserved native rules.
+"""Independent SD editing proposal, revised after LAB-1103 native discovery.
 
-Original training sample, population SD; mean includes spikes, upper median,
-continuous histogram mode. Policy/clip conventions require native confirmation.
+Classify the original sample; mean uses non-anomalous values, median uses all
+non-NULL training values (the replacement discriminator separates these rules).
+Clipping uses the normal-sample mean plus/minus one normal-sample population SD
+for the fixture's outlier multiplier 1 (also for extremes). General multipliers
+and exact clipping precision still require acceptance. No saved-model apply
+claim: --apply produces the desired frozen-fit contrast, not observed behavior.
 No Loginom, runtime, browser or actual-output inputs.
+--check regenerates the committed expected files in memory and fails on drift.
 """
 import argparse
 import csv
@@ -14,24 +19,32 @@ from fractions import Fraction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+COMMITTED = [(f"expected-{policy.replace('_', '-')}.json", policy, False, 'policies.csv')
+             for policy in ('delete', 'mean', 'median', 'most_probable', 'constant', 'limit')]
+COMMITTED += [('expected-apply.json', 'constant', True, 'policies.csv')]
+COMMITTED += [(f"expected-replacement-{policy.replace('_', '-')}.json", policy, False, 'replacement-discriminator.csv')
+              for policy in ('mean', 'median', 'most_probable', 'limit')]
 
 
 def read(name):
-    with (ROOT / 'fixtures' / name).open() as stream:
+    with (ROOT / 'fixtures' / name).open(newline='', encoding='utf-8') as stream:
         return [dict(RowID=int(row['RowID']), X=None if row['X'] == '?' else Fraction(row['X']),
                      Note=row['Note']) for row in csv.DictReader(stream)]
 
 
-def expected(policy, apply=False):
-    training = read('policies.csv')
+def expected(policy, apply=False, fixture='policies.csv', extreme_constant=-7):
+    training = read(fixture)
     values = sorted(row['X'] for row in training if row['X'] is not None)
     mean = sum(values) / len(values)
     variance = sum((value - mean) ** 2 for value in values) / len(values)
+    normal = [value for value in values if (value - mean) ** 2 <= variance]
+    replacement_mean = sum(normal) / len(normal)
+    replacement_variance = sum((value - replacement_mean) ** 2 for value in normal) / len(normal)
     bins = math.ceil(1 + math.log2(len(values)))
     width = (max(values) - min(values)) / bins
     histogram = Counter(min(bins - 1, int((value - min(values)) / width)) for value in values)
     winner = max(range(bins), key=lambda index: (histogram[index], -index))
-    replacements = dict(mean=mean, median=values[len(values) // 2],
+    replacements = dict(mean=replacement_mean, median=values[len(values) // 2],
                         most_probable=min(values) + Fraction(2 * winner + 1, 2) * width,
                         constant=Fraction(-7))
     ports = [[], [], []]
@@ -46,9 +59,9 @@ def expected(policy, apply=False):
         if category and policy == 'delete':
             continue
         if category and policy in replacements:
-            row['X'] = replacements[policy]
+            row['X'] = Fraction(extreme_constant) if policy == 'constant' and category == 2 else replacements[policy]
         if category and policy == 'limit':
-            row['X'] = float(mean) + math.copysign(category * math.sqrt(float(variance)), float(value - mean))
+            row['X'] = float(replacement_mean) + math.copysign(math.sqrt(float(replacement_variance)), float(value - replacement_mean))
         ports[0].append(row)
     columns = [dict(name='RowID', type='integer', label_any=True),
                dict(name='X', type='real', label_any=True, tolerance=dict(abs=1e-10 if policy in ('mean', 'limit') else 0,
@@ -64,10 +77,21 @@ def expected(policy, apply=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('policy', choices=['delete', 'mean', 'median', 'most_probable', 'constant', 'limit'])
+    parser.add_argument('policy', nargs='?', choices=['delete', 'mean', 'median', 'most_probable', 'constant', 'limit'])
     parser.add_argument('--apply', action='store_true')
+    parser.add_argument('--fixture', choices=['policies.csv', 'replacement-discriminator.csv'], default='policies.csv')
+    parser.add_argument('--extreme-constant', type=int, default=-7)
+    parser.add_argument('--check', action='store_true', help='compare committed expected files')
     args = parser.parse_args()
-    result = expected(args.policy, args.apply)
-    assert result['outputs'][2]['rows'][0]['RowID'] == (3 if args.apply else 7)
+    if args.check:
+        for name, policy, apply, fixture in COMMITTED:
+            text = json.dumps(expected(policy, apply, fixture), ensure_ascii=False, indent=2) + '\n'
+            assert (Path(__file__).parent / name).read_text(encoding='utf-8') == text, name
+        print(f'OK: {len(COMMITTED)} expected files match')
+        raise SystemExit
+    if args.policy is None:
+        parser.error('policy is required without --check')
+    result = expected(args.policy, args.apply, args.fixture, args.extreme_constant)
+    assert result['outputs'][2]['rows'][0]['RowID'] == (3 if args.apply else 7 if args.fixture == 'policies.csv' else 8)
     assert len(result['outputs'][1]['rows']) == (1 if args.apply else 0)
     print(json.dumps(result, ensure_ascii=False, indent=2))

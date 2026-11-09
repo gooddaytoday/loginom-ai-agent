@@ -43,7 +43,7 @@ export function readVariablesCalculatorBrowser(prefix) {
   const lines=Array.from({length:count},(_,i)=>doc.getLine(i));
   if(lines.some(s=>typeof s!=='string'||/[\r\n\0]/.test(s)))return fail('variables_calculator_editor_text');
   const text=lines.join('\n');if(text.length>2048)return fail('variables_calculator_editor_size');
-  const types={1:'boolean',3:'real',4:'integer',5:'string'},names=new Set(),ids=new Set(),expressionIds=new Set(),expressions=[];
+  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string'},names=new Set(),ids=new Set(),expressionIds=new Set(),expressions=[];
   for(const [index,r] of records.entries()) {
     const d=r?.data,id=String(r?.internalId??'');
     if(!r?.isModel||!d||!id||ids.has(id)||expressionIds.has(d.ID)||d.Index!==index||!Number.isSafeInteger(d.ID)||d.ID<0

@@ -33,7 +33,7 @@ test('text Import delimited guidance keeps every rule in compact English',async 
  for(const rule of [/confirmed source CSV/,/visualizer table/,/effect_possible=false/,/preview_only:true/,/server_profile/,
   /CP1251/,/mojibake/,/rare types/,/download\/sampling/,/full sample Import settings/,/settings\.columns`; add no Reform/,/order/,/overwrite=reject/,
   /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
-  /auto_detect_columns/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
+  /auto_detect_columns/,/only after Execute/,/output `mappings`/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
   /Calculator\/JS/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/])assert.match(text,rule);
  assert.doesNotMatch(description.guidance.replace(/^# .*\n/,'').replace(/\(\.\.\/large-files\.md#[^)]*\)/,''),/[А-Яа-яЁё]/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);
@@ -113,4 +113,36 @@ test('stale document identity defers to the authoritative document guard after S
  const request={document_id:'old-document',target:{type:'transform.sorting'},mode:'keys'};
  assert.equal(b.checkNodeDescription(request),null);
  assert.equal(b.checkNodeDescription({...request,document_id:'new-document'}).error.code,'NODE_TYPE_NOT_DESCRIBED');
+});
+
+test('acceptance review rules reach the model: describe after reopen, import all without mappings, replace rules without table inputs',async t=>{
+ const main=await readFile(new URL('../../../product/skills/loginom-automation/SKILL.md',import.meta.url),'utf8');
+ const reopen=main.split('\n').find(line=>line.includes('open_package')&&line.includes('dock_action_describe'));
+ assert.ok(reopen&&Buffer.byteLength(reopen)<=200,reopen);
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const [text]=await loader.describeNodes([{type:'imports.text',modes:NODE_TYPES['imports.text'].modes}],['delimited']);
+ assert.match(text.guidance,/`all`: fields appear only after Execute[^.]*pass no `columns` or\s+output `mappings`/);
+ assert.match(text.guidance,/to control fields use `new`\/`none`/);
+ const [rules]=await loader.describeNodes([{type:'variables.replace',modes:NODE_TYPES['variables.replace'].modes}],['rules']);
+ assert.match(rules.guidance,/без табличных `inputs` и `mappings`/);
+ assert.match(rules.guidance,/только через `variable_inputs`/);
+ for(const file of ['imports.text','variables.replace'])
+  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/'+file+'.md')))<=6000,file);
+});
+
+test('LAB-1162 skill text covers repeated model refusals from live runs',async t=>{
+ const source=await createBundledSkillFixture(t);
+ const loader=createSkillLoader({resources:source.resources});
+ const skill=await readFile(source.main,'utf8');
+ assert.match(skill,/[Пп]осле каждого `loginom_dock_prepare`[^\n]*(open_package|повторн)[^\n]*\n?[^\n]*describe/);
+ const workflow=await readFile(join(source.directory,'references/workflow.md'),'utf8');
+ assert.match(workflow,/source_operation_id[\s\S]{0,80}finish:"execute"/);
+ assert.match(workflow,/табличного узла[\s\S]{0,60}finish:"execute"[\s\S]{0,20}`finish:"done"` и экспорт не подходят[\s\S]{0,20}снимок\s+`variables\.user` — по его карточке/);
+ assert.doesNotMatch(workflow,/операция с `finish:"done"`[^\n]*не подходит/);
+ const card={type:'transform.group_data',modes:NODE_TYPES['transform.group_data'].modes};
+ const [aggregate]=await loader.describeNodes([card],['aggregate']);
+ assert.match(aggregate.guidance,/configured_field\.name[\s\S]{0,40}текущее выходное имя: после apply с `measures`[\s\S]{0,20}`name` меры/);
+ assert.match(aggregate.guidance,/не составляй имя из поля и функции \(`Amount_Median`\), если узел его не выдал/);
+ assert.doesNotMatch(aggregate.guidance,/native-имена[^\n]*не подходят/);
 });

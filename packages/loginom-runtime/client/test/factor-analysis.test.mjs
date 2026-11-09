@@ -16,7 +16,7 @@ test('factor analysis is registered with separate parameters and two outputs',()
  h.validate(parameters,'pca_fixed',request);
 });
 test('reject incomplete, unsupported or inconsistent PCA settings before UI',()=>{
- for(const p of [{},{factor_analysis:{features:['X','X'],factors:2,rotation:'none'}},{factor_analysis:{features:['X','Y'],factors:3,rotation:'none'}},{factor_analysis:{features:['X','Y'],factors:2,rotation:'varimax'}},{factor_analysis:{...parameters.factor_analysis,seed:42}}])assert.throws(()=>validateFactorAnalysisParameters(p,'pca_fixed',request));
+ for(const p of [{},{factor_analysis:{features:['X','X'],factors:2,rotation:'none'}},{factor_analysis:{features:['X','Y'],factors:3,rotation:'none'}},{factor_analysis:{features:['X','Y'],factors:2,rotation:'promax'}},{factor_analysis:{...parameters.factor_analysis,seed:42}}])assert.throws(()=>validateFactorAnalysisParameters(p,'pca_fixed',request));
  validateFactorAnalysisParameters({},'pca_fixed',{...request,target:{kind:'existing'}});
  assert.throws(()=>validateFactorAnalysisParameters(parameters,'apply',request));
  assert.throws(()=>resolveFactorAnalysisFeatures({factor_analysis:{features:['Tag']}},fields));
@@ -101,7 +101,7 @@ test('PCA readback requires distinct completed training and execution receipts',
   ...(phase==='finish'?{mode:'execute',settings_applied:true,execution_id:'execute',training:{status:'trained',execution_id:'train',source:[{node:{...node,node_id:'source'},output:0,input:0}]}}:{})}}));
  const readback=factorAnalysisConfigurationReadback({node,phases,operation_id});
  assert.equal(readback.kind,'factor_analysis');assert.equal(readback.output_mappings.length,2);assert.deepEqual(readback.features,['X','Y','Z']);
- for(const change of [p=>p.at(-1).value.training.execution_id='execute',p=>p.at(-1).value.training.status='not_requested',p=>p[1].value.configuration.rotation='varimax',p=>p[1].value.configuration.node_context={...node,node_id:'foreign'}]){
+ for(const change of [p=>p.at(-1).value.training.execution_id='execute',p=>p.at(-1).value.training.status='not_requested',p=>p[1].value.configuration.rotation='promax',p=>p[1].value.configuration.node_context={...node,node_id:'foreign'}]){
   const bad=structuredClone(phases);change(bad);assert.throws(()=>factorAnalysisConfigurationReadback({node,phases:bad,operation_id}));
  }
 });

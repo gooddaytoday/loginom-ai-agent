@@ -1214,7 +1214,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     checkNodeRef(sourceNode); checkNodeRef(targetNode);
     const bound=task.node_target_context;
     if(effectPossible&&readNodeTargetGraph&&bound?.request?.target?.kind==='new'
-      &&bound.request.target.type==='variables.to_table'&&task.parameters.source_port.kind==='var'&&targetPort.kind==='var'){
+      &&['variables.to_table','variables.column_union'].includes(bound.request.target.type)&&task.parameters.source_port.kind==='var'&&targetPort.kind==='var'){
       const baseline=bound.graph_baseline,source=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[0].id),target=baseline.nodes.filter(n=>n.ref.node_id===bound.nodes[1].id);
       const outputs=source[0]?.variable_outputs?.filter(p=>p.kind==='variables'&&p.native_index===task.parameters.source_port.index);
       const inputs=target[0]?.variable_inputs?.filter(p=>p.kind==='variables'&&p.native_index===targetPort.index);
@@ -1228,7 +1228,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           const exact=graphPrefix+sourceNode.node_label+'|Output_Var-'+task.parameters.source_port.index+'|'+label+'|Input_Var-'+targetPort.index;
           const links=await graphLinks(prefix),actualPorts=await ports(prefix,label),oldPrefix=graphPrefix+original+';',newPrefix=graphPrefix+label+';';
           if(!before.ports.every(p=>p.startsWith(oldPrefix))||links.filter(l=>l===exact).length!==1
-            ||!same(links.filter(l=>l!==exact),before.links)
+            ||!(bound.request.target.type==='variables.column_union'
+              ?same(sorted(links.filter(l=>l!==exact)),sorted(before.links.map(l=>l.replace('|'+original+'|','|'+label+'|'))))
+              :same(links.filter(l=>l!==exact),before.links))
             ||!same(sorted(actualPorts),sorted(before.ports.map(p=>newPrefix+p.slice(oldPrefix.length)))))throw Error('VarToData caption DOM differs from its native graph');
           bound.nodes=bound.nodes.map(n=>{const b=native.native_bindings.filter(b=>b.node_id===n.id),v=native.nodes.filter(v=>v.ref.node_id===n.id);if(b.length!==1||v.length!==1)throw Error('VarToData link endpoint disappeared');return {id:n.id,tid:b[0].label,dom_epoch:v[0].dom_epoch};});
           phase='verified';record('variables_to_table_link_caption_verified',{node_id:edge.target,before:target[0].label,after:native.nodes.find(n=>n.ref.node_id===edge.target).label});
@@ -3698,6 +3700,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               return serverDownloads?serverDownloads.bind(source,receipt):source;
             },
             isBoundFileInput:path=>{
+              if(!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))return false;
               try{requireStorageDestination(path,getStorageBinding()?.directories,'inputs');return true;}
               catch{return false;}
             },

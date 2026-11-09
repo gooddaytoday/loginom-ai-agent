@@ -29,6 +29,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
+D76_SCENARIOS = ('types300', 'date-time-formats')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -90,6 +91,12 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['duplicates-typed', 'duplicates-empty', 'duplicates-singleton']:
+        root = REPO / 'docs/node-development/nodes/duplicates'
+        kind = 'keys' if name == 'duplicates-typed' else name.removeprefix('duplicates-')
+        return dict(source=root / 'acceptance', prompt=root / 'acceptance' / ('task-typed-keys.md' if kind == 'keys' else 'task-' + kind + '.md'),
+                    data=root / 'fixtures', input_files=['typed-' + kind + '.csv'], base=None, oracle=root / 'acceptance/modes/oracle.py',
+                    expected_name='modes/expected.json' if kind == 'keys' else 'modes/expected-' + kind + '.json')
     if name == 'import-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
@@ -135,7 +142,14 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'variables-columns':
         src = REPO / 'docs/node-development/nodes/variables-vartodata/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    input_files=[], expected_name='expected.json')
+                    source_package=src.parent / 'fixtures/source.lgp', input_files=[], expected_name='expected.json')
+    if name == 'variables-totable-switch':
+        node = REPO / 'docs/node-development/nodes/variables-vartodata'
+        src = node / 'acceptance'
+        return dict(source=src, prompt=src / 'task-switch-run.md', data=node / 'fixtures', base=None, input_files=['modes.json'],
+                    expected_name='modes/expected-run.json', variable_only=True, variable_audit='variables-totable-switch',
+                    variable_initial='modes/expected-phases.json', variable_read_path='port',
+                    oracle=REPO / 'scripts/node-acceptance/variables-totable-switch.mjs')
     if name in ['quality-default', 'quality-spikes']:
         src = REPO / 'docs/node-development/nodes/research-quality/acceptance'
         case = src / 'probe' if name == 'quality-spikes' else src
@@ -177,6 +191,10 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures', input_files=['typed.csv', 'schema.json'] + (['typed-update.csv'] if export_case == 'overwrite' else []) if export else [{'standalone': 'source.lgd', 'properties': 'properties-stage0.lgd', 'corrupt': 'corrupt-block.lgd'}[variant]],
                     expected_name='expected-' + (export_case or variant) + '-run.json', base=None, lgd=variant, lgd_case=None if edges or name == 'lgd-export-compression' else export_case, lgd_empty_variant=edges, export_count=2 if edges else 1, lgd_export_compression=name == 'lgd-export-compression',
                     oracle=REPO / 'docs/node-development/nodes/imports-lgd/acceptance/oracle.py')
+    if name == 'clustering-apply':
+        src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
+        return dict(source=src, prompt=src / 'task-apply.md', data=src.parent.parent / 'fixtures/v040', base=None,
+                    input_files=['train.csv', 'holdout.csv'], export_count=2, expected_name='expected-apply-run.json')
     if name == 'clustering-gmeans':
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/v040'
         return dict(source=src, prompt=src / 'task-g-means.md', data=src.parent.parent / 'fixtures/v040', base=None,
@@ -186,6 +204,10 @@ def scenario(name, case_root=None, *, cases=None):
         kind = name.removeprefix('clustering-scale-')
         return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
                     input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
+    if name == 'factor-rotation':
+        src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-rotation.md', data=src / 'fixtures', base=None,
+                    input_files=['rotation.csv'], export_count=2, factor_mode='quartimax', oracle=src / 'oracle.py')
     if name in ['factor-auto', 'factor-cap']:
         src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
         return dict(source=src / 'modes', prompt=src / 'modes' / ('task-auto.md' if name == 'factor-auto' else 'task-cap.md'),
@@ -236,11 +258,12 @@ def scenario(name, case_root=None, *, cases=None):
         update = name == 'text-auto-update'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / ('task-auto-update.md' if update else 'task-auto-types.md'),
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
-                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json', export_count=1)
-    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count']:
+                    expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
+                    text_update=update, export_count=2 if update else 1)
+    if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
-                    data=root / 'fixtures', input_files=['modes.csv'], base=None, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
+                    data=root / 'fixtures', input_files=['modes.csv'], base=None, export_count=3 if name == 'grouping-concat' else 1, grouping_mode=name.removeprefix('grouping-').replace('-', '_'))
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -254,12 +277,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance' / name
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=[filename], external=True)
-    if name in ['missing-median-mode', 'missing-previous', 'missing-delete']:
+    if name in ['missing-median-mode', 'missing-previous', 'missing-delete', 'missing-linear', 'missing-random']:
         # v0.4.0 cycle 1: only the task and its CSV go to the model; expected tables are static oracle output.
         root = REPO / 'docs/node-development/nodes/missing-values'
         task, csv_name, expected = {'missing-median-mode': ('task-median-mode.md', 'statistics.csv', 'expected.json'),
                                     'missing-previous': ('task-previous.md', 'ordered.csv', 'expected-previous.json'),
-                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json')}[name]
+                                    'missing-delete': ('task-delete.md', 'delete.csv', 'expected-delete.json'),
+                                    'missing-linear': ('task-linear.md', 'ordered.csv', 'expected-linear.json'),
+                                    'missing-random': ('task-random.md', 'random-single-value.csv', 'expected-random.json')}[name]
         return dict(source=root / 'acceptance/modes', prompt=root / 'acceptance' / task, data=root / 'fixtures',
                     input_files=[csv_name], base=None, expected_name=expected)
     if name in ['missing-zero', 'missing-zero-threshold', 'missing-zero-empty', 'missing-mean']:
@@ -291,6 +316,15 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'exports-excel':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['cells.csv'], base=None, xlsx=True)
+    if name in ['crosstable-numeric', 'crosstable-scalar', 'crosstable-datetime', 'crosstable-null-cells']:
+        kind = name.removeprefix('crosstable-')
+        src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance'
+        task = kind if kind == 'null-cells' else kind + '-aggregates'
+        return dict(source=src, prompt=src / ('task-' + task + '.md'), data=src.parent / 'fixtures',
+                    input_files=['aggregate-values.csv'], base=None,
+                    expected_name='modes/expected-' + kind + '.json',
+                    oracle=src / 'modes/oracle.py',
+                    export_count={'numeric': 4, 'scalar': 2, 'datetime': 2, 'null-cells': 1}[kind])
     if name == 'crosstable-real-keys':
         src = REPO / 'docs/node-development/nodes/transform-crosstable/acceptance/continuous-real'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data',
@@ -314,7 +348,16 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
+    if name == 'trees-to-table-indices':
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
+                    base=None, external=True, expected_name='expected-indices-run.json')
 
+    if name == 'coarse-classes-continuous-manual':
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        return dict(source=src, prompt=src / 'task-continuous-manual.md',
+                    data=src.parent / 'fixtures', base=None, export_count=3,
+                    input_files=['continuous.csv'], expected_name='modes/expected.json')
     if name in ['coarse-classes-train', 'coarse-classes-apply']:
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
         applying = name == 'coarse-classes-apply'
@@ -322,6 +365,11 @@ def scenario(name, case_root=None, *, cases=None):
                     data=src / 'data', base=None, export_count=3,
                     input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
                     expected_name='expected-apply.json' if applying else 'expected.json')
+    if name == 'binning-datetime-manual':
+        node = REPO / 'docs/node-development/nodes/preprocessing-binning'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',
+                    data=node / 'fixtures', base=None, export_count=2, input_files=['modes.csv'],
+                    expected_name='modes/expected.json', oracle=node / 'acceptance/modes/oracle.py')
     if name in ['binning-count', 'binning-width', 'binning-real', 'binning-integer',
                 'binning-frequency', 'binning-frequency-ties', 'binning-apply', 'binning-retrain', 'binning-holdout']:
         src = REPO / 'docs/node-development/nodes/preprocessing-binning/acceptance'
@@ -333,9 +381,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
                     data=src / 'data', base=None, export_count=2, input_files=data,
                     expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
-    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding']:
+    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights']:
         node = REPO / 'docs/node-development/nodes/transform-ungroupdata'
         task, expected, inputs, count = {
+            'ungroup-weights': ('task-weights.md', 'expected-weights.json', ['weights-totals.csv', 'weights-support.csv'], 2),
             'ungroup-shares': ('task.md', 'expected.json', ['totals.csv', 'shares.csv'], 1),
             'ungroup-null': ('task-null.md', 'expected-null.json', ['null-totals.csv', 'edge-shares.csv'], 1),
             'ungroup-empty': ('task-empty.md', 'expected-empty.json', ['empty-totals.csv', 'edge-shares.csv'], 1),
@@ -343,11 +392,11 @@ def scenario(name, case_root=None, *, cases=None):
         }[name]
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
-                    input_files=inputs, export_count=count)
-    if name == 'corr-ranks':
+                    input_files=inputs, export_count=count, **({'oracle': node / 'acceptance/oracle-weights.py'} if name == 'ungroup-weights' else {}))
+    if name in ['corr-ranks', 'corr-discrete']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
-        return dict(source=src, prompt=src / 'task-ranks.md', data=src / 'fixtures', base=None,
-                    input_files=['ranks.csv'], corr_ranks=True)
+        return dict(source=src, prompt=src / ('task-discrete.md' if name=='corr-discrete' else 'task-ranks.md'), data=src / 'fixtures', base=None,
+                    input_files=['ranks.csv'], corr_ranks='discrete' if name=='corr-discrete' else True)
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -359,6 +408,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/field-parameters/acceptance/v040'
         return dict(source=src, prompt=src / 'task-rename-lossy.md', data=src / 'fixtures', base=None,
                     expected_name='expected.json', input_files=['reform.csv'], oracle=src / 'oracle.py')
+    if name in ['acf-nonzero', 'acf-empty', 'acf-null']:
+        src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance/edges'
+        edge = name.removeprefix('acf-')
+        return dict(source=src, prompt=src / ('task-' + edge + '.md'),
+                    data=src / 'fixtures', base=None, autocorrelation_edge=edge,
+                    input_files=['lab1144-series.csv', *([] if edge == 'nonzero' else ['lab1144-' + edge + '.csv'])])
     if name in ['acf-series', 'acf-update', 'acf-one', 'acf-eight']:
         src = REPO / 'docs/node-development/nodes/research-autocorrelation/acceptance'
         task, expected, inputs = {
@@ -407,9 +462,21 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'union-auto-match':
         src = REPO / 'docs/node-development/nodes/union/acceptance/union-auto-match'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name in ['smoothing-haar', 'smoothing-haar-depth2']:
+        node = REPO / 'docs/node-development/nodes/preprocessing-smoothing'
+        depth2 = name.endswith('depth2')
+        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance' / ('task-wavelet-depth2.md' if depth2 else 'task-wavelet.md'),
+                    data=node / 'fixtures', input_files=['wavelet.csv'], export_count=1, base=None,
+                    expected_name='expected-depth2.json' if depth2 else 'expected.json')
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
+    if name == 'linreg-lasso':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        return dict(source=REPO / 'scripts/node-acceptance/scenarios/linreg-lasso',
+                    prompt=node / 'acceptance/penalty/task-lasso.md',
+                    data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
+                    expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
     if name in ['linreg-forward-f', 'linreg-forward-r2', 'linreg-forward-r2-cutoffs', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge']:
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         variant = 'forward-r2' if name == 'linreg-forward-r2-cutoffs' else name.removeprefix('linreg-')
@@ -455,11 +522,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['normalization.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py', logreg_normalization=True,
                     cold_expected_name='cold/expected.json', export_count=2)
-    if name == 'sorting-locale':
+    if name in ['sorting-locale', 'sorting-case', 'sorting-threads', 'sorting-auto']:
         node = REPO / 'docs/node-development/nodes/sorting'
         src = node / 'acceptance/modes'
-        return dict(source=src, prompt=src / 'task-locale.md', data=node / 'fixtures', base=None,
-                    input_files=['modes.csv'], export_count=2, sorting_case='locale')
+        return dict(source=src, prompt=src / ('task-' + name.removeprefix('sorting-') + '.md'), data=node / 'fixtures', base=None,
+                    input_files=['modes.csv'], export_count=2, sorting_case=name.removeprefix('sorting-'))
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -485,6 +552,22 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     input_files=['variables.json', 'rules.json'], variable_only=True, variable_audit='variables-replace', variable_initial='expected-initial-run.json',
                     oracle=REPO / 'scripts/node-acceptance/variables-replace.mjs')
+    if name == 'variables-union-type-refusal':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-type-refusal.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None,
+                    expected_name='expected-type-refusal-run.json', variables_union_refusal=True,
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-manual.mjs')
+    if name == 'variables-union-inputs':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-inputs.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None,
+                    expected_name='expected-inputs-disconnected-run.json', variable_only=True, variable_audit='variables-union-inputs',
+                    variable_initial='expected-inputs-connected-run.json', variable_read_path='execution',
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-inputs.mjs')
+    if name == 'variables-union-manual':
+        src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
+        return dict(source=src, prompt=src / 'task-manual.md', data=src.parent / 'fixtures', input_files=['modes.json'], base=None, expected_name='expected-manual-updated-run.json',
+                    variable_only=True, variable_audit='variables-union-manual', variable_initial='expected-manual-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-union-manual.mjs')
     if name == 'variables-column-union':
         src = REPO / 'docs/node-development/nodes/variables-coluniondatavar/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', input_files=['inputs.json'], base=None, expected_name='expected-updated-run.json',
@@ -498,10 +581,23 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['null.csv'] if variant == 'null' else ['values.csv'] if variant == 'empty' else ['values.csv', 'replace.csv'], base=None,
                     expected_name=expected, variable_initial_name=expected if variant else 'expected-initial-run.json',
                     variable_only=True, variable_audit='variables-datatovar', variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name in ['variables-from-table-aggregates', 'variables-from-table-scalars']:
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        scalars = name == 'variables-from-table-scalars'
+        expected = 'expected-scalar-types-run.json' if scalars else 'expected-aggregates-run.json'
+        return dict(source=src, prompt=src / ('task-scalar-types.md' if scalars else 'task-aggregates.md'), data=src.parent / 'fixtures',
+                    input_files=['aggregate-types.csv' if scalars else 'aggregate-numeric.csv'], base=None, expected_name=expected, variable_initial_name=expected,
+                    variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
                     variable_only=True, variable_audit='variables-calculator', variable_initial='expected-initial-run.json',
+                    oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
+    if name == 'variables-calculator-modes':
+        src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'task-datetime-intermediate.md', data=src.parent / 'fixtures', base=None,
+                    expected_name='expected-modes-run.json', variable_initial='expected-modes-initial-run.json',
+                    variable_only=True, variable_read_path='execution', variable_audit='variables-calculator-modes',
                     oracle=REPO / 'scripts/node-acceptance/variables-calculator.mjs')
     if name == 'variables-user-real-date':
         src = REPO / 'docs/node-development/nodes/variables-user/acceptance'
@@ -543,12 +639,16 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'replace-nearest':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['replace-boolean', 'replace-mixed']:
+    if name in ['replace-boolean', 'replace-mixed', 'replace-keep-variant']:
         node = REPO / 'docs/node-development/nodes/replacement'
-        return dict(source=node / 'acceptance/extended',
-                    prompt=node / 'acceptance' / ('task-boolean.md' if name == 'replace-boolean' else 'task-mixed.md'),
-                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None,
-                    expected_name='expected.json' if name == 'replace-boolean' else 'expected-mixed.json')
+        task, expected = {'replace-boolean': ('task-boolean.md', 'expected.json'), 'replace-mixed': ('task-mixed.md', 'expected-mixed.json'),
+                          'replace-keep-variant': ('task-result-keep.md', 'expected-result-keep.json')}[name]
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance' / task,
+                    data=node / 'fixtures/extended', input_files=['input.csv'], base=None, expected_name=expected)
+    if name == 'variant-reader-collapse':
+        node = REPO / 'docs/node-development/nodes/variant-reader'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-collapse.md',
+                    data=node / 'fixtures', input_files=['mixed.csv'], base=None, expected_name='expected-collapse.json')
     if name == 'replace-convert':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/convert'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -567,6 +667,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=['minsec.csv'])
+    if name == 'date-time-formats':
+        node = REPO / 'docs/node-development/nodes/date-time'
+        return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance/task-string-formats.md',
+                    data=node / 'fixtures', base=None, expected_name='expected.json',
+                    input_files=['formats.csv'])
     if name in ['date-time-iso', 'date-time-iso-empty']:
         node = REPO / 'docs/node-development/nodes/date-time'
         empty = name.endswith('-empty')
@@ -648,8 +753,60 @@ def sorting_stages(case):
     return [dict(stage, column_order='exact') for stage in stages]
 
 
+def text_update_stages(case):
+    return [read(case['source'] / name)['outputs'][0] for name in
+            ['expected-auto-update-string.json', 'expected-auto-update.json']]
+
+
+def check_text_update_ports(replies, destinations, stages, node_binary='node'):
+    assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
+    previous, node = -1, None
+    tables = []
+    for destination, stage in zip(destinations, stages):
+        exports = [n for n, reply in replies if reply.get('status') == 'SUCCEEDED'
+                   and reply.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'
+                   and reply['configuration']['readback'].get('destination') == destination]
+        assert exports and exports[-1] > previous, 'TEXT_UPDATE_EXPORT_MISSING_OR_ORDER'
+        reads = [(n, owner, port) for n, reply in replies if previous < n < exports[-1]
+                 for owner, port in ports(reply) if owner.get('status') == 'SUCCEEDED'
+                 and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'
+                 and port.get('port') == 0]
+        assert reads, 'TEXT_UPDATE_PORT_MISSING'
+        _, owner, port = reads[-1]
+        identity = owner.get('node')
+        assert identity and (node is None or identity == node), 'TEXT_UPDATE_IMPORT_CHANGED'
+        node = identity
+        assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
+        assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
+            (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
+        tables.append(dict(actual=dict(node=identity, type='imports.text', output_port=0, data=port), expected=stage))
+        previous = exports[-1]
+    # Use the same typed full-table matcher as cold, including exact numeric and
+    # datetime evidence. Each stage has its own snapshot of the same node.
+    result = subprocess.run([str(node_binary), '--input-type=module', '-e', """
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {matchExpectedOutputs}=await import(pathToFileURL(process.argv[1]));
+for(const stage of JSON.parse(readFileSync(0,'utf8')))
+    matchExpectedOutputs([stage.actual],[stage.expected]);
+""", str(REPO / 'scripts/node-acceptance/expected-outputs.mjs')],
+        input=json.dumps(tables), text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, 'TEXT_UPDATE_PORT_VALUES: ' + result.stderr[:2000]
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
+    if case.get('autocorrelation_edge'):
+        approved = read(src / 'expected.json')
+        if case['autocorrelation_edge'] in ['empty', 'null']:
+            # Refusal text is fixed before runs: own guard (empty) or native Execute (null).
+            error = (read(src / 'expected-empty.json')['execution_error'] if case['autocorrelation_edge'] == 'empty'
+                     else {'text': approved['native_conventions']['null']['message']})
+            return dict(package_path=package, nodes=[{'type': t} for t in ['imports.text', 'research.auto_correlation']],
+                        outputs=[], execution_error=error)
+        output = approved['series']['count12']
+        return dict(package_path=package, nodes=[{'type': t} for t in
+                    ['imports.text', 'research.auto_correlation', 'exports.text']], outputs=[output])
     if cold and case.get('cold_expected_name'):
         return expected_for({**case, 'expected_name': case['cold_expected_name'], 'cold_expected_name': None}, package)
     if case.get('factor_mode'):
@@ -657,7 +814,7 @@ def expected_for(case, package, cold=False):
         return dict(expected, package_path=package)
     if case.get('sorting_case'):
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
-                    outputs=[sorting_stages(case)[-1]])
+                    outputs=[sorting_stages(case)[-1]], **(dict(sorting_mode=case['sorting_case'], sorting_stages=sorting_stages(case)) if case['sorting_case'] != 'locale' else {}))
     if case.get('sampling_uniform'):
         proposal = read(src / 'expected.json')
         partition = proposal['node_type'] == 'preprocessing.data_partition'
@@ -687,9 +844,9 @@ def expected_for(case, package, cold=False):
     if case.get('grouping_mode'):
         cases = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py')]))['cases']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}],
-                    outputs=cases[case['grouping_mode']]['stages'])
+                    outputs=cases[case['grouping_mode']]['stages'][-1:] if cold else cases[case['grouping_mode']]['stages'])
     if case.get('corr_ranks'):
-        expected = read(src / 'expected.json')['cases']['kendall']
+        expected = read(src / 'expected.json')['cases']['discrete_kendall' if case['corr_ranks']=='discrete' else 'kendall']
         expected['package_path'] = package
         return expected
     # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
@@ -923,14 +1080,17 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     assert len(data_rows) == len(expected['rows']), 'CSV_ROW_COUNT'
 
     def limitation(value, col, target):
-        # Owner-approved D76 forms are code-owned and only apply to types300.
-        if scenario_name != 'types300': return None
-        if (col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
+        # Owner-approved D76 forms are code-owned: both for types300; midnight_date
+        # also for date-time-formats (LAB-1101: port read keeps the exact value).
+        # LAB-1153: CrossTable permits only omission of exactly zero time.
+        if scenario_name not in D76_SCENARIOS + ('crosstable-datetime',): return None
+        if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
                 and math.copysign(1, target) < 0 and value == '0'):
             return 'negative_zero'
         if col['type'] == 'datetime' and isinstance(target, str):
             goal = datetime.fromisoformat(target)
-            if (goal.hour == goal.minute == goal.second == 0 and goal.microsecond != 0
+            if (goal.hour == goal.minute == goal.second == 0
+                    and (goal.microsecond != 0 if scenario_name in D76_SCENARIOS else goal.microsecond == 0)
                     and value == goal.date().isoformat()):
                 return 'midnight_date'
         return None
@@ -1021,7 +1181,7 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
             key, value = expected['rows'][want][columns[i]['name']], data_rows[actual][indices[i]]
             assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
             forward[key], reverse[value] = value, key
-    if scenario_name == 'types300' and d76 is not None:
+    if scenario_name in D76_SCENARIOS + ('crosstable-datetime',) and d76 is not None:
         counts = dict(negative_zero=0, midnight_date=0)
         for want, actual in enumerate(pairs):
             for i, col in enumerate(columns):
@@ -1461,7 +1621,9 @@ class Runner:
                     and isinstance(refusal['text'], str) and refusal['text'].strip()
                     and expected['outputs'] == [] and not rejection and not execution_error
                     and not spec.get('upload_only') and not lgd_corrupt
-                    and all(n['type'].startswith('imports.') for n in expected['nodes'])), 'INVALID_REFUSAL_ORACLE'
+                    and (all(n['type'].startswith('imports.') for n in expected['nodes'])
+                         or spec.get('variables_union_refusal') and len(expected['nodes']) == 2
+                         and all(n['type'] == 'variables.calculator' for n in expected['nodes']))), 'INVALID_REFUSAL_ORACLE'
         if execution_error is not None:
             assert (set(execution_error) == {'text'} and isinstance(execution_error['text'], str)
                     and execution_error['text'].strip() and expected['outputs'] == []
@@ -1473,6 +1635,7 @@ class Runner:
                    if spec.get('external') else
                    list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()
                                         and name != (spec.get('local_file').name if spec.get('local_file') else None))))
+        if spec.get('text_update'): exports = ['text-update-1.csv', 'text-update-2.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
@@ -1488,7 +1651,7 @@ class Runner:
             if spec.get('import_initial'): prompt += ' Порядок файлов: первый импорт, второй импорт, второй импорт после повторного открытия пакета.'
             if spec.get('sampling_uniform'):
                 prompt += (' Порядок файлов: общее, обучающее, тестовое множество для начала набора, затем те же три выхода для конца набора.' if spec.get('sampling_priority') else ' Порядок файлов: общее, обучающее, тестовое множество.' if len(exports) == 3 else ' Порядок файлов: первый расчёт, затем повторный расчёт того же узла.')
-            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and not spec.get('import_initial'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
+            if spec.get('export_count') == 3 and not spec.get('sampling_uniform') and spec.get('grouping_mode') != 'concat' and not spec.get('import_initial'): prompt += ' Порядок файлов: обработанные данные, выбросы, экстремальные значения.'
         destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
         if exports:
             routes = dict(zip(exports, destinations))
@@ -1572,7 +1735,7 @@ class Runner:
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'corr-ranks-events.json', evidence)
             self.phase('corr-ranks-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/corr-ranks.mjs',
-                src / 'expected.json', folder / 'corr-ranks-events.json'], folder, timeout=60)
+                src / 'expected.json', folder / 'corr-ranks-events.json', *(['discrete'] if spec['corr_ranks']=='discrete' else [])], folder, timeout=60)
         if case in ['quality-default', 'quality-spikes']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -1650,7 +1813,9 @@ class Runner:
                 if event.get('type') != 'tool_use': continue
                 request = part.get('state', {}).get('input', {})
                 if part.get('tool') == 'loginom_dock_node_apply':
-                    if spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
+                    if spec.get('variables_union_refusal') and request.get('target',{}).get('type')=='variables.column_union':
+                        assert request.get('parameters',{}).get('column_union',{}).get('mapping') == 'manual', 'UNION_REFUSAL_REQUEST'
+                    elif spec.get('excel_xls_refusal') and request.get('target',{}).get('type')=='exports.excel':
                         state=part.get('state',{})
                         reply=json.JSONDecoder().raw_decode(state.get('output') or state.get('error',''))[0]
                         assert reply.get('status')=='NOT_APPLIED' and reply.get('request_rejected') is True and reply.get('effect_possible') is False and reply.get('cleanup_complete') is True, 'XLS_REFUSAL_EFFECT'
@@ -1823,9 +1988,14 @@ class Runner:
             write(folder / 'variable-events.json', evidence)
             self.phase('variable-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], spec.get('variable_audit', 'variables-user'),
                 src / spec.get('variable_initial', spec.get('variable_initial_name', 'expected-user-initial.json')), folder / 'expected.json', folder / 'variable-events.json'], folder, timeout=60)
-            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union'] else 'snapshot')})
+            self.current.update(csv='— (variables)', **{'port-read': 'PASS', 'read-path': spec.get('variable_read_path', 'execution' if spec.get('variable_audit') in ['variables-calculator', 'variables-replace', 'variables-column-union', 'variables-union-manual'] else 'snapshot')})
             return session, expected, None, None
         if refusal:
+            if spec.get('variables_union_refusal'):
+                evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+                evidence.sort(key=lambda event: event.get('recorded_at', ''))
+                write(folder / 'variable-events.json', evidence)
+                self.phase('variable-refusal-oracle', [build / 'resources/loginom/bin/node', spec['oracle'], 'refusal', folder / 'variable-events.json'], folder, timeout=60)
             self.current.update(csv='— (expected refusal)', cold='— (expected refusal)')
             return session, expected, None, None
         if lgd_corrupt:
@@ -1910,6 +2080,12 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if expected.get('clustering_apply'):
+            write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
+            self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
+                folder / 'expected.json', folder / 'clustering-apply-replies.json', folder / 'clustering-apply-resolved.json'], folder, timeout=60)
+            expected = read(folder / 'clustering-apply-resolved.json')
+            write(folder / 'expected.json', expected)
         if expected.get('clustering_gmeans'):
             write(folder / 'clustering-gmeans-replies.json', [o for _, o in replies])
             self.phase('clustering-gmeans-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-gmeans.mjs',
@@ -1940,6 +2116,20 @@ class Runner:
                     write(folder / 'factor-initial-expected.json', dict(read(src / 'expected.json')['cases']['eigenvalue'], package_path=package))
                     self.phase('factor-initial-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
                         'factor-signs', folder / 'factor-initial-expected.json', folder / 'factor-initial.json', folder / 'factor-initial-aligned.json'], folder, timeout=60)
+                elif spec['factor_mode'] == 'quartimax':
+                    assert final['mode'] == 'pca_fixed' and final['factors'] == 2 and final['rotation'] == 'quartimax', 'FACTOR_FINAL_QUARTIMAX_MISSING'
+                    assert final['features'] == ['X', 'Y', 'Z'], 'FACTOR_ROTATION_FEATURES_CHANGED'
+                    initial = next((group for group in complete[:-1] if
+                        configurations[group[0]['execution']['execution_id']].get('mode') == 'pca_fixed' and
+                        configurations[group[0]['execution']['execution_id']].get('factors') == 2 and
+                        configurations[group[0]['execution']['execution_id']].get('features') == final['features'] and
+                        configurations[group[0]['execution']['execution_id']].get('rotation') == 'varimax' and
+                        group[0]['node'] == complete[-1][0]['node']), None)
+                    assert initial, 'FACTOR_INITIAL_VARIMAX_SAME_NODE_MISSING'
+                    write(folder / 'factor-initial.json', initial)
+                    write(folder / 'factor-initial-expected.json', dict(read(src / 'expected.json')['cases']['varimax'], package_path=package))
+                    self.phase('factor-initial-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                        'factor-signs', folder / 'factor-initial-expected.json', folder / 'factor-initial.json', folder / 'factor-initial-aligned.json'], folder, timeout=60)
                 else:
                     assert final['mode'] == 'pca_fixed' and final['factors'] == 2 and final['output_factors'] == 1, 'FACTOR_CAP_COUNT_CHANGED'
                     assert any(c['node'] == final['node'] and c['mode'] == 'pca_fixed' and c['factors'] == 2 and
@@ -1949,6 +2139,8 @@ class Runner:
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
             expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
+        if spec.get('text_update'):
+            check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)
         sampling_csvs = []
@@ -1973,7 +2165,8 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (sorting_stages(spec)[index] if spec.get('sorting_case')
+            csv_expected = (text_update_stages(spec)[index] if spec.get('text_update')
+                            else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
                             else read(src / spec['import_initial'])['outputs'][0] if spec.get('import_initial') and index == 0
@@ -1992,6 +2185,10 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('sorting_mode'):
+            write(folder / 'sorting-replies.json', [o for _, o in replies])
+            self.phase('sorting-modes-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sorting-modes.mjs',
+                folder / 'expected.json', folder / 'sorting-replies.json', folder / 'sorting-proof.json'], folder, timeout=60)
         if expected.get('logreg_normalization'):
             write(folder / 'logreg-replies.json', [o for _, o in replies])
             self.phase('logreg-normalization-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',
@@ -2047,14 +2244,20 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
-                        if spec.get('cold_expected_name'):
+                        if spec.get('cold_expected_name') or spec.get('grouping_mode') == 'concat':
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, expected_for(spec, r['package'], cold=True))
+                        if spec.get('variable_audit') == 'variables-union-inputs':
+                            proof = read(stage / 'variable-oracle.stdout')
+                            cold_expected = stage / 'expected-cold.json'
+                            write(cold_expected, {**expected, 'variable_inventory': {**expected['variable_inventory'], 'links': proof['cold_links']}})
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
+                        if spec.get('variable_audit') == 'variables-union-inputs':
+                            self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
                         r.update(cold='PASS', cleanup='both PASS')
                     r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:

@@ -7,8 +7,9 @@ import {configureGroupingOutput} from './grouping-output.mjs';
 import {groupingConfigurationReadback} from './grouping-readback.mjs';
 import {groupingParametersSchema} from './node-api.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 export function createGroupingNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.group_data',mode:'aggregate',revision:'grouping-v3-internal-1',readback:groupingConfigurationReadback,parameterSchema:groupingParametersSchema,
+ type:'transform.group_data',mode:'aggregate',revision:'grouping-v4-internal-2',readback:groupingConfigurationReadback,parameterSchema:groupingParametersSchema,
  validate:validateGroupingParameters,preflight:preflightGroupingSource,
  beforeInput:prepareGroupingInput,
  configurationObservation:{condition:'grouping configuration page',readGrouping:true,ready:s=>s.wizard?.stage==='grouping'&&s.node_grouping?.verified===true},
@@ -29,10 +30,15 @@ export async function prepareGroupingInput(options,ctx,{channel}){
  // Empty parameters/mappings preserve the just-configured chain. Its owned
  // input/configuration readers still verify the complete schema below; do not
  // execute it once here and again after reopening those unchanged settings.
- const state=await channel.observe({condition:'existing grouping before input schema refresh',readOutputs:true,
-  ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
+ const owned=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k])
-   &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true});
+   &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true;
+ let state=await channel.observe({condition:'existing grouping before input schema refresh',readOutputs:true,ready:owned});
+ // Releasing a stopped wizard deselects the node and hides its native port shapes.
+ if(!state.node_outputs.node_selected&&state.node_outputs.ports.length===0){
+  await selectPreparedGraphNode(channel,state,'select existing grouping before input schema refresh',{refreshReplacedBody:true});
+  state=await channel.observe({condition:'selected existing grouping before input schema refresh',readOutputs:true,ready:s=>owned(s)&&s.node_outputs.node_selected===true});
+ }
  if(state.node_outputs.ports.length!==1||state.node_outputs.ports[0].index!==0||typeof state.node_outputs.ports[0].active!=='boolean')
   throw Error('Existing grouping output activity is incomplete');
  if(Object.keys(request.parameters).length===0&&request.mappings.length===0)return;

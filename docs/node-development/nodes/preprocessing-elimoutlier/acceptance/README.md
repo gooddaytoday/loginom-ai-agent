@@ -28,7 +28,12 @@ Oracle использует только CSV и рациональную ари�
 python3 acceptance/oracle.py > acceptance/expected.json
 python3 acceptance/oracle.py --case iqr > acceptance/iqr/expected.json
 python3 acceptance/oracle.py --case null --package-path /own-account/new.lgp
+python3 -I acceptance/oracle.py --check
+python3 -I acceptance/oracle-policies.py --check
 ```
+
+`--check` пересчитывает все закоммиченные expected в памяти и падает на
+расхождении (`oracle.py` — 3 файла, `oracle-policies.py` — 11).
 
 Пути приведены относительно каталога узла. В рабочей копии expected перед cold
 заменяется только `{{PACKAGE_PATH}}` на личный путь текущей попытки. Oracle,

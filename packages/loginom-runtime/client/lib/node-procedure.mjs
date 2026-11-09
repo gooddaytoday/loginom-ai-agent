@@ -30,6 +30,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
+import {makeVariablesColumnUnionConfigureCode} from './variables-column-union-procedure.mjs';
 import { makeWorkspaceUiCode, validateUiAction, makeBlockingWindowDiagnosticCode } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
@@ -264,7 +265,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     now,
     async readOutputPort(request) {
       checkBudget();
-      if(['variables.to_table','imports.lgd'].includes((operation.nodeApply?.request??operation.parameters)?.target?.type))request={...request,typedVariants:true};
+      const readType=(operation.nodeApply?.request??operation.parameters)?.target?.type;
+      if(['variables.to_table','imports.lgd'].includes(readType))request={...request,typedVariants:true};
+      // Exact reads of these ports refused Variant cells as unverified_precision; ordinary reads keep their envelope.
+      if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns'].includes(readType))
+        request={...request,typedVariants:true,...(readType==='transform.replace_columns'?{variantEmptyIsNull:true}:{})};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;
@@ -368,12 +373,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async readVariablePort({port,execution}) {return crossTableOwnedStep('variable_output',{port,execution},makeNodeVariableOutputCode);},
     async probeUserVariables({allowDirty=false}={}) {return crossTableOwnedStep('user_probe',{probe_only:true,allow_dirty:allowDirty},makeUserVariablesSnapshotCode);},
-    async configureUserVariables(variables,finish) {return crossTableOwnedStep('user_values',{variables,finish},makeUserVariablesConfigureCode);},
+    async configureUserVariables(variables,finish,remove) {return crossTableOwnedStep('user_values',{variables,finish,...(remove?.length?{remove}:{})},makeUserVariablesConfigureCode);},
     async mapVariablePort(mapping){return crossTableOwnedStep('variable_mapping',{mapping},makeVariablePortMappingCode);},
     async readVariablePortMapping(mapping){return crossTableOwnedStep('variable_mapping_read',{mapping,read_only:true},makeVariablePortMappingCode);},
     async readBuiltinVariablesPreview({port_guid}) {return crossTableOwnedStep('user_runtime_read',{port:4,port_guid},makeBuiltinVariablesPreviewCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
+    async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
@@ -643,7 +649,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const normPortal=(readClustering||readLogRegression)&&wizard?.stage==='normalization'&&portals[0]?.tid===wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist'?portals[0].ref:undefined;
         const treeEditor=readTrees&&wizard?.stage==='table_tree'?(roots.output.ui?.elements??[]).find(e=>e.tid==='EditDataTreeNodeDefForm')?.ref:undefined;
         const treeQuestion=readTrees&&wizard?.stage==='table_tree'&&roots.output.ui?.dialogs?.length===1?roots.output.ui.dialogs[0].ref:undefined;
-        const root = (readTrees&&wizard?.stage==='table_tree'?portals[0]?.ref:undefined) ?? treeEditor ?? treeQuestion ?? ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? samplingFactorEditors[0]?.ref ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? replacementTypeMenus[0]?.ref ?? calculatorModeMenus[0]?.ref ?? unionMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        // Concat pickers are portal siblings of their factor dialog. Keep the
+        // dialog's complete selected-field/option proof for keyboard selection.
+        const groupingConcatPortal=wizard?.stage==='grouping'&&expressionEditors.length===1
+          &&['cbxConcatSeparator','cbxConcatWrapper','fc;cbxConcatSort'].some(k=>portals[0]?.tid===wizard.root_tid+';FactorEditDialog;cntCheckboxes;fs;'+k+';boundlist')?expressionEditors[0].ref:undefined;
+        const root = groupingConcatPortal ?? (readTrees&&wizard?.stage==='table_tree'?portals[0]?.ref:undefined) ?? treeEditor ?? treeQuestion ?? ownedErrorToast?.ref ?? normPortal ?? normEditor ?? trainingRoot ?? samplingFactorEditors[0]?.ref ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? replacementTypeMenus[0]?.ref ?? calculatorModeMenus[0]?.ref ?? unionMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         // Polling repaints the native process console. Read its cache before
         // issuing final UI refs/epoch, so those refs do not age across the
@@ -1149,7 +1159,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw error;
       }
     },
-    async act(action,processControl,{preserveJoinMapping=false}={}) {
+    async act(action,processControl,{preserveJoinMapping=false,variablesUnionInputChange=false}={}) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
       if(ownedErrorToast){
@@ -1165,6 +1175,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ||operation.parameters.target.type!=='transform.join_data'||action.verb!=='wizard_step'||action.expected_stage!=='join'
         ||snapshot.wizard?.stage!=='input_mapping'||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port))
         throw Error('Preserved Join navigation requires its unchanged node read');
+      if(variablesUnionInputChange){
+        const r=operation.parameters;
+        if(r.target.type!=='variables.column_union'||r.target.kind!=='existing'||r.mode!=='append_variables'||r.finish!=='execute'
+          ||(r.parameters.column_union?.mapping??'automatic')!=='automatic'||!((r.variable_inputs?.length===3&&r.variable_inputs.every((v,i)=>v.input===i&&v.kind==='variables'))
+            ||r.parameters.column_union?.disconnect_input===2&&r.variable_inputs?.length===0)
+          ||action.verb!=='wizard_step'||action.expected_stage!=='done'||snapshot.wizard?.stage!=='variables_column_union'
+          ||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port)
+          throw Error('Lost-links answer requires the owned automatic union input change');
+        if(operation.variablesUnionInputChangeDispatched)throw Error('Union lost-links policy may dispatch only once per operation');
+      }
       validateUiAction(action, snapshot);
       try {assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);}
       catch(error){
@@ -1183,18 +1203,18 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const launchStartedAt=now();
       snapshot = null;
       const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[]),
-        ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[])]);
+        ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[]),...(variablesUnionInputChange?[{variables_union_input_change:true}]:[])]);
       const processCode=processControl?makeNodeProcessControlCode(preparedNodeContext,before,action,processControl,
         {operation_id:id,deadline:operation.deadline,origin:targetOrigin,build:targetBuild}):null;
       // This write must be durable before the browser receives the mutation.
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
         action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature,
         ...(processControl?{process_control:structuredClone(processControl)}:{}),
-        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}) });
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),...(variablesUnionInputChange?{variables_union_input_change:true}:{}) });
       evidenceSnapshot = null;
       if (!persisted || JSON.stringify(persisted.action) !== JSON.stringify(action)
         || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)
-        ||preserveJoinMapping&&persisted.preserve_join_mapping!==true) throw new Error('Prepared step was not durably preserved after redaction');
+        ||preserveJoinMapping&&persisted.preserve_join_mapping!==true||variablesUnionInputChange&&persisted.variables_union_input_change!==true) throw new Error('Prepared step was not durably preserved after redaction');
       lastPreparedStep = structuredClone(persisted);
       preparedSteps.push({ step: persisted.step, internal_operation_id: persisted.internal_operation_id, signature: persisted.signature, verb: action.verb });
       if (preparedSteps.length > 512) { preparedSteps.shift(); preparedStepsTrimmed = true; }
@@ -1209,7 +1229,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
         ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),
-        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),...(variablesUnionInputChange?{variables_union_input_change:true}:{}),
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
@@ -1225,6 +1245,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         return (${code})(page);
       }`:code, { id, signature, action_key: 'ui.act' });
       let result;
+      if(variablesUnionInputChange)operation.variablesUnionInputChangeDispatched=true;
       try { result = await execute(wrapped, { timeout: settlementWait?settlementWait+5000:openingWait?openingWait+5000:35000 }); }
       catch (error) {
         operation.transportUncertain = true;
@@ -1259,7 +1280,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     // input never contains a resolver or a recipe. Only a durably recorded,
     // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, refreshGraphBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, refreshGraphBusy, processControl, settleProcessConsole, preserveJoinMapping=false, variablesUnionInputChange=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -1353,7 +1374,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw new Error('Node procedure recovery target or intent changed');
         }
         binding = nextBinding; intent = nextIntent;
-        try { return await channel.act(action,processControl,{preserveJoinMapping}); }
+        try { return await channel.act(action,processControl,{preserveJoinMapping,variablesUnionInputChange}); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
           if (r?.status !== 'NOT_APPLIED'

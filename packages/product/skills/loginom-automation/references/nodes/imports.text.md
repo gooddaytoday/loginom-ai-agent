@@ -37,9 +37,10 @@ no separate Import Execute.
 Data-driven types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),
 `settings.analysis`: `rows`, `refresh` (`all` — fields and types anew, `types` —
 types only). A new node needs no `columns`: the schema is read; check `output`.
-`all`: Loginom sets types, `columns` is refused. `new`: manual types (a separate
-call on the same node) survive a `source_path` change. `refresh` erases manual
-types: only on request.
+`all`: fields appear only after Execute, Loginom sets types; pass no `columns` or
+output `mappings`; to control fields use `new`/`none`. `new`: manual types (a
+separate call on the same node) survive a `source_path` change. `refresh` erases
+manual types: only on request.
 
 ## Path from variable
 

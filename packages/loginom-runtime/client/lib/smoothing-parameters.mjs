@@ -1,6 +1,6 @@
 const need=(v,m)=>{if(!v)throw Error('Smoothing: '+m);};
 export function validateSmoothingParameters(p,mode,request){
- need(mode==='hodrick_prescott','use mode hodrick_prescott');
+ need(['hodrick_prescott','wavelet'].includes(mode),'use mode hodrick_prescott or wavelet');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='smoothing'),'only smoothing rules supported; no variable bindings');
  need(request.target.kind!=='new'||Array.isArray(p.smoothing),'new node requires smoothing');
  need(request.mappings.every(m=>(m.fields??m.changes??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'mappings require configured fields; input exclusions unsupported');
@@ -8,7 +8,8 @@ export function validateSmoothingParameters(p,mode,request){
  need(Array.isArray(p.smoothing)&&p.smoothing.length<=128,'smoothing must contain at most 128 rules');
  const names=new Set();
  for(const rule of p.smoothing){
-  need(rule&&typeof rule==='object'&&!Array.isArray(rule)&&Object.keys(rule).every(k=>['field','lambda','period'].includes(k))&&typeof rule.field==='string'&&rule.field.length>0&&rule.field.length<=128&&!names.has(rule.field),'unique exact field names required');names.add(rule.field);
+  need(rule&&typeof rule==='object'&&!Array.isArray(rule)&&Object.keys(rule).every(k=>(mode==='wavelet'?['field','family','order','depth','boundary']:['field','lambda','period']).includes(k))&&typeof rule.field==='string'&&rule.field.length>0&&rule.field.length<=128&&!names.has(rule.field),'unique exact field names required');names.add(rule.field);
+  if(mode==='wavelet'){need(rule.family==='daubechies'&&rule.order===1&&[1,2].includes(rule.depth)&&rule.boundary==='symmetric','wavelet requires daubechies order 1, depth 1 or 2, boundary symmetric');continue;}
   need(Object.hasOwn(rule,'lambda')!==Object.hasOwn(rule,'period'),'each rule requires lambda OR period');
   const key=Object.hasOwn(rule,'lambda')?'lambda':'period',value=rule[key];
   need(Number.isFinite(value)&&value>=(key==='lambda'?0.0625:2)&&value<=(key==='lambda'?102659800000000:20000),'invalid '+key+' range');
@@ -29,7 +30,7 @@ export function resolveSmoothingParameters(p,inputs){
  return inputs.map(f=>{
   if(p.smoothing===undefined)return {...f};
   const rule=p.smoothing.find(r=>r.field===f.name);
-  return {...f,used:!!rule,...(rule?{strength:rule.lambda===undefined?'period':'lambda',requested:rule.lambda??rule.period}: {})};
+  return {...f,used:!!rule,...(rule?{...(rule.family?{family:rule.family,order:rule.order,depth:rule.depth,boundary:rule.boundary}:{strength:rule.lambda===undefined?'period':'lambda',requested:rule.lambda??rule.period})}: {})};
  });
 }
 export function validateSmoothingInputParameters(p,resolved,native){resolveSmoothingParameters(p,resolved.fields??native.target_fields);}

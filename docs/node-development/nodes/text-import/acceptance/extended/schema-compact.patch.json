@@ -1,0 +1,83 @@
+{
+ "properties/source/oneOf+": {
+  "type": "object",
+  "properties": {
+   "kind": {
+    "const": "verified_sources"
+   },
+   "items": {
+    "type": "array",
+    "minItems": 1,
+    "maxItems": 16,
+    "items": {
+     "type": "object"
+    }
+   }
+  },
+  "required": [
+   "kind",
+   "items"
+  ],
+  "additionalProperties": false,
+  "description": "One storage/verified_delivery object above per listed path or mask match, in order."
+ },
+ "properties/settings/properties/source/properties/source_paths": {
+  "type": "array",
+  "minItems": 2,
+  "maxItems": 16,
+  "items": {
+   "type": "string",
+   "minLength": 1,
+   "maxLength": 2048
+  }
+ },
+ "properties/settings/properties/source/properties/file_info": {
+  "enum": [
+   "none",
+   "name",
+   "relative_path",
+   "absolute_path"
+  ]
+ },
+ "properties/settings/properties/source/properties/source_mask": {
+  "type": "string",
+  "minLength": 1,
+  "maxLength": 2048
+ },
+ "properties/settings/properties/format/properties/variant_as_general_type": {
+  "type": "boolean"
+ },
+ "properties/settings/properties/node_title": {
+  "type": "object",
+  "properties": {
+   "mode": {
+    "enum": [
+     "automatic",
+     "custom"
+    ]
+   },
+   "label": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 120
+   }
+  },
+  "required": [
+   "mode"
+  ],
+  "additionalProperties": false
+ },
+ "properties/settings/properties/source/properties/parallel_processing": {
+  "type": "boolean"
+ },
+ "properties/settings/properties/source/properties/max_threads": {
+  "enum": [
+   "auto",
+   2,
+   4,
+   8,
+   16,
+   32
+  ]
+ }
+}

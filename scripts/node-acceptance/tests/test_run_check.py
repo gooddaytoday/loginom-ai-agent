@@ -22,6 +22,62 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_text_update_has_two_named_stages_and_final_only_cold(self):
+        case = runner.scenario('text-auto-update')
+        self.assertEqual(case.get('export_count'), 2)
+        stages = runner.text_update_stages(case)
+        self.assertEqual([s['columns'][1]['type'] for s in stages], ['string', 'real'])
+        self.assertEqual(stages[0]['rows'][0]['Amount'], '8.25')
+        self.assertEqual(runner.expected_for(case, '/own/text.lgp')['outputs'], stages[-1:])
+        prompt = case['prompt'].read_text()
+        for name in ['text-update-1.csv', 'text-update-2.csv']:
+            self.assertIn(name, prompt)
+
+    def test_text_update_requires_both_stage_ports_before_their_exports(self):
+        stages = runner.text_update_stages(runner.scenario('text-auto-update'))
+        replies = []
+        for i, stage in enumerate(stages):
+            def cell(column, row):
+                kind = column['type']
+                return dict(type=kind, is_null=False, value=str(row[column['name']]) if kind == 'integer' else row[column['name']],
+                            precision='millisecond' if kind == 'datetime' else '17_significant_digits' if kind == 'real' else 'exact_integer',
+                            representation='local_datetime' if kind == 'datetime' else 'binary64',
+                            timezone='unspecified', decimal=str(row[column['name']]))
+            port = dict(port=0, schema=copy.deepcopy(stage['columns']),
+                        sample=[[cell(c, row) for c in stage['columns']] for row in stage['rows']], precision=dict(numbers_verified=True),
+                        row_count=2, sample_complete=True, freshness_basis='completed_execution_port_source')
+            reply = dict(status='SUCCEEDED', cleanup_complete=True, node=dict(node_id='same-import'),
+                         configuration=dict(readback=dict(kind='text_import')), output=dict(ports=[port]))
+            replies += [(i * 2, reply), (i * 2 + 1, dict(status='SUCCEEDED', configuration=dict(
+                readback=dict(kind='text_export', destination=f'/own/stage-{i}.csv'))))]
+        runner.check_text_update_ports(replies, ['/own/stage-0.csv', '/own/stage-1.csv'], stages)
+        for fault in ['missing-final', 'wrong-order', 'wrong-type', 'other-node', 'stale', 'wrong-value']:
+            bad = copy.deepcopy(replies)
+            if fault == 'missing-final': bad.pop()
+            if fault == 'wrong-order': bad[2][1]['output']['ports'][0]['schema'].reverse()
+            if fault == 'wrong-type': bad[0][1]['output']['ports'][0]['schema'][1]['type'] = 'real'
+            if fault == 'other-node': bad[2][1]['node']['node_id'] = 'another-import'
+            if fault == 'stale': bad[2][1]['output']['ports'][0]['sample_complete'] = False
+            if fault == 'wrong-value': bad[2][1]['output']['ports'][0]['sample'][0][1]['value'] = 999
+            with self.subTest(fault=fault), self.assertRaisesRegex(AssertionError, 'TEXT_UPDATE'):
+                runner.check_text_update_ports(bad, ['/own/stage-0.csv', '/own/stage-1.csv'], stages)
+
+    def test_variables_calculator_modes_use_three_expressions_and_two_execution_outputs(self):
+        case = runner.scenario('variables-calculator-modes')
+        self.assertTrue(case['variable_only'])
+        self.assertEqual(case['variable_read_path'], 'execution')
+        self.assertEqual(case['variable_audit'], 'variables-calculator-modes')
+        self.assertEqual(case['prompt'].name, 'task-datetime-intermediate.md')
+        self.assertNotIn('input_files', case)
+        before = runner.read(case['source'] / case['variable_initial'])
+        after = runner.expected_for(case, '/own/modes.lgp')
+        for expected, total in [(before, 3), (after, 5)]:
+            variables = expected['variable_inventory']['outputs'][0]['variables']
+            self.assertEqual([v['name'] for v in variables], ['report_date', 'total'])
+            self.assertEqual([v['type'] for v in variables], ['datetime', 'integer'])
+            self.assertEqual(variables[0]['value'], '2026-11-07T23:59:58.123')
+            self.assertEqual(variables[1]['value'], total)
+
     def test_variables_replace_match_order_policy(self):
         case = runner.scenario('variables-replace-match')
         initial = runner.read(case['source'] / case['variable_initial'])
@@ -302,6 +358,46 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
             self.assertNotIn('expected', case['prompt'].read_text())
 
+    def test_datatovar_cycle1_cases_bind_independent_oracle_and_typed_csv_inputs(self):
+        oracle = runner.read(runner.REPO / 'docs/node-development/nodes/variables-datatovar/acceptance/aggregate-types/expected.json')
+        for name, section, files, source in [('variables-from-table-aggregates', 'numeric', ['aggregate-numeric.csv'], 'imports.text'),
+                                             ('variables-from-table-scalars', 'scalar_types', ['aggregate-types.csv'], 'imports.text')]:
+            case = runner.scenario(name)
+            expected = runner.expected_for(case, '/own/aggregate.lgp')
+            self.assertEqual((case['variable_audit'], case['input_files'], expected['package_path']), (name, files, '/own/aggregate.lgp'))
+            self.assertEqual(expected['nodes'], [{'type': source}, {'type': 'variables.from_table'}])
+            output = expected['variable_inventory']['outputs'][0]
+            self.assertEqual((output['node'], output['port'], output['ordered']), ({'type': 'variables.from_table'}, 0, True))
+            self.assertEqual(output['variables'], oracle[section]['variables'])
+            self.assertTrue((case['source'] / case['variable_initial_name']).is_file())
+            self.assertNotIn('expected', case['prompt'].read_text())
+        scalars = runner.scenario('variables-from-table-scalars')
+        self.assertNotIn('source_package', scalars)
+        self.assertTrue((scalars['data'] / 'aggregate-types.csv').is_file())
+
+    def test_datatovar_scalars_prompt_imports_typed_csv_and_saves_run_package(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
+            for path in [folder, profile, workspace]: path.mkdir()
+            runner.write(profile / 'saved-package-cleanup.json', {'package_closed': True, 'logged_out': True, 'unsaved_changes_discarded': False})
+            runner.write(profile / 'runtime-close-1.json', {'closed_ack': True})
+            event = {'type': 'tool_use', 'sessionID': 'own-session', 'part': {'tool': 'loginom_dock_action_run', 'state': {
+                'status': 'completed', 'output': json.dumps({'status': 'SUCCEEDED', 'action_key': 'package.save_checkpoint', 'output': {'save_completed': True}})}}}
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+            def phase(name, command, *args, **kwargs):
+                if name == 'model': (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                elif name != 'variable-oracle': self.fail('Unexpected phase ' + name)
+            with patch.object(instance, 'phase', side_effect=phase):
+                instance.model('variables-from-table-scalars', folder, profile, workspace, '/test/run-x.lgp', {'package_directory': '/test'}, root / 'build')
+            task = (folder / 'task.md').read_text()
+            self.assertIn('Импортируй aggregate-types.csv', task)
+            self.assertNotIn('JavaScript', task)
+            self.assertTrue(task.rstrip().endswith('Сохрани пакет как /test/run-x.lgp.'))
+            self.assertNotIn('{{PACKAGE_PATH}}', task)
+            self.assertEqual(runner.read(folder / 'expected.json')['package_path'], '/test/run-x.lgp')
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')
@@ -386,6 +482,20 @@ class RunCheckTests(unittest.TestCase):
             if kind == 'threshold':
                 self.assertIn('для I выбери замену средним', case['prompt'].read_text())
 
+    def test_variables_totable_switch_catalog_isolates_task_and_typed_phases(self):
+        case = runner.scenario('variables-totable-switch')
+        self.assertEqual(case['prompt'].name, 'task-switch-run.md')
+        self.assertEqual(case['input_files'], ['modes.json'])
+        self.assertTrue((case['data'] / 'modes.json').is_file() and case['variable_only'])
+        self.assertNotIn('oracle', case['prompt'].read_text().lower())
+        expected = runner.expected_for(case, '/test/switch.lgp')
+        self.assertEqual(expected['package_path'], '/test/switch.lgp')
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['amount', 'enabled', 'missing', 'rate'])
+        phases = json.loads((case['source'] / case['variable_initial']).read_text())
+        self.assertEqual(expected['outputs'][0], phases['switch_back_columns'])
+        self.assertEqual([c['name'] for c in phases['changed_rows']['columns']], ['Name', 'DisplayName', 'Value'])
+        self.assertEqual(expected['nodes'], [{'type': 'variables.user'}, {'type': 'variables.to_table'}])
+
     def test_variables_columns_catalog_uses_original_fixture_and_exact_typed_oracle(self):
         case = runner.scenario('variables-columns')
         self.assertEqual(case['source'].name, 'acceptance')
@@ -393,6 +503,7 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(case['prompt'].name, 'task.md')
         self.assertIsNone(case['base'])
         self.assertEqual(case['input_files'], [])
+        self.assertTrue(case['source_package'].is_file())  # the task opens a prepared package
         expected = runner.expected_for(case, '/test/variables-columns.lgp')
         self.assertEqual(expected['package_path'], '/test/variables-columns.lgp')
         output = expected['outputs'][0]
@@ -474,7 +585,8 @@ class RunCheckTests(unittest.TestCase):
 
     def test_replacement_boolean_and_mixed_use_only_approved_task_and_input(self):
         for name, task, expected_name in [('replace-boolean', 'task-boolean.md', 'expected.json'),
-                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json')]:
+                                          ('replace-mixed', 'task-mixed.md', 'expected-mixed.json'),
+                                          ('replace-keep-variant', 'task-result-keep.md', 'expected-result-keep.json')]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['expected_name'], expected_name)
@@ -485,6 +597,19 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(len(expected['outputs'][0]['rows']), 8)
             self.assertEqual(expected['outputs'][0]['output_node_type'], 'transform.replace_columns')
             self.assertEqual(len(expected['outputs'][0]['columns']), 5)
+
+    def test_variant_reader_cases_use_only_task_input_and_oracle_expected(self):
+        for name, task, data, rows, node_type in [('variant-reader-collapse', 'task-collapse.md', 'mixed.csv', 15, 'transform.collapse_columns')]:
+            case = runner.scenario(name)
+            self.assertEqual(case['prompt'].name, task)
+            self.assertEqual(case['input_files'], [data])
+            self.assertTrue((case['data'] / data).is_file())
+            expected = runner.expected_for(case, '/test/variant.lgp')
+            self.assertEqual(expected['package_path'], '/test/variant.lgp')
+            self.assertEqual(expected['outputs'][0]['output_node_type'], node_type)
+            self.assertEqual(len(expected['outputs'][0]['rows']), rows)
+        subprocess.run([sys.executable, str(case['source'] / 'oracle.py'), '--check'], check=True, capture_output=True)
+        with self.assertRaises(ValueError): runner.scenario('variant-reader-replace')
 
     def test_replace_convert_uses_independent_typed_fixture(self):
         case = runner.scenario('replace-convert')
@@ -504,7 +629,9 @@ class RunCheckTests(unittest.TestCase):
                        check=True, capture_output=True)
         for name, task, csv_name, rows, nodes in [('missing-median-mode', 'task-median-mode.md', 'statistics.csv', 4, 3),
                                                   ('missing-previous', 'task-previous.md', 'ordered.csv', 5, 3),
-                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3)]:
+                                                  ('missing-delete', 'task-delete.md', 'delete.csv', None, 3),
+                                                  ('missing-linear', 'task-linear.md', 'ordered.csv', 5, 3),
+                                                  ('missing-random', 'task-random.md', 'random-single-value.csv', 4, 3)]:
             case = runner.scenario(name)
             self.assertEqual(case['prompt'].name, task)
             self.assertEqual(case['input_files'], [csv_name])
@@ -545,6 +672,19 @@ class RunCheckTests(unittest.TestCase):
                 self.assertEqual(expected['outputs'], json.loads(subprocess.check_output([
                     sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages'])
                 self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], types)
+
+    def test_grouping_cycle_three_uses_approved_tasks_and_exact_stages(self):
+        for mode in ['first', 'last', 'only', 'concat']:
+            case = runner.scenario('grouping-' + mode)
+            self.assertEqual(case['prompt'].name, 'task-' + mode + '.md')
+            self.assertEqual(case['input_files'], ['modes.csv'])
+            expected = runner.expected_for(case, '/test/lists.lgp')
+            stages = json.loads(subprocess.check_output([
+                sys.executable, str(case['source'] / 'oracle.py')]))['cases'][mode]['stages']
+            self.assertEqual(expected['outputs'], stages)
+            self.assertEqual(len(stages), 3 if mode == 'concat' else 1)
+            cold = runner.expected_for(case, '/test/lists.lgp', cold=True)
+            self.assertEqual(cold['outputs'], [stages[-1]])
 
     def test_grouping_unique_fixture_and_independent_oracle(self):
         case = runner.scenario('grouping-unique')

@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "note": "x",
+      "enabled": true,
+      "qty": 2
+    },
+    {
+      "id": 2,
+      "note": null,
+      "enabled": false,
+      "qty": 0
+    },
+    {
+      "id": 3,
+      "note": "",
+      "enabled": null,
+      "qty": null
+    },
+    {
+      "id": 4
+    }
+  ]
+}

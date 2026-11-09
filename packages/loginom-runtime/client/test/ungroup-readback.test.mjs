@@ -17,7 +17,7 @@ function fixture(){
 }
 test('Ungroup readback binds two inputs, complete output and exact receipts',()=>{const r=ungroupConfigurationReadback(fixture());assert.equal(r.kind,'ungroup');assert.equal(r.input_mappings.length,2);assert.deepEqual(r.output_mapping.fields.map(f=>f.name),['Group','Total','Total_Rounded','Item','OutputValue']);assert.equal(r.package_persistence_verified,false);});
 test('Ungroup readback rejects foreign or partial inputs, incomplete output and invented flags',()=>{
- for(const change of [f=>f.phases[0].value.ports[1].port=0,f=>f.phases[0].value.ports[1].native_mapping.node_context.node_id='foreign',f=>f.phases[0].value.ports[1].native_mapping.source_identity_verified=false,f=>f.phases[0].value.ports.pop(),f=>f.phases[1].value.configuration.method='computed',f=>f.phases[3].value.native_mapping.target_fields.pop(),f=>f.phases[3].value.finish={settings_applied:true,mode:'done',node_context:{}},f=>f.phases[4].receipt_id='other']){
+ for(const change of [f=>f.phases[0].value.ports[1].port=0,f=>f.phases[0].value.ports[1].native_mapping.node_context.node_id='foreign',f=>f.phases[0].value.ports[1].native_mapping.source_identity_verified=false,f=>f.phases[0].value.ports.pop(),f=>f.phases[1].value.configuration.method='seasonal',f=>f.phases[3].value.native_mapping.target_fields.pop(),f=>f.phases[3].value.finish={settings_applied:true,mode:'done',node_context:{}},f=>f.phases[4].receipt_id='other']){
   const f=fixture();change(f);assert.throws(()=>ungroupConfigurationReadback(f));
  }
 });
@@ -27,4 +27,21 @@ test('Ungroup readback fits the registered result schema',()=>{
  execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
  package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied',readback:r}});
  assert.equal(result.valid,true,JSON.stringify(result));
+});
+
+test('computed readback requires independently owned secondary output and native integer values',()=>{
+ const make=()=>{
+  const f=fixture(),c=f.phases[1].value.configuration;c.method='computed';
+  for(const fs of c.input_fields)for(const field of fs)if(field.type==='real')field.type='integer';
+  for(const p of f.phases[0].value.ports)for(const field of [...p.native_mapping.source_fields,...p.native_mapping.target_fields])if(field.type==='real')field.type='integer';
+  const mapped=f.phases[3].value;
+  for(const field of [...mapped.native_mapping.source_fields,...mapped.native_mapping.target_fields])if(field.type==='real')field.type='integer';
+  mapped.ports=[{port:0},{port:1,native_mapping:{verified:true,inventory_complete:true,node_context:{...c.node_context,output_port:{port:1}},target_fields:[c.input_fields[1][1],c.input_fields[1][0]].map(field=>({...field,excluded:false}))},closed:{cleanup_complete:true}}];
+  return f;
+ };
+ const result=ungroupConfigurationReadback(make());assert.equal(result.mode,'computed');
+ assert.equal(result.output_mapping.fields.find(f=>f.name==='OutputValue').type,'integer');
+ for(const change of [f=>f.phases[3].value.ports.pop(),f=>f.phases[3].value.ports[1].native_mapping.node_context.node_id='foreign',f=>f.phases[3].value.ports[1].native_mapping.target_fields.reverse(),f=>f.phases[3].value.ports[1].closed.cleanup_complete=false]){
+  const f=make();change(f);assert.throws(()=>ungroupConfigurationReadback(f));
+ }
 });

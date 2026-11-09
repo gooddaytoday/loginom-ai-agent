@@ -33,3 +33,6 @@ NULL, порядок, повторное выполнение прежнего �
 Для фиксированного порядка полей применяется существующий mappings с autosync=false.
 
 [Loginom Help](https://help.loginom.ru/userguide/processors/preprocessing/smoothing.html).
+
+`parameter-schema.proposal.json` в корне узла — устаревший HP-проект этапа 0;
+действующий проект схемы — `acceptance/modes/parameter-schema.proposal.json`.

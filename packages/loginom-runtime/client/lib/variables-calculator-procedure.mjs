@@ -67,9 +67,14 @@ export async function configureVariablesCalculator(page,task,readNode=readPrepar
     return point(wrappers[0]);
    }
    need(ownedEditor,'one owned expression editor');
-   const fields={name:'edtName',label:'edtDisplayName',description:'txtDescription',type:'cbxDataType'};
+   const fields={name:'edtName',label:'edtDisplayName',description:'txtDescription',type:'cbxDataType',intermediate:'chbIntermediate'};
    if(mode==='field'){const c=cmp(editor+';'+fields[extra.key]),inputs=[...c.el.dom.querySelectorAll('input,textarea')].filter(visible);need(!c.disabled&&inputs.length===1,'enabled editor input');return point(inputs[0]);}
    if(mode==='dialog')return Object.fromEntries(Object.entries(fields).map(([key,tid])=>[key,cmp(editor+';'+tid).getValue()]));
+   if(mode==='intermediate'){
+    const c=cmp(editor+';chbIntermediate'),es=exact(editor+';chbIntermediate;DisplayEl');
+    need(!c.disabled&&editors[0].contains(c.el.dom)&&es.length===1&&c.el.dom.contains(es[0])&&typeof c.getValue()==='boolean','owned intermediate checkbox');
+    return point(es[0]);
+   }
    if(mode==='type') {
     const c=cmp(editor+';cbxDataType'),picker=c.picker,records=c.getStore().getData().items;
     const matches=records.filter(r=>r.data.Value===extra.value&&r.data.DisplayText===extra.label);
@@ -102,22 +107,23 @@ export async function configureVariablesCalculator(page,task,readNode=readPrepar
     await click('row',{record_id:prior.record_id,name:prior.name});
     current=await inventory();requireValue(current.expressions.find(e=>e.record_id===prior.record_id)?.selected===true,'selection did not settle');
    }
-   const propertiesChanged=!prior||['name','label','type','description'].some(k=>patch[k]!==prior[k]);
+   const propertiesChanged=!prior||['name','label','type','description','intermediate'].some(k=>patch[k]!==prior[k]);
    if(propertiesChanged) {
     await click('button',{key:prior?'btnExprEdit':'btnAddExpr'});
     await at(editor).waitFor({state:'visible',timeout:remaining()});
     const initial=await inspect('dialog');
-    if(prior)requireValue(initial.name===prior.name&&initial.label===prior.label&&initial.type===({boolean:1,real:3,integer:4,string:5})[prior.type]&&initial.description===prior.description,'editor does not match retained expression');
+    if(prior)requireValue(initial.name===prior.name&&initial.label===prior.label&&initial.type===({boolean:1,datetime:2,real:3,integer:4,string:5})[prior.type]&&initial.description===prior.description&&initial.intermediate===prior.intermediate,'editor does not match retained expression');
     for(const [key,tid] of [['name','edtName'],['label','edtDisplayName'],['description','txtDescription']]) {
      const state=await inspect('dialog');if(state[key]===patch[key])continue;
      await inspect('field',{key});const input=at(editor+';'+tid).locator('input:visible,textarea:visible');requireValue(await input.count()===1,'unique owned editor input');
      effect=true;await input.fill(patch[key],{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
     }
-    const type=({boolean:1,real:3,integer:4,string:5})[patch.type],label=({boolean:'Логический',real:'Вещественный',integer:'Целый',string:'Строковый'})[patch.type];
+    const type=({boolean:1,datetime:2,real:3,integer:4,string:5})[patch.type],label=({boolean:'Логический',datetime:'Дата/Время',real:'Вещественный',integer:'Целый',string:'Строковый'})[patch.type];
     if((await inspect('dialog')).type!==type) {
      effect=true;await at(editor+';cbxDataType;trg_picker').click({timeout:remaining()});await click('type',{value:type,label});
     }
-    const fields=await inspect('dialog');requireValue(fields.name===patch.name&&fields.label===patch.label&&fields.description===patch.description&&fields.type===type,'editor values differ');
+    if((await inspect('dialog')).intermediate!==patch.intermediate)await click('intermediate');
+    const fields=await inspect('dialog');requireValue(fields.name===patch.name&&fields.label===patch.label&&fields.description===patch.description&&fields.type===type&&fields.intermediate===patch.intermediate,'editor values differ');
     await click('apply');await page.locator('[data-tid='+JSON.stringify(editor)+']').waitFor({state:'hidden',timeout:remaining()});
     current=await inventory();
    }
