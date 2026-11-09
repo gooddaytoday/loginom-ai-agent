@@ -1112,7 +1112,11 @@ def export_null_marker(events, destination):
         readback = readbacks.get(request.get('operation_id'), {})
         if request.get('target', {}).get('kind') == 'new':
             if parameters.get('destination') != destination: continue
-            found, marker = 'null_marker' in parameters, parameters.get('null_marker')
+            settings = {} if 'null_marker' in parameters or readback.get('destination') != destination else readback.get('settings', {})
+            # An omitted marker is the product default, confirmed only by this
+            # operation's readback for the same file.
+            found = 'null_marker' in parameters or 'null_marker' in settings
+            marker = parameters['null_marker'] if 'null_marker' in parameters else settings.get('null_marker')
             node = readback.get('node')
         elif ((readback.get('destination') or parameters.get('destination')) == destination
               or node is not None and request.get('target', {}).get('ref') == node):
