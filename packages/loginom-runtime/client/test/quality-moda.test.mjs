@@ -38,6 +38,17 @@ test('Quality native capability refuses other nodes, ports, schemas and bounds b
   await assert.rejects(f.run());assert.equal(f.stats().requests,0);
  }
 });
+test('Quality retains native Boolean Moda and releases every frame',async()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(nativeCellSchema);
+ for(const value of [false,true]){
+  const f=fixture(),view=new DataView(f.frame.buffer);view.setInt16(12,11,true);f.frame[14]=Number(value);
+  const cells=await f.run();
+  assert.equal(cells[0].value,value);assert.equal(cells[0].cell_type,'boolean');assert.equal(cells[0].native.tag,11);
+  assert.equal(cells[0].representation,'native_boolean');assert.equal(cells[0].native.encoding,'boolean8');
+  assert.equal(validate(cells[0]).valid,true,JSON.stringify(validate(cells[0])));
+  assert.equal(f.stats().released,4);
+ }
+});
 test('native subtype remains string or NULL and unknown/interface tags refuse',async()=>{
  for(const tag of [1,8,9]){
   const f=fixture(),view=new DataView(f.frame.buffer);view.setInt16(12,tag,true);

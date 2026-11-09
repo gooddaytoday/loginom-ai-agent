@@ -33,17 +33,17 @@ export function auditFilterBindings(events,initial,final){
  return {status:'PASS',node:first.result.node,binding:b,initial_execution_id:first.result.execution.execution_id,final_execution_id:second.result.execution.execution_id};
 }
 export async function observeFilterBindingInventory({load,graph,channelFor,expected,record}){
- const {readFilterBindings}=await load('client/lib/variable-binding-readback.mjs');
+ const {readFilterBindings,readBooleanBindings}=await load('client/lib/variable-binding-readback.mjs');
  assert.ok(Array.isArray(expected.binding_inventory)&&expected.binding_inventory.length>0&&expected.binding_inventory.length<=32,'COLD_BINDING_EXPECTED');
  const result=[];
  for(const want of expected.binding_inventory){
-  assert.equal(want.node.type,'transform.filter_data');
+  assert.ok(['transform.filter_data','transform.group_data','transform.sorting'].includes(want.node.type));
   const targets=graph.nodes.filter(n=>n.type===want.node.type&&(want.node.label===undefined||n.label===want.node.label));
   assert.equal(targets.length,1,'COLD_BINDING_NODE_UNIQUE');
   const node=targets[0].ref,links=(graph.variable_links??[]).filter(l=>l.target===node.node_id&&l.kind==='control'&&l.input===0);
   const source=links.length===1?graph.nodes.find(n=>n.ref.node_id===links[0].source):null;
   const sourceProof=source?.type==='variables.user'?{...await channelFor(source.ref,'cold-binding-source').configureUserVariables([],'close'),source:source.ref}:undefined;
-  const bindings=await readFilterBindings(channelFor(node,'cold-bindings'),{readGraph:async()=>graph,sourceProof});
+  const bindings=await (want.node.type==='transform.filter_data'?readFilterBindings:readBooleanBindings)(channelFor(node,'cold-bindings'),{type:want.node.type,node,readGraph:async()=>graph,sourceProof});
   assert.equal(bindings.length,expected.binding_inventory.filter(w=>w.node.type===want.node.type&&w.node.label===want.node.label).length,'COLD_BINDING_COMPLETE');
   const matches=bindings.filter(b=>b.parameter===want.parameter);assert.equal(matches.length,1,'COLD_BINDING_PARAMETER');
   const b=matches[0];assert.equal(b.mode,want.mode);assert.equal(b.verified,true);

@@ -99,6 +99,15 @@ test('Grouping preserves an explicit autosync choice for a requested field order
  const f=outputChannel();await configureGroupingOutput(f.channel,f.config,f.params,{autosync:true});
  assert.equal(f.native.autosync,true);assert.ok(!f.actions.some(a=>a.ref==='auto'));
 });
+for(const bound of [false,true])test('Grouping '+(bound?'bound':'literal')+' already ordered layout preserves its persistence policy',async()=>{
+ const f=outputChannel();
+ f.native.target_fields.sort((a,b)=>Number(a.record_id.slice(1))-Number(b.record_id.slice(1)));
+ f.native.target_fields.forEach((field,index)=>Object.assign(field,{index,group_index:index}));
+ f.config.options={pedSortResult:{switch_pressed:bound}};
+ await configureGroupingOutput(f.channel,f.config,f.params,{});
+ assert.equal(f.native.autosync,!bound);
+ assert.deepEqual(f.native.target_fields.map(f=>f.name),['Segment','Group','OtherTotal','MeanAmount','TextRows']);
+});
 
 for(const option of ['cache_groups','sort_result'])for(const value of [false,true])test(`Grouping ${option}=${value} freezes a complete layout even when its initial order already matches`,async()=>{
  const f=outputChannel();

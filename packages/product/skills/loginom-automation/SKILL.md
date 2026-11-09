@@ -164,7 +164,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Дерево в JSON | `trees.to_json` / serialize | [читать](references/nodes/trees.to_json.md) |
 |Выборка: порядок/случайно/страты/смещение|`preprocessing.sampling` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.sampling.md)|
 |Train/test: порядок/случайно/страты/смещение|`preprocessing.data_partition` / sequential, random, stratified, biased|[читать](references/nodes/preprocessing.data_partition.md)|
-| Выбросы SD/IQR | `preprocessing.elim_outlier` / detect | [читать](references/nodes/preprocessing.elim_outlier.md) |
+| Выбросы SD/IQR | `preprocessing.elim_outlier` / detect, edit | [читать](references/nodes/preprocessing.elim_outlier.md) |
 | Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise, apply | [читать](references/nodes/datamining.log_regression.md) |
 | Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
 | Пирсон числовых полей | `research.corr_analysis` / pearson | [читать](references/nodes/research.corr_analysis.md) |

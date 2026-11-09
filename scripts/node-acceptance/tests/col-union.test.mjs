@@ -61,3 +61,19 @@ assert count==62
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
+
+test('third-repeat uses only v040 fixtures and the approved seven-column expected',()=>{
+ const r=spawnSync('python3',['-B','-c',`import importlib.util
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+c=r.scenario('colunion-third-repeat');e=r.expected_for(c,'/owned/test.lgp')
+assert c['source'].name=='v040' and c['data']==c['source']/'fixtures'
+assert c['input_files']==['main.csv','attached.csv','third.csv']
+assert c['prompt']==c['source']/'task-third.md' and c['export_count']==1
+assert c['expected_name']=='expected.json' and len(e['outputs'])==1
+assert len(e['outputs'][0]['columns'])==7 and len(e['outputs'][0]['rows'])==3
+assert all((c['data']/f).is_file() for f in c['input_files'])
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});

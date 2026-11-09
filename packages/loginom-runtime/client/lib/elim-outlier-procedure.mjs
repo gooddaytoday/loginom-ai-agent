@@ -21,7 +21,7 @@ export async function selectElimOutlierField(channel,baseline,name){
   s=await observe(channel,'outlier field list scrolled');
  }
 }
-export async function configureElimOutlier(channel,p,{inputMapping}){
+export async function configureElimOutlier(channel,p,{inputMapping,request}){
  const initial=await observe(channel,'complete outlier field inventory'),baseline=initial.node_elim_outlier;
  need(inputMapping?.verified&&inputMapping.inventory_complete,'verified input mapping required');
  const schema=fs=>fs.map(({name,label,type,data_kind})=>({name,label,type,data_kind}));
@@ -37,7 +37,9 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
   const old=before.find(f=>f.name===name).settings;
   const wanted=resolveElimOutlierParameters(p,baseline.fields,{...old,fields:selected,ordered:baseline.ordered});
   need(['sd','iqr'].includes(wanted.method)&&Number.isFinite(wanted.outlier_factor)&&Number.isFinite(wanted.extreme_factor),'newly enabled fields need explicit method and both factors');
-  return {name,method:wanted.method,outlier_factor:wanted.outlier_factor,extreme_factor:wanted.extreme_factor,outlier_policy:'keep',extreme_policy:'keep'};
+  const outlier_policy=request?.mode==='edit'?wanted.outlier_policy:'keep',extreme_policy=request?.mode==='edit'?wanted.extreme_policy:'keep';
+  need([outlier_policy,extreme_policy].every(v=>['keep','mean','median','most_probable'].includes(v)),'edit requires supported policies for every enabled field; supply both for newly enabled fields');
+  return {name,method:wanted.method,outlier_factor:wanted.outlier_factor,extreme_factor:wanted.extreme_factor,outlier_policy,extreme_policy};
  });
  const act=async(s,key,action)=>channel.perform({condition:'set outlier '+key,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,field:s.node_elim_outlier.selected.record_id}),
   resolve:s=>({...action,ref:one(s,e=>(e.tid===s.wizard.root_tid+';ElimOutlierWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';ElimOutlierWizard;'+key)&&e.allowed_actions.includes(action.verb),'Outlier control unavailable: '+key).ref})});
@@ -60,14 +62,15 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
     await act(s,key+';ValueControl',{verb:'fill',text:String(wanted[name])});s=await observe(channel,'outlier factor before commit');
     await act(s,key+';ValueControl',{verb:'press',key:'Tab'});s=await observe(channel,'outlier factor readback');need(s.node_elim_outlier.settings[name]===wanted[name],'factor differs');
    }
-   for(const key of ['pedActionOut','pedActionExtr']){
-    if(s.node_elim_outlier.values[key]===1)continue;
+   for(const [key,name] of [['pedActionOut','outlier_policy'],['pedActionExtr','extreme_policy']]){
+    const [value,label]=({keep:[1,'Оставить без изменения'],mean:[3,'Заменять средним'],median:[4,'Заменять медианой'],most_probable:[5,'Заменять наиболее вероятным']})[wanted[name]];
+    if(s.node_elim_outlier.values[key]===value)continue;
     const owner=s.wizard.root_tid+';ElimOutlierWizard;'+key+';ValueControl';
     await act(s,key+';ValueControl',{verb:'click'});
-    s=await channel.observe({condition:'native keep policy option',readElimOutlier:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label==='Оставить без изменения'&&e.allowed_actions.includes('click'))});
-    const option=one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label==='Оставить без изменения'&&e.allowed_actions.includes('click'),'Unique keep option required');
-    await channel.perform({condition:'select native keep policy',initialObservation:s,ready,identity:()=>f,resolve:()=>({verb:'click',ref:option.ref})});
-    s=await observe(channel,'keep policy readback');need(s.node_elim_outlier.values[key]===1,'keep policy differs');
+    s=await channel.observe({condition:'native '+name+' option',readElimOutlier:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'))});
+    const option=one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'Unique '+name+' option required');
+    await channel.perform({condition:'select native '+name,initialObservation:s,ready,identity:()=>f,resolve:()=>({verb:'click',ref:option.ref})});
+    s=await observe(channel,name+' readback');need(s.node_elim_outlier.values[key]===value&&s.node_elim_outlier.settings[name]===wanted[name],name+' differs');
    }
    need(same(s.node_elim_outlier.settings,Object.fromEntries(Object.entries(wanted).filter(([k])=>k!=='name'))),'final outlier field settings differ');
   }
@@ -81,7 +84,7 @@ export async function configureElimOutlier(channel,p,{inputMapping}){
  need(s.node_elim_outlier.ordered===ordered&&!s.node_elim_outlier.quality&&!Object.values(s.node_elim_outlier.switches).some(Boolean),'global outlier settings differ');
  need(same(s.node_elim_outlier.fields.filter(f=>f.used).map(f=>f.name),baseline.fields.filter(f=>selected.includes(f.name)).map(f=>f.name)),'selected field set differs');
  s=await observe(channel,'outlier editor binding and native queue idle before Next');
- const configuration={...s.node_elim_outlier,field_settings:after};
+ const configuration={...s.node_elim_outlier,mode:request?.mode??'detect',field_settings:after};
  await channel.perform({condition:'validate outlier detect settings',initialObservation:s,ready,identity:s=>s.prepared_node_context,
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Outlier Next unavailable').ref,expected_stage:'done'})});
  const done=await channel.observe({condition:'outlier detect accepted by Loginom',ready:s=>s.wizard?.stage==='done'});

@@ -279,7 +279,8 @@ page = context.pages()[0]
     }else if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
-  const reads=expectedOutputs.length===0&&state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0
+  const reads=expectedOutputs.length===0&&(Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0
+   ||state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0)
    ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
   if(expected.tree_outputs){
    for(const contract of expected.tree_outputs){

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {assnRulesConfigurationReadback} from '../lib/assn-rules-readback.mjs';
 const node={document_id:'doc',workflow_id:'workflow',node_id:'clustering'};
 function candidate(){
- const values={input_mapping:{},configure:{configuration:{verified:true,node_context:node,fields:[{name:'Transaction',usage_type:6},{name:'Item',usage_type:7}],roles:{transaction:6,item:7},min_support_pct:50,min_confidence_pct:60,max_items:2},validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{},finish:{settings_applied:true,mode:'execute',execution_id:'execute-2',training:{status:'trained',node,execution_id:'train-1',source:[{node:{...node,node_id:'import'},output:0,input:0}]}}};
+ const values={input_mapping:{},configure:{configuration:{verified:true,node_context:node,fields:[{name:'Transaction',usage_type:6},{name:'Item',usage_type:7}],roles:{transaction:6,item:7},min_support_pct:50,min_confidence_pct:60,max_items:2,min_lift:0,max_consequents:1},validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{},finish:{settings_applied:true,mode:'execute',execution_id:'execute-2',training:{status:'trained',node,execution_id:'train-1',source:[{node:{...node,node_id:'import'},output:0,input:0}]}}};
  return {node,operation_id:'operation',phases:Object.entries(values).map(([phase,value])=>({phase,status:'verified',receipt_id:'operation:'+phase,value:{verified:true,cleanup_complete:true,...value}}))};
 }
 test('readback distinguishes native training from subsequent execution and names its input',()=>{
@@ -17,6 +17,11 @@ test('readback preserves the observed item technical name independently of its l
   const input=candidate();input.phases[1].value.configuration.fields[1]={name,label:'Товар',usage_type:7};
   assert.equal(assnRulesConfigurationReadback(input).item_field,name);
  }
+});
+test('readback reports observed lengths and lift after native reconfiguration',()=>{
+ const input=candidate();Object.assign(input.phases[1].value.configuration,{max_items:3,max_consequents:2,min_lift:1.2});
+ const result=assnRulesConfigurationReadback(input);
+ assert.equal(result.max_items,3);assert.equal(result.consequence_limit,2);assert.equal(result.min_lift,1.2);
 });
 test('ordinary execution alone cannot claim a trained model',()=>{
  for(const alter of [v=>delete v.training,v=>v.training.execution_id=v.execution_id,v=>v.training.source=[]]){

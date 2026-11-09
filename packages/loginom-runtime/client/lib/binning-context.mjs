@@ -49,7 +49,7 @@ export function readBinningBrowser(prefix){
   if(f.FOwner!==c||!root.contains(el)||el.getAttribute('data-tid')!=='MethodSettingFrame')return fail('binning_frame_owner');
   const values={},controls={},switches=[];
   const names=['chkLowerLimitOpen;ValueControl','chkUpperLimitOpen;ValueControl','chkRoundingLevel',
-   ...(selected.method_code===3?['chkStrictLowerLimit','chkStrictUpperLimit','cbbCountBins;ValueControl']:selected.method_code===2?['chkStrictLowerLimit','chkStrictUpperLimit','edtBinWidth;ValueControl']:selected.method_code===4?['cbbTileCount;ValueControl','cbbMatchingObservationsMode;ValueControl','chkSummTile;ValueControl']:[])];
+   ...(selected.method_code===3?['chkStrictLowerLimit','chkStrictUpperLimit','cbbCountBins;ValueControl']:selected.method_code===2?['chkStrictLowerLimit','chkStrictUpperLimit','edtBinWidth;ValueControl']:selected.method_code===4?['cbbTileCount;ValueControl','cbbMatchingObservationsMode;ValueControl','chkSummTile;ValueControl']:selected.method_code===5?['cbbSDBinsMode;ValueControl']:[])];
   for(const key of names){const v=cmp('MethodSettingFrame;'+key,el);if(!v||typeof v.getValue!=='function')return fail('binning_control:'+key);values[key]=v.getValue();controls[key]='MethodSettingFrame;'+key;}
   if([2,3].includes(selected.method_code))for(const key of ['edtLowerLimit','edtUpperLimit']){
    const candidates=(selected.type==='datetime'?['ValueContainer;datetimefield']:['ValueContainer;num','ValueContainer;Int64Field']).map(k=>cmp('MethodSettingFrame;'+key+';'+k,el)).filter(v=>v?.el?.dom?.checkVisibility({checkVisibilityCSS:true}));
@@ -57,12 +57,13 @@ export function readBinningBrowser(prefix){
    const v=candidates[0],value=bound(v.getValue());values[key]=selected.type!=='datetime'&&typeof value==='string'&&/^-?\d+$/.test(value)&&Number.isSafeInteger(Number(value))?Number(value):value;controls[key]=v.el.dom.getAttribute('data-tid');
   }
   for(const e of el.querySelectorAll('[data-tid$=";SwitchButton"]'))if(globalThis.Ext?.getCmp?.(e.id)?.pressed===true)switches.push(e.getAttribute('data-tid'));
-  const method={2:'width',3:'count',4:'frequency'}[selected.method_code];
+  const method={2:'width',3:'count',4:'frequency',5:'sd'}[selected.method_code];
   frame={record_id:selected.record_id,controls,values,switches};
-  settings={method,size:values[method==='count'?'cbbCountBins;ValueControl':method==='width'?'edtBinWidth;ValueControl':'cbbTileCount;ValueControl'],
-   limits:method==='frequency'?null:[values.edtLowerLimit,values.edtUpperLimit],strict_lower:values.chkStrictLowerLimit??false,strict_upper:values.chkStrictUpperLimit??false,
+  settings={method,size:method==='sd'?null:values[method==='count'?'cbbCountBins;ValueControl':method==='width'?'edtBinWidth;ValueControl':'cbbTileCount;ValueControl'],
+   limits:['frequency','sd'].includes(method)||values.chkStrictLowerLimit===false&&values.chkStrictUpperLimit===false?null:[values.edtLowerLimit,values.edtUpperLimit],strict_lower:values.chkStrictLowerLimit??false,strict_upper:values.chkStrictUpperLimit??false,
    rounding:values.chkRoundingLevel,lower_open:values['chkLowerLimitOpen;ValueControl'],upper_open:values['chkUpperLimitOpen;ValueControl'],
-   ...(method==='frequency'?{ties:({0:'next',1:'current'})[values['cbbMatchingObservationsMode;ValueControl']]??'unsupported',sums:values['chkSummTile;ValueControl']}:{} )};
+   ...(method==='frequency'?{ties:({0:'next',1:'current'})[values['cbbMatchingObservationsMode;ValueControl']]??'unsupported',sums:values['chkSummTile;ValueControl']}:{}),
+   ...(method==='sd'?{sd_coefficient:[0,1,2].includes(values['cbbSDBinsMode;ValueControl'])?values['cbbSDBinsMode;ValueControl']+1:null}:{})};
  }
  const binGrid=cmp(base+';grdBins'),binRows=rows(c.FBinItemsStore),intervals=[];
  if(!binRows||binGrid?.getStore?.()!==c.FBinItemsStore)return fail('binning_bins_inventory');

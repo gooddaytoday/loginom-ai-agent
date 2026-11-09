@@ -13,7 +13,9 @@ import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 // Existing JS describe exception: [JS plan, J21](../../../../docs/node-development/nodes/programming-javascript/plan.md).
 // boundedUserToolReply below also enforces this limit on the complete JS wire reply.
-const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET});
+const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET,
+ // Text Import reference compaction (LAB-1139, cycle C0): measured card + 100; owner ceiling v040-text-budget-13k is 13000.
+ 'imports.text':10390});
 
 test('user-v1 model receives dock_node_apply within 20000 bytes',t=>{
  const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');
@@ -44,7 +46,7 @@ test('every registered user-v1 node card fits its type budget',async t=>{
   for(const modes of [undefined,...original.modes.map(mode=>[mode]),original.modes]){
    description.node_types=await loader.describeNodes([original],modes);
    const reply={content:[{type:'text',text:JSON.stringify(description)}]};
-   if(['programming.javascript','imports.text','transform.filter_data','transform.ungroup_data'].includes(type))t.diagnostic(JSON.stringify({type,modes,card_bytes:bytes(description.node_types[0]),wire_bytes:bytes(reply)}));
+   if(['programming.javascript','imports.text','transform.filter_data','transform.ungroup_data','transform.col_union_data'].includes(type))t.diagnostic(JSON.stringify({type,modes,card_bytes:bytes(description.node_types[0]),wire_bytes:bytes(reply)}));
    assert.equal(boundedUserToolReply(reply,{tool:'dock_action_describe'}),reply,type+': '+modes);
    const card=description.node_types[0];
    assert.equal(typeof card.guidance,'string');

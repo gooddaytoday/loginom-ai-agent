@@ -27,6 +27,15 @@ assert (c['data']/'modes.csv').is_file() and c['oracle'].is_file()
 assert [o['output_port'] for o in e['outputs']]==[0,1]
 assert all(o['column_order']=='exact' and o['ordered'] for o in e['outputs'])
 assert sum(len(o['columns'])*len(o['rows']) for o in e['outputs'])==146
+for kind in ['auto','sd']:
+ c=r.scenario('binning-'+kind);e=r.expected_for(c,'/owned/modes.lgp')
+ assert c['input_files']==['numeric-modes.csv'] and c['export_count']==2
+ assert c['expected_name']=='modes/expected-'+kind+'.json'
+ assert c['prompt'].name=='task-'+kind+'.md' and c['oracle'].is_file()
+ assert (c['data']/'numeric-modes.csv').is_file()
+ assert [o['output_port'] for o in e['outputs']]==[0,1]
+ assert all(o['column_order']=='exact' and o['ordered'] for o in e['outputs'])
+ assert sum(len(o['columns'])*len(o['rows']) for o in e['outputs'])==(130 if kind=='auto' else 143)
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
