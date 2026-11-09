@@ -35,7 +35,8 @@ def expected(determining):
                 # A table shorter than the determining one is padded with NULL.
                 row.update(table[i] if i < len(table) else dict.fromkeys(keys))
         rows.append(row)
-    return {'package_path': '{{PACKAGE_PATH}}',
+    return {**({'col_union_settings': {'row_count': 'input', 'determining_input': 'third', 'padding': 'null'}} if determining else {}),
+            'package_path': '{{PACKAGE_PATH}}',
             'nodes': [{'type': 'imports.text'}, {'type': 'transform.col_union_data'}, {'type': 'exports.text'}],
             'outputs': [{'output_node_type': 'transform.col_union_data', 'output_port': 0,
                          'ordered': True, 'column_order': 'exact', 'columns': columns, 'rows': rows}]}

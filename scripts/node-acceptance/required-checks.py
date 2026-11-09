@@ -73,7 +73,7 @@ RULES = (
     ((C + 'auto-correlation-*.mjs', 'docs/node-development/nodes/research-autocorrelation/acceptance/edges/**',
       'packages/product/skills/loginom-automation/references/nodes/research.auto_correlation.md'),
      ('live-ui',), ('acf-nonzero', 'acf-empty', 'acf-null', 'acf-one', 'acf-series', 'acf-eight', 'acf-update')),
-    ((C + 'col-union-*.mjs',), ('live-ui',), ('colunion-third-repeat', 'colunion-edit', 'colunion-repeat', 'union-auto-match')),
+    ((C + 'col-union-*.mjs', 'scripts/node-acceptance/col-union-*.mjs', 'docs/node-development/nodes/transform-coluniondata/acceptance/v040/**'), ('live-ui',), ('colunion-third-determining', 'colunion-third-repeat', 'colunion-edit', 'colunion-repeat', 'union-auto-match')),
     ((C + 'quality-*.mjs', 'scripts/node-acceptance/quality*.mjs',
       'docs/node-development/nodes/research-quality/acceptance/**',
       'docs/node-development/nodes/research-quality/fixtures/**'), ('live-ui',), ('quality-default', 'quality-spikes', 'quality-types')),
