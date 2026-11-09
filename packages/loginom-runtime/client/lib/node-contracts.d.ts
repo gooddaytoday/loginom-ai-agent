@@ -499,9 +499,11 @@ export interface EnrichConfigurationReadback {
 export interface UngroupParameters {
  ungroup?: {keys:Array<{total:string;support:string}>;value_field:string;item_field:string;share_field:string;
   rounding:{format:'none'}|{format:'precision'|'multiple';value:number};balance:'none'|'last'|'proportional'|'equal'};
+ seasonality?: {total_order_field:string;support_order_field:string;period:'year';multiplier:1;index_count:12;rare_density:0.25;absent_periods:1;novelty_periods:1;max_history_periods:0};
 }
 export interface UngroupConfigurationReadback extends Omit<JoinConfigurationReadback,'kind'|'mode'|'keys'|'case_sensitive'|'include_joined_keys'> {
- kind:'ungroup';mode:'shares'|'computed';ungroup:NonNullable<UngroupParameters['ungroup']>;
+ kind:'ungroup';mode:'shares'|'computed'|'seasonal';ungroup:NonNullable<UngroupParameters['ungroup']>&{total_order_field?:string;support_order_field?:string};
+ seasonality?:{period:'year';multiplier:number;index_count:number;rare_density:number;absent_periods:number;novelty_periods:number;max_history_periods:number};
 }
 
 export interface UserVariablesParameters {

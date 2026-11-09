@@ -813,6 +813,13 @@ cleanup. Для update сравнивается итоговая стадия (`
 Fraction oracle и expected-weights.json остаются в harness. Оба выхода,
 повтор Execute, native типы и порядок, два CSV, Save/cold/cleanup.
 
+`ungroup-seasonal`: Разгруппировка с учётом временных колебаний и сезонности,
+постоянная опора. Только `task-seasonal.md`, seasonal-totals.csv и
+seasonal-constant-support.csv передаются модели; Fraction oracle
+`oracle-seasonal.py` и expected-seasonal.json остаются в harness. Порт 0 без
+доверительных границ (исключены в соответствии полей), порт 1 целиком; повтор
+Execute, native типы и порядок, два CSV, Save/cold/cleanup.
+
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
 Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,

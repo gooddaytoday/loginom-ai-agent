@@ -13,7 +13,7 @@ test('computed mode accepts both outputs and preserves native integer fields',()
  assert.deepEqual(ungroupOutputFields({...configuration,ungroup:u}).map(f=>[f.name,f.type]),[['Group','string'],['Total','integer'],['Total_Rounded','integer'],['Item','string'],['OutputValue','integer']]);
  for(const change of [{rounding:{format:'precision',value:2}},{balance:'proportional'}])assert.throws(()=>validateUngroupParameters({ungroup:{...u,...change}},'computed',r));
  assert.throws(()=>validateUngroupParameters({ungroup:u},'shares',r));
- assert.deepEqual(createUngroupNodeSupport({}).nodeApplyHandlers.get('transform.ungroup_data').modes,['shares','computed']);
+ assert.deepEqual(createUngroupNodeSupport({}).nodeApplyHandlers.get('transform.ungroup_data').modes,['shares','computed','seasonal']);
 });
 test('existing computed execution preserves settings only with matching requested mode',async()=>{
  assert.equal(supportedUngroupConfiguration(configuration).share_field,'Weight');
