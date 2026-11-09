@@ -4,10 +4,11 @@
 Reads fixtures only. Constant signals have no slope and unit seasonal factors.
 Computed here: shares 25/75, constant trend, unit indices. Not computed:
 zero/NULL/empty outcomes (OutputVT=6 «Исключено», UngroupQuality=1 at zero
-support, empty ports) and NULL UngroupQuality at positive support are rewritten
-native stage-0 observation (DOM `&nbsp;`, NULL vs NaN not read exactly). Their
+support, empty ports) and UngroupQuality=NaN at positive constant support are
+rewritten native observations (NaN: Loginom 7.4.2 typed read, LAB-1314). Their
 expected files carry "claim": "наблюдение, не заявляется" and are not PASS
-criteria until a native typed-read or an owner decision.
+criteria until a native typed-read or an owner decision. NaN is written as the
+exact non-finite marker {"non_finite": "NaN"} (owner decision v040-nan-exact).
 The proposal projects out confidence bands: their formula is unknown.
 An alternating/nonconstant signal is deliberately refused, never fitted to actual.
 --check regenerates the five committed expected files and fails on drift.
@@ -28,7 +29,7 @@ CASES = {
 }
 CLAIM = 'наблюдение, не заявляется'
 OBSERVED_NOT_CLAIMED = {
-    'constant': 'UngroupQuality=null при положительной опоре: в DOM `&nbsp;`, NULL против NaN не прочитан',
+    'constant': 'UngroupQuality=NaN при постоянной положительной опоре: native typed-read Loginom 7.4.2 (LAB-1314), CSV `Nan`',
     'zero': 'OutputVT=6 «Исключено», OutputValue=OutputTrend=0 и UngroupQuality=1 при нулевой опоре',
     'null': 'пустые порты 0 и 1 с полной схемой при полностью NULL-опоре',
     'empty-support': 'пустые порты 0 и 1 с полной схемой при пустой опоре',
@@ -71,7 +72,7 @@ def expected(case):
                              OutputTrend=int(value), OutputSI=1,
                              OutputVT=0 if weight else 6,
                              OutputVTDesc='Разгруппированное' if weight else 'Исключено'))
-    quality = [dict(Item=item, Group=group, UngroupQuality=None if weight else 1,
+    quality = [dict(Item=item, Group=group, UngroupQuality={'non_finite': 'NaN'} if weight else 1,
                     **{f'SeasonalIndex{i}': 1 for i in range(1, 13)})
                for (group, item), weight in weights.items()] if totals else []
     fields = [('Group', 'string'), ('Total', 'integer'), ('Total_Rounded', 'integer'),
@@ -88,7 +89,7 @@ def expected(case):
                                           **({'tolerance': dict(abs=1e-12, rel=1e-12)}
                                              if kind == 'real' else {}))
                                      for name, kind in columns], rows=values))
-    return dict(claim=('частично: только UngroupQuality — ' + CLAIM) if case == 'constant' else CLAIM,
+    return dict(claim=('частично: только UngroupQuality — наблюдение 7.4.2, не заявляется в справке') if case == 'constant' else CLAIM,
                 observation=OBSERVED_NOT_CLAIMED[case],
                 package_path='{{PACKAGE_PATH}}', nodes=[dict(type='imports.text'),
                 dict(type='imports.text'), dict(type='transform.ungroup_data'),

@@ -3,7 +3,7 @@ import {ensureJoinOutputComplete} from './join-output-sync.mjs';
 import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
-import {resolveUngroupFields,ungroupOutputFields} from './ungroup-parameters.mjs';
+import {resolveUngroupFields,ungroupOutputFields,ungroupSecondaryFields} from './ungroup-parameters.mjs';
 import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 export const effectiveUngroupInput=(mapping,native)=>{
@@ -26,8 +26,8 @@ export async function configureUngroupInputs(channel,mappings,ctx,request,finish
  }
  try{
   if(request.parameters.ungroup){
-   resolveUngroupFields(request.parameters.ungroup,observations.map(o=>o.fields));
-   const fields=ungroupOutputFields({input_fields:observations.map(o=>o.fields),ungroup:request.parameters.ungroup});
+   resolveUngroupFields(request.parameters.ungroup,observations.map(o=>o.fields),{seasonality:request.parameters.seasonality});
+   const fields=ungroupOutputFields({input_fields:observations.map(o=>o.fields),ungroup:request.parameters.ungroup,method:request.mode});
    need(new Set(fields.map(f=>f.name.toLowerCase())).size===fields.length,'Ungroup output source names conflict; rename an input field explicitly');
    const output=request.mappings.find(m=>m.direction==='output');
    if(output?.fields)need(output.fields.length===fields.length&&output.fields.every(f=>fields.some(s=>s.name===f.source.name)),'Ungroup output mapping is incomplete');
@@ -76,8 +76,8 @@ export async function configureUngroupOutput(channel,configuration,parameters,ma
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
  return {verified:true,cleanup_complete:true,effect_possible:changes.length>0,source_identity_verified:true,native_mapping:s.node_mapping,changes};
 }
-// Keep shares' committing port-0 mapping; inspect computed's secondary output
-// without changing its native empty seasonal-index definition.
+// Keep shares' committing port-0 mapping; inspect the computed/seasonal
+// secondary output without changing its native definition.
 export async function configureUngroupOutputs(channel,c,p,mappings,finishWizard){
  await channel.openOutputPort(0);
  const result=await configureUngroupOutput(channel,c,p,mappings[0]??{});
@@ -85,10 +85,10 @@ export async function configureUngroupOutputs(channel,c,p,mappings,finishWizard)
  need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===result.native_mapping.target_fields[i][k])),'Ungroup rendered definition differs');
  const finish=await finishWizard('done',true,definition);
  const ports=[{port:0,schema:result.native_mapping.target_fields.filter(f=>!f.excluded)}];
- if(c.method==='computed'){
+ if(c.method!=='shares'){
   await channel.openOutputPort(1);
   const s=await channel.observe({condition:'ungroup secondary native output',readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified&&s.node_mapping.inventory_complete});
-  const m=s.node_mapping,n=m.node_context,current=s.prepared_node_context,expected=[c.ungroup.item_fields[0],...c.ungroup.keys.map(k=>k.support)].map(name=>c.input_fields[1].find(f=>f.name===name));
+  const m=s.node_mapping,n=m.node_context,current=s.prepared_node_context,expected=ungroupSecondaryFields(c,c.seasonality?.index_count??0);
   need(n?.verified&&current?.verified&&['document_id','workflow_id','node_id'].every(k=>n[k]===c.node_context[k]&&n[k]===current[k])
    &&n.output_port?.port===1&&JSON.stringify(n.output_port)===JSON.stringify(current.output_port),'Ungroup secondary output owner differs');
   const fields=m.target_fields;
@@ -108,7 +108,8 @@ export async function readUngroupOutputs(channel,read,ctx,mapped){
   need(expected&&output.schema.length===expected.length&&output.schema.every((f,i)=>f.name===expected[i].name&&f.type===expected[i].type),'Ungroup output schema/order differs');
   const aligned=alignReadSchema(output.schema,expected);
   output.schema=output.schema.map((f,index)=>({...f,data_kind:aligned[index].data_kind}));
-  if(port===1)need(output.row_count===0&&output.sample_complete,'Ungroup computed secondary output must be empty');
+  // Computed's secondary output is natively empty; seasonal's has quality/indices.
+  if(port===1&&!expected.some(f=>f.name==='UngroupQuality'))need(output.row_count===0&&output.sample_complete,'Ungroup computed secondary output must be empty');
   ports.push(output);
  }
  need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'Ungroup distinct native output ports required');

@@ -38,3 +38,18 @@ assert json.loads(subprocess.check_output([sys.executable,str(c['oracle'])]))==j
  const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
+
+test('seasonal catalog uses the approved two-output Fraction oracle privately',()=>{
+ const script=`import importlib.util,json,subprocess,sys
+from pathlib import Path
+s=importlib.util.spec_from_file_location('run_check',Path('scripts/node-acceptance/run-check.py'));m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('ungroup-seasonal');e=m.expected_for(c,'/own/test.lgp')
+assert c['export_count']==2 and c['input_files']==['seasonal-totals.csv','seasonal-constant-support.csv'] and c['base'] is None
+assert c['prompt'].name=='task-seasonal.md' and c['oracle'].name=='oracle-seasonal.py'
+assert e['package_path']=='/own/test.lgp' and [o['output_port'] for o in e['outputs']]==[0,1]
+assert [len(o['rows']) for o in e['outputs']]==[4,2] and [len(o['columns']) for o in e['outputs']]==[10,15]
+assert all((c['data']/f).is_file() for f in c['input_files'])
+assert json.loads(subprocess.check_output([sys.executable,str(c['oracle'])]))==json.loads((c['source']/c['expected_name']).read_text())`;
+ const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});

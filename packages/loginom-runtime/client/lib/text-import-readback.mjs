@@ -24,10 +24,10 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
   }));
   const source=fields(c.source,['source_path','connection','encoding','rows_to_skip','first_line_as_title',
     ...['file_info','parallel_processing'].filter(k=>c.source?.fields?.[k]?.status==='observed')]);
-  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','date_format','date_separator'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
+  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','variant_as_general_type','date_format','date_separator'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
   requireValue(typeof source.first_line_as_title==='boolean'
     &&Object.entries(source).every(([k,v])=>typeof v===(['first_line_as_title','parallel_processing'].includes(k)?'boolean':'string'))
-    &&Object.entries(format).every(([k,v])=>typeof v===(k==='multiple_delimiters'?'boolean':'string')),'invalid observed field types');
+    &&Object.entries(format).every(([k,v])=>typeof v===(['multiple_delimiters','variant_as_general_type'].includes(k)?'boolean':'string')),'invalid observed field types');
   requireValue(Array.isArray(c.columns)&&c.columns.length>0&&c.columns.length<=1000
     &&c.columns.every((f,i)=>f.status==='observed'&&f.index===i&&typeof f.used==='boolean'
       &&['name','label','type','data_kind'].every(k=>typeof f[k]==='string'&&f[k].length<=120))
