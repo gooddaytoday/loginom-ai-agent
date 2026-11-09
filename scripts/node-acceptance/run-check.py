@@ -745,6 +745,12 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name in ['collapse-null', 'collapse-null-ignore', 'collapse-header', 'collapse-header-ignore', 'collapse-ignore']:
+        src = REPO / 'docs/node-development/nodes/collapse-columns/acceptance/v040'
+        mode = name.removeprefix('collapse-')
+        fixture = 'all-null.csv' if mode.startswith('null') else 'header-only.csv' if mode.startswith('header') else 'mixed.csv'
+        return dict(source=src, prompt=src / ('task-' + mode + '.md'), data=src / 'fixtures',
+                    base=None, input_files=[fixture], expected_name='expected-' + mode + '.json')
     if name in ['collapse-variant', 'collapse-mixed']:
         src = REPO / 'docs/node-development/nodes/collapse-columns/acceptance/v040'
         variant = name == 'collapse-variant'
