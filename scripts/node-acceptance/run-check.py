@@ -406,7 +406,8 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / ('acceptance/task-' + kind + '.md'),
                     data=node / 'fixtures', base=None, export_count=2,
                     input_files=['ties-modes.csv'] if kind == 'ties-current' else ['numeric-modes.csv'],
-                    expected_name='modes/expected-' + ('current' if kind == 'ties-current' else kind) + '.json', oracle=node / 'acceptance/modes/oracle.py')
+                    expected_name='modes/expected-' + ('current' if kind == 'ties-current' else kind) + '.json',
+                    oracle=node / ('acceptance/modes/oracle-edges.py' if kind == 'ties-current' else 'acceptance/modes/oracle.py'))
     if name == 'binning-datetime-manual':
         node = REPO / 'docs/node-development/nodes/preprocessing-binning'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',
@@ -1153,14 +1154,16 @@ def check_text_export_encodings(replies, destinations):
 
 def export_null_marker(events, destination):
     # Requests identify the exact export file. Existing-node patches can retain
-    # omitted settings, so only their correlated final UI readback is authoritative.
+    # omitted settings, so only the final UI readback of the same nonempty
+    # operation_id is authoritative.
     readbacks = {}
     def collect(value):
         if isinstance(value, dict):
             configuration = value.get('configuration', {})
             if (value.get('status') == 'SUCCEEDED' and configuration.get('status') == 'applied'
-                    and configuration.get('readback', {}).get('kind') == 'text_export'):
-                readbacks[value.get('operation_id')] = configuration['readback']
+                    and configuration.get('readback', {}).get('kind') == 'text_export'
+                    and value.get('operation_id')):
+                readbacks[value['operation_id']] = configuration['readback']
             for item in value.values(): collect(item)
         if isinstance(value, list):
             for item in value: collect(item)
@@ -1197,7 +1200,7 @@ def export_null_marker(events, destination):
             settings = readback.get('settings', {})
             found = readback.get('destination') == destination and 'null_marker' in settings
             marker, node = settings.get('null_marker'), readback.get('node', node)
-    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or correlated patch readback required for ' + str(destination)
+    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or a SUCCEEDED readback with the same operation_id required for ' + str(destination)
     assert isinstance(marker, str) and marker in ['', '?', 'null', 'NULL'], 'CSV_NULL_MARKER_UNSUPPORTED'
     return marker
 
@@ -1379,7 +1382,8 @@ def check_coarse_frozen_trainings(replies):
     assert len(trained) >= 2, 'COARSE_FROZEN_TWO_TRAININGS'
     assert len({o['node']['node_id'] for o in trained}) == 1, 'COARSE_FROZEN_SAME_NODE'
     assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in trained), 'COARSE_FROZEN_LOCKED'
-    assert len({json.dumps(o['configuration']['readback']['training'].get('source'), sort_keys=True) for o in trained}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
+    sources = {json.dumps(o['configuration']['readback'].get('training', {}).get('source'), sort_keys=True) for o in trained}
+    assert len(sources) == 1 and 'null' not in sources, 'COARSE_FROZEN_SAME_IMPORT'
 
 
 def port_path(reply, port):
