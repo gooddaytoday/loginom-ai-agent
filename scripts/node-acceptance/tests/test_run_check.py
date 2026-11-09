@@ -35,7 +35,6 @@ class RunCheckTests(unittest.TestCase):
         after = runner.expected_for(case, '/own/variant.lgp')
         self.assertEqual(after['outputs'][0]['columns'][1]['type'], 'string')
         self.assertEqual(runner.expected_for(case, '/own/variant.lgp', cold=True), after)
-        self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-variant.md').read_bytes())
 
     def test_text_update_has_two_named_stages_and_final_only_cold(self):
         case = runner.scenario('text-auto-update')

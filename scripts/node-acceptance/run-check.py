@@ -268,7 +268,7 @@ def scenario(name, case_root=None, *, cases=None):
 
     if name == 'text-variant':
         node = REPO / 'docs/node-development/nodes/text-import'
-        return dict(source=node / 'acceptance/extended', prompt=REPO / 'scripts/node-acceptance/scenarios/text-variant/task.md',
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-variant.md',
                     data=node / 'fixtures/extended', input_files=['variant.csv'], base=None, export_count=2,
                     lgd_initial='expected-variant.json', expected_name='expected-variant-off.json',
                     oracle=node / 'acceptance/extended/oracle.py', text_variant=True)

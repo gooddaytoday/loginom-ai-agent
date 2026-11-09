@@ -128,7 +128,7 @@ RULES = (
       'docs/node-development/nodes/text-import/acceptance/task-multi-file-list.md',
       'docs/node-development/nodes/text-import/acceptance/task-multi-file.md',
       'scripts/node-acceptance/scenarios/text-mask/**',
-      'scripts/node-acceptance/scenarios/text-variant/**',
+      'docs/node-development/nodes/text-import/acceptance/task-variant.md',
       'packages/product/skills/loginom-automation/references/nodes/imports.text.md'),
      ('live-ui',), ('text-variant', 'text-mask', 'text-multi-file-list', 'text-auto-types', 'text-auto-update', 'import-bindings')),
     ((C + 'text-import-*.mjs', C + 'collapse-*.mjs'), ('live-ui',), ('s1', 's4')),

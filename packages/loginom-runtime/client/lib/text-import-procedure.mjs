@@ -415,10 +415,11 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
         : stage === 'text_import_format' ? w.settings?.fields : null;
       const names = stage === 'text_import_file' ? Object.keys(parameters.source)
         : stage === 'text_import_format' ? Object.keys(parameters.format) : [];
-      // A format picker can temporarily hide the new Variant checkbox. Its own mutation still requires field().
-      const formatPicker=stage==='text_import_format'&&state.ui.elements.some(e=>e.wizard_combo?.kind==='option'
+      // A format picker or an open column editor can temporarily hide the new Variant checkbox.
+      // Its own mutation still requires field(); the final format readback after editors close stays strict.
+      const formatPicker=stage==='text_import_format'&&(w.import_column_editor!=null||state.ui.elements.some(e=>e.wizard_combo?.kind==='option'
         &&(e.wizard_combo.field?.scope??'import_format')==='import_format'&&e.wizard_combo.field?.root_ref===w.root_ref
-        &&Object.hasOwn(parameters.format,e.wizard_combo.field.name)&&e.allowed_actions?.includes('select_wizard_option'));
+        &&Object.hasOwn(parameters.format,e.wizard_combo.field.name)&&e.allowed_actions?.includes('select_wizard_option')));
       if (!names.every(name => fields?.[name]?.status === 'observed' && fields[name].truncated !== true
         || name==='variant_as_general_type'&&!Object.hasOwn(fields??{},name)&&formatPicker)) return false;
       if (stage === 'output_mapping' && w.output_columns?.definition_coverage?.status !== 'complete_configured_rows') return false;
