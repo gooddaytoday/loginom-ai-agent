@@ -61,6 +61,14 @@ test("exports preserve NULL separately from empty strings with an explicit annou
   expect(exports).not.toMatch(/\$(?:1|ARGUMENTS)/)
 })
 
+test("continuation adds a new Export only for a new upstream node and a different destination", async () => {
+  const exports = await Bun.file(new URL("../skills/loginom-automation/references/nodes/exports.text.md", import.meta.url)).text()
+  expect(exports).toMatch(/новый узел выше Export[\s\S]*?другой destination[\s\S]*?новый Export[\s\S]*?прежний не трогай/)
+  expect(exports).toContain("не создавай второй Export на тот же destination")
+  expect(exports).not.toContain("upstream-полей сама по себе не")
+  expect(new TextEncoder().encode(exports).length).toBeLessThanOrEqual(6000)
+})
+
 test("single chain calculation permits source activation only after a safe preflight refusal", () => {
   expect(chain).toContain('finish:"done"')
   expect(chain).toContain("requires an active source output")

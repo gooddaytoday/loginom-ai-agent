@@ -120,6 +120,7 @@ test('occupied existing export explains upstream recovery without duplicating th
    assert.match(reply.error.message,/same Export with inputs:\[\].*NEW operation_id/);
    assert.match(reply.error.message,/Do not create a second Export/);
    assert.ok(!reply.error.message.includes('target.kind:"new"'));
+   assert.match(reply.error.message,/different destination.*new Export/);
    assert.match(reply.next_step.instruction,/No node mutation or browser recovery is required/);
    assert.deepEqual(f.calls,['source']);
    assert.equal((await f.runtime.runNodeApply(r)).error.message,outcome.error.message);
