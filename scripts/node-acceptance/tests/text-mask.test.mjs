@@ -41,14 +41,21 @@ with tempfile.TemporaryDirectory() as d:
  except AssertionError as error:assert str(error)=='TEXT_MASK_INPUT_DELIVERY_MISSING'
  else:raise AssertionError('missing delivery passed')
 owner=dict(status='SUCCEEDED',node=dict(node_id='same',document_id='first'),configuration=dict(readback=dict(kind='text_import',
- source=dict(source_path='/own/mask-run-mask/sales_*.csv',file_info='Имя файла',parallel_processing=False),format={},columns=[],output_mapping={})),
+ source=dict(source_path='/own/mask-run-mask/sales_*.csv',file_info='Имя файла',parallel_processing=False),
+ format=dict(delimiter=';',text_qualifier='"',decimal_separator='.',null_marker='NULL'),columns=[],output_mapping={})),
  output=dict(ports=[dict(port=0,schema=[],sample=[])]))
 second=copy.deepcopy(owner);second['node']['document_id']='reopened'
+second['configuration']['readback']['format'].update(delimiter='Точка с запятой',text_qualifier='Двойная кавычка (")',decimal_separator='Точка (.)')
 r.check_text_mask([(1,owner),(2,second)])
 for key,value in [('node_id','other'),('source_path','/own/sales_2026-03.csv'),('parallel_processing',True)]:
  bad=copy.deepcopy(second)
  if key=='node_id':bad['node'][key]=value
  else:bad['configuration']['readback']['source'][key]=value
+ try:r.check_text_mask([(1,owner),(2,bad)])
+ except AssertionError:pass
+ else:raise AssertionError(key)
+for key,value in [('delimiter',','),('text_qualifier',''),('decimal_separator',','),('null_marker','')]:
+ bad=copy.deepcopy(second);bad['configuration']['readback']['format'][key]=value
  try:r.check_text_mask([(1,owner),(2,bad)])
  except AssertionError:pass
  else:raise AssertionError(key)

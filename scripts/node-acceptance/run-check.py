@@ -847,6 +847,11 @@ def check_text_multi_file_list(replies):
 
 
 def check_text_mask(replies):
+    # Native editable combos show literals after editing and these labels after
+    # reopen (the same aliases as text-import-procedure's saved-format check).
+    displays = dict(delimiter={';': 'Точка с запятой'}, text_qualifier={'"': 'Двойная кавычка (")'},
+                    decimal_separator={'.': 'Точка (.)'})
+    format_values = lambda value: {k: displays.get(k, {}).get(v, v) for k, v in value.items()}
     imports = [owner for _, reply in replies for owner, port in ports(reply)
                if owner.get('status') == 'SUCCEEDED' and port.get('port') == 0
                and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
@@ -857,7 +862,8 @@ def check_text_mask(replies):
         assert owner['node']['node_id'] == imports[0]['node']['node_id'], 'TEXT_MASK_IMPORT_RECREATED'
         assert current['source']['source_path'].endswith('/sales_*.csv'), 'TEXT_MASK_NATIVE_MASK_MISSING'
         assert current['source'].get('file_info') == 'Имя файла' and current['source'].get('parallel_processing') is False, 'TEXT_MASK_SERVICE_SETTINGS'
-        assert all(current[k] == saved[k] for k in ['source', 'format', 'columns', 'output_mapping']), 'TEXT_MASK_SETTINGS_CHANGED'
+        assert all(current[k] == saved[k] for k in ['source', 'columns', 'output_mapping']), 'TEXT_MASK_SETTINGS_CHANGED'
+        assert format_values(current['format']) == format_values(saved['format']), 'TEXT_MASK_FORMAT_CHANGED'
 
 
 def model_replies(events):

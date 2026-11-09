@@ -40,9 +40,9 @@ or get fresh `dock_storage_source` refs. Set `source.kind:"verified_sources"`,
 string FileName outside CSV `columns` (or `"none"`). No Calculator/JS. Preserve
 the existing node; inspect all output fields and Save separately.
 
-Mask: `source_mask`, `*` in the basename of one owned directory, never with
-`source_path(s)`. Before each Execute observe all matches via
-`dock_storage_source` and pass their proofs; a new match joins on rerun.
+Mask: `source_mask` in an owned directory, `*` only in filename; never `source_path(s)`.
+Each Execute: fresh `dock_storage_source` for ALL matches; resend SAME
+`source_mask` with `verified_sources` on the SAME node.
 
 ## Auto-detected types
 
