@@ -790,6 +790,28 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
                 runner.check_csv(path, expected, **options)
 
+    def test_new_export_without_marker_uses_correlated_readback(self):
+        # LAB-1257 model.stdout.jsonl:52 new export-intervals sent only destination;
+        # its wait receipt (:57) read back settings.null_marker ''.
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='value')])
+        def events(readback=None, readback_destination='/test/all.csv'):
+            batch = self.export_events(readback=readback)
+            del batch[0][1]['part']['state']['input']['parameters']['null_marker']
+            if readback is not None:
+                outcome = json.loads(batch[1][1]['part']['state']['output'])
+                outcome['configuration']['readback']['destination'] = readback_destination
+                batch[1][1]['part']['state']['output'] = json.dumps(outcome)
+            return batch
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text('s\n""\nvalue\n')
+            options = dict(null_marker=None, destination='/test/all.csv')
+            runner.check_csv(path, expected, export_events=events(readback=''), **options)
+            for batch in [events(), events(readback='', readback_destination='/other/all.csv')]:
+                with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                    runner.check_csv(path, expected, export_events=batch, **options)
+        self.assertEqual(runner.export_null_marker(self.export_events('?', readback=''), '/test/all.csv'), '?')
+
     def test_export_null_marker_patch_uses_final_receipt(self):
         expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='')])
         with tempfile.TemporaryDirectory() as directory:

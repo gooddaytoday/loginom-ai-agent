@@ -269,6 +269,8 @@ rules. Names, widths, counts and every value remain checked.
 When `expected.json` sets `null_marker`, CSV NULL cells must use that exact
 marker. Otherwise, for outputs containing NULL, the CSV check uses the explicit
 `parameters.null_marker` of the `exports.text` request for that exact destination.
+A new export that omits it uses `settings.null_marker` from the correlated
+successful configuration readback of the same `operation_id` and destination.
 Existing-node patches require the correlated successful configuration readback
 (including retained settings), also through wait/inspect receipts. Supported
 markers are `''`, `?`, `null`, and `NULL`; a marker matching any non-NULL value
