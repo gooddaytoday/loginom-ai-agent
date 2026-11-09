@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { createRoot } from "react-dom/client"
 import { dashboard, type DashboardState } from "./loginom"
 import "./style.css"
@@ -29,7 +30,7 @@ function channelsFrom(table: Table) {
 
 type Channel = ReturnType<typeof channelsFrom>[number]
 const number = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 })
-const percent = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1, style: "percent" })
+const percent = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2, style: "percent" })
 const quantity = (value: number | null) => value === null ? "—" : number.format(value)
 const roiLabel = (value: number | null) => value === null ? "—" : percent.format(value / 100)
 const thresholdLabel = (value: number | null) => value === null ? "не задан" : quantity(value)
@@ -42,27 +43,16 @@ function total(channels: Channel[], field: "budget" | "revenue" | "campaigns") {
 }
 
 function Comparison({ channels }: { channels: Channel[] }) {
-  const limits = channels.reduce((range, channel) => {
-    const roi = channel.roi ?? 0
-    return { min: Math.min(range.min, roi), max: Math.max(range.max, roi) }
-  }, { min: 0, max: 0 })
-  const span = limits.max - limits.min || 1
-  const zero = -limits.min / span * 100
   return <section className="comparison">
     <h2>ROI по каналам</h2>
-    <ol>
-      {channels.map((channel, index) => {
-        const width = Math.abs(channel.roi ?? 0) / span * 100
-        const negative = (channel.roi ?? 0) < 0
-        return <li key={index}>
-          <div className="chart-label"><span>{channel.name}</span><strong>{roiLabel(channel.roi)}</strong></div>
-          <div className="track" aria-hidden="true">
-            <i style={{ left: `${zero}%` }} />
-            <b className={negative ? "loss" : ""} style={{ left: `${negative ? zero - width : zero}%`, width: `${width}%` }} />
-          </div>
-        </li>
-      })}
-    </ol>
+    <ResponsiveContainer width="100%" height={Math.max(140, channels.length * 44)}>
+      <BarChart data={channels} layout="vertical" margin={{ right: 12, top: 12 }}>
+        <XAxis type="number" stroke="#d9edb5" tickFormatter={n => n + "%"} />
+        <YAxis type="category" dataKey="name" width={86} tick={{ fill:"#fff", fontSize:12 }} />
+        <Tooltip formatter={value => roiLabel(Number(value))} contentStyle={{color:"#20312c"}} />
+        <Bar name="ROI" dataKey="roi" fill="#c8e98e" isAnimationActive={false} />
+      </BarChart>
+    </ResponsiveContainer>
   </section>
 }
 
@@ -107,20 +97,25 @@ function App() {
   const [needsRun, setNeedsRun] = useState(false)
   const input = useRef<HTMLInputElement>(null)
 
+  const revision = useRef(0)
+
   async function calculate(operation: () => Promise<DashboardState>) {
+    const request = ++revision.current
     setBusy(true)
     setError("")
     try {
       const state = await operation()
+      if (request !== revision.current) return
       if (input.current) input.current.value = state.value === null ? "" : String(state.value)
       if (state.error) throw Error(state.error)
       setNeedsRun(state.table === null)
       if (state.table) setData({ channels: channelsFrom(state.table), threshold: state.value })
     } catch (failure) {
+      if (request !== revision.current) return
       setError(failure instanceof Error ? failure.message : String(failure))
       setNeedsRun(true)
     } finally {
-      setBusy(false)
+      if (request === revision.current) setBusy(false)
     }
   }
 
@@ -148,15 +143,15 @@ function App() {
         <h1>Эффективность маркетинга</h1>
       </div>
       <label className="filter">Минимальный бюджет кампании
-        <input ref={input} type="number" min="0" step="any" required disabled={busy || !dashboard} />
+        <input ref={input} type="number" min="0" step="any" required disabled={!dashboard} />
       </label>
     </header>
     <div className="status" role="status">
       {busy && <span>Идёт расчёт…</span>}
       {error && <span className="failure">{error}</span>}
       {!busy && needsRun && !error && <span>Узел ещё не рассчитан.</span>}
-      {needsRun && dashboard && !busy && <button onClick={() => void calculate(() => dashboard!.run())}>Рассчитать</button>}
-      {data && <span className="threshold">Показаны данные при пороге <strong>{thresholdLabel(data.threshold)}</strong></span>}
+      {needsRun && dashboard && !busy && <button onClick={() => void calculate(() => dashboard!.run())}>Выполнить</button>}
+      {data && <span className="threshold">Расчёт при пороге <strong>{thresholdLabel(data.threshold)}</strong></span>}
     </div>
     {data && <Results channels={data.channels} />}
   </main>
