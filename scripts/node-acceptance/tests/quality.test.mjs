@@ -23,6 +23,20 @@ print('PASS')`;
  const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
+test('Quality types catalog selects only the approved input and independent oracle',()=>{
+ const script=`import importlib.util
+from pathlib import Path
+p=Path('scripts/node-acceptance/run-check.py'); s=importlib.util.spec_from_file_location('r',p); m=importlib.util.module_from_spec(s); s.loader.exec_module(m)
+c=m.scenario('quality-types'); e=m.expected_for(c,'/own/quality.lgp')
+assert c['input_files']==['types.csv'] and c['export_count']==5
+assert c['prompt'].name=='task-types.md' and c['oracle'].name=='oracle-types.py'
+assert c['expected_name']=='expected-types.json' and 'quality_initial_name' not in c
+assert [o['output_port'] for o in e['outputs']]==[0,1,2,3,4]
+assert [len(o['rows']) for o in e['outputs']]==[8,0,0,8,6]
+assert all(o['ordered'] and o['column_order']=='exact' for o in e['outputs'])`;
+ const r=spawnSync('python3',['-B','-c',script],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});
 async function qualityEvents(){
  const root=new URL('../../../docs/node-development/nodes/research-quality/acceptance/',import.meta.url);
  const initial=JSON.parse(await readFile(new URL('expected.json',root))),updated=JSON.parse(await readFile(new URL('expected-update.json',root)));
@@ -46,6 +60,21 @@ test('Quality audit uses stock exact typed matching and refuses substitutions or
   if(fault==='source')bad[1].configuration.readback.source.source_path='diagnostic.csv';
   if(fault==='node')last.node.node_id='new-quality';
   assert.throws(()=>checkQualityMain(initial,updated,bad),/QUALITY_/);
+ }
+});
+test('Quality single round requires five exact fresh outputs from the configured node',async()=>{
+ const {initial,events}=await qualityEvents(),one=[events[0],events[2]];
+ assert.deepEqual(checkQualityMain(null,initial,one),{status:'PASS',node_id:'quality',execution_ids:['first'],ports:[0,1,2,3,4]});
+ for(const fault of ['value','fresh','port','configured','cleanup','execution','node']){
+  const bad=structuredClone(one),r=bad[1];
+  if(fault==='value')r.output.ports[4].sample[0][8].value='999';
+  if(fault==='fresh')r.output.ports[0].fresh=false;
+  if(fault==='port')r.output.ports.pop();
+  if(fault==='configured')delete r.configuration.readback;
+  if(fault==='cleanup')r.cleanup_complete=false;
+  if(fault==='execution')r.output.ports[0].execution_id='other';
+  if(fault==='node')bad.push({...structuredClone(r),node:{node_id:'replacement'}});
+  assert.throws(()=>checkQualityMain(null,initial,bad),/QUALITY_/,fault);
  }
 });
 

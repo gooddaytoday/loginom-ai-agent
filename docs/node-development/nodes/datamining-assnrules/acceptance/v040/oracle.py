@@ -101,7 +101,55 @@ def expected():
                             'native recommendation table and padding for two consequences'])
 
 
-if __name__ == '__main__':
+def consequents_expected(lift):
+    source = baskets('train.csv')
+    # Native reader binding for this fixture on Loginom 7.4.2. These lists
+    # bind enumeration only; all membership and metrics come from Fraction.
+    native_sets = ['A', 'B', 'AB', 'C', 'AC', 'BC', 'ABC']
+    native_rules = [('A', 'B'), ('B', 'A'), ('A', 'C'), ('C', 'A'),
+                    ('B', 'C'), ('C', 'B'), ('AB', 'C'), ('AC', 'B'),
+                    ('BC', 'A'), ('C', 'AB'), ('B', 'AC'), ('A', 'BC')]
+    sets = sorted(itemsets(source), key=lambda s: native_sets.index(''.join(s['items'])))
+    found = sorted(rules(source, lift, 2),
+                   key=lambda r: native_rules.index((''.join(r['antecedent']), ''.join(r['consequent']))))
+    assert len(sets) == 7 and len(found) == (12 if lift == 0 else 6)
+    column = lambda name, kind: dict(name=name, type=kind, label_any=True,
+        **(dict(tolerance=dict(abs=1e-10, rel=1e-10)) if kind == 'real' else {}))
+    output = lambda port, columns, rows: dict(output_node_type='datamining.assn_rules', output_port=port,
+        ordered=False, column_order='exact', columns=columns, rows=rows)
+    set_columns = [column('ItemsetID', 'integer'), column('Width', 'integer'), column('Support', 'real')]
+    set_columns += [column('Item_' + str(i), 'string') for i in range(3)]
+    rule_columns = [column('RuleID', 'integer')] + [column(n, 'real') for n in ['Support', 'Confidence', 'Lift']]
+    # Fresh max_items=3 node: Teach, Execute, Save, cold and lift retraining
+    # retain grouped A/A/C/C columns (LAB-1239 native cycle 2). Metrics below
+    # remain independent of this native schema binding.
+    rule_columns += [column('Item_' + str(i) + '_' + side, 'string') for side in ['A', 'C'] for i in range(2)]
+    return [output(0, set_columns, [dict(ItemsetID=index, Width=len(s['items']), Support=s['support'],
+        **{'Item_' + str(i): s['items'][i] if i < len(s['items']) else None for i in range(3)})
+        for index, s in enumerate(sets, 1)]),
+        output(1, rule_columns, [dict(RuleID=index, Support=r['support'], Confidence=r['confidence'], Lift=r['lift'],
+            **{'Item_' + str(i) + '_' + side: r[key][i] if i < len(r[key]) else None
+               for i in range(2) for side, key in [('A', 'antecedent'), ('C', 'consequent')]})
+            for index, r in enumerate(found, 1)])]
+
+
+def consequents_artifacts():
+    base = dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
+        ['imports.text', 'datamining.assn_rules', 'exports.text']])
+    final = consequents_expected(Fraction(6, 5))
+    return {'expected-consequents.json': dict(base, outputs=consequents_expected(Fraction(0)) + final),
+            'expected-consequents-cold.json': dict(base, outputs=final)}
+
+
+if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):
+    for name, value in consequents_artifacts().items():
+        path = Path(__file__).with_name(name)
+        if sys.argv[1:] == ['--write-consequents']:
+            path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        else:
+            assert json.loads(path.read_text(encoding='utf-8')) == value, name
+    print('PASS: independent consequent tables, native enumeration, NULL padding and final cold expectations')
+elif __name__ == '__main__':
     value = expected()
     if sys.argv[1:] == ['--check']:
         assert json.loads(Path(__file__).with_name('expected.json').read_text()) == value

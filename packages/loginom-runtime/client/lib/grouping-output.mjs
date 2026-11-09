@@ -61,6 +61,10 @@ export function resolveGroupingOutput(configuration,parameters,native,mapping={}
  return {fields:ordered};
 }
 export async function configureGroupingOutput(channel,configuration,parameters,mapping={}){
+ // A binding reruns the saved node without reapplying its output definition.
+ // Freeze its declared layout before Save, including an initially matching
+ // native order; autosync can otherwise reorder exported columns on reopen.
+ if(configuration.options?.pedSortResult?.switch_pressed&&mapping.autosync===undefined)mapping={...mapping,autosync:false};
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
  let initial=await channel.observe({condition:'grouping output inventory',readMappings:true,ready});
  initial=await ensureGroupingOutputSources(channel,initial);
