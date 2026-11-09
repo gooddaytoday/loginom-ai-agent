@@ -64,8 +64,9 @@ test("exports preserve NULL separately from empty strings with an explicit annou
 test("continuation adds a new Export only for a new upstream node and a different destination", async () => {
   const exports = await Bun.file(new URL("../skills/loginom-automation/references/nodes/exports.text.md", import.meta.url)).text()
   expect(exports).toMatch(/новый узел выше Export[\s\S]*?другой destination[\s\S]*?новый Export[\s\S]*?прежний не трогай/)
-  expect(exports).toContain("не создавай второй Export на тот же destination")
-  expect(exports).not.toContain("upstream-полей сама по себе не")
+  expect(exports).toMatch(/прежний не трогай\. Иначе исправь прежнюю upstream-цепочку на месте или сообщи ограничение/)
+  expect(exports).toContain("второй Export на тот же destination не создавай")
+  expect(exports).toContain("только смена файла не требует нового Export")
   expect(new TextEncoder().encode(exports).length).toBeLessThanOrEqual(6000)
 })
 
