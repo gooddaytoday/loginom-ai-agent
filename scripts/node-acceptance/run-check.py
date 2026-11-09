@@ -558,6 +558,12 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-holdout':
+        node = REPO / 'docs/node-development/nodes/datamining-assnrules'
+        src = node / 'acceptance/v040'
+        return dict(source=src, prompt=src / 'task-recommendations.md', data=node / 'fixtures/v040',
+                    base=None, input_files=['recommend-train.csv', 'recommend-holdout.csv'], export_count=2,
+                    expected_name='expected-holdout.json', assnrules_holdout=True)
     if name == 'assnrules-recommend':
         node = REPO / 'docs/node-development/nodes/datamining-assnrules'
         src = node / 'acceptance/v040'
@@ -2178,6 +2184,10 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if spec.get('assnrules_holdout'):
+            write(folder / 'assnrules-holdout-replies.json', [o for _, o in replies])
+            self.phase('assnrules-holdout-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/assnrules-holdout.mjs',
+                folder / 'expected.json', folder / 'assnrules-holdout-replies.json'], folder, timeout=60)
         if expected.get('clustering_apply'):
             write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
             self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
