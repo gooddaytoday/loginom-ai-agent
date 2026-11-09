@@ -225,6 +225,29 @@ class RunCheckTests(unittest.TestCase):
             self.csv_result(dict(output, rows=[dict(Q=None)]), 'Q\nNan\n', null_marker='?')
         self.csv_result(dict(output, rows=[dict(Q={'non_finite': '-Infinity'})]), 'Q\n-Inf\n', null_marker='?')
 
+    def test_csv_present_datetime_requires_a_date_in_every_row_never_its_value(self):
+        # v040-c8-filetime: FileTime is typed datetime and not NULL; its value is not promised.
+        output = dict(column_order='exact', columns=[dict(name='File', type='string'),
+                      dict(name='FileTime', type='datetime', label_any=True, comparison='present')],
+                      rows=[dict(File='a.csv', FileTime=True), dict(File='b.csv', FileTime=True)])
+        for first, second in [('2026-11-09 10:11:00', '1999-01-01T00:00:00.000'), ('2026-11-09', '2026-11-09T10:11')]:
+            self.csv_result(output, f'File,FileTime\na.csv,{first}\nb.csv,{second}\n', null_marker='?')
+        for bad in ['?', '', 'not a date', '10:11']:
+            with self.subTest(bad=bad), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, f'File,FileTime\na.csv,2026-11-09 10:11:00\nb.csv,{bad}\n', null_marker='?')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'File,FileTime\na.csv,2026-11-09\nb.csv,\n')
+        for change in [dict(type='string'), dict(types=['datetime', 'string'])]:
+            bad = copy.deepcopy(output)
+            bad['columns'][1].update(change)
+            with self.subTest(change=change), self.assertRaisesRegex(AssertionError, 'EXPECTED_COMPARISON_INVALID'):
+                self.csv_result(bad, 'File,FileTime\na.csv,2026-11-09\nb.csv,2026-11-09\n')
+        for token in [None, '2026-11-09T10:11:00.000', False]:
+            bad = copy.deepcopy(output)
+            bad['rows'][1]['FileTime'] = token
+            with self.subTest(token=token), self.assertRaisesRegex(AssertionError, 'EXPECTED_COMPARISON_INVALID'):
+                self.csv_result(bad, 'File,FileTime\na.csv,2026-11-09\nb.csv,2026-11-09\n')
+
     def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
         output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
                       rows=[dict(A=1, B=1), dict(A=2, B=3)])

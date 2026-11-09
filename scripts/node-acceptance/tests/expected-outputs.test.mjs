@@ -222,3 +222,28 @@ test('expected non-finite Real matches the exact typed marker, never NULL or a n
  assert.throws(()=>matchExpectedOutputs([marked('NaN')],[report(1)]));
  assert.throws(()=>parseExpectedOutputs({package_path:'/t.lgp',nodes:[],outputs:[report({non_finite:'nan'})]}));
 });
+
+test('v040-c8-filetime: comparison present accepts any non-NULL DateTime and never compares the value',()=>{
+ const columns=[{name:'File',type:'string',label_any:true},{name:'FileTime',type:'datetime',label_any:true,comparison:'present'}];
+ const output={output_node_type:'imports.text',output_port:0,ordered:false,column_order:'exact',columns,rows:[{File:'a.csv',FileTime:true},{File:'b.csv',FileTime:true}]};
+ const expected={package_path:'/own/p.lgp',nodes:[{type:'imports.text'}],outputs:[output]};
+ const {outputs}=parseExpectedOutputs(expected);
+ const schema=[{name:'File',label:'File',type:'string'},{name:'FileTime',label:'Время файла',type:'datetime'}];
+ const time=value=>({type:'datetime',is_null:false,value,precision:'millisecond',representation:'local_datetime',timezone:'unspecified'});
+ const read=cells=>[{node:{node_id:'t'},type:'imports.text',output_port:0,data:{schema,row_count:2,sample_complete:true,precision:{numbers_verified:true},
+  sample:cells.map((cell,i)=>[{type:'string',is_null:false,value:['a.csv','b.csv'][i]},cell])}}];
+ // Any present value passes: the time is not promised to equal a local mtime.
+ assert.equal(matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),time('1999-01-01T00:00:00.000')]),outputs).length,1);
+ assert.equal(matchExpectedOutputs(read([{...time('2026-11-09T10:11:00.000'),timezone:'Europe/Moscow'},
+  {type:'datetime',is_null:false,value:'2026-11-09T10:11:00.000',precision:'minute'}]),outputs).length,1);
+ assert.equal(matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),{type:'datetime',is_null:false,value:'00000000c079e640',
+  precision:'exact_native',native:{tag:7,bytes_le:'00000000c079e640'}}]),outputs).length,1);
+ for(const bad of [{type:'datetime',is_null:true,value:null},{...time(''),value:''},{...time('x'),value:'not a date'},
+  {...time('x'),value:null},{type:'string',is_null:false,value:'2026-11-09T10:11:00.000'},undefined])
+  assert.throws(()=>matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),bad]),outputs),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ // The form is datetime-only, and its rows carry only the presence token.
+ const variant=change=>{const e=structuredClone(expected);change(e.outputs[0]);return e;};
+ for(const change of [o=>{o.columns[1].type='string';},o=>{o.columns[1].types=['datetime','string'];},
+  o=>{o.rows[0].FileTime=null;},o=>{o.rows[0].FileTime='2026-11-09T10:11:00.000';},o=>{o.rows[0].FileTime=false;}])
+  assert.throws(()=>parseExpectedOutputs(variant(change)),/EXPECTED_COMPARISON_INVALID/);
+});

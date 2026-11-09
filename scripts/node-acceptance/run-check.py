@@ -1228,6 +1228,10 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     delimiter = csv_delimiter(path)
     rows = list(csv.reader(io.StringIO(path.read_text(encoding='utf-8-sig')), delimiter=delimiter))
     columns = expected['columns']
+    # v040-c8-filetime: same shape rule as expected-outputs.mjs comparison 'present'.
+    assert all(col.get('comparison') != 'present' or col['type'] == 'datetime'
+               and not any(k in col for k in ['types', 'tolerance', 'category_labels_any', 'name_any'])
+               and all(row[col['name']] is True for row in expected['rows']) for col in columns), 'EXPECTED_COMPARISON_INVALID'
     infer_marker = null_marker is None and any(row[col['name']] is None for row in expected['rows'] for col in columns)
     if infer_marker:
         null_marker = export_null_marker(export_events, destination)
@@ -1260,6 +1264,11 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
         return None
 
     def equal(value, col, target):
+        if col.get('comparison') == 'present':
+            if value == null_marker or not value.strip(): return False
+            try: datetime.fromisoformat(value)
+            except ValueError: return False
+            return re.match(r'\d{4}-\d{2}-\d{2}', value) is not None
         if target is None: return value == null_marker
         if infer_marker and value == null_marker: return False
         if col.get('comparison') == 'json_ast':
