@@ -102,6 +102,7 @@ def proposals():
                  'l2_slopes_only': str(b)}, 'beta_exact': list(map(str, beta)), 'rss_exact': str(rss),
                  'expected': expected(rows, beta)}
     for name, fixture, lasso, ridge in [
+            ('shifted-elastic-1-3', 'shifted', F(1), F(3)),
             ('en-0-2', 'shifted', F(0), F(2)),
             ('en-2-0', 'shifted', F(2), F(0)),
             ('en-2-1', 'shifted', F(2), F(1)),
@@ -116,7 +117,7 @@ def proposals():
     # Only the two proposed acceptance tasks need full cell tables. Other
     # cases retain exact diagnostic vectors/RSS rather than duplicating data.
     for name, value in cases.items():
-        if name not in ['shifted-lasso', 'shifted-elastic']:
+        if name not in ['shifted-lasso', 'shifted-elastic', 'shifted-elastic-1-3']:
             value.pop('expected')
     return {'status': 'proposal_requires_owner_approval', 'cases': cases}
 

@@ -45,6 +45,18 @@ test('Ridge readback reports observed manual lambda without aliasing configurati
  assert.equal(result.epsilon,1e-10);assert.equal(result.training.status,'trained');
  configuration.regularization.lambda_l2=2;assert.equal(result.regularization.lambda_l2,1);
 });
+test('Elastic Net readback confirms method, both lambdas and fixed internal epsilon',()=>{
+ const input=candidate(),c=input.phases[1].value.configuration;
+ Object.assign(c,{mode:'elastic',regularization:{setup:'manual',lambda_l1:1,lambda_l2:3},epsilon:1e-12});
+ const result=linRegressionConfigurationReadback(input);
+ assert.equal(result.mode,'elastic');assert.equal(result.epsilon,1e-12);
+ assert.deepEqual(result.regularization,{setup:'manual',lambda_l1:1,lambda_l2:3});
+ const validator=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ assert.equal(validator(result).valid,true);
+ assert.equal(validator({...result,epsilon:1e-10}).valid,false);
+ assert.equal(validator({...result,regularization:{setup:'manual',lambda_l1:1}}).valid,false);
+ c.regularization.lambda_l2=4;assert.equal(result.regularization.lambda_l2,3);
+});
 test('Enter readback reports the requested coefficient statistics and observed confidence level',()=>{
  const input=candidate(),configuration=input.phases[1].value.configuration;
  assert.equal(linRegressionConfigurationReadback(input).statistics,'coefficients');

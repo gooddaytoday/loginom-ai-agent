@@ -161,10 +161,11 @@ test('the installed catalog and request validator admit Enter with both tabular 
  assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l2.minimum,0);
  assert.equal(validateNodeApplyRequest({...request,mode:'lasso',parameters:{...request.parameters,linear_regression:{lambda_l1:1}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
  assert.equal(card.parameter_schema.properties.linear_regression.properties.lambda_l1.minimum,0);
+ assert.equal(validateNodeApplyRequest({...request,mode:'elastic',parameters:{...request.parameters,linear_regression:{lambda_l1:1,lambda_l2:3}}},support.nodeApplyHandlers).handler,support.nodeApplyHandlers.get('datamining.lin_regression'));
 });
 
-for(const mixed of [false,true])test('LASSO freezes prediction field order, mixed='+mixed,async()=>{
- const c={...configuration,mode:'lasso'},predicted=linRegressionOutputColumns(c,0);
+for(const mode of ['lasso','elastic'])for(const mixed of [false,true])test(mode+' freezes prediction field order, mixed='+mixed,async()=>{
+ const c={...configuration,mode},predicted=linRegressionOutputColumns(c,0);
  const prediction={verified:true,inventory_complete:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
   target_fields:predicted.map((f,index)=>({...f,index,record_id:'p'+index,required:false,inherited:false,excluded:false})),source_fields:[]};
  if(mixed){
