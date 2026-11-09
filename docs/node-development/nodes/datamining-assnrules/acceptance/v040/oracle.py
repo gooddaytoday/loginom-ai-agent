@@ -141,6 +141,31 @@ def consequents_artifacts():
             'expected-consequents-cold.json': dict(base, outputs=final)}
 
 
+def recommend_artifact():
+    source = baskets('recommend-train.csv')
+    found = rules(source, Fraction(0), 1, max_items=2)
+    assert [(r['antecedent'], r['consequent']) for r in found] == [(['A'], ['B']), (['B'], ['A'])]
+    column = lambda name, kind: dict(name=name, type=kind, label_any=True,
+        **(dict(tolerance=dict(abs=1e-10, rel=1e-10)) if kind == 'real' else {}))
+    # Native reader schema from discovery.md: port 2 inserts the transaction
+    # field between metrics and items. Rule IDs share port 1 enumeration.
+    columns = [column('RuleID', 'integer')] + [column(n, 'real') for n in ['Support', 'Confidence', 'Lift']]
+    items = [column('Item_0_' + side, 'string') for side in ['A', 'C']]
+    row = lambda index, r: dict(RuleID=index, Support=r['support'], Confidence=r['confidence'],
+        Lift=r['lift'], Item_0_A=r['antecedent'][0], Item_0_C=r['consequent'][0])
+    recommendations = [dict(row(index, r), Transaction=t)
+        for t, basket in source.items() for index, r in enumerate(found, 1)
+        if set(r['antecedent']) <= basket and not set(r['consequent']) & basket]
+    assert recommendations == [dict(RuleID=1, Support=.75, Confidence=.75, Lift=1.,
+        Transaction='T4', Item_0_A='A', Item_0_C='B')]
+    output = lambda port, schema, rows: dict(output_node_type='datamining.assn_rules', output_port=port,
+        ordered=False, column_order='exact', columns=schema, rows=rows)
+    return dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
+        ['imports.text', 'datamining.assn_rules', 'exports.text']], outputs=[
+        output(1, columns + items, [row(i, r) for i, r in enumerate(found, 1)]),
+        output(2, columns + [column('Transaction', 'string')] + items, recommendations)])
+
+
 if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):
     for name, value in consequents_artifacts().items():
         path = Path(__file__).with_name(name)
@@ -151,7 +176,13 @@ if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--chec
     print('PASS: independent consequent tables, native enumeration, NULL padding and final cold expectations')
 elif __name__ == '__main__':
     value = expected()
-    if sys.argv[1:] == ['--check']:
+    if sys.argv[1:] == ['--write-recommend']:
+        Path(__file__).with_name('expected-recommend.json').write_text(json.dumps(recommend_artifact(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    elif sys.argv[1:] == ['--check']:
+        assert json.loads(Path(__file__).with_name('expected-recommend.json').read_text()) == recommend_artifact()
+        task = Path(__file__).with_name('task-recommend.md').read_text()
+        assert 'recommend-train.csv' in task and 'recommend-holdout.csv' not in task
+        assert 'T4' not in task and '.75' not in task
         assert json.loads(Path(__file__).with_name('expected.json').read_text()) == value
         print('PASS: exhaustive subsets, lift, multi-consequence, selected-item exclusion and holdout sensitivity')
     else:

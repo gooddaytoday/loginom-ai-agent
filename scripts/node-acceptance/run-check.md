@@ -935,3 +935,9 @@ CSV, Save, cold без перенастройки и cleanup; CDF сохраня
 Stock CSV, Save, cold без перенастройки существующего узла и cleanup.
 Oracle/expected остаются вне контекста модели. Регрессия: `colunion-edit`,
 `colunion-repeat`, `union-auto-match`.
+
+`assnrules-recommend`: обучение и повторное выполнение того же узла на
+`fixtures/v040/recommend-train.csv`, max_items=2, одно следствие, lift=0.
+Только `acceptance/v040/task-recommend.md` и CSV передаются модели.
+Независимый `oracle.py --check` проверяет правила и рекомендации порта 2,
+совпадающий RuleID, все native поля, типы и порядок; два CSV, Save/cold/cleanup.
