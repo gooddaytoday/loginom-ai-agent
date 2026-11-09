@@ -11,13 +11,13 @@
 новых предикатов или ослабления точности. Такое ограничение объёма требует
 решения владельца до этапа 1; оно не согласовано этим PR.
 
-| Сценарий (ещё не зарегистрирован) | Task | Expected | Строки 0 / 1 | Статус |
+| Сценарий | Task | Expected | Строки 0 / 1 | Статус |
 |---|---|---|---:|---|
 | ungroup-seasonal | task-seasonal.md | expected-seasonal.json | 4 / 2 | доли, тренд, индексы вычислены и проверяются; UngroupQuality=NaN (`{"non_finite":"NaN"}`, решение `v040-nan-exact`) — наблюдение 7.4.2, не заявляется в справке |
-| ungroup-seasonal-zero | task-seasonal-zero.md | expected-seasonal-zero.json | 4 / 2 | наблюдение, не заявляется |
-| ungroup-seasonal-null | task-seasonal-null.md | expected-seasonal-null.json | 0 / 0 | наблюдение, не заявляется |
-| ungroup-seasonal-empty-support | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | 0 / 0 | наблюдение, не заявляется |
-| ungroup-seasonal-empty-totals | task-seasonal-empty-totals.md | expected-seasonal-empty-totals.json | 0 / 0 | наблюдение, не заявляется |
+| ungroup-seasonal-zero (не зарегистрирован) | task-seasonal-zero.md | expected-seasonal-zero.json | 4 / 2 | наблюдение, не заявляется |
+| ungroup-seasonal-null (не зарегистрирован) | task-seasonal-null.md | expected-seasonal-null.json | 0 / 0 | наблюдение, не заявляется |
+| ungroup-seasonal-empty-support (не зарегистрирован) | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | 0 / 0 | наблюдение, не заявляется |
+| ungroup-seasonal-empty-totals (не зарегистрирован) | task-seasonal-empty-totals.md | expected-seasonal-empty-totals.json | 0 / 0 | наблюдение, не заявляется |
 
 LAB-1166 (решение оркестратора пересмотрено): исходы zero/null/empty
 (OutputVT=6 «Исключено», UngroupQuality=1 при нулевой опоре, пустые порты)
