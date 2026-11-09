@@ -1,0 +1,6 @@
+FROM loginom-server-master:latest
+COPY server-libs/ /app/
+COPY artifacts/Dist/Server/config/ /workdir/
+COPY --chmod=755 artifacts/Dist/Server/server/loginomd /app/loginomd
+COPY --chmod=755 artifacts/Dist/Server/server/python_run.sh /app/python_run.sh
+USER root
