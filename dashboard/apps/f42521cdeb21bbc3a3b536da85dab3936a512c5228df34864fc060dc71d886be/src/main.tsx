@@ -29,6 +29,9 @@ function channelsFrom(table: Table) {
 }
 
 type Channel = ReturnType<typeof channelsFrom>[number]
+const columns = [
+  ["name", "Канал"], ["budget", "Бюджет"], ["revenue", "Выручка"], ["roi", "ROI"], ["campaigns", "Кампании"],
+] as const
 const number = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 })
 const percent = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2, style: "percent" })
 const quantity = (value: number | null) => value === null ? "—" : number.format(value)
@@ -49,6 +52,8 @@ function Comparison({ channels }: { channels: Channel[] }) {
       <BarChart data={channels} layout="vertical" margin={{ right: 12, top: 12 }}>
         <XAxis type="number" stroke="#d9edb5" tickFormatter={n => n + "%"} />
         <YAxis type="category" dataKey="name" width={86} tick={{ fill:"#fff", fontSize:12 }} />
+        <YAxis yAxisId="roiLabels" orientation="right" type="category" dataKey={(channel: Channel) => roiLabel(channel.roi)}
+          interval={0} width="auto" axisLine={false} tickLine={false} tick={{ fill: "#d9edb5", fontSize: 12 }} />
         <Tooltip formatter={value => roiLabel(Number(value))} contentStyle={{color:"#20312c"}} />
         <Bar name="ROI" dataKey="roi" fill="#c8e98e" isAnimationActive={false} />
       </BarChart>
@@ -57,6 +62,17 @@ function Comparison({ channels }: { channels: Channel[] }) {
 }
 
 function Results({ channels }: { channels: Channel[] }) {
+  const [sort, setSort] = useState<{ key: keyof Channel; direction: "ascending" | "descending" } | null>(null)
+  const sorted = sort ? [...channels].sort((a, b) => {
+    const direction = sort.direction === "ascending" ? 1 : -1
+    if (sort.key === "name") return direction * a.name.localeCompare(b.name, "ru")
+    const left = a[sort.key]
+    const right = b[sort.key]
+    if (left === right) return 0
+    if (left === null) return 1
+    if (right === null) return -1
+    return direction * (left - right)
+  }) : channels
   const budget = total(channels, "budget")
   const revenue = total(channels, "revenue")
   const roi = budget && revenue !== null ? (revenue - budget) / budget * 100 : null
@@ -76,9 +92,15 @@ function Results({ channels }: { channels: Channel[] }) {
           <h2>Показатели каналов</h2>
           <div className="scroll">
             <table aria-label="Показатели каналов">
-              <thead><tr>{["Канал", "Бюджет", "Выручка", "ROI", "Кампании"].map(label =>
-                <th key={label} scope="col">{label}</th>)}</tr></thead>
-              <tbody>{channels.map((channel, index) => <tr key={index}>
+              <thead><tr>{columns.map(([key, label]) => {
+                const direction = key === sort?.key ? sort.direction : undefined
+                return <th key={key} scope="col" aria-sort={direction}>
+                  <button type="button" onClick={() => setSort({
+                    key, direction: direction === "ascending" ? "descending" : "ascending",
+                  })}>{label} <span aria-hidden="true">{direction === "ascending" ? "↑" : direction === "descending" ? "↓" : "↕"}</span></button>
+                </th>
+              })}</tr></thead>
+              <tbody>{sorted.map((channel, index) => <tr key={index}>
                 <th scope="row">{channel.name}</th><td>{quantity(channel.budget)}</td>
                 <td>{quantity(channel.revenue)}</td><td className="return">{roiLabel(channel.roi)}</td>
                 <td>{quantity(channel.campaigns)}</td>
