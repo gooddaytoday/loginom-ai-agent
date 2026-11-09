@@ -4,17 +4,19 @@ const properties=['name','label','type','formula','description','intermediate'];
 
 export function validateVariablesCalculatorParameters(parameters,mode,request) {
  requireValue(mode==='expression','only native expression mode is supported');
- requireValue(parameters&&typeof parameters==='object'&&!Array.isArray(parameters)
+ requireValue(request?.target&&['new','existing'].includes(request.target.kind),'node target required');
+ // Existing parameters:{} reruns the saved expressions without editing them.
+ const keep=request.target.kind==='existing'&&parameters&&typeof parameters==='object'&&!Array.isArray(parameters)&&Object.keys(parameters).length===0;
+ requireValue(keep||parameters&&typeof parameters==='object'&&!Array.isArray(parameters)
   &&Object.keys(parameters).length===1&&Array.isArray(parameters.expressions)
   &&parameters.expressions.length>=1&&parameters.expressions.length<=32,'1–32 expressions required');
- requireValue(request?.target&&['new','existing'].includes(request.target.kind),'node target required');
  requireValue(Array.isArray(request.inputs)&&request.inputs.length===0,'table inputs are unsupported; use the variables port contract');
  requireValue(Array.isArray(request.mappings)&&request.mappings.every(m=>['variables','control'].includes(m.kind)&&m.direction==='input'&&m.port===0),'only typed variable/control input mappings are supported');
  if(request.read!==undefined)requireValue(Array.isArray(request.read.ports)&&request.read.ports.length===0,'table output reads are unsupported; use read.variable_ports');
  if(request.read?.variable_ports!==undefined)requireValue(request.read.variable_ports.every(p=>p===0),'only variable output zero is supported');
  requireValue((request.variable_inputs??[]).every(i=>i.input===0&&['variables','control'].includes(i.kind)),'only variable/control input zero is supported');
  const targets=new Set(),names=new Set();
- for(const e of parameters.expressions) {
+ for(const e of parameters.expressions??[]) {
   requireValue(e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['target',...properties].includes(k)),'unsupported expression parameter');
   const t=e.target;
   requireValue(t&&typeof t==='object'&&!Array.isArray(t)&&['new','existing'].includes(t.kind),'new/existing expression target required');
@@ -49,7 +51,7 @@ export function resolveVariablesCalculatorPatch(parameters,observed,{newNode=fal
  if(newNode)requireValue(baseline.length===1&&baseline[0].name==='Expr1'&&baseline[0].formula===''
   &&baseline[0].type==='real'&&baseline[0].intermediate===false&&baseline[0].description==='','new-node default expression changed');
  const expressions=newNode?[]:structuredClone(baseline),changes=[];
- for(const [index,patch] of parameters.expressions.entries()) {
+ for(const [index,patch] of (parameters.expressions??[]).entries()) {
   const existing=patch.target.kind==='existing',matches=existing?baseline.filter(e=>e.name===patch.target.name):[];
   requireValue(!existing||matches.length===1,'saved expression is missing or ambiguous');
   const before=existing?matches[0]:newNode&&index===0?baseline[0]:null;

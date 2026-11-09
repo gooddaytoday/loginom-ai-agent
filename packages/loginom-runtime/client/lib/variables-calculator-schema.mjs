@@ -152,8 +152,5 @@ export const variablesCalculatorParametersSchema={
         ]
       }
     }
-  },
-  "required": [
-    "expressions"
-  ]
+  }
 };
