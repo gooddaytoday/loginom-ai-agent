@@ -15,6 +15,7 @@ export function validateColUnionGraphInputs(request,graph){
 export function colUnionInputPorts(request,existing,graph){
  const count=Math.max(existing?.inputs.length??0,...request.inputs.map(i=>i.input+1));
  need([2,3].includes(count),'ColUnion requires two or three inputs');
+ need(!existing||!request.inputs.some(i=>i.input===2)||graph.links.some(e=>e.target===existing.ref.node_id&&e.input===2),'Adding input 2 to a saved two-input union is not supported; create a new union with inputs 0,1,2');
  const ports=Array.from({length:count},(_,i)=>i);
  need(!existing||existing.inputs.every((p,i)=>p===i),'ColUnion input inventory must be contiguous');
  need(ports.every(port=>request.inputs.some(i=>i.input===port)||existing&&graph.links.filter(e=>e.target===existing.ref.node_id&&e.input===port).length===1),'Every ColUnion input requires a source before mutation');
