@@ -13,7 +13,7 @@
 
 | Сценарий (ещё не зарегистрирован) | Task | Expected | Строки 0 / 1 | Статус |
 |---|---|---|---:|---|
-| ungroup-seasonal | task-seasonal.md | expected-seasonal.json | 4 / 2 | доли, тренд, индексы вычислены и проверяются; UngroupQuality=null — наблюдение, не заявляется (`claim` «частично») |
+| ungroup-seasonal | task-seasonal.md | expected-seasonal.json | 4 / 2 | доли, тренд, индексы вычислены и проверяются; UngroupQuality=NaN (`{"non_finite":"NaN"}`, решение `v040-nan-exact`) — наблюдение 7.4.2, не заявляется в справке |
 | ungroup-seasonal-zero | task-seasonal-zero.md | expected-seasonal-zero.json | 4 / 2 | наблюдение, не заявляется |
 | ungroup-seasonal-null | task-seasonal-null.md | expected-seasonal-null.json | 0 / 0 | наблюдение, не заявляется |
 | ungroup-seasonal-empty-support | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | 0 / 0 | наблюдение, не заявляется |
