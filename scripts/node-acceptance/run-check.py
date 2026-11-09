@@ -418,9 +418,13 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=inputs)
     if name in ['outlier-replacement-mean', 'outlier-replacement-median',
-                'outlier-replacement-most-probable', 'outlier-quartile-boundaries']:
+                'outlier-replacement-most-probable', 'outlier-quartile-boundaries',
+                'outlier-replacement-limit', 'outlier-delete', 'outlier-constant']:
         node = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier'
         task, expected, fixture = {
+            'outlier-replacement-limit': ('task-replacement-limit.md', 'expected-replacement-limit.json', 'replacement-discriminator.csv'),
+            'outlier-delete': ('task-delete.md', 'expected-delete.json', 'policies.csv'),
+            'outlier-constant': ('task-constant.md', 'expected-constant.json', 'policies.csv'),
             'outlier-replacement-mean': ('task-replacement-discriminator.md', 'expected-replacement-mean.json', 'replacement-discriminator.csv'),
             'outlier-replacement-median': ('task-replacement-median.md', 'expected-replacement-median.json', 'replacement-discriminator.csv'),
             'outlier-replacement-most-probable': ('task-replacement-most-probable.md', 'expected-replacement-most-probable.json', 'replacement-discriminator.csv'),

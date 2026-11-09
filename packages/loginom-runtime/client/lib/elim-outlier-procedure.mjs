@@ -1,5 +1,5 @@
 import {resolveElimOutlierParameters} from './elim-outlier-parameters.mjs';
-const need=(v,m)=>{if(!v)throw Error('Outlier detect: '+m);};
+const need=(v,m)=>{if(!v)throw Error('Outlier: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const ready=s=>s.wizard?.stage==='elim_outlier'&&s.node_elim_outlier?.verified===true&&s.node_elim_outlier.binding_ready===true;
 const observe=(channel,condition)=>channel.observe({condition,readElimOutlier:true,ready});
@@ -38,8 +38,9 @@ export async function configureElimOutlier(channel,p,{inputMapping,request}){
   const wanted=resolveElimOutlierParameters(p,baseline.fields,{...old,fields:selected,ordered:baseline.ordered});
   need(['sd','iqr'].includes(wanted.method)&&Number.isFinite(wanted.outlier_factor)&&Number.isFinite(wanted.extreme_factor),'newly enabled fields need explicit method and both factors');
   const outlier_policy=request?.mode==='edit'?wanted.outlier_policy:'keep',extreme_policy=request?.mode==='edit'?wanted.extreme_policy:'keep';
-  need([outlier_policy,extreme_policy].every(v=>['keep','mean','median','most_probable'].includes(v)),'edit requires supported policies for every enabled field; supply both for newly enabled fields');
-  return {name,method:wanted.method,outlier_factor:wanted.outlier_factor,extreme_factor:wanted.extreme_factor,outlier_policy,extreme_policy};
+  need([outlier_policy,extreme_policy].every(v=>['keep','mean','median','most_probable','limit','delete','constant'].includes(v)),'edit requires supported policies for every enabled field; supply both for newly enabled fields');
+  return {name,method:wanted.method,outlier_factor:wanted.outlier_factor,extreme_factor:wanted.extreme_factor,outlier_policy,extreme_policy,
+   ...(outlier_policy==='constant'?{outlier_constant:wanted.outlier_constant}:{}),...(extreme_policy==='constant'?{extreme_constant:wanted.extreme_constant}:{})};
  });
  const act=async(s,key,action)=>channel.perform({condition:'set outlier '+key,initialObservation:s,ready,identity:s=>({node:s.prepared_node_context,field:s.node_elim_outlier.selected.record_id}),
   resolve:s=>({...action,ref:one(s,e=>(e.tid===s.wizard.root_tid+';ElimOutlierWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';ElimOutlierWizard;'+key)&&e.allowed_actions.includes(action.verb),'Outlier control unavailable: '+key).ref})});
@@ -63,7 +64,7 @@ export async function configureElimOutlier(channel,p,{inputMapping,request}){
     await act(s,key+';ValueControl',{verb:'press',key:'Tab'});s=await observe(channel,'outlier factor readback');need(s.node_elim_outlier.settings[name]===wanted[name],'factor differs');
    }
    for(const [key,name] of [['pedActionOut','outlier_policy'],['pedActionExtr','extreme_policy']]){
-    const [value,label]=({keep:[1,'Оставить без изменения'],mean:[3,'Заменять средним'],median:[4,'Заменять медианой'],most_probable:[5,'Заменять наиболее вероятным']})[wanted[name]];
+    const [value,label]=({keep:[1,'Оставить без изменения'],mean:[3,'Заменять средним'],median:[4,'Заменять медианой'],most_probable:[5,'Заменять наиболее вероятным'],limit:[7,'Ограничивать'],delete:[2,'Удалять записи'],constant:[6,'Заменять заданным значением']})[wanted[name]];
     if(s.node_elim_outlier.values[key]===value)continue;
     const owner=s.wizard.root_tid+';ElimOutlierWizard;'+key+';ValueControl';
     await act(s,key+';ValueControl',{verb:'click'});
@@ -71,6 +72,13 @@ export async function configureElimOutlier(channel,p,{inputMapping,request}){
     const option=one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'Unique '+name+' option required');
     await channel.perform({condition:'select native '+name,initialObservation:s,ready,identity:()=>f,resolve:()=>({verb:'click',ref:option.ref})});
     s=await observe(channel,name+' readback');need(s.node_elim_outlier.values[key]===value&&s.node_elim_outlier.settings[name]===wanted[name],name+' differs');
+   }
+   for(const [key,name,policy] of [['pedSettedValueOut','outlier_constant','outlier_policy'],['pedSettedValueExtr','extreme_constant','extreme_policy']]){
+    if(wanted[policy]!=='constant'||s.node_elim_outlier.settings[name]===wanted[name])continue;
+    await act(s,key+';ValueContainer;num',{verb:'fill',text:String(wanted[name])});
+    s=await observe(channel,'outlier constant before commit');
+    await act(s,key+';ValueContainer;num',{verb:'press',key:'Tab'});
+    s=await observe(channel,'outlier constant readback');need(s.node_elim_outlier.settings[name]===wanted[name],name+' differs');
    }
    need(same(s.node_elim_outlier.settings,Object.fromEntries(Object.entries(wanted).filter(([k])=>k!=='name'))),'final outlier field settings differ');
   }

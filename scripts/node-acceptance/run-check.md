@@ -865,3 +865,11 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
 порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
 проверяется принятым `replace-keep-variant`.
+
+`outlier-replacement-limit`, `outlier-delete`, `outlier-constant`: edit E2.
+Утверждённые task-replacement-limit.md/task-delete.md/task-constant.md из
+preprocessing-elimoutlier/acceptance; только replacement-discriminator.csv
+для limit, policies.csv для остальных из fixtures. Независимые expected/oracle
+модели не передаются. Limit SD с множителями 1/2: RowID 8, X=4.463921244845127
+с допуском 1e-10; delete: семь строк порта 0; constant: обе политики -7.
+Полные typed-порты 0/1/2, три CSV, Save, cold без перенастройки и cleanup.

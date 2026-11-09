@@ -1882,6 +1882,9 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
 
     def test_outlier_edit_scenarios_expose_only_the_selected_fixture(self):
         for name, task, expected_name, fixture in [
+            ('outlier-replacement-limit', 'task-replacement-limit.md', 'expected-replacement-limit.json', 'replacement-discriminator.csv'),
+            ('outlier-delete', 'task-delete.md', 'expected-delete.json', 'policies.csv'),
+            ('outlier-constant', 'task-constant.md', 'expected-constant.json', 'policies.csv'),
             ('outlier-replacement-mean', 'task-replacement-discriminator.md', 'expected-replacement-mean.json', 'replacement-discriminator.csv'),
             ('outlier-replacement-median', 'task-replacement-median.md', 'expected-replacement-median.json', 'replacement-discriminator.csv'),
             ('outlier-replacement-most-probable', 'task-replacement-most-probable.md', 'expected-replacement-most-probable.json', 'replacement-discriminator.csv'),
@@ -1896,6 +1899,10 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             self.assertEqual(case['export_count'], 3)
             expected = runner.expected_for(case, '/test.lgp')
             self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 2])
+            if name == 'outlier-delete': self.assertEqual(len(expected['outputs'][0]['rows']), 7)
+            if name == 'outlier-replacement-limit':
+                row = next(r for r in expected['outputs'][0]['rows'] if r['RowID'] == 8)
+                self.assertAlmostEqual(row['X'], 4.463921244845127, delta=1e-10)
             if name == 'outlier-replacement-mean':
                 row = next(r for r in expected['outputs'][0]['rows'] if r['RowID'] == 8)
                 self.assertAlmostEqual(row['X'], 19 / 7)

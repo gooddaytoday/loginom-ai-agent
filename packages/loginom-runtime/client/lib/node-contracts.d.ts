@@ -417,7 +417,7 @@ export interface ElimOutlierConfigurationReadback {
 
 export interface ElimOutlierEditConfigurationReadback extends Omit<ElimOutlierConfigurationReadback,'mode'|'fields'> {
  mode:'edit';
- fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep'|'mean'|'median'|'most_probable';extreme_policy:'keep'|'mean'|'median'|'most_probable'}>;
+ fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';extreme_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';outlier_constant?:number;extreme_constant?:number}>;
 }
 
 export interface LogRegressionConfigurationReadback {

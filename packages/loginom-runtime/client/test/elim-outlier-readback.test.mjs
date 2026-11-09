@@ -25,9 +25,9 @@ test('readback refuses lost receipts, changed owner, clipping, untrained executi
 test('edit readback retains distinct class policies and validates the published union',()=>{
  const schema=nodeApplyResultSchema.properties.configuration.properties.readback;
  const validate=new AjvJsonSchemaValidator().getValidator(schema);
- for(const outlier_policy of ['keep','mean','median','most_probable'])for(const extreme_policy of ['keep','mean','median','most_probable']){
+ for(const outlier_policy of ['keep','mean','median','most_probable','limit','delete','constant'])for(const extreme_policy of ['keep','mean','median','most_probable','limit','delete','constant']){
   const f=fixture(),c=f.phases[1].value.configuration;
-  c.mode='edit';Object.assign(c.field_settings[0].settings,{outlier_policy,extreme_policy});
+  c.mode='edit';Object.assign(c.field_settings[0].settings,{outlier_policy,extreme_policy,...(outlier_policy==='constant'?{outlier_constant:-7}:{}),...(extreme_policy==='constant'?{extreme_constant:-9}:{})});
   const readback=elimOutlierConfigurationReadback(f);
   assert.equal(readback.mode,'edit');
   assert.equal(readback.fields[0].outlier_policy,outlier_policy);assert.equal(readback.fields[0].extreme_policy,extreme_policy);
@@ -35,4 +35,12 @@ test('edit readback retains distinct class policies and validates the published 
  }
  const invalid=fixture();invalid.phases[1].value.configuration.field_settings[0].settings.extreme_policy='mean';
  assert.throws(()=>elimOutlierConfigurationReadback(invalid),'detect never reports replacement');
+});
+
+test('readback refuses absent, nonfinite or inactive constants independently',()=>{
+ for(const kind of ['outlier','extreme'])for(const [policy,value] of [['constant',undefined],['constant',Infinity],['keep',-7]]){
+  const f=fixture(),c=f.phases[1].value.configuration;c.mode='edit';
+  Object.assign(c.field_settings[0].settings,{[kind+'_policy']:policy,[kind+'_constant']:value});
+  assert.throws(()=>elimOutlierConfigurationReadback(f),/constant/);
+ }
 });
