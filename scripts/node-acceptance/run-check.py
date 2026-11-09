@@ -266,6 +266,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'text-parallel':
+        node = REPO / 'docs/node-development/nodes/text-import'
+        return dict(source=node / 'acceptance/extended', prompt=REPO / 'scripts/node-acceptance/scenarios/text-parallel/task.md',
+                    data=node / 'fixtures/multi-file', input_files=['sales_2026-01.csv', 'sales_2026-02.csv'], base=None, export_count=2,
+                    lgd_initial='expected-parallel.json', expected_name='expected-parallel.json',
+                    oracle=node / 'acceptance/extended/oracle.py', text_parallel=True, text_list_sources=True)
     if name == 'text-auto-label':
         node = REPO / 'docs/node-development/nodes/text-import'
         return dict(source=node / 'acceptance/extended', prompt=REPO / 'scripts/node-acceptance/scenarios/text-auto-label/task.md',
@@ -875,6 +881,19 @@ def sorting_stages(case):
 def text_update_stages(case):
     return [read(case['source'] / name)['outputs'][0] for name in
             ['expected-auto-update-string.json', 'expected-auto-update.json']]
+
+
+def check_text_parallel(replies):
+    imports = [owner for _, reply in replies for owner, port in ports(reply)
+               if owner.get('status') == 'SUCCEEDED' and port.get('port') == 0
+               and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
+    assert len(imports) >= 2, 'TEXT_PARALLEL_STAGES_MISSING'
+    assert len({owner['node']['node_id'] for owner in imports}) == 1, 'TEXT_PARALLEL_IMPORT_RECREATED'
+    before, after = [owner['configuration']['readback']['source'] for owner in [imports[0], imports[-1]]]
+    assert before.get('parallel_processing') is False, 'TEXT_PARALLEL_SEQUENTIAL_MISSING'
+    assert after.get('parallel_processing') is True and after.get('max_threads') == '2', 'TEXT_PARALLEL_TWO_THREADS_MISSING'
+    assert before.get('source_path') == after.get('source_path'), 'TEXT_PARALLEL_SOURCE_CHANGED'
+    assert all(source.get('file_info') == 'Имя файла' for source in [before, after]), 'TEXT_PARALLEL_FILENAME_MISSING'
 
 
 def check_text_multi_file_list(replies):
@@ -2458,6 +2477,9 @@ class Runner:
         header = spec.get('csv_header', 'names')
         if case == 'text-multi-file-list':
             check_text_multi_file_list(replies)
+        if spec.get('text_parallel'):
+            check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
+            check_text_parallel(replies)
         if spec.get('text_mask'):
             check_text_mask(replies, self.text_mask_directory(login) + '/sales_*.csv')
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)

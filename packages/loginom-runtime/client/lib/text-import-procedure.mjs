@@ -58,6 +58,7 @@ export const autoDetectLabels={none:'Нет',new:'Только новые',all:'
 const autoDetectMode=label=>Object.keys(autoDetectLabels).find(k=>autoDetectLabels[k]===label);
 export const autoTypesRequested=p=>['new','all'].includes(p?.format?.auto_detect_columns)||!!p?.analysis?.refresh;
 export const fileInfoLabels={none:'Нет',name:'Имя файла'};
+const threadChoices=['auto',2,4,8,16,32];
 export function textImportSourceMask(source) {
   const mask=source.source_mask;
   requireValue(typeof mask==='string'&&mask.length<=2048&&mask.startsWith('/')&&!mask.startsWith('//')
@@ -139,10 +140,12 @@ function validateSettings(p,maxColumns) {
   if(Object.hasOwn(p,'node_title'))validateNodeTitle(p.node_title);
   if(Object.hasOwn(p,'analysis'))validateAnalysis(p.analysis);
   requireValue(p.source&&['encoding','first_line_as_title','rows_to_skip'].every(k=>Object.hasOwn(p.source,k))
-    &&Object.keys(p.source).every(k=>['encoding','first_line_as_title','rows_to_skip','source_path','source_paths','source_mask','file_info'].includes(k)), 'Source parameters are incomplete');
+    &&Object.keys(p.source).every(k=>['encoding','first_line_as_title','rows_to_skip','source_path','source_paths','source_mask','file_info','parallel_processing','max_threads'].includes(k)), 'Source parameters are incomplete');
   if(Object.hasOwn(p.source,'source_mask'))textImportSourceMask(p.source);
   else textImportSourcePaths(p.source);
   if(Object.hasOwn(p.source,'file_info'))requireValue(Object.hasOwn(fileInfoLabels,p.source.file_info),'Invalid file_info');
+  if(Object.hasOwn(p.source,'parallel_processing'))requireValue(typeof p.source.parallel_processing==='boolean','Invalid parallel_processing');
+  if(Object.hasOwn(p.source,'max_threads'))requireValue(threadChoices.includes(p.source.max_threads),'Invalid max_threads');
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
   requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
     && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
@@ -212,7 +215,7 @@ export function validateTextImportPatch(p) {
   const format={delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
   for(const [name,defaults] of Object.entries({source,format})) {
     if(!Object.hasOwn(p,name))continue;
-    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='source'&&['source_paths','source_mask','file_info'].includes(k)||name==='format'&&['multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
+    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='source'&&['source_paths','source_mask','file_info','parallel_processing','max_threads'].includes(k)||name==='format'&&['multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
     if(name==='source'&&['source_paths','source_mask'].some(k=>Object.hasOwn(p.source,k))&&!Object.hasOwn(p.source,'source_path'))delete defaults.source_path;
     Object.assign(defaults,p[name]);
   }
@@ -524,16 +527,17 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner:currentOwner,read,ready:isTextImportSourceReady});
   }
 
-  for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title','file_info','parallel_processing']) {
-    const sequential=name==='parallel_processing'&&(requested.source?.source_paths||requested.source?.source_mask);
+  for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title','file_info','parallel_processing','max_threads']) {
+    const sequential=name==='parallel_processing'&&(requested.source?.source_paths||requested.source?.source_mask)
+      &&!Object.hasOwn(requested.source,'parallel_processing');
     if(sequential)parameters.source.parallel_processing=false;
-    if(['file_info','parallel_processing'].includes(name)&&!Object.hasOwn(parameters.source,name))continue;
+    if(['file_info','parallel_processing','max_threads'].includes(name)&&!Object.hasOwn(parameters.source,name))continue;
     if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
     let s = await read('text_import_file'), f = field(s, name, true);
     const encoding = fieldsOnly && name==='encoding' ? resolveTextImportEncoding(parameters.source.encoding):null;
-    const desired = encoding ? encoding.label : name==='file_info'?fileInfoLabels[parameters.source[name]]: name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];
+    const desired = encoding ? encoding.label : name==='file_info'?fileInfoLabels[parameters.source[name]]:name==='max_threads'?(parameters.source[name]==='auto'?'Автоопределение':String(parameters.source[name])): name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];
     if (f.value === desired) continue;
-    if(encoding||name==='file_info') {
+    if(encoding||['file_info','max_threads'].includes(name)) {
       const picker=one(s.ui.elements.filter(e=>e.wizard_combo?.kind==='picker'&&e.wizard_combo.field.scope==='import_source'
         &&e.wizard_combo.field.name===name&&e.wizard_combo.field.root_ref===s.wizard.root_ref&&e.wizard_combo.field.owner_ref===f.owner_ref),'Source picker unavailable');
       await act(s,{verb:'click',ref:picker.ref});

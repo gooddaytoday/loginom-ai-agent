@@ -22,6 +22,36 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_text_parallel_uses_frozen_tables_and_original_input_names(self):
+        case = runner.scenario('text-parallel')
+        self.assertTrue(case['text_parallel'])
+        self.assertTrue(case['text_list_sources'])
+        self.assertEqual(case['input_files'], ['sales_2026-01.csv', 'sales_2026-02.csv'])
+        self.assertEqual(case['lgd_initial'], 'expected-parallel.json')
+        self.assertEqual(case['expected_name'], 'expected-parallel.json')
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-parallel.md').read_bytes())
+        self.assertEqual(runner.expected_for(case, '/own/parallel.lgp', cold=True), runner.expected_for(case, '/own/parallel.lgp'))
+
+    def test_text_parallel_requires_native_toggle_and_same_node(self):
+        replies = [(n, dict(status='SUCCEEDED', node=dict(node_id='import'), configuration=dict(readback=dict(
+            kind='text_import', source=dict(source_path='/own/jan.csv｜/own/feb.csv', file_info='Имя файла',
+                                           parallel_processing=enabled, max_threads='2'))),
+            output=dict(ports=[dict(port=0, schema=[], sample=[])]))) for n, enabled in enumerate([False, True])]
+        runner.check_text_parallel(replies)
+        for path, value, message in [('parallel_processing', False, 'TWO_THREADS'), ('max_threads', '4', 'TWO_THREADS'),
+                                     ('file_info', 'Нет', 'FILENAME'), ('source_path', '/own/other.csv', 'SOURCE_CHANGED')]:
+            changed = copy.deepcopy(replies)
+            changed[-1][1]['configuration']['readback']['source'][path] = value
+            with self.assertRaisesRegex(AssertionError, message):
+                runner.check_text_parallel(changed)
+        changed = copy.deepcopy(replies)
+        changed[-1][1]['node']['node_id'] = 'replacement'
+        with self.assertRaisesRegex(AssertionError, 'RECREATED'):
+            runner.check_text_parallel(changed)
+        with self.assertRaisesRegex(AssertionError, 'STAGES_MISSING'):
+            runner.check_text_parallel(replies[1:])
+
     def test_text_auto_label_keeps_frozen_oracles_and_exact_input_names(self):
         case = runner.scenario('text-auto-label')
         self.assertTrue(case['text_auto_label'])
