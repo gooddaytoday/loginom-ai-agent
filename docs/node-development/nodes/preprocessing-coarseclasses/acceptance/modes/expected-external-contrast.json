@@ -75,16 +75,16 @@
           "Segment": "A",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 0,
+          "Segment_ClassMark": "[A]",
+          "Segment_ClassSignificant": 0.28092698767605173
         },
         {
           "RowID": 2,
           "Segment": "B",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 0,
+          "Segment_ClassNum": 1,
           "Segment_ClassMark": "[B]",
           "Segment_ClassSignificant": 0.36325377690026006
         },
@@ -93,16 +93,16 @@
           "Segment": "C",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 4,
           "Segment": "B",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 0,
+          "Segment_ClassNum": 1,
           "Segment_ClassMark": "[B]",
           "Segment_ClassSignificant": 0.36325377690026006
         },
@@ -111,34 +111,34 @@
           "Segment": "C",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 6,
           "Segment": "A",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 0,
+          "Segment_ClassMark": "[A]",
+          "Segment_ClassSignificant": 0.28092698767605173
         },
         {
           "RowID": 7,
           "Segment": "C",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 8,
           "Segment": "B",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 0,
+          "Segment_ClassNum": 1,
           "Segment_ClassMark": "[B]",
           "Segment_ClassSignificant": 0.36325377690026006
         },
@@ -147,16 +147,16 @@
           "Segment": "C",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 10,
           "Segment": "B",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 0,
+          "Segment_ClassNum": 1,
           "Segment_ClassMark": "[B]",
           "Segment_ClassSignificant": 0.36325377690026006
         },
@@ -165,25 +165,25 @@
           "Segment": "A",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 0,
+          "Segment_ClassMark": "[A]",
+          "Segment_ClassSignificant": 0.28092698767605173
         },
         {
           "RowID": 12,
           "Segment": "C",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 13,
           "Segment": "B",
           "Target": "yes",
           "Note": "keep",
-          "Segment_ClassNum": 0,
+          "Segment_ClassNum": 1,
           "Segment_ClassMark": "[B]",
           "Segment_ClassSignificant": 0.36325377690026006
         },
@@ -192,16 +192,16 @@
           "Segment": "C",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 15,
           "Segment": "B",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 0,
+          "Segment_ClassNum": 1,
           "Segment_ClassMark": "[B]",
           "Segment_ClassSignificant": 0.36325377690026006
         },
@@ -210,34 +210,34 @@
           "Segment": "C",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 17,
           "Segment": "A",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 0,
+          "Segment_ClassMark": "[A]",
+          "Segment_ClassSignificant": 0.28092698767605173
         },
         {
           "RowID": 18,
           "Segment": "C",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 1,
-          "Segment_ClassMark": "[A,C]",
-          "Segment_ClassSignificant": 0.2089908141874201
+          "Segment_ClassNum": 2,
+          "Segment_ClassMark": "[C]",
+          "Segment_ClassSignificant": 1.083879228556298
         },
         {
           "RowID": 19,
           "Segment": "B",
           "Target": "no",
           "Note": "keep",
-          "Segment_ClassNum": 0,
+          "Segment_ClassNum": 1,
           "Segment_ClassMark": "[B]",
           "Segment_ClassSignificant": 0.36325377690026006
         }
@@ -362,6 +362,25 @@
           "ColumnName": "Segment",
           "ColumnDisplayName": "Segment",
           "ClassNumber": 0,
+          "UniqueValue": "A",
+          "ClassMark": "[A]",
+          "EventsCount": 3,
+          "NonEventsCount": 1,
+          "EventRate": 0.75,
+          "NonEventRate": 0.25,
+          "LowerBound": null,
+          "UpperBound": null,
+          "WoE": -1.203972804325936,
+          "IV": 0.28092698767605173,
+          "Weight": 0.21052631578947367,
+          "IncludeUpperBound": null,
+          "PreQuantingApplied": null
+        },
+        {
+          "Group": 0,
+          "ColumnName": "Segment",
+          "ColumnDisplayName": "Segment",
+          "ClassNumber": 1,
           "UniqueValue": "B",
           "ClassMark": "[B]",
           "EventsCount": 5,
@@ -380,37 +399,18 @@
           "Group": 0,
           "ColumnName": "Segment",
           "ColumnDisplayName": "Segment",
-          "ClassNumber": 1,
-          "UniqueValue": "A",
-          "ClassMark": "[A,C]",
-          "EventsCount": 4,
-          "NonEventsCount": 8,
-          "EventRate": 0.3333333333333333,
-          "NonEventRate": 0.6666666666666666,
-          "LowerBound": null,
-          "UpperBound": null,
-          "WoE": 0.5877866649021191,
-          "IV": 0.2089908141874201,
-          "Weight": 0.631578947368421,
-          "IncludeUpperBound": null,
-          "PreQuantingApplied": null
-        },
-        {
-          "Group": 0,
-          "ColumnName": "Segment",
-          "ColumnDisplayName": "Segment",
-          "ClassNumber": 1,
+          "ClassNumber": 2,
           "UniqueValue": "C",
-          "ClassMark": "[A,C]",
-          "EventsCount": 4,
-          "NonEventsCount": 8,
-          "EventRate": 0.3333333333333333,
-          "NonEventRate": 0.6666666666666666,
+          "ClassMark": "[C]",
+          "EventsCount": 1,
+          "NonEventsCount": 7,
+          "EventRate": 0.125,
+          "NonEventRate": 0.875,
           "LowerBound": null,
           "UpperBound": null,
-          "WoE": 0.5877866649021191,
-          "IV": 0.2089908141874201,
-          "Weight": 0.631578947368421,
+          "WoE": 1.840549633397487,
+          "IV": 1.083879228556298,
+          "Weight": 0.42105263157894735,
           "IncludeUpperBound": null,
           "PreQuantingApplied": null
         }
@@ -489,7 +489,7 @@
           "EventRate": 0.47368421052631576,
           "NonEventRate": 0.5263157894736842,
           "TotalEventsCount": 19,
-          "IV": 0.5722445910876801,
+          "IV": 1.7280599931326097,
           "Significance": "Высокая"
         }
       ]

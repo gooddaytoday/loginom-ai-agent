@@ -1,4 +1,9 @@
 {
+  "col_union_settings": {
+    "row_count": "input",
+    "determining_input": "third",
+    "padding": "null"
+  },
   "package_path": "{{PACKAGE_PATH}}",
   "nodes": [
     {

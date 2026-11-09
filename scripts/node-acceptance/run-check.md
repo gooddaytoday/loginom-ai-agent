@@ -926,7 +926,14 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 
 `coarse-classes-frozen-zero` uses task-frozen-zero.md and only train.csv plus zero-frequency.csv from preprocessing-coarseclasses/fixtures. The independent modes/expected-frozen-zero.json checks three full ordered outputs, CSV, Save and cold. The same Import and Coarse Classes node must be retained with a locked partition during retraining; reopen readback checks IsLocked before execution.
 
-`coarse-classes-external-contrast` uses task-external-contrast.md with external-contrast.csv and external-contrast-classes.csv; `coarse-classes-external` uses task-external-frozen.md with zero-frequency.csv and external-classes.csv (both from preprocessing-coarseclasses/fixtures). Independent modes/expected-external-contrast.json and modes/expected-external.json check three full ordered outputs, CSV, Save and cold. The run requires partition external with inputs 0 and 1, complete native links (identifier, class number, category) and fine_classes=true; cold reopen reads the saved links and fine_classes before execution. The singleton case does not distinguish external from automatic training, so only the contrast case counts for ≥2/3.
+`coarse-classes-external-contrast` uses task-external-contrast.md with external-contrast.csv and external-contrast-classes.csv; `coarse-classes-external` uses task-external-frozen.md with zero-frequency.csv and external-classes.csv (both from preprocessing-coarseclasses/fixtures). Independent modes/expected-external-contrast.json and modes/expected-external.json check three full ordered outputs, CSV, Save and cold. The run requires partition external with inputs 0 and 1, complete native links (identifier, class number, category) and the native predictor role «Входное (внешнее разбиение)» (ColumnPurpose 2); cold reopen reads the saved links and role before execution. 7.4.2 refuses a class number shared by several categories, so the contrast fixture uses three single-category classes (unreachable at max_classes 2). The singleton case does not distinguish external from automatic training, so only the contrast case counts for ≥2/3.
+
+`colunion-third-determining`: `transform-coluniondata/acceptance/v040/task-third-determining.md`,
+три CSV из `v040/fixtures`, один экспорт и `expected-third.json` (одна строка).
+`col_union_settings` требует readback `row_count=input`, `determining_input=third`,
+`padding=null` на том же узле до Save; cold читает сохранённые настройки через
+production `readColUnion` и отменяет мастер без применения изменений. CSV без
+этого аудита не даёт PASS: `minimum` возвращает ту же строку.
 
 `smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
 `smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
@@ -939,3 +946,8 @@ CSV, Save, cold без перенастройки и cleanup; CDF сохраня
 Stock CSV, Save, cold без перенастройки существующего узла и cleanup.
 Oracle/expected остаются вне контекста модели. Регрессия: `colunion-edit`,
 `colunion-repeat`, `union-auto-match`.
+
+`linreg-elastic`: C10, утверждённая независимая точка (1,3) на shifted.csv.
+Только task-elastic.md и CSV передаются модели; frozen KKT oracle из
+8c1b6ac415645227d8977c3d9f7d3194e7e9b4b2 остаётся приватным. Оба typed-порта,
+прогнозный CSV, Save/cold без перенастройки и cleanup; abs=1e-8, rel=1e-10.

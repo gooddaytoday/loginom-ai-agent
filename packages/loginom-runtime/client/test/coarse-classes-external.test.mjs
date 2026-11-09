@@ -55,28 +55,50 @@ test('external page refuses incomplete links and mismatched partitions before Ne
  assert.equal(await acceptCoarseClassesExternalPage(externalChannel({stage:'coarse_classes'}).channel,{mode:'internal',parameters:{coarse_classes:{...external,partition:'automatic'}}}),null);
 });
 
-test('external predictor enables ready classes last and records the locked native model',async()=>{
- const fields=[{name:'Segment',label:'Segment',type:'string',data_kind:'Дискретный',index:0,record_id:'s',role:'input',frozen:false},
-  {name:'Target',label:'Target',type:'string',data_kind:'Дискретный',index:1,record_id:'t',role:'target',frozen:false}];
- let stage='coarse_classes',selected=fields[0],fine=false;const gestures=[];
- const root='w',settingsTid=root+';CoarseClassesWizard-1;CoarseClassesSettingsFrame;chkUseFineClassesBinning;ValueControl';
- const model={input_field:'Segment',locked:true,edited:false,classes:[{number:0,lower:null,upper:null},{number:1,lower:null,upper:null}]};
+test('external predictor uses the native role input (external partition), never the fine-classes checkbox (LAB-1324 probe)',async()=>{
+ const fields=[{name:'Segment',label:'Segment',type:'string',data_kind:'Дискретный',index:0,record_id:'s',role:'input',frozen:false,external:false},
+  {name:'Target',label:'Target',type:'string',data_kind:'Дискретный',index:1,record_id:'t',role:'target',frozen:false,external:false}];
+ let stage='coarse_classes',selected=fields[0],picker=false;const gestures=[];
+ const root='w',frame=root+';CoarseClassesWizard-1;CoarseClassesSettingsFrame;',owner=frame+'cbxColumnPurpose;boundlist;';
+ const options=['Не выбрано','Входное','Входное (внешнее разбиение)','Входное (замороженное)','Выходное'];
+ const model={input_field:'Segment',locked:false,edited:false,classes:[0,1,2].map(number=>({number,lower:null,upper:null}))};
  const snapshot=()=>structuredClone({wizard:{stage,root_tid:root},prepared_node_context:{verified:true},
-  node_coarse_classes:{verified:true,fields,selected,model,settings:{event_value:selected.name==='Target'?'yes':null,min_class_percent:5,max_classes:2,uniformity_percent:0,fine_classes:fine}},
-  ui:{elements:[{tid:root+';btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:settingsTid+';DisplayEl',ref:'fine',allowed_actions:['set_checked']},
+  node_coarse_classes:{verified:true,fields,selected,model,settings:{event_value:selected.name==='Target'?'yes':null,min_class_percent:fields[0].external?null:5,max_classes:fields[0].external?null:2,uniformity_percent:fields[0].external?null:0,fine_classes:false}},
+  ui:{elements:[{tid:root+';btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:frame+'chkUseFineClassesBinning;ValueControl;DisplayEl',ref:'fine',allowed_actions:['set_checked']},
+   {tid:frame+'cbxColumnPurpose;trg_picker',ref:'picker',allowed_actions:['click']},
+   ...(picker?options.map(label=>({tid:owner+label.replaceAll(' ','_'),label,ref:'option:'+label,allowed_actions:['click']})):[]),
    ...fields.map(f=>({tid:root+';CoarseClassesWizard-1;colColumnDisplayName_'+f.name,ref:f.name,allowed_actions:['click']}))]}});
  const channel={observe:async o=>{const s=snapshot();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
   const a=o.resolve(snapshot());gestures.push(a);
   if(a.verb==='wizard_step')stage=a.expected_stage;
-  else if(a.ref==='fine'){assert.equal(selected.name,'Segment');assert.equal(a.checked,true);fine=true;}
+  else if(a.ref==='fine')assert.fail('fine-classes checkbox must not be used for external');
+  else if(a.ref==='picker')picker=true;
+  else if(a.ref.startsWith('option:')){assert.equal(a.ref,'option:Входное (внешнее разбиение)');picker=false;fields[0].external=true;selected=fields[0];}
   else selected=fields.find(f=>f.name===a.ref);
  }};
  const links=[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}];
- const result=await configureCoarseClasses(channel,{coarse_classes:external},{request:{mode:'internal'},inputMapping:{target_fields:fields},external:{links}});
- assert.deepEqual(result.configuration.external_partition,{links,fine_classes:true,model});
+ const result=await configureCoarseClasses(channel,{coarse_classes:external},{request:{mode:'internal'},inputMapping:{target_fields:fields.map(({role,frozen,external,...f})=>f)},external:{links}});
+ assert.deepEqual(result.configuration.external_partition,{links,role:'external',model});
  assert.equal(result.configuration.partition,'external');
- assert.equal(gestures.filter(a=>a.ref==='fine').length,1);
+ assert.ok(gestures.some(a=>a.ref==='option:Входное (внешнее разбиение)'));
  assert.equal(gestures.filter(a=>a.verb==='wizard_step').length,5);
+});
+
+test('roles reader maps native ColumnPurpose 2 to an external input without analytic settings',()=>{
+ const prefix='MF;TF-1',base=prefix+';WizrdMCF;CoarseClassesWizard-1',elements=[],components={};
+ const el=(tid,parent)=>{const e={id:'e'+elements.length,tid,parent,getAttribute:()=>tid,getBoundingClientRect:()=>({left:0,top:0,right:100,bottom:100,width:100,height:100}),checkVisibility:()=>true,contains:x=>x===e||x?.parent===e};elements.push(e);return e;};
+ const root=el(base),wizard=el(prefix+';WizrdMCF'),w={el:{dom:wizard},[Symbol('LockQueue')]:{IsEmpty:true}};
+ const records=[['Segment',2],['Target',4]].map(([name,purpose],index)=>({internalId:'r'+index,data:{Index:index,Name:name,DisplayName:name,DataType:5,DataKind:2,ColumnPurpose:purpose}}));
+ const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,isLoading:()=>false};
+ const gridEl=el(base+';grdColumns',root),selection=[records[0]];
+ class CoarseClassesWizard{}
+ const controller=Object.assign(new CoarseClassesWizard(),{FColumnsStore:store,FWizardForm:{FView:w}});
+ const role=el(base+';CoarseClassesSettingsFrame;cbxColumnPurpose',root);
+ Object.assign(components,{[root.id]:{el:{dom:root},'@@TestCmpController':controller},[wizard.id]:w,[gridEl.id]:{el:{dom:gridEl},getStore:()=>store,getSelectionModel:()=>({getSelection:()=>selection})},[role.id]:{el:{dom:role},getValue:()=>2}});
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
+ const r=JSON.parse(JSON.stringify(vm.runInNewContext('('+readCoarseClassesBrowser.toString()+')('+JSON.stringify(prefix)+')',context)));
+ assert.equal(r.verified,true,r.reason);
+ assert.deepEqual([r.selected.role,r.selected.external,r.selected.frozen],['input',true,false]);
 });
 
 test('external links page reader returns owned grid kinds and names',()=>{
@@ -105,22 +127,23 @@ test('coarse classes add_input consumes its single native Input_Add (LAB-1324 ev
  assert.equal(verifyNodeTargetEffect(effect(graph([0],['Input_Add'],'transform.col_union_data')),graph([0,1],[],'transform.col_union_data')),null);
 });
 
-test('a multi-category class on port 1 is one materialized class (expected-external-contrast rows)',async()=>{
+test('port 1 rows of one class number form one materialized class; the contrast expected has three',async()=>{
  const {coarseClassesMaterializedModel}=await import('../lib/coarse-classes-output.mjs');
  const {readFile}=await import('node:fs/promises');
  const expected=JSON.parse(await readFile(new URL('../../../../docs/node-development/nodes/preprocessing-coarseclasses/acceptance/modes/expected-external-contrast.json',import.meta.url),'utf8'));
  const [p1,p2]=[1,2].map(port=>expected.outputs.find(o=>o.output_port===port));
  const cell=(type,value)=>({type,value:type==='integer'?String(value):value,is_null:false,precision:type==='real'?'17_significant_digits':type==='integer'?'exact_integer':'display_text'});
  const names=['ColumnName','ClassNumber','ClassMark','WoE','IV'],types=['string','integer','string','real','real'];
- const port=(n,o,cols,ts)=>({port:n,fresh:true,sample_complete:true,row_count:o.rows.length,schema:cols.map(name=>({name})),sample:o.rows.map(r=>cols.map((c,i)=>cell(ts[i],r[c])))});
- const ports=[port(1,p1,names,types),port(2,p2,['ColumnName','IV'],['string','real'])];
- const model=coarseClassesMaterializedModel(ports);
- assert.deepEqual(model.classes.map(c=>[c.number,c.woe]),[[0,p1.rows[0].WoE],[1,p1.rows[1].WoE]]);
- assert.equal(model.total_iv,p2.rows[0].IV);
- const split=structuredClone(ports);split[0].sample[2][3].value=0;
- assert.throws(()=>coarseClassesMaterializedModel(split),/class rows differ/);
- const apart=structuredClone(ports);apart[0].sample.push(structuredClone(apart[0].sample[0]));apart[0].row_count=4;
- assert.throws(()=>coarseClassesMaterializedModel(apart),/duplicate model class identity/);
+ const port=(n,rows,cols,ts)=>({port:n,fresh:true,sample_complete:true,row_count:rows.length,schema:cols.map(name=>({name})),sample:rows.map(r=>cols.map((c,i)=>cell(ts[i],r[c])))});
+ const ports=rows=>[port(1,rows,names,types),port(2,p2.rows,['ColumnName','IV'],['string','real'])];
+ const model=coarseClassesMaterializedModel(ports(p1.rows));
+ assert.deepEqual(model.classes.map(c=>c.number),[0,1,2]);assert.equal(model.total_iv,p2.rows[0].IV);
+ // Native port-1 layout of a class with several categories: one row per UniqueValue.
+ const merged=[p1.rows[0],{...p1.rows[1],UniqueValue:'X'},p1.rows[1]];
+ assert.deepEqual(coarseClassesMaterializedModel(ports(merged)).classes.map(c=>c.number),[0,1]);
+ const split=structuredClone(merged);split[2].WoE=0;
+ assert.throws(()=>coarseClassesMaterializedModel(ports(split)),/class rows differ/);
+ assert.throws(()=>coarseClassesMaterializedModel(ports([...p1.rows,p1.rows[0]])),/duplicate model class identity/);
 });
 
 test('external internal readback matches the published node result schema',async()=>{
@@ -131,13 +154,13 @@ test('external internal readback matches the published node result schema',async
  const cell=(type,value)=>({type,value,is_null:false,precision:type==='real'?'17_significant_digits':type==='integer'?'exact_integer':'display_text'});
  const ports=[{port:1,fresh:true,sample_complete:true,row_count:3,schema:['ColumnName','ClassNumber','ClassMark','WoE','IV'].map(name=>({name})),sample:[['Segment','0','[B]',-1,.3],['Segment','1','[A,C]',.5,.2],['Segment','1','[A,C]',.5,.2]].map(r=>r.map((v,i)=>cell(['string','integer','string','real','real'][i],v)))},{port:2,fresh:true,sample_complete:true,row_count:1,schema:[{name:'ColumnName'},{name:'IV'}],sample:[[cell('string','Segment'),cell('real',.5)]]}];
  const links=[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}];
- const model={input_field:'Segment',locked:true,edited:false,classes:[{number:0,lower:null,upper:null},{number:1,lower:null,upper:null}]};
- const configuration={verified:true,node_context:node,mode:'internal',state:'settings',classes:[],total_iv:null,input_field:'Segment',target_field:'Target',event_value:'yes',partition:'external',frozen:false,min_class_percent:5,max_classes:2,uniformity_percent:0,roles:[{name:'Segment',role:'input'},{name:'Target',role:'target'}],external_partition:{links,fine_classes:true,model}};
+ const model={input_field:'Segment',locked:false,edited:false,classes:[{number:0,lower:null,upper:null},{number:1,lower:null,upper:null}]};
+ const configuration={verified:true,node_context:node,mode:'internal',state:'settings',classes:[],total_iv:null,input_field:'Segment',target_field:'Target',event_value:'yes',partition:'external',frozen:false,min_class_percent:null,max_classes:null,uniformity_percent:null,roles:[{name:'Segment',role:'input'},{name:'Target',role:'target'}],external_partition:{links,role:'external',model}};
  const training={status:'trained',node,execution_id:'train',source:[{node:ref('main'),output:0,input:0},{node:ref('classes'),output:0,input:1}]};
  const values={input_mapping:{},configure:{configuration,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{ports:[0,1,2].map(port=>({port,schema:[{name:'X',label:'X',type:'string',data_kind:'Дискретный'}]}))},finish:{mode:'execute',settings_applied:true,execution_id:'execute',training},read:{ports}};
  const phases=Object.entries(values).map(([phase,value])=>({phase,status:'verified',receipt_id:operation_id+':'+phase,value:{verified:true,cleanup_complete:true,...value}}));
  const readback=coarseClassesConfigurationReadback({node,phases,operation_id});
- assert.deepEqual(readback.external_partition,{links,fine_classes:true,model});
+ assert.deepEqual(readback.external_partition,{links,role:'external',model});
  const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
  const r=validate(readback);assert.equal(r.valid,true,JSON.stringify(r.errorMessage??r).slice(0,600));
 });

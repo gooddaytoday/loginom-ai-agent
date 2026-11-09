@@ -2,6 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {checkColUnionSettings} from '../col-union-settings.mjs';
+
+test('settings audit distinguishes third from minimum even with identical output rows',()=>{
+ const expected={col_union_settings:{row_count:'input',determining_input:'third',padding:'null'}};
+ const node={document_id:'doc',workflow_id:'flow',node_id:'union'};
+ const receipt=()=>({status:'SUCCEEDED',node,cleanup_complete:true,configuration:{readback:{kind:'col_union',node,
+  values_are:'observed_ui_values',scope:'observed_before_verified_finish',mode:'positional',
+  settings:{...expected.col_union_settings},receipt_ids:['input','configure','done','output','finish'],
+  input_mappings:[0,1,2].map(port=>({port}))}}});
+ const r=receipt();assert.equal(checkColUnionSettings(expected,[{output:r}]).settings_verified,true);
+ for(const change of [r=>r.configuration.readback.settings={row_count:'minimum',padding:'null'},
+  r=>r.configuration.readback.settings.determining_input='attached',r=>delete r.configuration,
+  r=>r.cleanup_complete=false,r=>r.configuration.readback.input_mappings.pop(),
+  r=>r.configuration.readback.node={...node,node_id:'other'},r=>r.configuration.readback.receipt_ids.fill('same')]){
+  const bad=receipt();change(bad);assert.throws(()=>checkColUnionSettings(expected,[bad]));
+ }
+ const other=receipt();other.node={...node,node_id:'recreated'};other.configuration.readback.node=other.node;
+ assert.throws(()=>checkColUnionSettings(expected,[r,other]),/SAME_NODE/);
+ const badLast=receipt();badLast.configuration.readback.settings={row_count:'minimum',padding:'null'};
+ assert.throws(()=>checkColUnionSettings(expected,[r,badLast]),/SETTINGS_DIFFER/);
+});
 test('small positional matrix tasks partition the original 62 outputs exactly once without changing expectations',()=>{
  const r=spawnSync('python3',['-B','-c',`import importlib.util,json
 from pathlib import Path
@@ -74,6 +95,21 @@ assert c['prompt']==c['source']/'task-third.md' and c['export_count']==1
 assert c['expected_name']=='expected.json' and len(e['outputs'])==1
 assert len(e['outputs'][0]['columns'])==7 and len(e['outputs'][0]['rows'])==3
 assert all((c['data']/f).is_file() for f in c['input_files'])
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});
+
+test('third determining keeps the independent one-row oracle and requires saved settings audit',()=>{
+ const r=spawnSync('python3',['-B','-c',`import importlib.util
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+c=r.scenario('colunion-third-determining');e=r.expected_for(c,'/owned/test.lgp')
+assert c['source'].name=='v040' and c['data']==c['source']/'fixtures'
+assert c['input_files']==['main.csv','attached.csv','third.csv'] and c['export_count']==1
+assert c['prompt']==c['source']/'task-third-determining.md' and c['expected_name']=='expected-third.json'
+assert len(e['outputs'])==1 and len(e['outputs'][0]['rows'])==1 and len(e['outputs'][0]['columns'])==7
+assert e['col_union_settings']==dict(row_count='input',determining_input='third',padding='null')
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(r.status,0,r.stdout+r.stderr);
 });

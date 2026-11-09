@@ -1,21 +1,17 @@
-# Разгруппировка по заданным долям
+# Разгруппировка
 
 <!-- mode: shares -->
-Тип `transform.ungroup_data`, режим `shares`. Для распределения итогов по готовым долям выбирай этот узел через `dock_node_apply` с `mode:"shares"`. Вход 0 — групповые итоги, вход 1 — опорные позиции с готовыми долями. Оба источника выполни до настройки. Доли — уже заданные дроби. Для опорных весов используй режим computed ниже; сезонность пока не поддерживается.
+Type `transform.ungroup_data`, `mode:"shares"`: to distribute totals over ready-made fractional shares choose this node via `dock_node_apply`. Input 0 = group totals, input 1 = support items with shares; execute both sources before configuring. For support weights use mode computed below; seasonality is unsupported.
 
-Если `dock_node_apply` для этого режима вернул отказ, прочитай его причину и исправь подтверждённую настройку. Не подменяй Разгруппировку цепочкой `transform.calculator`, `transform.join_data` или `programming.javascript`: такой обход не проверяет её native настройки. Если продолжить нельзя, сообщи отказ; неизвестный эффект сначала разреши по выданному `next_step` исходной операции.
+On a `dock_node_apply` refusal read its reason and fix the confirmed setting. Never substitute a `transform.calculator`, `transform.join_data` or `programming.javascript` chain: it bypasses the native settings. If you cannot continue, report the refusal; resolve an unknown effect via the issued `next_step` of the original operation first.
 
-На новом узле передай `parameters.ungroup`: полные `keys` со связями `total`/`support`, `value_field`, `item_field`, `share_field`, `rounding` и `balance`. Указывай точные имена из схемы соответствующего входа. Существующий узел с `parameters:{}`, `inputs:[]`, `finish:"execute"` повторно считает текущие источники без смены настройки. Проверь связи обоих входов и ключей.
+New node: complete `parameters.ungroup` with `keys` (`total`/`support` links), `value_field`, `item_field`, `share_field`, `rounding`, `balance`; exact names from each input schema. Choose the user's policy explicitly: `rounding.format` `none`, `precision` (`value` = decimals) or `multiple` (`value` = positive integer step); `balance` `none`, `last`, `proportional` or `equal`. Existing node: `parameters:{}`, `inputs:[]`, `finish:"execute"` recomputes current sources with saved settings. Verify links of both inputs and keys.
 
-`rounding.format`: `none`, `precision` (число знаков `value`) или `multiple` (целый положительный шаг `value`). `balance`: `none`, `last`, `proportional`, `equal`. Выбирай политику пользователя явно.
-
-При `none`/`none` результат равен итогу × неотрицательная доля без нормирования суммы долей; отрицательная доля даёт ноль. NULL в итоге удаляет строки этой записи. Строки с NULL-долями пропускаются; NULL-наименования сохраняются. В таблице итогов каждая группа должна быть уникальна. NULL-ключ сопоставляется с NULL, пустая строка отдельно. Итоги без опорной группы и лишние опорные группы не создают деталей.
-
-Читай порт 0 целиком для небольших данных: исходные поля входа 0, `<value_field>_Rounded`, поле наименования и `OutputValue`. Значения результата — вещественные. Округлённый итог повторяется для каждой позиции, поэтому его нельзя суммировать как распределённую величину. При `last` остаток получает последняя позиция входного порядка, а не позиция с максимальным именем. Сохрани пакет; обучение не нужно. В режиме shares порт 1 не читается; переменные и сезонная модель не поддерживаются.
+Read port 0 fully for small data. `<value_field>_Rounded` repeats per item; never sum it as the distributed value. With `last` the remainder goes to the last item in input order, not the max name. Save the package; no training. Shares does not read port 1.
 <!-- /mode -->
 
 <!-- mode: computed -->
-Для опорных весов выбирай `transform.ungroup_data` через `dock_node_apply`, `mode:"computed"`, без Калькулятора/JS. Вход 0 — итоги, вход 1 — опора. Передай полные `parameters.ungroup`, например `keys:[{total:"Zone",support:"Zone"}]`, `value_field:"Amount"`, `item_field:"Product"`, `share_field:"Units"`, `rounding:{format:"none"}`, `balance:"none"`; замени имена фактическими из схем. Вес — native роль «Поле с долями».
-Поддержаны положительные целые веса с ненулевой суммой группы. Веса повторяющихся наименований суммируются и делятся на сумму весов группы. Отрицательные/NULL веса и нулевая сумма не проверены. Порядок — группы итогов, затем первое появление позиции в опоре.
-Читай `read.ports:[0,1]`: порт 0 — поля итогов, округлённый итог, наименование, OutputValue с native типами. При целом Total и неделимых долях целый native-выход теряет дробь. В этом цикле порт 1 ожидается пустым: наименование, затем ключи опоры; это не таблица долей. Выгрузи оба порта в CSV. Повтор Execute: тот же узел, `mode:"computed"`, `parameters:{}`, `inputs:[]`, `mappings:[]`; настройки сохраняются. Сохрани пакет. Сезонность, индексы, округление и балансировка этого режима вне цикла.
+`mode:"computed"`: for support weights choose `transform.ungroup_data` via `dock_node_apply`, never Calculator/JS. Input 0 = totals, input 1 = support. Pass complete `parameters.ungroup`, e.g. `keys:[{total:"Zone",support:"Zone"}]`, `value_field:"Amount"`, `item_field:"Product"`, `share_field:"Units"`, `rounding:{format:"none"}`, `balance:"none"`; use actual schema names. The weight is the native role «Поле с долями».
+Order: totals groups, then first appearance of an item in support. An integer total with indivisible shares loses the fraction in the integer native output.
+Use `read.ports:[0,1]`; port 1 is expected empty (item, then support keys), not a share table. Export both ports to CSV. Re-Execute: same node, `mode:"computed"`, `parameters:{}`, `inputs:[]`, `mappings:[]`; settings are kept. Save the package. Seasonality, indices, rounding and balancing are out of scope for this mode.
 <!-- /mode -->

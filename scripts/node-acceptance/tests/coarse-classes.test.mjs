@@ -98,10 +98,10 @@ for name,files,rows,classes in [('coarse-classes-external-contrast',['external-c
  assert [n['type'] for n in e['nodes']][:3]==['imports.text','imports.text','preprocessing.coarse_classes']
  assert [len(o['rows']) for o in e['outputs']]==[rows,classes,1]
  assert 'oracle' not in c['prompt'].read_text()
-ok={'status':'SUCCEEDED','execution':{'status':'completed','execution_id':'x'},'output':{'ports':[{'port':0,'schema':[],'sample':[]}]},'configuration':{'readback':{'partition':'external','training':{'source':[{'input':0},{'input':1}]},'external_partition':{'fine_classes':True,'links':[{'kind':1},{'kind':2},{'kind':3},{'kind':0}],'model':{'locked':True}}}}}
+ok={'status':'SUCCEEDED','execution':{'status':'completed','execution_id':'x'},'output':{'ports':[{'port':0,'schema':[],'sample':[]}]},'configuration':{'readback':{'partition':'external','training':{'source':[{'input':0},{'input':1}]},'external_partition':{'role':'external','links':[{'kind':1},{'kind':2},{'kind':3},{'kind':0}],'model':{'locked':False,'classes':[{'number':0}]}}}}}
 r.check_coarse_external_trainings([(None,ok)])
 import copy
-for path,value,code in [(('fine_classes',),False,'FINE_CLASSES'),(('links',),[{'kind':1},{'kind':2}],'LINKS'),(('model',),{'locked':False},'LOCKED')]:
+for path,value,code in [(('role',),'fine','ROLE'),(('links',),[{'kind':1},{'kind':2}],'LINKS'),(('model',),{'classes':[]},'MODEL')]:
  bad=copy.deepcopy(ok);bad['configuration']['readback']['external_partition'][path[0]]=value
  try:r.check_coarse_external_trainings([(None,bad)]);raise SystemExit('accepted '+code)
  except AssertionError as error:assert str(error)=='COARSE_EXTERNAL_'+code,error
@@ -109,14 +109,14 @@ for path,value,code in [(('fine_classes',),False,'FINE_CLASSES'),(('links',),[{'
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
 
-test('external reopen reads saved links and fine_classes, then cancels without applying',async()=>{
+test('external reopen reads saved links and the native external role, then cancels without applying',async()=>{
  const {observeCoarseExternalSavedSettings}=await import('../coarse-classes-external.mjs');
  for(const fine of [true,false]){
   let stage='graph',closed=0;
   const links=[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}];
   const fields=[{name:'Segment',label:'Segment',type:'string',data_kind:'Дискретный',record_id:'s',role:'input',frozen:true},{name:'Target',label:'Target',type:'string',data_kind:'Дискретный',record_id:'t',role:'target',frozen:false}];
   const state=()=>structuredClone({wizard:{stage,status:stage==='graph'?'absent':'observed',root_tid:'w'},prepared_node_context:{surface:stage==='graph'?'graph':'wizard'},
-   node_coarse_classes:stage==='coarse_classes_external'?{verified:true,external:{links}}:{verified:true,fields,selected:fields[0],settings:{fine_classes:fine}},
+   node_coarse_classes:stage==='coarse_classes_external'?{verified:true,external:{links}}:{verified:true,fields,selected:{...fields[0],external:fine},settings:{fine_classes:false}},
    ui:{elements:[{tid:'w;btnNext',ref:'next',allowed_actions:['wizard_step']}]}});
   const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{const a=o.resolve(state());if(a.verb==='wizard_step')stage=a.expected_stage;}};
   const load=async path=>({
@@ -126,8 +126,8 @@ test('external reopen reads saved links and fine_classes, then cancels without a
    'client/lib/coarse-classes-procedure.mjs':await import('../../../packages/loginom-runtime/client/lib/coarse-classes-procedure.mjs'),
   })[path];
   const run=observeCoarseExternalSavedSettings({load,channel});
-  if(fine)assert.deepEqual(await run,{links,input_field:'Segment',fine_classes:true,settings_applied:false});
-  else await assert.rejects(run,/COARSE_EXTERNAL_SAVED_FINE_CLASSES/);
+  if(fine)assert.deepEqual(await run,{links,input_field:'Segment',role:'external',settings_applied:false});
+  else await assert.rejects(run,/COARSE_EXTERNAL_SAVED_EXTERNAL_ROLE/);
   assert.equal(closed,1);
  }
 });

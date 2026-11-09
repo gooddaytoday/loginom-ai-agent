@@ -483,11 +483,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, export_count=3)
     if name in D87:
         return dict(D87[name], base=None, generated=True)
-    if name == 'colunion-third-repeat':
+    if name in ['colunion-third-repeat', 'colunion-third-determining']:
         src = REPO / 'docs/node-development/nodes/transform-coluniondata/acceptance/v040'
-        return dict(source=src, prompt=src / 'task-third.md', data=src / 'fixtures',
+        determining = name == 'colunion-third-determining'
+        return dict(source=src, prompt=src / ('task-third-determining.md' if determining else 'task-third.md'), data=src / 'fixtures',
                     input_files=['main.csv', 'attached.csv', 'third.csv'], base=None,
-                    expected_name='expected.json', export_count=1)
+                    expected_name='expected-third.json' if determining else 'expected.json', export_count=1)
     colunion_part = re.fullmatch(r'colunion-matrix-(regular|reverse)-(a|b|c)|colunion-matrix-(empty-main|empty-attached|both-empty)-(minimum|maximum|main|attached)', name)
     if colunion_part or name in ['colunion-edit', 'colunion-repeat', 'colunion-matrix-regular', 'colunion-matrix-reverse',
                 'colunion-matrix-empty-main', 'colunion-matrix-empty-attached', 'colunion-matrix-both-empty']:
@@ -537,10 +538,10 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'smoothing-hp':
         src = REPO / 'docs/node-development/nodes/preprocessing-smoothing/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name == 'linreg-lasso':
+    if name in ['linreg-lasso', 'linreg-elastic']:
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
-        return dict(source=REPO / 'scripts/node-acceptance/scenarios/linreg-lasso',
-                    prompt=node / 'acceptance/penalty/task-lasso.md',
+        return dict(source=REPO / 'scripts/node-acceptance/scenarios' / name,
+                    prompt=node / ('acceptance/penalty/task-elastic.md' if name == 'linreg-elastic' else 'acceptance/penalty/task-lasso.md'),
                     data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
                     expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
     if name == 'linreg-coefficients':
@@ -979,9 +980,9 @@ def save_confirmed(case, receipt, package):
     output = receipt.get('output', {})
     if output.get('save_completed') is True:
         return True
-    # This scenario also accepts the verified save_as v2 receipt (which has
-    # no save_completed field). Require the complete reopened path identity.
-    return (case.get('logreg_normalization') is True and receipt.get('action_key') == 'package.save_as'
+    # The verified save_as v2 receipt has no save_completed field (LAB-1298).
+    # Require the complete reopened path identity in every scenario.
+    return (receipt.get('action_key') == 'package.save_as'
             and receipt.get('action_revision') == '2' and receipt.get('phase') == 'verified'
             and receipt.get('cleanup_complete') is True and output.get('reopened') is True
             and output.get('package_ref') == dict(kind='package', path=package, active_identity=package))
@@ -1311,7 +1312,7 @@ def check_coarse_frozen_trainings(replies):
 
 
 def check_coarse_external_trainings(replies):
-    # LAB-1324: ready classes must be used (fine_classes) with complete native links.
+    # LAB-1324: native role input (external partition) with complete links.
     trained = [o for _, reply in replies for o, _ in ports(reply)
                if o.get('status') == 'SUCCEEDED'
                and o.get('configuration', {}).get('readback', {}).get('partition') == 'external'
@@ -1319,9 +1320,9 @@ def check_coarse_external_trainings(replies):
     assert trained, 'COARSE_EXTERNAL_TRAINED'
     for o in trained:
         external = o['configuration']['readback'].get('external_partition') or {}
-        assert external.get('fine_classes') is True, 'COARSE_EXTERNAL_FINE_CLASSES'
+        assert external.get('role') == 'external', 'COARSE_EXTERNAL_ROLE'
         assert sorted(l['kind'] for l in external.get('links', []) if l['kind']) == [1, 2, 3], 'COARSE_EXTERNAL_LINKS'
-        assert external.get('model', {}).get('locked') is True, 'COARSE_EXTERNAL_LOCKED'
+        assert external.get('model', {}).get('classes'), 'COARSE_EXTERNAL_MODEL'
         assert sorted(e['input'] for e in o['configuration']['readback']['training'].get('source', [])) == [0, 1], 'COARSE_EXTERNAL_INPUTS'
 
 
@@ -2327,6 +2328,11 @@ class Runner:
             write(folder / 'sampling-csvs.json', sampling_csvs)
             self.phase('sampling-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sampling-modes.mjs',
                 'main', folder / 'expected.json', folder / 'sampling-replies.json', folder / 'sampling-csvs.json', folder / 'sampling-baseline.json'], folder, timeout=60)
+        if expected.get('col_union_settings'):
+            write(folder / 'col-union-replies.json', [o for _, o in replies])
+            self.phase('col-union-settings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/col-union-settings.mjs',
+                folder / 'expected.json', folder / 'col-union-replies.json', folder / 'col-union-settings-proof.json'], folder, timeout=60)
+            self.current['col-union-settings'] = 'PASS'
         if expected.get('sorting_mode'):
             write(folder / 'sorting-replies.json', [o for _, o in replies])
             self.phase('sorting-modes-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sorting-modes.mjs',

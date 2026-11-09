@@ -1,6 +1,6 @@
 const need=(v,m)=>{if(!v)throw Error('COARSE_EXTERNAL_'+m);};
 // LAB-1324: after reopen, the saved node keeps complete external links and
-// ready-class use (fine_classes=true) for its predictor. Read-only: Cancel.
+// the native predictor role input (external partition). Read-only: Cancel.
 export async function observeCoarseExternalSavedSettings({load,channel}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
@@ -21,8 +21,8 @@ export async function observeCoarseExternalSavedSettings({load,channel}){
   const inputs=roles.node_coarse_classes.fields.filter(f=>f.role==='input');
   need(inputs.length===1,'SAVED_ROLE');
   s=await selectCoarseClassesField(channel,roles.node_coarse_classes,inputs[0].name);
-  need(s.node_coarse_classes.settings.fine_classes===true,'SAVED_FINE_CLASSES');
-  return {links,input_field:inputs[0].name,fine_classes:true,settings_applied:false};
+  need(s.node_coarse_classes.selected?.external===true,'SAVED_EXTERNAL_ROLE');
+  return {links,input_field:inputs[0].name,role:'external',settings_applied:false};
  }finally{
   const closed=await closePreparedWizard(channel);need(closed.verified&&closed.cleanup_complete&&closed.settings_applied===false,'CANCEL');
  }

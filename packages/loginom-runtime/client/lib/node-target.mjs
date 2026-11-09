@@ -295,7 +295,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
           const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
           if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
             &&!(restInputReplacement(graph)&&edgeKey(occupied)===edgeKey(operation.restQueryInput.edge)))throw new Error('Requested input is occupied by an unowned link'
-            +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. Keep this Export and its link: correct the existing upstream chain, or complete final formatting before the Export is first connected. Then reconfigure the same Export with inputs:[] and a NEW operation_id. Do not create a second Export for the same destination. If the required result cannot use the existing source, report the connection limitation.':''));
+            +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. Keep this Export and its link: correct the existing upstream chain, or complete final formatting before the Export is first connected. Then reconfigure the same Export with inputs:[] and a NEW operation_id. Do not create a second Export for the same destination. If the result needs a new upstream node and the task names a different destination, add a new Export from that node to that destination and leave this one; otherwise report the connection limitation.':''));
         }
         state.targetId = existing.ref.node_id;
       }

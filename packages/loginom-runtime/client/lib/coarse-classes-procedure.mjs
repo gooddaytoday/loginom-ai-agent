@@ -5,7 +5,7 @@ const need=(v,m)=>{if(!v)throw Error('Coarse classes: '+m);};
 export const coarseClassesReady=s=>s.wizard?.stage==='coarse_classes'&&s.node_coarse_classes?.verified===true;
 export const observeCoarseClasses=(channel,condition,ready=()=>true)=>channel.observe({condition,readCoarseClasses:true,ready:s=>coarseClassesReady(s)&&ready(s)});
 const one=(s,p,m)=>{const es=s.ui.elements.filter(p);need(es.length===1,m);return es[0];};
-const inventory=c=>c.fields.map(({role,frozen,...f})=>f);
+const inventory=c=>c.fields.map(({role,frozen,external,...f})=>f);
 // One feature identifier (1), class number (2) and category (3); every other
 // external column stays unused (0). Numeric bound kinds are outside this mode.
 export const completeExternalLinks=links=>Array.isArray(links)&&links.length>0&&[1,2,3].every(k=>links.filter(l=>l.kind===k).length===1)&&links.every(l=>[0,1,2,3].includes(l.kind));
@@ -55,21 +55,23 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
  if(!applying)for(const f of baseline.fields){
   s=await selectCoarseClassesField(channel,baseline,f.name);
   const role=f.name===wanted.input_field?'input':f.name===wanted.target_field?'target':'unused';
-  if(s.node_coarse_classes.selected.role!==role||role==='input'&&s.node_coarse_classes.selected.frozen&&!wanted.frozen&&wanted.partition!=='external'){
+  // LAB-1324 probe: the external partition is the native role 'Входное (внешнее разбиение)' (ColumnPurpose 2).
+  const external=role==='input'&&wanted.partition==='external';
+  if(s.node_coarse_classes.selected.role!==role||role==='input'&&(external!==(s.node_coarse_classes.selected.external===true)||s.node_coarse_classes.selected.frozen&&!wanted.frozen)){
    await act('cbxColumnPurpose;trg_picker',{verb:'click'},f);
    const owner=s.wizard.root_tid+';CoarseClassesWizard-1;CoarseClassesSettingsFrame;cbxColumnPurpose;boundlist;';
-   const label={unused:'Не выбрано',input:'Входное',target:'Выходное'}[role];
+   const label=external?'Входное (внешнее разбиение)':{unused:'Не выбрано',input:'Входное',target:'Выходное'}[role];
    s=await observeCoarseClasses(channel,'coarse classes role option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner)&&e.label===label));
    await channel.perform({condition:'choose coarse classes '+role,initialObservation:s,ready:coarseClassesReady,identity:()=>f,
     resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner)&&e.label===label&&e.allowed_actions.includes('click'),'exact coarse classes role option required').ref})});
-   s=await observeCoarseClasses(channel,'coarse classes role committed',s=>s.node_coarse_classes.selected?.record_id===f.record_id&&s.node_coarse_classes.selected.role===role&&(role!=='input'||wanted.frozen||wanted.partition==='external'||!s.node_coarse_classes.selected.frozen));
+   s=await observeCoarseClasses(channel,'coarse classes role committed',s=>s.node_coarse_classes.selected?.record_id===f.record_id&&s.node_coarse_classes.selected.role===role&&(role!=='input'||(external?s.node_coarse_classes.selected.external===true:wanted.frozen||!s.node_coarse_classes.selected.frozen&&!s.node_coarse_classes.selected.external)));
   }
-  if(role==='input'&&!s.node_coarse_classes.selected.frozen)for(const [key,path] of [['min_class_percent','edtMinimalClassRate;ValueControl'],['max_classes','edtDesiredClassCount;ValueControl'],['uniformity_percent','edtUniformityCoefficient;ValueControl']]){
+  if(role==='input'&&!s.node_coarse_classes.selected.frozen&&!external)for(const [key,path] of [['min_class_percent','edtMinimalClassRate;ValueControl'],['max_classes','edtDesiredClassCount;ValueControl'],['uniformity_percent','edtUniformityCoefficient;ValueControl']]){
    if(s.node_coarse_classes.settings[key]===wanted[key])continue;
    await act(path,{verb:'fill',text:String(wanted[key])},f);await act(path,{verb:'press',key:'Tab'},f);
    need(s.node_coarse_classes.settings[key]===wanted[key],'analytic setting readback differs: '+key);
   }
-  if(role==='input'&&!s.node_coarse_classes.selected.frozen&&wanted.partition!=='external'&&s.node_coarse_classes.settings.fine_classes!==false)await act('chkUseFineClassesBinning;ValueControl',{verb:'set_checked',checked:false},f);
+  if(role==='input'&&!s.node_coarse_classes.selected.frozen&&!external&&s.node_coarse_classes.settings.fine_classes!==false)await act('chkUseFineClassesBinning;ValueControl',{verb:'set_checked',checked:false},f);
   if(role==='target'&&s.node_coarse_classes.settings.event_value!==wanted.event_value){
    const path=s.node_coarse_classes.settings.event_control;need(typeof path==='string','rendered target event editor required');
    if(path.endsWith(';cbx')){
@@ -93,7 +95,7 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
  s=await selectCoarseClassesField(channel,baseline,input.name);
  // Rebind after the target's asynchronous event editor has settled. These
  // controls belong to the selected predictor, never the previous field.
- if(!applying&&!input.frozen)for(const [key,path] of [['min_class_percent','edtMinimalClassRate;ValueControl'],['max_classes','edtDesiredClassCount;ValueControl'],['uniformity_percent','edtUniformityCoefficient;ValueControl']]){
+ if(!applying&&!input.frozen&&!input.external)for(const [key,path] of [['min_class_percent','edtMinimalClassRate;ValueControl'],['max_classes','edtDesiredClassCount;ValueControl'],['uniformity_percent','edtUniformityCoefficient;ValueControl']]){
   if(s.node_coarse_classes.settings[key]===wanted[key])continue;
   await act(path,{verb:'fill',text:String(wanted[key])},input);await act(path,{verb:'press',key:'Tab'},input);
   need(s.node_coarse_classes.settings[key]===wanted[key],'final predictor setting differs: '+key);
@@ -109,14 +111,11 @@ export async function configureCoarseClasses(channel,parameters,{request,inputMa
   if(!s.node_coarse_classes.settings.include_upper_input)await act('chkIncludeHighBounds;ValueControl',{verb:'set_checked',checked:true},input);
   need(s.node_coarse_classes.settings.include_upper_input===true,'manual partition requires an inclusive upper boundary');
  }
- if(wanted?.partition==='external'&&s.node_coarse_classes.settings.fine_classes!==true){
-  // Last predictor edit: the provided classes are used as ready, not optimized.
-  await act('chkUseFineClassesBinning;ValueControl',{verb:'set_checked',checked:true},input);
- }
  const settings=s.node_coarse_classes.settings;
- if(wanted?.partition==='external')need(settings.fine_classes===true,'external partition requires native ready-class use (fine_classes=true)');
+ // The fine-classes checkbox makes one class per category and ignores input 1.
+ if(wanted?.partition==='external')need(s.node_coarse_classes.selected?.external===true,'external partition requires the native role input (external partition)');
  else need(input.frozen||settings.fine_classes===false,'initial-class bypass is outside this stage');
- const configuration={...s.node_coarse_classes,...(wanted?.partition==='external'?{external_partition:{links:external?.links,fine_classes:settings.fine_classes}}:{}),mode:request.mode,input_field:input.name,target_field:target.name,event_value:event,partition:wanted?.partition??'automatic',frozen:wanted?.frozen===true,min_class_percent:settings.min_class_percent,max_classes:settings.max_classes,uniformity_percent:settings.uniformity_percent,fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),roles:s.node_coarse_classes.fields.map(({name,role})=>({name,role}))};
+ const configuration={...s.node_coarse_classes,...(wanted?.partition==='external'?{external_partition:{links:external?.links,role:'external'}}:{}),mode:request.mode,input_field:input.name,target_field:target.name,event_value:event,partition:wanted?.partition??'automatic',frozen:wanted?.frozen===true,min_class_percent:settings.min_class_percent,max_classes:settings.max_classes,uniformity_percent:settings.uniformity_percent,fields:fields.map(({name,label,type,data_kind})=>({name,label,type,data_kind})),roles:s.node_coarse_classes.fields.map(({name,role})=>({name,role}))};
  const next=async(stage,destination)=>{
   await channel.perform({condition:'accept coarse classes '+stage,ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'coarse classes Next required').ref,expected_stage:destination})});

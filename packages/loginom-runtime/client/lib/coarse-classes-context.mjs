@@ -63,8 +63,8 @@ export function readCoarseClassesBrowser(prefix){
  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},kinds={0:'Неопределенное',1:'Непрерывный',2:'Дискретный'},fields=[];
  for(const [index,r] of rs.entries()){
   const d=r.data;
-  if(d.Index!==index||!d.Name||typeof d.DisplayName!=='string'||!types[d.DataType]||!kinds[d.DataKind]||![0,1,3,4].includes(d.ColumnPurpose))return fail('coarse_classes_field');
-  fields.push({index,record_id:String(r.internalId),name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],role:{0:'unused',1:'input',3:'input',4:'target'}[d.ColumnPurpose],frozen:d.ColumnPurpose===3});
+  if(d.Index!==index||!d.Name||typeof d.DisplayName!=='string'||!types[d.DataType]||!kinds[d.DataKind]||![0,1,2,3,4].includes(d.ColumnPurpose))return fail('coarse_classes_field');
+  fields.push({index,record_id:String(r.internalId),name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],role:{0:'unused',1:'input',2:'input',3:'input',4:'target'}[d.ColumnPurpose],frozen:d.ColumnPurpose===3,external:d.ColumnPurpose===2});
  }
  if(new Set(fields.map(f=>f.name)).size!==fields.length||new Set(fields.map(f=>f.record_id)).size!==fields.length)return fail('coarse_classes_identity');
  const selected=selection.length?fields[rs.indexOf(selection[0])]:null,settings={},controlBase=base+';CoarseClassesSettingsFrame;';
@@ -78,7 +78,7 @@ export function readCoarseClassesBrowser(prefix){
  settings.event_control=event?.path??null;
  settings.event_value=event?(event.path.endsWith(';cbx')?event.control.getRawValue?.():event.control.getValue?.()):null;
  if(selected?.role==='target'&&typeof settings.event_value!=='string')return fail('coarse_classes_event_pending');
- if(selected&&settings.role!==(selected.frozen?3:{unused:0,input:1,target:4}[selected.role]))return fail('coarse_classes_selection_binding');
- if(selected?.role==='input'&&!selected.frozen&&(!['min_class_percent','max_classes','uniformity_percent'].every(k=>Number.isFinite(settings[k]))||typeof settings.fine_classes!=='boolean'))return fail('coarse_classes_settings_pending');
+ if(selected&&settings.role!==(selected.frozen?3:selected.external?2:{unused:0,input:1,target:4}[selected.role]))return fail('coarse_classes_selection_binding');
+ if(selected?.role==='input'&&!selected.frozen&&!selected.external&&(!['min_class_percent','max_classes','uniformity_percent'].every(k=>Number.isFinite(settings[k]))||typeof settings.fine_classes!=='boolean'))return fail('coarse_classes_settings_pending');
  return {verified:true,inventory_complete:true,binding_ready:true,fields,selected,settings,settings_applied:false};
 }

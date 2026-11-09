@@ -68,3 +68,18 @@ print(json.dumps(dict(task=c['prompt'].name,files=c['input_files'],outputs=e['ou
  assert.equal(value.outputs.length,2);assert.equal(value.outputs[0].rows.length,16);
  assert.deepEqual(value.outputs[1].rows.map(r=>r.Y_coefficients),[95/32,63/32,15/32,0]);
 });
+
+test('C10 Elastic Net uses frozen independent 1-3 expectations and only task/CSV delivery',()=>{
+ const value=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('linreg-elastic');e=m.expected_for(c,'/worker/c10.lgp')
+approved=json.loads(Path('docs/node-development/nodes/datamining-linregression/acceptance/penalty/expected.json').read_text())['cases']['shifted-elastic-1-3']['expected']
+approved['package_path']='/worker/c10.lgp';assert e==approved
+s=importlib.util.spec_from_file_location('checks','scripts/node-acceptance/required-checks.py');checks=importlib.util.module_from_spec(s);s.loader.exec_module(checks)
+assert 'linreg-elastic' in checks.select({'scripts/node-acceptance/scenarios/linreg-elastic/expected.json'})[1]
+print(json.dumps(dict(task=c['prompt'].name,files=c['input_files'],outputs=e['outputs'])))`],{encoding:'utf8'}));
+ assert.equal(value.task,'task-elastic.md');assert.deepEqual(value.files,['shifted.csv']);
+ assert.deepEqual(value.outputs[1].rows.map(r=>r.Y_coefficients),[23/8,24/13,24/65,0]);
+ assert.equal(value.outputs[0].rows.length,16);
+});
