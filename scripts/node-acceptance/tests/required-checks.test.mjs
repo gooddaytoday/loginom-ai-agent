@@ -86,6 +86,14 @@ test(`duplicates typed acceptance paths require all three cases: ${path}`,t=>{
  for(const name of ['duplicates-typed','duplicates-empty','duplicates-singleton'])assert.ok(text.includes(name));
 });
 
+for(const path of ['packages/loginom-runtime/client/lib/binning-procedure.mjs',
+ 'docs/node-development/nodes/preprocessing-binning/acceptance/modes/semantics.txt'])
+test(`Binning current and default next acceptance remain required: ${path}`,t=>{
+ const r=repo(t);r.commit(path);const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['binning-ties-current','binning-frequency-ties','binning-sd','binning-count','binning-apply'])assert.ok(text.includes(name));
+});
+
 test('REST C1 requires four single-method cases and excludes the retired eight-row example',t=>{
  const r=repo(t);r.commit('packages/loginom-runtime/client/lib/rest-request.mjs');const text=r.list();
  for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
