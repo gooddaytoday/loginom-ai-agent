@@ -52,9 +52,20 @@ export function readElimOutlierBrowser(prefix){
   ||!['pedDetectOSko','pedDetectESko','pedDetectOKvartil','pedDetectEKvartil'].every(k=>Number.isFinite(values[k])&&values[k]>=0)
   ||!['pedActionOut','pedActionExtr'].every(k=>Number.isInteger(values[k])&&values[k]>=1&&values[k]<=7)))return fail('elim_outlier_selected_settings');
  if(typeof values.pedOrderedSample!=='boolean'||typeof values.pedUseQuality!=='boolean')return fail('elim_outlier_global_settings');
+ const constants={};
+ for(const [key,action,name] of [['pedSettedValueOut','pedActionOut','outlier_constant'],['pedSettedValueExtr','pedActionExtr','extreme_constant']]){
+  if(!selected?.used||values[action]!==6)continue;
+  const c=cmp(key+';ValueContainer;num');
+  if(!c||typeof c.getValue!=='function')return fail('elim_outlier_control:'+key);
+  const value=c.getValue();if(!Number.isFinite(value))return fail('elim_outlier_constant:'+key);
+  values[key]=value;constants[name]=value;
+  const es=exact(base+key+';SwitchButton');
+  if(es.length>1||es.length===1&&typeof cmp(key+';SwitchButton')?.pressed!=='boolean')return fail('elim_outlier_switch');
+  switches[key]=es.length===1&&cmp(key+';SwitchButton').pressed;
+ }
  const method=radios[0]?'sd':'iqr';
  return {verified:true,binding_ready:true,inventory_complete:true,state_source:'cached_elim_outlier_store',fields,selected,values,switches,
   ordered:values.pedOrderedSample,quality:values.pedUseQuality,
-  settings:selected?.used?{method,outlier_factor:values[method==='sd'?'pedDetectOSko':'pedDetectOKvartil'],extreme_factor:values[method==='sd'?'pedDetectESko':'pedDetectEKvartil'],outlier_policy:({1:'keep',3:'mean',4:'median',5:'most_probable'})[values.pedActionOut]??'unsupported',extreme_policy:({1:'keep',3:'mean',4:'median',5:'most_probable'})[values.pedActionExtr]??'unsupported'}:null,
+  settings:selected?.used?{method,outlier_factor:values[method==='sd'?'pedDetectOSko':'pedDetectOKvartil'],extreme_factor:values[method==='sd'?'pedDetectESko':'pedDetectEKvartil'],outlier_policy:({1:'keep',2:'delete',3:'mean',4:'median',5:'most_probable',6:'constant',7:'limit'})[values.pedActionOut],extreme_policy:({1:'keep',2:'delete',3:'mean',4:'median',5:'most_probable',6:'constant',7:'limit'})[values.pedActionExtr],...constants}:null,
   settings_applied:false};
 }

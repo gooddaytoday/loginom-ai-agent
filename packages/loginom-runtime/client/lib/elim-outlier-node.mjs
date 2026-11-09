@@ -6,10 +6,10 @@ import {configureElimOutlier} from './elim-outlier-procedure.mjs';
 import {elimOutlierConfigurationReadback} from './elim-outlier-readback.mjs';
 import {readElimOutlierOutputs} from './elim-outlier-output.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
-const need=(v,m)=>{if(!v)throw Error('Outlier detect: '+m);};
+const need=(v,m)=>{if(!v)throw Error('Outlier: '+m);};
 export function createElimOutlierNodeSupport(config){return createTabularTransformNodeSupport(config,{
  type:'preprocessing.elim_outlier',modes:['detect','edit'],revision:'elim-outlier-v1-internal-2',parameterSchema:elimOutlierParametersSchema,
- validate:validateElimOutlierParameters,validateInput:(p,resolved,native)=>{if(p.outlier?.fields)resolveElimOutlierParameters(p,resolved.fields??native.target_fields);},readback:elimOutlierConfigurationReadback,
+ validate:validateElimOutlierParameters,validateInput:(p,resolved,native)=>{if(p.outlier?.fields)resolveElimOutlierParameters({outlier:{fields:p.outlier.fields}},resolved.fields??native.target_fields);},readback:elimOutlierConfigurationReadback,
  preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.outlier?.fields!==undefined,resolve:validateElimOutlierPreview,label:'elim_outlier'}),
  configurationObservation:{condition:'outlier detect fields',readElimOutlier:true,ready:s=>s.wizard?.stage==='elim_outlier'&&s.node_elim_outlier?.verified===true},
  async configure(channel,p,context){
