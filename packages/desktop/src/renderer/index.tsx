@@ -69,6 +69,7 @@ const deepLinkEvent = "loginom-ai-agent:deep-link"
 
 type DesktopWindowState = {
   id?: string
+  dashboardLaunch: boolean
 }
 
 const emitDeepLinks = ({ urls, coldDashboard }: PendingDeepLinks) => {
@@ -81,9 +82,12 @@ const emitDeepLinks = ({ urls, coldDashboard }: PendingDeepLinks) => {
 }
 
 const listenForDeepLinks = () => {
-  const consume = () => void window.api.consumeDeepLinks().then(emitDeepLinks)
-  window.api.onDeepLink(consume)
-  consume()
+  const initial = window.api.consumeDeepLinks()
+  window.api.onDeepLink(() => void window.api.consumeDeepLinks().then(emitDeepLinks))
+  return initial.then((links) => {
+    emitDeepLinks(links)
+    return !!links.coldDashboard
+  })
 }
 
 function windowLastActiveUrlKey(windowID: string) {
@@ -342,7 +346,7 @@ let menuTrigger = null as null | ((id: string) => void)
 window.api.onMenuCommand((id) => {
   menuTrigger?.(id)
 })
-listenForDeepLinks()
+const dashboardLaunch = listenForDeepLinks()
 
 function LoadingSplash() {
   return (
@@ -432,6 +436,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
               startup={onboarding.promise}
               serverScoped={
                 <DesktopFirstLaunchOnboarding
+                  dashboardLaunch={props.windowState.dashboardLaunch}
                   initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}
                   onLoaded={onboarding.resolve}
                 />
@@ -463,7 +468,7 @@ render(() => {
     const api = window.api as typeof window.api & {
       getWindowID?: () => Promise<string>
     }
-    return { id: await api.getWindowID?.() }
+    return { id: await api.getWindowID?.(), dashboardLaunch: await dashboardLaunch }
   })
 
   return (
