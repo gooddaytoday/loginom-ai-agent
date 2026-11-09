@@ -78,7 +78,7 @@ RULES = (
       'docs/node-development/nodes/research-quality/acceptance/**',
       'docs/node-development/nodes/research-quality/fixtures/**'), ('live-ui',), ('quality-default', 'quality-spikes', 'quality-types')),
 
-    ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights')),
+    ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights', 'ungroup-seasonal')),
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age', 'corr-ranks', 'corr-discrete')),
     ((C + 'elim-outlier-*.mjs', 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance/**',
       'docs/node-development/nodes/preprocessing-elimoutlier/fixtures/**'), ('live-ui',),
@@ -128,7 +128,7 @@ RULES = (
       'docs/node-development/nodes/text-import/acceptance/task-multi-file-list.md',
       'docs/node-development/nodes/text-import/acceptance/task-multi-file.md',
       'scripts/node-acceptance/scenarios/text-mask/**',
-      'scripts/node-acceptance/scenarios/text-variant/**',
+      'docs/node-development/nodes/text-import/acceptance/task-variant.md',
       'scripts/node-acceptance/scenarios/text-auto-label/**',
       'packages/product/skills/loginom-automation/references/nodes/imports.text.md'),
      ('live-ui',), ('text-auto-label', 'text-variant', 'text-mask', 'text-multi-file-list', 'text-auto-types', 'text-auto-update', 'import-bindings')),

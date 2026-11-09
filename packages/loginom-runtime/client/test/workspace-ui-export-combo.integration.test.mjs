@@ -17,13 +17,13 @@ async function fixture(t,{openOnInput=false,corrupt=false,plain=false,sticky=fal
   <div id="switch" data-tid="${base}${plain?'edtFileName':'edtTimeFormat'};SwitchButton">literal</div>
   <div data-tid="${plain?base+'edtFileName;ValueControl':owner}"><input value="Не задано (hh:nn:ss)">
   ${plain?'':`<button data-tid="${owner};trg_picker">▼</button>`}</div></div>
-  <div data-tid="${owner};boundlist" style="display:none"></div>
-  ${staleList?`<div data-tid="${owner};boundlist" style="display:none">stale</div>`:''}`}));
+  ${staleList?`<div data-tid="${owner};boundlist" style="display:none">stale</div>`:''}
+  <div id="list" data-tid="${owner};boundlist" style="display:none"></div>`}));
  await page.goto('http://combo.test/');
  await page.evaluate(({owner,openOnInput,corrupt,plain,sticky})=>{
   globalThis.bg={app:{Version:'7.4.2'}};
   globalThis.Ext={getCmp:id=>id==='switch'?{pressed:false}:null};
-  const input=document.querySelector('input'),list=document.querySelector('[data-tid="'+owner+';boundlist"]');
+  const input=document.querySelector('input'),list=document.getElementById('list');
   const presets=['Не задано (hh:nn:ss)','h:mm','h:mm:ss','hh:mm','hh:mm:ss'];
   let highlighted=null;
   globalThis.comboEvents=[];

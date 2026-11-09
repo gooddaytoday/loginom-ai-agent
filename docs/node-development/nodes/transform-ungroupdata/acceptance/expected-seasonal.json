@@ -1,6 +1,6 @@
 {
-  "claim": "частично: только UngroupQuality — наблюдение, не заявляется",
-  "observation": "UngroupQuality=null при положительной опоре: в DOM `&nbsp;`, NULL против NaN не прочитан",
+  "claim": "частично: только UngroupQuality — наблюдение 7.4.2, не заявляется в справке",
+  "observation": "UngroupQuality=NaN при постоянной положительной опоре: native typed-read Loginom 7.4.2 (LAB-1314), CSV `Nan`",
   "package_path": "{{PACKAGE_PATH}}",
   "nodes": [
     {
@@ -270,7 +270,9 @@
         {
           "Item": "a",
           "Group": "G",
-          "UngroupQuality": null,
+          "UngroupQuality": {
+            "non_finite": "NaN"
+          },
           "SeasonalIndex1": 1,
           "SeasonalIndex2": 1,
           "SeasonalIndex3": 1,
@@ -287,7 +289,9 @@
         {
           "Item": "b",
           "Group": "G",
-          "UngroupQuality": null,
+          "UngroupQuality": {
+            "non_finite": "NaN"
+          },
           "SeasonalIndex1": 1,
           "SeasonalIndex2": 1,
           "SeasonalIndex3": 1,

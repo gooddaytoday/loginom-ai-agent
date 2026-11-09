@@ -70,12 +70,14 @@ the model; oracle and expected remain private.
 Run live acceptance without repeatedly reading live logs:
 
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
-native NaN/±Infinity as `{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",
-precision:"exact_non_finite"}` without `numeric_display_precision`. Expected
-writes the same marker as the Real cell, `{"non_finite":"NaN"}`. Typed comparison
-needs that exact marker; CSV accepts Loginom's spelling case-insensitively
-(`Nan`/`NaN`, `Inf`/`Infinity`, `-Inf`). NaN differs from NULL, from the export
-null marker and from an empty string.
+native NaN/±Infinity of a Real or an untyped Variant column as
+`{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",
+precision:"exact_non_finite"}` without `numeric_display_precision`. A typed
+Variant cell (`variant-native-decode.mjs`) still refuses a non-finite number.
+Expected writes the same marker as the Real cell, `{"non_finite":"NaN"}`. Typed
+comparison needs that exact marker; CSV accepts only the observed NaN spelling,
+case-insensitively (`Nan`/`NaN`); unobserved infinity spellings fail closed.
+NaN differs from NULL, from the export null marker and from an empty string.
 
 `reform-cache` uses `field-parameters/acceptance/v040/task-cache.md`, reform.csv
 and independent expected-cache.json (one export). Production readbacks prove
@@ -899,6 +901,13 @@ cleanup. Для update сравнивается итоговая стадия (`
 `task-weights.md` и weights-totals/support.csv передаются модели; независимый
 Fraction oracle и expected-weights.json остаются в harness. Оба выхода,
 повтор Execute, native типы и порядок, два CSV, Save/cold/cleanup.
+
+`ungroup-seasonal`: Разгруппировка с учётом временных колебаний и сезонности,
+постоянная опора. Только `task-seasonal.md`, seasonal-totals.csv и
+seasonal-constant-support.csv передаются модели; Fraction oracle
+`oracle-seasonal.py` и expected-seasonal.json остаются в harness. Порт 0 без
+доверительных границ (исключены в соответствии полей), порт 1 целиком; повтор
+Execute, native типы и порядок, два CSV, Save/cold/cleanup.
 
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.

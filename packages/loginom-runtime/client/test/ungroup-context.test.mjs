@@ -11,13 +11,13 @@ function fixture(){
  const owner={constructor:{name:'UngroupDataWizard'},FWizardForm:form,FColumnsStore:stores[0],FSupportColumnsStore:stores[1],FMissingLinks:false};
  components[root.id]={el:{dom:root},'@@TestCmpController':owner};components[wizard.id]={el:{dom:wizard},Controller:form};
  const filters=['txtUngroupFilterField','txtSupportFilterField'].map(k=>add(k,{getValue:()=>''}));
- const props=[];for(const k of ['pedUngroupMethod','pedRoundFormat','pedRoundParam','pedBalanceMethod']){props.push(add(k,{Controller:{FLastViewMode:0,FLastValue:0,FLastVariable:null,FInitializing:false}}));add(k+';ValueControl',{getValue:()=>0});}
+ const props=[];for(const k of ['pedUngroupMethod','pedRoundFormat','pedRoundParam','pedBalanceMethod']){props.push(add(k,{isDisabled:()=>false,Controller:{FLastViewMode:0,FLastValue:0,FLastVariable:null,FInitializing:false}}));add(k+';ValueControl',{getValue:()=>0});}
  const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>all.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
  return {records,stores,owner,filters,props,read:()=>vm.runInNewContext('('+readUngroupBrowser.toString()+')("MF;TF")',context)};
 }
 test('ungroup reads two owned complete schemas, reciprocal links, roles and policies',()=>{
  const c=fixture().read();assert.equal(c.verified,true);assert.equal(c.method,'shares');
- assert.deepEqual(JSON.parse(JSON.stringify(c.ungroup)),{keys:[{total:'Group',support:'Group'}],value_fields:['Total'],item_fields:['Item'],share_fields:['Share'],rounding:{format:'none'},balance:'none'});
+ assert.deepEqual(JSON.parse(JSON.stringify(c.ungroup)),{keys:[{total:'Group',support:'Group'}],value_fields:['Total'],item_fields:['Item'],share_fields:['Share'],order_fields:[[],[]],rounding:{format:'none'},balance:'none'});
  assert.equal(c.settings_applied,false);
 });
 test('ungroup never dereferences engine or native link proxies',()=>{const f=fixture();for(const k of ['FEngine','FLinks','FTimeAxisLink'])Object.defineProperty(f.owner,k,{get(){throw Error('RPC getter forbidden');}});assert.equal(f.read().verified,true);});
@@ -30,4 +30,20 @@ test('ungroup refuses pending and variable-bound properties',()=>{for(const muta
 test('ungroup context refuses owner changes and separate port forms',async()=>{
  let i=0;assert.equal((await readUngroupContext({evaluate:async()=>({verified:true})},{workflow_ref:{prefix:'MF;TF'}},async()=>({verified:true,surface:'wizard',node_id:++i}))).verified,false);
  assert.equal((await readUngroupContext({}, {},async()=>({verified:true,surface:'wizard',output_port:{}}))).reason,'ungroup_node_surface');
+});
+test('ungroup seasonal reads order roles on both inputs and its seasonality page',()=>{
+ const f=fixture();f.records[0].push({isModel:true,internalId:'r02',data:{Name:'Period',DisplayName:'Period',DataType:2,UsageType:8,Index:2,LinkIndex:-1,LinkName:'',GroupField:''}});
+ f.records[1].push({isModel:true,internalId:'r13',data:{Name:'Period',DisplayName:'Period',DataType:2,UsageType:8,Index:3,LinkIndex:-1,LinkName:'',GroupField:''}});
+ assert.deepEqual(JSON.parse(JSON.stringify(f.read().ungroup.order_fields)),[['Period'],['Period']]);
+ const all=[],components={},base='MF;TF;WizrdMCF;UngroupDataWizard';
+ const element=(tid,parent=null,visible=true)=>{const e={id:'e'+all.length,tid,parent,checkVisibility:()=>visible,contains(x){return x===this||!!x.parent&&this.contains(x.parent)}};all.push(e);return e;};
+ const wizard=element('MF;TF;WizrdMCF');element(base,wizard,false);const page=element(base+'-1',wizard);components[wizard.id]={el:{dom:wizard},Controller:{}};
+ const values={pedSeasonalityPeriod:0,pedSeasonalityMultiplier:1,pedNumSeasonalIndexes:12,pedMaxRareDensity:0.25,pedAbsentPeriodFraction:1,pedNoveltyPeriodFraction:1,pedMaxDepthPeriodFraction:0,pedAbsentDataPoints:10,pedMaxDepthDataPoints:100};
+ const owners={};for(const [k,v] of Object.entries(values)){const o=element(base+'-1;'+k,page),c=element(base+'-1;'+k+';ValueControl',o);
+  owners[k]=components[o.id]={el:{dom:o},isDisabled:()=>['pedAbsentDataPoints','pedMaxDepthDataPoints'].includes(k),Controller:{FLastViewMode:0,FLastValue:v,FLastVariable:null,FInitializing:false}};components[c.id]={el:{dom:c},getValue:()=>v};}
+ const context={Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>all.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
+ const read=()=>vm.runInNewContext('('+readUngroupBrowser.toString()+')("MF;TF")',context);
+ const r=read();assert.equal(r.verified,true);assert.equal(r.kind,'seasonality');assert.deepEqual(JSON.parse(JSON.stringify(r.values)),values);
+ owners.pedMaxRareDensity.Controller.FLastValue=0.5;assert.equal(read().reason,'ungroup_seasonality_pending');
+ owners.pedMaxRareDensity.Controller.FLastValue=0.25;owners.pedSeasonalityPeriod.Controller.FLastVariable='V';assert.equal(read().verified,false);
 });

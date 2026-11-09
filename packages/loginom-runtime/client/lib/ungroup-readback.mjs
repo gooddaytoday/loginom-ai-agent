@@ -1,4 +1,4 @@
-import {ungroupOutputFields} from './ungroup-parameters.mjs';
+import {ungroupOutputFields,ungroupSecondaryFields} from './ungroup-parameters.mjs';
 import {supportedUngroupConfiguration} from './ungroup-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error('Ungroup readback: '+m);};
 const pick=(v,keys)=>Object.fromEntries(keys.map(k=>[k,v[k]]));
@@ -8,7 +8,8 @@ export function ungroupConfigurationReadback({node,phases,operation_id}){
  const receipt=name=>{const xs=phases.filter(p=>p.phase===name),p=xs[0];need(xs.length===1&&p.status==='verified'&&p.receipt_id===operation_id+':'+name&&p.value?.verified===true&&p.value.cleanup_complete===true,'verified '+name);return p;};
  const input=receipt('input_mapping'),configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
  const c=configured.value.configuration,m=mapped.value.native_mapping;
- need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.ungroup?.keys?.length&&['shares','computed'].includes(c.method),'configuration owner');
+ need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.ungroup?.keys?.length&&['shares','computed','seasonal'].includes(c.method),'configuration owner');
+ need(c.method!=='seasonal'||Number.isInteger(c.seasonality?.index_count)&&c.seasonality.period==='year','seasonality readback');
  const ungroup=supportedUngroupConfiguration(c);
  need(Array.isArray(c.input_fields)&&c.input_fields.length===2,'both input schemas');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context),'validation');
@@ -22,9 +23,9 @@ export function ungroupConfigurationReadback({node,phases,operation_id}){
   return {port,autosync:im.autosync,fields};
  });
  need(m?.verified&&m.inventory_complete&&m.source_identity_verified&&owner(m.node_context)&&m.node_context.output_port?.port===0&&mapped.value.finish?.settings_applied===true&&mapped.value.finish.mode==='done'&&owner(mapped.value.finish.node_context),'output owner');
- if(c.method==='computed'){
+ if(c.method!=='shares'){
   const second=mapped.value.ports?.find(p=>p.port===1),sm=second?.native_mapping;
-  const expected=[ungroup.item_field,...ungroup.keys.map(k=>k.support)].map(name=>c.input_fields[1].find(f=>f.name===name));
+  const expected=ungroupSecondaryFields({...c,ungroup},c.seasonality?.index_count??0);
   need(sm?.verified&&sm.inventory_complete&&owner(sm.node_context)&&sm.node_context.output_port?.port===1&&second.closed?.cleanup_complete===true,'secondary output owner');
   need(sm.target_fields.length===expected.length&&sm.target_fields.every((f,i)=>!f.excluded&&f.name===expected[i].name&&f.type===expected[i].type),'secondary output schema');
  }
@@ -35,6 +36,7 @@ export function ungroupConfigurationReadback({node,phases,operation_id}){
   return {...pick(f,['index','name','label','type','data_kind','excluded']),source_name:source.name};
  });need(linked.size===m.source_fields.length,'complete output sources');
  return {kind:'ungroup',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),
-  mode:c.method,ungroup:{keys:ungroup.keys,value_field:ungroup.value_field,item_field:ungroup.item_field,share_field:ungroup.share_field,rounding:ungroup.rounding,balance:ungroup.balance},input_mappings:inputs,
+  mode:c.method,ungroup:{keys:ungroup.keys,value_field:ungroup.value_field,item_field:ungroup.item_field,share_field:ungroup.share_field,rounding:ungroup.rounding,balance:ungroup.balance,
+   ...(c.method==='seasonal'?{total_order_field:ungroup.total_order_field,support_order_field:ungroup.support_order_field}:{})},...(c.method==='seasonal'?{seasonality:structuredClone(c.seasonality)}:{}),input_mappings:inputs,
   output_mapping:{port:0,autosync:m.autosync,fields},package_persistence_verified:false};
 }
