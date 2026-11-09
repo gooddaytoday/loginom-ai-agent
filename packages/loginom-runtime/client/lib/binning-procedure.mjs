@@ -130,7 +130,8 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
   }
   if(wanted.method==='sd'&&s.node_binning.settings.sd_coefficient!==wanted.sd_coefficient){
    const key='cbbSDBinsMode;ValueControl',owner=s.node_binning.frame.controls[key],label='+/- '+wanted.sd_coefficient+' СКО';
-   await act(key,{verb:'click'});
+   await channel.perform({condition:'open owned SD coefficient picker',initialObservation:s,ready:binningReady,identity:()=>field,
+    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===owner+';trg_picker'&&e.allowed_actions.includes('click'),'owned SD picker trigger required').ref})});
    s=await observeBinning(channel,'native SD coefficient option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
    await channel.perform({condition:'choose requested SD coefficient',initialObservation:s,ready:binningReady,identity:()=>field,
     resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'requested SD option required').ref})});

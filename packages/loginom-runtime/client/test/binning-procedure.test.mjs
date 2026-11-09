@@ -182,7 +182,9 @@ async function automaticMode(method,{stale=false,manual=false}={}){
   frame:{record_id:'X',switches:[],values,controls:Object.fromEntries(Object.keys(values).map(k=>[k,'MethodSettingFrame;'+k]))},
   settings:{method,size:sd?null:2,limits:sd?null:[0,20],sd_coefficient:2,strict_lower:true,strict_upper:true,rounding:false,lower_open:false,upper_open:false}};
  if(manual)Object.assign(c.settings,{sd_coefficient:1,lower_open:true,upper_open:true});
- const elements=()=>[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},...Object.keys(values).map(k=>({tid:'MethodSettingFrame;'+k+(typeof values[k]==='boolean'?';DisplayEl':''),ref:k,allowed_actions:[typeof values[k]==='boolean'?'set_checked':'click']}))];
+ const elements=()=>[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},
+  {tid:'MethodSettingFrame;cbbSDBinsMode;ValueControl;trg_picker',ref:'sd-picker',allowed_actions:['click']},
+  ...Object.keys(values).map(k=>({tid:'MethodSettingFrame;'+k+(typeof values[k]==='boolean'?';DisplayEl':''),ref:k,allowed_actions:[typeof values[k]==='boolean'?'set_checked':'click']}))];
  const s={wizard:{root_tid:'W',stage:'binning'},node_binning:c,ui:{elements:elements()}};
  const channel={observe:async o=>{assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
   assert.ok(o.ready(s));const a=o.resolve(s);calls.push(a);
@@ -191,7 +193,8 @@ async function automaticMode(method,{stale=false,manual=false}={}){
    const k={chkStrictLowerLimit:'strict_lower',chkStrictUpperLimit:'strict_upper','chkLowerLimitOpen;ValueControl':'lower_open','chkUpperLimitOpen;ValueControl':'upper_open'}[a.ref];
    c.settings[k]=a.checked;
    if(!sd&&!c.settings.strict_lower&&!c.settings.strict_upper)c.settings.limits=null;
-  }else if(a.ref==='cbbSDBinsMode;ValueControl')s.ui.elements=[{tid:'MethodSettingFrame;cbbSDBinsMode;ValueControl;boundlist;one',ref:'sd-one',label:'+/- 1 СКО',allowed_actions:['click']},
+  }else if(a.ref==='cbbSDBinsMode;ValueControl'){} // LAB-1260 native: focusing the input does not expand its picker.
+  else if(a.ref==='sd-picker')s.ui.elements=[{tid:'MethodSettingFrame;cbbSDBinsMode;ValueControl;boundlist;one',ref:'sd-one',label:'+/- 1 СКО',allowed_actions:['click']},
    {tid:'foreign;boundlist;one',ref:'foreign',label:'+/- 1 СКО',allowed_actions:['click']}];
   else if(a.ref==='sd-one'){if(!stale){c.settings.sd_coefficient=1;values['cbbSDBinsMode;ValueControl']=0;}s.ui.elements=elements();}
   else if(a.verb==='wizard_step')s.wizard.stage=a.expected_stage;
@@ -206,7 +209,7 @@ test('auto turns off both previously explicit limits without writing disabled bo
 });
 test('SD selects the owned ±1 option from native default ±2 and opens both tails',async()=>{
  const f=await automaticMode('sd'),r=await f.run();assert.equal(r.configuration.sd_coefficient,1);
- assert.deepEqual(f.calls.filter(a=>a.verb==='click').map(a=>a.ref),['cbbSDBinsMode;ValueControl','sd-one']);
+ assert.deepEqual(f.calls.filter(a=>a.verb==='click').map(a=>a.ref),['sd-picker','sd-one']);
  assert.equal(r.configuration.open_ends,true);
 });
 test('SD refuses a stale coefficient before accepting settings',async()=>{
