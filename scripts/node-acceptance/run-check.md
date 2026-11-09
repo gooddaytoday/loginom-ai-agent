@@ -875,3 +875,10 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
 порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
 проверяется принятым `replace-keep-variant`.
+
+`assnrules-filters` uses task-filters.md and the original train.csv plus
+selected-items.csv (B). The same FP-Growth node first contains selected items,
+then excludes items whose support is strictly above 90%. Four full typed CSVs
+must contain 4 sets/10 rules followed by 2 sets/2 rules; final cold reexecution
+checks B→C and C→B, field order, NULL padding, saved graph and cleanup.
+The independent Fraction oracle and expected-filters*.json stay private.

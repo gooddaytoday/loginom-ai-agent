@@ -12,6 +12,9 @@ r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
 c=r.scenario('assnrules-filters');e=r.expected_for(c,'/own/filters.lgp')
 assert c['input_files']==['train.csv','selected-items.csv'] and c['export_count']==4
 assert c['prompt'].name=='task-filters.md' and c['base'] is None
+s=importlib.util.spec_from_file_location('checks','scripts/node-acceptance/required-checks.py')
+checks=importlib.util.module_from_spec(s);s.loader.exec_module(checks)
+assert 'assnrules-filters' in checks.select([checks.C+'assn-rules-procedure.mjs'])[1]
 assert all((c['data']/name).is_file() for name in c['input_files'])
 s=importlib.util.spec_from_file_location('oracle',c['source']/'oracle.py')
 o=importlib.util.module_from_spec(s);s.loader.exec_module(o)

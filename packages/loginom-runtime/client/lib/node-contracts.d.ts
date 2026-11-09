@@ -48,7 +48,7 @@ export interface NodeHandler<T extends NodeType, P> {
   configure(context: NodeProcedureContext, parameters: P): Promise<VerifiedNodePhase>;
   /** Pure projection of accepted receipts; never executes or rereads the UI. */
   configurationReadback?(context: {node: NodeRef; operation_id: string;
-    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): VariablesCalculatorConfigurationReadback | DataToVarConfigurationReadback | UserVariablesConfigurationReadback | AssnRulesConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisModesConfigurationReadback | CorrAnalysisRanksConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | SamplingUniformConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
+    phases: Array<PhaseReceipt & {value: VerifiedNodePhase}>}): VariablesCalculatorConfigurationReadback | DataToVarConfigurationReadback | UserVariablesConfigurationReadback | AssnRulesConfigurationReadback | AssnRulesFiltersConfigurationReadback | QualityConfigurationReadback | TextImportConfigurationReadback | CalculatorConfigurationReadback | JavascriptConfigurationReadback | GroupingConfigurationReadback | VariablesToTableConfigurationReadback | SortingConfigurationReadback | CollapseConfigurationReadback | MissingValuesConfigurationReadback | ReplacementConfigurationReadback | DuplicatesConfigurationReadback | EnrichConfigurationReadback | JoinConfigurationReadback | CrossTableConfigurationReadback | AutoCorrelationConfigurationReadback | CorrAnalysisConfigurationReadback | FactorAnalysisModesConfigurationReadback | CorrAnalysisRanksConfigurationReadback | FactorAnalysisConfigurationReadback | ClusteringConfigurationReadback | ClusteringGmeansConfigurationReadback | ClusteringApplyConfigurationReadback | LinRegressionConfigurationReadback | ElimOutlierConfigurationReadback | LogRegressionConfigurationReadback | TreeConversionConfigurationReadback | TreeConfigurationReadback | SamplingModesConfigurationReadback | SamplingUniformConfigurationReadback | CoarseClassesConfigurationReadback | BinningConfigurationReadback | SamplingConfigurationReadback;
 }
 export interface VerifiedNodePhase { verified: true; cleanup_complete: true; effect_possible: boolean }
 export interface NodeProcedureContext {
@@ -377,6 +377,12 @@ export interface AssnRulesConfigurationReadback {
   min_support_pct: number; min_confidence_pct: number; max_items: 2 | 3;
   min_lift: number; singletons: true; consequence_limit: 1 | 2;
   training: ClusteringConfigurationReadback['training']; package_persistence_verified: false;
+}
+
+export interface AssnRulesFiltersConfigurationReadback extends Omit<AssnRulesConfigurationReadback,'training'> {
+  selected_item_field: string | null; contain_selected_items: boolean; exclude_support_above_pct: number | null;
+  training: AssnRulesConfigurationReadback['training'] | {status:'trained';node:NodeRef;execution_id:string;
+    source:Array<{node:NodeRef;output:number;input:0 | 1}>};
 }
 
 export interface LinRegressionConfigurationReadback {
