@@ -867,3 +867,9 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 сверяются по cell_type и value (NULL, пустая строка, false, 0 различаются),
 порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
 проверяется принятым `replace-keep-variant`.
+
+`smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
+`smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
+expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
+передаётся модели. Все 8 строк, RowID,X,Tag,X_S, real abs 1e-8 / rel 1e-10,
+CSV, Save, cold без перенастройки и cleanup; CDF сохраняется без order.
