@@ -6,10 +6,10 @@ import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { AttachmentCardV2 } from "@opencode-ai/session-ui/v2/attachment-card-v2"
 import { CommentCardV2 } from "@opencode-ai/session-ui/v2/comment-card-v2"
 import { typeLabel } from "@opencode-ai/session-ui/message-file"
-import type { ContextItem, ImageAttachmentPart } from "@/context/prompt"
+import type { FileContextItem, ImageAttachmentPart } from "@/context/prompt"
 import "./image-attachments.css"
 
-type PromptCommentItem = ContextItem & { key: string }
+type PromptCommentItem = FileContextItem & { key: string }
 
 type PromptImageAttachmentsProps = {
   attachments: ImageAttachmentPart[]

@@ -76,12 +76,19 @@ export type PromptInputV2Comment = {
   preview?: string
 }
 
+export type DashboardContextItem = {
+  type: "dashboard"
+  id: string
+  action: "create" | "edit"
+  nodeName: string
+}
+
 export type PromptInputV2PersistedState = {
   prompt: PromptInputV2Prompt
   cursor?: number
   model?: PromptInputV2Model
   context: {
-    items: PromptInputV2Comment[]
+    items: (PromptInputV2Comment | (DashboardContextItem & { key: string }))[]
   }
 }
 

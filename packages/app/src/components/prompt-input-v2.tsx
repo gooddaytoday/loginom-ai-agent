@@ -13,6 +13,7 @@ import type { PromptInputProps } from "@/components/prompt-input/contracts"
 import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } from "@/components/prompt-input/history"
 import { createPersistedPromptInputHistory } from "@/components/prompt-input/history-store"
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
+import { PromptDashboardContext } from "@/components/prompt-input/context-items"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
@@ -20,7 +21,7 @@ import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
-import { type ImageAttachmentPart, usePrompt } from "@/context/prompt"
+import { type ImageAttachmentPart, isCommentItem, usePrompt } from "@/context/prompt"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -51,6 +52,16 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
 
   return (
     <div class="flex flex-col gap-3">
+      <PromptDashboardContext
+        item={props.controller.dashboard()}
+        hidden={props.controller.state.mode === "shell"}
+        focus={() => {
+          props.controller.dispatch({ type: "mode.normal" })
+          props.controller.restoreFocus()
+        }}
+        remove={props.controller.removeContext}
+        t={language.t}
+      />
       <PromptInputV2
         controller={props.controller}
         borderUnderlay={props.borderUnderlay}
@@ -118,7 +129,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   )
   const commentCount = createMemo(() => {
     if (mode() === "shell") return 0
-    return prompt.context.items().filter((item) => !!item.comment?.trim()).length
+    return prompt.context.items().filter(isCommentItem).length
   })
   const blank = createMemo(() => {
     const text = prompt
@@ -145,6 +156,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const historyComments = () => {
     const byID = new Map(comments.all().map((item) => [`${item.file}\n${item.id}`, item] as const))
     return prompt.context.items().flatMap((item) => {
+      if (item.type !== "file") return []
       const comment = item.comment?.trim()
       if (!comment) return []
       const selection = item.commentID ? byID.get(`${item.path}\n${item.commentID}`)?.selection : undefined
@@ -450,17 +462,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         const edit = props.edit
         if (!id || !edit) return
         prompt.context.items().forEach((item) => prompt.context.remove(item.key))
-        edit.context.forEach((item) =>
-          prompt.context.add({
-            type: item.type,
-            path: item.path,
-            selection: item.selection,
-            comment: item.comment,
-            commentID: item.commentID,
-            commentOrigin: item.commentOrigin,
-            preview: item.preview,
-          }),
-        )
+        edit.context.forEach(prompt.context.add)
         controller.dispatch({ type: "mode.normal" })
         controller.resetHistory()
         prompt.set(edit.prompt, promptLength(edit.prompt))

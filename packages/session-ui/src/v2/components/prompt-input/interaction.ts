@@ -302,11 +302,18 @@ export function createPromptInputV2Controller(input: {
       return draft.state.prompt
     },
     addPart,
+    dashboard() {
+      return draft.state.context.items.find((item) => item.type === "dashboard")
+    },
     contextItem(id: string) {
-      return draft.state.context.items.find((item) => item.key === id)
+      return draft.state.context.items.find(
+        (item): item is PromptInputV2Comment => item.type === "file" && item.key === id,
+      )
     },
     comments() {
-      return draft.state.context.items.filter((item) => !!item.comment?.trim())
+      return draft.state.context.items.filter(
+        (item): item is PromptInputV2Comment => item.type === "file" && !!item.comment?.trim(),
+      )
     },
     attachments(): PromptInputV2Attachment[] {
       return draft.state.prompt.filter((part): part is PromptInputV2Attachment => part.type === "image")
@@ -317,7 +324,7 @@ export function createPromptInputV2Controller(input: {
     },
     removeContext(id: string) {
       const item = draft.state.context.items.find((entry) => entry.key === id)
-      if (item) input.onContextRemove?.(item)
+      if (item?.type === "file") input.onContextRemove?.(item)
       draft.removeContext(id)
       if (state.activeContextID === id) dispatch({ type: "context.active", id })
     },
@@ -330,7 +337,7 @@ export function createPromptInputV2Controller(input: {
     canSubmit() {
       const persisted = draft.state
       if (persisted.prompt.some((part) => part.type === "image")) return true
-      if (persisted.context.items.some((item) => !!item.comment?.trim())) return true
+      if (persisted.context.items.some((item) => item.type === "file" && !!item.comment?.trim())) return true
       return persisted.prompt.some((part) => "content" in part && !!part.content.trim())
     },
     setEditor(element: HTMLElement) {

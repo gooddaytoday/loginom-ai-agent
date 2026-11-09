@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { createStore } from "solid-js/store"
+import { createPromptState } from "@/context/prompt-state"
 import type { Prompt, PromptStore } from "@/context/prompt"
 import type { ModelSelection } from "@/context/local"
 
@@ -779,4 +780,66 @@ describe("prompt submit worktree selection", () => {
     expect(storedSessions["/repo/worktree-a"]?.[0]).toMatchObject({ id: "session-1", title: "New session 1" })
     expect(optimisticSeeded).toEqual([true])
   })
+})
+
+test("a queued slash command includes its pinned dashboard in the accepted message", async () => {
+  commands.push({ name: "review" })
+  await sendFollowupDraft({
+    api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
+    serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
+    sync: { data: { command: commands } } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
+    draft: {
+      sessionID: "ses",
+      sessionDirectory: "/repo/main",
+      prompt: [{ type: "text", content: "/review chart", start: 0, end: 13 }],
+      context: [{ type: "dashboard", key: "dashboard", id: "target-a", nodeName: "A", action: "edit" }],
+      agent: "build",
+      model: { modelID: "m", providerID: "p" },
+    },
+  })
+  expect(sentCommands[0]).toMatchObject({
+    arguments: "chart",
+    legacyParts: [
+      expect.objectContaining({
+        type: "text",
+        synthetic: true,
+        text: expect.stringContaining("/dashboard/targets/target-a"),
+      }),
+    ],
+  })
+})
+
+test("a rejected dashboard prompt restores the user's words and target for retry", async () => {
+  params = { id: "session-1" }
+  const state = createPromptState({ prompt: "Edit chart" })
+  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  const submit = createPromptSubmit({
+    prompt: state,
+    info: () => ({ id: "session-1" }),
+    imageAttachments: () => [],
+    commentCount: () => 0,
+    autoAccept: () => false,
+    mode: () => "normal",
+    working: () => false,
+    editor: () => undefined,
+    queueScroll: () => {},
+    promptLength: () => 10,
+    addToHistory: () => {},
+    resetHistoryNavigation: () => {},
+    setMode: () => {},
+    setPopover: () => {},
+  })
+  onPrompt = () => {
+    throw new Error("request rejected")
+  }
+  await submit.handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  expect(promptInputs[0]).toMatchObject({
+    legacyParts: [
+      expect.objectContaining({ text: "Edit chart" }),
+      expect.objectContaining({ synthetic: true, text: expect.stringContaining("/dashboard/targets/target-a") }),
+    ],
+  })
+  expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
+  expect(state.context.items()[0]).toMatchObject({ type: "dashboard", id: "target-a" })
 })

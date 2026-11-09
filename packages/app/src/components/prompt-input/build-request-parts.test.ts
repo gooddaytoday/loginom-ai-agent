@@ -480,3 +480,33 @@ test("large native references retain escaped paths and receipts without inline b
   expect(JSON.stringify(result)).not.toMatch(/data:|base64/)
   expect(result.optimisticParts[0]).toMatchObject({ url: part.url, source: part.source })
 })
+
+test("a dashboard request keeps the user's words and passes only the selected snapshot to the agent", () => {
+  const { requestParts } = buildRequestParts({
+    prompt: [],
+    text: "Change the title",
+    images: [],
+    sessionDirectory: "/repo",
+    sessionID: "s",
+    messageID: "m",
+    context: [
+      {
+        type: "dashboard",
+        key: "dashboard",
+        id: "5f85dea9-7be3-4709-9525-e11736087e19",
+        nodeName: "Node",
+        action: "edit",
+      },
+    ],
+  })
+  expect(requestParts).toEqual([
+    expect.objectContaining({ type: "text", text: "Change the title" }),
+    expect.objectContaining({
+      type: "text",
+      synthetic: true,
+      text: expect.stringContaining(
+        "GET http://127.0.0.1:32768/dashboard/targets/5f85dea9-7be3-4709-9525-e11736087e19",
+      ),
+    }),
+  ])
+})

@@ -1,13 +1,14 @@
-import { Component, For, Show } from "solid-js"
+import { Component, createEffect, For, on, Show } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { getDirectory, getFilename, getFilenameTruncated } from "@opencode-ai/core/util/path"
-import type { ContextItem } from "@/context/prompt"
+import type { DashboardContextItem } from "@opencode-ai/session-ui/v2/prompt-input/types"
+import type { FileContextItem } from "@/context/prompt"
 
-type PromptContextItem = ContextItem & { key: string }
+type PromptContextItem = FileContextItem & { key: string }
 
 type ContextItemsProps = {
   items: PromptContextItem[]
@@ -93,6 +94,49 @@ export const PromptContextItems: Component<ContextItemsProps> = (props) => {
           }}
         </For>
       </div>
+    </Show>
+  )
+}
+
+export function PromptDashboardContext(props: {
+  item?: DashboardContextItem & { key: string }
+  hidden?: boolean
+  remove: (key: string) => void
+  focus: () => void
+  t: (
+    key: "prompt.context.dashboardCreate" | "prompt.context.dashboardEdit" | "prompt.attachment.remove",
+    params?: { name: string },
+  ) => string
+}) {
+  createEffect(
+    on(
+      () => props.item,
+      (item) => {
+        if (item) props.focus()
+      },
+    ),
+  )
+  return (
+    <Show when={props.item}>
+      {(item) => (
+        <div
+          class="flex items-center gap-2 px-3 pt-2 text-12-medium text-text-strong"
+          classList={{ hidden: props.hidden }}
+        >
+          <span>
+            {props.t(item().action === "create" ? "prompt.context.dashboardCreate" : "prompt.context.dashboardEdit", {
+              name: item().nodeName,
+            })}
+          </span>
+          <IconButton
+            type="button"
+            icon="close-small"
+            variant="ghost"
+            aria-label={props.t("prompt.attachment.remove")}
+            onClick={() => props.remove(item().key)}
+          />
+        </div>
+      )}
     </Show>
   )
 }

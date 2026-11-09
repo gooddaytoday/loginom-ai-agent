@@ -3,26 +3,15 @@ import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
 import { type AgentPartInput, type FilePartInput, type Part, type TextPartInput } from "@opencode-ai/sdk/v2/client"
 import type { FileSelection } from "@/context/file"
 import { encodeFilePath } from "@/context/file/path"
-import type { AgentPart, FileAttachmentPart, ImageAttachmentPart, Prompt } from "@/context/prompt"
+import type { AgentPart, ContextItem, FileAttachmentPart, ImageAttachmentPart, Prompt } from "@/context/prompt"
 import { Identifier } from "@/utils/id"
 import { createCommentMetadata, formatCommentNote } from "@/utils/comment-note"
 
 type PromptRequestPart = (TextPartInput | FilePartInput | AgentPartInput) & { id: string }
 
-type ContextFile = {
-  key: string
-  type: "file"
-  path: string
-  selection?: FileSelection
-  comment?: string
-  commentID?: string
-  commentOrigin?: "review" | "file"
-  preview?: string
-}
-
 type BuildRequestPartsInput = {
   prompt: Prompt
-  context: ContextFile[]
+  context: (ContextItem & { key: string })[]
   images: (Omit<ImageAttachmentPart, "blob"> & { dataUrl: string })[]
   text: string
   messageID: string
@@ -144,7 +133,8 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
   })
 
   const used = new Set(files.map((part) => part.url))
-  const context = input.context.flatMap((item) => {
+  const context = input.context.flatMap((item): PromptRequestPart[] => {
+    if (item.type === "dashboard") return [buildDashboardPart(item)]
     const path = absolute(input.sessionDirectory, item.path)
     const url = `file://${encodeFilePath(path)}${fileQuery(item.selection)}`
     const comment = item.comment?.trim()
@@ -200,6 +190,22 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
   return {
     requestParts,
     optimisticParts: requestParts.map((part) => toOptimisticPart(part, input.sessionID, input.messageID)),
+  }
+}
+
+export function buildDashboardPart(item: Extract<ContextItem, { type: "dashboard" }>) {
+  return {
+    id: Identifier.ascending("part"),
+    type: "text" as const,
+    synthetic: true,
+    text: [
+      item.action === "create"
+        ? "Создай пульт Loginom по просьбе пользователя."
+        : "Измени пульт Loginom по просьбе пользователя.",
+      `Прочитай снимок запросом GET http://127.0.0.1:32768/dashboard/targets/${item.id} и используй только этот ID до окончания запроса.`,
+      "Возьми путь исходников и команды из этого снимка. Штатными инструментами отредактируй файлы, проверь, собери и опубликуй приложение.",
+      "Не обращайся к /dashboard/current и не входи в живую сессию Loginom.",
+    ].join(" "),
   }
 }
 
