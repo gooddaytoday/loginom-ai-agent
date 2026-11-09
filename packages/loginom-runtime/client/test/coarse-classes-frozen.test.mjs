@@ -41,3 +41,23 @@ test('same-node frozen retraining preserves the saved input role without resetti
  assert.equal(gestures.filter(a=>a.verb==='wizard_step').length,5);
  assert.ok(gestures.every(a=>a.verb==='wizard_step'||['Segment','Target'].includes(a.ref)));
 });
+
+test('an unrequested frozen predictor does not bypass the initial-class check; saved apply keeps it',async()=>{
+ const {configureCoarseClasses}=await import('../lib/coarse-classes-procedure.mjs');
+ const root='wizard',fine='wizard;CoarseClassesWizard-1;CoarseClassesSettingsFrame;chkUseFineClassesBinning;ValueControl;DisplayEl';
+ const run=async(mode,settings)=>{
+  const fields=[{name:'Segment',label:'Segment',type:'string',data_kind:'Дискретный',index:0,record_id:'s',role:'input',frozen:true},
+   {name:'Target',label:'Target',type:'string',data_kind:'Дискретный',index:1,record_id:'t',role:'target',frozen:false}];
+  let selected={...fields[0],frozen:false};
+  const snapshot=()=>structuredClone({wizard:{stage:'coarse_classes',root_tid:root},prepared_node_context:{verified:true,node_id:'node'},
+   node_coarse_classes:{verified:true,fields,selected,settings:{event_value:selected.name==='Target'?'yes':null,min_class_percent:5,max_classes:2,uniformity_percent:0,...settings}},
+   ui:{elements:[{tid:fine,ref:'fine',allowed_actions:['set_checked']},...fields.map(f=>({tid:root+';CoarseClassesWizard-1;colColumnDisplayName_'+f.name,ref:f.name,allowed_actions:['click']}))]}});
+  const channel={observe:async o=>{const s=snapshot();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
+   const a=o.resolve(snapshot());if(a.verb==='click')selected=fields.find(f=>f.name===a.ref);
+  }};
+  return mode==='apply'?configureCoarseClasses(channel,{},{request:{mode},preconfiguration:{target_fields:fields}})
+   :configureCoarseClasses(channel,{coarse_classes:{input_field:'Segment',target_field:'Target',event_value:'yes',partition:'automatic',min_class_percent:5,max_classes:2,uniformity_percent:0}},{request:{mode},inputMapping:{target_fields:fields}});
+ };
+ await assert.rejects(run('internal',{fine_classes:true}),/initial-class bypass is outside this stage/);
+ assert.equal((await run('apply',{})).settings_applied,false);
+});
