@@ -671,8 +671,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         if(mode==='close')return {...await closePreparedWizard(channel),...(configured?.server_profile?{server_profile:configured.server_profile}:{})};
         const executeRequested=mode==='execute'&&!sourceSwitch&&!operation.importBinding,verb=executeRequested?'execute_wizard':'finish_wizard',button=executeRequested?'btnExecute':'btnDone';
         requireValue(mode!=='execute'||executionDriver,'Execution baseline was not prepared');
-        if(operation.nodeApply.request.parameters.settings.node_title)
-          await configureTextImportTitle(channel,operation.nodeApply.request.parameters.settings.node_title);
+        const nodeTitleRequest=operation.nodeApply.request.parameters?.settings?.node_title;
+        if(nodeTitleRequest)await configureTextImportTitle(channel,nodeTitleRequest);
         const s=await read('done',mode+' available for the prepared node',s=>s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+button && e.allowed_actions.includes(verb)));
         const nodeTitle=structuredClone(s.wizard.completion);
         await channel.perform({condition:'bound import '+mode+' available',initialObservation:s,
