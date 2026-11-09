@@ -45,3 +45,8 @@ test('apply requires discarded settings and rejects any training claim',()=>{
   const bad=structuredClone(input);alter(bad);assert.throws(()=>assnRulesConfigurationReadback(bad));
  }
 });
+
+test('readback reports the observed maximum support exclusion',()=>{
+ const input=candidate();input.phases[1].value.configuration.exclude_support_above_pct=90;
+ assert.equal(assnRulesConfigurationReadback(input).exclude_support_above_pct,90);
+});

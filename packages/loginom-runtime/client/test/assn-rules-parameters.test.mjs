@@ -57,3 +57,10 @@ test('public dispatch admits all registered association-rule ports before the pr
   assert.throws(()=>validateNodeApplyEnvelope({...envelope,target:{...envelope.target,type},read:{ports:[2]}}),/must be <= 1/);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,read:{ports:[3],sample_rows:100,require_exact_numbers:true}}),/must be <= 2/);
 });
+
+test('maximum support exclusion admits only finite percentages or explicit disable and keeps auxiliary inputs unsupported',()=>{
+ for(const value of [0,90,100,null])validateAssnRulesParameters({...p,exclude_support_above_pct:value},'fp_growth',request);
+ for(const value of [-1,101,NaN,Infinity,'90',true])assert.throws(()=>validateAssnRulesParameters({...p,exclude_support_above_pct:value},'fp_growth',request));
+ for(const parameters of [{selected_item_field:'Item'},{contain_selected_items:true}])assert.throws(()=>validateAssnRulesParameters({...p,...parameters},'fp_growth',request));
+ for(const r of [request,{...request,target:{kind:'existing'}}])assert.throws(()=>validateAssnRulesParameters({...p,exclude_support_above_pct:90},'fp_growth',{...r,inputs:[{input:0},{input:1}]}),/auxiliary/);
+});

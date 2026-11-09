@@ -959,3 +959,9 @@ recommend-holdout.csv из fixtures/v040. Oracle сохраняет правил
 Только task-elastic.md и CSV передаются модели; frozen KKT oracle из
 8c1b6ac415645227d8977c3d9f7d3194e7e9b4b2 остаётся приватным. Оба typed-порта,
 прогнозный CSV, Save/cold без перенастройки и cleanup; abs=1e-8, rel=1e-10.
+
+`assnrules-exclude`: train.csv из fixtures/v040, support 50%, confidence 60%,
+lift 0, max_items=3, max_consequents=2, исключение поддержки >90%.
+Только task-exclude.md и train.csv передаются модели. Два CSV наборов и правил,
+Save/cold/cleanup; expected-exclude*.json генерируются oracle.py --write-exclude.
+Вспомогательный вход и отбор выбранных элементов не входят в сценарий.
