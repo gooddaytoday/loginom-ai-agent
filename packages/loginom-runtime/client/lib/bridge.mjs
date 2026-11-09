@@ -151,6 +151,9 @@ export async function createBridge(config, session, { browserTransport: managedB
   const saveAdmissions = new Map();
   let saveSequence=0;
   let lastSavedPackage = null;
+  // Save As closes the package and reopens it in a new tab. Until a new
+  // preparation, the original receipt no longer owns that tab for cleanup.
+  let reopenedSave = null;
   let closing, shutdownStarted = false;
   const skill = createSkillLoader({ resources: config.resources });
   let clipboardUncertain = false;
@@ -583,6 +586,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
                 document_id:admission.document_id,sequence:admission.sequence};
+              if(confirmedSave.output?.reopened===true)
+                reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
             }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
@@ -802,11 +807,32 @@ export async function createBridge(config, session, { browserTransport: managedB
                     arguments:{code:makeFailedOpenCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
                   return parsePackageCleanupResult(response, cleanupOptions);
                 }
+                let tabTid = prepared.state.workflow_ref.tab_tid;
+                // The reopened package is a new node in a new tab. Bind it like
+                // open_package to an already active package: no gesture, same
+                // document/account/path. The native tab guard stays unchanged.
+                if (reopenedSave && reopenedSave.path === packagePath && reopenedSave.preparation === prepared
+                    && !unsavedDraft && !openedPackage) {
+                  let bound = null;
+                  try {
+                    const code = makeWorkspacePrepareCode({loginomUrl:config.loginomUrl, compatibility:pinnedActions.compatibility,
+                      sessionId:session.metadata.sessionId, operationId:'cleanup-rebind-'+randomUUID(), intent:'open_package',
+                      packagePath, timeoutMs:10000, bindOpenOnly:true});
+                    bound = structuredClone(redactor.redact(parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',
+                      arguments:{code}}, undefined, {timeout:11000}))));
+                  } catch {}
+                  const accepted = bound?.status === 'READY' && bound.effect_possible === false && bound.created_draft === false
+                    && bound.document_id === prepared.state.document_id && bound.loginom_account === prepared.state.loginom_account
+                    && bound.package_ref?.path === packagePath && bound.package_ref.persisted === true;
+                  await recordExecution({phase:'reopened_package_cleanup_binding', package_path:packagePath, accepted, state:bound});
+                  if (!accepted) return {status:'BLOCKED', reason:'REOPENED_PACKAGE_UNBOUND'};
+                  tabTid = bound.workflow_ref.tab_tid;
+                }
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
                   // Managed runtimes have no replay login account; the cleanup
                   // binds to the account observed at workspace preparation.
-                  tabTid:prepared.state.workflow_ref.tab_tid, account:prepared.state.loginom_account??config.replayLoginUser,
+                  tabTid, account:prepared.state.loginom_account??config.replayLoginUser,
                   packagePath, unsavedDraft, loginomUrl:config.loginomUrl,
                   loginomBuild:session.metadata.targetIdentity?.loginom_build ?? prepared.state.target?.loginom_build,
                 };

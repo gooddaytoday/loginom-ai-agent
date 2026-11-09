@@ -610,7 +610,7 @@ for(const scenario of ['reopened','reopened-then-checkpoint','reopened-reprepare
    const accepted=['reopened','reopened-then-checkpoint','reopened-reprepared'].includes(scenario);
    assert.equal(closed.browser_transport_closed,true);
    assert.equal(cleanup.status,accepted?'SUCCEEDED':'BLOCKED',JSON.stringify(cleanup));
-   assert.equal(cleanup.package_closed,accepted);assert.equal(cleanup.logged_out,accepted);
+   assert.equal(cleanup.package_closed===true,accepted);assert.equal(cleanup.logged_out===true,accepted);
    assert.equal(cleanup.save_operation_id,expectedSave);assert.equal(cleanup.package_path,path);
    assert.equal(cleanup.policy,'last_confirmed_own_save');
    // A model preparation after the reopen already owns the new tab: no extra binding.
