@@ -74,7 +74,7 @@ import {
 } from "./prompt-input/contracts"
 import { createPromptSubmit } from "./prompt-input/submit"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
-import { PromptContextItems } from "./prompt-input/context-items"
+import { PromptContextItems, PromptDashboardContext } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
@@ -274,7 +274,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const commentCount = createMemo(() => {
     if (store.mode === "shell") return 0
-    return prompt.context.items().filter((item) => !!item.comment?.trim()).length
+    return prompt.context.items().filter(isCommentItem).length
   })
   const blank = createMemo(() => {
     const text = prompt
@@ -303,7 +303,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const contextItems = createMemo(() => {
-    const items = prompt.context.items()
+    const items = prompt.context.items().filter((item) => item.type === "file")
     if (store.mode !== "shell") return items
     return items.filter((item) => !item.comment?.trim())
   })
@@ -1116,17 +1116,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           prompt.context.remove(item.key)
         }
 
-        for (const item of edit.context) {
-          prompt.context.add({
-            type: item.type,
-            path: item.path,
-            selection: item.selection,
-            comment: item.comment,
-            commentID: item.commentID,
-            commentOrigin: item.commentOrigin,
-            preview: item.preview,
-          })
-        }
+        edit.context.forEach(prompt.context.add)
 
         setStore("mode", "normal")
         closePopover()
@@ -1471,6 +1461,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         <PromptDragOverlay
           type={store.draggingType}
           label={language.t(store.draggingType === "@mention" ? "prompt.dropzone.file.label" : "prompt.dropzone.label")}
+        />
+        <PromptDashboardContext
+          item={prompt.context.items().find((item) => item.type === "dashboard")}
+          hidden={store.mode === "shell"}
+          focus={() => setMode("normal")}
+          remove={prompt.context.remove}
+          t={language.t}
         />
         <PromptContextItems
           items={contextItems()}

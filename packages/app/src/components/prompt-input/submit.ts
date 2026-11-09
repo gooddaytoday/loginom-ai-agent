@@ -15,7 +15,7 @@ import { useSDK, type DirectorySDK } from "@/context/sdk"
 import { useSync, type DirectorySync } from "@/context/sync"
 import { Identifier } from "@/utils/id"
 import { Worktree as WorktreeState } from "@/utils/worktree"
-import { buildAttachmentParts, buildRequestParts } from "./build-request-parts"
+import { buildAttachmentParts, buildDashboardPart, buildRequestParts } from "./build-request-parts"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
@@ -56,7 +56,7 @@ const draftText = (prompt: Prompt) => prompt.map((part) => ("content" in part ? 
 
 const draftImages = (prompt: Prompt) => prompt.filter((part): part is ImageAttachmentPart => part.type === "image")
 
-async function buildCommandAttachments(text: string, images: ImageAttachmentPart[]) {
+async function buildCommandAttachments(text: string, images: ImageAttachmentPart[], context: FollowupDraft["context"]) {
   const parts = buildAttachmentParts(
     await Promise.all(
       images.map(async (attachment) => ({
@@ -68,6 +68,8 @@ async function buildCommandAttachments(text: string, images: ImageAttachmentPart
       })),
     ),
   )
+  const dashboard = context.find((item) => item.type === "dashboard")
+  if (dashboard) parts.push(buildDashboardPart(dashboard))
   return {
     arguments: text,
     files: parts.flatMap((part) => (part.type === "file" ? [{ uri: part.url, name: part.filename }] : [])),
@@ -109,7 +111,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
         sessionID: input.draft.sessionID,
         id: messageID,
         command: cmd,
-        ...(await buildCommandAttachments(tail.join(" "), images)),
+        ...(await buildCommandAttachments(tail.join(" "), images, input.draft.context)),
         agent: input.draft.agent,
         model: {
           id: input.draft.model.modelID,
@@ -294,23 +296,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       .catch(() => {})
   }
 
-  const restoreCommentItems = (
-    target: ReturnType<ReturnType<typeof usePrompt>["capture"]>,
-    items: (ContextItem & { key: string })[],
-  ) => {
-    for (const item of items) {
-      target.context.add({
-        type: "file",
-        path: item.path,
-        selection: item.selection,
-        comment: item.comment,
-        commentID: item.commentID,
-        commentOrigin: item.commentOrigin,
-        preview: item.preview,
-      })
-    }
-  }
-
   const clearContext = (target: ReturnType<ReturnType<typeof usePrompt>["capture"]>) => {
     for (const item of target.context.items()) {
       target.context.remove(item.key)
@@ -370,6 +355,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     const projectDirectory = sdk().directory
     const permissionState = permission.currentServerState()
     const isNewSession = !params.id
+    const draftID = search.draftId
+    let session = input.info()
     const shouldAutoAccept = isNewSession && input.autoAccept()
     const worktreeSelection = input.newSessionWorktree?.() || "main"
 
@@ -415,7 +402,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       input.onNewSessionWorktreeReset?.()
     }
 
-    let session = input.info()
     if (!session && isNewSession) {
       const created = await sdk()
         .api.session.create({
@@ -443,9 +429,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
             variant: variant ?? null,
           })
           layout.handoff.setTabs(base64Encode(sessionDirectory), session.id)
-          const draftID = search.draftId
           if (draftID) tabs.promoteDraft(draftID, { server: tabs.draft(draftID).server, sessionId: session.id })
-          else navigate(`/${base64Encode(sessionDirectory)}/session/${session.id}`)
+          else if (prompt.capture() === target) navigate(`/${base64Encode(sessionDirectory)}/session/${session.id}`)
           submission.retarget(prompt.capture({ dir: base64Encode(sessionDirectory), id: session.id }))
         })
       }
@@ -474,16 +459,21 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     }
 
     const clearInput = () => {
-      submission.clear()
+      submission.clear(mode === "normal")
       input.setMode("normal")
       input.setPopover(null)
     }
 
     const restoreInput = () => {
       const restored = submission.restore()
-      if (!restored) return false
+      if (!restored) return
       restored.target.set(restored.prompt, input.promptLength(restored.prompt))
-      if (!submission.current(prompt.capture())) return true
+      if (mode === "normal") {
+        for (const item of restored.context) {
+          if (item.type === "dashboard" || item.comment?.trim()) restored.target.context.add(item)
+        }
+      }
+      if (!submission.current(prompt.capture())) return
       input.setMode(mode)
       input.setPopover(null)
       requestAnimationFrame(() => {
@@ -493,7 +483,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         setCursorPosition(editor, input.promptLength(currentPrompt))
         input.queueScroll()
       })
-      return true
     }
 
     if (!isNewSession && mode === "normal" && input.shouldQueue?.()) {
@@ -527,30 +516,24 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     }
 
     if (text.startsWith("/")) {
-      const [cmdName, ...args] = text.split(" ")
+      const [cmdName] = text.split(" ")
       const commandName = cmdName.slice(1)
       const customCommand = sync().data.command.find((c) => c.name === commandName)
       if (customCommand) {
         clearInput()
-        const messageID = Identifier.ascending("message")
-        serverSync().session.set("session_status", session.id, { type: "busy" })
-        sdk()
-          .api.session.command({
-            sessionID: session.id,
-            id: messageID,
-            command: commandName,
-            ...(await buildCommandAttachments(args.join(" "), images)),
-            agent,
-            model: { id: model.modelID, providerID: model.providerID, variant },
+        await sendFollowupDraft({
+          api: sdk().api.session,
+          sync: sync(),
+          serverSync: serverSync(),
+          draft,
+          optimisticBusy: true,
+        }).catch((err) => {
+          showToast({
+            title: language.t("prompt.toast.commandSendFailed.title"),
+            description: formatServerError(err, language.t, language.t("common.requestFailed")),
           })
-          .catch((err) => {
-            serverSync().session.set("session_status", session.id, { type: "idle" })
-            showToast({
-              title: language.t("prompt.toast.commandSendFailed.title"),
-              description: formatServerError(err, language.t, language.t("common.requestFailed")),
-            })
-            restoreInput()
-          })
+          restoreInput()
+        })
         return
       }
     }
@@ -583,7 +566,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           sync().set("session_status", session.id, { type: "idle" })
         }
         removeOptimisticMessage()
-        if (restoreInput()) restoreCommentItems(submission.target(), commentItems)
+        restoreInput()
       }
 
       pending.set(pendingKey(session.id), { abort: controller, cleanup })
@@ -645,7 +628,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         description: errorMessage(err),
       })
       removeOptimisticMessage()
-      if (restoreInput()) restoreCommentItems(submission.target(), commentItems)
+      restoreInput()
     })
   }
 
