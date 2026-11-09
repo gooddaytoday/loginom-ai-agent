@@ -20,6 +20,13 @@ for kind in ['count','width','real','integer','frequency','frequency-ties','appl
  assert 'oracle' not in c['prompt'].read_text()
 assert r.scenario('binning-count')['input_files']==['values.csv']
 assert r.scenario('binning-apply')['input_files']==['frequency.csv','update.csv']
+c=r.scenario('binning-datetime-manual');e=r.expected_for(c,'/owned/manual.lgp')
+assert c['input_files']==['modes.csv'] and c['expected_name']=='modes/expected.json'
+assert c['prompt'].name=='task-datetime-manual.md' and c['export_count']==2
+assert (c['data']/'modes.csv').is_file() and c['oracle'].is_file()
+assert [o['output_port'] for o in e['outputs']]==[0,1]
+assert all(o['column_order']=='exact' and o['ordered'] for o in e['outputs'])
+assert sum(len(o['columns'])*len(o['rows']) for o in e['outputs'])==146
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });

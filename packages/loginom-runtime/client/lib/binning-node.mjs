@@ -9,7 +9,7 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('Binning: '+m);};
 export async function binningBeforeGraphExecute(options,ctx,c,channel){
- if(options.operation.nodeApply.request.mode==='apply')return {};
+ if(options.operation.nodeApply.request.mode==='apply'||c?.manual_edits===true)return {};
  const request={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},graph=await options.operation.nodeTargetAdapter.observe(request,ctx.deadline);
  const source=graph.links.filter(e=>e.target===ctx.node.node_id).map(e=>({node:graph.nodes.find(n=>n.ref.node_id===e.source)?.ref,output:e.output,input:e.input}));
  need(source.length===1&&source[0].input===0&&source[0].node,'one current input source required for Train');
@@ -28,7 +28,7 @@ export function createBinningNodeSupport(config){
   validate:validateBinningParameters,validateInput:(p,resolved,native)=>resolveBinningField(p,resolved.fields??native.target_fields),readback:binningConfigurationReadback,
   configurationObservation:{condition:'owned binning numeric field page',readBinning:true,ready:s=>s.wizard?.stage==='binning'&&s.node_binning?.verified===true},
   async beforeOpen(channel,request){
-   if(request.mode!=='apply')return;
+   if(request.mode!=='apply'&&request.parameters?.binning?.method!=='manual')return;
    await channel.openInputPort(0);
    const s=await channel.observe({condition:'read saved binning input without commit',readMappings:true,ready:s=>s.node_mapping?.verified&&s.node_mapping.inventory_complete});
    const mapping=s.node_mapping;need(mapping.source_identity_verified,'complete current saved input mapping required');
@@ -42,11 +42,12 @@ export function createBinningNodeSupport(config){
  });
  return {...support,nodeApplyDriverFactory:options=>{
   const drivers=support.nodeApplyDriverFactory(options);
-  if(options.operation.parameters.mode!=='apply')return drivers;
+  const applying=options.operation.parameters.mode==='apply';
+  if(!applying&&options.operation.parameters.parameters?.binning?.method!=='manual')return drivers;
   return {...drivers,
    async mapPorts(mappings,ctx){if(ctx.receipt_id===options.operation.id+':input_mapping')return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false};return drivers.mapPorts(mappings,ctx);},
-   async finish(mode,ctx){return drivers.finish('close',ctx);},
-   async finishGraph(mode,ctx){return {...await drivers.finishGraph(mode,ctx),settings_applied:false};},
+   async finish(mode,ctx){return drivers.finish(applying?'close':mode,ctx);},
+   async finishGraph(mode,ctx){return {...await drivers.finishGraph(mode,ctx),settings_applied:!applying};},
   };
  }};
 }

@@ -10,6 +10,12 @@ export async function readBinningContext(page,binding,readNode=readPreparedNodeC
 // LAB-654 discovery: numeric rows carry Index/DisplayName, not Name. Bind them
 // to the complete input mapping in the procedure. Never read Column/Engine RPC.
 export function readBinningBrowser(prefix){
+ const bound=v=>{
+  if(Object.prototype.toString.call(v)!=='[object Date]')return v;
+  if(!Number.isFinite(v.getTime()))return null;
+  const p=(n,w=2)=>String(n).padStart(w,'0');
+  return p(v.getFullYear(),4)+'-'+p(v.getMonth()+1)+'-'+p(v.getDate())+'T'+p(v.getHours())+':'+p(v.getMinutes())+':'+p(v.getSeconds())+'.'+p(v.getMilliseconds(),3);
+ };
  const fail=reason=>({verified:false,reason}),base=prefix+';WizrdMCF;MethodSettingsWizard-1';
  const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
  const roots=exact(base);if(roots.length!==1||!roots[0].checkVisibility({checkVisibilityCSS:true}))return fail('binning_root');
@@ -46,9 +52,9 @@ export function readBinningBrowser(prefix){
    ...(selected.method_code===3?['chkStrictLowerLimit','chkStrictUpperLimit','cbbCountBins;ValueControl']:selected.method_code===2?['chkStrictLowerLimit','chkStrictUpperLimit','edtBinWidth;ValueControl']:selected.method_code===4?['cbbTileCount;ValueControl','cbbMatchingObservationsMode;ValueControl','chkSummTile;ValueControl']:[])];
   for(const key of names){const v=cmp('MethodSettingFrame;'+key,el);if(!v||typeof v.getValue!=='function')return fail('binning_control:'+key);values[key]=v.getValue();controls[key]='MethodSettingFrame;'+key;}
   if([2,3].includes(selected.method_code))for(const key of ['edtLowerLimit','edtUpperLimit']){
-   const candidates=['ValueContainer;num','ValueContainer;Int64Field'].map(k=>cmp('MethodSettingFrame;'+key+';'+k,el)).filter(v=>v?.el?.dom?.checkVisibility({checkVisibilityCSS:true}));
+   const candidates=(selected.type==='datetime'?['ValueContainer;datetimefield']:['ValueContainer;num','ValueContainer;Int64Field']).map(k=>cmp('MethodSettingFrame;'+key+';'+k,el)).filter(v=>v?.el?.dom?.checkVisibility({checkVisibilityCSS:true}));
    if(candidates.length!==1)return fail('binning_bound_control');
-   const v=candidates[0],value=v.getValue();values[key]=typeof value==='string'&&/^-?\d+$/.test(value)&&Number.isSafeInteger(Number(value))?Number(value):value;controls[key]=v.el.dom.getAttribute('data-tid');
+   const v=candidates[0],value=bound(v.getValue());values[key]=selected.type!=='datetime'&&typeof value==='string'&&/^-?\d+$/.test(value)&&Number.isSafeInteger(Number(value))?Number(value):value;controls[key]=v.el.dom.getAttribute('data-tid');
   }
   for(const e of el.querySelectorAll('[data-tid$=";SwitchButton"]'))if(globalThis.Ext?.getCmp?.(e.id)?.pressed===true)switches.push(e.getAttribute('data-tid'));
   const method={2:'width',3:'count',4:'frequency'}[selected.method_code];
@@ -56,16 +62,20 @@ export function readBinningBrowser(prefix){
   settings={method,size:values[method==='count'?'cbbCountBins;ValueControl':method==='width'?'edtBinWidth;ValueControl':'cbbTileCount;ValueControl'],
    limits:method==='frequency'?null:[values.edtLowerLimit,values.edtUpperLimit],strict_lower:values.chkStrictLowerLimit??false,strict_upper:values.chkStrictUpperLimit??false,
    rounding:values.chkRoundingLevel,lower_open:values['chkLowerLimitOpen;ValueControl'],upper_open:values['chkUpperLimitOpen;ValueControl'],
-   ...(method==='frequency'?{ties:values['cbbMatchingObservationsMode;ValueControl']===0?'next':'unsupported',sums:values['chkSummTile;ValueControl']}:{} )};
+   ...(method==='frequency'?{ties:({0:'next',1:'current'})[values['cbbMatchingObservationsMode;ValueControl']]??'unsupported',sums:values['chkSummTile;ValueControl']}:{} )};
  }
  const binGrid=cmp(base+';grdBins'),binRows=rows(c.FBinItemsStore),intervals=[];
  if(!binRows||binGrid?.getStore?.()!==c.FBinItemsStore)return fail('binning_bins_inventory');
  if(selected?.bins_count>0){
   if(binRows.length!==selected.bins_count)return fail('binning_bins_pending');
   for(const [i,r] of binRows.entries()){const d=r?.data;
-   if(!r?.isModel||d.ColIndex!==selected.index||d.BinIndex!==i||d.BinNumber!==i||typeof d.BinLabel!=='string'||![0,1,2,3].includes(d.BoundModes)||!Number.isFinite(d.LowerBoundValue)||!Number.isFinite(d.UpperBoundValue)||d.InvalidMode!==0||d.LowerBoundInvalid!==false||d.UpperBoundInvalid!==false||d.BoundModeInvalid!==false)return fail('binning_interval');
-   intervals.push({number:i,lower:d.LowerBoundValue,upper:d.UpperBoundValue,label:d.BinLabel,lower_included:(d.BoundModes&1)!==0,upper_included:(d.BoundModes&2)!==0});
+   const lower=bound(d.LowerBoundValue),upper=bound(d.UpperBoundValue),valid=v=>selected.type==='datetime'?typeof v==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}$/.test(v):Number.isFinite(v);
+   if(!r?.isModel||d.ColIndex!==selected.index||d.BinIndex!==i||d.BinNumber!==i||typeof d.BinLabel!=='string'||![0,1,2,3].includes(d.BoundModes)||!valid(lower)||!valid(upper)||d.InvalidMode!==0||d.LowerBoundInvalid!==false||d.UpperBoundInvalid!==false||d.BoundModeInvalid!==false)return fail('binning_interval');
+   intervals.push({number:i,lower,upper,label:d.BinLabel,lower_included:(d.BoundModes&1)!==0,upper_included:(d.BoundModes&2)!==0});
   }
  }
- return {verified:true,inventory_complete:true,binding_ready:true,fields,selected,method_editor,frame,settings,intervals,state:selected?.bins_count>0?'materialized':'settings',state_source:'cached_binning_ui',settings_applied:false};
+ const bp=binGrid.editingPlugin,be=bp?.editing===true?bp.activeEditor:null,bc=bp?.context;
+ if(be&&(!binRows.includes(bc?.record)||bc.grid!==binGrid||!['LowerBoundValue','UpperBoundValue','BinLabel','BoundModes'].includes(bc.field)||!root.contains(be.el?.dom)))return fail('binning_bin_editor_owner');
+ const bin_editor=be?{number:binRows.indexOf(bc.record),field:bc.field,root_tid:be.el.dom.getAttribute('data-tid')}:null;
+ return {verified:true,inventory_complete:true,binding_ready:true,fields,selected,method_editor,bin_editor,frame,settings,intervals,state:selected?.bins_count>0?'materialized':'settings',state_source:'cached_binning_ui',settings_applied:false};
 }
