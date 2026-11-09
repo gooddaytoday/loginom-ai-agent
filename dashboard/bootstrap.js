@@ -21,39 +21,33 @@
   }
 
   async function table(node, maxRows = Infinity) {
-    // The node belongs to Loginom. Release only references acquired by this read.
-    const refs = [];
-    const take = async task => {const ref = await task; refs.push(ref); return ref};
-    try {
-      const port = await take((await take(node.get_OutputPorts())).getItem(0));
-      const base = await take(port.get_Socket());
-      const socket = await take(base.QueryInterface(bg.IBGModelOutputSocket));
-      const output = await take(socket.get_Output());
-      const source = await take(output.QueryInterface(bg.IBGDataSource));
-      const cols = await take(source.get_Columns());
-      const schema = [];
-      for (let i=0,n=await cols.get_Count(); i<n; i++) {
-        const col = await take(cols.getItem(i));
-        schema.push({name:await col.get_Name(), type:await col.get_DataType()});
-      }
-      const rows = [];
-      for (let r=0,n=Math.min(await source.get_RowCount(), maxRows); r<n; r++) {
-        const row = [];
-        for (let c=0; c<schema.length; c++) {
-          const raw = await source.AsVariant(r, c);
-          const type = schema[c].type;
-          if (raw == null) row.push(null);
-          else if (type === bg.TBGDataType.dtFloat) row.push(Number(String(raw)));
-          else if (type === bg.TBGDataType.dtInteger && Number.isSafeInteger(Number(String(raw)))) row.push(Number(String(raw)));
-          else if (type === bg.TBGDataType.dtBoolean) row.push(raw === true || String(raw).toLowerCase() === 'true');
-          else row.push(String(raw));
-        }
-        rows.push(row);
-      }
-      return {schema, rows};
-    } finally {
-      for (const ref of refs.reverse()) await ref?.dispose();
+    // RPC getters return proxies shared with Loginom; the runtime manages their lifetime.
+    const port = await (await node.get_OutputPorts()).getItem(0);
+    const base = await port.get_Socket();
+    const socket = await base.QueryInterface(bg.IBGModelOutputSocket);
+    const output = await socket.get_Output();
+    const source = await output.QueryInterface(bg.IBGDataSource);
+    const cols = await source.get_Columns();
+    const schema = [];
+    for (let i=0,n=await cols.get_Count(); i<n; i++) {
+      const col = await cols.getItem(i);
+      schema.push({name:await col.get_Name(), type:await col.get_DataType()});
     }
+    const rows = [];
+    for (let r=0,n=Math.min(await source.get_RowCount(), maxRows); r<n; r++) {
+      const row = [];
+      for (let c=0; c<schema.length; c++) {
+        const raw = await source.AsVariant(r, c);
+        const type = schema[c].type;
+        if (raw == null) row.push(null);
+        else if (type === bg.TBGDataType.dtFloat) row.push(Number(String(raw)));
+        else if (type === bg.TBGDataType.dtInteger && Number.isSafeInteger(Number(String(raw)))) row.push(Number(String(raw)));
+        else if (type === bg.TBGDataType.dtBoolean) row.push(raw === true || String(raw).toLowerCase() === 'true');
+        else row.push(String(raw));
+      }
+      rows.push(row);
+    }
+    return {schema, rows};
   }
 
   const active = async node => await node.get_Status() === bg.TBGModelNodeStatus.mnsActive;
