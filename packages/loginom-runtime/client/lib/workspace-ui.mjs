@@ -4263,7 +4263,7 @@ function readRenderedInputMapping(observation) {
             ||fresh.active_tab_ref!==before.active_tab_ref||!same(fresh.package_identity,before.package_identity)
             ||fresh.observation_root?.ref!==before.observation_root.ref||fresh.file_storage?.status!=='observed'
             ||fresh.file_storage.directory!==before.file_storage.directory||fresh.ui.dialogs.length||fresh.ui.masks.length
-            ||!fresh.ui.elements.some(e=>e.scroll?.ref===moved.owner_ref&&e.scroll.top===moved.to&&e.scroll.max_top>=moved.to))
+            ||!fresh.ui.elements.some(e=>e.scroll?.ref===moved.owner_ref&&e.scroll.top===moved.to))
             fail('UI_SCROLL_NOT_CONFIRMED','File-list context or scroll owner changed after its completed scroll');
         }
         if(consoleMenu){
@@ -4675,10 +4675,12 @@ function readRenderedInputMapping(observation) {
             if(['expression_parameter','output_column','reform_column','import_format','export_format'].includes(before.wizard_field.scope)) {
               if(!await first.evaluate(element=>document.activeElement===element))fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
               if(exportCombo) {
-                const list=page.locator('[data-tid='+JSON.stringify(exportCombo.tid.replace(/;trg_picker$/,';boundlist'))+']');
-                if(await list.isVisible()) {
+                // Loginom may keep a hidden stale list with the same test ID.
+                const list=page.locator('[data-tid='+JSON.stringify(exportCombo.tid.replace(/;trg_picker$/,';boundlist'))+']').filter({visible:true});
+                if(await list.count()) {
                   await first.press('Escape',{timeout:timeout()});
-                  if(await list.isVisible() || !await first.evaluate(element=>document.activeElement===element))
+                  if(await list.count())fail('WIZARD_FIELD_CHANGED','Wizard field list stayed open before edit completion');
+                  if(!await first.evaluate(element=>document.activeElement===element))
                     fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
                 }
               }

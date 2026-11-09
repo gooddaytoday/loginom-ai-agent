@@ -6,8 +6,7 @@ for the file before Execute/read: a read adds a visualizer table to the package
 even if configuration is refused. After `NOT_APPLIED` with `effect_possible=false`
 do no baseline/Save for cleanup: report the refusal and ask for the CSV.
 
-Server text preview: `dock_node_apply` for `imports.text`,
-`parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
+Server text preview: `dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
 `finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}` returns
 `output.server_profile` and closes the draft without Execute. Set known
 `settings.source.encoding`, e.g. `CP1251`; if UTF-8 mangles Cyrillic, refresh
@@ -29,20 +28,19 @@ upload_operation_id. Defaults: UTF-8, header in line 1, skip 0, comma, decimal
 point, empty NULL, double quote; explicit values are kept. You set column types
 and names.
 
-`source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл);
-no separate Import Execute.
+`source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл); no separate Import Execute.
 
 ## File list
 
-Use one `imports.text` / `delimited` for same-schema files. Deliver each file
+One `imports.text` for same-schema files. Deliver each file
 or get fresh `dock_storage_source` refs. Set `source.kind:"verified_sources"`,
 `sources` in `settings.source.source_paths` order; `file_info:"name"` adds native
 string FileName outside CSV `columns` (or `"none"`). No Calculator/JS. Preserve
 the existing node; inspect all output fields and Save separately.
 
 Mask: `source_mask` in an owned directory, `*` only in filename; never `source_path(s)`.
-Each Execute: fresh `dock_storage_source` for ALL matches; resend SAME
-`source_mask` with `verified_sources` on the SAME node.
+Export/Save outside the mask directory. Each Execute: fresh `dock_storage_source` for ALL
+matches (max 16); resend SAME `source_mask` with `verified_sources` on the SAME node.
 
 ## Auto-detected types
 
@@ -54,9 +52,9 @@ output `mappings`; to control fields use `new`/`none`. `new`: manual types (a
 separate call on the same node) survive a `source_path` change. `refresh` erases
 manual types: only on request.
 
-Mixed cell types: `settings.format.variant_as_general_type:true` and
+Mixed types: `settings.format.variant_as_general_type:true` and
 `settings.analysis.refresh:"types"` on the same Import; no Calculator/JS. Use false
-and refresh to redetect strings. Check values, native types and NULL.
+and refresh to redetect strings. Check values, types and NULL.
 
 ## Path from variable
 

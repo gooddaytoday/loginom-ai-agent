@@ -84,3 +84,13 @@ test('variant display never proves a native numeric subtype or exact value',()=>
  f.options.requireExactNumbers=false;const r=decodeTableOutput(f.output,f.options);assert.equal(r.precision.numbers_verified,false);assert.deepEqual(r.precision.limitations,['variant_display_precision']);assert.equal(r.sample[0][0].value,undefined);assert.equal(r.sample[0][0].type,'variant');}
  const empty=fixture(['variant']);empty.output.rows=[];empty.output.row_total=0;assert.equal(decodeTableOutput(empty.output,empty.options).sample.length,0);
 });
+// v040-nan-exact, LAB-1314 cold execution-events: the verified Real mask shows
+// native NaN as "NaN" with is_null:false; it is exact, distinct from NULL.
+test('typed Table output reads verified-format NaN as an exact non-finite cell',()=>{
+ const f=fixture();f.output.rows[0].cells[1].text='NaN';
+ const r=decodeTableOutput(f.output,f.options);
+ assert.deepEqual([r.sample[0][1].is_null,r.sample[0][1].value,r.sample[0][1].non_finite,r.sample[0][1].precision],[false,null,'NaN','exact_non_finite']);
+ assert.equal(r.precision.numbers_verified,true);
+ for(const text of ['nan','Inf','INF','-NaN']){const g=fixture();g.output.rows[0].cells[1].text=text;assert.throws(()=>decodeTableOutput(g.output,g.options));}
+ const g=fixture();g.output.rows[0].cells[1].text='NaN';g.options.formatProof.numeric_formats=[];assert.throws(()=>decodeTableOutput(g.output,g.options));
+});

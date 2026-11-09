@@ -46,17 +46,23 @@ owner=dict(status='SUCCEEDED',node=dict(node_id='same',document_id='first'),conf
  output=dict(ports=[dict(port=0,schema=[],sample=[])]))
 second=copy.deepcopy(owner);second['node']['document_id']='reopened'
 second['configuration']['readback']['format'].update(delimiter='Точка с запятой',text_qualifier='Двойная кавычка (")',decimal_separator='Точка (.)')
-r.check_text_mask([(1,owner),(2,second)])
+mask='/own/mask-run-mask/sales_*.csv'
+r.check_text_mask([(1,owner),(2,second)],mask)
+# A mask outside this run's directory (here: package_directory root) also matches the run's exports.
+root=copy.deepcopy(owner);root['configuration']['readback']['source']['source_path']='/own/sales_*.csv'
+try:r.check_text_mask([(1,root)],mask)
+except AssertionError as error:assert str(error)=='TEXT_MASK_NATIVE_MASK_MISSING',error
+else:raise AssertionError('root mask passed')
 for key,value in [('node_id','other'),('source_path','/own/sales_2026-03.csv'),('parallel_processing',True)]:
  bad=copy.deepcopy(second)
  if key=='node_id':bad['node'][key]=value
  else:bad['configuration']['readback']['source'][key]=value
- try:r.check_text_mask([(1,owner),(2,bad)])
+ try:r.check_text_mask([(1,owner),(2,bad)],mask)
  except AssertionError:pass
  else:raise AssertionError(key)
 for key,value in [('delimiter',','),('text_qualifier',''),('decimal_separator',','),('null_marker','')]:
  bad=copy.deepcopy(second);bad['configuration']['readback']['format'][key]=value
- try:r.check_text_mask([(1,owner),(2,bad)])
+ try:r.check_text_mask([(1,owner),(2,bad)],mask)
  except AssertionError:pass
  else:raise AssertionError(key)
 `],{encoding:'utf8'});

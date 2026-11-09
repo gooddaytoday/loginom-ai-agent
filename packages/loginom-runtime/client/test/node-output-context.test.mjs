@@ -113,7 +113,7 @@ test('W1 real values and preview use the existing finite binary64 decoder',()=>{
  const s=variableStore();s.items[1].data.DataType=3;s.items[1].data.ValueVariant=3.5;
  assert.equal(readVariableRecords(s,'preview',decodePortCell).variables[1].cell.value,3.5);
  s.items[1].data.DisplayValue=3.5;assert.equal(readVariableRecords(s,'values',decodePortCell).variables[1].cell.value,3.5);
- s.items[1].data.ValueVariant=Infinity;assert.throws(()=>readVariableRecords(s,'preview',decodePortCell));
+ s.items[1].data.ValueVariant=Infinity;assert.equal(readVariableRecords(s,'preview',decodePortCell).variables[1].cell.non_finite,'Infinity');
  for(const patch of [{complete:false},{loadCount:0},{getTotalCount:()=>8}])assert.throws(()=>readVariableRecords({...variableStore(),...patch},'preview',decodePortCell));
 });
 test('W1 local datetime values retain civil milliseconds and typed NULL through W2 decoder',{

@@ -71,6 +71,9 @@ export function parseExpectedOutputs(expected){
     'EXPECTED_TOLERANCE_INVALID');
   }
   need(output.rows.every(r=>r&&Object.keys(r).length===names.length&&names.every(n=>Object.hasOwn(r,n))), 'EXPECTED_ROWS_INVALID');
+  // v040-nan-exact: a Real value may be the exact non-finite marker only.
+  for(const row of output.rows)for(const c of output.columns)if(c.type==='real'&&row[c.name]&&typeof row[c.name]==='object')
+   need(Object.keys(row[c.name]).join()==='non_finite'&&['NaN','Infinity','-Infinity'].includes(row[c.name].non_finite),'EXPECTED_NON_FINITE_INVALID');
   for(const row of output.rows)for(const c of output.columns)if(c.type==='variant'&&row[c.name]!==null){
    const v=row[c.name];need(v&&typeof v==='object'&&['string','boolean','real','integer','datetime'].includes(v.cell_type)
     &&(Object.hasOwn(v,'value')||/^[a-f0-9]{16}$/.test(v.bytes_le??'')),'EXPECTED_VARIANT_SUBTYPE_REQUIRED');
@@ -180,6 +183,10 @@ function matchesCell(cell,column,want,coarseBound=false){
  // Keep native provenance mandatory for every other Variant value/path.
 
  if(!cell||!allowsType(column,cell.type))return false;
+ // Exact non-finite Real: never NULL, never a finite value or display text.
+ if(column.type==='real'&&want&&typeof want==='object'&&Object.hasOwn(want,'non_finite'))
+  return cell.type==='real'&&cell.is_null===false&&cell.value===null&&cell.precision==='exact_non_finite'&&cell.non_finite===want.non_finite;
+ if(column.type==='real'&&cell.precision==='exact_non_finite')return false;
  if(coarseBound&&column.type==='variant'&&want===null&&cell.precision==='exact_null')
   return cell.is_null===true&&cell.value===null&&cell.cell_type===undefined&&cell.native===undefined;
  const nativeRequired=column.type==='variant'||want&&typeof want==='object';

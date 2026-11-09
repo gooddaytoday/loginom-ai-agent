@@ -1111,8 +1111,18 @@ for(const stage of ['controls','data_views'])for(const fault of ['transient','pe
  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
  assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);
  assert.equal(failures,fault==='persistent'?2:1);
- if(['directory','owner','position'].includes(fault))assert.equal(result.error.code,'UI_SCROLL_NOT_CONFIRMED');
+ if(['directory','owner','position'].includes(fault)){
+  assert.equal(result.error.code,'UI_SCROLL_NOT_CONFIRMED');
+  assert.equal(result.error.message,'File-list context or scroll owner changed after its completed scroll');
+ }
  if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+ // A refused read must name the limit kind and stage it actually hit.
+ if(['persistent','before','work','elements','traversal','other_stage'].includes(fault)){
+  assert.equal(result.error.code,'UI_SCAN_LIMIT');
+  assert.equal(result.error.message,'Workspace scan budget exceeded; use root discovery and a narrower observation');
+  const kind=['work','elements','traversal'].includes(fault)?fault:'time',scanStage=fault==='other_stage'?'collect':stage;
+  assert.deepEqual(result.trace.filter(e=>e.event==='ui_scan_limit').map(e=>[e.limit_kind,e.scan_stage]),Array(failures).fill([kind,scanStage]));
+ }
 });
 
 // LAB-1164 grouping-median :1673: a 1092-element Files region scrolled 4000->5000

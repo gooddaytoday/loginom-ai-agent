@@ -412,7 +412,8 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / ('acceptance/task-' + kind + '.md'),
                     data=node / 'fixtures', base=None, export_count=2,
                     input_files=['ties-modes.csv'] if kind == 'ties-current' else ['numeric-modes.csv'],
-                    expected_name='modes/expected-' + ('current' if kind == 'ties-current' else kind) + '.json', oracle=node / 'acceptance/modes/oracle.py')
+                    expected_name='modes/expected-' + ('current' if kind == 'ties-current' else kind) + '.json',
+                    oracle=node / ('acceptance/modes/oracle-edges.py' if kind == 'ties-current' else 'acceptance/modes/oracle.py'))
     if name == 'binning-datetime-manual':
         node = REPO / 'docs/node-development/nodes/preprocessing-binning'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',
@@ -880,7 +881,7 @@ def check_text_multi_file_list(replies):
     assert source.get('file_info') == 'Имя файла' and source.get('parallel_processing') is False, 'TEXT_LIST_SERVICE_SETTINGS'
 
 
-def check_text_mask(replies):
+def check_text_mask(replies, mask):
     # Native editable combos show literals after editing and these labels after
     # reopen (the same aliases as text-import-procedure's saved-format check).
     displays = dict(delimiter={';': 'Точка с запятой'}, text_qualifier={'"': 'Двойная кавычка (")'},
@@ -894,7 +895,7 @@ def check_text_mask(replies):
     for owner in imports:
         current = owner['configuration']['readback']
         assert owner['node']['node_id'] == imports[0]['node']['node_id'], 'TEXT_MASK_IMPORT_RECREATED'
-        assert current['source']['source_path'].endswith('/sales_*.csv'), 'TEXT_MASK_NATIVE_MASK_MISSING'
+        assert current['source']['source_path'] == mask, 'TEXT_MASK_NATIVE_MASK_MISSING'
         assert current['source'].get('file_info') == 'Имя файла' and current['source'].get('parallel_processing') is False, 'TEXT_MASK_SERVICE_SETTINGS'
         assert all(current[k] == saved[k] for k in ['source', 'columns', 'output_mapping']), 'TEXT_MASK_SETTINGS_CHANGED'
         assert format_values(current['format']) == format_values(saved['format']), 'TEXT_MASK_FORMAT_CHANGED'
@@ -1159,14 +1160,16 @@ def check_text_export_encodings(replies, destinations):
 
 def export_null_marker(events, destination):
     # Requests identify the exact export file. Existing-node patches can retain
-    # omitted settings, so only their correlated final UI readback is authoritative.
+    # omitted settings, so only the final UI readback of the same nonempty
+    # operation_id is authoritative.
     readbacks = {}
     def collect(value):
         if isinstance(value, dict):
             configuration = value.get('configuration', {})
             if (value.get('status') == 'SUCCEEDED' and configuration.get('status') == 'applied'
-                    and configuration.get('readback', {}).get('kind') == 'text_export'):
-                readbacks[value.get('operation_id')] = configuration['readback']
+                    and configuration.get('readback', {}).get('kind') == 'text_export'
+                    and value.get('operation_id')):
+                readbacks[value['operation_id']] = configuration['readback']
             for item in value.values(): collect(item)
         if isinstance(value, list):
             for item in value: collect(item)
@@ -1203,7 +1206,7 @@ def export_null_marker(events, destination):
             settings = readback.get('settings', {})
             found = readback.get('destination') == destination and 'null_marker' in settings
             marker, node = settings.get('null_marker'), readback.get('node', node)
-    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or correlated patch readback required for ' + str(destination)
+    assert found, 'CSV_NULL_MARKER_MISSING: explicit export marker or a SUCCEEDED readback with the same operation_id required for ' + str(destination)
     assert isinstance(marker, str) and marker in ['', '?', 'null', 'NULL'], 'CSV_NULL_MARKER_UNSUPPORTED'
     return marker
 
@@ -1281,6 +1284,10 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
                 return (math.isfinite(number) and math.isfinite(goal) and number == goal
                         and (goal != 0 or math.copysign(1, number) == math.copysign(1, goal)))
             except (ValueError, InvalidOperation, OverflowError): return False
+        if col['type'] == 'real' and isinstance(target, dict):
+            # v040-nan-exact: expected {"non_finite": ...}; Loginom writes NaN as "Nan".
+            spelled = {'NaN': ['nan'], 'Infinity': ['inf', 'infinity', '+inf', '+infinity'], '-Infinity': ['-inf', '-infinity']}
+            return set(target) == {'non_finite'} and value.strip().lower() in spelled.get(target['non_finite'], [])
         if col['type'] == 'variant':
             return isinstance(target, dict) and set(target) == {'cell_type', 'value'} and equal(value, dict(col, type=target['cell_type']), target['value'])
         if col.get('category_labels_any'): return bool(value.strip())
@@ -1385,7 +1392,8 @@ def check_coarse_frozen_trainings(replies):
     assert len(trained) >= 2, 'COARSE_FROZEN_TWO_TRAININGS'
     assert len({o['node']['node_id'] for o in trained}) == 1, 'COARSE_FROZEN_SAME_NODE'
     assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in trained), 'COARSE_FROZEN_LOCKED'
-    assert len({json.dumps(o['configuration']['readback']['training'].get('source'), sort_keys=True) for o in trained}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
+    sources = {json.dumps(o['configuration']['readback'].get('training', {}).get('source'), sort_keys=True) for o in trained}
+    assert len(sources) == 1 and 'null' not in sources, 'COARSE_FROZEN_SAME_IMPORT'
 
 
 def port_path(reply, port):
@@ -1765,9 +1773,12 @@ class Runner:
                     file.unlink()
             self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
 
+    def text_mask_directory(self, login):
+        return login['package_directory'].rstrip('/') + '/' + self.out.name + '-mask'
+
     def text_mask_inputs(self, spec, folder, login, build, *, late=False):
         name = self.out.name + '-mask'
-        directory = login['package_directory'].rstrip('/') + '/' + name
+        directory = self.text_mask_directory(login)
         files = [spec['data'] / 'variants/sales_2026-03.csv'] if late else [spec['data'] / f for f in spec['input_files']]
         books = [dict(fixture=str(f), destination=directory + '/' + f.name) for f in files]
         phase = 'text-mask-new-month-input' if late else 'text-mask-inputs'
@@ -1936,7 +1947,7 @@ class Runner:
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
         replies = model_replies(events)
         if spec.get('text_mask'):
-            check_text_mask(replies)
+            check_text_mask(replies, self.text_mask_directory(login) + '/sales_*.csv')
             assert any(save_confirmed(spec, reply, package) for _, reply in replies), 'TEXT_MASK_INITIAL_SAVE_MISSING'
             cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
             assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
@@ -2392,7 +2403,7 @@ class Runner:
         if case == 'text-multi-file-list':
             check_text_multi_file_list(replies)
         if spec.get('text_mask'):
-            check_text_mask(replies)
+            check_text_mask(replies, self.text_mask_directory(login) + '/sales_*.csv')
             check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             self.current['new_month'] = 'PASS'
         if spec.get('text_variant'):

@@ -6,7 +6,7 @@ import {makeWorkspaceUiCode} from '../lib/workspace-ui.mjs';
 
 const root='MF;TF-1;WizrdMCF',base=root+';ExportTextFileParamsWizard;',owner=base+'edtTimeFormat;ValueControl';
 
-async function fixture(t,{openOnInput=false,corrupt=false,plain=false,sticky=false}={}) {
+async function fixture(t,{openOnInput=false,corrupt=false,plain=false,sticky=false,staleList=false}={}) {
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
  t.after(()=>browser.close());
  const page=await browser.newPage();
@@ -17,7 +17,8 @@ async function fixture(t,{openOnInput=false,corrupt=false,plain=false,sticky=fal
   <div id="switch" data-tid="${base}${plain?'edtFileName':'edtTimeFormat'};SwitchButton">literal</div>
   <div data-tid="${plain?base+'edtFileName;ValueControl':owner}"><input value="Не задано (hh:nn:ss)">
   ${plain?'':`<button data-tid="${owner};trg_picker">▼</button>`}</div></div>
-  <div data-tid="${owner};boundlist" style="display:none"></div>`}));
+  <div data-tid="${owner};boundlist" style="display:none"></div>
+  ${staleList?`<div data-tid="${owner};boundlist" style="display:none">stale</div>`:''}`}));
  await page.goto('http://combo.test/');
  await page.evaluate(({owner,openOnInput,corrupt,plain,sticky})=>{
   globalThis.bg={app:{Version:'7.4.2'}};
@@ -82,6 +83,7 @@ test('export combo refuses Tab if Escape leaves its own list open',async t=>{
  const f=await fixture(t,{openOnInput:true,sticky:true}),result=await f.run('hh:nn:ss.zzz');
  assert.equal(result.status,'AMBIGUOUS');
  assert.equal(result.error.code,'WIZARD_FIELD_CHANGED');
+ assert.match(result.error.message,/list stayed open/);
  assert.equal((await f.page.evaluate(()=>comboEvents)).includes('Tab'),false);
 });
 
@@ -93,4 +95,16 @@ test('ordinary export text fields retain keyboard typing and empty replacement',
  const empty=await fixture(t),cleared=await empty.run('');
  assert.equal(cleared.status,'SUCCEEDED',JSON.stringify(cleared.error));
  assert.equal(await empty.page.locator('input').inputValue(),'');
+});
+
+test('export combo decides by the visible list when a hidden list shares its test ID',async t=>{
+ const f=await fixture(t,{openOnInput:true,staleList:true}),result=await f.run('hh:nn:ss.zzz');
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(await f.page.locator('input').inputValue(),'hh:nn:ss.zzz');
+ const events=await f.page.evaluate(()=>comboEvents);
+ assert.ok(events.includes('Escape')&&events.indexOf('Escape')<events.indexOf('Tab'),JSON.stringify(events));
+ const sticky=await fixture(t,{openOnInput:true,sticky:true,staleList:true}),refused=await sticky.run('hh:nn:ss.zzz');
+ assert.equal(refused.status,'AMBIGUOUS');
+ assert.equal(refused.error.code,'WIZARD_FIELD_CHANGED');
+ assert.match(refused.error.message,/list stayed open/);
 });

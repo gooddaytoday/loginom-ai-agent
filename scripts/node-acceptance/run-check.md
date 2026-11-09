@@ -61,6 +61,14 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
+native NaN/±Infinity as `{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",
+precision:"exact_non_finite"}` without `numeric_display_precision`. Expected
+writes the same marker as the Real cell, `{"non_finite":"NaN"}`. Typed comparison
+needs that exact marker; CSV accepts Loginom's spelling case-insensitively
+(`Nan`/`NaN`, `Inf`/`Infinity`, `-Inf`). NaN differs from NULL, from the export
+null marker and from an empty string.
+
 `reform-cache` uses `field-parameters/acceptance/v040/task-cache.md`, reform.csv
 and independent expected-cache.json (one export). Production readbacks prove
 disabled → on_activation → on_access → selected_fields executions on one node,
