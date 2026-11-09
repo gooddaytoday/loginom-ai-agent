@@ -170,3 +170,42 @@ test('actual MCP delivery bounds a source-bound JavaScript preview without chang
  assert.ok(value.limitations.some(s=>s.includes('exports.text')));
  assert.deepEqual(source,before);assert.equal(source.outcome.output.output.ports[0].sample_rows,1);
 });
+
+
+test('wait trims ordinary ports while preserving a native summary port byte for byte',()=>{
+ const source=raw(Array.from({length:36},(_,i)=>Array.from({length:8},()=>integer(i))));
+ const ports=source.outcome.output.output.ports;
+ ports.push({...structuredClone(ports[0]),port:3});
+ const summary=raw(Array.from({length:8},()=>[real(18.5),{
+  type:'variant',cell_type:'real',is_null:false,value:'33.5',decimal:'33.5',
+  precision:'exact_native',representation:'binary64_decimal',
+  native:{tag:5,encoding:'ieee754-binary64-le',bits:64,bytes_le:'0000000000c04040'},
+ }])).outcome.output.output.ports[0];
+ summary.port=4;ports.push(summary);
+ const before=structuredClone(source);
+ const exact=JSON.stringify(compactNodeResult(source,{wireSize:()=>0}).output.ports.find(p=>p.port===4).sample);
+ const reply=nodeResultReply(source,{userProfile:true,tool:'dock_node_wait'});
+ assert.equal(reply.isError,undefined);
+ assert.ok(Buffer.byteLength(JSON.stringify(reply),'utf8')<=46000);
+ const value=JSON.parse(reply.content[0].text);
+ for(const index of [0,3]){
+  const port=value.output.ports.find(p=>p.port===index);
+  assert.ok(port.sample_rows>0&&port.sample_rows<36);
+  assert.equal(port.sample_rows,port.sample.length);assert.equal(port.sample_complete,false);
+ }
+ assert.equal(new AjvJsonSchemaValidator().getValidator(userResultSchema)(value).valid,true);
+ const native=value.output.ports.find(p=>p.port===4);
+ assert.equal(JSON.stringify(native.sample),exact);
+ assert.equal(native.sample_rows,8);assert.equal(native.sample_complete,true);
+ assert.ok(value.limitations.some(s=>s.includes('already-read rows')));
+ assert.deepEqual(source,before);
+});
+
+test('native cells alone exceeding the wait budget still refuse without dropping exact evidence',()=>{
+ const source=raw([[{type:'variant',cell_type:'string',is_null:false,value:'x'.repeat(30000),
+  precision:'exact_native',representation:'native_string',native:{tag:8,encoding:'utf8',utf8_hex:'78'.repeat(30000)}}]]);
+ const before=structuredClone(source),reply=nodeResultReply(source,{userProfile:true,tool:'dock_node_wait'});
+ assert.equal(reply.isError,true);
+ assert.equal(JSON.parse(reply.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+ assert.deepEqual(source,before);
+});
