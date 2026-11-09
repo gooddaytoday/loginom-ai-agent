@@ -955,3 +955,9 @@ Oracle/expected остаются вне контекста модели. Рег�
 Только task-elastic.md и CSV передаются модели; frozen KKT oracle из
 8c1b6ac415645227d8977c3d9f7d3194e7e9b4b2 остаётся приватным. Оба typed-порта,
 прогнозный CSV, Save/cold без перенастройки и cleanup; abs=1e-8, rel=1e-10.
+
+`assnrules-recommend`: обучение и повторное выполнение того же узла на
+`fixtures/v040/recommend-train.csv`, max_items=2, одно следствие, lift=0.
+Только `acceptance/v040/task-recommend.md` и CSV передаются модели.
+Независимый `oracle.py --check` проверяет правила и рекомендации порта 2,
+совпадающий RuleID, все native поля, типы и порядок; два CSV, Save/cold/cleanup.

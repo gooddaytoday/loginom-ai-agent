@@ -90,7 +90,7 @@ RULES = (
     (('docs/node-development/nodes/datamining-clustering/acceptance/scaling/**',), ('live-ui',),
      ('clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
     ((C + 'factor-analysis-*.mjs', 'docs/node-development/nodes/research-factoranalysis/acceptance/**'), ('live-ui',), ('factor-pca', 'factor-retrain', 'factor-auto', 'factor-cap', 'factor-rotation')),
-    ((C + 'assn-rules-*.mjs', 'docs/node-development/nodes/datamining-assnrules/acceptance/**', 'docs/node-development/nodes/datamining-assnrules/fixtures/v040/**'), ('live-ui',), ('assnrules-consequents', 'assnrules-basic', 'assnrules-length', 'assnrules-retrain')),
+    ((C + 'assn-rules-*.mjs', 'docs/node-development/nodes/datamining-assnrules/acceptance/**', 'docs/node-development/nodes/datamining-assnrules/fixtures/v040/**'), ('live-ui',), ('assnrules-recommend', 'assnrules-consequents', 'assnrules-basic', 'assnrules-length', 'assnrules-retrain')),
     (('scripts/node-acceptance/clustering-normalized.mjs',
       'docs/node-development/nodes/datamining-clustering/acceptance/normalized/**'), ('live-ui',), ('clustering-normalized',)),
     ((C + 'coarse-classes-*.mjs', 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance/modes/**'), ('live-ui',), ('coarse-classes-frozen-zero', 'coarse-classes-continuous-manual', 'coarse-classes-train', 'coarse-classes-apply')),
