@@ -29,3 +29,11 @@ test('overlap, ambiguous names and later-stage model options refuse before brows
  validateLinRegressionParameters(p,'enter',request);
  assert.throws(()=>validateLinRegressionParameters(p,'enter',{...request,read:{ports:[2]}}),/output 1/);
 });
+test('full coefficient statistics are an Enter-only choice and refuse elsewhere before effects',()=>{
+ for(const statistics of ['coefficients','full'])assert.doesNotThrow(()=>validateLinRegressionParameters({...p,linear_regression:{statistics}},'enter'));
+ for(const linear_regression of [{statistics:'all'},{statistics:'full',lambda_l2:1},{statistics:null}])
+  assert.throws(()=>validateLinRegressionParameters({...p,linear_regression},'enter'),/statistics/);
+ for(const [mode,extra] of [['ridge',{lambda_l2:1}],['lasso',{lambda_l1:1}],['forward',{selection:{criterion:'f'}}],['backward',{selection:{criterion:'f'}}],['stepwise',{selection:{criterion:'f'}}],['apply',{}]])
+  assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{...extra,statistics:'full'}},mode),/statistics.*only in mode enter/);
+ assert.deepEqual(resolveLinRegressionRoles({...p,linear_regression:{statistics:'full'}},fields).map(f=>f.usage_type),[0,3,4,0]);
+});

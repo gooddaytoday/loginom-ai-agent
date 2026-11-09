@@ -60,3 +60,17 @@ test('CDF reopened empty order and canonical zero/reflect boundaries are read wi
   assert.equal(result.verified,true,JSON.stringify(result));assert.deepEqual(result.settings,{family,order,depth:1,boundary});
  }
 });
+
+test('wavelet boundary readback uses the anchored trimmed labels of the procedure',()=>{
+ const read=label=>fixture(f=>{
+  f.record.data.Algorithm=1;
+  for(const key of ['pedWaveletType','edtWaveletOrder','edtDecompositionLevel','edtEdgeExtension'])f.add(key+';SwitchButton',{pressed:false});
+  for(const [i,suffix] of ['','-1','-2'].entries())f.add('pedWaveletType;ValueControl;radiofield'+suffix,{getValue:()=>i===0});
+  f.add('edtWaveletOrder;ValueControl',{getValue:()=>1});f.add('edtDecompositionLevel;ValueControl',{getValue:()=>1});
+  f.add('edtEdgeExtension;ValueControl',{getRawValue:()=>label});
+ }).settings.boundary;
+ for(const label of ['Нулями','Продолжение нулями',' продолжение нулями ','НУЛЯМИ\n'])assert.equal(read(label),'zero',label);
+ assert.equal(read(' Симметричное '),'symmetric');
+ assert.equal(read('Симметричное без крайней точки '),'reflect');
+ for(const label of ['Не нулями','Нулями слева','Продолжение  нулями'])assert.notEqual(read(label),'zero',label);
+});

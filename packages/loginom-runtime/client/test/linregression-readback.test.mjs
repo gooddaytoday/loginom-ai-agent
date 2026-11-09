@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {linRegressionConfigurationReadback} from '../lib/linregression-readback.mjs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 const node={document_id:'doc',workflow_id:'workflow',node_id:'regression'};
 function candidate(){
  const values={input_mapping:{},configure:{configuration:{verified:true,node_context:node,fields:[{name:'RowID',usage_type:0},{name:'X',usage_type:3},{name:'Y',usage_type:4}],target_field:'Y',intercept:true},validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{},finish:{settings_applied:true,mode:'execute',execution_id:'execute-2',training:{status:'trained',node,execution_id:'train-1',source:[{node:{...node,node_id:'import'},output:0,input:0}]}}};
@@ -42,4 +44,16 @@ test('Ridge readback reports observed manual lambda without aliasing configurati
  assert.equal(result.mode,'ridge');assert.deepEqual(result.regularization,{setup:'manual',lambda_l2:1});
  assert.equal(result.epsilon,1e-10);assert.equal(result.training.status,'trained');
  configuration.regularization.lambda_l2=2;assert.equal(result.regularization.lambda_l2,1);
+});
+test('Enter readback reports the requested coefficient statistics and observed confidence level',()=>{
+ const input=candidate(),configuration=input.phases[1].value.configuration;
+ assert.equal(linRegressionConfigurationReadback(input).statistics,'coefficients');
+ Object.assign(configuration,{statistics:'full',confidence_level:95});
+ const result=linRegressionConfigurationReadback(input);
+ assert.equal(result.statistics,'full');assert.equal(result.confidence_level,95);
+ const validator=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ assert.equal(validator(result).valid,true);assert.equal(validator(linRegressionConfigurationReadback(candidate())).valid,true);
+ assert.equal(validator({...result,statistics:'all'}).valid,false);
+ Object.assign(configuration,{mode:'ridge',regularization:{setup:'manual',lambda_l2:1},epsilon:1e-10});
+ assert.equal(linRegressionConfigurationReadback(input).statistics,undefined);
 });

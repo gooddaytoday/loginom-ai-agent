@@ -1,16 +1,21 @@
 const need=(v,m)=>{if(!v)throw Error('Outlier detect: '+m);};
 const keys=['fields','method','outlier_factor','extreme_factor','ordered'];
+const policies=['keep','mean','median','most_probable'];
 export function validateElimOutlierPreview(p,fields){
  // Native Preview omits DataKind. Validate numeric names here; the complete
  // owned input mapping checks continuous kind before its Done/configuration.
  need(p.outlier.fields.every(name=>fields.some(f=>f.name===name&&['integer','real'].includes(f.type))),'preview fields must name numeric input fields');
 }
 export function validateElimOutlierParameters(p,mode,r){
- need(mode==='detect','only detect (keep/keep, Train current input) is supported');
+ need(['detect','edit'].includes(mode),'use detect or edit with Train current input');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='outlier'),'use parameters.outlier');
  const o=p.outlier??{};
- need(o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).every(k=>keys.includes(k)),'unsupported outlier parameter');
+ need(o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).every(k=>keys.includes(k)||['outlier_policy','extreme_policy'].includes(k)),'unsupported outlier parameter');
  need(r.target.kind==='existing'||keys.every(k=>o[k]!==undefined),'new nodes require fields, method, outlier_factor, extreme_factor and ordered');
+ for(const key of ['outlier_policy','extreme_policy']){
+  if(mode==='edit'&&r.target.kind!=='existing')need(o[key]!==undefined,'new edit nodes require both policies');
+  if(o[key]!==undefined)need((mode==='detect'?['keep']:policies).includes(o[key]),mode+' policy must be '+(mode==='detect'?'keep':'keep, mean, median or most_probable'));
+ }
  if(o.fields!==undefined)need(Array.isArray(o.fields)&&o.fields.length>0&&o.fields.length<=128&&o.fields.every(f=>typeof f==='string'&&f.length>0&&f.length<=128)&&new Set(o.fields).size===o.fields.length,'fields must be distinct technical names');
  if(o.method!==undefined)need(['sd','iqr'].includes(o.method),'method must be sd or iqr');
  for(const key of ['outlier_factor','extreme_factor'])if(o[key]!==undefined)need(Number.isFinite(o[key])&&o[key]>=0,key+' must be finite and nonnegative');
