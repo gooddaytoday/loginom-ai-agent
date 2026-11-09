@@ -1079,7 +1079,7 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
-for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
+for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','extent','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
  const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
  page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async ms=>{clock.advance(ms);};
  Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
@@ -1100,13 +1100,13 @@ for(const stage of ['controls','data_views'])for(const fault of ['transient','pe
     failures++;if(fault==='expired')clock.advance(16000);
     return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':stage}};
    }
-   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
+   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;if(fault==='extent')table.scrollHeight=2401;}
   }
   return evaluate(fn,arg);
  };
  const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
- const retry=['transient','persistent','directory','owner','position'].includes(fault);
- assert.equal(result.status,fault==='transient'?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ const retry=['transient','persistent','directory','owner','position','extent'].includes(fault);
+ assert.equal(result.status,['transient','extent'].includes(fault)?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
  assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,fault==='before'?0:1);
  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
  assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);

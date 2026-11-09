@@ -181,7 +181,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  };
  const roots=()=>read({discover_roots:true});
  const act=async(s,e,verb='click',extra={})=>{
-  const original={workflow:s.workflow_ref,directory:s.file_storage?.directory,package:s.package_identity,tid:e.tid,label:e.label,root:s.observation_root?.ref};
+  const original={workflow:s.workflow_ref,directory:s.file_storage?.directory,package:s.package_identity,tid:e.tid,label:e.label,root:s.observation_root?.ref,tab:s.active_tab_ref};
   for(let attempt=0;attempt<3;attempt++){
   guard();need(quiet(s)&&e.allowed_actions.includes(verb),'Export storage gesture unavailable');
   const fileRow=e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_');
@@ -204,6 +204,17 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    const fresh=await read({root_ref:verb==='scroll'?original.root:e.ref}),matches=fresh.ui.elements.filter(x=>x.ref===e.ref&&x.tid===original.tid&&x.label===original.label);
    need(quiet(fresh)&&JSON.stringify(fresh.workflow_ref)===JSON.stringify(original.workflow)&&fresh.file_storage?.directory===original.directory&&JSON.stringify(fresh.package_identity)===JSON.stringify(original.package)&&matches.length===1,'Export control changed during pre-gesture refresh');
    s=fresh;e=matches[0];continue;
+  }
+  if(verb==='scroll'&&fileRow&&original.root&&r.status==='AMBIGUOUS'&&!uncertain
+   &&['UI_SCAN_LIMIT','UI_SCROLL_NOT_CONFIRMED'].includes(r.error?.code)){
+   // The navigation may have completed. Observe its stable table once and
+   // let the bounded search inspect fresh rows; never replay this gesture.
+   const fresh=await read({root_ref:original.root});
+   need(quiet(fresh)&&JSON.stringify(fresh.workflow_ref)===JSON.stringify(original.workflow)
+    &&fresh.active_tab_ref===original.tab&&JSON.stringify(fresh.package_identity)===JSON.stringify(original.package)
+    &&fresh.observation_root?.ref===original.root&&fresh.file_storage?.status==='observed'
+    &&fresh.file_storage.directory===original.directory,'Export storage changed after its completed scroll');
+   return;
   }
   need(r.status==='SUCCEEDED'&&!uncertain,'Export storage gesture requires inspection');
   return;
