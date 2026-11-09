@@ -290,17 +290,17 @@ page = context.pages()[0]
     reads.unshift({node:matches[0],ports:[{port:contract.output_port??0}],treeContract:contract});
    }
   }
-  if(expected.col_union_settings){
-   const nodes=graph.nodes.filter(n=>n.type==='transform.col_union_data');
-   if(nodes.length!==1)throw Error('COL_UNION_ONE_SAVED_NODE');
-   const settings=await observeColUnionSavedSettings({load,channel:channelFor(nodes[0].ref,'col-union-saved'),expected});
-   await record({phase:'col_union_saved_settings',node:nodes[0].ref,...settings});
-  }
   if(expected.sorting_mode){
    const nodes=graph.nodes.filter(n=>n.type==='transform.sorting');
    if(nodes.length!==1)throw Error('SORTING_MODES_ONE_SAVED_NODE');
    const settings=await observeSortingSaved({load,channel:channelFor(nodes[0].ref,'sorting-saved'),mode:expected.sorting_mode});
    await record({phase:'sorting_saved_settings',node:nodes[0].ref,...settings});
+  }
+  if(expected.col_union_settings){
+   const nodes=graph.nodes.filter(n=>n.type==='transform.col_union_data');
+   if(nodes.length!==1)throw Error('COL_UNION_ONE_SAVED_NODE');
+   const settings=await observeColUnionSavedSettings({load,channel:channelFor(nodes[0].ref,'col-union-saved'),expected});
+   await record({phase:'col_union_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.logreg_normalization){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');
