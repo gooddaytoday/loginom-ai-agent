@@ -7,6 +7,52 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const types = { integer: 'Целый', real: 'Вещественный', string: 'Строковый', boolean: 'Логический', datetime: 'Дата/Время' };
 const kinds = ['Неопределенное', 'Непрерывный', 'Дискретный'];
 function requireValue(condition, message) { if (!condition) throw new Error(message); }
+const titleModes={automatic:'Автоматическая метка',custom:'Пользовательская метка'};
+function validateNodeTitle(title) {
+  requireValue(title&&typeof title==='object'&&!Array.isArray(title)
+    &&Object.keys(title).every(k=>['mode','label'].includes(k))&&Object.hasOwn(titleModes,title.mode), 'Invalid node_title');
+  requireValue(title.mode==='automatic'?!Object.hasOwn(title,'label')
+    :typeof title.label==='string'&&title.label.length<=120&&title.label.trim().length>0
+      &&!/[;|<>"'\\\x00-\x1f]/.test(title.label), 'Custom node_title requires a safe nonblank label; automatic forbids label');
+}
+
+export async function configureTextImportTitle(channel,title) {
+  if(title)validateNodeTitle(title);
+  const ready=s=>s.wizard?.status==='observed'&&s.wizard.stage==='done'&&s.wizard.completion?.ready===true;
+  let state=await channel.observe({condition:'Text Import title on Done',ready});
+  const owner=state.wizard.owner_context,root=state.wizard.root_ref;
+  const sameOwner=s=>ready(s)&&s.wizard.root_ref===root&&same(s.wizard.owner_context,owner);
+  if(title){
+    const mode=titleModes[title.mode];
+    if(state.wizard.completion.fields.label_mode.value!==mode){
+      const choice=(s,kind)=>{
+        const f=s.wizard.completion.fields.label_mode;
+        return one(s.ui.elements.filter(e=>e.wizard_combo?.kind===kind
+          &&e.wizard_combo.field.scope==='node_title'&&e.wizard_combo.field.name==='label_mode'
+          &&e.wizard_combo.field.root_ref===s.wizard.root_ref
+          &&e.wizard_combo.field.owner_ref===f.owner_ref&&e.wizard_combo.field.input_ref===f.input_ref
+          &&(kind==='picker'||e.wizard_combo.label===mode)), 'Exact Text Import title '+kind+' unavailable');
+      };
+      await channel.perform({condition:'Text Import title picker',initialObservation:state,ready:sameOwner,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'click',ref:choice(s,'picker').ref})});
+      state=await channel.observe({condition:'Text Import title choices',ready:s=>sameOwner(s)
+        &&s.ui.elements.some(e=>e.wizard_combo?.field.scope==='node_title'&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===mode)});
+      await channel.perform({condition:'Text Import title mode',initialObservation:state,ready:sameOwner,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'select_wizard_option',ref:choice(s,'option').ref})});
+      state=await channel.observe({condition:'Text Import title mode readback',ready:s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode});
+    }
+    if(title.mode==='custom'&&state.wizard.completion.fields.label.value!==title.label){
+      const labelReady=s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode;
+      await channel.perform({condition:'Text Import custom title',initialObservation:state,ready:labelReady,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'fill',ref:s.wizard.completion.fields.label.input_ref,text:title.label})});
+      state=await channel.observe({condition:'Text Import custom title entered',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
+      await channel.perform({condition:'Text Import custom title commit',initialObservation:state,ready:labelReady,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'press',ref:s.wizard.completion.fields.label.input_ref,key:'Tab'})});
+      state=await channel.observe({condition:'Text Import custom title readback',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
+    }
+  }
+  return structuredClone(state.wizard.completion);
+}
 // Native «Автоопределение столбцов» labels. An omitted mode keeps native settings.
 export const autoDetectLabels={none:'Нет',new:'Только новые',all:'Все'};
 const autoDetectMode=label=>Object.keys(autoDetectLabels).find(k=>autoDetectLabels[k]===label);
@@ -89,7 +135,8 @@ export function isTextImportSourceReady(state) {
 function validateSettings(p,maxColumns) {
   requireValue(p && typeof p === 'object' && !Array.isArray(p), 'Text import parameters are required');
   const auto=autoTypesRequested(p);
-  requireValue(Object.keys(p).filter(k=>k!=='analysis').sort().join(',') === (auto&&!Object.hasOwn(p,'columns')?'format,source':'columns,format,source'), 'Unexpected text import parameters');
+  requireValue(Object.keys(p).filter(k=>!['analysis','node_title'].includes(k)).sort().join(',') === (auto&&!Object.hasOwn(p,'columns')?'format,source':'columns,format,source'), 'Unexpected text import parameters');
+  if(Object.hasOwn(p,'node_title'))validateNodeTitle(p.node_title);
   if(Object.hasOwn(p,'analysis'))validateAnalysis(p.analysis);
   requireValue(p.source&&['encoding','first_line_as_title','rows_to_skip'].every(k=>Object.hasOwn(p.source,k))
     &&Object.keys(p.source).every(k=>['encoding','first_line_as_title','rows_to_skip','source_path','source_paths','source_mask','file_info'].includes(k)), 'Source parameters are incomplete');
@@ -157,7 +204,8 @@ export function validateInitialExistingImportSettings(parameters,verifiedSourceP
 
 export function validateTextImportPatch(p) {
   const object=value=>value && typeof value==='object' && !Array.isArray(value);
-  requireValue(object(p) && Object.keys(p).every(k=>['source','format','columns','analysis'].includes(k)), 'Invalid import settings patch');
+  requireValue(object(p) && Object.keys(p).every(k=>['source','format','columns','analysis','node_title'].includes(k)), 'Invalid import settings patch');
+  if(Object.hasOwn(p,'node_title'))validateNodeTitle(p.node_title);
   if(Object.hasOwn(p,'analysis'))validateAnalysis(p.analysis);
   requireValue(!(p.format?.auto_detect_columns==='all'&&p.columns?.length),allModeColumns);
   const source={source_path:'/validation.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true};

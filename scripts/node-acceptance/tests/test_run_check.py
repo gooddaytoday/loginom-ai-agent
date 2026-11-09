@@ -22,6 +22,33 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_text_auto_label_keeps_frozen_oracles_and_exact_input_names(self):
+        case = runner.scenario('text-auto-label')
+        self.assertTrue(case['text_auto_label'])
+        self.assertTrue(case['text_list_sources'])
+        self.assertEqual(case['input_files'], ['typed.csv', 'typed-update.csv'])
+        self.assertEqual(case['lgd_initial'], 'expected-auto-label.json')
+        self.assertEqual(case['expected_name'], 'expected-custom-label.json')
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-auto-label.md').read_bytes())
+        self.assertEqual(runner.expected_for(case, '/own/label.lgp', cold=True)['outputs'][0]['output_node_label'], 'Ежедневные продажи')
+
+    def test_text_auto_label_requires_all_native_mode_source_transitions_on_one_guid(self):
+        stages = [('typed.csv', 'automatic', 'typed.csv'), ('typed-update.csv', 'automatic', 'typed-update.csv'),
+                  ('typed-update.csv', 'custom', 'Ежедневные продажи'), ('typed.csv', 'custom', 'Ежедневные продажи'),
+                  ('typed-update.csv', 'custom', 'Ежедневные продажи')]
+        replies = [(n, dict(status='SUCCEEDED', node=dict(node_id='import'), configuration=dict(readback=dict(
+            kind='text_import', source=dict(source_path='/own/' + path), node_title=dict(mode=mode, label=label)))))
+                   for n, (path, mode, label) in enumerate(stages)]
+        runner.check_text_auto_label(replies)
+        for index in range(len(replies)):
+            with self.assertRaisesRegex(AssertionError, 'STAGES_MISSING'):
+                runner.check_text_auto_label(replies[:index] + replies[index + 1:])
+        changed = copy.deepcopy(replies)
+        changed[2][1]['node']['node_id'] = 'replacement'
+        with self.assertRaisesRegex(AssertionError, 'IMPORT_CHANGED'):
+            runner.check_text_auto_label(changed)
+
     def test_text_variant_keeps_frozen_subtypes_and_final_cold(self):
         case = runner.scenario('text-variant')
         self.assertTrue(case['text_variant'])
