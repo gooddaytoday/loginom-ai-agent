@@ -2533,4 +2533,10 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         with self.assertRaisesRegex(AssertionError, 'COARSE_FROZEN_SAME_IMPORT'):
             runner.check_coarse_frozen_trainings([reply('first'), reply('second', training=False)])
 
+    def test_binning_ties_current_binds_the_oracle_that_reproduces_its_expected(self):
+        self.assertEqual(runner.scenario('binning-ties-current')['oracle'].name, 'oracle-edges.py')
+        self.assertEqual(runner.scenario('binning-ties-current')['expected_name'], 'modes/expected-current.json')
+        for name in ['binning-auto', 'binning-sd']:
+            self.assertEqual(runner.scenario(name)['oracle'].name, 'oracle.py')
+
 if __name__ == '__main__': unittest.main()
