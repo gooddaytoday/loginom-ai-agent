@@ -57,7 +57,46 @@ test('title procedure uses native mode selection and commits custom text; omissi
  assert.equal(observed.fields.label.value,'Ежедневные продажи');
 });
 
-function doneFixture(icon='importtextfile'){
+// Native Done readback may lag the gesture by one tick per field: the channel
+// applies a field change only on the read after the one that observed a gesture.
+function laggingTitleChannel(state,lagged,actions=[]){
+ let pending=null;
+ return {actions,observe:async options=>{
+  for(let read=0;read<5;read++){
+   const snapshot=structuredClone(state);
+   if(pending){pending();pending=null;}
+   if(options.ready(snapshot))return snapshot;
+  }
+  throw new Error('UI_DEADLINE_EXCEEDED: '+options.condition);
+ },perform:async options=>{
+  assert.ok(options.ready(state));const action=options.resolve(state);actions.push(action);
+  const fields=state.wizard.completion.fields;
+  if(action.verb==='select_wizard_option'){
+   const option=state.ui.elements.find(e=>e.ref===action.ref).wizard_combo.label;
+   fields.label_mode.value=option;
+   if(option==='Автоматическая метка')pending=()=>{fields.label.value=lagged;};
+  }
+  if(action.verb==='fill')fields.label.value=action.text;
+ }};
+}
+test('automatic title waits for the native file-name caption that lags the mode readback',async()=>{
+ const f=doneFixture('importtextfile','Пользовательская метка','Ежедневные продажи');
+ const channel=laggingTitleChannel((await f.observe()).output,'typed.csv');
+ const observed=await configureTextImportTitle(channel,{mode:'automatic'});
+ assert.deepEqual(channel.actions.map(a=>a.verb),['click','select_wizard_option']);
+ assert.equal(observed.fields.label_mode.value,'Автоматическая метка');
+ assert.equal(observed.fields.label.value,'typed.csv');
+});
+test('automatic to custom title selects the native mode, then enters and commits the caption',async()=>{
+ const f=doneFixture('importtextfile','Автоматическая метка','typed.csv');
+ const channel=laggingTitleChannel((await f.observe()).output,'typed.csv');
+ const observed=await configureTextImportTitle(channel,{mode:'custom',label:'Ежедневные продажи'});
+ assert.deepEqual(channel.actions.map(a=>a.verb),['click','select_wizard_option','fill','press']);
+ assert.equal(observed.fields.label_mode.value,'Пользовательская метка');
+ assert.equal(observed.fields.label.value,'Ежедневные продажи');
+});
+
+function doneFixture(icon='importtextfile',mode='Пользовательская метка',label='Import'){
  const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
  let path='';const crumbs=[];
  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Import','Настройка']){
@@ -68,7 +107,7 @@ function doneFixture(icon='importtextfile'){
  }
  const wizard=page.add('div',base+'WizrdMCF');
  let labelInput,modeInput,picker;
- for(const [key,value] of [['edtDisplayName','Import'],['cbxNodeTitleMode','Пользовательская метка']]){
+ for(const [key,value] of [['edtDisplayName',label],['cbxNodeTitleMode',mode]]){
   const tid=base+'WizrdMCF;DoneWizard;'+key;
   const owner=page.add('div',tid,'',undefined,wizard),input=page.add('input',null,'',undefined,owner);input.value=value;
   if(key==='edtDisplayName')labelInput=input;
@@ -76,7 +115,9 @@ function doneFixture(icon='importtextfile'){
    modeInput=input;input.readOnly=true;
    picker=page.add('div',tid+';trg_picker','',undefined,owner);
    const list=page.add('div',tid+';boundlist','',undefined,owner);
-   page.add('div',tid+';boundlist;Автоматическая_метка','Автоматическая метка',undefined,list);
+   // The fixture hit-tests one box, so it lists only the other native mode.
+   for(const option of ['Автоматическая метка','Пользовательская метка'].filter(o=>o!==mode))
+    page.add('div',tid+';boundlist;'+option.replace(' ','_'),option,undefined,list);
   }
  }
  const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:page.tab.getAttribute('data-tid'),navigation_path:crumbs.slice(0,5).map(c=>({tid:c.getAttribute('data-tid'),label:c.textContent.trim()}))};
