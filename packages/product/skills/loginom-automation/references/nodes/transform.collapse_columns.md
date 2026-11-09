@@ -1,6 +1,18 @@
 # Свертка столбцов (`transform.collapse_columns`)
 
 <!-- mode: unpivot -->
+Для полного Variant-вывода разделяй выполнение с настройкой и точное чтение.
+Сначала вызови `dock_node_apply` с `finish:"execute"` и
+`read:{ports:[0],sample_rows:0,require_exact_numbers:false}`: получи успешную
+квитанцию и схему того же узла. Затем вызови `dock_node_read` с
+`source_operation_id` этой квитанции и
+`read:{ports:[0],sample_rows:0,require_exact_numbers:true}`.
+Этот вызов заново выполняет сохранённый узел без изменения настроек.
+Все строки и типы ячеек бери из `exact_table.rows` при
+`exact_table.complete:true`; нулевой sample не сокращает эту полную таблицу.
+Не запрашивай одновременно большой sample и полную exact_table: строки
+дублируются, и ответ может не поместиться в бюджет доставки.
+
 Для transform.collapse_columns, служащего промежуточным источником в расширенном
 графе, допускается finish="execute" с read:{ports:[0],sample_rows:0,
 require_exact_numbers:false}; это выполняет узел без чтения промежуточной таблицы.
