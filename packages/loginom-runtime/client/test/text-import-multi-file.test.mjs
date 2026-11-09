@@ -47,7 +47,7 @@ test('invalid lists and service options refuse in production preflight',()=>{
  for(const source of [{source_paths:[]},{source_paths:['','']},{source_paths:['/x.csv｜/y.csv']},
   {source_paths:['/x*.csv']},{source_paths:['/../x.csv']},{source_paths:['https://x/a.csv']},
   {source_paths:paths,source_path:paths[0]},{source_paths:paths,file_info:'absolute'},
-  {source_paths:paths,file_info:'name',parallel_processing:true}])
+  {source_paths:paths,file_info:'name',parallel_processing:'true'}])
   assert.throws(()=>validateTextImportPatch({source}));
  for(const sources of [[refs[0]], [...refs].reverse(),[refs[0],{kind:'verified_sources',sources:refs}]]){
   const p=parameters();p.source.sources=sources;
