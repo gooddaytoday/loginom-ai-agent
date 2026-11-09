@@ -24,11 +24,23 @@ test('Binning observes its external SD options through their own bounded root',a
  const f=fixture();await f.read(true);assert.equal(f.roots.at(-1),'sd-options');
  await f.read(false);assert.equal(f.roots.at(-1),'wizard');
 });
-test('SD portal registration stays limited to Binning and the exact coefficient list',async()=>{
- for(const options of [{stage:'calculator'},{tid:'ForeignFrame;cbbSDBinsMode;ValueControl;boundlist'},{tid:'MethodSettingFrame;cbbMatchingObservationsMode;ValueControl;boundlist'}]){
+test('Binning observes its exact external matching-observations list',async()=>{
+ const f=fixture({tid:'MethodSettingFrame;cbbMatchingObservationsMode;ValueControl;boundlist'});
+ await f.read(true);assert.equal(f.roots.at(-1),'sd-options');
+ await f.read(false);assert.equal(f.roots.at(-1),'wizard');
+});
+test('portal registration stays limited to Binning and the exact supported lists',async()=>{
+ for(const options of [{stage:'calculator'},{tid:'ForeignFrame;cbbSDBinsMode;ValueControl;boundlist'},
+  {stage:'calculator',tid:'MethodSettingFrame;cbbMatchingObservationsMode;ValueControl;boundlist'},
+  {tid:'ForeignFrame;cbbMatchingObservationsMode;ValueControl;boundlist'},
+  {tid:'MethodSettingFrame;other;ValueControl;boundlist'}]){
   const f=fixture(options);await f.read(true);assert.equal(f.roots.at(-1),'wizard');
  }
 });
 test('duplicate SD portals remain ambiguous instead of selecting the first',async()=>{
  const f=fixture({duplicate:true});await assert.rejects(f.read(true),/dropdown owner is ambiguous/);
+});
+test('duplicate tie portals remain ambiguous',async()=>{
+ const f=fixture({duplicate:true,tid:'MethodSettingFrame;cbbMatchingObservationsMode;ValueControl;boundlist'});
+ await assert.rejects(f.read(true),/dropdown owner is ambiguous/);
 });

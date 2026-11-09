@@ -11,6 +11,8 @@ test('association rules fit the approved model-visible tool and card budgets',()
  const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
  const card=userActionInventory({node_types:describeNodeTypes(['datamining.assn_rules'],{},new Map(),handlers)}).node_types[0];
  assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
+ assert.match(card.semantics,/Port 2: native missing-item recommendations/);
+ assert.doesNotMatch(card.semantics,/No.*recommendations/);
  assert.deepEqual(card.candidate_modes,['fp_growth']);assert.ok(card.parameter_schema.properties.transaction_field);
  const file=readFileSync(new URL('../../../product/skills/loginom-automation/references/nodes/datamining.assn_rules.md',import.meta.url),'utf8');
  assert.ok(Buffer.byteLength(file)<=6000);assert.doesNotMatch(file,/\$\d|\$ARGUMENTS/);

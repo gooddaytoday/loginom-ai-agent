@@ -1079,7 +1079,7 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
-for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
+for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','extent','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
  const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
  page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async ms=>{clock.advance(ms);};
  Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
@@ -1100,13 +1100,13 @@ for(const stage of ['controls','data_views'])for(const fault of ['transient','pe
     failures++;if(fault==='expired')clock.advance(16000);
     return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':stage}};
    }
-   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
+   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;if(fault==='extent')table.scrollHeight=2401;}
   }
   return evaluate(fn,arg);
  };
  const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
- const retry=['transient','persistent','directory','owner','position'].includes(fault);
- assert.equal(result.status,fault==='transient'?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ const retry=['transient','persistent','directory','owner','position','extent'].includes(fault);
+ assert.equal(result.status,['transient','extent'].includes(fault)?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
  assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,fault==='before'?0:1);
  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
  assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);
@@ -6529,7 +6529,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata','importtextfile','importnative','sampling','partition'])for(const outputPort of vendor==='filterdata'?[0,1]:vendor==='partition'?[0,1,2]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata','importtextfile','importnative','sampling','partition','coarseclasses'])for(const outputPort of vendor==='filterdata'?[0,1]:['partition','coarseclasses'].includes(vendor)?[0,1,2]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     if(vendor==='importnative')for(const e of page.document.all())if(e.attrs['data-tid'])
@@ -6553,7 +6553,7 @@ test('overflow output socket requires a current native owner and visible actiona
     const port={direction:'output',port:outputPort,native_index:outputPort,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-'+vendor};
     if(mode==='bound_folder_missing_native_icon')delete port.node_icon_class;
     if(mode==='bound_folder_wrong_native_icon')port.node_icon_class='bg-vendor-icon-unknown';
-    if(mode==='bound_folder_wrong_port')port.port=port.native_index=vendor==='filterdata'?2:vendor==='partition'?3:1;
+    if(mode==='bound_folder_wrong_port')port.port=port.native_index=vendor==='filterdata'?2:['partition','coarseclasses'].includes(vendor)?3:1;
     if(mode==='bound_folder_wrong_index')port.native_index=outputPort===0?1:0;
     if(mode==='bound_folder_missing_guid')delete port.port_guid;
     if(mode==='bound_folder_missing_opening')delete port.opening_operation_id;
@@ -6581,7 +6581,7 @@ test('overflow output socket requires a current native owner and visible actiona
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
     assert.equal(controls.length,accepted?1:0,vendor+': '+socketIcon+': '+mode);
     if(accepted){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
-    if(['javascript','joindata','importtextfile','sampling','partition'].includes(vendor)&&mode.startsWith('bound_folder')) {
+    if(['javascript','joindata','importtextfile','sampling','partition','coarseclasses'].includes(vendor)&&mode.startsWith('bound_folder')) {
       const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
       page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
       page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
