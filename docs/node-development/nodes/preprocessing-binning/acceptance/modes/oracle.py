@@ -49,10 +49,15 @@ def expected(case):
         assert len(matches) <= 1
         index = matches[0] if matches else None
         interval = intervals[index] if index is not None else None
+        # Row flags differ from ranges quotas for open tails: native Loginom 7.4.2
+        # reports Incl=false on the -inf/+inf side of the outer bins, while ranges
+        # keep the finite-bound quota 1 (LAB-1260, discovery.md, port 0 vs port 1).
+        low_incl = interval and interval[2] and not (open_ends and index == 0)
+        upp_incl = interval and interval[3] and not (open_ends and index == len(intervals) - 1)
         derived = dict(BinsID=field, Number=index, Label=interval[4] if interval else None,
                        LowBound=converted(interval[0]) if interval else None,
                        UppBound=converted(interval[1]) if interval else None,
-                       LowBoundIncl=interval[2] if interval else None, UppBoundIncl=interval[3] if interval else None,
+                       LowBoundIncl=low_incl if interval else None, UppBoundIncl=upp_incl if interval else None,
                        LowLimOpen=open_ends, UppLimOpen=open_ends,
                        OutOfBins=None if value is None else 0 if index is not None else -1 if value < intervals[0][0] else 1)
         transformed.append({k: converted(v) for k, v in row.items()} | {field + "_" + k: v for k, v in derived.items()})
