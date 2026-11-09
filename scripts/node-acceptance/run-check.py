@@ -266,6 +266,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'text-auto-label':
+        node = REPO / 'docs/node-development/nodes/text-import'
+        return dict(source=node / 'acceptance/extended', prompt=REPO / 'scripts/node-acceptance/scenarios/text-auto-label/task.md',
+                    data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'], base=None, export_count=2,
+                    lgd_initial='expected-auto-label.json', expected_name='expected-custom-label.json',
+                    oracle=node / 'acceptance/extended/oracle.py', text_auto_label=True, text_list_sources=True)
     if name == 'text-variant':
         node = REPO / 'docs/node-development/nodes/text-import'
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-variant.md',
@@ -913,6 +919,25 @@ def model_replies(events):
     return replies
 
 
+def check_text_auto_label(replies):
+    stages = [('typed.csv', 'automatic', 'typed.csv'), ('typed-update.csv', 'automatic', 'typed-update.csv'),
+              ('typed-update.csv', 'custom', 'Ежедневные продажи'), ('typed.csv', 'custom', 'Ежедневные продажи'),
+              ('typed-update.csv', 'custom', 'Ежедневные продажи')]
+    index, node = 0, None
+    for _, reply in replies:
+        if reply.get('status') != 'SUCCEEDED': continue
+        config = reply.get('configuration', {}).get('readback', {})
+        if config.get('kind') != 'text_import': continue
+        title = config.get('node_title', {})
+        actual = (Path(config.get('source', {}).get('source_path', '')).name, title.get('mode'), title.get('label'))
+        if index < len(stages) and actual == stages[index]:
+            identity = reply.get('node', {}).get('node_id')
+            assert identity and (node is None or identity == node), 'TEXT_AUTO_LABEL_IMPORT_CHANGED'
+            node = identity
+            index += 1
+    assert index == len(stages), f'TEXT_AUTO_LABEL_STAGES_MISSING: {index}/{len(stages)}'
+
+
 def check_text_update_ports(replies, destinations, stages, node_binary='node', *, same_node_id=False):
     assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
     previous, node = -1, None
@@ -934,7 +959,7 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node', *
         assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
         assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
             (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
-        tables.append(dict(actual=dict(node=identity, type='imports.text', output_port=0, data=port), expected=stage))
+        tables.append(dict(actual=dict(node=identity, type='imports.text', label=owner['configuration']['readback'].get('node_title', {}).get('label'), output_port=0, data=port), expected=stage))
         previous = exports[-1]
     # Use the same typed full-table matcher as cold, including exact numeric and
     # datetime evidence. Each stage has its own snapshot of the same node.
@@ -2437,6 +2462,9 @@ class Runner:
             check_text_mask(replies, self.text_mask_directory(login) + '/sales_*.csv')
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             self.current['new_month'] = 'PASS'
+        if spec.get('text_auto_label'):
+            check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
+            check_text_auto_label(replies)
         if spec.get('text_variant'):
             check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             formats = [owner['configuration']['readback']['format'] for _, reply in replies for owner, _ in ports(reply)

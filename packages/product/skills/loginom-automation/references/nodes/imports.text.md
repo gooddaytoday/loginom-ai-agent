@@ -56,6 +56,10 @@ Mixed types: `settings.format.variant_as_general_type:true` and
 `settings.analysis.refresh:"types"` on the same Import; no Calculator/JS. Use false
 and refresh to redetect strings. Check values, types and NULL.
 
+Caption on SAME Import: `settings.node_title:{mode:"automatic"}` follows the basename;
+`{mode:"custom",label:"Daily sales"}` keeps its label across sources. Omit preserves.
+Check `configuration.readback.node_title`. No Calculator/JS.
+
 ## Path from variable
 
 Use `binding_schema`; `variable_inputs`: `variables.user` 4 → Import 0. First
