@@ -433,7 +433,7 @@ class RunCheckTests(unittest.TestCase):
         rule = next(r for r in rules['rows'] if r['Item_0_A'] == 'A' and r['Item_0_C'] == 'B')
         self.assertEqual(recommendations['rows'], [dict(rule, Transaction='T4')])
         self.assertEqual([c['name'] for c in recommendations['columns']],
-            ['RuleID', 'Support', 'Confidence', 'Lift', 'Transaction', 'Item_0_A', 'Item_0_C'])
+            ['Transaction', 'RuleID', 'Support', 'Confidence', 'Lift', 'Item_0_A', 'Item_0_C'])
         self.assertEqual(runner.expected_for(case, '/test/recommend.lgp', cold=True), expected)
         for text in ['expected', 'oracle', 'T4', 'recommend-holdout.csv', '.75']:
             self.assertNotIn(text, case['prompt'].read_text())

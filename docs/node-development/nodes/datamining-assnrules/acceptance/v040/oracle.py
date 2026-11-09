@@ -147,8 +147,8 @@ def recommend_artifact():
     assert [(r['antecedent'], r['consequent']) for r in found] == [(['A'], ['B']), (['B'], ['A'])]
     column = lambda name, kind: dict(name=name, type=kind, label_any=True,
         **(dict(tolerance=dict(abs=1e-10, rel=1e-10)) if kind == 'real' else {}))
-    # Native reader schema from discovery.md: port 2 inserts the transaction
-    # field between metrics and items. Rule IDs share port 1 enumeration.
+    # Native source-field inventory of a fresh recommendations port places
+    # Transaction first. Rule IDs share port 1 enumeration; metrics are Fraction-derived.
     columns = [column('RuleID', 'integer')] + [column(n, 'real') for n in ['Support', 'Confidence', 'Lift']]
     items = [column('Item_0_' + side, 'string') for side in ['A', 'C']]
     row = lambda index, r: dict(RuleID=index, Support=r['support'], Confidence=r['confidence'],
@@ -163,7 +163,7 @@ def recommend_artifact():
     return dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
         ['imports.text', 'datamining.assn_rules', 'exports.text']], outputs=[
         output(1, columns + items, [row(i, r) for i, r in enumerate(found, 1)]),
-        output(2, columns + [column('Transaction', 'string')] + items, recommendations)])
+        output(2, [column('Transaction', 'string')] + columns + items, recommendations)])
 
 
 if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):

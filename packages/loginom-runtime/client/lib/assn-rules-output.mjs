@@ -5,8 +5,8 @@ export function assnRulesOutputColumns(configuration,port){
  const transaction=configuration.fields.find(f=>f.usage_type===configuration.roles.transaction)?.name;
  if(port===2&&!transaction)throw Error('Association rules: configured transaction field missing');
  const width=configuration.max_items??2,consequents=configuration.max_consequents??1;
- const names=port===0?['ItemsetID','Width','Support',...Array.from({length:width},(_,i)=>item+'_'+i)]:['RuleID','Support','Confidence','Lift',...(port===2?[transaction]:[]),...Array.from({length:width-1},(_,i)=>[item+'_'+i+'_A',...(i<consequents?[item+'_'+i+'_C']:[])]).flat()];
- return names.map((name,index)=>({name,type:index>=(port===0?3:4)?'string':['ItemsetID','Width','RuleID'].includes(name)?'integer':'real'}));
+ const names=port===0?['ItemsetID','Width','Support',...Array.from({length:width},(_,i)=>item+'_'+i)]:[...(port===2?[transaction]:[]),'RuleID','Support','Confidence','Lift',...Array.from({length:width-1},(_,i)=>[item+'_'+i+'_A',...(i<consequents?[item+'_'+i+'_C']:[])]).flat()];
+ return names.map((name,index)=>({name,type:port===2&&index===0||index>=(port===0?3:port===2?5:4)?'string':['ItemsetID','Width','RuleID'].includes(name)?'integer':'real'}));
 }
 export function alignAssnRulesOutput(columns,expected){
  // Native field order depends on how the node was configured. Validate the

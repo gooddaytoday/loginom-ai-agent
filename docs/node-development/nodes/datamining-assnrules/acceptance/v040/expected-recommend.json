@@ -87,6 +87,11 @@
       "column_order": "exact",
       "columns": [
         {
+          "name": "Transaction",
+          "type": "string",
+          "label_any": true
+        },
+        {
           "name": "RuleID",
           "type": "integer",
           "label_any": true
@@ -117,11 +122,6 @@
             "abs": 1e-10,
             "rel": 1e-10
           }
-        },
-        {
-          "name": "Transaction",
-          "type": "string",
-          "label_any": true
         },
         {
           "name": "Item_0_A",

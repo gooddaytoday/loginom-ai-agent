@@ -31,3 +31,22 @@ test('training recommendations accept port 2 with existing-node parameter preser
  validateAssnRulesParameters({...p,max_consequents:1,min_lift:0},'fp_growth',{...request,read:{ports:[1,2]}});
  validateAssnRulesParameters({},'fp_growth',{...request,target:{kind:'existing'},inputs:[],read:{ports:[0,1,2]}});
 });
+
+test('public dispatch admits all registered association-rule ports before the production handler',async()=>{
+ const {nodeApiTools,dispatchNodeApi,validateNodeApplyEnvelope}=await import('../lib/node-api.mjs');
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
+ const runtime={tools:nodeApiTools,startNodeApply:args=>validateNodeApplyRequest(args,handlers)};
+ const envelope={operation_id:'recommend',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'datamining.assn_rules',position:{x:320,y:280}},
+  inputs:[{source:{document_id:'doc',workflow_id:'wf',node_id:'source'},output:0,input:0}],
+  mode:'fp_growth',parameters:p,mappings:[],finish:'execute',
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ for(const ports of [[2],[1,2],[0,1,2]])
+  await dispatchNodeApi(runtime,'dock_node_apply',{...envelope,read:{ports,sample_rows:100,require_exact_numbers:true}});
+ for(const type of ['transform.calculator','datamining.clustering'])
+  assert.throws(()=>validateNodeApplyEnvelope({...envelope,target:{...envelope.target,type},read:{ports:[2]}}),/must be <= 1/);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,read:{ports:[3],sample_rows:100,require_exact_numbers:true}}),/must be <= 2/);
+});
