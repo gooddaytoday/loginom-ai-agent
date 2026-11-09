@@ -3769,6 +3769,29 @@ test('import column choice closes editor and settles both type and kind without 
   }
 });
 
+test('Variant checkbox reappearing after a column editor preserves legacy format guards',async()=>{
+ for(const mode of ['reappears','unchanged','changed_variant','changed_format']){
+  const page=new Page(),c=importChoiceFixture(page,'data_kind');
+  const tid='MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtVariantAsGeneralType;ValueControl';
+  const owner=page.add('div',tid,'',undefined,c.form);
+  page.add('div',tid+';DisplayEl','',undefined,owner).attrs.class='x-form-checkbox';
+  if(['reappears','changed_format'].includes(mode))owner.style.display='none';
+  const snapshot=await page.observe(),option=snapshot.ui.elements.find(e=>e.wizard_combo?.kind==='option');
+  assert.equal(snapshot.wizard.settings.fields.variant_as_general_type?.status,
+   ['reappears','changed_format'].includes(mode)?undefined:'observed');
+  const click=page.mouse.click;
+  page.mouse.click=async(...args)=>{
+   await click(...args);c.owner.remove();c.list.remove();c.hidden.remove();c.cells[c.row].ownText=c.label;
+   owner.style.display='';
+   if(mode==='changed_variant')owner.attrs.class='x-form-cb-checked';
+   if(mode==='changed_format')c.form.querySelector('[data-tid="MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtValueNull;ValueControl"]').querySelector('input').value='changed';
+  };
+  const result=await page.act({verb:'select_wizard_option',ref:option.ref},snapshot);
+  assert.equal(result.status,['reappears','unchanged'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,mode);
+ }
+});
+
 test('closed import type and kind cells are delivered as actionable observed controls',async()=>{
   const page=new Page(),c=importFormatField(page);importColumnFixture(page,c.form,2);
   const snapshot=await page.observe(),column=snapshot.wizard.import_columns.fields[0];
