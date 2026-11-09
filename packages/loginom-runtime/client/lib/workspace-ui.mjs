@@ -3407,22 +3407,28 @@ function readRenderedInputMapping(observation) {
       if (['checkbox','radio'].includes(role) && ['true','false','mixed'].includes(value)) return {kind:role,checked:value==='mixed'?null:value==='true',indeterminate:value==='mixed',source:'aria'};
       return null;
     };
+    // Controls share almost all ancestors (LAB-1389 :913, export wizard after
+    // focus). Within one synchronous read, memoRead reuses each ancestor's
+    // scroll owner instead of re-reading its extents and style per control.
+    const verticalOwner = memoRead(parent => {
+      if (!parent || parent===document.body) return null;
+      charge();
+      return parent.scrollHeight>parent.clientHeight && ['auto','scroll'].includes(getComputedStyle(parent).overflowY)
+        ? parent : verticalOwner(parent.parentElement);
+    });
+    const horizontalOwner = memoRead(parent => {
+      if (!parent || parent===document.body) return null;
+      charge();
+      return parent.scrollWidth>parent.clientWidth && ['auto','scroll'].includes(getComputedStyle(parent).overflowX)
+        ? parent : horizontalOwner(parent.parentElement);
+    });
     const scrollOf = element => {
-      for (let parent=element; parent && parent!==document.body; parent=parent.parentElement) {
-        charge();
-        if (parent.scrollHeight>parent.clientHeight && ['auto','scroll'].includes(getComputedStyle(parent).overflowY)) {
-          return { ref: refOf(parent), top: parent.scrollTop, max_top: parent.scrollHeight-parent.clientHeight };
-        }
-      }
-      return null;
+      const parent=verticalOwner(element);
+      return parent ? { ref: refOf(parent), top: parent.scrollTop, max_top: parent.scrollHeight-parent.clientHeight } : null;
     };
     const horizontalScrollOf = element => {
-      for(let parent=element;parent && parent!==document.body;parent=parent.parentElement) {
-        charge();
-        if(parent.scrollWidth>parent.clientWidth && ['auto','scroll'].includes(getComputedStyle(parent).overflowX))
-          return {ref:refOf(parent),left:parent.scrollLeft,max_left:parent.scrollWidth-parent.clientWidth};
-      }
-      return null;
+      const parent=horizontalOwner(element);
+      return parent ? {ref:refOf(parent),left:parent.scrollLeft,max_left:parent.scrollWidth-parent.clientWidth} : null;
     };
     const interactionOf = (element, accept) => {
       const box=boxOf(element), width=globalThis.innerWidth ?? document.documentElement.clientWidth,

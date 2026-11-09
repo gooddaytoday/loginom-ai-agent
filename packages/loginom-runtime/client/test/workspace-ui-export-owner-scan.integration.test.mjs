@@ -14,14 +14,14 @@ const binding={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:'
 // exhausted 500 ms in the controls stage. The page has real Chromium layout;
 // after focus each native geometry/style/hit-test read is charged a fixed
 // page-clock cost, as in storageScrollCostFixture.
-async function fixture(t,{fault}={}) {
+async function fixture(t,{fault,ms=0.25}={}) {
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
  t.after(()=>browser.close());
  const page=await browser.newPage({viewport:{width:1280,height:800}});
  await page.route('http://owner.test/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><body style="margin:0"></body>'}));
  await page.goto('http://owner.test/');
  const fields=Object.entries(EXPORT_FIELDS).filter(([,[card]])=>card==='ExportTextFileParamsWizard');
- await page.evaluate(({binding,root,base,fields,fault})=>{
+ await page.evaluate(({binding,root,base,fields,fault,ms})=>{
   const components=new Map();let ids=0;
   const add=(tag,parent,tid,style)=>{const e=document.createElement(tag);if(tid)e.dataset.tid=tid;e.id='ext-'+ids++;if(style)e.style.cssText=style;parent.append(e);return e;};
   const avatar=add('button',document.body,'MF;cntMain;tlbMainToolbar;btnAvatar');avatar.textContent='user';
@@ -42,7 +42,8 @@ async function fixture(t,{fault}={}) {
    const td=add('td',cell);
    const value=add('div',td,base+id+';ValueControl','width:600px;height:24px');
    let wrap=value;for(let i=0;i<4;i++)wrap=add('div',wrap,null,'width:600px');
-   const input=add('input',wrap,null,'width:560px');input.value=key==='destination'?'':key==='text_qualifier'?'"':'x';
+   const input=add('input',wrap,null,'width:520px');input.value=key==='destination'?'':key==='text_qualifier'?'"':'x';
+   if(key!=='destination')add('div',wrap,base+id+';ValueControl;trg_picker','display:inline-block;width:20px;height:20px');
    for(let i=0;i<30;i++)add('span',td,null,'display:inline-block;width:1px;height:1px');
    const sw=add('a',add('td',cell),base+id+';SwitchButton','display:inline-block;width:20px;height:20px');
    add('span',add('span',sw));components.set(sw.id,{pressed:false,el:{dom:sw}});
@@ -62,7 +63,7 @@ async function fixture(t,{fault}={}) {
   // Page clock: after focus, each native layout/style/hit-test read costs a
   // fixed amount. Counts are kept per kind for the measurement.
   const realNow=Date.now.bind(Date);let offset=0;Date.now=()=>realNow()+offset;
-  const cost=globalThis.ownerScanCost={charging:false,ms:0.25,reads:{},total:0};
+  const cost=globalThis.ownerScanCost={charging:false,ms,reads:{},total:0};
   const read=kind=>{if(!cost.charging)return;cost.reads[kind]=(cost.reads[kind]??0)+1;cost.total++;offset+=cost.ms;};
   const wrap=(target,key,kind)=>{const original=target[key];target[key]=function(...args){read(kind);return original.apply(this,args);};};
   wrap(Element.prototype,'getBoundingClientRect','box');wrap(globalThis,'getComputedStyle','style');wrap(Document.prototype,'elementFromPoint','hit');
@@ -73,10 +74,10 @@ async function fixture(t,{fault}={}) {
   const path=document.querySelector('[data-tid="'+base+'edtFileName;ValueControl"] input');
   path.addEventListener('focus',()=>{
    cost.charging=true;
-   if(fault==='mask')add('div',document.body,null,'position:fixed;inset:0').className='x-mask';
+   if(fault==='mask'){const mask=add('div',wizard,null,'position:absolute;left:900px;top:600px;width:120px;height:30px');mask.className='x-mask-msg';mask.textContent='Загрузка...';}
    if(fault==='owner')node.FGuid='foreign';
   });
- },{binding,root,base,fields,fault});
+ },{binding,root,base,fields,fault,ms});
  const execute=options=>runInNewContext(makeWorkspaceUiCode({expected_origin:'http://owner.test',expected_build:'7.4.2',prepared_node_context:binding,...options}))(page);
  const roots=await execute({mode:'observe',discover_roots:true});
  assert.equal(roots.status,'SUCCEEDED',JSON.stringify(roots.error));
@@ -99,3 +100,14 @@ test('export path ownership read after focus fits the scan budget',async t=>{
  assert.equal(await f.page.locator('[data-tid$="edtFileName;ValueControl"] input').inputValue(),'/test-2/a.csv');
  assert.equal(result.trace.some(e=>e.event==='ui_scan_limit'),false);
 });
+
+// The cheaper read must keep both refusals: a mask appearing on focus or a
+// foreign node owner still stops the replacement before any text is typed.
+for(const [fault,code] of [['mask','WIZARD_FIELD_CHANGED'],['owner','PREPARED_NODE_CONTEXT_CHANGED']])
+ test('export path ownership read still refuses a '+fault+' change after focus',async t=>{
+  const f=await fixture(t,{fault}),result=await f.run('/test-2/a.csv');
+  assert.equal(result.status,'AMBIGUOUS',JSON.stringify(result.error));
+  assert.equal(result.error.code,code,JSON.stringify({error:result.error,trace:result.trace}));
+  assert.equal(result.trace.some(e=>e.event==='ui_scan_limit'),false);
+  assert.equal(await f.page.locator('[data-tid$="edtFileName;ValueControl"] input').inputValue(),'');
+ });
