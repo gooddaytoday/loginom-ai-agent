@@ -266,6 +266,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'text-multi-file-list':
+        node = REPO / 'docs/node-development/nodes/text-import'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file-list.md',
+                    data=node / 'fixtures/multi-file', input_files=['sales_2026-02.csv', 'sales_2026-01.csv', 'returns_2026-01.csv'],
+                    base=None, expected_name='expected-list.json', oracle=node / 'acceptance/oracle-multi-file.py', text_list_sources=True)
     if name in ['text-auto-types', 'text-auto-update']:
         node = REPO / 'docs/node-development/nodes/text-import'
         update = name == 'text-auto-update'
@@ -834,6 +839,17 @@ def sorting_stages(case):
 def text_update_stages(case):
     return [read(case['source'] / name)['outputs'][0] for name in
             ['expected-auto-update-string.json', 'expected-auto-update.json']]
+
+
+def check_text_multi_file_list(replies):
+    imports = [(owner, port) for _, reply in replies for owner, port in ports(reply)
+               if owner.get('status') == 'SUCCEEDED'
+               and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
+    assert imports, 'TEXT_LIST_IMPORT_RECEIPT_MISSING'
+    assert len({owner['node']['node_id'] for owner, _ in imports}) == 1, 'TEXT_LIST_IMPORT_RECREATED'
+    source = imports[-1][0]['configuration']['readback']['source']
+    assert [Path(p).name for p in source['source_path'].split('｜')] == ['sales_2026-02.csv', 'sales_2026-01.csv'], 'TEXT_LIST_SOURCE_ORDER'
+    assert source.get('file_info') == 'Имя файла' and source.get('parallel_processing') is False, 'TEXT_LIST_SERVICE_SETTINGS'
 
 
 def check_text_update_ports(replies, destinations, stages, node_binary='node'):
@@ -1811,6 +1827,16 @@ class Runner:
         if spec.get('local_file'):
             if spec['attachment'] == 'file': command += ['--file', spec['local_file']]
             files = []  # No multi-GiB workspace copy, and no --file for the path case.
+        if spec.get('text_list_sources'):
+            # FileName is the physical server basename. Both inline and small
+            # local-path admission prefix names; seed the original inputs via
+            # the existing verified delivery protocol, rejecting unequal files.
+            books = [dict(fixture=str(f), destination=login['package_directory'].rstrip('/') + '/' + f.name) for f in files]
+            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books))
+            self.phase('text-list-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
+                       build / 'resources/loginom', folder / 'text-list-inputs.json', folder / 'text-list-inputs'], folder, timeout=300)
+            prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
+            files = []
         for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
@@ -2264,6 +2290,8 @@ class Runner:
                 'factor-signs', folder / 'expected.json', folder / 'factor-actual.json', folder / 'factor-aligned.json'], folder, timeout=60)
             expected = read(folder / 'factor-aligned.json')
         header = spec.get('csv_header', 'names')
+        if case == 'text-multi-file-list':
+            check_text_multi_file_list(replies)
         if spec.get('text_update'):
             check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):

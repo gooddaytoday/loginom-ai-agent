@@ -95,7 +95,7 @@ test('production Import input scope accepts only Files-supported extensions insi
  for(const path of ['/worker/a.exe','/worker/a.csv.bak','/worker/a','/outside/a.csv','/worker/../foreign/a.csv'])assert.equal(scope(path),false,path);
 });
 
-for(const change of ['unchanged','bytes','mtime'])test('import retry after released STALE reopens Files and rechecks the original native witness: '+change,async t=>{
+for(const list of [false,true])for(const change of ['unchanged','bytes','mtime'])test('import retry after released STALE reopens Files and rechecks the original native witness: '+change+', list: '+list,async t=>{
  const node={document_id:'doc',workflow_id:'flow',node_id:'import'},workflow={workflow_id:'flow',prefix:'MF;TF-1',
   tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]};
  const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{ref:node,type:'imports.text',label:'Source',inputs:[],outputs:[0]}],links:[],foreign_links:[]};
@@ -116,6 +116,7 @@ for(const change of ['unchanged','bytes','mtime'])test('import retry after relea
   target:{kind:'existing',type:'imports.text',ref:node},inputs:[],mode:'delimited',parameters:{source:{kind:'storage',server_source_ref:source.server_source_ref},
    settings:{source:{source_path:'/worker/full.csv'}}},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:false},
   budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ if(list){request.parameters.source={kind:'verified_sources',sources:[request.parameters.source]};request.parameters.settings.source={source_paths:['/worker/full.csv']};}
  f.runtime.startNodeApply(request);
  const first=await f.runtime.waitNodeApply(request.operation_id,{timeoutMs:10000});
  assert.equal(first.outcome.error?.cause?.code,'UI_REFERENCE_STALE',JSON.stringify(first));

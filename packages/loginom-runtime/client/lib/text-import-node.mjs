@@ -4,7 +4,7 @@ import {validateImportSource} from './storage-policy.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping,outputsOutOfSync,resyncOutputFields} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
-import {autoTypesRequested,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError,previousTextImportStep} from './text-import-procedure.mjs';
+import {autoTypesRequested,textImportSourcePaths,configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError,previousTextImportStep} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
@@ -23,6 +23,12 @@ import {makeNodeProcessContextCode} from './node-process-context.mjs';
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possible:false,...details});
+function validateTextSource(source) {
+  if(source?.kind!=='verified_sources')return validateImportSource(source);
+  requireValue(Object.keys(source).sort().join(',')==='kind,sources'&&Array.isArray(source.sources)
+    &&source.sources.length>=1&&source.sources.length<=16,'Verified source list required');
+  source.sources.forEach(validateImportSource);
+}
 
 export function serverPreviewProfile({source,format,columns,preview}) {
   const values=group=>Object.fromEntries(Object.entries(group.fields).filter(([,f])=>f.status==='observed'&&!f.truncated)
@@ -67,7 +73,9 @@ export function validateTextImportNodeParameters(p,mode,request) {
   // Same refusal as deferredImportOutput, but before the format is applied.
   requireValue(!(p.settings.format?.auto_detect_columns==='all'&&request.mappings?.length),
     'Output mapping cannot be edited while auto_detect_columns=all: its fields appear only after execution; use new or none');
-  if(p.source)validateImportSource(p.source);
+  if(p.source)validateTextSource(p.source);
+  requireValue(!p.settings.source?.source_paths||p.source?.kind==='verified_sources','source_paths requires verified_sources');
+  requireValue(p.source?.kind!=='verified_sources'||!p.source_switch&&!request.bindings?.length,'Lists cannot use a binding or source_switch');
   if(Object.hasOwn(p,'source_switch'))requireValue(p.source_switch&&existing&&(request.finish==='done'&&request.read.ports.length===0
     ||request.finish==='execute'&&request.read.ports.length===1&&request.read.ports[0]===0)
     &&request.mappings.length===0&&Object.keys(p.settings).join(',')==='source'
@@ -87,7 +95,16 @@ export function validateTextImportNodeParameters(p,mode,request) {
 export function verifyTextImportSource(parameters,uploads,uploadHistory,storageProof) {
   try {
   const s=parameters.source;
-  validateImportSource(s);
+  validateTextSource(s);
+  if(s.kind==='verified_sources') {
+    const declared=parameters.settings.source??{},paths=Object.hasOwn(declared,'source_paths')?textImportSourcePaths(declared):null;
+    requireValue(!Object.hasOwn(declared,'source_path')&&(!paths||paths.length===s.sources.length),'One verified source per ordered source_path required');
+    const sources=s.sources.map((source,i)=>verifyTextImportSource({source,settings:{source:{
+      source_path:paths?.[i]??(source.kind==='storage'?storageProof?.[i]?.destination:undefined)}}},uploads,uploadHistory,storageProof?.[i]).source);
+    const destinations=sources.map(source=>source.destination);
+    textImportSourcePaths({source_paths:destinations});
+    return verified({source:{kind:'verified_sources',destination:destinations.join('｜'),sources}});
+  }
   if(s.kind==='storage') {
     requireValue(storageProof?.verified===true&&storageProof.kind==='storage'&&storageProof.server_source_ref===s.server_source_ref,
       'Verified storage source reference is missing');
@@ -318,6 +335,15 @@ export function bindConfiguredOutputColumns(configured,actual,native) {
   return expected.map(f=>({name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,used:true}));
 }
 
+export function textImportOutputFields(configured,native) {
+  const columns=configured.columns.filter(c=>c.used);
+  if(configured.source?.fields?.file_info?.value!=='Имя файла')return columns;
+  requireValue(!columns.some(c=>c.name==='FileName'),'CSV FileName collides with the service field');
+  const service=one(native.source_fields.filter(c=>c.name==='FileName'),'Observed FileName source required');
+  requireValue(service.type==='string','Invalid FileName source type');
+  return [...columns,{...service,used:true}];
+}
+
 // Native autosync can replace a changed-type target at the end of the list.
 // Record IDs belong to the current wizard; associate layouts through the verified
 // source names, never through output aliases or former source positions.
@@ -363,9 +389,6 @@ export async function restoreImportOutputLayout(channel,before,native,mappings,c
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const parameterSchema=structuredClone(textImportParametersSchema);
   parameterSchema.properties.preview_only.description='Storage+source_path/encoding; Close/no inputs,mappings,read. Preview <=25 rows, no SHA/N; discard. Reuse after profile/scan/sample.';
-  parameterSchema.properties.source_switch.description='Existing text/Excel import only: exact full scan, save_checkpoint, then only text settings.source.source_path or Excel path/optional sheet. Preserve and independently reopen-check columns/output mapping; no format/column/mapping edits. Text Done/read.ports:[], then dock_storage_source immediately before one terminal-node Execute with identity/size/SHA rechecked. Excel Execute verifies full output-0 N. Backend binds profile_id to delivered digest; never expected_records. Missing proof means N not verified; inspect the SAME operation on timeout, never execute again.';
-  parameterSchema.properties.source.description='Required for new imports and configuration changes: storage server_source_ref observed in Files (no upload), or completed verified_delivery artifact_id/upload_operation_id (legacy IDs accepted). Optional bytes/SHA must match. Omit source only to execute an unchanged existing Import: settings:{}, inputs/mappings:[], Execute/read.ports:[0]; no reupload/stale upload ID.';
-  parameterSchema.properties.settings.description='New: source (verified source_path,encoding,rows_to_skip,first_line_as_title), format (delimiter,decimal_separator,null_marker,text_qualifier), all columns (name,label,type,data_kind,used; optional source_name on rename), at least one used. Binding replaces source_path. Existing omitted settings preserved; {} reuses saved configuration. Column identity: source_name or name. Optional multiple_delimiters:boolean, explicit date_format/order and date_separator; no automatic encoding/date substitution.';
   const nodeApplyHandlers=new Map([['imports.text',{revision:'text-import-output-v2',modes:['delimited'],
     parameter_schema:parameterSchema,binding_schema:importBindingSchema,
     configurationReadback:textImportConfigurationReadback,
@@ -423,7 +446,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       verifySource:async (p,ctx)=>{
         try{
         if(!p.source&&operation.parameters?.bindings?.length&&operation.parameters.target.kind==='existing')return verified({source_kind:'current_bound_file'});
-        const storage=p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref):undefined;
+        const storage=p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref)
+          :p.source.kind==='verified_sources'?await Promise.all(p.source.sources.map(s=>s.kind==='storage'?resolveStorageSource?.(s.server_source_ref):undefined)):undefined;
         if(operation.parameters?.bindings?.length&&storage)p={...p,settings:{...p.settings,source:{...p.settings.source,source_path:storage.destination}}};
         sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),storage);
         if(sourceSwitch){
@@ -581,9 +605,9 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         enter(ctx);requireValue(configured,'Configured import schema unavailable');
         if(configured.server_profile)return verified({preview_only:true});
         await next('text_import_format','output_mapping');
-        const outputFields=configured.columns.filter(c=>c.used);
         const nativeReady=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
         let native=(await readNativeImportMapping(channel,'configured import native output mapping',nativeReady)).node_mapping;
+        const outputFields=textImportOutputFields(configured,native);
         const deferred=deferredImportOutput(configured,native,mappings);
         if(deferred) {
           outputColumns=deferred;
@@ -607,8 +631,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         }
         if(mappings.length) {
           const mapping=one(mappings,'One import output mapping required');
-          const resolved=resolveConfiguredOutputMapping(mapping,configured.columns,native);
-          changes.push(await configureOutputFields(channel,mapping,configured.columns));
+          const resolved=resolveConfiguredOutputMapping(mapping,outputFields,native);
+          changes.push(await configureOutputFields(channel,mapping,outputFields));
           if(resolved.fields)changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));
           if(mapping.autosync!==undefined)changes.push(await configureOutputAutosync(channel,mapping.autosync));
           native=(await channel.observe({condition:'requested import native output mapping',readMappings:true,ready:nativeReady})).node_mapping;
@@ -627,7 +651,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           catch(error){return refuseSwitchSchema(error,'output_mapping');}
         // Existing output aliases/order remain valid when no mapping is asked.
         // The source association is proved by native records, never label alone.
-        outputColumns=bindConfiguredOutputColumns(configured.columns,actual,native);
+        outputColumns=bindConfiguredOutputColumns(outputFields,actual,native);
         const done=await next('output_mapping','done');
         return verified({effect_possible:true,mapping:actual,native_mapping:native,completion:done.wizard.completion,changes,source_identity_verified:true});
       },

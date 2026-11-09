@@ -14,8 +14,8 @@ const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 // Existing JS describe exception: [JS plan, J21](../../../../docs/node-development/nodes/programming-javascript/plan.md).
 // boundedUserToolReply below also enforces this limit on the complete JS wire reply.
 const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET,
- // Text Import reference compaction (LAB-1139, cycle C0): measured card + 100; owner ceiling v040-text-budget-13k is 13000.
- 'imports.text':10390});
+ // Text Import C2: owner-approved cycle ceiling, including the delimited reference.
+ 'imports.text':11261});
 
 test('user-v1 model receives dock_node_apply within 20000 bytes',t=>{
  const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');

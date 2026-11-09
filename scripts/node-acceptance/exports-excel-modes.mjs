@@ -29,7 +29,7 @@ try{
  const delivered=[];
  for(const [index,book]of config.books.entries()){
   if(book.destination.slice(0,book.destination.lastIndexOf('/'))!==directory)throw Error('EXCEL_SEED_DIRECTORY');
-  const bytes=await readFile(book.fixture),artifact=await artifactStore.admit({sourcePath:book.fixture,name:book.destination.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory,overwrite:'replace'}});
+  const bytes=await readFile(book.fixture),artifact=await artifactStore.admit({sourcePath:book.fixture,name:book.destination.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory,overwrite:config.overwrite??'replace'}});
   const result=await runtime.deliverArtifact({operation_id:'excel-seed-'+index,artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
   if(result.outcome?.status!=='SUCCEEDED'||result.outcome.destination!==book.destination||result.outcome.upload_completion_verified!==true||result.outcome.cleanup_complete!==true)throw Error('EXCEL_SEED_UPLOAD:'+JSON.stringify(result));
   delivered.push(result.outcome);

@@ -3843,7 +3843,7 @@ test('import source reads exact controls and Ext checkbox equally in full roots 
   const snapshot=await page.observe(),source=snapshot.wizard.import_source;
   assert.equal(snapshot.wizard.stage,'text_import_file');assert.ok(source);
   assert.deepEqual(Object.fromEntries(Object.entries(source.fields).map(([k,v])=>[k,v.value])),{
-    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true});
+    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',file_info:undefined,first_line_as_title:true,parallel_processing:undefined});
   assert.equal(source.fields.connection.read_only,true);assert.equal(c.native.checked,false);
   for(const options of [{discover_roots:true},{root_ref:snapshot.wizard.root_ref}]) {
     const read=await page.execute({mode:'observe',...options});assert.deepEqual(read.output.wizard.import_source,source);
@@ -3851,6 +3851,19 @@ test('import source reads exact controls and Ext checkbox equally in full roots 
   assert.equal(source.settings_applied,false);assert.equal(source.file_bytes_verified,false);assert.equal(source.schema_complete,false);
   assert.ok(!snapshot.ui.elements.some(e=>e.wizard_field?.scope==='import_source' || e.wizard_combo?.field?.scope==='import_source'));
   c.header.attrs.class='';assert.equal((await page.observe()).wizard.import_source.fields.first_line_as_title.value,false);
+});
+
+test('file list source observes the native filename combo and parallel checkbox',async()=>{
+  const page=new Page(),c=importSourceFixture(page);
+  const info=page.add('div',c.base+'cbbFileInfoColumnsType;ValueControl','',undefined,c.form);
+  info.append(new Element('input')).value='Имя файла';
+  const parallel=page.add('div',c.base+'chkParallelProcessing;ValueControl','',undefined,c.form);
+  const display=page.add('span',c.base+'chkParallelProcessing;ValueControl;DisplayEl','',undefined,parallel);display.attrs.class='x-form-checkbox';
+  c.inputs.source_path.value='/test/feb.csv｜/test/jan.csv';
+  const snapshot=await page.observe(),fields=snapshot.wizard.import_source.fields;
+  assert.equal(fields.file_info.value,'Имя файла');assert.equal(fields.parallel_processing.value,false);
+  assert.equal(fields.source_path.value,'/test/feb.csv｜/test/jan.csv');
+  assert.equal(fields.parallel_processing.display_ref,snapshot.ui.elements.find(e=>e.tid===display.attrs['data-tid']).ref);
 });
 
 test('import source fails closed for duplicate hidden missing controls and redacts URL values',async()=>{

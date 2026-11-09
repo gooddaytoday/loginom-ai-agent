@@ -379,10 +379,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       ...['edtMultipleDelimiters;ValueControl','edtMultipleDelimiters;ValueControl;InputEl','edtMultipleDelimiters;ValueControl;DisplayEl'].map(name=>'[data-tid$=";WizrdMCF;ImportTextFileParamsWizard;'+name+'"]'),
       ...['SwitchButton','VariableControl','VariableControl;trg_picker','VariableControl;boundlist'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName;'+name+'"]';return [owner,owner+' input',owner+' [data-recordid]'];}),
       ...['GroupDataWizard;pedSortResult','SortingWizard;SortingColumnCollection;chkLocaleAware'].flatMap(base=>['SwitchButton','VariableControl','VariableControl;trg_picker','VariableControl;boundlist'].flatMap(part=>{const owner='[data-tid$=";WizrdMCF;'+base+';'+part+'"]';return [owner,owner+' input',owner+' [data-recordid]'];})),
-      ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl'].flatMap(name=>{
+      ...['edtConnection','edtFileName;ValueControl','edtCodePage;ValueControl','edtRowsToSkip;ValueControl','cbbFileInfoColumnsType;ValueControl'].flatMap(name=>{
         const owner='[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;'+name+'"]';return [owner,owner+' input',owner+' textarea'];}),
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl"]',
       '[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFirstLineAsTitle;ValueControl;DisplayEl"]',
+      ...['',';DisplayEl'].map(suffix=>'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;chkParallelProcessing;ValueControl'+suffix+'"]'),
       ...['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard','DataSetOutputSocketWizard','DerivedDataSourceMappingEngineOutputPortWizard','TuneDataSourceMappingWizard','TuneDataSourceInputPortWizard'].flatMap(form=>
         ['grdTargetColumns;tbl','TargetFilter','rbTable','rbLinks','btnAutoSyncThroughColumns'].flatMap(name=>{
           const owner='[data-tid$=";WizrdMCF;'+form+';'+name+'"]';return [owner,owner+' input'];})),
@@ -2055,7 +2056,7 @@ function readRenderedInputMapping(observation) {
       // variable inputs. Only the exact ValueControl owns the displayed value.
       const base=wizard.root_tid+';ImportTextFilePreviewWizard;';
       const fields=Object.fromEntries(Object.entries({source_path:'edtFileName;ValueControl',connection:'edtConnection',
-        encoding:'edtCodePage;ValueControl',rows_to_skip:'edtRowsToSkip;ValueControl'}).map(([name,key])=>{
+        encoding:'edtCodePage;ValueControl',rows_to_skip:'edtRowsToSkip;ValueControl',file_info:'cbbFileInfoColumnsType;ValueControl'}).map(([name,key])=>{
         if(name==='source_path'){
           const switches=(tids.get(base+'edtFileName;SwitchButton')??[]).filter(e=>wizardForms[0].contains(e)&&visible(e));
           const sw=switches.length===1?globalThis.Ext?.getCmp?.(switches[0].id):null;
@@ -2083,20 +2084,24 @@ function readRenderedInputMapping(observation) {
           input_ref:refOf(input),owner_ref:refOf(owners[0]),enabled:enabled(input),read_only:input.readOnly===true,
           value_kind:'displayed_input_text'}];
       }));
-      const ownerTid=base+'edtFirstLineAsTitle;ValueControl';
+      for(const [name,key] of Object.entries({first_line_as_title:'edtFirstLineAsTitle',parallel_processing:'chkParallelProcessing'})) {
+      const ownerTid=base+key+';ValueControl';
       const owners=(tids.get(ownerTid)??[]).filter(e=>wizardForms[0].contains(e) && visible(e) && !sensitive(e));
       const displays=(tids.get(ownerTid+';DisplayEl')??[]).filter(e=>owners.length===1 && owners[0].contains(e) && visible(e) && !sensitive(e));
-      fields.first_line_as_title=owners.length===1 && displays.length===1 && displays[0].matches('.x-form-checkbox')
+      fields[name]=owners.length===1 && displays.length===1 && displays[0].matches('.x-form-checkbox')
         ?{status:'observed',value:owners[0].classList.contains('x-form-cb-checked'),owner_ref:refOf(owners[0]),
           display_ref:refOf(displays[0]),enabled:enabled(displays[0]),value_kind:'loginom_ext_checkbox'}
         :{status:owners.length>1 || displays.length>1?'ambiguous':'unobserved'};
+      }
       wizard.import_source={status:'draft_ui_values',settings_applied:false,file_bytes_verified:false,schema_complete:false,fields};
     }
     const wizardFields=new Map(),wizardCombos=new Map();
     if(wizard.status==='observed'&&wizard.stage==='text_import_file') {
-      const f=wizard.import_source?.fields?.encoding;
-      if(f?.status==='observed'&&f.enabled&&!f.truncated)wizardCombos.set(wizard.root_tid+';ImportTextFilePreviewWizard;edtCodePage;ValueControl',
-        {name:'encoding',scope:'import_source',owner_ref:f.owner_ref,input_ref:f.input_ref,root_ref:wizard.root_ref,value:f.value});
+      for(const [name,key] of Object.entries({encoding:'edtCodePage',file_info:'cbbFileInfoColumnsType'})) {
+      const f=wizard.import_source?.fields?.[name];
+      if(f?.status==='observed'&&f.enabled&&!f.truncated)wizardCombos.set(wizard.root_tid+';ImportTextFilePreviewWizard;'+key+';ValueControl',
+        {name,scope:'import_source',owner_ref:f.owner_ref,input_ref:f.input_ref,root_ref:wizard.root_ref,value:f.value});
+      }
     }
     if(wizard.status==='observed'&&wizard.stage==='field_parameters'&&!wizard.reform_parameters){
       const ownerTid=wizard.root_tid+';ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl';
