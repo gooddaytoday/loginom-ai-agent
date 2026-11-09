@@ -91,7 +91,7 @@ test('guard text is the execution error fixed in the acf-empty expected before r
 test('existing Execute on an inactive source names the source Execute step and keeps the empty-input guard',async()=>{
  const f=sourceFixture({rows:0,kind:'existing',active:false,parameters:{}});
  await assert.rejects(f.run(),error=>{
-  for(const text of ['auto_correlation preflight requires an active source output','Import','finish:"execute"','same existing','NEW operation_id'])
+  for(const text of ['auto_correlation preflight requires an active source output','node feeding input 0','Import','finish:"execute"','same existing','NEW operation_id'])
    assert.ok(error.message.includes(text),text);
   assert.deepEqual(error.nodePhaseRefusal,{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
   return true;
@@ -100,10 +100,21 @@ test('existing Execute on an inactive source names the source Execute step and k
  assert.equal(f.events.some(e=>e.phase==='node_target_effect_prepared'),false);
 });
 
-test('node reference tells to execute the updated Import before repeating the existing node',async()=>{
+test('new-node Execute on an inactive source keeps the neutral refusal',async()=>{
+ const f=sourceFixture({rows:0,kind:'new',active:false});
+ await assert.rejects(f.run(),error=>{
+  assert.equal(error.message,'auto_correlation preflight requires an active source output');
+  assert.doesNotMatch(error.message,/existing/);
+  assert.deepEqual(error.nodePhaseRefusal,{phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+  return true;
+ });
+ assert.equal(f.preview,false);assert.equal(f.reads,0);
+});
+
+test('node reference tells to execute a Done-only or reopened Import before repeating the existing node',async()=>{
  const {readFile}=await import('node:fs/promises');
  const url=new URL('../../../product/skills/loginom-automation/references/nodes/research.auto_correlation.md',import.meta.url);
  const text=await readFile(url,'utf8');
- assert.ok(text.includes('перед повторным выполнением существующего узла выполни обновлённый Импорт с `finish:"execute"`'));
+ assert.ok(text.includes('Если Импорт обновлён с `finish:"done"` (в том числе `source_switch`) или пакет открыт заново, перед повторным выполнением существующего узла выполни Импорт с `finish:"execute"`'));
  assert.ok(Buffer.byteLength(text)<=6000);
 });
