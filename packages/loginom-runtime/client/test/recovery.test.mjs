@@ -986,6 +986,28 @@ test('graph scope without an observed active graph delivers roots, never a compl
   }
 });
 
+test('graph scope scan-limit fallback reads roots once and keeps the UI_SCAN_LIMIT reason',async()=>{
+  // Real roots reads leave graph_identity unobserved; that must not trigger a second roots read.
+  const page=linkPage(),evaluate=page.evaluate,records=[];let broad=0,roots=0;
+  page.evaluate=async function(fn,arg) {
+    if(arg && 'discoverRoots' in arg && !arg.discoverRoots) {
+      broad++;const error=new Error('oversized document');error.code='UI_SCAN_LIMIT';throw error;
+    }
+    const result=await evaluate.call(this,fn,arg);
+    if(result?.ui && arg?.discoverRoots) {
+      roots++;result.observation_kind='roots';result.graph_identity={status:'unobserved'};result.nodes=[];result.links=[];
+      result.ui.elements=[{ref:'ui-region-0',tid:'Region-0',identity:{anchor_tid:'Region-0',path:[]},kind:'region',scope:'workflow',label:'Region 0',allowed_actions:[]}];
+      result.ui.truncated.nodes=true;result.ui.truncated.links=true;
+    }
+    return result;
+  };
+  const engine=runtime(page,{onRecord:async r=>records.push(r)}),out=await engine.observe({scope:'graph'});
+  assert.equal(out.status,'SUCCEEDED');assert.equal(out.output.page.scope,'roots');
+  assert.equal(broad,1);assert.equal(roots,1);assert.equal(records.length,1);
+  const fallbacks=records[0].outcome.trace.filter(t=>t.event==='observation_scope_fallback');
+  assert.deepEqual(fallbacks,[{event:'observation_scope_fallback',requested_scope:'graph',delivered_scope:'roots',reason:'UI_SCAN_LIMIT'}]);
+});
+
 test('root discovery failures never trigger recursive scan retries',async()=>{
   const page=linkPage(),evaluate=page.evaluate;let attempts=0;
   page.evaluate=async function(fn,arg){

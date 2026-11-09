@@ -3203,7 +3203,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       // Empty nodes/links without an observed active graph (e.g. the Files tab)
       // are not a complete graph: deliver roots, as for UI_SCAN_LIMIT above.
-      if(cursor===undefined && selectedRoot===undefined && scope==='graph'
+      if(cursor===undefined && selectedRoot===undefined && scope==='graph' && deliveredScope==='graph'
           && outcome.status==='SUCCEEDED' && outcome.output?.graph_identity?.status!=='observed') {
         signal?.throwIfAborted();
         outcome=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:observationOperationId,
