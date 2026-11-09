@@ -88,6 +88,11 @@ export function readRetainedImportFormatBrowser({rootTid}) {
   const checkboxOwners=exact(base+'edtMultipleDelimiters;ValueControl'),displays=exact(base+'edtMultipleDelimiters;ValueControl;DisplayEl');
   if(checkboxOwners.length!==1||displays.length!==1||!root.contains(checkboxOwners[0])||!checkboxOwners[0].contains(displays[0])||!displays[0].matches('.x-form-checkbox'))return fail('format_checkbox');
   values.multiple_delimiters=checkboxOwners[0].classList.contains('x-form-cb-checked');
+  const variantOwners=exact(base+'edtVariantAsGeneralType;ValueControl'),variantDisplays=exact(base+'edtVariantAsGeneralType;ValueControl;DisplayEl');
+  if(variantOwners.length||variantDisplays.length){
+    if(variantOwners.length!==1||variantDisplays.length!==1||!root.contains(variantOwners[0])||!variantOwners[0].contains(variantDisplays[0])||!variantDisplays[0].matches('.x-form-checkbox'))return fail('format_variant_checkbox');
+    values.variant_as_general_type=variantOwners[0].classList.contains('x-form-cb-checked');
+  }
   const gridTid=base+'ColumnDefsTuning;grdSettings;grd-1',grids=exact(gridTid),containers=exact(gridTid+';normalHeaderCt'),bodies=exact(gridTid+';tbl');
   if(grids.length!==1||containers.length!==1||bodies.length!==1||!root.contains(grids[0])||!grids[0].contains(containers[0])||!grids[0].contains(bodies[0]))return fail('definition_grid');
   const columnBase=gridTid+';normalHeaderCt;',headers=[...containers[0].querySelectorAll('.x-column-header')];

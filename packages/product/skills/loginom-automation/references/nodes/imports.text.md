@@ -52,6 +52,10 @@ output `mappings`; to control fields use `new`/`none`. `new`: manual types (a
 separate call on the same node) survive a `source_path` change. `refresh` erases
 manual types: only on request.
 
+Mixed types: `settings.format.variant_as_general_type:true` and
+`settings.analysis.refresh:"types"` on the same Import; no Calculator/JS. Use false
+and refresh to redetect strings. Check values, types and NULL.
+
 ## Path from variable
 
 Use `binding_schema`; `variable_inputs`: `variables.user` 4 → Import 0. First

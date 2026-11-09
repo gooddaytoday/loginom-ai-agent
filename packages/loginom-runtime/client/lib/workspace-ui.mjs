@@ -2318,6 +2318,13 @@ function readRenderedInputMapping(observation) {
         ?{status:'observed',value:multipleOwners[0].classList.contains('x-form-cb-checked'),owner_ref:refOf(multipleOwners[0]),
           display_ref:refOf(multipleDisplays[0]),root_ref:wizard.root_ref,enabled:enabled(multipleDisplays[0]),value_kind:'loginom_ext_checkbox'}
         :{status:multipleOwners.length>1||multipleDisplays.length>1?'ambiguous':'unobserved'};
+      const variantTid=base+'edtVariantAsGeneralType;ValueControl';
+      const variantOwners=(tids.get(variantTid)??[]).filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e));
+      const variantDisplays=(tids.get(variantTid+';DisplayEl')??[]).filter(e=>variantOwners.length===1&&variantOwners[0].contains(e)&&visible(e)&&!sensitive(e));
+      if(variantOwners.length||variantDisplays.length)wizard.settings.fields.variant_as_general_type=variantOwners.length===1&&variantDisplays.length===1&&variantDisplays[0].matches('.x-form-checkbox')
+        ?{status:'observed',value:variantOwners[0].classList.contains('x-form-cb-checked'),owner_ref:refOf(variantOwners[0]),
+          display_ref:refOf(variantDisplays[0]),root_ref:wizard.root_ref,enabled:enabled(variantDisplays[0]),value_kind:'loginom_ext_checkbox'}
+        :{status:variantOwners.length>1||variantDisplays.length>1?'ambiguous':'unobserved'};
       // E2E sColumnDefsTuning: properties are rows; field identity is a column
       // index. These are rendered draft settings, never complete output schema.
       scanStage='import_definitions';
@@ -5161,13 +5168,20 @@ function readRenderedInputMapping(observation) {
           if(choice.field.scope==='import_column') {
             const editor=current.wizard.import_column_editor;
             const desired=editor.property==='type'?({'Целый':'integer','Вещественный':'real','Строковый':'string','Логический':'boolean','Дата/Время':'datetime','Переменный':'variant'})[choice.label]:choice.label;
+            // The optional Variant checkbox may be hidden while a column editor is open.
+            // Its reappearance must not change the legacy format comparison; observed values stay pinned.
+            const formatSnapshot=fresh=>{
+              const fields={...fresh.wizard.settings.fields};
+              if(!Object.hasOwn(current.wizard.settings.fields,'variant_as_general_type'))delete fields.variant_as_general_type;
+              return {...fresh.wizard.settings,fields};
+            };
             const sameContext=fresh=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
               && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
               && same(fresh.active_identity,current.active_identity) && fresh.active_tab_ref===current.active_tab_ref
               && fresh.dom_epoch.document===current.dom_epoch.document && fresh.wizard.status==='observed'
               && fresh.wizard.root_ref===current.wizard.root_ref && fresh.wizard.stage===current.wizard.stage
               && same(fresh.wizard.owner_context,current.wizard.owner_context) && same(fresh.ui.dialogs,current.ui.dialogs)
-              && same(fresh.wizard.settings,current.wizard.settings);
+              && same(formatSnapshot(fresh),current.wizard.settings);
             let stable=0,previous=null,column;
             for(let attempt=0;attempt<40 && sameContext(observed);attempt++) {
               column=observed.wizard.import_columns?.fields?.find(e=>e.index===editor.index);
