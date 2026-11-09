@@ -14,7 +14,7 @@ import {closePreparedWizard} from './node-wizard-close.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
-import {configureTextImportTitle} from './text-import-procedure.mjs';
+import {configureTextImportTitle,textImportServiceFields} from './text-import-procedure.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -346,11 +346,13 @@ export function bindConfiguredOutputColumns(configured,actual,native) {
 
 export function textImportOutputFields(configured,native) {
   const columns=configured.columns.filter(c=>c.used);
-  if(configured.source?.fields?.file_info?.value!=='Имя файла')return columns;
-  requireValue(!columns.some(c=>c.name==='FileName'),'CSV FileName collides with the service field');
-  const service=one(native.source_fields.filter(c=>c.name==='FileName'),'Observed FileName source required');
-  requireValue(service.type==='string','Invalid FileName source type');
-  return [...columns,{...service,used:true}];
+  const services=textImportServiceFields(configured.source?.fields?.file_info?.value).map(({name,type})=>{
+    requireValue(!columns.some(c=>c.name===name),'CSV '+name+' collides with the service field');
+    const service=one(native.source_fields.filter(c=>c.name===name),'Observed '+name+' source required');
+    requireValue(service.type===type,'Invalid '+name+' source type');
+    return {...service,used:true};
+  });
+  return [...columns,...services];
 }
 
 // Native autosync can replace a changed-type target at the end of the list.

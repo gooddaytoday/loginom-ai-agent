@@ -7,7 +7,7 @@ export function verifyConfiguredImportContinuation({node,configured,source,forma
     ||format.wizard?.stage!=='text_import_format'||format.wizard.column_parameters||!schema?.definition_complete
     ||schema.schema_id!==configured.schema_id||schema.fields?.length!==configured.columns?.length)return false;
   if(!['source_path','connection','encoding','rows_to_skip','first_line_as_title',
-    ...['file_info','parallel_processing'].filter(k=>configured.source?.fields?.[k]?.status==='observed')].every(k=>
+    ...['file_info','parallel_processing','max_threads'].filter(k=>configured.source?.fields?.[k]?.status==='observed')].every(k=>
     configured.source?.fields?.[k]?.status==='observed'&&!configured.source.fields[k].truncated
       &&source.values?.[k]===configured.source.fields[k].value))return false;
   if(!Object.entries(configured.format?.fields??{}).every(([k,v])=>v.status==='observed'&&!v.truncated
@@ -48,6 +48,12 @@ export function readRetainedImportSourceBrowser({rootTid}) {
     const display=exact(base+'chkParallelProcessing;ValueControl;DisplayEl');
     if(parallel.length!==1||!root.contains(parallel[0])||display.length!==1||!parallel[0].contains(display[0])||!display[0].matches('.x-form-checkbox'))return fail('parallel_processing');
     values.parallel_processing=parallel[0].classList.contains('x-form-cb-checked');
+  }
+  const threads=exact(base+'cbbMaxThreadCount;ValueControl');
+  if(threads.length){
+    const inputs=threads.length===1?[...threads[0].querySelectorAll('input:not([type="hidden"]):not([type="password"])')]:[];
+    if(threads.length!==1||!root.contains(threads[0])||inputs.length!==1||inputs[0].value.length>256)return fail('max_threads');
+    values.max_threads=inputs[0].value;
   }
   return {verified:true,values,source:'retained_wizard_controls',server_bytes_verified:false};
 }

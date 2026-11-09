@@ -57,7 +57,15 @@ export async function configureTextImportTitle(channel,title) {
 export const autoDetectLabels={none:'Нет',new:'Только новые',all:'Все'};
 const autoDetectMode=label=>Object.keys(autoDetectLabels).find(k=>autoDetectLabels[k]===label);
 export const autoTypesRequested=p=>['new','all'].includes(p?.format?.auto_detect_columns)||!!p?.analysis?.refresh;
-export const fileInfoLabels={none:'Нет',name:'Имя файла'};
+export const fileInfoLabels={none:'Нет',name:'Имя файла',relative_path:'Относительный путь',absolute_path:'Абсолютный путь',
+  name_time:'Имя файла, Время модификации',relative_path_time:'Относительный путь, Время модификации',
+  absolute_path_time:'Абсолютный путь, Время модификации'};
+export function textImportServiceFields(label) {
+  if(label===undefined||label===fileInfoLabels.none)return [];
+  const mode=Object.keys(fileInfoLabels).find(k=>fileInfoLabels[k]===label);
+  requireValue(mode,'Unknown observed file_info');
+  return [{name:'FileName',type:'string'},...(mode.endsWith('_time')?[{name:'FileTime',type:'datetime'}]:[])];
+}
 const threadChoices=['auto',2,4,8,16,32];
 export function textImportSourceMask(source) {
   const mask=source.source_mask;
@@ -145,7 +153,12 @@ function validateSettings(p,maxColumns) {
   else textImportSourcePaths(p.source);
   if(Object.hasOwn(p.source,'file_info'))requireValue(Object.hasOwn(fileInfoLabels,p.source.file_info),'Invalid file_info');
   if(Object.hasOwn(p.source,'parallel_processing'))requireValue(typeof p.source.parallel_processing==='boolean','Invalid parallel_processing');
-  if(Object.hasOwn(p.source,'max_threads'))requireValue(threadChoices.includes(p.source.max_threads),'Invalid max_threads');
+  if(Object.hasOwn(p.source,'max_threads')){
+    requireValue(threadChoices.includes(p.source.max_threads),'Invalid max_threads');
+    requireValue(p.source.parallel_processing!==false
+      &&(!['source_paths','source_mask'].some(k=>Object.hasOwn(p.source,k))||p.source.parallel_processing===true),
+      'max_threads requires parallel_processing:true');
+  }
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
   requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
     && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
@@ -534,12 +547,14 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     if(['file_info','parallel_processing','max_threads'].includes(name)&&!Object.hasOwn(parameters.source,name))continue;
     if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
     let s = await read('text_import_file'), f = field(s, name, true);
+    if(name==='max_threads')requireValue(f.enabled!==false,'max_threads requires parallel_processing:true');
     const encoding = fieldsOnly && name==='encoding' ? resolveTextImportEncoding(parameters.source.encoding):null;
     const desired = encoding ? encoding.label : name==='file_info'?fileInfoLabels[parameters.source[name]]:name==='max_threads'?(parameters.source[name]==='auto'?'Автоопределение':String(parameters.source[name])): name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];
     if (f.value === desired) continue;
     if(encoding||['file_info','max_threads'].includes(name)) {
       const picker=one(s.ui.elements.filter(e=>e.wizard_combo?.kind==='picker'&&e.wizard_combo.field.scope==='import_source'
         &&e.wizard_combo.field.name===name&&e.wizard_combo.field.root_ref===s.wizard.root_ref&&e.wizard_combo.field.owner_ref===f.owner_ref),'Source picker unavailable');
+      if(name==='max_threads')requireValue(picker.enabled!==false,'max_threads requires parallel_processing:true');
       await act(s,{verb:'click',ref:picker.ref});
       s=await read('text_import_file','code page option visible',state=>state.ui.elements.filter(e=>e.wizard_combo?.kind==='option'
         &&e.wizard_combo.field.scope==='import_source'&&e.wizard_combo.field.name===name&&e.wizard_combo.label===desired).length===1);

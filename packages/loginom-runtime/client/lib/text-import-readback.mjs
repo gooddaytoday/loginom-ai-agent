@@ -1,5 +1,6 @@
 // Public, bounded projection of verified UI receipts. Never derive these values
 // from requested settings: an empty existing-node patch must still expose them.
+import {textImportServiceFields} from './text-import-procedure.mjs';
 const requireValue=(value,message)=>{if(!value)throw new Error('Import readback: '+message);};
 const pick=(value,keys)=>Object.fromEntries(keys.map(key=>[key,value[key]]));
 export function textImportConfigurationReadback({node,phases,operation_id}) {
@@ -44,10 +45,10 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
     return {...pick(f,['index','name','label','type','data_kind']),source_name:f.source.name};
   });
   // Auto-detect «Все» materializes output fields only at execution; the mapping stage reports none.
-  const service=source.file_info==='Имя файла'?1:0;
-  if(service)requireValue(!c.columns.some(f=>f.used&&f.name==='FileName')
-    &&output.filter(f=>f.source_name==='FileName'&&f.type==='string').length===1,'missing FileName source');
-  requireValue(output.length===(m.deferred_output===true?0:c.columns.filter(f=>f.used).length+service),'output inventory differs');
+  const services=textImportServiceFields(source.file_info);
+  for(const {name,type} of services)requireValue(!c.columns.some(f=>f.used&&f.name===name)
+    &&output.filter(f=>f.source_name===name&&f.type===type).length===1,'missing '+name+' source');
+  requireValue(output.length===(m.deferred_output===true?0:c.columns.filter(f=>f.used).length+services.length),'output inventory differs');
   const title=finished.value.node_title?fields(finished.value.node_title,['label_mode','label']):null;
   if(title)requireValue(['Автоматическая метка','Пользовательская метка'].includes(title.label_mode)&&title.label.length>0,'invalid node title');
   return {kind:'text_import',scope:'observed_before_verified_finish',node:structuredClone(node),

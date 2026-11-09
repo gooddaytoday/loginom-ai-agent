@@ -1,3 +1,11 @@
+`text-file-info` uses the unchanged text-import `task-file-info.md` and original
+January/February inputs next to the saved package. Both complete typed tables
+and CSVs use frozen `expected-absolute-path.json` then `expected-relative-path.json`;
+SOURCE_DIR is bound by the existing harness. The same Import changes absolute
+to relative paths while retaining FileTime (datetime, non-NULL, comparison present).
+Stock Save, cold execution without configuration and cleanup apply.
+Only the business task and source paths reach the model.
+
 `text-parallel` uses the unchanged text-import `task-parallel.md`, original
 January/February filenames and frozen `extended/expected-parallel.json` for
 BOTH `sequential.csv` and `parallel.csv`. Complete typed reads, row multisets,

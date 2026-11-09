@@ -20,7 +20,7 @@ const page=context.pages()[0],sessionId=randomUUID(),record=createExecutionJourn
 const execute=code=>new Function('page',`return (${code})(page)`)(page);
 try{
  const identity=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'excel-seed-workspace',intent:'new_draft'}));
- if(identity.status!=='READY')throw Error('EXCEL_SEED_WORKSPACE');
+ if(identity.status!=='READY')throw Error('SEED_WORKSPACE');
  const mask=config.text_mask_directory;
  if(mask&&(!/^[A-Za-z0-9_-]{1,100}$/.test(mask.name)||typeof mask.create!=='boolean'))throw Error('TEXT_MASK_DIRECTORY_INVALID');
  const directory=config.login.package_directory+(mask?'/'+mask.name:'');
@@ -53,13 +53,13 @@ try{
  const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,artifactStore,allowCandidate:true,targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2',getStorageBinding:()=>binding});
  const delivered=[];
  for(const [index,book]of config.books.entries()){
-  if(book.destination.slice(0,book.destination.lastIndexOf('/'))!==directory)throw Error('EXCEL_SEED_DIRECTORY');
+  if(book.destination.slice(0,book.destination.lastIndexOf('/'))!==directory)throw Error('SEED_DIRECTORY');
   const bytes=await readFile(book.fixture),artifact=await artifactStore.admit({sourcePath:book.fixture,name:book.destination.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory,overwrite:config.overwrite??'replace'}});
   const result=await runtime.deliverArtifact({operation_id:'excel-seed-'+index,artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
-  if(result.outcome?.status!=='SUCCEEDED'||result.outcome.destination!==book.destination||result.outcome.upload_completion_verified!==true||result.outcome.cleanup_complete!==true)throw Error('EXCEL_SEED_UPLOAD:'+JSON.stringify(result));
+  if(result.outcome?.status!=='SUCCEEDED'||result.outcome.destination!==book.destination||result.outcome.upload_completion_verified!==true||result.outcome.cleanup_complete!==true)throw Error('SEED_UPLOAD:'+JSON.stringify(result));
   delivered.push(result.outcome);
  }
  const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
  await record({phase:'excel_seed_cleanup',cleanup});await writeFile(output+'/result.json',JSON.stringify({delivered,cleanup}));
- if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('EXCEL_SEED_CLEANUP');
+ if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('SEED_CLEANUP');
 }finally{await context.close();}
