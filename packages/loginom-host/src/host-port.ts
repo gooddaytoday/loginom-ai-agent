@@ -154,7 +154,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     const status = await service.api.status()
     if (run.lease) return run.lease
     if (!status.generation) throw new Error("LOGINOM_CONFIG_REQUIRED")
-    if ((preparation && status.state === "starting") || status.help.state === "recoverable-error") {
+    if (
+      (status.state === "starting" && (preparation || (inputBudget && service.recoveringKnowledge(status.generation)))) ||
+      status.help.state === "recoverable-error"
+    ) {
       const budget = preparation ??
         inputBudget ?? { deadline: Date.now() + 120_000, signal: AbortSignal.timeout(120_000) }
       if (preparation) preparation.waited = true
@@ -410,7 +413,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const generation = run.lease?.generation ?? status.generation
           const knowledge =
             (status.mode === "custom" || status.cloud.connected) &&
-            (run.lease || status.help.state === "ready" || status.help.state === "recoverable-error")
+            (run.lease ||
+              status.help.state === "ready" ||
+              service.recoveringKnowledge(generation) ||
+              status.help.state === "recoverable-error")
               ? await service.catalog(generation, knowledgeBudget)
                   .then((value) => catalogTools(value).filter((tool) => knowledgeTools.has(tool.name)))
                   .catch((error: unknown) => {

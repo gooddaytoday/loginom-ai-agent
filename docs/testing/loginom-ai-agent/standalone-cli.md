@@ -728,7 +728,13 @@ bun packages/loginom-host/script/build-cli.ts "$run/cli" --no-archive
 `settings-live.mjs` с JSON stdin (`executable`, `connection`, `cloud` из fixture.json):
 он сохраняет настройки до входа, подключается через настоящий preload/IPC/Host,
 проверяет ready в той же generation, cancel/disconnect и первый site/Help запрос
-через login-shell proxy. Только внешний OS opener перехватывается в своём процессе.
+через login-shell proxy на POSIX и явное proxy environment на Windows.
+Для Windows `packages/loginom-host/script/windows-settings-live.ts` принимает
+`LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE`, `LOGINOM_AI_AGENT_TEST_RESOURCES`,
+`LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE` и `LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE`.
+Fixture должен соответствовать compiled dev endpoints проверяемой сборки.
+Драйвер читает из профиля только URL и username, передаёт `{executable,connection,cloud}`.
+Только внешний OS opener перехватывается в своём процессе.
 Для CLI текущий artifact передаётся через `LOGINOM_AI_AGENT_TEST_CLI_BIN` в Bun tests,
 через `LOGINOM_AI_AGENT_TEST_CLI_EXE` в PTY; общий fixture file —
 `LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE`. PTY `--compiled-cloud --cloud-without-login`

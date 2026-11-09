@@ -304,12 +304,10 @@ native cloud save/read/delete в safeStorage/DPAPI/Keychain и отказ чуж
 профилю расшифровать Keychain запись. Browser Loginom остаётся прямым.
 Linux plaintext0700/0600 и local CA/proxy fixtures PASS; это не installed OS trust
 и не полный native worst-case budget. Установленные приложения не запускались.
-Перед Windows gate восстановить совместимый manual driver/input и platform setup:
-`packages/loginom-host/script/windows-settings-live.ts` передаёт старое
-`{executable,connection}` без обязательного `cloud`, а общий `settings-live.mjs`
-создаёт POSIX shell fixture. Текущий helper не подтверждает Windows; его совместимость
-нужно исправить либо выбрать подходящий entry point до настоящего native прогона.
-Этой docs-only задачей native helper не менялся.
+На момент Task15 Windows driver передавал старый input без `cloud`, а общий
+checker создавал POSIX shell. Совместимость исправлена 2026-11-09 и проверена
+переносимыми тестами, результаты приведены ниже. Сам native Windows gate
+по-прежнему требует выполнения на целевой ОС.
 
 **Внешний gate:** не выполнен — разрешённые staging site, два независимых Dock
 registry/accounts и подготовленные тестовые установки не предоставлены.
@@ -379,3 +377,54 @@ checkpoint<=20 строк, diff и неизменность кода. Новые
 изолированные site/reserve/accounts, native CA/proxy/storage приёмка с совместимым
 Windows driver, безопасный authentic0.3.9 стенд; legacy-disable отдельной командой.
 Push, PR, merge, release, production rollout и отключение legacy key не выполнялись.
+
+## Исправления ревью от 2026-11-09
+
+Семь замечаний к `c5e75acb34` исправлены в ветке `dock-cloud-auth`.
+План и принятые решения находятся в
+`docs/superpowers/plans/2026-11-09-cloud-review-fixes.md`.
+
+- Повторный вход после ожидания cleanup учитывает каждую последующую отмену
+  и закрытие Host. Присоединение к общей отмене также прекращает ожидающий start.
+- Повреждённый cloud store возвращает безопасный `cloud.failure=LOGINOM_STORE_READ_FAILED`.
+  Исправный custom-профиль сохраняет Help, а management disconnect удаляет повреждённую
+  запись. Cancel сохраняет ошибку чтения, ошибка удаления остаётся явной.
+- Во время повторного восстановления Help новые read/tools ожидают общий каталог
+  в собственном исходном budget. Interrupt/release любого участника прекращает
+  только его ожидание. Общая загрузка ограничена lifetime поколения и deadline
+  первой попытки. Первоначальный startup сохраняет доступ к локальной диагностике.
+- Eval setup/ensure/verify сохраняют префикс Dock base URL с завершающим slash и без него.
+- TUI учитывает `cloud.connected` и открывает обычный чат без повторного входа,
+  когда подключение аккаунта уже сохранено, а настройки Loginom ещё отсутствуют.
+- Ошибка записи обновлённых ключей включает demand-only cooldown 30 секунд.
+  Повторный запрос после этого срока может сохранить новую пару.
+- Windows settings driver передаёт актуальный cloud fixture, использует явные
+  proxy и CA. POSIX сохраняет проверку login-shell. Драйверу нужен
+  `LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE` от стенда с compiled dev endpoints сборки.
+
+Для каждого замечания воспроизведён RED и получен GREEN через существующие
+публичные точки входа. F3 дополнительно воспроизвёл отмену общей загрузки
+при interrupt инициатора, после исправления проверены оба участника.
+Независимое ревью плана и итогового diff завершено, новых замечаний нет.
+
+Пакетные проверки выполнены на исходниках с закреплённым Node24.19.0,
+Bun1.3.14 и временными каталогами в `$HOME/storage/tmp/`.
+Ambient proxy убраны только из окружения тестовых runners.
+
+- Host `cloud-auth`, `cloud-readiness`, `cloud-store` — 87 PASS.
+- Host `connection-validation`, `connection-readiness`, `transport`, `settings-live` — 33 PASS.
+- Host `cloud-recovery`, `host-port`, `knowledge` — 70 PASS.
+- Evals `profile` — 110 PASS, 2 opt-in proc-denial SKIP.
+- Opencode `standalone-startup`, `standalone-preflight`, `loginom-management` — 42 PASS,
+  2 compiled CLI opt-in SKIP.
+
+Всего в этих непересекающихся наборах 342 PASS, 4 SKIP, 0 FAIL.
+Финальный `bun typecheck` в Host, opencode, Desktop и evals прошёл exit0.
+`git diff --check` также прошёл.
+Переносимые F7 проверки включены в 33 Host PASS и отдельно не прибавляются.
+Они проверяют передачу fixture, Windows launch options, реальный POSIX shell
+и отклонение внешних fixture endpoints.
+
+Новые сборки, installed CLI/реальный PTY, GUI, native Windows/macOS и внешний
+staging в этом исправлении не запускались. Исторические source/local artifact
+результаты выше относятся к указанным там SHA и сборкам.

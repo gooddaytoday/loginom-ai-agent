@@ -129,7 +129,11 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       if (signal?.aborted) throw Error("CLI_CANCELLED")
       const refreshed = Schema.decodeUnknownOption(Loginom.View)(await host.request("connection.status", {}))
       if (Option.isNone(refreshed)) throw Error("LOGINOM_REPLY_INVALID")
-      if (refreshed.value.mode === "cloud" && refreshed.value.help.state === "connection-required") {
+      if (
+        refreshed.value.mode === "cloud" &&
+        !refreshed.value.cloud.connected &&
+        refreshed.value.help.state === "connection-required"
+      ) {
         const { confirm, isCancel } = await import("@clack/prompts")
         const connect = await confirm({
           message: "Подключиться к Loginom AI сейчас? Можно продолжить обычный чат без подключения.",

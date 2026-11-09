@@ -1468,6 +1468,40 @@ test("refresh joins its durable write before the next authenticated revoke deman
   } finally { release.resolve(); await auth.close(); await f.cleanup() }
 }, 30000)
 
+test("a later cancel or close prevents a replacement login waiting for cleanup", async () => {
+  for (const action of ["cancel", "close"] as const) {
+    const f = await fixture(request => request.url.endsWith("/revoke-session") ? Response.json({ status: true }) : undefined)
+    const writing = gate()
+    const release = gate()
+    const auth = await createCloudAuth({
+      store: { ...f.store, async write(value) {
+        writing.resolve()
+        await release.promise
+        await f.store.write(value)
+      } },
+      endpoints: f.endpoints,
+      wait: async () => {},
+      changed() {},
+    })
+    try {
+      await auth.start()
+      await writing.promise
+      const replacement = auth.start().then(() => undefined, (error: Error) => error.message)
+      const stopped = auth[action]()
+      release.resolve()
+      await stopped
+      expect(await replacement).toBe(action === "close" ? "LOGINOM_HOST_CLOSED" : undefined)
+      expect(f.calls.filter(call => call.path.endsWith("/device/code"))).toHaveLength(1)
+      expect(auth.status()).toEqual({ connected: false })
+      expect(await f.store.read()).toBeUndefined()
+    } finally {
+      release.resolve()
+      await auth.close()
+      await f.cleanup()
+    }
+  }
+})
+
 test("close joins cancellation of an unfinished login write without dropping its deletion", async () => {
   const f = await fixture((request) =>
     request.url.endsWith("/revoke-session") ? Response.json({ status: true }) : undefined,
@@ -1621,6 +1655,39 @@ test("concurrent refresh waiters share one real HTTP GET", async () => {
     expect(auth.credentials()?.dock.primary.apiKey).toBe("new-primary")
   } finally { await auth.close(); await f.cleanup() }
 }, 30000)
+
+test("a failed refresh write suppresses GET until the demand-only cooldown expires", async () => {
+  let clock = Date.now()
+  let writable = false
+  const fresh = { primary: { apiKey: "new-primary" }, reserve: { apiKey: "new-reserve" } }
+  const f = await fixture(request => request.url.endsWith("/dock-credentials") ? Response.json({ dock: fresh }) : undefined)
+  await f.store.write({ kind: "loginom-cloud-v1", installationKey: pair.installationKey, email: pair.user.email, dock: pair.dock })
+  const auth = await createCloudAuth({
+    store: { ...f.store, async write(value) {
+      if (!writable) throw Error("write-private-canary")
+      await f.store.write(value)
+    } },
+    endpoints: f.endpoints,
+    now: () => clock,
+    changed() {},
+  })
+  const refresh = () => auth.refresh({ deadline: clock + 3000, signal: new AbortController().signal })
+  try {
+    await expect(refresh()).rejects.toThrow("LOGINOM_STORE_WRITE_FAILED")
+    expect(auth.credentials()?.dock).toEqual(pair.dock)
+    expect(auth.revision()).toBe(0)
+    writable = true
+    await expect(refresh()).rejects.toThrow("LOGINOM_CLOUD_UNAVAILABLE")
+    clock += 29_999
+    await expect(refresh()).rejects.toThrow("LOGINOM_CLOUD_UNAVAILABLE")
+    expect(f.calls).toHaveLength(1)
+    clock += 1
+    await refresh()
+    expect(f.calls).toHaveLength(2)
+    expect(auth.credentials()?.dock).toEqual(fresh)
+    expect((await f.store.read())?.dock).toEqual(fresh)
+  } finally { await auth.close(); await f.cleanup() }
+})
 
 test("unchanged refresh pair has a demand-only thirty second cooldown", async () => {
   let clock = Date.now()

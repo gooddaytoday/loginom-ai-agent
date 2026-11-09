@@ -104,10 +104,10 @@ export function createKnowledgeSession(options: KnowledgeSessionOptions): Knowle
     options.changed({ state: "starting" })
     const cancellation = new AbortController()
     controller = cancellation
+    // Shared startup keeps its deadline while each caller cancels only its own wait.
     const signal = AbortSignal.any([
       cancellation.signal,
       options.signal,
-      budget.signal,
       AbortSignal.timeout(Math.max(1, budget.deadline - Date.now())),
     ])
     childServer = server

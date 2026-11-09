@@ -7,7 +7,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { createLoginomHost } from "../src/host"
-import { createCloudAuth } from "../src/cloud-auth"
+import { createCloudAuth, type CallBudget } from "../src/cloud-auth"
 import { createKnowledgeSession } from "../src/knowledge-session"
 import { cloudStore } from "../src/connection/cloud-store"
 import { connectionStore } from "../src/connection/connection-store"
@@ -186,6 +186,73 @@ test("interrupt cancels a Help call while it is still acquiring its connection l
       timer = setTimeout(() => reject(Error("LEASE_WAIT_NOT_CANCELLED")), 1000)
     })])).rejects.toThrow("LOGINOM_KNOWLEDGE_INTERRUPTED")
   } finally { clearTimeout(timer); release.resolve(); client.close(); await port.close(); await f.close() }
+}, 240000)
+
+for (const ending of ["complete", "interrupt-first", "interrupt-second", "release-first", "release-second"])
+for (const operation of ["read", "tools"]) test(`a fresh HostPort ${operation} joins another run recovering Help: ${ending}`, async () => {
+  const entered = Promise.withResolvers<void>()
+  const joined = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  let recovering = false
+  let initializations = 0
+  const f = await fixture({ async request(body, _request, response) {
+    if (!body || typeof body !== "object" || !("method" in body) || body.method !== "initialize") return false
+    if (recovering) { initializations++; entered.resolve(); await release.promise; return false }
+    response.writeHead(503); response.end(); return true
+  } }, { async request(body, _request, response) {
+    if (!body || typeof body !== "object" || !("method" in body) || body.method !== "initialize") return false
+    response.writeHead(503); response.end(); return true
+  } })
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const budgets: CallBudget[] = []
+  const reads: CallBudget[] = []
+  const port = loginomHostPort({ postMessage: value => replies.emit("message", { data: value }), on: requests.on.bind(requests), start() {} }, {
+    ...f.host,
+    catalog(generation, budget) {
+      if (budget) budgets.push(budget)
+      if (budgets.length === 2) joined.resolve()
+      return f.host.catalog(generation, budget)
+    },
+    callKnowledge(generation, input, budget) { reads.push(budget); return f.host.callKnowledge(generation, input, budget) },
+  })
+  const client = transport({ postMessage: value => requests.emit("message", { data: value }), on: replies.on.bind(replies), start() {} })
+  try {
+    await f.host.settled()
+    await expect(f.host.catalog(1)).rejects.toThrow()
+    recovering = true
+    await client.request("acquire", { run: "first", session: "first" })
+    const first = client.request("call", { run: "first", name: "read", userMessage: "first",
+      args: { uris: ["viking://resources/loginom-dock/help"] } })
+    void first.catch(() => {})
+    await entered.promise
+    expect((await f.host.api.status()).state).toBe("starting")
+    await client.request("acquire", { run: "second", session: "second" })
+    const started = Date.now()
+    const second = operation === "read"
+      ? client.request("call", { run: "second", name: "read", userMessage: "second",
+          args: { uris: ["viking://resources/loginom-dock/help"] } })
+      : client.request("tools", { run: "second" })
+    void second.catch(() => {})
+    await Promise.race([joined.promise, second.then(() => { throw Error("HELP_RECOVERY_NOT_JOINED") })])
+    expect(budgets[1]!.deadline).toBeGreaterThanOrEqual(started + 120_000)
+    expect(budgets[1]!.deadline).toBeLessThanOrEqual(Date.now() + 120_000)
+    expect(budgets[1]!.signal).not.toBe(budgets[0]!.signal)
+    const cancelled = ending === "complete" ? undefined : ending.endsWith("first") ? "first" : "second"
+    if (cancelled) {
+      await client.request(ending.startsWith("release") ? "release" : "interrupt", { run: cancelled })
+      await expect(cancelled === "first" ? first : second).rejects.toThrow("LOGINOM_KNOWLEDGE_INTERRUPTED")
+    }
+    release.resolve()
+    if (cancelled !== "second") expect(await second).toMatchObject(operation === "read"
+      ? { content: expect.any(Array) }
+      : { tools: expect.arrayContaining([expect.objectContaining({ name: "read" })]) })
+    if (cancelled !== "first") expect(await first).toMatchObject({ content: expect.any(Array) })
+    expect(f.primary.calls).toHaveLength((cancelled === "first" ? 0 : 1) + (operation === "read" && cancelled !== "second" ? 1 : 0))
+    expect(f.reserve.calls).toHaveLength(0)
+    expect(initializations).toBe(1)
+    for (const budget of reads) expect(budgets).toContain(budget)
+  } finally { release.resolve(); client.close(); await port.close(); await f.close() }
 }, 240000)
 
 test("primary 401 refreshes the full pair once and retries the same Dock", async () => {

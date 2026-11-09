@@ -359,6 +359,30 @@ test.each([false, true])(
   180000,
 )
 
+test("a damaged cloud record preserves custom Help and can be removed through management", async () => {
+  const f = await networkFixture({}, false, undefined, "custom")
+  await f.host.close()
+  await writeFile(join(f.root, "connection/cloud.json"), "{private-corrupt-canary", { mode: 0o600 })
+  let host: Awaited<ReturnType<typeof createLoginomHost>> | undefined
+  try {
+    host = await createLoginomHost({ root: f.root, resources: join(f.root, "../resources"), codec: credentials("linux"), environment: {} })
+    await host.settled()
+    await host.catalog(1)
+    expect(await host.api.status()).toMatchObject({ mode: "custom", state: "ready", generation: 1,
+      cloud: { connected: false, failure: "LOGINOM_STORE_READ_FAILED" } })
+    expect((await host.api.cloudCancel()).cloud.failure).toBe("LOGINOM_STORE_READ_FAILED")
+    expect((await host.api.cloudDisconnect()).cloud).toEqual({ connected: false })
+    await expect(access(join(f.root, "connection/cloud.json"))).rejects.toMatchObject({ code: "ENOENT" })
+    expect(await f.store.read()).toEqual(f.saved)
+    expect(await host.callKnowledge(1, { run: "run", id: "read", name: "read", arguments: {
+      uris: ["viking://resources/loginom-dock/help"],
+    } }, { deadline: Date.now() + 5000, signal: new AbortController().signal })).toMatchObject({ content: expect.any(Array) })
+  } finally {
+    await host?.close()
+    await f.close()
+  }
+}, 30000)
+
 test("cloud login leaves an in-flight custom catalog and selected mode unchanged", async () => {
   const entered = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()

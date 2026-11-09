@@ -41,6 +41,7 @@ export async function createLoginomHost(options: {
     {
       connection: ActiveConnection
       knowledge: KnowledgeSession
+      recovering(): boolean
       children: Map<string, Promise<Awaited<ReturnType<typeof supervise>>>>
     }
   >()
@@ -208,6 +209,7 @@ export async function createLoginomHost(options: {
       },
       async prepare(connection) {
         let status: { state: Loginom.HelpState; failure?: string } = { state: "starting" }
+        let initial = true
         let observer: ((value: typeof status) => void) | undefined
         const knowledge = createKnowledgeSession({
           generation: connection.generation,
@@ -219,6 +221,7 @@ export async function createLoginomHost(options: {
           environment,
           signal: lifetime.signal,
           changed(value) {
+            if (value.state !== "starting") initial = false
             status = value
             observer?.(value)
           },
@@ -227,7 +230,12 @@ export async function createLoginomHost(options: {
             selection.server = "reserve"
           },
         })
-        const generation = { connection, knowledge, children: new Map<string, Promise<Runtime>>() }
+        const generation = {
+          connection,
+          knowledge,
+          recovering: () => !initial && status.state === "starting",
+          children: new Map<string, Promise<Runtime>>(),
+        }
         generations.set(connection.generation, generation)
         void knowledge.ensure(budget()).catch(backgroundFailure)
         await knowledge.admission.catch(async (error: unknown) => {
@@ -323,6 +331,9 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    recoveringKnowledge(generation: number) {
+      return generations.get(generation)?.recovering() ?? false
+    },
     async callKnowledge(generation: number, input: Parameters<KnowledgeSession["call"]>[0], inputBudget: CallBudget) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")

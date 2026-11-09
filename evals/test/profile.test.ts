@@ -562,6 +562,27 @@ test("ensureProfile: ready с hasApiKey не вызывает setup и пише�
   expect(await Bun.file(path.join(profileDir, "config", "loginom-ai-agent.json")).exists()).toBe(true)
 })
 
+test.each(["https://x/tenant/dock", "https://x/tenant/dock/"])(
+  "profile setup, reuse and verification preserve Dock URL prefix: %s", async baseUrl => {
+    const context = await fakeProfile()
+    const config = { ...context.config, dock: { ...context.config.dock, baseUrl } }
+    const state = path.join(context.profileDir, "view.json")
+    const input = path.join(context.profileDir, "setup-input.json")
+    const calls = path.join(context.profileDir, "calls.jsonl")
+    const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state,
+      EVAL_FAKE_SETUP_INPUT_FILE: input, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+    try {
+      await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
+      expect(await ensureProfile(config, command)).toEqual({ fresh: true })
+      expect((await Bun.file(input).json()).endpoint).toBe("https://x/tenant/dock/mcp")
+      expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+      expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+      expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1]))
+        .toEqual(["status", "setup", "status", "status"])
+    } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+  },
+)
+
 test.each(["username", "url", "missing-username", "missing-url"] as const)("ensureProfile v2: %s mismatch refuses before setup or config replacement", async kind => {
   const context = await fakeProfile()
   const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),

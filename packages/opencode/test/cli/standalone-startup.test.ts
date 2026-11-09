@@ -262,9 +262,13 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)(
   60000,
 )
 
-test.each([false, true])(
-  "TUI offers saved cloud sign-in on the same Host and hands off cancellation: accept=%s",
-  async (accept) => {
+test.each([
+  { accept: false, connected: false, generation: 1 },
+  { accept: true, connected: false, generation: 1 },
+  { accept: true, connected: true, generation: 0 },
+])(
+  "TUI offers cloud sign-in only when disconnected and hands off cancellation: %j",
+  async ({ accept, connected, generation }) => {
     const directory = await mkdtemp(join(tmpdir(), "tui-cloud-startup-"))
     const bundle = join(directory, "bundle")
     const profile = join(directory, "profile")
@@ -276,13 +280,14 @@ test.each([false, true])(
       join(bundle, "host/node-host.mjs"),
       `
     import {appendFileSync} from 'node:fs';
-    let connected=false;
+    let connected=${connected};
+    const generation=${generation};
     process.on('message', m => {
       appendFileSync(${JSON.stringify(calls)},JSON.stringify(m.method)+'\\n');
       if(m.method==='start') return process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
       if(m.method==='close') return process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
       if(m.method==='connection.cloud-start')connected=true;
-      process.send({id:m.id,result:{mode:'cloud',hasApiKey:false,server:'primary',help:{state:connected?'ready':'connection-required'},cloud:{connected},revision:1,generation:1,url:'https://example.test/app/',username:'user',folder:'/user',hasPassword:false,state:connected?'ready':'connection-required'}});
+      process.send({id:m.id,result:{mode:'cloud',hasApiKey:false,server:'primary',help:{state:connected&&generation?'ready':'connection-required'},cloud:{connected},revision:1,generation,url:'https://example.test/app/',username:'user',folder:'/user',hasPassword:false,state:generation?(connected?'ready':'connection-required'):'unconfigured'}});
     });`,
     )
     const child = Bun.spawn(
@@ -297,7 +302,7 @@ test.each([false, true])(
     Object.defineProperty(process.stdin,'isTTY',{value:true});
     mock.module('@clack/prompts',()=>({confirm:async options=>{
       console.log(JSON.stringify({prompt:options.message,signal:!!standaloneCancellation(),guard:existsSync(${JSON.stringify(join(profile, ".writer"))})}));
-      return ${accept};
+      return options.message.startsWith('Настроить') ? false : ${accept};
     },isCancel:()=>false}));
     mock.module('./src/cli/cmd/tui',()=>({setTuiLoginomHost:()=>{},setTuiStartupWarning:()=>{},TuiThreadCommand:{command:'$0',handler:()=>{console.log(JSON.stringify({tui:true,signal:!!standaloneCancellation(),guard:existsSync(${JSON.stringify(join(profile, ".writer"))})}));}}}));
     const {standaloneRun}=await import('./src/cli/standalone-run.ts');
@@ -327,7 +332,7 @@ test.each([false, true])(
     try {
       expect({ exit: await child.exited, errors: await errors }).toEqual({
         exit: 0,
-        errors: accept ? "" : "Для входа позже выйдите из TUI, выполните loginom connect и откройте TUI снова.\n",
+        errors: connected || accept ? "" : "Для входа позже выйдите из TUI, выполните loginom connect и откройте TUI снова.\n",
       })
       const rows = (await output)
         .trim()
@@ -335,7 +340,9 @@ test.each([false, true])(
         .map((row) => JSON.parse(row))
       expect(rows).toEqual([
         {
-          prompt: "Подключиться к Loginom AI сейчас? Можно продолжить обычный чат без подключения.",
+          prompt: generation
+            ? "Подключиться к Loginom AI сейчас? Можно продолжить обычный чат без подключения."
+            : "Настроить Loginom сейчас? Можно продолжить обычный чат без подключения.",
           signal: true,
           guard: true,
         },
@@ -346,7 +353,7 @@ test.each([false, true])(
         .split("\n")
         .map((row) => JSON.parse(row))
       expect(operations.filter((operation) => operation === "start")).toHaveLength(1)
-      expect(operations.filter((operation) => operation === "connection.cloud-start")).toHaveLength(accept ? 1 : 0)
+      expect(operations.filter((operation) => operation === "connection.cloud-start")).toHaveLength(accept && !connected ? 1 : 0)
       expect(operations.at(-1)).toBe("close")
       await expect(access(join(profile, ".writer"))).rejects.toMatchObject({ code: "ENOENT" })
     } finally {

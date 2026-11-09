@@ -309,7 +309,7 @@ export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
   const observed = await management(command, ["loginom", "status", "--format", "json"])
   const view = parseView(observed.stdout)
   if (observed.exitCode !== 0 || !view || !["ready", "starting"].includes(view.state) || view.failure || view.recoveries?.length || view.mode !== "custom" ||
-    view.endpoint !== new URL("/mcp", config.dock.baseUrl).href || view.hasApiKey !== true ||
+    view.endpoint !== new URL(`${config.dock.baseUrl.replace(/\/$/, "")}/mcp`).href || view.hasApiKey !== true ||
     (view.state === "ready" && view.help?.state !== "ready") ||
     view.url !== config.loginom.url || view.username !== config.loginom.username)
     throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
@@ -333,7 +333,7 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
     throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
   const fresh = !view || ["unconfigured", "connection-required"].includes(view.state) || view.mode !== "custom" ||
-    view.endpoint !== new URL("/mcp", config.dock.baseUrl).href || view.hasApiKey !== true
+    view.endpoint !== new URL(`${config.dock.baseUrl.replace(/\/$/, "")}/mcp`).href || view.hasApiKey !== true
   if (fresh) await setupProfile(config, command)
   await Bun.write(
     path.join(config.profileDir, "config", "loginom-ai-agent.json"),
@@ -348,7 +348,7 @@ export async function setupProfile(config: EvalConfig, command: AgentCommand) {
     ["loginom", "setup", "--stdin-json", "--format", "json"],
     JSON.stringify({
       mode: "custom",
-      endpoint: new URL("/mcp", config.dock.baseUrl).href,
+      endpoint: new URL(`${config.dock.baseUrl.replace(/\/$/, "")}/mcp`).href,
       url: config.loginom.url,
       username: config.loginom.username,
       password: config.loginom.password,

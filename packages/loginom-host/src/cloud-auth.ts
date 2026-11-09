@@ -71,10 +71,14 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
   let cancelling: Promise<void> | undefined
   let closing: Promise<void> | undefined
   let epoch = 0
-  let saved = await options.store.read()
+  let loginRequest = 0
+  let failure: string | undefined
+  let saved = await options.store.read().catch(() => {
+    failure = "LOGINOM_STORE_READ_FAILED"
+    return undefined
+  })
   let revision = 0
   let pending: Loginom.CloudStatus["pending"]
-  let failure: string | undefined
   let loginWrite: number | undefined
   let login: AbortController | undefined
   let polling: Promise<void> | undefined
@@ -174,8 +178,11 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       options.changed()
       throw Error("LOGINOM_STORE_WRITE_FAILED")
     })
+    if (failure === "LOGINOM_STORE_READ_FAILED" || failure === "LOGINOM_STORE_WRITE_FAILED") failure = undefined
   }
   function cancel() {
+    // A joined cancellation must still supersede replacement login requests.
+    loginRequest++
     // A second cancel joins the pending deletion instead of invalidating its owner.
     cancelling ??= (async () => {
       const discard = !saved && loginWrite === epoch
@@ -187,7 +194,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       if (cancellation !== epoch) return
       pending = undefined
       if (discard) await clear()
-      if (failure !== "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" && failure !== "LOGINOM_STORE_WRITE_FAILED")
+      if (failure !== "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" && failure !== "LOGINOM_STORE_WRITE_FAILED" && failure !== "LOGINOM_STORE_READ_FAILED")
         failure = undefined
       options.changed()
     })().finally(() => {
@@ -220,7 +227,14 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
     async start() {
       if (closing) throw Error("LOGINOM_HOST_CLOSED")
       if (saved) throw Error("LOGINOM_CLOUD_ALREADY_CONNECTED")
-      if (login) await cancel()
+      if (login) {
+        const cancelled = cancel()
+        const requested = ++loginRequest
+        await cancelled
+        if (closing) throw Error("LOGINOM_HOST_CLOSED")
+        if (requested !== loginRequest) return
+        if (saved) throw Error("LOGINOM_CLOUD_ALREADY_CONNECTED")
+      }
       const attempt = ++epoch
       const controller = new AbortController()
       login = controller
@@ -360,7 +374,10 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
           cooldown = now() + 30_000
           return
         }
-        await persist({ ...previous, dock: value.dock }, attempt)
+        await persist({ ...previous, dock: value.dock }, attempt).catch((error: unknown) => {
+          if (attempt === epoch) cooldown = now() + 30_000
+          throw error
+        })
         if (attempt === epoch) options.changed()
       })()
       const flight = { promise: operation, controller, deadline: input.deadline }
