@@ -32,8 +32,10 @@ export async function readNodeMapping(page,binding,readNode=readPreparedNodeCont
 export function readMappingBrowser(request) {
   const prefix=typeof request==='string'?request:request.prefix,editor=typeof request==='string'?null:request.editor;
   // Ungroup retains usage 9 (share/weight) on its support input after Execute,
-  // and seasonal usage 8 (order field) on both inputs. The native port receipt
-  // above admits 9 only for that type and input 1, 8 for its inputs 0 and 1.
+  // and usage 8 (order field) on both inputs. The native port receipt above
+  // admits 9 only for that type and input 1, 8 for its inputs 0 and 1, in every
+  // method; "8 only for seasonal" is enforced by supportedUngroupConfiguration
+  // in ungroup-procedure.mjs, not here.
   const inputRolesByType={'datamining.assn_rules':[0,1,2,3,4,5,6,7,8,9],
     'transform.ungroup_data#totals':[0,1,2,3,4,5,6,7,8],'transform.ungroup_data':[0,1,2,3,4,5,6,7,8,9]};
   const inputRoles=Object.hasOwn(inputRolesByType,request?.node_type)?inputRolesByType[request.node_type]:[0,1,2,3,4,5,6,7];
