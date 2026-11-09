@@ -1,6 +1,11 @@
 const need=(v,m)=>{if(!v)throw Error('Association rules: '+m);};
 export function validateAssnRulesParameters(p,mode,request){
- need(mode==='fp_growth','only fp_growth training is supported');
+ need(['fp_growth','apply'].includes(mode),'only fp_growth training and saved-model apply are supported');
+ if(mode==='apply'){
+  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===0,'apply requires parameters:{} to preserve every saved setting');
+  need(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0&&request.finish==='execute','apply requires an existing trained model, unchanged connections, no mappings and finish execute');
+  need(request.read.ports.every(port=>port===0||port===1||port===2),'apply reads itemsets 0, saved rules 1 and recommendations 2');return;
+ }
  const required=['transaction_field','item_field','min_support_pct','min_confidence_pct','max_items'];
  const keys=[...required,'max_consequents','min_lift'];
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>keys.includes(k)),'unsupported parameter');

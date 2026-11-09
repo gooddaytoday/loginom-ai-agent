@@ -952,6 +952,15 @@ production `readColUnion` и отменяет мастер без примене
 
 `coarse-classes-frozen-zero` uses task-frozen-zero.md and only train.csv plus zero-frequency.csv from preprocessing-coarseclasses/fixtures. The independent modes/expected-frozen-zero.json checks three full ordered outputs, CSV, Save and cold. The same Import and Coarse Classes node must be retained with a locked partition during retraining; reopen readback checks IsLocked before execution.
 
+`outlier-replacement-limit`, `outlier-delete`, `outlier-constant`: edit E2.
+Утверждённые task-replacement-limit.md/task-delete.md/task-constant.md из
+preprocessing-elimoutlier/acceptance; только replacement-discriminator.csv
+для limit, policies.csv для остальных из fixtures. Независимые expected/oracle
+модели не передаются. Limit SD с множителями 1/2: RowID 8, X=4.463921244845127
+с допуском 1e-10; delete: семь строк порта 0; constant: обе политики -7.
+Для limit выбран replacement-discriminator.csv: он различает границу по нормальной выборке и по всему входу; task-limit.md/policies.csv остаются отдельным примером.
+Полные typed-порты 0/1/2, три CSV, Save, cold без перенастройки и cleanup.
+
 `smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
 `smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
@@ -974,3 +983,9 @@ Oracle/expected остаются вне контекста модели. Рег�
 Только `acceptance/v040/task-recommend.md` и CSV передаются модели.
 Независимый `oracle.py --check` проверяет правила и рекомендации порта 2,
 совпадающий RuleID, все native поля, типы и порядок; два CSV, Save/cold/cleanup.
+
+`assnrules-holdout`: `task-recommendations.md`, только recommend-train.csv и
+recommend-holdout.csv из fixtures/v040. Oracle сохраняет правила train и
+проверяет H1→B (.75/.75/1); переобучение holdout даёт ноль правил.
+Аудит требует обучение и apply одного GUID, без повторного Train;
+оба полных typed-порта 1/2, два CSV, Save, cold без настройки и cleanup.

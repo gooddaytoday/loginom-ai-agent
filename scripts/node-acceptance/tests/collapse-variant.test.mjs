@@ -20,6 +20,23 @@ for name,task,rows in [('collapse-mixed','task-mixed.md',15),('collapse-variant'
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
 import {selectColdOutputReads} from '../expected-outputs.mjs';
+test('collapse NULL, header and ignore scenarios retain approved fixtures and complete typed schemas',()=>{
+ const result=spawnSync('python3',['-B','-c',`import importlib.util
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+for mode,fixture,rows in [('null','all-null.csv',10),('null-ignore','all-null.csv',0),('header','header-only.csv',0),('header-ignore','header-only.csv',0),('ignore','mixed.csv',10)]:
+ c=r.scenario('collapse-'+mode); e=r.expected_for(c,'/owned/collapse.lgp')
+ assert c['base'] is None and c['input_files']==[fixture]
+ assert c['prompt'].name=='task-'+mode+'.md' and fixture in c['prompt'].read_text()
+ assert (c['data']/fixture).is_file() and c['expected_name']=='expected-'+mode+'.json'
+ o=e['outputs'][0]
+ assert o['column_order']=='exact' and len(o['rows'])==rows
+ assert [f['name'] for f in o['columns']]==['RowID','Field','FieldLabel','Cell','Kind']
+ assert [f['type'] for f in o['columns']]==['integer','string','string','variant','integer']
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});
 test('cold selector reads only the labelled Collapse when two Collapse nodes exist',()=>{
  const node=(id,label)=>({type:'transform.collapse_columns',label,ref:{node_id:id},outputs:[0]});
  const graph={nodes:[node('a','Свёртка столбцов'),node('b','Повторная свёртка')]};

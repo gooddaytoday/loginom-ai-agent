@@ -373,7 +373,7 @@ export interface ClusteringGmeansConfigurationReadback extends Omit<ClusteringCo
 
 export interface AssnRulesConfigurationReadback {
   kind: 'assn_rules'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
-  node: NodeRef; receipt_ids: string[]; mode: 'fp_growth'; transaction_field: string; item_field: string;
+  node: NodeRef; receipt_ids: string[]; mode: 'fp_growth' | 'apply'; transaction_field: string; item_field: string;
   min_support_pct: number; min_confidence_pct: number; max_items: 2 | 3;
   min_lift: number; singletons: true; consequence_limit: 1 | 2;
   training: ClusteringConfigurationReadback['training']; package_persistence_verified: false;
@@ -417,7 +417,7 @@ export interface ElimOutlierConfigurationReadback {
 
 export interface ElimOutlierEditConfigurationReadback extends Omit<ElimOutlierConfigurationReadback,'mode'|'fields'> {
  mode:'edit';
- fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep'|'mean'|'median'|'most_probable';extreme_policy:'keep'|'mean'|'median'|'most_probable'}>;
+ fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';extreme_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';outlier_constant?:number;extreme_constant?:number}>;
 }
 
 export interface LogRegressionConfigurationReadback {

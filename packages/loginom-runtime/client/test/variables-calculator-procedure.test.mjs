@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {configureVariablesCalculator} from '../lib/variables-calculator-procedure.mjs';
 import {resolveVariablesCalculatorPatch} from '../lib/variables-calculator-parameters.mjs';
-function fixture({drift=false,ownerDrift=false,baselineDrift=false,formula='120'}={}) {
+function fixture({drift=false,ownerDrift=false,baselineDrift=false,formula='120',patch}={}) {
  const expressions=[{index:0,record_id:'r0',expression_id:'0',name:'limit',label:'Лимит',type:'integer',formula:'100',description:'',intermediate:false,selected:true},
   {index:1,record_id:'r1',expression_id:'1',name:'missing',label:'Нет значения',type:'integer',formula:'NULL',description:'keep',intermediate:false,selected:false}];
- const parameters={expressions:[{target:{kind:'existing',name:'limit'},formula}]};
+ const parameters=patch??{expressions:[{target:{kind:'existing',name:'limit'},formula}]};
  const owner={verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'node'};
  const inventory=()=>structuredClone({verified:true,inventory_complete:true,mode:'expression',expressions,node_context:owner});
  const plan=resolveVariablesCalculatorPatch(parameters,inventory());
@@ -27,6 +27,12 @@ test('serialized writer patches one formula through UI and preserves NULL, descr
  assert.equal(result.settings_applied,false);assert.equal(result.configuration.expressions[0].formula,'120');
  assert.equal(result.configuration.expressions[1].formula,'NULL');assert.equal(result.configuration.expressions[1].description,'keep');
  assert.deepEqual(f.actions.filter(a=>['insert','press'].includes(a[0])),[['press','ControlOrMeta+A'],['press','Backspace'],['insert','120']]);
+});
+test('existing parameters:{} reruns saved expressions without gestures and reads them back unchanged',async()=>{
+ const f=fixture({patch:{}}),saved=structuredClone(f.expressions),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.effect_possible,false);
+ assert.deepEqual(result.configuration.expressions,saved);assert.deepEqual(f.expressions,saved);
+ assert.ok(!f.actions.some(a=>['click','insert','press','scroll'].includes(a[0])));
 });
 test('a stale baseline and an expired deadline refuse with no gestures',async()=>{
  for(const f of [fixture({baselineDrift:true}),fixture()]) {

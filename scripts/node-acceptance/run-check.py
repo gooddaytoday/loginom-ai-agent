@@ -465,9 +465,13 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=inputs)
     if name in ['outlier-replacement-mean', 'outlier-replacement-median',
-                'outlier-replacement-most-probable', 'outlier-quartile-boundaries']:
+                'outlier-replacement-most-probable', 'outlier-quartile-boundaries',
+                'outlier-replacement-limit', 'outlier-delete', 'outlier-constant']:
         node = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier'
         task, expected, fixture = {
+            'outlier-replacement-limit': ('task-replacement-limit.md', 'expected-replacement-limit.json', 'replacement-discriminator.csv'),
+            'outlier-delete': ('task-delete.md', 'expected-delete.json', 'policies.csv'),
+            'outlier-constant': ('task-constant.md', 'expected-constant.json', 'policies.csv'),
             'outlier-replacement-mean': ('task-replacement-discriminator.md', 'expected-replacement-mean.json', 'replacement-discriminator.csv'),
             'outlier-replacement-median': ('task-replacement-median.md', 'expected-replacement-median.json', 'replacement-discriminator.csv'),
             'outlier-replacement-most-probable': ('task-replacement-most-probable.md', 'expected-replacement-most-probable.json', 'replacement-discriminator.csv'),
@@ -570,6 +574,12 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-holdout':
+        node = REPO / 'docs/node-development/nodes/datamining-assnrules'
+        src = node / 'acceptance/v040'
+        return dict(source=src, prompt=src / 'task-recommendations.md', data=node / 'fixtures/v040',
+                    base=None, input_files=['recommend-train.csv', 'recommend-holdout.csv'], export_count=2,
+                    expected_name='expected-holdout.json', assnrules_holdout=True)
     if name == 'assnrules-recommend':
         node = REPO / 'docs/node-development/nodes/datamining-assnrules'
         src = node / 'acceptance/v040'
@@ -741,6 +751,12 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / 'acceptance' / ('task-regex.md' if name == 'regex-add' else 'task-regex-replace.md'),
                     data=node / 'fixtures/regex', base=None,
                     expected_name='expected.json' if name == 'regex-add' else 'expected-replace.json')
+    if name in ['collapse-null', 'collapse-null-ignore', 'collapse-header', 'collapse-header-ignore', 'collapse-ignore']:
+        src = REPO / 'docs/node-development/nodes/collapse-columns/acceptance/v040'
+        mode = name.removeprefix('collapse-')
+        fixture = 'all-null.csv' if mode.startswith('null') else 'header-only.csv' if mode.startswith('header') else 'mixed.csv'
+        return dict(source=src, prompt=src / ('task-' + mode + '.md'), data=src / 'fixtures',
+                    base=None, input_files=[fixture], expected_name='expected-' + mode + '.json')
     if name in ['collapse-variant', 'collapse-mixed']:
         src = REPO / 'docs/node-development/nodes/collapse-columns/acceptance/v040'
         variant = name == 'collapse-variant'
@@ -2231,6 +2247,10 @@ class Runner:
             return session, expected, actual, ','
         if spec.get('coarse_frozen'):
             check_coarse_frozen_trainings(replies)
+        if spec.get('assnrules_holdout'):
+            write(folder / 'assnrules-holdout-replies.json', [o for _, o in replies])
+            self.phase('assnrules-holdout-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/assnrules-holdout.mjs',
+                folder / 'expected.json', folder / 'assnrules-holdout-replies.json'], folder, timeout=60)
         if expected.get('clustering_apply'):
             write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
             self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
