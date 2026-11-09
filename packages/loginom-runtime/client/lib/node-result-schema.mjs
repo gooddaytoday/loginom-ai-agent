@@ -23,7 +23,7 @@ const execution={anyOf:[object({status:values('not_requested','pending','complet
  object({status:values('failed'),execution_id:str,failure_verified:{type:'boolean',const:true},root_id:str,group_id:str,group_record_id:str})]};
 const receipt=object({phase,receipt_id:str,status:values('pending','verified','not_requested'),effect_possible:bool});
 const legacyCell=object({type:str,is_null:bool,value:{type:['string','number','boolean','null']},decimal:str,
- representation:str,precision:{type:'string',pattern:'^(?!exact_native$)'},display_text:str,timezone:str},['type','is_null','precision']);
+ representation:str,precision:{type:'string',pattern:'^(?!exact_native$)'},display_text:str,timezone:str,non_finite:values('NaN','Infinity','-Infinity')},['type','is_null','precision']);
 const cell={anyOf:[legacyCell,nativeCellSchema]};
 const column=object({index:integer,name:str,label:str,type:str,header_tid:str,data_kind:str},['index','name','label','type'],true);
 const port=object({...nativePortProperties,port:integer,port_guid:str,fresh:bool,freshness_basis:str,execution_id:str,
