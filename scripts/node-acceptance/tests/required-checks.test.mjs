@@ -49,6 +49,8 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-consequents.md','assnrules-consequents'],
+ ['docs/node-development/nodes/datamining-assnrules/fixtures/v040/train.csv','assnrules-consequents'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/modes/README.md','crosstable-datetime'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/task-numeric-aggregates.md','crosstable-numeric'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/task-scalar-aggregates.md','crosstable-scalar'],

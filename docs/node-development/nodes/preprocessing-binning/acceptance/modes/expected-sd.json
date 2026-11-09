@@ -110,7 +110,7 @@
           "X_Label": "Low",
           "X_LowBound": -3.319717960171481,
           "X_UppBound": 1.3401410199142596,
-          "X_LowBoundIncl": true,
+          "X_LowBoundIncl": false,
           "X_UppBoundIncl": false,
           "X_LowLimOpen": true,
           "X_UppLimOpen": true,
@@ -216,7 +216,7 @@
           "X_LowBound": 10.65985898008574,
           "X_UppBound": 15.31971796017148,
           "X_LowBoundIncl": false,
-          "X_UppBoundIncl": true,
+          "X_UppBoundIncl": false,
           "X_LowLimOpen": true,
           "X_UppLimOpen": true,
           "X_OutOfBins": 0

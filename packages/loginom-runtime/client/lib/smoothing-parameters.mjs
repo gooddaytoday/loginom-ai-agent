@@ -9,7 +9,7 @@ export function validateSmoothingParameters(p,mode,request){
  const names=new Set();
  for(const rule of p.smoothing){
   need(rule&&typeof rule==='object'&&!Array.isArray(rule)&&Object.keys(rule).every(k=>(mode==='wavelet'?['field','family','order','depth','boundary']:['field','lambda','period']).includes(k))&&typeof rule.field==='string'&&rule.field.length>0&&rule.field.length<=128&&!names.has(rule.field),'unique exact field names required');names.add(rule.field);
-  if(mode==='wavelet'){need(rule.family==='daubechies'&&rule.order===1&&[1,2].includes(rule.depth)&&rule.boundary==='symmetric','wavelet requires daubechies order 1, depth 1 or 2, boundary symmetric');continue;}
+  if(mode==='wavelet'){need((rule.family==='daubechies'&&[1,2].includes(rule.order)||rule.family==='coiflet'&&rule.order===1||rule.family==='cdf_9_7'&&!Object.hasOwn(rule,'order'))&&[1,2].includes(rule.depth)&&['symmetric','zero','reflect'].includes(rule.boundary),'wavelet requires daubechies order 1/2, coiflet order 1 or cdf_9_7 without order; depth 1/2; boundary symmetric/zero/reflect');continue;}
   need(Object.hasOwn(rule,'lambda')!==Object.hasOwn(rule,'period'),'each rule requires lambda OR period');
   const key=Object.hasOwn(rule,'lambda')?'lambda':'period',value=rule[key];
   need(Number.isFinite(value)&&value>=(key==='lambda'?0.0625:2)&&value<=(key==='lambda'?102659800000000:20000),'invalid '+key+' range');

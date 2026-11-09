@@ -7,6 +7,77 @@ from unittest.mock import patch
 from test_run_check import runner
 
 
+class TreeOnlyTests(unittest.TestCase):
+    def test_tree_read_is_required_and_cold_receives_no_csv(self):
+        for missing in [False, True]:
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                out = root / 'run'
+                out.mkdir()
+                (root / 'pair').mkdir()
+                runner.write(root / 'pair/worker.json', dict(package_directory='/test', loginom=dict(
+                    username='test', password='test', url='https://example.test')))
+                runner.write(out / 'request.json', dict(pair=str(root / 'pair'), cold=True))
+                runner.write(out / 'results.json', dict(head='a'*40, tree='b'*40, started=runner.time.time(),
+                    runs=[dict(scenario='tree-null-leaves', status='PENDING')]))
+                instance = runner.Runner(out)
+                expected = runner.expected_for(runner.scenario('tree-null-leaves'), '/test/tree.lgp')['proposed_tree_output']
+                schema = [dict(index=0, path='', name='Root', is_container=True, is_array=False, children=[])]
+                for path, kind in expected['schema_types'].items():
+                    parent = next(n for n in schema if n['path'] == path.rsplit('/', 1)[0])
+                    index = len(schema)
+                    parent['children'].append(index)
+                    schema.append(dict(index=index, path=path, name=path.rsplit('/', 1)[1],
+                        type='object' if kind == 'object_array' else kind, is_array=kind == 'object_array', children=[]))
+                instances = []
+                def add(node, parent=None, path=''):
+                    index = len(instances)
+                    binding = next(n for n in schema if n['path'] == path)
+                    value = dict(index=index, parent=parent, path=node['path'], schema_index=binding['index'], type=node['type'])
+                    instances.append(value)
+                    if 'children' in node:
+                        value['children'] = [add(child, index, path if node['type'] == 'array' else path+'/'+child['path'].rsplit('/', 1)[1])
+                                             for child in node['children']]
+                    else:
+                        null = node['type'] == 'null'
+                        value.update(type=binding['type'], is_null=null, value=node['value'], precision='exact_null' if null else
+                            'exact_integer' if node['type'] == 'integer' else 'source_text')
+                    return index
+                add(expected['document'])
+                port = dict(port=0, port_kind='tree', sample_complete=True, freshness_basis='completed_execution_port_source',
+                    tree=dict(complete=True, schema=schema, instances=instances, node_count=len(instances), max_depth=4))
+                cold_calls = []
+                def phase(name, command, folder, **kwargs):
+                    instance.report['phase'] = name
+                    profile = out / 'tree-null-leaves/profile'
+                    if name == 'setup':
+                        (profile / 'data').mkdir(parents=True)
+                        (profile / 'config').mkdir()
+                        runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+                    if name == 'model':
+                        replies = [dict(status='SUCCEEDED', action_key='package.save_as', output=dict(save_completed=True))]
+                        if not missing:
+                            replies.append(dict(cleanup_complete=True, node=dict(node_id='tree'),
+                                configuration=dict(readback=dict(kind='json_to_tree')), output=dict(ports=[port])))
+                        (folder / 'model.stdout').write_text('\n'.join(json.dumps(dict(type='tool_use', sessionID='session',
+                            part=dict(state=dict(status='completed', output=json.dumps(reply))))) for reply in replies))
+                        runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True))
+                        runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
+                    if name == 'cold':
+                        self.assertNotIn('--csv', command)
+                        cold_calls.append(command)
+                        (folder / 'cold').mkdir()
+                        runner.write(folder / 'cold/result.json', dict(status='PASS', settingsReapplied=False,
+                            cleanup=dict(package_closed=True, logged_out=True)))
+                with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'phase', side_effect=phase):
+                    instance.run()
+                result = runner.read(out / 'results.json')['runs'][0]
+                self.assertEqual(result['status'], 'FAIL' if missing else 'PASS', result)
+                self.assertEqual(len(cold_calls), 0 if missing else 1)
+                if missing: self.assertEqual(result['failure_class'], 'TREE_READ_MISSING')
+                else: self.assertEqual(result['tree-read'], 'PASS')
+
+
 class DuplicatesCatalogTests(unittest.TestCase):
     def test_typed_inputs_use_approved_tasks_and_exact_expectations(self):
         node = runner.REPO / 'docs/node-development/nodes/duplicates'

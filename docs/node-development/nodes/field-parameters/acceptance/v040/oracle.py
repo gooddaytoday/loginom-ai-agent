@@ -30,13 +30,26 @@ def expected(swap):
                          'ordered': True, 'column_order': 'exact', 'columns': columns, 'rows': values}]}
 
 
+# UI correspondence observed on mas2 2026-11-08 (LAB-1223 report comment,
+# attachment cache-settings-evidence.json), data-tid ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl
+# and EditReformColumnDefForm;cntMain;cbxCachingMethod. Only numeric codes
+# come from that observation; desired modes and fields come from task-cache.md.
+def cache_settings():
+    labels = ['Отключено', 'При активации', 'При обращении', 'Выбранные поля']
+    return {'sequence': [{'value': code, 'display': label, 'variable': False}
+                         for code, label in enumerate(labels)],
+            'caching': {'value': 3, 'display': labels[3], 'variable': False},
+            'fields': [{'name': name, 'caching_method': method}
+                       for name, method in [('RowID', 0), ('A', 1), ('B', 2), ('R', 0), ('S', 0)]]}
+
+
 if __name__ == '__main__':
     assert sys.argv[1:] in (['--write'], ['--check'])
     assert [r['R'] for r in expected(True)['outputs'][0]['rows']] == [2, -3, 0]
     assert expected(True)['outputs'][0]['rows'][0]['B'] == 10
     assert expected(True)['outputs'][0]['rows'][0]['A'] == 100
-    for name, swap in [('expected.json', True), ('expected-cache.json', False)]:
-        result = expected(swap)
+    for name, swap in [('expected.json', True), ('expected-cache.json', False), ('expected-cache-settings.json', None)]:
+        result = cache_settings() if swap is None else expected(swap)
         path = ROOT / name
         if sys.argv[1] == '--write':
             path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
