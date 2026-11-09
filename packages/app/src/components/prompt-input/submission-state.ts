@@ -2,6 +2,9 @@ import { type ContextItem, type Prompt, type usePrompt } from "@/context/prompt"
 
 type PromptTarget = ReturnType<ReturnType<typeof usePrompt>["capture"]>
 
+// A draft can move to another mounted composer while its first send is pending.
+const submitting = new WeakMap<PromptTarget, VoidFunction>()
+
 export function createPromptSubmissionState(input: {
   target: PromptTarget
   prompt: Prompt
@@ -15,11 +18,22 @@ export function createPromptSubmissionState(input: {
   let restoreDashboard = true
   let cleared: Prompt | undefined
 
+  const release = () => {
+    if (submitting.get(target) === release) submitting.delete(target)
+  }
+
   return {
+    claim(addressed: boolean) {
+      if (submitting.has(target)) return false
+      if (addressed) submitting.set(target, release)
+      return true
+    },
+    release,
     prompt: input.prompt,
     context: input.context,
     target: () => target,
     clear(consumeDashboard = true) {
+      release()
       const selected = dashboard(target)
       const samePrompt = target.current() === submittedPrompt
       superseded = !samePrompt
@@ -30,16 +44,20 @@ export function createPromptSubmissionState(input: {
     },
     retarget(next: PromptTarget) {
       if (next === target) return
+      if (submitting.get(target) === release) {
+        release()
+        submitting.set(next, release)
+      }
       target.context.items().forEach(next.context.add)
       if (submittedDashboard && dashboard(target) === submittedDashboard) {
         target.context.remove(submittedDashboard.key)
         submittedDashboard = dashboard(next)
       }
-      if (target.current() === submittedPrompt) {
+      const current = target.current()
+      next.set(current, target.cursor())
+      if (current === submittedPrompt) {
         target.reset()
         submittedPrompt = next.current()
-      } else {
-        next.set(target.current(), target.cursor())
       }
       target = next
     },
