@@ -33,6 +33,8 @@ const promotedDrafts: Array<{ draftID: string; server: string; sessionId: string
 const sentPrompts: string[] = []
 const promptInputs: unknown[] = []
 const sentCommands: unknown[] = []
+const toasts: unknown[] = []
+let lookupDashboard: (id: string) => Promise<{ nodeName: string; directory: string }>
 let onPrompt: (() => void) | undefined
 const commands: Array<{ name: string }> = []
 let serverSessionSyncs = 0
@@ -137,7 +139,7 @@ beforeAll(async () => {
   }))
 
   mock.module("@/utils/toast", () => ({
-    showToast: () => 0,
+    showToast: (toast: unknown) => toasts.push(toast),
   }))
 
   mock.module("@opencode-ai/core/util/encode", () => ({
@@ -268,6 +270,7 @@ beforeAll(async () => {
   mock.module("@/context/platform", () => ({
     usePlatform: () => ({
       fetch: fetch,
+      getDashboardTarget: (id: string) => lookupDashboard(id),
     }),
   }))
 
@@ -306,6 +309,8 @@ beforeEach(() => {
   createSessionGate = undefined
   serverSessionSyncs = 0
   onPrompt = undefined
+  lookupDashboard = async () => ({ nodeName: "A", directory: "/repo/main" })
+  toasts.length = 0
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
 })
 
@@ -813,7 +818,27 @@ test("a rejected dashboard prompt restores the user's words and target for retry
   params = { id: "session-1" }
   const state = createPromptState({ prompt: "Edit chart" })
   state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
-  const submit = createPromptSubmit({
+  const submit = dashboardSubmit(state)
+  onPrompt = () => {
+    throw new Error("request rejected")
+  }
+  await submit.handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  expect(promptInputs[0]).toMatchObject({
+    legacyParts: [
+      expect.objectContaining({ text: "Edit chart" }),
+      expect.objectContaining({ synthetic: true, text: expect.stringContaining("/dashboard/targets/target-a") }),
+    ],
+  })
+  expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
+  expect(state.context.items()[0]).toMatchObject({ type: "dashboard", id: "target-a" })
+})
+
+function dashboardSubmit(
+  state: ReturnType<typeof createPromptState>,
+  options?: Partial<Parameters<typeof createPromptSubmit>[0]>,
+) {
+  return createPromptSubmit({
     prompt: state,
     info: () => ({ id: "session-1" }),
     imageAttachments: () => [],
@@ -828,18 +853,123 @@ test("a rejected dashboard prompt restores the user's words and target for retry
     resetHistoryNavigation: () => {},
     setMode: () => {},
     setPopover: () => {},
+    ...options,
   })
-  onPrompt = () => {
-    throw new Error("request rejected")
+}
+
+test("an expired dashboard keeps the draft and tells the user to reopen it in Loginom", async () => {
+  params = { id: "session-1" }
+  const state = createPromptState({ prompt: "Edit chart" })
+  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  lookupDashboard = async (id) => {
+    expect(id).toBe("target-a")
+    throw new Error("404")
   }
-  await submit.handleSubmit(new Event("submit"))
+
+  await dashboardSubmit(state).handleSubmit(new Event("submit"))
   await Bun.sleep(0)
-  expect(promptInputs[0]).toMatchObject({
-    legacyParts: [
-      expect.objectContaining({ text: "Edit chart" }),
-      expect.objectContaining({ synthetic: true, text: expect.stringContaining("/dashboard/targets/target-a") }),
-    ],
-  })
+  expect(promptInputs).toHaveLength(0)
   expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
-  expect(state.context.items()[0]).toMatchObject({ type: "dashboard", id: "target-a" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
+  expect(toasts).toContainEqual(expect.objectContaining({ title: "dashboard.target.unavailable", variant: "error" }))
+})
+
+test("queueing a validated dashboard keeps a newer selection and text in the editor", async () => {
+  params = { id: "session-1" }
+  const state = createPromptState({ prompt: "Edit first" })
+  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
+  lookupDashboard = () => gate.promise
+  const queued: import("./submit").FollowupDraft[] = []
+  const submit = dashboardSubmit(state, { shouldQueue: () => true, onQueue: (draft) => queued.push(draft) })
+  const pending = submit.handleSubmit(new Event("submit"))
+  state.context.add({ type: "dashboard", id: "target-b", nodeName: "B", action: "edit" })
+  state.set([{ type: "text", content: "Edit second", start: 0, end: 11 }])
+  gate.resolve({ nodeName: "A", directory: "/repo/main" })
+  await pending
+
+  expect(queued[0]?.context[0]).toMatchObject({ id: "target-a" })
+  expect(queued[0]?.prompt[0]).toMatchObject({ content: "Edit first" })
+  expect(state.context.items()[0]).toMatchObject({ id: "target-b" })
+  expect(state.current()[0]).toMatchObject({ content: "Edit second" })
+})
+
+test("an expired queued dashboard rejects delivery without sending its command", async () => {
+  commands.push({ name: "review" })
+  const ids: string[] = []
+  await expect(
+    sendFollowupDraft({
+      api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
+      serverSync: {} as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
+      sync: { data: { command: commands } } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
+      draft: {
+        sessionID: "ses",
+        sessionDirectory: "/repo/main",
+        prompt: [{ type: "text", content: "/review chart", start: 0, end: 13 }],
+        context: [{ type: "dashboard", key: "dashboard", id: "target-a", nodeName: "A", action: "edit" }],
+        agent: "build",
+        model: { modelID: "m", providerID: "p" },
+      },
+      checkDashboard: async (id) => {
+        ids.push(id)
+        throw new Error("dashboard.target.unavailable")
+      },
+    }),
+  ).rejects.toThrow("dashboard.target.unavailable")
+  expect(ids).toEqual(["target-a"])
+  expect(sentCommands).toHaveLength(0)
+})
+
+test("repeat Enter during a dashboard lookup submits the captured draft once", async () => {
+  params = { id: "session-1" }
+  const state = createPromptState({ prompt: "Edit A" })
+  state.context.add({ type: "dashboard", id: "target-a", nodeName: "A", action: "edit" })
+  const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
+  const ids: string[] = []
+  lookupDashboard = (id) => {
+    ids.push(id)
+    return gate.promise
+  }
+  const submit = dashboardSubmit(state)
+  const sends = [submit.handleSubmit(new Event("submit")), submit.handleSubmit(new Event("submit"))]
+  gate.resolve({ nodeName: "A", directory: "/repo/main" })
+  await Promise.all(sends)
+  await Bun.sleep(0)
+  expect(ids).toEqual(["target-a"])
+  expect(promptInputs).toHaveLength(1)
+})
+
+test("a failed send restores the text and target alongside a newly added file", async () => {
+  params = { id: "session-1" }
+  const state = createPromptState({ prompt: "Edit A" })
+  state.context.add({ type: "dashboard", id: "target-a", action: "edit", nodeName: "A" })
+  onPrompt = () => {
+    state.context.add({ type: "file", path: "new.txt" })
+    throw new Error("network failure")
+  }
+  await dashboardSubmit(state).handleSubmit(new Event("submit"))
+  await Bun.sleep(0)
+  expect(state.current()[0]).toMatchObject({ content: "Edit A" })
+  expect(state.context.items()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ type: "file", path: "new.txt" }),
+      expect.objectContaining({ type: "dashboard", id: "target-a" }),
+    ]),
+  )
+})
+
+test("a shell command leaves the selected dashboard for the next model request", async () => {
+  params = { id: "session-1" }
+  const state = createPromptState({ prompt: "pwd" })
+  state.context.add({ type: "dashboard", id: "target-a", action: "edit", nodeName: "A" })
+  const ids: string[] = []
+  lookupDashboard = async (id) => {
+    ids.push(id)
+    throw new Error("404")
+  }
+  await dashboardSubmit(state, { mode: () => "shell" }).handleSubmit(new Event("submit"))
+  expect(sentShell[0]).toMatchObject({ command: "pwd" })
+  expect(promptInputs).toHaveLength(0)
+  expect(ids).toHaveLength(0)
+  expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
 })

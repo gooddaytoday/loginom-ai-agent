@@ -9,6 +9,7 @@ import { useServerSync, type ServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useLocal, type ModelSelection } from "@/context/local"
+import { usePlatform } from "@/context/platform"
 import { usePermission } from "@/context/permission"
 import { type ContextItem, type ImageAttachmentPart, type Prompt, type usePrompt } from "@/context/prompt"
 import { useSDK, type DirectorySDK } from "@/context/sdk"
@@ -50,6 +51,7 @@ type FollowupSendInput = {
   messageID?: string
   optimisticBusy?: boolean
   before?: () => Promise<boolean> | boolean
+  checkDashboard?: (id: string) => Promise<void>
 }
 
 const draftText = (prompt: Prompt) => prompt.map((part) => ("content" in part ? part.content : "")).join("")
@@ -93,6 +95,10 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   const wait = async () => {
     const ok = await input.before?.()
     if (ok === false) return false
+    if (input.checkDashboard) {
+      const item = input.draft.context.find((item) => item.type === "dashboard")
+      if (item) await input.checkDashboard(item.id)
+    }
     return true
   }
 
@@ -250,6 +256,15 @@ type PromptSubmitInput = {
   model?: ModelSelection
 }
 
+export function useDashboardTargetCheck() {
+  const platform = usePlatform()
+  const language = useLanguage()
+  return async (id: string) => {
+    const snapshot = await platform.getDashboardTarget?.(id).catch(() => undefined)
+    if (!snapshot) throw new Error(language.t("dashboard.target.unavailable"))
+  }
+}
+
 export function createPromptSubmit(input: PromptSubmitInput) {
   const navigate = useNavigate()
   const sdk = useSDK()
@@ -263,6 +278,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const params = useParams()
   const [search] = useSearchParams<{ draftId?: string }>()
   const tabs = useTabs()
+  const checkDashboard = useDashboardTargetCheck()
+  const verifying = new WeakSet<ReturnType<typeof prompt.capture>>()
   const pendingKey = (sessionID: string) => ScopedKey.from(sdk().scope, sessionID)
 
   const errorMessage = (err: unknown) => {
@@ -294,12 +311,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     return sdk()
       .api.session.interrupt({ sessionID })
       .catch(() => {})
-  }
-
-  const clearContext = (target: ReturnType<ReturnType<typeof usePrompt>["capture"]>) => {
-    for (const item of target.context.items()) {
-      target.context.remove(item.key)
-    }
   }
 
   const seed = (dir: string, info: Session) => {
@@ -349,9 +360,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
-    input.addToHistory(currentPrompt, mode)
-    input.resetHistoryNavigation()
-
     const projectDirectory = sdk().directory
     const permissionState = permission.currentServerState()
     const isNewSession = !params.id
@@ -362,6 +370,23 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     let sessionDirectory = projectDirectory
     let client = sdk().client
+
+    const selected = mode === "normal" && context.find((item) => item.type === "dashboard")
+    if (selected) {
+      if (verifying.has(target)) return
+      verifying.add(target)
+      try {
+        await checkDashboard(selected.id)
+      } catch (err) {
+        showToast({ title: errorMessage(err), variant: "error" })
+        return
+      } finally {
+        verifying.delete(target)
+      }
+    }
+
+    input.addToHistory(currentPrompt, mode)
+    input.resetHistoryNavigation()
 
     if (isNewSession) {
       if (worktreeSelection === "create") {
@@ -487,7 +512,9 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     if (!isNewSession && mode === "normal" && input.shouldQueue?.()) {
       input.onQueue?.(draft)
-      clearContext(submission.target())
+      for (const item of target.context.items()) {
+        if (item.type === "file" && context.includes(item)) target.context.remove(item.key)
+      }
       clearInput()
       return
     }

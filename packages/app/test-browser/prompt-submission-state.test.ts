@@ -105,7 +105,8 @@ test("a dashboard is consumed with the submitted draft and can be restored after
   expect(target.context.items()).toHaveLength(0)
   expect(submission.restore()?.context[0]).toMatchObject({ type: "dashboard", id: "A" })
   target.context.add({ type: "dashboard", id: "B", action: "edit", nodeName: "Second" })
-  expect(submission.restore()).toBeUndefined()
+  expect(submission.restore()?.prompt[0]).toMatchObject({ content: "Edit A" })
+  expect(submission.restore()?.context).toEqual([])
   expect(target.context.items()[0]).toMatchObject({ type: "dashboard", id: "B" })
 })
 
@@ -127,4 +128,24 @@ test("edits made while creating the session remain in its next draft", () => {
   expect(session.context.items()[0]).toMatchObject({ type: "dashboard", id: "B" })
   expect(submission.context[0]).toMatchObject({ type: "dashboard", id: "A" })
   expect(submission.restore()).toBeUndefined()
+})
+
+test("a newly attached image survives restoration of failed dashboard text", () => {
+  const target = createPromptState({ prompt: "Edit A" })
+  target.context.add({ type: "dashboard", id: "A", action: "edit", nodeName: "First" })
+  const submission = createPromptSubmissionState({
+    target,
+    prompt: target.current(),
+    context: target.context.items().slice(),
+  })
+  submission.clear()
+  const attachment = {
+    type: "image" as const,
+    id: "B",
+    filename: "new.png",
+    mime: "image/png",
+    blob: { id: "b", url: "blob:b" },
+  }
+  target.set([...target.current(), attachment])
+  expect(submission.restore()?.prompt).toEqual([{ type: "text", content: "Edit A", start: 0, end: 6 }, attachment])
 })

@@ -1464,8 +1464,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         />
         <PromptDashboardContext
           item={prompt.context.items().find((item) => item.type === "dashboard")}
-          hidden={store.mode === "shell"}
-          focus={() => setMode("normal")}
+          focus={() => requestAnimationFrame(() => editorRef?.focus())}
           remove={prompt.context.remove}
           t={language.t}
         />
