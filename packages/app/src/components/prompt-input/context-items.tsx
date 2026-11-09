@@ -100,7 +100,6 @@ export const PromptContextItems: Component<ContextItemsProps> = (props) => {
 
 export function PromptDashboardContext(props: {
   item?: DashboardContextItem & { key: string }
-  hidden?: boolean
   remove: (key: string) => void
   focus: () => void
   t: (
@@ -119,10 +118,7 @@ export function PromptDashboardContext(props: {
   return (
     <Show when={props.item}>
       {(item) => (
-        <div
-          class="flex items-center gap-2 px-3 pt-2 text-12-medium text-text-strong"
-          classList={{ hidden: props.hidden }}
-        >
+        <div class="flex items-center gap-2 px-3 pt-2 text-12-medium text-text-strong">
           <span>
             {props.t(item().action === "create" ? "prompt.context.dashboardCreate" : "prompt.context.dashboardEdit", {
               name: item().nodeName,

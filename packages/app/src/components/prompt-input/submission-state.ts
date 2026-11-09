@@ -12,8 +12,8 @@ export function createPromptSubmissionState(input: {
   let submittedDashboard = input.context.find((item) => item.type === "dashboard")
   const dashboard = (draft: PromptTarget) => draft.context.items().find((item) => item.type === "dashboard")
   let superseded = false
+  let restoreDashboard = true
   let cleared: Prompt | undefined
-  let clearedContext: ReturnType<PromptTarget["context"]["items"]> | undefined
 
   return {
     prompt: input.prompt,
@@ -22,11 +22,11 @@ export function createPromptSubmissionState(input: {
     clear(consumeDashboard = true) {
       const selected = dashboard(target)
       const samePrompt = target.current() === submittedPrompt
-      superseded = !samePrompt || (consumeDashboard && selected !== submittedDashboard)
+      superseded = !samePrompt
+      restoreDashboard = !consumeDashboard || selected === submittedDashboard
       if (consumeDashboard && selected && selected === submittedDashboard) target.context.remove(selected.key)
       if (samePrompt) target.reset()
       cleared = target.current()
-      clearedContext = target.context.items()
     },
     retarget(next: PromptTarget) {
       if (next === target) return
@@ -46,8 +46,21 @@ export function createPromptSubmissionState(input: {
     current: (value: PromptTarget) => target === value,
     restore() {
       if (superseded) return
-      if (cleared !== undefined && (target.current() !== cleared || target.context.items() !== clearedContext)) return
-      return { target, prompt: input.prompt, context: input.context }
+      let prompt = input.prompt
+      const current = target.current()
+      if (cleared !== undefined && current !== cleared) {
+        const images = current.filter((part) => part.type === "image")
+        if (!images.length || current.some((part) => part.type !== "image" && part.content)) return
+        prompt = [
+          ...prompt,
+          ...images.filter((image) => !prompt.some((part) => part.type === "image" && part.id === image.id)),
+        ]
+      }
+      const context =
+        restoreDashboard && !dashboard(target)
+          ? input.context
+          : input.context.filter((item) => item.type !== "dashboard")
+      return { target, prompt, context }
     },
   }
 }

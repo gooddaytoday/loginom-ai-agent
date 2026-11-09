@@ -54,11 +54,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
     <div class="flex flex-col gap-3">
       <PromptDashboardContext
         item={props.controller.dashboard()}
-        hidden={props.controller.state.mode === "shell"}
-        focus={() => {
-          props.controller.dispatch({ type: "mode.normal" })
-          props.controller.restoreFocus()
-        }}
+        focus={() => props.controller.restoreFocus()}
         remove={props.controller.removeContext}
         t={language.t}
       />
