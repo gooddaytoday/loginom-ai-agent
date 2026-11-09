@@ -193,7 +193,7 @@ async function automaticMode(method,{stale=false,manual=false}={}){
    const k={chkStrictLowerLimit:'strict_lower',chkStrictUpperLimit:'strict_upper','chkLowerLimitOpen;ValueControl':'lower_open','chkUpperLimitOpen;ValueControl':'upper_open'}[a.ref];
    c.settings[k]=a.checked;
    if(!sd&&!c.settings.strict_lower&&!c.settings.strict_upper)c.settings.limits=null;
-  }else if(a.ref==='cbbSDBinsMode;ValueControl'){} // LAB-1260 native: focusing the input does not expand its picker.
+  }else if(a.ref==='cbbSDBinsMode;ValueControl'){} // A focus-only input is modeled here; external portal visibility needs the node-procedure test.
   else if(a.ref==='sd-picker')s.ui.elements=[{tid:'MethodSettingFrame;cbbSDBinsMode;ValueControl;boundlist;one',ref:'sd-one',label:'+/- 1 СКО',allowed_actions:['click']},
    {tid:'foreign;boundlist;one',ref:'foreign',label:'+/- 1 СКО',allowed_actions:['click']}];
   else if(a.ref==='sd-one'){if(!stale){c.settings.sd_coefficient=1;values['cbbSDBinsMode;ValueControl']=0;}s.ui.elements=elements();}

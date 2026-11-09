@@ -600,7 +600,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           wizardConfirmation??=wizardCloseBinding(roots.output);
         }
         const portals = wizard?.status === 'observed' ? (roots.output.ui?.elements??[]).filter(e =>
-          (e.tid?.startsWith(wizard.root_tid + ';') || wizard.stage==='table_tree' && e.tid?.startsWith('EditDataTreeNodeDefForm;') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && e.tid.endsWith(';boundlist')) : [];
+          (e.tid?.startsWith(wizard.root_tid + ';') || readBinning&&wizard.stage==='binning'&&e.tid==='MethodSettingFrame;cbbSDBinsMode;ValueControl;boundlist' || wizard.stage==='table_tree' && e.tid?.startsWith('EditDataTreeNodeDefForm;') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && e.tid.endsWith(';boundlist')) : [];
         if(portals.length>1)throw new Error('Node procedure dropdown owner is ambiguous');
         // Dropdowns live outside the wizard subtree. Reading the unique
         // portal plus fixed wizard guards avoids scanning unrelated file tabs.
