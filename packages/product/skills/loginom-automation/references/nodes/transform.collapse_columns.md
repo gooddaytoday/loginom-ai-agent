@@ -6,10 +6,11 @@
 `read:{ports:[0],sample_rows:0,require_exact_numbers:false}`: получи успешную
 квитанцию и схему того же узла. Затем вызови `dock_node_read` с
 `source_operation_id` этой квитанции и
-`read:{ports:[0],sample_rows:0,require_exact_numbers:true}`.
+`read:{ports:[0],sample_rows:50,require_exact_numbers:true}`.
 Этот вызов заново выполняет сохранённый узел без изменения настроек.
-Все строки и типы ячеек бери из `exact_table.rows` при
-`exact_table.complete:true`; нулевой sample не сокращает эту полную таблицу.
+Все строки и типы ячеек бери из `sample` только при `sample_complete:true`
+и числе строк, равном `row_count`. Нулевой sample в `dock_node_read` даёт
+только схему, а не полное чтение значений.
 Не запрашивай одновременно большой sample и полную exact_table: строки
 дублируются, и ответ может не поместиться в бюджет доставки.
 
