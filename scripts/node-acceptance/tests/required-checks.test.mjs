@@ -101,11 +101,11 @@ test('REST C1 requires four single-method cases and excludes the retired eight-r
  for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
  assert.ok(!text.includes('rest-methods-body'));
 });
-test('tree changes require J2 scenarios but not tree-empty-containers until J3',t=>{
+test('tree changes require J2 scenarios and includes tree-empty-containers from J3',t=>{
  const r=repo(t);r.commit('packages/loginom-runtime/client/lib/tree-parameters.mjs');const text=r.list();
  assert.ok(ids(text).includes('live-ui'));
  for(const name of ['table-tree-json','json-tree-json','tree-null-leaves','tree-nested-records'])assert.ok(text.includes(name));
- assert.ok(!text.includes('tree-empty-containers'));
+ assert.ok(text.includes('tree-empty-containers'));
 });
 test('empty/unrelated diff, explicit head, subdirectory and uncommitted files',t=>{
  const r=repo(t);assert.deepEqual(ids(r.list()),[]);

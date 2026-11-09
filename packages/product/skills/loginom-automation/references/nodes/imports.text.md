@@ -32,6 +32,14 @@ and names.
 `source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл);
 no separate Import Execute.
 
+## File list
+
+Use one `imports.text` / `delimited` for same-schema files. Deliver each file
+or get fresh `dock_storage_source` refs. Set `source.kind:"verified_sources"`,
+`sources` in `settings.source.source_paths` order; `file_info:"name"` adds native
+string FileName outside CSV `columns` (or `"none"`). No Calculator/JS. Preserve
+the existing node; inspect all output fields and Save separately.
+
 ## Auto-detected types
 
 Data-driven types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),

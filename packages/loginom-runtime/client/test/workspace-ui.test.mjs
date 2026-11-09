@@ -1079,7 +1079,7 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
-for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
+for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','extent','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
  const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
  page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async ms=>{clock.advance(ms);};
  Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
@@ -1100,13 +1100,13 @@ for(const stage of ['controls','data_views'])for(const fault of ['transient','pe
     failures++;if(fault==='expired')clock.advance(16000);
     return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':stage}};
    }
-   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
+   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;if(fault==='extent')table.scrollHeight=2401;}
   }
   return evaluate(fn,arg);
  };
  const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
- const retry=['transient','persistent','directory','owner','position'].includes(fault);
- assert.equal(result.status,fault==='transient'?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ const retry=['transient','persistent','directory','owner','position','extent'].includes(fault);
+ assert.equal(result.status,['transient','extent'].includes(fault)?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
  assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,fault==='before'?0:1);
  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
  assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);
@@ -3843,7 +3843,7 @@ test('import source reads exact controls and Ext checkbox equally in full roots 
   const snapshot=await page.observe(),source=snapshot.wizard.import_source;
   assert.equal(snapshot.wizard.stage,'text_import_file');assert.ok(source);
   assert.deepEqual(Object.fromEntries(Object.entries(source.fields).map(([k,v])=>[k,v.value])),{
-    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true});
+    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',file_info:undefined,first_line_as_title:true,parallel_processing:undefined});
   assert.equal(source.fields.connection.read_only,true);assert.equal(c.native.checked,false);
   for(const options of [{discover_roots:true},{root_ref:snapshot.wizard.root_ref}]) {
     const read=await page.execute({mode:'observe',...options});assert.deepEqual(read.output.wizard.import_source,source);
@@ -3851,6 +3851,19 @@ test('import source reads exact controls and Ext checkbox equally in full roots 
   assert.equal(source.settings_applied,false);assert.equal(source.file_bytes_verified,false);assert.equal(source.schema_complete,false);
   assert.ok(!snapshot.ui.elements.some(e=>e.wizard_field?.scope==='import_source' || e.wizard_combo?.field?.scope==='import_source'));
   c.header.attrs.class='';assert.equal((await page.observe()).wizard.import_source.fields.first_line_as_title.value,false);
+});
+
+test('file list source observes the native filename combo and parallel checkbox',async()=>{
+  const page=new Page(),c=importSourceFixture(page);
+  const info=page.add('div',c.base+'cbbFileInfoColumnsType;ValueControl','',undefined,c.form);
+  info.append(new Element('input')).value='Имя файла';
+  const parallel=page.add('div',c.base+'chkParallelProcessing;ValueControl','',undefined,c.form);
+  const display=page.add('span',c.base+'chkParallelProcessing;ValueControl;DisplayEl','',undefined,parallel);display.attrs.class='x-form-checkbox';
+  c.inputs.source_path.value='/test/feb.csv｜/test/jan.csv';
+  const snapshot=await page.observe(),fields=snapshot.wizard.import_source.fields;
+  assert.equal(fields.file_info.value,'Имя файла');assert.equal(fields.parallel_processing.value,false);
+  assert.equal(fields.source_path.value,'/test/feb.csv｜/test/jan.csv');
+  assert.equal(fields.parallel_processing.display_ref,snapshot.ui.elements.find(e=>e.tid===display.attrs['data-tid']).ref);
 });
 
 test('import source fails closed for duplicate hidden missing controls and redacts URL values',async()=>{
