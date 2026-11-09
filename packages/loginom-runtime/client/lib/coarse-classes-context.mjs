@@ -41,8 +41,8 @@ export function readCoarseClassesBrowser(prefix){
   if(store?.$className!=='Ext.data.Store'||store.isBufferedStore||store.isLoading?.()||!Array.isArray(rs)||!rs.length||rs.length>1000||store.getCount?.()!==rs.length)return fail('coarse_classes_external_inventory');
   const out=[];
   for(const [index,r] of rs.entries()){
-   const d=r.data,name=d.Name??d.ColumnName??d.DisplayName,kind=d.InputRangesColumnKind??d.ColumnKind;
-   if(typeof name!=='string'||!name||!Number.isInteger(kind))return {...fail('coarse_classes_external_link'),record_keys:Object.keys(d??{}).slice(0,40)};
+   const d=r.data,name=d.Name??d.DisplayName,kind=d.ClassParamsColumnKind;
+   if(typeof name!=='string'||!name||!Number.isInteger(kind))return {...fail('coarse_classes_external_link'),record_keys:Object.keys(d??{}).filter(k=>!k.startsWith('$')).slice(0,40),kind_type:typeof kind};
    out.push({index,name,kind});
   }
   if(new Set(out.map(l=>l.name)).size!==out.length)return fail('coarse_classes_external_identity');

@@ -83,14 +83,15 @@ test('external links page reader returns owned grid kinds and names',()=>{
  const prefix='MF;TF-1',elements=[],components={};
  const el=(tid,parent)=>{const e={id:'e'+elements.length,tid,parent,getAttribute:()=>tid,getBoundingClientRect:()=>({left:0,top:0,right:100,bottom:100,width:100,height:100}),checkVisibility:()=>true,contains:x=>x===e||x?.parent===e||x?.parent?.parent===e};elements.push(e);return e;};
  const wizard=el(prefix+';WizrdMCF'),page=el(prefix+';WizrdMCF;CoarseClassesWizard',wizard),grid=el(prefix+';WizrdMCF;CoarseClassesWizard;grdExternalBinningLinks',page);
- const records=[['ColumnName',1],['ClassNumber',2],['UniqueValue',3]].map(([Name,InputRangesColumnKind],Index)=>({data:{Index,Name,InputRangesColumnKind}}));
+ // Observed native record keys (run 1794207511032523192, events:514).
+ const records=[['ColumnName',1],['ClassNumber',2],['UniqueValue',3]].map(([DisplayName,ClassParamsColumnKind],Index)=>({data:{Index,DisplayName,DataType:5,ClassParamsColumnKind,AllowedColumnKinds:[0,1]}}));
  const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,isLoading:()=>false};
  components[wizard.id]={el:{dom:wizard},[Symbol('LockQueue')]:{IsEmpty:true}};components[grid.id]={el:{dom:grid},getStore:()=>store};
  const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
  const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readCoarseClassesBrowser.toString()+')('+JSON.stringify(prefix)+')',context)));
  assert.deepEqual(read(),{verified:true,external:{links:[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}]},settings_applied:false});
- delete records[1].data.InputRangesColumnKind;
- assert.deepEqual(read(),{verified:false,reason:'coarse_classes_external_link',record_keys:['Index','Name']});
+ records[1].data.ClassParamsColumnKind='2';
+ assert.deepEqual(read(),{verified:false,reason:'coarse_classes_external_link',record_keys:['Index','DisplayName','DataType','ClassParamsColumnKind','AllowedColumnKinds'],kind_type:'string'});
 });
 
 test('coarse classes add_input consumes its single native Input_Add (LAB-1324 events:439)',async()=>{
