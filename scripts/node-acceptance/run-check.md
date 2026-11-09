@@ -931,6 +931,8 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 production `readColUnion` и отменяет мастер без применения изменений. CSV без
 этого аудита не даёт PASS: `minimum` возвращает ту же строку.
 
+`coarse-classes-frozen-zero` uses task-frozen-zero.md and only train.csv plus zero-frequency.csv from preprocessing-coarseclasses/fixtures. The independent modes/expected-frozen-zero.json checks three full ordered outputs, CSV, Save and cold. The same Import and Coarse Classes node must be retained with a locked partition during retraining; reopen readback checks IsLocked before execution.
+
 `smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
 `smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv

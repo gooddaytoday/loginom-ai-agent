@@ -372,6 +372,11 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
                     base=None, external=True, expected_name='expected-indices-run.json')
 
+    if name == 'coarse-classes-frozen-zero':
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        return dict(source=src, prompt=src / 'task-frozen-zero.md',
+                    data=src.parent / 'fixtures', base=None, export_count=3,
+                    input_files=['train.csv', 'zero-frequency.csv'], expected_name='modes/expected-frozen-zero.json', coarse_frozen=True)
     if name == 'coarse-classes-continuous-manual':
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
         return dict(source=src, prompt=src / 'task-continuous-manual.md',
@@ -865,6 +870,8 @@ def expected_for(case, package, cold=False):
     if case.get('tree_only'):
         expected = read(src / 'expected.json')['cases'][case['tree_case']]
         return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
+    if case.get('coarse_frozen'):
+        return {**expected_for({**case, 'coarse_frozen': False}, package, cold=cold), 'coarse_frozen': True}
     if case.get('autocorrelation_edge'):
         approved = read(src / 'expected.json')
         if case['autocorrelation_edge'] in ['empty', 'null']:
@@ -1281,6 +1288,18 @@ def ports(value, receipt=None):
         for item in value.values(): yield from ports(item, receipt)
     if isinstance(value, list):
         for item in value: yield from ports(item, receipt)
+
+
+def check_coarse_frozen_trainings(replies):
+    owners = {o['execution']['execution_id']: o for _, reply in replies for o, _ in ports(reply)
+              if o.get('status') == 'SUCCEEDED'
+              and o.get('configuration', {}).get('readback', {}).get('kind') == 'coarse_classes'
+              and o.get('execution', {}).get('status') == 'completed'}
+    trained = list(owners.values())
+    assert len(trained) >= 2, 'COARSE_FROZEN_TWO_TRAININGS'
+    assert len({o['node']['node_id'] for o in trained}) == 1, 'COARSE_FROZEN_SAME_NODE'
+    assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in trained), 'COARSE_FROZEN_LOCKED'
+    assert len({json.dumps(o['configuration']['readback']['training'].get('source'), sort_keys=True) for o in trained}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
 
 
 def port_path(reply, port):
@@ -2173,6 +2192,8 @@ class Runner:
             self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', '--xlsx', actual, '--expected', folder / 'xlsx-expected.json'], folder, timeout=60)
             self.current['csv'] = 'PASS (XLSX)'
             return session, expected, actual, ','
+        if spec.get('coarse_frozen'):
+            check_coarse_frozen_trainings(replies)
         if expected.get('clustering_apply'):
             write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
             self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',
