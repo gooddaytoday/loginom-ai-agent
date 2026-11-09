@@ -420,6 +420,22 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in case['data'].iterdir()), case['input_files'])
             self.assertNotIn('expected', case['prompt'].read_text())
 
+    def test_assnrules_consequents_has_exact_input_boundary_and_final_cold(self):
+        case = runner.scenario('assnrules-consequents')
+        self.assertEqual(case['data'], runner.REPO / 'docs/node-development/nodes/datamining-assnrules/fixtures/v040')
+        self.assertEqual(case['input_files'], ['train.csv'])
+        self.assertEqual(case['export_count'], 4)
+        expected = runner.expected_for(case, '/test/consequents.lgp')
+        self.assertEqual([len(o['rows']) for o in expected['outputs']], [7, 12, 7, 6])
+        self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 0, 1])
+        cold = runner.expected_for(case, '/test/consequents.lgp', cold=True)
+        self.assertEqual(cold['outputs'], expected['outputs'][2:])
+        prompt = case['prompt'].read_text()
+        for text in ['expected', 'oracle', 'LAB-', 'Proposal', 'DESIGN ONLY']:
+            self.assertNotIn(text, prompt)
+        self.assertEqual(re.findall(r'[\w-]+\.csv', prompt),
+                         ['train.csv', 'sets-lift0.csv', 'rules-lift0.csv', 'sets-lift12.csv', 'rules-lift12.csv'])
+
     def test_variable_only_model_requires_its_oracle_without_inventing_a_table_failure(self):
         for oracle_fails in [False, True]:
             with self.subTest(oracle_fails=oracle_fails), tempfile.TemporaryDirectory() as directory:
@@ -1741,6 +1757,17 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(expected['package_path'], '/test/reform.lgp')
         self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'B', 'A', 'R', 'S'])
         self.assertEqual([r['R'] for r in expected['outputs'][0]['rows']], [2, -3, 0])
+
+    def test_reform_cache_requires_private_settings_audit_and_one_export(self):
+        case = runner.scenario('reform-cache')
+        self.assertEqual(case['prompt'].name, 'task-cache.md')
+        self.assertEqual(case['input_files'], ['reform.csv'])
+        self.assertEqual(case['export_count'], 1)
+        expected = runner.expected_for(case, '/own/cache.lgp')
+        self.assertEqual(expected['reform_cache']['caching']['value'], 3)
+        self.assertEqual([f['caching_method'] for f in expected['reform_cache']['fields']], [0, 1, 2, 0, 0])
+        self.assertEqual([c['name'] for c in expected['outputs'][0]['columns']], ['RowID', 'A', 'B', 'R', 'S'])
+        self.assertEqual(runner.expected_for(case, '/own/cache.lgp', cold=True), expected)
 
     def test_rest_get_plain_has_no_input_and_independent_single_request_oracle(self):
         case = runner.scenario('rest-get-plain')

@@ -108,6 +108,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();
   let userBundleDelivered = false;
+  // Identity of a READY new draft whose user-v1 reply this bridge refused.
+  let undeliveredDraft = null;
   const logResult = async (tool, result) => {
     if (!userProfile || session.metadata.workspaceReady !== true) return;
     // The source receipt is delivered only to the caller. A diagnostics copy
@@ -337,8 +339,13 @@ export async function createBridge(config, session, { browserTransport: managedB
           };
           if (userProfile) args = userWorkflows.normalizePreparation(args);
           await admitHostArtifacts(args.host_context_token, codexInputIdentity(request.params));
-          const preparationRequest = { operation_id: args.operation_id ?? 'prepare', intent: args.intent ?? 'new_draft',
+          let preparationRequest = { operation_id: args.operation_id ?? 'prepare', intent: args.intent ?? 'new_draft',
             package_path: privatePackage?.upload.destination??args.package_path??null, workflow_ref: args.workflow_ref ?? null };
+          // The refused reply never issued this draft. A new_draft retry under
+          // another ID reconciles it with the original receipt, not a second package.
+          if (undeliveredDraft && undeliveredDraft === session.metadata.workspacePreparation?.identity
+              && session.metadata.workspaceReady === true && preparationRequest.intent === 'new_draft'
+              && preparationRequest.package_path === null) preparationRequest = JSON.parse(undeliveredDraft);
           if (config.storageDirectories && preparationRequest.package_path)
             requireStorageDestination(preparationRequest.package_path, config.storageDirectories, 'packages');
           const workspaceOptions = actionRuntime ? { loginomUrl: config.loginomUrl,
@@ -447,6 +454,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             if(preparationRequest.intent==='open_package')delete delivered.workspace.browser_geometry;
             const reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},{tool:'dock_prepare'});
             if (ready && reply.isError !== true) userBundleDelivered = true;
+            undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true
+              && preparationRequest.intent === 'new_draft' ? session.metadata.workspacePreparation.identity : null;
             return reply;
           }
           return { content: [{ type: 'text', text: JSON.stringify({

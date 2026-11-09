@@ -15,8 +15,9 @@ export const effectiveColUnionInput=(mapping,native)=>{
  return resolved.fields??native.target_fields;
 };
 const schema=fields=>fields.map(({name,label,type})=>({name,label,type}));
-export async function configureColUnionInputs(channel,mappings,ctx,request,finishWizard){
- const observations=[],ports=[0,1];
+export async function configureColUnionInputs(channel,mappings,ctx,request,finishWizard,preflight){
+ need([2,3].includes(preflight?.inputCount),'Verified ColUnion input count required');
+ const observations=[],ports=Array.from({length:preflight.inputCount},(_,i)=>i);
  // Validate every effective schema before committing any port. Keep the
  // last wizard open for its commit; the node wizard is still opened once.
  for(const port of ports){

@@ -9,6 +9,23 @@ import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 const parameters={binning:{field:'X',method:'count',size:2,limits:[0,20]}};
 const fields=[{name:'RowID',label:'RowID',type:'integer',data_kind:'Непрерывный'},{name:'X',label:'X',type:'real',data_kind:'Непрерывный'},{name:'Note',label:'Note',type:'string',data_kind:'Дискретный'}];
+test('auto numeric limits and SD coefficients validate without weakening manual/apply',()=>{
+ for(const method of ['count','width']){
+  const p={binning:{field:'X',method,size:2}};
+  assert.doesNotThrow(()=>validateBinningParameters(p,'internal'));
+  assert.equal(resolveBinningField(p,fields).name,'X');
+  assert.throws(()=>resolveBinningField(p,[{name:'X',type:'datetime'}]),/DateTime/);
+ }
+ for(const sd_coefficient of [1,2,3]){
+  const p={binning:{field:'X',method:'sd',sd_coefficient}};
+  assert.doesNotThrow(()=>validateBinningParameters(p,'internal'));
+  assert.equal(resolveBinningField(p,fields).name,'X');
+  assert.throws(()=>resolveBinningField(p,[{name:'X',type:'datetime'}]),/DateTime/);
+ }
+ for(const patch of [{sd_coefficient:0},{sd_coefficient:4},{sd_coefficient:1.5},{sd_coefficient:undefined},{size:2},{limits:[0,20]},{ties:'next'}])
+  assert.throws(()=>validateBinningParameters({binning:{field:'X',method:'sd',sd_coefficient:1,...patch}},'internal'));
+ assert.throws(()=>validateBinningParameters({binning:{field:'X',method:'count',size:2,sd_coefficient:1}},'internal'));
+});
 test('production driver is created before nodeApply state is initialized',()=>{
  const support=createBinningNodeSupport({});
  for(const [mode,p] of [['internal',parameters],['internal',{binning:{field:'When',method:'manual',intervals:[]}}],['apply',{}]]){
@@ -50,6 +67,10 @@ test('readback requires a separately trained materialized model or an uncommitte
  const validate=new AjvJsonSchemaValidator().getValidator(configurationSchema);assert.equal(validate(trained).valid,true,JSON.stringify(validate(trained)));
  Object.assign(c,{method:'frequency',limits:null,ties:'current'});
  const frequency=binningConfigurationReadback(candidate());assert.equal(frequency.ties,'current');assert.equal(validate(frequency).valid,true);
+ Object.assign(c,{method:'sd',size:null,limits:null,sd_coefficient:1});
+ const sd=binningConfigurationReadback(candidate());assert.equal(sd.open_ends,true);assert.equal(sd.sd_coefficient,1);assert.equal(validate(sd).valid,true);
+ Object.assign(c,{method:'count',size:1,limits:null,sd_coefficient:null});
+ const auto=binningConfigurationReadback(candidate());assert.equal(auto.limits,null);assert.equal(validate(auto).valid,true);
  Object.assign(c,{method:'count',limits:[0,20],ties:null});
  values.finish.training.execution_id='execute';assert.throws(()=>binningConfigurationReadback(candidate()),/separate training/);
  c.mode='apply';c.state='materialized';c.intervals=intervals;values.node_finish={settings_applied:false,draft_discarded:true};values.finish={mode:'execute',settings_applied:false,execution_id:'apply'};
@@ -70,7 +91,6 @@ test('binning rejects unsupported combinations before mutation',()=>{
  assert.doesNotThrow(()=>validateBinningParameters({binning:{field:'X',method:'width',size:0.25,limits:[0,1]}},'internal'));
  assert.doesNotThrow(()=>validateBinningParameters({binning:{field:'X',method:'frequency',size:3}},'internal'));
  assert.throws(()=>validateBinningParameters({binning:{...parameters.binning,method:'frequency'}},'internal'));
- assert.throws(()=>validateBinningParameters({binning:{field:'X',method:'count',size:2}},'internal'));
  assert.doesNotThrow(()=>validateBinningParameters({},'apply',{target:{kind:'existing'},inputs:[],mappings:[],finish:'execute',read:{ports:[0,1]}}));
  for(const patch of [{target:{kind:'new'}},{inputs:[{}]},{mappings:[{}]},{finish:'done'}])
   assert.throws(()=>validateBinningParameters({},'apply',{target:{kind:'existing'},inputs:[],mappings:[],finish:'execute',read:{ports:[0,1]},...patch}));
