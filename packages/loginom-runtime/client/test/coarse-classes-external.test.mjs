@@ -104,3 +104,40 @@ test('coarse classes add_input consumes its single native Input_Add (LAB-1324 ev
  assert.equal(verifyNodeTargetEffect(effect(graph([0],['Input_Add'])),graph([0,1],['Input_Var-1'])),null);
  assert.equal(verifyNodeTargetEffect(effect(graph([0],['Input_Add'],'transform.col_union_data')),graph([0,1],[],'transform.col_union_data')),null);
 });
+
+test('a multi-category class on port 1 is one materialized class (expected-external-contrast rows)',async()=>{
+ const {coarseClassesMaterializedModel}=await import('../lib/coarse-classes-output.mjs');
+ const {readFile}=await import('node:fs/promises');
+ const expected=JSON.parse(await readFile(new URL('../../../../docs/node-development/nodes/preprocessing-coarseclasses/acceptance/modes/expected-external-contrast.json',import.meta.url),'utf8'));
+ const [p1,p2]=[1,2].map(port=>expected.outputs.find(o=>o.output_port===port));
+ const cell=(type,value)=>({type,value:type==='integer'?String(value):value,is_null:false,precision:type==='real'?'17_significant_digits':type==='integer'?'exact_integer':'display_text'});
+ const names=['ColumnName','ClassNumber','ClassMark','WoE','IV'],types=['string','integer','string','real','real'];
+ const port=(n,o,cols,ts)=>({port:n,fresh:true,sample_complete:true,row_count:o.rows.length,schema:cols.map(name=>({name})),sample:o.rows.map(r=>cols.map((c,i)=>cell(ts[i],r[c])))});
+ const ports=[port(1,p1,names,types),port(2,p2,['ColumnName','IV'],['string','real'])];
+ const model=coarseClassesMaterializedModel(ports);
+ assert.deepEqual(model.classes.map(c=>[c.number,c.woe]),[[0,p1.rows[0].WoE],[1,p1.rows[1].WoE]]);
+ assert.equal(model.total_iv,p2.rows[0].IV);
+ const split=structuredClone(ports);split[0].sample[2][3].value=0;
+ assert.throws(()=>coarseClassesMaterializedModel(split),/class rows differ/);
+ const apart=structuredClone(ports);apart[0].sample.push(structuredClone(apart[0].sample[0]));apart[0].row_count=4;
+ assert.throws(()=>coarseClassesMaterializedModel(apart),/duplicate model class identity/);
+});
+
+test('external internal readback matches the published node result schema',async()=>{
+ const {coarseClassesConfigurationReadback}=await import('../lib/coarse-classes-readback.mjs');
+ const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
+ const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
+ const node={document_id:'doc',workflow_id:'flow',node_id:'node'},operation_id='op',ref=id=>({document_id:'doc',workflow_id:'flow',node_id:id});
+ const cell=(type,value)=>({type,value,is_null:false,precision:type==='real'?'17_significant_digits':type==='integer'?'exact_integer':'display_text'});
+ const ports=[{port:1,fresh:true,sample_complete:true,row_count:3,schema:['ColumnName','ClassNumber','ClassMark','WoE','IV'].map(name=>({name})),sample:[['Segment','0','[B]',-1,.3],['Segment','1','[A,C]',.5,.2],['Segment','1','[A,C]',.5,.2]].map(r=>r.map((v,i)=>cell(['string','integer','string','real','real'][i],v)))},{port:2,fresh:true,sample_complete:true,row_count:1,schema:[{name:'ColumnName'},{name:'IV'}],sample:[[cell('string','Segment'),cell('real',.5)]]}];
+ const links=[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}];
+ const model={input_field:'Segment',locked:true,edited:false,classes:[{number:0,lower:null,upper:null},{number:1,lower:null,upper:null}]};
+ const configuration={verified:true,node_context:node,mode:'internal',state:'settings',classes:[],total_iv:null,input_field:'Segment',target_field:'Target',event_value:'yes',partition:'external',frozen:false,min_class_percent:5,max_classes:2,uniformity_percent:0,roles:[{name:'Segment',role:'input'},{name:'Target',role:'target'}],external_partition:{links,fine_classes:true,model}};
+ const training={status:'trained',node,execution_id:'train',source:[{node:ref('main'),output:0,input:0},{node:ref('classes'),output:0,input:1}]};
+ const values={input_mapping:{},configure:{configuration,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{ports:[0,1,2].map(port=>({port,schema:[{name:'X',label:'X',type:'string',data_kind:'Дискретный'}]}))},finish:{mode:'execute',settings_applied:true,execution_id:'execute',training},read:{ports}};
+ const phases=Object.entries(values).map(([phase,value])=>({phase,status:'verified',receipt_id:operation_id+':'+phase,value:{verified:true,cleanup_complete:true,...value}}));
+ const readback=coarseClassesConfigurationReadback({node,phases,operation_id});
+ assert.deepEqual(readback.external_partition,{links,fine_classes:true,model});
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ const r=validate(readback);assert.equal(r.valid,true,JSON.stringify(r.errorMessage??r).slice(0,600));
+});

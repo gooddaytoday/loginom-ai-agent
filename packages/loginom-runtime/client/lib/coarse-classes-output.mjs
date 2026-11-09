@@ -58,7 +58,10 @@ export function coarseClassesMaterializedModel(ports){
   if(type==='integer')need(c.precision==='exact_integer'&&/^(0|[1-9][0-9]*)$/.test(c.value)&&Number.isSafeInteger(Number(c.value)),'exact model class number required');
   if(type==='string')need(typeof c.value==='string'&&c.value.length>0,'model text required');return type==='integer'?Number(c.value):c.value;};
  const input_field=value(stats,stats.sample[0],'ColumnName','string'),total_iv=value(stats,stats.sample[0],'IV','real');
- const classes=classesPort.sample.map(row=>{need(value(classesPort,row,'ColumnName','string')===input_field,'model field differs');return {number:value(classesPort,row,'ClassNumber','integer'),mark:value(classesPort,row,'ClassMark','string'),woe:value(classesPort,row,'WoE','real'),iv:value(classesPort,row,'IV','real')};});
+ const rows=classesPort.sample.map(row=>{need(value(classesPort,row,'ColumnName','string')===input_field,'model field differs');return {number:value(classesPort,row,'ClassNumber','integer'),mark:value(classesPort,row,'ClassMark','string'),woe:value(classesPort,row,'WoE','real'),iv:value(classesPort,row,'IV','real')};});
+ // A class of several categories has one port-1 row per UniqueValue with the
+ // same class statistics (LAB-1324); its rows must be adjacent and identical.
+ const classes=rows.filter((r,i)=>{if(i===0||rows[i-1].number!==r.number)return true;need(JSON.stringify(rows[i-1])===JSON.stringify(r),'class rows differ: '+r.number);return false;});
  need(new Set(classes.map(c=>c.number)).size===classes.length,'duplicate model class identity');
  return {state:'materialized',input_field,total_iv,classes};
 }
