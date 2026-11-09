@@ -114,10 +114,18 @@
         const lookup = await post('lookup', target);
         await pending;
         if (overlay !== section) return;
-        if (!lookup.exists && !await active(node)) {
-          note.textContent = 'Идёт расчёт';
-          await execute(node);
+        if (!lookup.exists) {
+          busy++;
+          const task = pending.then(async () => {
+            if (!await active(node)) {
+              note.textContent = 'Идёт расчёт';
+              await execute(node);
+            }
+          });
+          pending = task.then(() => {busy--}, () => {busy--});
+          await task;
         }
+        if (overlay !== section) return;
         const parameters = () => window.loginomDashboardParameters(form);
         const available = await parameters();
         const sample = !errors.has(lookup.key) && await active(node) ? await table(node, 12) : null;
