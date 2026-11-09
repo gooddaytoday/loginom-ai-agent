@@ -53,7 +53,7 @@ class ExternalClient {
         // replays its own draft, an unknown one creates another package tab.
         const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1)),known=this.f.drafts.has(o.operationId);
         if(!known)this.f.drafts.set(o.operationId,'own-tab'+(this.f.drafts.size?'-'+(this.f.drafts.size+1):''));
-        value={...value,operation_id:o.operationId,session_id:'own-session',replayed:known,
+        value={...value,operation_id:o.operationId,session_id:'own-session',replayed:known,package_ref:{path:null,persisted:false},
           workflow_ref:{...value.workflow_ref,tab_tid:this.f.drafts.get(o.operationId)}};
       }
     }
