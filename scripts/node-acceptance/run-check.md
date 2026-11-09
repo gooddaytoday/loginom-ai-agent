@@ -926,6 +926,8 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 
 `coarse-classes-frozen-zero` uses task-frozen-zero.md and only train.csv plus zero-frequency.csv from preprocessing-coarseclasses/fixtures. The independent modes/expected-frozen-zero.json checks three full ordered outputs, CSV, Save and cold. The same Import and Coarse Classes node must be retained with a locked partition during retraining; reopen readback checks IsLocked before execution.
 
+`coarse-classes-external-contrast` uses task-external-contrast.md with external-contrast.csv and external-contrast-classes.csv; `coarse-classes-external` uses task-external-frozen.md with zero-frequency.csv and external-classes.csv (both from preprocessing-coarseclasses/fixtures). Independent modes/expected-external-contrast.json and modes/expected-external.json check three full ordered outputs, CSV, Save and cold. The run requires partition external with inputs 0 and 1, complete native links (identifier, class number, category) and fine_classes=true; cold reopen reads the saved links and fine_classes before execution. The singleton case does not distinguish external from automatic training, so only the contrast case counts for ≥2/3.
+
 `smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
 `smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv

@@ -51,3 +51,15 @@ export async function configureFrozenCoarseClasses(channel,{input_field}){
  need(s.node_coarse_classes.model.locked===true&&JSON.stringify(s.node_coarse_classes.model.classes)===JSON.stringify(before),'freeze must retain native classes and IsLocked=true');
  return structuredClone(s.node_coarse_classes.model);
 }
+// LAB-1324: ready external classes are applied by the native editor itself;
+// its activated model must be the selected predictor with IsLocked=true.
+export async function observeExternalCoarseClasses(channel,{input_field}){
+ const stage=s=>s.wizard?.stage==='coarse_classes_model';
+ let s=await channel.observe({condition:'external class editor available',ready:stage});
+ const activation=s.wizard.root_tid+';CoarseClassesWizard-2;btnActivationPortVisualizer';
+ const es=s.ui.elements.filter(e=>e.tid===activation&&e.label==='Активировать'&&e.allowed_actions.includes('click'));
+ if(es.length)await channel.perform({condition:'activate external class editor inputs',initialObservation:s,ready:stage,identity:s=>s.prepared_node_context,resolve:s=>{const a=s.ui.elements.filter(e=>e.tid===activation&&e.allowed_actions.includes('click'));need(a.length===1,'one owned control required: '+activation);return {verb:'click',ref:a[0].ref};}});
+ s=await channel.observe({condition:'external ready classes readback',readCoarseClasses:true,ready:s=>stage(s)&&s.node_coarse_classes?.verified===true&&s.node_coarse_classes.model?.input_field===input_field});
+ need(s.node_coarse_classes.model.locked===true&&s.node_coarse_classes.model.classes.length>0,'external ready classes must be locked native classes');
+ return structuredClone(s.node_coarse_classes.model);
+}

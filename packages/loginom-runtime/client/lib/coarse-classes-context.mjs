@@ -29,6 +29,25 @@ export function readCoarseClassesBrowser(prefix){
   if(classes.some((r,i)=>r.number!==i||![r.lower,r.upper].every(v=>v===null||Number.isFinite(v))))return fail('coarse_classes_model_bounds');
   return {verified:true,model:{input_field:c.Name,locked:c.IsLocked,edited:c.IsEdited,classes},settings_applied:false};
  }
+ // LAB-1324: the external partition page precedes field roles when input 1
+ // exists. Its link kinds are read from the owned grid store: 0 unused,
+ // 1 feature identifier, 2 class number, 3 category (discovery LAB-1055).
+ const links=exact(prefix+';WizrdMCF;CoarseClassesWizard;grdExternalBinningLinks');
+ if(links.length===1&&links[0].checkVisibility({checkVisibilityCSS:true})){
+  const owner=exact(prefix+';WizrdMCF'),w=owner.length===1&&globalThis.Ext?.getCmp?.(owner[0].id),g=globalThis.Ext?.getCmp?.(links[0].id),store=g?.getStore?.(),rs=store?.getData?.().items;
+  if(!w||w.el?.dom!==owner[0]||g?.el?.dom!==links[0]||!owner[0].contains(links[0]))return fail('coarse_classes_external_owner');
+  const queues=Object.getOwnPropertySymbols(w).filter(s=>s.description==='LockQueue');
+  if(queues.length!==1||w[queues[0]]?.IsEmpty!==true)return fail('coarse_classes_external_pending');
+  if(store?.$className!=='Ext.data.Store'||store.isBufferedStore||store.isLoading?.()||!Array.isArray(rs)||!rs.length||rs.length>1000||store.getCount?.()!==rs.length)return fail('coarse_classes_external_inventory');
+  const out=[];
+  for(const [index,r] of rs.entries()){
+   const d=r.data,name=d.Name??d.ColumnName??d.DisplayName,kind=d.InputRangesColumnKind??d.ColumnKind;
+   if(typeof name!=='string'||!name||!Number.isInteger(kind))return {...fail('coarse_classes_external_link'),record_keys:Object.keys(d??{}).slice(0,40)};
+   out.push({index,name,kind});
+  }
+  if(new Set(out.map(l=>l.name)).size!==out.length)return fail('coarse_classes_external_identity');
+  return {verified:true,external:{links:out},settings_applied:false};
+ }
  const roots=exact(base),root=roots[0];
  if(roots.length!==1||!root.checkVisibility({checkVisibilityCSS:true}))return fail('coarse_classes_root');
  const cmp=t=>{const es=exact(t),c=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id);return c?.el?.dom===es[0]&&root.contains(es[0])?c:null;};

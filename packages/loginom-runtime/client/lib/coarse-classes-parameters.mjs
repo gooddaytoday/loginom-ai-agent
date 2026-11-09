@@ -13,12 +13,13 @@ export function validateCoarseClassesParameters(p,mode,r){
   need(!Object.hasOwn(c,'frozen')||typeof c.frozen==='boolean'&&c.partition==='automatic','frozen requires a Boolean and automatic discrete partition');
   for(const k of ['input_field','target_field','event_value'])need(typeof c[k]==='string'&&c[k].trim().length>0&&c[k].length<=128,k+' must be an exact nonempty string');
   need(c.input_field!==c.target_field,'input and target must differ');
-  need(['automatic','manual'].includes(c.partition),'use automatic discrete or manual continuous partition');
+  need(['automatic','manual','external'].includes(c.partition),'use automatic discrete, manual continuous or external ready partition');
   need(c.partition==='manual'?Number.isSafeInteger(c.cut)&&c.max_classes===2:!Object.hasOwn(c,'cut'),'manual requires an integer cut and max_classes:2; automatic omits cut');
   need(Number.isFinite(c.min_class_percent)&&c.min_class_percent>=0&&c.min_class_percent<=50,'min_class_percent must be 0..50');
   need(Number.isSafeInteger(c.max_classes)&&c.max_classes>=1&&c.max_classes<=1000,'max_classes must be 1..1000');
   need(Number.isFinite(c.uniformity_percent)&&c.uniformity_percent>=0&&c.uniformity_percent<=100,'uniformity_percent must be 0..100');
-  if(r)need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&(r.target.kind==='existing'||r.inputs.length===1)&&r.mappings.length===0,'one input 0 required; external inputs and mapping overrides unsupported');
+  if(r&&c.partition==='external')need(r.inputs.length<=2&&new Set(r.inputs.map(i=>i.input)).size===r.inputs.length&&r.inputs.every(i=>[0,1].includes(i.input))&&(r.target.kind==='existing'||r.inputs.length===2)&&r.mappings.length===0,'external requires main input 0 and ready class table input 1; mapping overrides unsupported');
+  else if(r)need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&(r.target.kind==='existing'||r.inputs.length===1)&&r.mappings.length===0,'one input 0 required; input 1 only with partition external; mapping overrides unsupported');
  }
  if(r)need(JSON.stringify(r.read.ports)===JSON.stringify(r.finish==='execute'?[0,1,2]:[]),'execute requires all ordered ports [0,1,2]; Done/Close use []');
 }

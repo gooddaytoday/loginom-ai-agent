@@ -377,6 +377,13 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task-frozen-zero.md',
                     data=src.parent / 'fixtures', base=None, export_count=3,
                     input_files=['train.csv', 'zero-frequency.csv'], expected_name='modes/expected-frozen-zero.json', coarse_frozen=True)
+    if name in ['coarse-classes-external-contrast', 'coarse-classes-external']:
+        src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
+        contrast = name.endswith('-contrast')
+        return dict(source=src, prompt=src / ('task-external-contrast.md' if contrast else 'task-external-frozen.md'),
+                    data=src.parent / 'fixtures', base=None, export_count=3,
+                    input_files=['external-contrast.csv', 'external-contrast-classes.csv'] if contrast else ['zero-frequency.csv', 'external-classes.csv'],
+                    expected_name='modes/expected-external-contrast.json' if contrast else 'modes/expected-external.json', coarse_external=True)
     if name == 'coarse-classes-continuous-manual':
         src = REPO / 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance'
         return dict(source=src, prompt=src / 'task-continuous-manual.md',
@@ -868,6 +875,8 @@ def expected_for(case, package, cold=False):
     src = case['source']
     if case.get('coarse_frozen'):
         return {**expected_for({**case, 'coarse_frozen': False}, package, cold=cold), 'coarse_frozen': True}
+    if case.get('coarse_external'):
+        return {**expected_for({**case, 'coarse_external': False}, package, cold=cold), 'coarse_external': True}
     if case.get('tree_only'):
         expected = read(src / 'expected.json')['cases'][case['tree_case']]
         return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
@@ -1299,6 +1308,21 @@ def check_coarse_frozen_trainings(replies):
     assert len({o['node']['node_id'] for o in trained}) == 1, 'COARSE_FROZEN_SAME_NODE'
     assert all(o['configuration']['readback'].get('frozen_partition', {}).get('locked') is True for o in trained), 'COARSE_FROZEN_LOCKED'
     assert len({json.dumps(o['configuration']['readback']['training'].get('source'), sort_keys=True) for o in trained}) == 1, 'COARSE_FROZEN_SAME_IMPORT'
+
+
+def check_coarse_external_trainings(replies):
+    # LAB-1324: ready classes must be used (fine_classes) with complete native links.
+    trained = [o for _, reply in replies for o, _ in ports(reply)
+               if o.get('status') == 'SUCCEEDED'
+               and o.get('configuration', {}).get('readback', {}).get('partition') == 'external'
+               and o.get('execution', {}).get('status') == 'completed']
+    assert trained, 'COARSE_EXTERNAL_TRAINED'
+    for o in trained:
+        external = o['configuration']['readback'].get('external_partition') or {}
+        assert external.get('fine_classes') is True, 'COARSE_EXTERNAL_FINE_CLASSES'
+        assert sorted(l['kind'] for l in external.get('links', []) if l['kind']) == [1, 2, 3], 'COARSE_EXTERNAL_LINKS'
+        assert external.get('model', {}).get('locked') is True, 'COARSE_EXTERNAL_LOCKED'
+        assert sorted(e['input'] for e in o['configuration']['readback']['training'].get('source', [])) == [0, 1], 'COARSE_EXTERNAL_INPUTS'
 
 
 def port_path(reply, port):
@@ -2193,6 +2217,8 @@ class Runner:
             return session, expected, actual, ','
         if spec.get('coarse_frozen'):
             check_coarse_frozen_trainings(replies)
+        if spec.get('coarse_external'):
+            check_coarse_external_trainings(replies)
         if expected.get('clustering_apply'):
             write(folder / 'clustering-apply-replies.json', [o for _, o in replies])
             self.phase('clustering-apply-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/clustering-apply.mjs',

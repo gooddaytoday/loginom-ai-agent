@@ -1,6 +1,6 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {validateCoarseClassesParameters,resolveCoarseClassesFields} from './coarse-classes-parameters.mjs';
-import {configureCoarseClasses,observeCoarseClasses} from './coarse-classes-procedure.mjs';
+import {configureCoarseClasses,observeCoarseClasses,acceptCoarseClassesExternalPage} from './coarse-classes-procedure.mjs';
 import {coarseClassesConfigurationReadback} from './coarse-classes-readback.mjs';
 import {configureCoarseClassesOutputs,readCoarseClassesOutputs} from './coarse-classes-output.mjs';
 import {coarseClassesParametersSchema} from './node-api.mjs';
@@ -10,17 +10,22 @@ const need=(v,m)=>{if(!v)throw Error('CoarseClasses: '+m);};
 export async function coarseClassesBeforeGraphExecute(options,ctx,c,channel){
  if(options.operation.nodeApply.request.mode==='apply')return {};
  const request={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},graph=await options.operation.nodeTargetAdapter.observe(request,ctx.deadline);
- const source=graph.links.filter(e=>e.target===ctx.node.node_id).map(e=>({node:graph.nodes.find(n=>n.ref.node_id===e.source)?.ref,output:e.output,input:e.input}));
- need(source.length===1&&source[0].input===0&&source[0].node,'one current input source required for Train');
+ const source=graph.links.filter(e=>e.target===ctx.node.node_id).map(e=>({node:graph.nodes.find(n=>n.ref.node_id===e.source)?.ref,output:e.output,input:e.input})).sort((a,b)=>a.input-b.input);
+ // External partition trains on main input 0 with the ready class table on input 1.
+ const inputs=options.operation.nodeApply.request.parameters?.coarse_classes?.partition==='external'?[0,1]:[0];
+ need(JSON.stringify(source.map(e=>e.input))===JSON.stringify(inputs)&&source.every(e=>e.node),inputs.length===2?'main input 0 and ready class table input 1 required for Train':'one current input source required for Train');
  const training=await trainConfiguredNode(channel,ctx.node),after=await options.operation.nodeTargetAdapter.observe(request,ctx.deadline);
  need(JSON.stringify(after.links.filter(e=>e.target===ctx.node.node_id))===JSON.stringify(graph.links.filter(e=>e.target===ctx.node.node_id)),'source changed during Train');
  return {training:{...training,source}};
 }
 export function createCoarseClassesNodeSupport(config){
+ const external=new WeakMap();
  const support=createTabularTransformNodeSupport(config,{
   type:'preprocessing.coarse_classes',modes:['internal','apply'],revision:'coarse-classes-v2-manual-1',parameterSchema:coarseClassesParametersSchema,
   validate:validateCoarseClassesParameters,validateInput:(p,resolved,native)=>resolveCoarseClassesFields(p,resolved.fields??native.target_fields),readback:coarseClassesConfigurationReadback,
   configurationObservation:{condition:'owned coarse classes field page',readCoarseClasses:true,ready:s=>s.wizard?.stage==='coarse_classes'&&s.node_coarse_classes?.verified===true},
+  // Input 1 inserts the native external links page before field roles.
+  async afterOpen(channel,request){external.set(channel,await acceptCoarseClassesExternalPage(channel,request));},
   async beforeOpen(channel,request){
    if(request.mode!=='apply')return;
    await channel.openInputPort(0);
@@ -30,7 +35,7 @@ export function createCoarseClassesNodeSupport(config){
   },
   async configure(channel,p,context){
    if(context.request.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:false,configuration:(await observeCoarseClasses(channel,'owned draft for disposal')).node_coarse_classes,draft_edits_skipped:true};
-   return configureCoarseClasses(channel,p,context);
+   return configureCoarseClasses(channel,p,{...context,external:external.get(channel)});
   },
   configureAllOutputs:configureCoarseClassesOutputs,beforeGraphExecute:coarseClassesBeforeGraphExecute,readOutputs:readCoarseClassesOutputs,
  });
