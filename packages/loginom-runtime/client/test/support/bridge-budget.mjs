@@ -22,10 +22,11 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  const catalog=await createActionCatalogFixture(compatibility);
  const openPackage=process.env.LOGINOM_TEST_OPEN_PACKAGE==='1';
  const threeFiles=process.env.LOGINOM_TEST_THREE_FILES;
- const account='lab-66-monkey-'+'a'.repeat(36),documentId='d'.repeat(36),operationId='o'.repeat(36);
+ const smoothingHp=process.env.LOGINOM_TEST_SMOOTHING_HP==='1',fullWorkspace=openPackage||smoothingHp;
+ const account=(smoothingHp?'lab111-3-reviewer-':'lab-66-monkey-')+'a'.repeat(36),documentId='d'.repeat(36),operationId=smoothingHp?'prepare':'o'.repeat(36);
  let packageArtifact;
  const workflow=()=>({tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-2',prefix:'MF;TF-2',
-  navigation_path:['Сервер','Пакеты',packageArtifact.name.replace(/[.-]/g,'_'),'Модуль1','Сценарий'].map((label,index,labels)=>({
+  navigation_path:['Сервер','Пакеты',(smoothingHp?'Package1':packageArtifact.name.replace(/[.-]/g,'_')),'Модуль1','Сценарий'].map((label,index,labels)=>({
    tid:'MF;TF-2;cnrNaviMode;b.s_'+labels.slice(0,index+1).join('>'),label:index===0?'':label})),workflow_id:documentId+'-1'});
  let browserCalls=0,prepareDebug=false;
  class ExternalClient {
@@ -41,14 +42,14 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
    }
    assert.equal(this.browser,true);assert.equal(request.name,'browser_run_code_unsafe');browserCalls++;
    const code=request.arguments.code;
-   if(openPackage){
+   if(fullWorkspace){
     const value=code.includes('"identityOnly":true')?{status:'BOUND',target:compatibility,authenticated:true,
       created_draft:false,effect_possible:false,document_id:documentId,loginom_account:account,target_verified:true}
      :code.includes('async function prepareWorkspace(')?{status:'READY',reason:null,phase:'exact_workflow_ready',target:compatibility,
-      authenticated:true,created_draft:false,effect_possible:true,operation_id:operationId,session_id:'s'.repeat(36),
+      authenticated:true,created_draft:smoothingHp,effect_possible:true,operation_id:operationId,session_id:'s'.repeat(36),
       trace:['ui_build','login_or_workspace','workspace_entry_ready','package_menu_ready','open_package_dialog','exact_workflow_ready']
        .map(condition=>({condition,satisfied:true})),document_id:documentId,loginom_account:account,workflow_ref:workflow(),
-      package_ref:{path:packageArtifact.upload.destination,name:packageArtifact.name.replace(/[.-]/g,'_'),persisted:true},
+      package_ref:smoothingHp?{path:null,name:'Package1',persisted:false}:{path:packageArtifact.upload.destination,name:packageArtifact.name.replace(/[.-]/g,'_'),persisted:true},
       preserved_workflows:[],ownership_verified:false,target_verified:true,interaction_readiness:'driver_verification_required',
       window:{width:1280,height:800,outer_width:1280,outer_height:800,available_width:1280,available_height:800}}
      :{version:1,source:'prepare_same_browser_page',session_id:'s'.repeat(36),operation_id:operationId,document_id:documentId,
@@ -96,12 +97,12 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
  let bridge,client;
  try{
   const session={directory,browserCli:'/unit/browser.mjs',browserConfig:'/unit/browser.json',browserRoot:'/unit/browser',
-    metadata:{client:'unit',clientRevision:'d'.repeat(64),sessionId:openPackage?'s'.repeat(36):'protocol-budget-session'},async save(){},
+    metadata:{client:'unit',clientRevision:'d'.repeat(64),sessionId:fullWorkspace?'s'.repeat(36):'protocol-budget-session'},async save(){},
     artifactStore:await createArtifactStore({directory:join(directory,'input')})};
   bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
     endpoint:'http://memory.invalid/mcp',apiKey:'UNIT_NONSECRET',loginomUrl:'http://loginom.test/app/',
     mode:'executor-replay',resultProfile:'user-v1',stateDir:directory,
-    ...(openPackage||threeFiles?{storageDirectories:{inputs:'/'+account,packages:'/'+account,exports:'/'+account}}:{})},session);
+    ...(fullWorkspace||threeFiles?{storageDirectories:{inputs:'/'+account,packages:'/'+account,exports:'/'+account}}:{})},session);
   client=new Client({name:'budget-protocol-client',version:'1'});
   const [agentTransport,bridgeTransport]=InMemoryTransport.createLinkedPair();
   await Promise.all([client.connect(agentTransport),bridge.server.connect(bridgeTransport)]);
@@ -112,21 +113,21 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   assert.ok(parse(inventory).available_node_types.includes('programming.javascript'));
   assert.equal(browserCalls,0);
 
-  if(threeFiles){
+  if(threeFiles||smoothingHp){
    const root=new URL('../../../../../',import.meta.url);
-   const data=new URL(threeFiles==='s4'
+   const data=new URL(smoothingHp?'docs/node-development/nodes/preprocessing-smoothing/acceptance/data/':threeFiles==='s4'
     ?'docs/testing/loginom-ai-agent/demo-2026-10-22/s4-branches/data/'
     :'docs/node-development/nodes/union/acceptance/union-auto-match/data/',root);
-   const names=threeFiles==='s4'?['central.csv','north.csv','south.csv']:['main.csv','second.csv','third.csv'];
+   const names=smoothingHp?['series.csv','update.csv']:threeFiles==='s4'?['central.csv','north.csv','south.csv']:['main.csv','second.csv','third.csv'];
    const inputs=await Promise.all(names.map(async(name,index)=>{
     const sourcePath=new URL(name,data).pathname,buffer=await readFile(sourcePath);
     return session.artifactStore.admit({sourcePath,name:'a'.repeat(64)+'-'+index+'-'+name,bytes:buffer.length,
      sha256:createHash('sha256').update(buffer).digest('hex'),upload:{directory:'/'+account,overwrite:'reject'}});
    }));
    const prepared=await call('dock_prepare'),delivered=parse(prepared);
-   t.diagnostic(threeFiles+' prepare envelope bytes: '+size(prepared));
+   t.diagnostic((smoothingHp?'smoothing-hp':threeFiles)+' prepare envelope bytes: '+size(prepared));
    assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
-   assert.ok(size(prepared)<=43000,'three-file prepare must leave at least 3000 bytes of wire headroom');
+   assert.ok(size(prepared)<=(smoothingHp?46000:43000),smoothingHp?'HP two-file prepare must fit its unchanged wire budget':'three-file prepare must leave at least 3000 bytes of wire headroom');
    assert.deepEqual(delivered.input_artifacts,session.artifactStore.list());
    for(const input of inputs)assert.deepEqual(delivered.input_artifacts.find(item=>item.artifact_id===input.artifact_id),input);
    const diagnosticPath=join(directory,'diagnostics',createHash('sha256').update('dock:'+session.metadata.sessionId).digest('hex'),'events.jsonl');
