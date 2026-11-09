@@ -166,6 +166,21 @@ def recommend_artifact():
         output(2, [column('Transaction', 'string')] + columns + items, recommendations)])
 
 
+def holdout_artifact():
+    # Fixed train rules; only the transaction baskets change. Relearning must
+    # fail this oracle because holdout alone produces no rules.
+    artifact = recommend_artifact()
+    found = rules(baskets('recommend-train.csv'), Fraction(0), 1, max_items=2)
+    assert rules(baskets('recommend-holdout.csv'), Fraction(0), 1, max_items=2) == []
+    rows = [dict(artifact['outputs'][0]['rows'][index], Transaction=t)
+        for t, basket in baskets('recommend-holdout.csv').items() for index, rule in enumerate(found)
+        if set(rule['antecedent']) <= basket and not set(rule['consequent']) & basket]
+    assert rows == [dict(RuleID=1, Support=.75, Confidence=.75, Lift=1.,
+        Transaction='H1', Item_0_A='A', Item_0_C='B')]
+    artifact['outputs'][1]['rows'] = rows
+    return artifact
+
+
 if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):
     for name, value in consequents_artifacts().items():
         path = Path(__file__).with_name(name)
@@ -178,7 +193,10 @@ elif __name__ == '__main__':
     value = expected()
     if sys.argv[1:] == ['--write-recommend']:
         Path(__file__).with_name('expected-recommend.json').write_text(json.dumps(recommend_artifact(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    elif sys.argv[1:] == ['--write-holdout']:
+        Path(__file__).with_name('expected-holdout.json').write_text(json.dumps(holdout_artifact(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     elif sys.argv[1:] == ['--check']:
+        assert json.loads(Path(__file__).with_name('expected-holdout.json').read_text()) == holdout_artifact()
         assert json.loads(Path(__file__).with_name('expected-recommend.json').read_text()) == recommend_artifact()
         task = Path(__file__).with_name('task-recommend.md').read_text()
         assert 'recommend-train.csv' in task and 'recommend-holdout.csv' not in task

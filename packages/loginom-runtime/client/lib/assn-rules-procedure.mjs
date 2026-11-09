@@ -1,6 +1,7 @@
 import {resolveAssnRulesRoles} from './assn-rules-parameters.mjs';
 import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('Association rules: '+m);};
 const semantic=fs=>fs.map(({selected,origin_type,...f})=>f);
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -48,6 +49,7 @@ export async function configureAssnRulesRoles(channel,p,inputMapping){
 }
 
 export async function configureAssnRules(channel,p,{request,inputMapping}){
+ if(request.mode==='apply')return configureAssnRulesApply(channel);
  const roles=await configureAssnRulesRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'association rules '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -78,5 +80,33 @@ export async function configureAssnRules(channel,p,{request,inputMapping}){
  await next('assn_rules','done');
  const done=await channel.observe({condition:'association rule settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,min_support_pct:after.values.pedMinSupport,min_confidence_pct:after.values.pedMinConfidence,max_items:after.values.pedNItemsMax,min_lift:after.values.pedMinLift,max_consequents:after.values.pedNConsequentMax,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+}
+
+// Inspect and Cancel: committing even unchanged settings invalidates the model.
+async function configureAssnRulesApply(channel){
+ const observe=stage=>channel.observe({condition:'inspect saved association rules '+stage,readAssnRules:true,ready:s=>s.wizard?.stage===stage&&s.node_assn_rules?.verified===true});
+ const saved=async(value,message)=>{
+  if(value)return;
+  const error=Error('Association rules apply: saved '+message+' is unsupported; no training requested');
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'assn_rules_apply_preserved',proof:{closed:await closePreparedWizard(channel)}};throw error;
+ };
+ const next=(stage,destination)=>channel.perform({condition:'inspect association rules '+stage,ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
+  resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:destination};}});
+ const roles=(await observe('input_mapping')).node_assn_rules;
+ const transaction=roles.fields.filter(f=>f.usage_type===roles.roles.transaction),item=roles.fields.filter(f=>f.usage_type===roles.roles.item);
+ await saved(transaction.length===1&&item.length===1&&transaction[0].name!==item[0].name&&[...transaction,...item].every(f=>f.type==='string'&&f.data_kind==='Дискретный')&&roles.fields.every(f=>[0,roles.roles.transaction,roles.roles.item].includes(f.usage_type)),'discrete string roles');
+ await next('input_mapping','assn_rules_auxiliary');
+ const auxiliary=(await observe('assn_rules_auxiliary')).node_assn_rules;
+ await saved(auxiliary.kind==='auxiliary'&&auxiliary.field_count===0,'auxiliary input');
+ await next('assn_rules_auxiliary','assn_rules');
+ const params=(await observe('assn_rules')).node_assn_rules,v=params.values;
+ await saved(params.kind==='parameters'&&Object.values(params.switches).every(x=>x===false)&&['pedExcludeLargeSupportItems','pedSelectColumn','pedExcludeSingleItems'].every(k=>v[k]===false),'filters or variable-driven parameters');
+ await saved([2,3].includes(v.pedNItemsMax)&&[1,2].includes(v.pedNConsequentMax)&&v.pedNConsequentMax<v.pedNItemsMax&&['pedMinSupport','pedMinConfidence'].every(k=>Number.isFinite(v[k])&&v[k]>=0&&v[k]<=100)&&Number.isFinite(v.pedMinLift)&&v.pedMinLift>=0,'FP-Growth parameters');
+ await next('assn_rules','done');
+ const done=await channel.observe({condition:'saved association rules inspected',ready:s=>s.wizard?.stage==='done'});
+ return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false,
+  configuration:{...roles,mode:'apply',min_support_pct:v.pedMinSupport,min_confidence_pct:v.pedMinConfidence,max_items:v.pedNItemsMax,min_lift:v.pedMinLift,max_consequents:v.pedNConsequentMax,node_context:done.prepared_node_context},
+  validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
 

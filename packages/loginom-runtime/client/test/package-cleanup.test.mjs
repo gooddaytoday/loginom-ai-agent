@@ -413,6 +413,23 @@ test('foreign prepared package or tab refuses before native close', async () => 
   assert.deepEqual(f.events,[]);
 });
 
+// LAB-1331: Save As reopened the package as a new node in TF-5. The original
+// preparation receipt (tb-1) no longer owns it; only a rebind receipt does.
+test('reopened package closes only through its rebind receipt', async () => {
+  const reopenedTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';
+  const rebind=f=>vm.runInContext(`__loginomDockPreparationV1.receipts.set('cleanup-rebind',{request:JSON.stringify({session:'owned-session',intent:'open_package'}),
+    packageNode:bg.app.Application.FInstance.FMainForm.FMapTree.PackageNodes.Items(0),tab:ownedTab})`,f.context);
+  const original=fixture({foreignPreparedPackage:true,tabTid:reopenedTab});rebind(original);
+  const stale=await original.run({tabTid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1'});
+  assert.equal(stale.reason,'TAB_IDENTITY_CHANGED');assert.deepEqual(original.events,[]);
+  const unbound=fixture({foreignPreparedPackage:true,tabTid:reopenedTab}),refused=await unbound.run({tabTid:reopenedTab});
+  assert.equal(refused.reason,'TAB_IDENTITY_CHANGED');assert.deepEqual(unbound.events,[]);
+  const bound=fixture({foreignPreparedPackage:true,tabTid:reopenedTab});rebind(bound);
+  const result=await bound.run({tabTid:reopenedTab});
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.package_closed,true);assert.equal(result.logged_out,true);
+  assert.deepEqual(bound.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
+});
+
 for (const [change,reason] of [
   [{modified:true},'UNSAVED_CHANGES'], [{running:true},'RUNNING_NODES'],
   [{account:'another-user'},'ACCOUNT_CHANGED'], [{path:'/other/result.lgp'},'PACKAGE_IDENTITY_CHANGED'],
