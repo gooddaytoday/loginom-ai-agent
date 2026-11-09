@@ -924,6 +924,13 @@ expected-collapse.json пишет `oracle.py --write` из `cases.collapse`. Val
 порядок, CSV/Save/cold/cleanup. Модели — только task и CSV. Замена Variant
 проверяется принятым `replace-keep-variant`.
 
+`colunion-third-determining`: `transform-coluniondata/acceptance/v040/task-third-determining.md`,
+три CSV из `v040/fixtures`, один экспорт и `expected-third.json` (одна строка).
+`col_union_settings` требует readback `row_count=input`, `determining_input=third`,
+`padding=null` на том же узле до Save; cold читает сохранённые настройки через
+production `readColUnion` и отменяет мастер без применения изменений. CSV без
+этого аудита не даёт PASS: `minimum` возвращает ту же строку.
+
 `smoothing-db2`, `smoothing-db2-depth2`, `smoothing-coif1`, `smoothing-cdf97`,
 `smoothing-db2-zero`, `smoothing-cdf97-reflect`: утверждённые task-*.md и
 expected-*.json из preprocessing-smoothing/acceptance/modes. Только wavelet.csv
@@ -935,3 +942,8 @@ CSV, Save, cold без перенастройки и cleanup; CDF сохраня
 Stock CSV, Save, cold без перенастройки существующего узла и cleanup.
 Oracle/expected остаются вне контекста модели. Регрессия: `colunion-edit`,
 `colunion-repeat`, `union-auto-match`.
+
+`linreg-elastic`: C10, утверждённая независимая точка (1,3) на shifted.csv.
+Только task-elastic.md и CSV передаются модели; frozen KKT oracle из
+8c1b6ac415645227d8977c3d9f7d3194e7e9b4b2 остаётся приватным. Оба typed-порта,
+прогнозный CSV, Save/cold без перенастройки и cleanup; abs=1e-8, rel=1e-10.
