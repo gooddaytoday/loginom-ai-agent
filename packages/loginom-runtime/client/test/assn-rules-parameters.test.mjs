@@ -53,6 +53,7 @@ test('public dispatch admits all registered association-rule ports before the pr
   budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
  for(const ports of [[2],[1,2],[0,1,2]])
   await dispatchNodeApi(runtime,'dock_node_apply',{...envelope,read:{ports,sample_rows:100,require_exact_numbers:true}});
+ for(const threshold of [90,null])await dispatchNodeApi(runtime,'dock_node_apply',{...envelope,parameters:{...p,exclude_support_above_pct:threshold},read:{ports:[0,1],sample_rows:100,require_exact_numbers:true}});
  for(const type of ['transform.calculator','datamining.clustering'])
   assert.throws(()=>validateNodeApplyEnvelope({...envelope,target:{...envelope.target,type},read:{ports:[2]}}),/must be <= 1/);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,read:{ports:[3],sample_rows:100,require_exact_numbers:true}}),/must be <= 2/);
