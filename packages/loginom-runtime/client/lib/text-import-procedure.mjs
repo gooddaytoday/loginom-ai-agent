@@ -415,7 +415,12 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
         : stage === 'text_import_format' ? w.settings?.fields : null;
       const names = stage === 'text_import_file' ? Object.keys(parameters.source)
         : stage === 'text_import_format' ? Object.keys(parameters.format) : [];
-      if (!names.every(name => fields?.[name]?.status === 'observed' && fields[name].truncated !== true)) return false;
+      // A format picker can temporarily hide the new Variant checkbox. Its own mutation still requires field().
+      const formatPicker=stage==='text_import_format'&&state.ui.elements.some(e=>e.wizard_combo?.kind==='option'
+        &&(e.wizard_combo.field?.scope??'import_format')==='import_format'&&e.wizard_combo.field?.root_ref===w.root_ref
+        &&Object.hasOwn(parameters.format,e.wizard_combo.field.name)&&e.allowed_actions?.includes('select_wizard_option'));
+      if (!names.every(name => fields?.[name]?.status === 'observed' && fields[name].truncated !== true
+        || name==='variant_as_general_type'&&!Object.hasOwn(fields??{},name)&&formatPicker)) return false;
       if (stage === 'output_mapping' && w.output_columns?.definition_coverage?.status !== 'complete_configured_rows') return false;
       if (stage === 'done' && state.ui.elements.filter(e => e.tid === w.root_tid + ';btnDone'
         && e.allowed_actions?.includes('finish_wizard')).length !== 1) return false;
