@@ -36,15 +36,6 @@ button:hover { background: #ebefe6; }
 .details { display: grid; grid-template-columns: minmax(290px, .85fr) minmax(0, 1.7fr); gap: 16px; margin-top: 18px; }
 .details h2, .empty h2 { font-size: clamp(20px, 1.75vw, 26px); letter-spacing: -.035em; font-weight: 550; }
 .comparison { border-radius: 15px; padding: 24px; background: #233e33; color: #fff; }
-.comparison ol { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 18px; }
-.chart-label { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
-.chart-label span { overflow-wrap: anywhere; }
-.chart-label strong { font-weight: 500; color: #d9edb5; white-space: nowrap; }
-.track { position: relative; height: 7px; background: #496155; margin-top: 8px; border-radius: 3px; }
-.track b, .track i { position: absolute; inset-block: 0; }
-.track i { width: 1px; background: #a8b5ac; }
-.track b { background: #c8e98e; border-radius: 3px; }
-.track b.loss { background: #f0af94; }
 .records { min-width: 0; padding: 24px 0 10px; }
 .records h2 { margin: 0 24px 18px; }
 .scroll { overflow-x: auto; }
@@ -69,7 +60,6 @@ td.return { color: #2c5943; font-weight: 600; }
 }
 @media (max-width: 860px) {
   .details { grid-template-columns: 1fr; }
-  .comparison ol { gap: 12px; }
 }
 @media (max-width: 680px) {
   header { align-items: flex-start; flex-direction: column; gap: 18px; }
