@@ -442,6 +442,18 @@ def scenario(name, case_root=None, *, cases=None):
         }[name]
         return dict(source=src, prompt=src / task, data=src / 'data', base=None,
                     expected_name=expected, input_files=inputs)
+    if name in ['outlier-replacement-mean', 'outlier-replacement-median',
+                'outlier-replacement-most-probable', 'outlier-quartile-boundaries']:
+        node = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier'
+        task, expected, fixture = {
+            'outlier-replacement-mean': ('task-replacement-discriminator.md', 'expected-replacement-mean.json', 'replacement-discriminator.csv'),
+            'outlier-replacement-median': ('task-replacement-median.md', 'expected-replacement-median.json', 'replacement-discriminator.csv'),
+            'outlier-replacement-most-probable': ('task-replacement-most-probable.md', 'expected-replacement-most-probable.json', 'replacement-discriminator.csv'),
+            'outlier-quartile-boundaries': ('task-quartile-boundaries.md', 'expected-quartile-boundaries.json', 'quartile-boundaries.csv'),
+        }[name]
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
+                    data=node / 'fixtures', input_files=[fixture], base=None,
+                    expected_name=expected, export_count=3)
     if name in ['outlier-sd', 'outlier-iqr']:
         src = REPO / 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance'
         if name == 'outlier-iqr': src = src / 'iqr'

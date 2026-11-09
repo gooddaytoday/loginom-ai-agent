@@ -78,7 +78,10 @@ RULES = (
 
     ((C + 'ungroup-*.mjs', 'docs/node-development/nodes/transform-ungroupdata/acceptance/**'), ('live-ui',), ('ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights')),
     ((C + 'corr-analysis-*.mjs',), ('live-ui',), ('corr-pairs', 'corr-null', 'corr-age', 'corr-ranks', 'corr-discrete')),
-    ((C + 'elim-outlier-*.mjs',), ('live-ui',), ('outlier-sd', 'outlier-iqr')),
+    ((C + 'elim-outlier-*.mjs', 'docs/node-development/nodes/preprocessing-elimoutlier/acceptance/**',
+      'docs/node-development/nodes/preprocessing-elimoutlier/fixtures/**'), ('live-ui',),
+     ('outlier-replacement-mean', 'outlier-replacement-median', 'outlier-replacement-most-probable',
+      'outlier-quartile-boundaries', 'outlier-sd', 'outlier-iqr')),
     (('scripts/node-acceptance/clustering-apply.mjs',), ('live-ui',), ('clustering-apply',)),
     (('scripts/node-acceptance/clustering-gmeans.mjs', 'docs/node-development/nodes/datamining-clustering/acceptance/v040/**'), ('live-ui',), ('clustering-gmeans',)),
     ((C + 'clustering-*.mjs',), ('live-ui',), ('clustering-apply', 'clustering-gmeans', 'n19', 'r1', 'r2', 'clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
