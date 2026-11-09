@@ -27,6 +27,13 @@ assert (c['data']/'modes.csv').is_file() and c['oracle'].is_file()
 assert [o['output_port'] for o in e['outputs']]==[0,1]
 assert all(o['column_order']=='exact' and o['ordered'] for o in e['outputs'])
 assert sum(len(o['columns'])*len(o['rows']) for o in e['outputs'])==146
+c=r.scenario('binning-ties-current');e=r.expected_for(c,'/owned/current.lgp')
+assert c['input_files']==['ties-modes.csv'] and c['expected_name']=='modes/expected-current.json'
+assert c['prompt'].name=='task-ties-current.md' and c['export_count']==2
+assert (c['data']/'ties-modes.csv').is_file() and c['oracle'].is_file()
+assert [o['output_port'] for o in e['outputs']]==[0,1]
+assert all(o['column_order']=='exact' and o['ordered'] for o in e['outputs'])
+assert sum(len(o['columns'])*len(o['rows']) for o in e['outputs'])==156
 for kind in ['auto','sd']:
  c=r.scenario('binning-'+kind);e=r.expected_for(c,'/owned/modes.lgp')
  assert c['input_files']==['numeric-modes.csv'] and c['export_count']==2

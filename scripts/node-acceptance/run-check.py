@@ -389,12 +389,13 @@ def scenario(name, case_root=None, *, cases=None):
                     data=src / 'data', base=None, export_count=3,
                     input_files=['train.csv', 'holdout.csv'] if applying else ['train.csv'],
                     expected_name='expected-apply.json' if applying else 'expected.json')
-    if name in ['binning-auto', 'binning-sd']:
+    if name in ['binning-auto', 'binning-sd', 'binning-ties-current']:
         node = REPO / 'docs/node-development/nodes/preprocessing-binning'
         kind = name.removeprefix('binning-')
         return dict(source=node / 'acceptance', prompt=node / ('acceptance/task-' + kind + '.md'),
-                    data=node / 'fixtures', base=None, export_count=2, input_files=['numeric-modes.csv'],
-                    expected_name='modes/expected-' + kind + '.json', oracle=node / 'acceptance/modes/oracle.py')
+                    data=node / 'fixtures', base=None, export_count=2,
+                    input_files=['ties-modes.csv'] if kind == 'ties-current' else ['numeric-modes.csv'],
+                    expected_name='modes/expected-' + ('current' if kind == 'ties-current' else kind) + '.json', oracle=node / 'acceptance/modes/oracle.py')
     if name == 'binning-datetime-manual':
         node = REPO / 'docs/node-development/nodes/preprocessing-binning'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-datetime-manual.md',

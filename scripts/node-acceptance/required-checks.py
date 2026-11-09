@@ -94,7 +94,7 @@ RULES = (
     (('scripts/node-acceptance/clustering-normalized.mjs',
       'docs/node-development/nodes/datamining-clustering/acceptance/normalized/**'), ('live-ui',), ('clustering-normalized',)),
     ((C + 'coarse-classes-*.mjs', 'docs/node-development/nodes/preprocessing-coarseclasses/acceptance/modes/**'), ('live-ui',), ('coarse-classes-frozen-zero', 'coarse-classes-continuous-manual', 'coarse-classes-train', 'coarse-classes-apply')),
-    ((C + 'binning-*.mjs', 'docs/node-development/nodes/preprocessing-binning/acceptance/modes/**'), ('live-ui',), ('binning-auto', 'binning-sd', 'binning-count', 'binning-width', 'binning-frequency', 'binning-apply', 'binning-datetime-manual')),
+    ((C + 'binning-*.mjs', 'docs/node-development/nodes/preprocessing-binning/acceptance/modes/**'), ('live-ui',), ('binning-auto', 'binning-sd', 'binning-count', 'binning-width', 'binning-frequency', 'binning-apply', 'binning-datetime-manual', 'binning-ties-current', 'binning-frequency-ties')),
     (('scripts/node-acceptance/logreg-normalization.mjs', 'docs/node-development/nodes/datamining-logregression/acceptance/modes/normalization/**'), ('live-ui',), ('logreg-normalization',)),
     ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-ridge', 'logreg-normalization', 'logreg-coefficients', 'logreg-apply', 'logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive')),
     (('scripts/node-acceptance/scenarios/linreg-elastic/**',), ('live-ui',), ('linreg-elastic',)),

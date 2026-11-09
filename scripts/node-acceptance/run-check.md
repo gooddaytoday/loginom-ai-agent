@@ -871,6 +871,12 @@ Cluster/Distance/X/Y/RowID/Txn/Item. Последний наблюдён на l1
 146 значений обоих портов, типы/порядок, NULL, два CSV, Save/cold/cleanup.
 Модель получает только task и modes.csv; oracle остаётся в оснастке.
 
+`binning-ties-current` использует task-ties-current.md и только fixtures/ties-modes.csv:
+frequency, size=4, ties=current, без сумм. Неизменный modes/expected-current.json
+проверяет все 156 значений двух портов, типы/порядок, NULL, два CSV, Save,
+cold без перенастройки и cleanup. `binning-frequency-ties` проверяет прежний
+next по умолчанию; oracle/expected остаются вне модельного контекста.
+
 `binning-auto` и `binning-sd` используют task-auto.md/task-sd.md и только
 fixtures/numeric-modes.csv; expected_name=modes/expected-auto.json либо
 modes/expected-sd.json, два экспорта. Auto — count=2 без ручных пределов;
