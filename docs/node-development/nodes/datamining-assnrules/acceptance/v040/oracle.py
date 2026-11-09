@@ -19,18 +19,12 @@ def baskets(name):
     return result
 
 
-def selected_items(name):
-    with (ROOT / 'fixtures/v040' / name).open(newline='', encoding='utf-8') as stream:
-        return sorted({row['Item'] for row in csv.DictReader(stream)})
-
-
 def support_of(source):
     return lambda s: Fraction(sum(set(s) <= b for b in source.values()), len(source))
 
 
-def itemsets(source, max_items=3, selected=(), exclude_above=None):
-    """Frequent sets of 1..max_items items, optionally only sets with a selected item
-    and without items whose own support is above exclude_above."""
+def itemsets(source, max_items=3, exclude_above=None):
+    """Frequent sets excluding items whose support exceeds the inclusive maximum."""
     support = support_of(source)
     items = sorted(set.union(*source.values()))
     if exclude_above is not None:
@@ -38,13 +32,13 @@ def itemsets(source, max_items=3, selected=(), exclude_above=None):
     return [dict(items=list(union), support=float(support(union)))
             for width in range(1, max_items + 1)
             for union in itertools.combinations(items, width)
-            if support(union) >= MIN_SUPPORT and (not selected or set(union) & set(selected))]
+            if support(union) >= MIN_SUPPORT]
 
 
-def rules(source, lift, consequences, max_items=3, selected=(), exclude_above=None):
+def rules(source, lift, consequences, max_items=3, exclude_above=None):
     support = support_of(source)
     result = []
-    for found in itemsets(source, max_items, selected, exclude_above):
+    for found in itemsets(source, max_items, exclude_above):
         union = tuple(found['items'])
         probability = support(union)
         for size in range(1, min(consequences, len(union) - 1) + 1):
@@ -65,15 +59,9 @@ def expected():
     filtered = rules(source, Fraction(6, 5), 2)
     assert len(extended) > len(base) and len(filtered) < len(extended)
     assert any(r['consequent'] == ['B', 'C'] and r['antecedent'] == ['A'] for r in extended)
-    # Selected item B (decision 3 of LAB-1119); excluding support > 90% removes A (4/4) and leaves a non-empty result.
-    selected = selected_items('selected-items.csv')
-    assert selected == ['B']
-    selected_sets = itemsets(source, selected=selected)
-    selected_rules = rules(source, Fraction(0), 2, selected=selected)
-    excluded_sets = itemsets(source, selected=selected, exclude_above=MAX_SUPPORT)
-    excluded_rules = rules(source, Fraction(0), 2, selected=selected, exclude_above=MAX_SUPPORT)
-    assert (len(selected_sets), len(selected_rules)) == (4, 10)
-    assert [s['items'] for s in excluded_sets] == [['B'], ['B', 'C']]
+    excluded_sets = itemsets(source, exclude_above=MAX_SUPPORT)
+    excluded_rules = rules(source, Fraction(0), 2, exclude_above=MAX_SUPPORT)
+    assert [s['items'] for s in excluded_sets] == [['B'], ['C'], ['B', 'C']]
     assert [(r['antecedent'], r['consequent']) for r in excluded_rules] == [(['B'], ['C']), (['C'], ['B'])]
     # A dedicated pair model leaves exactly one applicable rule for H1.
     rec_train = baskets('recommend-train.csv')
@@ -90,14 +78,12 @@ def expected():
     return dict(status='proposal_not_stock_expected', columns='technical schema to bind from live UI',
                 thresholds=dict(min_support_pct=50, min_confidence_pct=60, max_items=3),
                 single_consequent=base, two_consequents=extended, min_lift_1_2=filtered,
-                selected_items=selected,
-                selected_item_B=dict(sets=selected_sets, rules=selected_rules),
-                selected_item_B_then_exclude_support_above_90=dict(sets=excluded_sets, rules=excluded_rules),
+                exclude_support_above_90=dict(sets=excluded_sets, rules=excluded_rules),
                 recommendations=dict(max_items=2, max_consequents=1, source='recommend-train.csv', holdout_source='recommend-holdout.csv', rules=rec_rules, holdout=candidates,
                                      retraining_on_holdout_rules=holdout_retraining,
                                      rule_metrics='from saved train model; never from holdout'),
                 holdout_retraining_would_change_rules=rules(holdout, Fraction(0), 2) != extended,
-                unresolved=['native RuleID order', 'numerical effect of restrictive auxiliary item values',
+                unresolved=['native RuleID order',
                             'native recommendation table and padding for two consequences'])
 
 
@@ -181,10 +167,30 @@ def holdout_artifact():
     return artifact
 
 
-if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents']):
-    for name, value in consequents_artifacts().items():
+def exclude_artifacts():
+    source = baskets('train.csv')
+    sets = itemsets(source, exclude_above=MAX_SUPPORT)
+    found = rules(source, Fraction(0), 2, exclude_above=MAX_SUPPORT)
+    tables = consequents_expected(Fraction(0))
+    tables[0]['rows'] = [row for row in tables[0]['rows'] if any(
+        [row['Item_' + str(i)] for i in range(3) if row['Item_' + str(i)] is not None] == value['items'] for value in sets)]
+    tables[1]['rows'] = [row for row in tables[1]['rows'] if any(
+        [row['Item_' + str(i) + '_A'] for i in range(2) if row['Item_' + str(i) + '_A'] is not None] == value['antecedent'] and
+        [row['Item_' + str(i) + '_C'] for i in range(2) if row['Item_' + str(i) + '_C'] is not None] == value['consequent'] for value in found)]
+    for table, key in zip(tables, ['ItemsetID', 'RuleID']):
+        for index, row in enumerate(table['rows'], 1):
+            row[key] = index
+    assert [len(t['rows']) for t in tables] == [3, 2]
+    artifact = dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
+        ['imports.text', 'datamining.assn_rules', 'exports.text']], outputs=tables)
+    return {name: artifact for name in ['expected-exclude.json', 'expected-exclude-cold.json']}
+
+
+if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents'], ['--write-exclude'], ['--check-exclude']):
+    artifacts = exclude_artifacts() if sys.argv[1].endswith('exclude') else consequents_artifacts()
+    for name, value in artifacts.items():
         path = Path(__file__).with_name(name)
-        if sys.argv[1:] == ['--write-consequents']:
+        if sys.argv[1].startswith('--write-'):
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         else:
             assert json.loads(path.read_text(encoding='utf-8')) == value, name
@@ -196,13 +202,15 @@ elif __name__ == '__main__':
     elif sys.argv[1:] == ['--write-holdout']:
         Path(__file__).with_name('expected-holdout.json').write_text(json.dumps(holdout_artifact(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     elif sys.argv[1:] == ['--check']:
+        for name, artifact in exclude_artifacts().items():
+            assert json.loads(Path(__file__).with_name(name).read_text()) == artifact, name
         assert json.loads(Path(__file__).with_name('expected-holdout.json').read_text()) == holdout_artifact()
         assert json.loads(Path(__file__).with_name('expected-recommend.json').read_text()) == recommend_artifact()
         task = Path(__file__).with_name('task-recommend.md').read_text()
         assert 'recommend-train.csv' in task and 'recommend-holdout.csv' not in task
         assert 'T4' not in task and '.75' not in task
         assert json.loads(Path(__file__).with_name('expected.json').read_text()) == value
-        print('PASS: exhaustive subsets, lift, multi-consequence, selected-item exclusion and holdout sensitivity')
+        print('PASS: exhaustive subsets, lift, multi-consequence, maximum-support exclusion and holdout sensitivity')
     else:
         assert not sys.argv[1:]
         print(json.dumps(value, ensure_ascii=False, indent=2))

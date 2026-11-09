@@ -5,9 +5,6 @@
       "type": "imports.text"
     },
     {
-      "type": "imports.text"
-    },
-    {
       "type": "datamining.assn_rules"
     },
     {
@@ -67,6 +64,14 @@
         },
         {
           "ItemsetID": 2,
+          "Width": 1,
+          "Support": 0.75,
+          "Item_0": "C",
+          "Item_1": null,
+          "Item_2": null
+        },
+        {
+          "ItemsetID": 3,
           "Width": 2,
           "Support": 0.75,
           "Item_0": "B",
