@@ -131,7 +131,7 @@
         const sample = !errors.has(lookup.key) && await active(node) ? await table(node, 12) : null;
         if (overlay !== section) return;
         const snapshot = await post('targets', {binding:target, nodeName:await node.get_DisplayName(),
-          schema:sample?.schema ?? [], rows:sample?.rows ?? [], parameters:available});
+          sample, parameters:available});
         if (overlay !== section) return;
         title.textContent = snapshot.nodeName;
         if (!lookup.exists) {
