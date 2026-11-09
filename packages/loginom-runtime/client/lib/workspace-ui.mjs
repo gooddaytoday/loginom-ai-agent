@@ -4636,6 +4636,9 @@ function readRenderedInputMapping(observation) {
         }
         else if (task.action.verb === 'set_wizard_field') {
           const before=current.ui.elements.find(item=>item.ref===task.action.ref);
+          const exportCombo=before.wizard_field.scope==='export_format' && current.ui.elements.find(item=>
+            item.wizard_combo?.kind==='picker' && item.wizard_combo.field.owner_ref===before.wizard_field.owner_ref
+            && item.wizard_combo.field.input_ref===before.ref);
           const stillOwned=async()=>{
             const fresh=await readUi(),field=fresh.ui.elements.find(item=>item.ref===task.action.ref);
             return fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
@@ -4653,10 +4656,20 @@ function readRenderedInputMapping(observation) {
             await first.press('ControlOrMeta+A',{timeout:timeout()});
             if(!await stillOwned())fail('WIZARD_FIELD_CHANGED','Wizard field changed before replacement; inspect before retry');
             timeout();
-            if(task.action.text)await page.keyboard.type(task.action.text,{delay:0});
+            // Prefix keyups can highlight a preset that Tab would then select.
+            if(task.action.text && exportCombo)await page.keyboard.insertText(task.action.text);
+            else if(task.action.text)await page.keyboard.type(task.action.text,{delay:0});
             else await first.press('Backspace',{timeout:timeout()});
             if(['expression_parameter','output_column','reform_column','import_format','export_format'].includes(before.wizard_field.scope)) {
               if(!await first.evaluate(element=>document.activeElement===element))fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
+              if(exportCombo) {
+                const list=page.locator('[data-tid='+JSON.stringify(exportCombo.tid.replace(/;trg_picker$/,';boundlist'))+']');
+                if(await list.isVisible()) {
+                  await first.press('Escape',{timeout:timeout()});
+                  if(await list.isVisible() || !await first.evaluate(element=>document.activeElement===element))
+                    fail('WIZARD_FIELD_CHANGED','Wizard field lost focus before edit completion');
+                }
+              }
               // Loginom updates a linked display label on input completion.
               // Commit the draft input before reading coupled parameter values.
               await first.press('Tab',{timeout:timeout()});
