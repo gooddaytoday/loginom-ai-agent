@@ -89,12 +89,13 @@
       section.setAttribute('aria-label','Dashboard');
       section.style.cssText = 'position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;background:#fff;font:14px system-ui;color:#242638';
       const header = document.createElement('header');
-      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#393744;color:white';
+      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:2px 16px;background:#393744;color:white';
       const title = document.createElement('strong');
       title.textContent = 'Dashboard';
       header.append(title);
       const back = document.createElement('button');
       back.textContent = 'Вернуться к сценарию';
+      back.style.cssText = 'cursor:pointer;padding:7px 6px';
       back.onclick = close;
       header.append(back);
       const note = document.createElement('p');
@@ -115,17 +116,21 @@
         const lookup = await post('lookup', target);
         await pending;
         if (overlay !== section) return;
-        if (!lookup.exists) {
-          busy++;
-          const task = pending.then(async () => {
-            if (!await active(node)) {
-              note.textContent = 'Идёт расчёт';
+        busy++;
+        const task = pending.then(async () => {
+          if (!await active(node) || errors.has(lookup.key)) {
+            note.textContent = 'Идёт расчёт';
+            try {
               await execute(node);
+              errors.delete(lookup.key);
+            } catch (e) {
+              errors.set(lookup.key, String(e.message ?? e));
+              throw e;
             }
-          });
-          pending = task.then(() => {busy--}, () => {busy--});
-          await task;
-        }
+          }
+        });
+        pending = task.then(() => {busy--}, () => {busy--});
+        await task;
         if (overlay !== section) return;
         const parameters = () => window.loginomDashboardParameters(form);
         const available = await parameters();
@@ -135,17 +140,22 @@
           sample, parameters:available});
         if (overlay !== section) return;
         title.textContent = snapshot.nodeName;
-        const chat = document.createElement('a');
-        chat.href = 'loginom-ai-agent://dashboard?id=' + encodeURIComponent(snapshot.id) + '&action=' + (lookup.exists ? 'edit' : 'create');
+        const chat = document.createElement(lookup.exists ? 'button' : 'a');
+        const chatUrl = 'loginom-ai-agent://dashboard?id=' + encodeURIComponent(snapshot.id) + '&action=' + (lookup.exists ? 'edit' : 'create');
         if (!lookup.exists) {
+          chat.href = chatUrl;
+          chat.target = '_blank';
+          chat.rel = 'noopener';
           chat.textContent = 'Открыть чат в Desktop';
           note.replaceChildren('Опишите пульт для узла «' + snapshot.nodeName + '» в чате. ', chat);
           // A long first execution can outlive the browser's user gesture. The same link remains clickable.
           chat.click();
           return;
         }
+        chat.type = 'button';
         chat.textContent = 'Изменить в чате';
-        chat.style.color = 'white';
+        chat.style.cssText = 'cursor:pointer;text-decoration:underline;padding:7px 6px';
+        chat.onclick = () => window.open(chatUrl, '_blank', 'noopener');
         back.before(chat);
         const state = async () => {
           const params = await parameters();

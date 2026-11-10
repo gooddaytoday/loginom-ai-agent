@@ -30,10 +30,11 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
     if (!platform.getDashboardTarget) return
     const path = location.pathname
     const draftID = search.draftId || search.dashboardDraft
-    const existing = !cold && (path === "/new-session" || /\/session(?:\/[^/]+)?\/?$/.test(path))
+    const current = !cold && (path === "/new-session" || /\/session(?:\/[^/]+)?\/?$/.test(path))
+    const existing = link.action === "edit" && current
     const draft = path === "/new-session" && tabs.store.find((tab) => tab.type === "draft" && tab.draftID === draftID)
     const key =
-      existing && params.serverKey ? requireServerKey(params.serverKey) : existing && draft ? draft.server : server.key
+      current && params.serverKey ? requireServerKey(params.serverKey) : current && draft ? draft.server : server.key
     if (!ServerConnection.local(server.list.find((item) => ServerConnection.key(item) === key))) {
       showToast({ title: language.t("dashboard.target.localOnly"), variant: "error" })
       return
