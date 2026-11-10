@@ -1,5 +1,9 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-11-10 — отдельный чат для нового dashboard, локальный кандидат
+
+`create` всегда открывает отдельный черновик, `edit` сохраняет текущий; выбор сервера прежний. RED→GREEN, App56/56, Desktop4/4, оба typecheck и production benchmark PASS. Отдельный Electron и готовая AppImage проверены с HTTP/busy/IPC fixture, без модели и живой Loginom-сессии. В0.3.9 заменён только renderer,5976 остальных файлов ASAR совпали. Launcher переключён для следующего ручного запуска; пользовательский Desktop/backend не перезапускались. Это локальное исправление, не выпуск. [Отчёт](../testing/loginom-ai-agent/reports/2026-11-10-dashboard-create-chat.md).
+
 ## 2026-10-26 — v0.3.3 опубликован
 
 Release source: `2eea642cf2f0363e12aa1a0078a3740a75cdda42`, ветка `loginom` (PR #441: v033-rel4 9f1d4a48).
