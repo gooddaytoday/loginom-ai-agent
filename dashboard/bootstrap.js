@@ -2,7 +2,7 @@
 (() => {
   const guid = value => String(value).replace(/[{}]/g, '').toLowerCase();
   async function post(path, body) {
-    const res = await fetch('/dashboard/' + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const res = await fetch(location.origin + '/dashboard/' + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     if (!res.ok) throw Error(await res.text());
     return res.json();
   }
