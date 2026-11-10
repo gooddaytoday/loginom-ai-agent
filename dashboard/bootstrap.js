@@ -78,6 +78,13 @@
       const owner = tab();
       const section = document.createElement('section');
       overlay = section;
+      const escape = (event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      };
+      section.addEventListener('keydown', escape, true);
       section.id = 'dashboard-tab-overlay';
       section.setAttribute('aria-label','Dashboard');
       section.style.cssText = 'position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;background:#fff;font:14px system-ui;color:#242638';
@@ -165,6 +172,7 @@
         const frame = document.createElement('iframe');
         frame.title = 'Dashboard';
         frame.style.cssText = 'border:0;flex:1;width:100%;min-height:0';
+        frame.addEventListener('load', () => frame.contentDocument?.addEventListener('keydown', escape, true));
         frame.dashboard = {
           state:async () => {await pending; return state()},
           change:(value, name = available[0]?.name) => {
