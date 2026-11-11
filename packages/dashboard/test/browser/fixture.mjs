@@ -121,6 +121,9 @@ export async function fixture(
         window.Out = class {};
         window.ReleaseObject = () => {};
         window.bg = {
+          IBGModelPackage: 'model-package',
+          IBGModelOutputSocket: 'model-output-socket',
+          IBGDataSource: 'data-source',
           AsyncInvoker: (node, method) => (...args) => method.apply(node, args),
           TBGDataType: {dtInteger: 1},
           TBGProcessingMode: {pmExecute: 'execute'},
@@ -183,7 +186,10 @@ export async function fixture(
           },
           ComponentQuery: {query: () => [view]}
         };
-        if (${JSON.stringify(missingAPI)} === 'EndOperationEx') delete bg.EndOperationEx;
+        const missing = ${JSON.stringify(missingAPI)};
+        if (missing === 'EndOperationEx') delete bg.EndOperationEx;
+        if (missing === 'dtInteger') delete bg.TBGDataType.dtInteger;
+        if (missing === 'IBGModelOutputSocket') delete bg.IBGModelOutputSocket;
       </script><script src="/dashboard-bootstrap.js"></script>`,
     })
   })

@@ -291,3 +291,21 @@ test("invalid snapshot fields leave an error instead of opening Desktop or an if
   assert.equal(await page.getByRole("link", { name: "Открыть чат в Desktop" }).count(), 0)
   assert.deepEqual(errors, [])
 })
+
+test("missing required Studio enum member preserves native actions without dashboard UI", async (t) => {
+  const { page, errors } = await fixture(t, { published: true, missingAPI: "dtInteger" })
+  await page.getByRole("button", { name: "Native action" }).click()
+  assert.equal(await page.evaluate(() => window.fixture.native), true)
+  assert.equal(await page.getByRole("button", { name: /^(Dashboard|Создать dashboard)$/ }).count(), 0)
+  assert.equal(await page.locator("#dashboard-tab-overlay, iframe").count(), 0)
+  assert.deepEqual(errors, [])
+})
+
+test("missing required Studio interface identifier preserves native actions without dashboard UI", async (t) => {
+  const { page, errors } = await fixture(t, { published: true, missingAPI: "IBGModelOutputSocket" })
+  await page.getByRole("button", { name: "Native action" }).click()
+  assert.equal(await page.evaluate(() => window.fixture.native), true)
+  assert.equal(await page.getByRole("button", { name: /^(Dashboard|Создать dashboard)$/ }).count(), 0)
+  assert.equal(await page.locator("#dashboard-tab-overlay, iframe").count(), 0)
+  assert.deepEqual(errors, [])
+})

@@ -23,7 +23,22 @@ export function connect() {
     ].some((method) => typeof method !== "function")
   )
     return
-  if (!bg.TBGDataType || !bg.TBGModelNodeStatus || !bg.TBGProcessingMode || !bg.TBGNodeActivateMode) return
+  if (
+    [
+      bg.IBGModelPackage,
+      bg.IBGModelOutputSocket,
+      bg.IBGDataSource,
+      bg.IBGEditableVariablesOutputSocket,
+      bg.TBGDataType?.dtFloat,
+      bg.TBGDataType?.dtInteger,
+      bg.TBGDataType?.dtBoolean,
+      bg.TBGModelNodeStatus?.mnsActive,
+      bg.TBGProcessingMode?.pmExecute,
+      bg.TBGNodeActivateMode?.namAsynchronous,
+      mxEvent.CHANGE,
+    ].some((value) => value == null)
+  )
+    return
   const studio = { bg, Ext, mxEvent, Out, ReleaseObject }
   const guid = (value: string) => String(value).replace(/[{}]/g, "").toLowerCase()
   async function binding(tab: Tab, form: Form, visual: Visual): Promise<TargetBinding> {
