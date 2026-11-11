@@ -88,7 +88,7 @@ export async function fixture(
           ActivateCancellable: async () => {
             window.fixture.calls++;
             if (window.fixture.wait) await new Promise(resolve => {window.fixture.finish = resolve});
-            if (window.fixture.executeError) throw Error(window.fixture.executeError);
+            if (window.fixture.executeError) throw window.fixture.executeError;
             window.fixture.status = 'active';
           },
           get_OutputPorts: async () => ({getItem: async () => ({
@@ -189,6 +189,7 @@ export async function fixture(
         };
         const missing = ${JSON.stringify(missingAPI)};
         if (missing === 'EndOperationEx') delete bg.EndOperationEx;
+        if (missing === 'GetData' || missing === 'GetOutputPorts') delete visual[missing];
         if (missing === 'dtInteger') delete bg.TBGDataType.dtInteger;
         if (missing === 'IBGModelOutputSocket') delete bg.IBGModelOutputSocket;
         if (${lateForm}) {
