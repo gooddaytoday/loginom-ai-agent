@@ -148,7 +148,7 @@ function App() {
   useEffect(() => {
     if (!dashboard) {
       setBusy(false)
-      setError("Откройте пульт через кнопку Dashboard выбранного узла в Loginom.")
+      setError("Откройте dashboard через кнопку Dashboard выбранного узла в Loginom.")
       return
     }
     const adapter = dashboard

@@ -51,7 +51,7 @@ function App() {
 
   useEffect(() => {
     if (!adapter) {
-      setError("Откройте пульт у узла «По убыванию ROI» в Loginom.")
+      setError("Откройте dashboard у узла «По убыванию ROI» в Loginom.")
       setBusy(false)
       return
     }
@@ -143,7 +143,7 @@ function App() {
       {!last && !busy && adapter && <button type="button" onClick={() => void calculate(() => adapter.run())}>Выполнить</button>}
       {last && error && !busy && adapter && <button type="button" onClick={() => void calculate(() => adapter.run())}>Повторить расчёт</button>}
     </section>
-    <footer>Источник: По убыванию ROI <span>Живые данные · штатный адаптер пульта</span></footer>
+    <footer>Источник: По убыванию ROI <span>Живые данные · штатный адаптер dashboard</span></footer>
   </main>
 }
 

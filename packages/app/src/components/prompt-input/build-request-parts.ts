@@ -200,8 +200,8 @@ export function buildDashboardPart(item: Extract<ContextItem, { type: "dashboard
     synthetic: true,
     text: [
       item.action === "create"
-        ? "Создай пульт Loginom по просьбе пользователя."
-        : "Измени пульт Loginom по просьбе пользователя.",
+        ? "Создай dashboard Loginom по просьбе пользователя."
+        : "Измени dashboard Loginom по просьбе пользователя.",
       `Прочитай снимок запросом GET http://127.0.0.1:32768/dashboard/targets/${item.id} и используй только этот ID до окончания запроса.`,
       "Возьми путь исходников и команды из этого снимка. Штатными инструментами отредактируй файлы, проверь, собери и опубликуй приложение.",
       "Не обращайся к /dashboard/current и не входи в живую сессию Loginom.",

@@ -147,7 +147,7 @@
           chat.target = '_blank';
           chat.rel = 'noopener';
           chat.textContent = 'Открыть чат в Desktop';
-          note.replaceChildren('Опишите пульт для узла «' + snapshot.nodeName + '» в чате. ', chat);
+          note.replaceChildren('Опишите dashboard для узла «' + snapshot.nodeName + '» в чате. ', chat);
           // A long first execution can outlive the browser's user gesture. The same link remains clickable.
           chat.click();
           return;
