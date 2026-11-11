@@ -1,6 +1,10 @@
 import { parameters } from "./parameters"
 import type { Form, Node, Studio, Tab, View, Visual, TargetBinding, Update } from "./types"
 
+function missingMethod(...methods: unknown[]) {
+  return methods.some((method) => typeof method !== "function")
+}
+
 export function connect() {
   const runtime = window as Window & Partial<Studio>
   const bg = runtime.bg
@@ -9,7 +13,7 @@ export function connect() {
   const ReleaseObject = runtime.ReleaseObject
   if (!bg || !mxEvent || !Out || !ReleaseObject) return
   if (
-    [
+    missingMethod(
       Out,
       ReleaseObject,
       bg.AsyncInvoker,
@@ -18,7 +22,7 @@ export function connect() {
       bg.ScopeFindObject,
       bg.EndOperationEx,
       bg.app?.Application?.Instance?.FMainForm?.GetActiveTab,
-    ].some((method) => typeof method !== "function")
+    )
   )
     return
   if (
@@ -39,8 +43,7 @@ export function connect() {
     return
   const studio = { bg, Out, ReleaseObject }
   const guid = (value: string) => String(value).replace(/[{}]/g, "").toLowerCase()
-  async function binding(tab: Tab, form: Form, visual: Visual): Promise<TargetBinding> {
-    const node = visual.GetData()
+  async function binding(tab: Tab, form: Form, node: Node): Promise<TargetBinding> {
     let filename: string | undefined
     await studio.bg.selectAsyncValue(
       node,
@@ -114,15 +117,19 @@ export function connect() {
       const form = view.Controller
       const toolbar = form?.Items?.tlbModel
       const graph = form?.FDiagram?.GetMxGraph
-      if (
-        [form?.GetOneSelectedNode, toolbar?.insert, toolbar?.getComponent, graph, view.on].some(
-          (method) => typeof method !== "function",
-        )
-      )
-        return false
+      if (missingMethod(form?.GetOneSelectedNode, toolbar?.insert, toolbar?.getComponent, graph, view.on)) return false
       const selection = form.FDiagram.GetMxGraph()?.getSelectionModel?.()
-      return typeof selection?.addListener === "function" && typeof selection?.removeListener === "function"
+      return !missingMethod(selection?.addListener, selection?.removeListener)
     },
+    selected(form: Form) {
+      const visual = form.GetOneSelectedNode(false)
+      if (!missingMethod(visual?.GetOutputPorts, visual?.GetData)) return visual
+    },
+    tableNode(visual: Visual) {
+      // Loginom PortAbstract: subtype 1 is a table. Never execute an export to discover its type.
+      return visual.GetOutputPorts()[0]?.SubType === 1 ? visual.GetData() : undefined
+    },
+    name: (node: Node) => node.get_DisplayName(),
     binding,
     table,
     active,
@@ -150,7 +157,7 @@ export function connect() {
 // the main form and the runtime APIs become available when a workflow renders.
 export function views(install: (view: View) => void) {
   const Ext = (window as Window & Partial<Studio>).Ext
-  if ([Ext?.onReady, Ext?.create, Ext?.ComponentQuery?.query].some((method) => typeof method !== "function")) return
+  if (missingMethod(Ext?.onReady, Ext?.create, Ext?.ComponentQuery?.query)) return
   Ext!.onReady(() => {
     const controller = Ext!.create("Ext.app.Controller", { id: "loginomDashboardApp" })
     if (typeof controller?.control !== "function") return

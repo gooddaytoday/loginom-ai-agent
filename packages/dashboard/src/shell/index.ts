@@ -2,7 +2,7 @@ import { lookupResponse, snapshotResponse } from "./response"
 import { connect, views } from "./loginom/adapter"
 import type { Frame, Update, View } from "./loginom/types"
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
+const message = (error: unknown) => String((error as { message?: unknown } | null)?.message ?? error)
 start()
 function start() {
   async function post(path: string, body: unknown) {
@@ -24,8 +24,10 @@ function start() {
     let overlay: HTMLElement | undefined
     let pending: Promise<void> = Promise.resolve(),
       busy = 0
+    const finish = () => {
+      busy--
+    }
     const errors = new Map<string, string>()
-    const selected = () => form.GetOneSelectedNode(false)
     const tab = studio.tab
     const close = () => {
       overlay?.remove()
@@ -34,7 +36,7 @@ function start() {
     }
 
     async function open() {
-      const visual = selected()
+      const visual = studio.selected(form)
       if (!visual || overlay) return
       const owner = tab()
       const section = document.createElement("section")
@@ -68,14 +70,13 @@ function start() {
       owner.View.el.dom.append(section)
       back.focus()
       try {
-        // Loginom PortAbstract: subtype 1 is a table. Never execute an export to discover its type.
-        if (visual.GetOutputPorts()[0]?.SubType !== 1) {
+        const node = studio.tableNode(visual)
+        if (!node) {
           note.textContent = "Dashboard для этого узла недоступен"
           return
         }
-        const node = visual.GetData()
         note.textContent = busy ? "Идёт расчёт" : "Открываем dashboard…"
-        const target = await studio.binding(owner, form, visual)
+        const target = await studio.binding(owner, form, node)
         const lookup = lookupResponse(await post("lookup", target))
         await pending
         if (overlay !== section) return
@@ -92,14 +93,7 @@ function start() {
             }
           }
         })
-        pending = task.then(
-          () => {
-            busy--
-          },
-          () => {
-            busy--
-          },
-        )
+        pending = task.then(finish, finish)
         await task
         if (overlay !== section) return
         const parameters = () => studio.parameters(form)
@@ -109,7 +103,7 @@ function start() {
         const snapshot = snapshotResponse(
           await post("targets", {
             binding: target,
-            nodeName: await node.get_DisplayName(),
+            nodeName: await studio.name(node),
             sample,
             parameters: available,
           }),
@@ -161,14 +155,7 @@ function start() {
               return await state()
             }
           })
-          pending = task.then(
-            () => {
-              busy--
-            },
-            () => {
-              busy--
-            },
-          )
+          pending = task.then(finish, finish)
           return task
         }
         const frame = document.createElement("iframe") as Frame
@@ -203,13 +190,14 @@ function start() {
     let revision = 0
     async function update() {
       const seq = ++revision
-      const visual = selected()
+      const visual = studio.selected(form)
       button.setVisible(Boolean(visual))
       if (!visual) return
       button.setText("Dashboard")
-      if (visual.GetOutputPorts()[0]?.SubType !== 1) return
       try {
-        const lookup = lookupResponse(await post("lookup", await studio.binding(tab(), form, visual)))
+        const node = studio.tableNode(visual)
+        if (!node) return
+        const lookup = lookupResponse(await post("lookup", await studio.binding(tab(), form, node)))
         if (seq === revision && !view.destroyed) button.setText(lookup.exists ? "Dashboard" : "Создать dashboard")
       } catch {
         /* Opening the button reports the service error in the tab. */

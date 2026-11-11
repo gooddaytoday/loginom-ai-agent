@@ -105,15 +105,15 @@ test("reopening retries a saved error even when the node remains active", async 
   await page.locator("iframe").waitFor()
   assert.equal(await page.evaluate(() => window.fixture.calls), 0)
   await page.evaluate(() => {
-    window.fixture.executeError = "Calculation failed"
+    window.fixture.executeError = { message: "Ошибка расчёта в Studio" }
   })
   const failed = await page.locator("iframe").evaluate((frame) => frame.dashboard.run())
-  assert.equal(failed.error, "Calculation failed")
+  assert.equal(failed.error, "Ошибка расчёта в Studio")
   assert.equal(failed.table, null)
   assert.equal(await page.evaluate(() => window.fixture.status), "active")
   await page.getByRole("button", { name: "Вернуться к сценарию" }).click()
   await page.evaluate(() => {
-    window.fixture.executeError = "Still failing"
+    window.fixture.executeError = Error("Still failing")
   })
   await page.getByRole("button", { name: "Dashboard", exact: true }).click()
   await page.getByRole("status").filter({ hasText: "Still failing" }).waitFor()
@@ -179,7 +179,7 @@ test("closing during a parameter calculation and reopening waits without a dupli
 test("an initial calculation error stays visible until a successful reopening", async (t) => {
   const { page, errors } = await fixture(t, { published: true, status: "inactive" })
   await page.evaluate(() => {
-    window.fixture.executeError = "Source unavailable"
+    window.fixture.executeError = Error("Source unavailable")
   })
   await page.getByRole("button", { name: "Dashboard", exact: true }).click()
   await page.getByRole("status").filter({ hasText: "Source unavailable" }).waitFor()
@@ -249,14 +249,17 @@ test("queued parameter submissions finish in order after the iframe closes", asy
   assert.deepEqual(errors, [])
 })
 
-test("missing required Studio API preserves native actions without a dashboard button", async (t) => {
-  const { page, errors } = await fixture(t, { missingAPI: "EndOperationEx" })
-  await page.getByRole("button", { name: "Native action" }).click()
-  assert.equal(await page.evaluate(() => window.fixture.native), true)
-  assert.equal(await page.getByRole("button", { name: /^(Dashboard|Создать dashboard)$/ }).count(), 0)
-  assert.equal(await page.locator("#dashboard-tab-overlay").count(), 0)
-  assert.deepEqual(errors, [])
-})
+for (const missingAPI of ["EndOperationEx", "GetOutputPorts", "GetData"]) {
+  test(`missing ${missingAPI} preserves native actions without a dashboard button`, async (t) => {
+    const { page, errors } = await fixture(t, { missingAPI, lateForm: true })
+    await page.evaluate(() => window.fixture.showScenario())
+    await page.getByRole("button", { name: "Native action" }).click()
+    assert.equal(await page.evaluate(() => window.fixture.native), true)
+    assert.deepEqual(errors, [])
+    assert.equal(await page.getByRole("button", { name: /^(Dashboard|Создать dashboard)$/ }).count(), 0)
+    assert.equal(await page.locator("#dashboard-tab-overlay").count(), 0)
+  })
+}
 
 test("Escape closes the bundled dashboard and leaves Studio usable", async (t) => {
   const { page, errors } = await fixture(t, { published: true })
