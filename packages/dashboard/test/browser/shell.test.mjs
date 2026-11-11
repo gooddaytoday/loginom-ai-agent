@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
-import { chromium } from "../packages/loginom-runtime/client/node_modules/playwright-core/index.mjs"
+import { chromium } from "../../../loginom-runtime/client/node_modules/playwright-core/index.mjs"
 
 async function fixture(t, { published = false, status = "active" } = {}) {
-  const browser = await chromium.launch({ headless: true, chromiumSandbox: true })
+  const browser = await chromium.launch({ channel: "chromium", headless: true, chromiumSandbox: true })
   t.after(() => browser.close())
   const context = await browser.newContext()
   await context.addInitScript(() => {
@@ -26,7 +26,7 @@ async function fixture(t, { published = false, status = "active" } = {}) {
     }, true)
   })
   const origin = "http://127.0.0.1:39999"
-  const bootstrap = await readFile(new URL("./bootstrap.js", import.meta.url), "utf8")
+  const bootstrap = await readFile(new URL("../../../../dashboard/bootstrap.js", import.meta.url), "utf8")
   const snapshots = []
   await context.route("**/*", async route => {
     const url = new URL(route.request().url())
@@ -316,5 +316,40 @@ test("creation still calculates its sample and unsupported outputs never execute
   await page.getByRole("status").filter({ hasText: "Dashboard для этого узла недоступен" }).waitFor()
   assert.equal(await page.evaluate(() => window.fixture.calls), 1)
   assert.equal(snapshots.length, 1)
+  assert.deepEqual(errors, [])
+})
+
+test("queued parameter submissions finish in order after the iframe closes", async t => {
+  const { page, errors } = await fixture(t, { published: true })
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await page.locator("iframe").waitFor()
+  await page.locator("iframe").evaluate(frame => {
+    window.fixture.wait = true
+    window.fixture.writes = []
+    const parameters = window.loginomDashboardParameters
+    window.loginomDashboardParameters = (form, update) => {
+      if (update) window.fixture.writes.push(update.value)
+      return parameters(form, update)
+    }
+    window.fixture.first = frame.dashboard.change(17)
+    window.fixture.second = frame.dashboard.change(29)
+  })
+  await page.waitForFunction(() => window.fixture.calls === 1 && window.fixture.finish)
+  assert.deepEqual(await page.evaluate(() => window.fixture.writes), [17])
+  await page.getByRole("button", { name: "Вернуться к сценарию" }).click()
+  assert.equal(await page.locator("iframe").count(), 0)
+  await page.evaluate(() => {
+    const finish = window.fixture.finish
+    delete window.fixture.finish
+    finish()
+  })
+  await page.waitForFunction(() => window.fixture.calls === 2 && window.fixture.finish)
+  assert.deepEqual(await page.evaluate(() => window.fixture.writes), [17, 29])
+  await page.evaluate(() => window.fixture.finish())
+  assert.deepEqual(await page.evaluate(async () => (await Promise.all([window.fixture.first, window.fixture.second])).map(state => state.value)), [17, 29])
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await page.locator("iframe").waitFor()
+  assert.equal(await page.locator("iframe").evaluate(async frame => (await frame.dashboard.state()).value), 29)
+  assert.equal(await page.evaluate(() => window.fixture.calls), 2)
   assert.deepEqual(errors, [])
 })

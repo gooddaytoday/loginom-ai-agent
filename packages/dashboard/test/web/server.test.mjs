@@ -5,7 +5,7 @@ import { request } from "node:http"
 import { networkInterfaces, tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { dashboardServer, startDashboard } from "./server.mjs"
+import { dashboardServer, startDashboard } from "../../../../dashboard/server.mjs"
 
 const binding = {
   server: "http://127.0.0.1:32768",
@@ -22,6 +22,7 @@ async function stand(t, options = {}) {
     projectRoot: root,
     publishRoot: join(root, "published"),
     maxSnapshots: options.maxSnapshots,
+    allowCurrent: options.allowCurrent,
   })
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
@@ -255,4 +256,111 @@ test("debug current rejects a non-loopback TCP peer despite forwarded headers", 
   assert.equal(byID.data.id, created.data.id)
   assert.equal((await send("/current")).status, 404)
   assert.deepEqual(peers, [address, address, address])
+})
+
+test("M0 application keys normalize GUID case and preserve the package path", async t => {
+  const server = await stand(t)
+  // SHA-256 of the M0 JSON tuple [server, packagePath, lowercase workflow/node GUIDs, 0].
+  const expected = "c6942c09050b00fa713cd36efa108198ae1e5a58a8fea55962212b3f52b0effb"
+  assert.equal((await server.request("lookup", binding)).key, expected)
+  assert.equal((await server.request("lookup", {
+    ...binding, workflowGuid: binding.workflowGuid.toUpperCase(), nodeGuid: binding.nodeGuid.toUpperCase(),
+  })).key, expected)
+  assert.notEqual((await server.request("lookup", { ...binding, packagePath: binding.packagePath.toLowerCase() })).key, expected)
+  assert.notEqual((await server.request("lookup", { ...binding, server: "http://localhost:32768" })).key, expected)
+  await assert.rejects(server.request("lookup", { ...binding, port: 1 }), /returned 400/)
+})
+
+test("lookup leaves current unchanged and default retention evicts only the oldest of 101 snapshots", async t => {
+  const server = await stand(t, { allowCurrent: true })
+  const data = { binding, nodeName: "Retained target", schema: [{ name: "n", type: 1 }], parameters: [] }
+  const first = await server.request("targets", { ...data, rows: [[0]] })
+  await server.request("lookup", other)
+  assert.deepEqual(await server.request("current"), first)
+  const snapshots = [first]
+  for (let i = 1; i < 100; i++) snapshots.push(await server.request("targets", { ...data, binding: other, rows: [[i]] }))
+  assert.deepEqual(await server.request("targets/" + first.id), first)
+  assert.deepEqual(await server.request("current"), snapshots[99])
+  const last = await server.request("targets", { ...data, rows: [[100]] })
+  assert.equal((await fetch(server.base + "/targets/" + first.id)).status, 404)
+  for (const snapshot of snapshots.slice(1)) assert.deepEqual(await server.request("targets/" + snapshot.id), snapshot)
+  assert.deepEqual(await server.request("targets/" + last.id), last)
+  await server.request("lookup", other)
+  assert.deepEqual(await server.request("current"), last)
+})
+
+test("sample replaces legacy schema and rows while omitted sample retains their meaning", async t => {
+  const server = await stand(t)
+  const legacy = { schema: [{ name: "legacy", type: "number" }], rows: [[12]] }
+  const sample = { schema: [{ name: "sample", type: 3 }], rows: [[34]] }
+  const data = { binding, nodeName: "Payload compatibility", parameters: [] }
+  const top = await server.request("targets", { ...data, ...legacy })
+  assert.deepEqual({ schema: top.schema, rows: top.rows, tableSource: top.tableSource }, { ...legacy, tableSource: "live" })
+  const nested = await server.request("targets", { ...data, sample })
+  assert.deepEqual({ schema: nested.schema, rows: nested.rows, tableSource: nested.tableSource }, { ...sample, tableSource: "live" })
+  const both = await server.request("targets", { ...data, ...legacy, sample })
+  assert.deepEqual({ schema: both.schema, rows: both.rows }, sample)
+  const ignoredLegacy = await server.request("targets", { ...data, schema: "invalid ignored legacy", rows: null, sample })
+  assert.deepEqual({ schema: ignoredLegacy.schema, rows: ignoredLegacy.rows }, sample)
+  const absent = await server.request("targets", { ...data, ...legacy, sample: null })
+  assert.equal(absent.tableSource, "unavailable")
+  assert.deepEqual(absent.schema, [])
+  assert.deepEqual(absent.rows, [])
+})
+
+test("known fields are validated while unknown nested metadata survives the snapshot", async t => {
+  const server = await stand(t)
+  const data = {
+    binding: { ...binding, extra: { label: "binding extension" } }, nodeName: "Metadata",
+    schema: [{ name: "budget", type: 3, extra: { unit: "RUB" } }], rows: [[500]],
+    parameters: [{ name: "MinBudget", value: 0, extra: { precision: 2 } }],
+    extra: { ignored: true },
+  }
+  const target = await server.request("targets", data)
+  assert.deepEqual(target.binding, data.binding)
+  assert.deepEqual(target.schema, data.schema)
+  assert.deepEqual(target.parameters, data.parameters)
+  assert.equal(Object.hasOwn(target, "extra"), false)
+  assert.deepEqual(await server.request("targets/" + target.id), target)
+  for (const invalid of [
+    { nodeName: 42 }, { binding: { ...binding, port: "0" } },
+    { schema: [{ name: 42, type: 3 }] }, { schema: [{ name: "budget", type: {} }] },
+    { rows: [[500, 600]] }, { rows: [[{}]] }, { parameters: [{ name: 42, value: 0 }] },
+    { parameters: [{ name: "MinBudget", value: {} }] },
+  ]) await assert.rejects(server.request("targets", { ...data, ...invalid }), /returned 400/)
+})
+
+test("published files have M0 MIME and cache headers and cannot escape publication", async t => {
+  const server = await stand(t)
+  const app = await server.request("lookup", binding)
+  const dir = join(server.publishRoot, app.key)
+  await mkdir(dir, { recursive: true })
+  const assets = [
+    ["index.html", "text/html; charset=utf-8"], ["app.js", "text/javascript"], ["app.css", "text/css"],
+    ["data.json", "application/json"], ["icon.svg", "image/svg+xml"], ["icon.png", "image/png"],
+    ["photo.jpg", "image/jpeg"], ["font.woff2", "font/woff2"], ["unknown.bin", "application/octet-stream"],
+  ]
+  for (const [name, mime] of assets) {
+    await writeFile(join(dir, name), "fixture " + name)
+    const response = await fetch(`${server.base}/apps/${app.key}/${name}`)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get("content-type"), mime)
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff")
+    assert.equal(response.headers.get("cache-control"), name === "index.html" ? "no-store" : "no-cache")
+    assert.equal(await response.text(), "fixture " + name)
+  }
+  const outside = join(server.publishRoot, "..", "outside")
+  await mkdir(outside)
+  await writeFile(join(outside, "secret.txt"), "OUTSIDE SECRET")
+  await symlink(join(outside, "secret.txt"), join(dir, "escape.txt"))
+  const escaped = "b".repeat(64)
+  await symlink(outside, join(server.publishRoot, escaped), "dir")
+  for (const [path, status] of [
+    [`${app.key}/missing.js`, 404], [`${app.key}/escape.txt`, 404], [`${escaped}/secret.txt`, 404],
+    [`${app.key}/%2e%2e%2foutside%2fsecret.txt`, 400], [`${app.key}/%2e%2e%5coutside%5csecret.txt`, 400],
+  ]) {
+    const response = await fetch(`${server.base}/apps/${path}`)
+    assert.equal(response.status, status, path)
+    assert.ok(!(await response.text()).includes("OUTSIDE SECRET"), path)
+  }
 })
