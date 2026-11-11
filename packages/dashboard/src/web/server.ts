@@ -79,7 +79,7 @@ async function snapshot(input: unknown, projectRoot: string, publishRoot: string
   const rows = table.value.rows
   const id = randomUUID()
   const sourceDir = join(projectRoot, "dashboard/apps", key)
-  const script = join(projectRoot, "dashboard/publish.mjs").replaceAll("'", "'\\''")
+  const script = join(projectRoot, "packages/dashboard/script/publish.mjs").replaceAll("'", "'\\''")
   const publish = `node '${script}' ${id}`
   return {
     id,
