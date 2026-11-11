@@ -5,6 +5,10 @@ import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 export const LOGINOM_ENGLISH = {
   "prompt.attachment.missingPath":
     "This attachment has no disk path. Save it and attach it using the file picker, or provide its path.",
+  "dashboard.target.unavailable": "Could not load the selected node. Open the dashboard in Loginom again.",
+  "dashboard.target.localOnly": "Open a local Desktop chat to work on this dashboard.",
+  "prompt.context.dashboardCreate": "Creating a dashboard for node “{{name}}”",
+  "prompt.context.dashboardEdit": "Editing dashboard “{{name}}”",
   "loginom.saveClose": "Save and close",
   "loginom.saving": "Saving settings…",
   "loginom.applying": "Applying settings…",
@@ -363,10 +367,6 @@ export const dict = {
   "prompt.context.active": "active",
   "prompt.context.includeActiveFile": "Include active file",
   "prompt.context.removeActiveFile": "Remove active file from context",
-  "dashboard.target.unavailable": "Could not load the selected node. Open the dashboard in Loginom again.",
-  "dashboard.target.localOnly": "Open a local Desktop chat to work on this dashboard.",
-  "prompt.context.dashboardCreate": "Creating a dashboard for node “{{name}}”",
-  "prompt.context.dashboardEdit": "Editing dashboard “{{name}}”",
   "prompt.context.removeFile": "Remove file from context",
   "prompt.action.attachFile": "Add files",
   "prompt.menu.addImagesAndFiles": "Add files and more",
