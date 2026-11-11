@@ -3,9 +3,9 @@ import { once } from "node:events"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { request } from "node:http"
 import { networkInterfaces, tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import test from "node:test"
-import { dashboardServer, startDashboard } from "../../../../dashboard/server.mjs"
+import { dashboardServer, startDashboard } from "../../src/web/server.ts"
 
 const binding = {
   server: "http://127.0.0.1:32768",
@@ -363,4 +363,23 @@ test("published files have M0 MIME and cache headers and cannot escape publicati
     assert.equal(response.status, status, path)
     assert.ok(!(await response.text()).includes("OUTSIDE SECRET"), path)
   }
+})
+
+test("source startup derives the checkout independently of the working directory", async t => {
+  const root = await mkdtemp(join(tmpdir(), "dashboard-source-root-"))
+  const server = startDashboard({ DASHBOARD_PUBLISH_ROOT: root, DASHBOARD_PORT: "0" })
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve))
+    await rm(root, { recursive: true, force: true })
+  })
+  await once(server, "listening")
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/dashboard/targets`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ binding, nodeName: "Source checkout", sample: null, parameters: [] }),
+  })
+  assert.equal(response.status, 201)
+  const target = await response.json()
+  const checkout = resolve(import.meta.dirname, "../../../..")
+  assert.equal(target.sourceDir, join(checkout, "dashboard/apps", target.key))
+  assert.equal(target.commands.publish, `node '${join(checkout, "dashboard/publish.mjs")}' ${target.id}`)
 })

@@ -392,6 +392,19 @@
         "prettier": "3.6.2",
       },
     },
+    "packages/dashboard": {
+      "name": "@loginom-ai-agent/dashboard",
+      "version": "0.1.0",
+      "dependencies": {
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@tsconfig/bun": "catalog:",
+        "@types/bun": "catalog:",
+        "@types/node": "catalog:",
+        "@typescript/native-preview": "catalog:",
+      },
+    },
     "packages/desktop": {
       "name": "@opencode-ai/desktop",
       "version": "0.3.9",
@@ -1852,6 +1865,8 @@
     "@kurkle/color": ["@kurkle/color@0.3.4", "", {}, "sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w=="],
 
     "@leichtgewicht/ip-codec": ["@leichtgewicht/ip-codec@2.0.5", "", {}, "sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw=="],
+
+    "@loginom-ai-agent/dashboard": ["@loginom-ai-agent/dashboard@workspace:packages/dashboard"],
 
     "@loginom-ai-agent/loginom-host": ["@loginom-ai-agent/loginom-host@workspace:packages/loginom-host"],
 
