@@ -177,7 +177,6 @@ const table = sqliteTable("session", {
 - Keep EventV2 replay owner claims separate from clustered Session execution ownership.
 - Keep the System Context algebra, registry, and built-ins in `src/system-context`; keep Context Source producers with their observed domains, and keep Session History selection plus Context Epoch persistence Session-owned.
 
-Если пользователь просит создать или изменить dashboard для узла Loginom, исполнитель (включая субагента) сам один раз читает JSON снимка. Для цели, приложенной Desktop к сообщению, используй http://127.0.0.1:32768/dashboard/targets/<ID> с её ID. При запросе из Codex без приложенной цели используй http://127.0.0.1:32768/dashboard/current. Назови узел и путь в первой строке ответа и сам отредактируй, проверь и опубликуй приложение командами этого снимка. До конца запроса используй только его ID, не запрашивай контекст у пользователя или другого агента и не входи в живую сессию Loginom.
 ## Loginom AI Agent: module map and current state
 
 - In `loginom-cli`, implement the [standalone CLI design](docs/superpowers/specs/2026-09-17-loginom-cli-standalone-design.md), starting from `c37913ab5`. Desktop and CLI own independent backend v1 processes and profiles. The earlier shared-service CLI design is historical; do not introduce service discovery, client leases, or Desktop profile migration.
@@ -194,5 +193,6 @@ const table = sqliteTable("session", {
 - [CI: release builds and test workflows](docs/testing/loginom-ai-agent/ci-release.md)
 - [Git secret protection, commands and audit](docs/security/secret-protection.md)
 - [Eval harness for Loginom scenarios](evals/AGENTS.md)
+- [Node dashboards: browser app on a Loginom table output, created and published from a snapshot](dashboard/AGENTS.md)
 
 Before resuming release work, read the [canonical Linux checkpoint](docs/migration/linux-implementation-checkpoint.md) and [platform runbooks](docs/testing/loginom-ai-agent/README.md). Reports distinguish tested installed artifacts from source-only checks. Keep durable decisions here or in the owning module; keep secrets and raw diagnostic logs out of git. Historical release reports retain the paths/version that were actually tested.
