@@ -3,7 +3,7 @@
 Это рецепт **нового стенда на другом компьютере**. Он не останавливает и не заменяет
 существующие контейнеры. Имена ниже и порт `127.0.0.1:32768` должны быть свободны:
 они входят в текущий прототип Dashboard и Desktop. Используйте Linux x86_64,
-Docker, Git LFS, unzip, curl и закреплённый Node из инструкции
+Docker, Git LFS, unzip, curl, ShellCheck и закреплённый Node из инструкции
 [переноса](../HANDOFF.md). Node должен находиться в `PATH`: installer копирует
 `command -v node` в Debian-контейнер сервера.
 
@@ -73,7 +73,7 @@ printf '{"wsproxy":"true"}\n' > "$dist/Client/server_proxy.json"
 `libs` дополняют официальный `Dist/Server/Dockerfile`; не заменяйте их системными
 библиотеками произвольных версий. Сам Dockerfile устанавливает остальные Debian
 зависимости и запускает Loginom от UID/GID 7001. Небольшой wrapper из этой ветки
-добавляет `procps`: `dashboard/install.sh` использует `ps` при запуске своего Node.
+добавляет `procps`: `dev-master.sh` использует `ps` при запуске своего Node.
 `httpd.conf` загружает `mod_headers`, `mod_proxy_http`, `mod_proxy_wstunnel` и
 `conf/*.site.conf`; наш site config направляет оба WebSocket маршрута только в
 этот server-контейнер, без Integrator и других стендов.
@@ -122,17 +122,38 @@ HTTP 200 страницы сам по себе не доказывает раб�
 
 ```sh
 cd "$repo"
-./dashboard/install.sh
+(cd packages/dashboard && bun run build)
+bash -n packages/dashboard/deploy/dev-master.sh
+shellcheck packages/dashboard/deploy/dev-master.sh
+./packages/dashboard/deploy/dev-master.sh install
 ```
 
-Installer установит bootstrap обоих клиентов, сервис снимков и fixture
+Installer подключит оболочку обоих клиентов, сервис снимков и fixture
 `/user/dashboard-roi/campaign.lgp` вместе с `dataset.csv`. Обновите браузер,
 откройте пакет, выполните узел «По убыванию ROI»: ожидается 500 кампаний.
 Нажатие «Создать dashboard» выдаёт **новый** снимок. Старые ID с прежнего компьютера
 не действуют; публикацию и привязку примера выполняйте по [инструкции переноса](../HANDOFF.md).
 
-После перезапуска server-контейнера повторите `./dashboard/install.sh`: процесс
+После перезапуска server-контейнера повторите `./packages/dashboard/deploy/dev-master.sh install`: процесс
 снимков запускается installer, отдельной системной службы в прототипе нет.
 Это удаляет старые ID снимков, поэтому получите цель заново. После проверки
 штатно выйдите из своей сессии Loginom и только затем закрывайте вкладку:
 простое закрытие браузера может оставить пакет заблокированным.
+
+## Проверка и удаление
+
+Для `check` нужен закреплённый Node в PATH, Bun, Chromium из `PLAYWRIGHT_BROWSERS_PATH` и зависимости `packages/loginom-runtime/client` из [инструкции переноса](../HANDOFF.md). Предоставьте приватный JSON вне Git (доступ только владельцу). Обязательные поля: `url` (URL клиента Studio), `username`, строка `password` или `secrets.password` в конфигурации Desktop. Используйте отдельную тестовую учётную запись и пакет, который можно открыть и выполнить: проба не сохраняет его на диск. По умолчанию это `/user/dashboard-roi/campaign.lgp`, `Unit1`, «По убыванию ROI». Для другого подготовленного сценария задайте `packagePath`, `unit`, `nodeName`; нужен табличный узел с данными и числовой переменной.
+
+Из корня в Bash:
+
+```sh
+export DASHBOARD_STUDIO_CONFIG=/absolute/private/path/to/master.json
+./packages/dashboard/deploy/dev-master.sh check
+```
+
+Проверяются ROI lookup, закрытые `current`, `binding.json` и `sample.json`, запрещённый Host, оба клиентских JSON целиком и точный файл оболочки. Затем проба входит в каждый клиент в отдельном временном профиле, выбирает узел, проверяет кнопку и обращения адаптера к реальной таблице и параметрам. Перед следующим входом закрывает проверочный пакет и выполняет штатный выход. Сбой входа или неподготовленный сценарий даёт «Не проверено» и ненулевой код. Учётные данные не передаются в аргументах процесса.
+
+Для лицензированной **7.4.2** укажите отдельную конфигурацию этой машины и URL минифицированного клиента:
+`DASHBOARD_STUDIO_CONFIG=/absolute/private/path/to/release.json node packages/dashboard/deploy/check-studio.mjs 7.4.2`. Если интеграции нет, тот же собранный файл загружается только во временную страницу после входа. Нужна работающая Studio; служба dashboard для этой проверки не требуется. Строки результата показывают сборку, наличие кнопки, штатное действие Studio и отсутствующий API, если он обнаружен.
+
+Для снятия интеграции: `./packages/dashboard/deploy/dev-master.sh uninstall`. Оба оригинальных `client.json` остаются на месте, снимаются только их Apache-алиасы и копии. Публикации, исходники, пакеты и зависимости сохраняются. После нового `install` запустите `check` и откройте прежнюю публикацию.

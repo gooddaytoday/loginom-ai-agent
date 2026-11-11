@@ -1,6 +1,6 @@
 import type { Form, Studio, Update } from "./types"
 
-export async function parameters(studio: Studio, form: Form, update?: Update) {
+export async function parameters(studio: Pick<Studio, "bg" | "Out">, form: Form, update?: Update) {
   const node = form.FDiagram.VariablesNode?.GetData()
   if (!node) return []
   // RPC getters return proxies shared with Loginom; the runtime manages their lifetime.

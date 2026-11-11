@@ -166,6 +166,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Check dashboard stand installer
+        run: |
+          bash -n packages/dashboard/deploy/dev-master.sh
+          shellcheck packages/dashboard/deploy/dev-master.sh
+
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
         with:

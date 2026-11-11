@@ -1,11 +1,10 @@
 import { lookupResponse, snapshotResponse } from "./response"
-import { connect } from "./loginom/adapter"
+import { connect, views } from "./loginom/adapter"
 import type { Frame, Update, View } from "./loginom/types"
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
-const studio = connect()
-if (studio) start(studio)
-function start(studio: NonNullable<ReturnType<typeof connect>>) {
+start()
+function start() {
   async function post(path: string, body: unknown) {
     const res = await fetch(location.origin + "/dashboard/" + path, {
       method: "POST",
@@ -16,7 +15,9 @@ function start(studio: NonNullable<ReturnType<typeof connect>>) {
     return (await res.json()) as unknown
   }
   function install(view: View) {
-    if (!studio.available(view)) return
+    const api = connect()
+    if (!api?.available(view)) return
+    const studio = api
     const form = view.Controller
     const toolbar = form.Items.tlbModel
     if (toolbar.getComponent("dashboardApp")) return
@@ -221,5 +222,5 @@ function start(studio: NonNullable<ReturnType<typeof connect>>) {
     })
     update()
   }
-  studio.views(install)
+  views(install)
 }

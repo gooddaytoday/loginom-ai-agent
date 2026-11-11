@@ -1,6 +1,6 @@
 # Продолжение dashboard + Desktop на другом компьютере
 
-Рабочая ветка — `dashboard-app`. Она содержит стенд, исходники брендированного
+Рабочая ветка M1 — `dashboard-m1`. Она содержит стенд, исходники брендированного
 Desktop и передачу выбранного узла в одну просьбу чата. Отдельная ветка Desktop
 для продолжения не нужна. Начинайте с этого документа; прежние отчёты описывают
 проверки на исходном компьютере, а их абсолютные пути не являются входами сборки.
@@ -24,14 +24,14 @@ Desktop и передачу выбранного узла в одну прось
 
 В Git сохранены исходники двух примеров в `dashboard/apps`: маркетинговый ROI
 и созданная Desktop «Сводка по каналам». Зависимости второго примера фиксирует
-общий `dashboard/template/package-lock.json`; его одинаковая локальная копия
+общий `packages/dashboard/template/package-lock.json`; его одинаковая локальная копия
 не нужна для публикации. `node_modules`, `dist`, снимки и серверные сессии
 не переносятся. Для каждого нового открытия получают новый снимок.
 
 ## 1. Получить исходники и инструменты
 
 ```sh
-git clone --branch dashboard-app --single-branch git@github.com:gooddaytoday/loginom-ai-agent.git
+git clone --branch dashboard-m1 --single-branch git@github.com:gooddaytoday/loginom-ai-agent.git
 cd loginom-ai-agent
 bun install --frozen-lockfile
 ```
@@ -55,6 +55,7 @@ awk -v file="$distribution.tar.xz" '$2 == file' "$transfer_cache/SHASUMS256.txt"
 (cd "$transfer_cache" && sha256sum -c node.sha256)
 tar -xJf "$transfer_cache/$distribution.tar.xz" -C "$transfer_cache"
 export LOGINOM_AI_AGENT_NODE_SOURCE="$transfer_cache/$distribution/bin/node"
+export LOGINOM_AI_AGENT_TEST_NODE="$LOGINOM_AI_AGENT_NODE_SOURCE"
 export PATH="$(dirname "$LOGINOM_AI_AGENT_NODE_SOURCE"):$PATH"
 export PLAYWRIGHT_BROWSERS_PATH="$transfer_cache/browsers"
 export LOGINOM_AI_AGENT_BROWSER_SOURCE="$PLAYWRIGHT_BROWSERS_PATH"
@@ -75,13 +76,16 @@ master с сервером, обоими клиентами, библиотек�
 Из корня checkout после создания контейнеров:
 
 ```sh
-./dashboard/install.sh
+(cd packages/dashboard && bun run build)
+bash -n packages/dashboard/deploy/dev-master.sh
+shellcheck packages/dashboard/deploy/dev-master.sh
+./packages/dashboard/deploy/dev-master.sh install
 ```
 
-Не запускайте общий installer другого стенда. `dashboard/install.sh` обслуживает
+Не запускайте общий installer другого стенда. `packages/dashboard/deploy/dev-master.sh` обслуживает
 только контейнеры с именами из рецепта. После перезапуска server-контейнера
 повторите эту команду: служба снимков запускается отдельно. Старые ID при этом
-исчезают. После замены bootstrap обновите страницу через Ctrl+Shift+R.
+исчезают. Для проверки обоих клиентов запустите [check](stand/README.md#проверка-и-удаление). После замены оболочки обновите страницу через Ctrl+Shift+R.
 
 ## 3. Собрать и подключить Desktop
 
@@ -165,6 +169,6 @@ xdg-mime default com.loginom.aiagent.desktop x-scheme-handler/loginom-ai-agent
 сервер выберет сохранённый каталог исходников. Для нового пути используйте
 `commands.init` и затем создавайте новый dashboard через Desktop.
 
-Проверки из каталогов пакетов: `node --test server.test.mjs` из `dashboard`;
+Проверки из каталогов пакетов: `bun run test` и `bun run test:browser` из `packages/dashboard`;
 `bun typecheck` из `packages/app` и `packages/desktop`. Полный прогон и его
 непройденные пункты фиксируйте в [плане](../docs/superpowers/plans/2026-11-10-dashboard-full-cycle.md).
