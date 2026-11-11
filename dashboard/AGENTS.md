@@ -11,3 +11,4 @@
 - Сервис снимков по умолчанию слушает только `127.0.0.1:8100`; стенд открывает его для Apache переменной `DASHBOARD_HOST=0.0.0.0`. В памяти хранятся последние 100 снимков.
 - Проверки сервиса из `dashboard/`: `node --test server.test.mjs bootstrap.test.mjs`. Типы и сборка — `bun typecheck` и `npm run build` из `template/` или каталога приложения.
 - Стенд и перенос — [README](README.md) и [HANDOFF](HANDOFF.md). Границы приёмки — [дизайн](../docs/superpowers/specs/2026-11-09-loginom-dashboard-design.md).
+- Целевая архитектура, порядок работ и безопасность — [roadmap](../docs/superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md) и [план изоляции](../docs/security/dashboard-isolation.md); этот файл описывает текущий поток; этапы M0–M3 его меняют.
