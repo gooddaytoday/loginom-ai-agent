@@ -103,7 +103,7 @@ async function serveApp(response, publishRoot, key, asset) {
   }
 }
 
-export function dashboardServer({projectRoot, publishRoot, maxSnapshots = 100}) {
+export function dashboardServer({projectRoot, publishRoot, maxSnapshots = 100, allowCurrent = false}) {
   const snapshots = new Map()
   let current
   return createServer(async (request, response) => {
@@ -122,7 +122,9 @@ export function dashboardServer({projectRoot, publishRoot, maxSnapshots = 100}) 
         return json(response, 201, target)
       }
       if (request.method === "GET") {
-        const target = path === "/dashboard/current" ? current : snapshots.get(path.match(/^\/dashboard\/targets\/([^/]+)$/)?.[1])
+        const target = path === "/dashboard/current"
+          ? allowCurrent && /^(?:127\.|::ffff:127\.|::1$)/.test(request.socket.remoteAddress) && current
+          : snapshots.get(path.match(/^\/dashboard\/targets\/([^/]+)$/)?.[1])
         if (target) return json(response, 200, target)
         const app = path.match(/^\/dashboard\/apps\/([a-f0-9]{64})\/(.*)$/)
         if (app) return await serveApp(response, publishRoot, app[1], decodeURIComponent(app[2]))
@@ -139,6 +141,7 @@ export function startDashboard(env = process.env) {
   const server = dashboardServer({
     projectRoot: env.DASHBOARD_PROJECT_ROOT ?? resolve(import.meta.dirname, ".."),
     publishRoot: env.DASHBOARD_PUBLISH_ROOT ?? "/workdir/dashboard-app/apps",
+    allowCurrent: env.DASHBOARD_ALLOW_CURRENT === "1",
   })
   server.listen(Number(env.DASHBOARD_PORT ?? 8100), env.DASHBOARD_HOST ?? "127.0.0.1")
   return server

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { networkInterfaces, tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 import { dashboardServer, startDashboard } from "./server.mjs"
@@ -84,14 +84,14 @@ test("the first snapshot stays available by ID after opening another node", asyn
   }
   const a = await request("targets", data)
   await request("lookup", other)
-  assert.deepEqual(await request("current"), a)
+  assert.deepEqual(await request("targets/" + a.id), a)
   const b = await request("targets", {...data, binding: other, rows: [[245]]})
   assert.notEqual(a.id, b.id)
   assert.notEqual(a.sourceDir, b.sourceDir)
   assert.deepEqual(a.binding, binding)
   assert.deepEqual(a.rows, data.rows)
   assert.deepEqual(await request("targets/" + a.id), a)
-  assert.deepEqual(await request("current"), b)
+  assert.equal((await fetch(server.base + "/current")).status, 404)
 
   // A fresh session has no live result; the example is scoped to the published binding.
   await mkdir(join(server.publishRoot, a.key), { recursive: true })
@@ -151,5 +151,71 @@ test("only the newest snapshots stay available", async t => {
   await assert.rejects(request("targets/" + first.id), /returned 404/)
   assert.deepEqual(await request("targets/" + second.id), second)
   assert.deepEqual(await request("targets/" + third.id), third)
-  assert.deepEqual(await request("current"), third)
+  assert.equal((await fetch(server.base + "/current")).status, 404)
+})
+
+test("current is explicit local debugging through startDashboard", async t => {
+  for (const connection of [
+    { name: "IPv4", host: "127.0.0.1", client: "127.0.0.1", peer: "127.0.0.1", flag: "1", status: 200 },
+    { name: "IPv6", host: "::", client: "[::1]", peer: "::1", flag: "1", status: 200 },
+    { name: "mapped IPv4", host: "::", client: "127.0.0.1", peer: "::ffff:127.0.0.1", flag: "1", status: 200 },
+    { name: "only the literal 1 enables debugging", host: "127.0.0.1", client: "127.0.0.1", peer: "127.0.0.1", flag: "true", status: 404 },
+  ]) await t.test(connection.name, async t => {
+    const root = await mkdtemp(join(tmpdir(), "dashboard-current-"))
+    const server = startDashboard({
+      DASHBOARD_PROJECT_ROOT: root, DASHBOARD_PUBLISH_ROOT: join(root, "published"),
+      DASHBOARD_PORT: "0", DASHBOARD_HOST: connection.host, DASHBOARD_ALLOW_CURRENT: connection.flag,
+    })
+    t.after(async () => {
+      await new Promise(resolve => server.close(resolve))
+      await rm(root, { recursive: true, force: true })
+    })
+    await once(server, "listening")
+    const peers = []
+    server.on("request", request => peers.push(request.socket.remoteAddress))
+    const base = `http://${connection.client}:${server.address().port}/dashboard`
+    const created = await fetch(base + "/targets", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ binding, nodeName: "Synthetic debug target", sample: null, parameters: [] }),
+    })
+    assert.equal(created.status, 201)
+    const target = await created.json()
+    const current = await fetch(base + "/current")
+    assert.equal(current.status, connection.status)
+    if (current.ok) assert.equal((await current.json()).id, target.id)
+    assert.deepEqual(peers, [connection.peer, connection.peer])
+  })
+})
+
+test("debug current rejects a non-loopback TCP peer despite forwarded headers", async t => {
+  const address = Object.values(networkInterfaces()).flat().find(ip => ip.family === "IPv4" && !ip.internal)?.address
+  if (!address) return t.skip("No non-loopback IPv4 interface; verify this case on the dev stand")
+  const root = await mkdtemp(join(tmpdir(), "dashboard-current-network-"))
+  const server = startDashboard({
+    DASHBOARD_PROJECT_ROOT: root, DASHBOARD_PUBLISH_ROOT: join(root, "published"),
+    DASHBOARD_PORT: "0", DASHBOARD_HOST: "0.0.0.0", DASHBOARD_ALLOW_CURRENT: "1",
+  })
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve))
+    await rm(root, { recursive: true, force: true })
+  })
+  await once(server, "listening")
+  const peers = []
+  server.on("request", request => peers.push(request.socket.remoteAddress))
+  const base = `http://${address}:${server.address().port}/dashboard`
+  const headers = {
+    host: `127.0.0.1:${server.address().port}`, "content-type": "application/json",
+    "x-forwarded-for": "127.0.0.1", "x-real-ip": "::1", forwarded: 'for="[::1]"',
+  }
+  const created = await fetch(base + "/targets", {
+    method: "POST", headers,
+    body: JSON.stringify({ binding, nodeName: "Synthetic network target", sample: null, parameters: [] }),
+  })
+  assert.equal(created.status, 201)
+  const target = await created.json()
+  const byID = await fetch(base + "/targets/" + target.id, { headers })
+  assert.equal(byID.status, 200)
+  assert.equal((await byID.json()).id, target.id)
+  assert.equal((await fetch(base + "/current", { headers })).status, 404)
+  assert.deepEqual(peers, [address, address, address])
 })
