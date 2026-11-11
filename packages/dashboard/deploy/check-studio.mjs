@@ -96,19 +96,40 @@ async function check() {
 }
 
 async function closeSession(page, username, packagePath) {
-  const closing = page.evaluate(async ({ username, packagePath }) => {
-    const map = window.bg.app.Application.FInstance.FMainForm.FMapTree
-    if (map.FServerConnection.UserName !== username) return false
-    if (map.PackageNodes.Count === 0) return true
-    const pkg = map.PackageNodes.Items(0)
-    if (map.PackageNodes.Count !== 1 || "/" + pkg.PackageFileName.replaceAll("\\", "/").replace(/^\/+/, "") !== packagePath ||
-        pkg.HasRunningNodes() || await map.FServerConnection.Session.IsPackageModified(pkg.Package)) return false
-    return await map.ClosePackage(pkg, false, true) === true && map.PackageNodes.Count === 0
-  }, { username, packagePath })
-  if (!(await withinTimeout(closing, false))) throw Error("close failed")
+  if (!(await withinTimeout(closePackage(page, username, packagePath), false))) throw Error("close failed")
   await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]').click()
   await page.locator('[data-tid="MF;AppMenuForm;btnLogOut"]').click()
   await page.locator('[data-tid="LoginForm;Login;edtUsername"] input').waitFor()
+}
+
+async function closePackage(page, username, packagePath) {
+  const held = await page.evaluateHandle(async ({ username, packagePath, deadline }) => {
+    const map = window.bg.app.Application.FInstance.FMainForm.FMapTree
+    const connection = map.FServerConnection
+    const session = connection.Session
+    const pkg = map.PackageNodes.Count ? map.PackageNodes.Items(0) : null
+    const model = pkg?.Package
+    const idle = () => {
+      if (window.bg.app.Application.FInstance.FMainForm.FMapTree !== map || map.FServerConnection !== connection ||
+          connection.Session !== session || connection.UserName !== username || map.PackageNodes.Count !== (pkg ? 1 : 0) ||
+          (pkg && (map.PackageNodes.Items(0) !== pkg || pkg.Package !== model ||
+            "/" + pkg.PackageFileName.replaceAll("\\", "/").replace(/^\/+/, "") !== packagePath))) throw Error("package changed")
+      return !pkg || pkg.HasRunningNodes() === false
+    }
+    const clean = async () => !pkg || await session.IsPackageModified(model) === false
+    idle() // Verify identity before reading the modification flag or waiting.
+    if (!await clean()) throw Error("modified package")
+    return {
+      idle,
+      async close() {
+        if (!idle() || !await clean() || !idle() || Date.now() >= deadline) return false
+        return !pkg || await map.ClosePackage(pkg, false, true) === true && map.PackageNodes.Count === 0
+      },
+    }
+  }, { username, packagePath, deadline: Date.now() + timeoutMs })
+  // A completed table read can precede Studio's running→idle notification.
+  await page.waitForFunction(state => state.idle(), held, { polling: 200, timeout: timeoutMs })
+  return held.evaluate(state => state.close())
 }
 
 async function withinTimeout(operation, timeoutResult) {

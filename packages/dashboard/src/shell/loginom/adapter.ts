@@ -51,7 +51,7 @@ export function connect() {
     )
     let tree = tab.FNode
     while (tree && !tree.data.node?.ModelUnitItem) tree = tree.parentNode
-    const workflow = form.FGenericNode ? await form.FGenericNode.get_Guid() : tree?.data.node?.Guid
+    const workflow = await (form.FGenericNode || tree?.data.node?.ModelUnitItem)?.get_Guid()
     if (!workflow || !filename) throw Error("Не удалось определить пакет и сценарий узла.")
     return {
       server: location.origin,

@@ -315,3 +315,25 @@ test("Studio loads the shell before login and renders the workflow after login",
   await page.evaluate(() => window.fixture.showScenario())
   await page.getByRole("button", { name: "Создать dashboard" }).waitFor()
 })
+
+test("a workflow tree without a generic form node preserves the ROI binding", async (t) => {
+  const { page, origin, snapshots } = await fixture(t, { published: true })
+  await page.evaluate(() => {
+    const form = window.Ext.ComponentQuery.query("panel#pnlModelForm")[0].Controller
+    delete form.FGenericNode
+    const tab = window.bg.app.Application.Instance.FMainForm.GetActiveTab()
+    const modelUnit = { get_Guid: async () => "{27CB94A9-F6E9-35FF-80B7-BC7D01BA6AA7}" }
+    tab.FNode = { data: {}, parentNode: { data: { node: { ModelUnitItem: modelUnit } } } }
+    form.GetOneSelectedNode(false).GetData().get_Guid = async () => "{77C145B1-6CE3-458F-AA36-E6AFDAB2A930}"
+    window.bg.ScopeFindObject = () => ({ FileName: "user/dashboard-roi/campaign.lgp" })
+  })
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await page.locator("iframe").waitFor()
+  assert.deepEqual(snapshots[0].binding, {
+    server: origin,
+    packagePath: "/user/dashboard-roi/campaign.lgp",
+    workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7",
+    nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930",
+    port: 0,
+  })
+})
