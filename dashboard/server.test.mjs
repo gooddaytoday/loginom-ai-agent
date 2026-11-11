@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { request } from "node:http"
 import { networkInterfaces, tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -63,6 +64,37 @@ test("published dashboard keeps its metadata private", async t => {
     const alias = await fetch(base + "assets/" + name + ".alias")
     assert.equal(alias.status, 404)
   }
+})
+
+test("dashboard accepts only configured hosts", async t => {
+  const root = await mkdtemp(join(tmpdir(), "dashboard-hosts-"))
+  const key = "a".repeat(64)
+  await mkdir(join(root, "published", key), { recursive: true })
+  await writeFile(join(root, "published", key, "index.html"), "Dashboard")
+  const server = startDashboard({
+    DASHBOARD_PROJECT_ROOT: root, DASHBOARD_PUBLISH_ROOT: join(root, "published"), DASHBOARD_PORT: "0",
+    DASHBOARD_PUBLIC_HOSTS: "Example.test:32768, localhost:32768",
+  })
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve))
+    await rm(root, { recursive: true, force: true })
+  })
+  await once(server, "listening")
+  const status = (host, path = `/dashboard/apps/${key}/`, method = "GET") => new Promise((resolve, reject) => {
+    const req = request({ hostname: "127.0.0.1", port: server.address().port, path, method, headers: { host } }, response => {
+      response.resume()
+      resolve(response.statusCode)
+    })
+    req.on("error", reject)
+    req.end()
+  })
+  assert.equal(await status("eXAMPLE.TEST:32768"), 200)
+  assert.equal(await status("LOCALHOST:32768"), 200)
+  assert.equal(await status("evil.test:32768"), 403)
+  assert.equal(await status("example.test:32769"), 403)
+  assert.equal(await status("example.test"), 403)
+  assert.equal(await status(`127.0.0.1:${server.address().port}`), 403)
+  assert.equal(await status("evil.test:32768", "/dashboard/targets", "POST"), 403)
 })
 
 test("a package path separates applications even when node GUIDs match", async t => {
@@ -207,15 +239,20 @@ test("debug current rejects a non-loopback TCP peer despite forwarded headers", 
     host: `127.0.0.1:${server.address().port}`, "content-type": "application/json",
     "x-forwarded-for": "127.0.0.1", "x-real-ip": "::1", forwarded: 'for="[::1]"',
   }
-  const created = await fetch(base + "/targets", {
-    method: "POST", headers,
-    body: JSON.stringify({ binding, nodeName: "Synthetic network target", sample: null, parameters: [] }),
+  const send = (path, data) => new Promise((resolve, reject) => {
+    const req = request(base + path, { method: data ? "POST" : "GET", headers }, response => {
+      const chunks = []
+      response.on("data", chunk => chunks.push(chunk))
+      response.on("end", () => resolve({ status: response.statusCode, data: JSON.parse(Buffer.concat(chunks)) }))
+    })
+    req.on("error", reject)
+    req.end(data && JSON.stringify(data))
   })
+  const created = await send("/targets", { binding, nodeName: "Synthetic network target", sample: null, parameters: [] })
   assert.equal(created.status, 201)
-  const target = await created.json()
-  const byID = await fetch(base + "/targets/" + target.id, { headers })
+  const byID = await send("/targets/" + created.data.id)
   assert.equal(byID.status, 200)
-  assert.equal((await byID.json()).id, target.id)
-  assert.equal((await fetch(base + "/current", { headers })).status, 404)
+  assert.equal(byID.data.id, created.data.id)
+  assert.equal((await send("/current")).status, 404)
   assert.deepEqual(peers, [address, address, address])
 })

@@ -18,7 +18,7 @@ if ! docker exec "$server" test -x /app/dashboard-node; then docker cp "$(comman
 docker exec "$server" sh -c 'ps -eo pid,args | awk '\''$2 == "/app/dashboard-node" && $3 == "/workdir/dashboard-app/server.mjs" {print $1}'\'' | xargs -r kill'
 # Apache runs in the studio container, so this process must accept the Docker network address.
 # The server container publishes no ports and shares that network only with studio.
-docker exec -d -e DASHBOARD_PROJECT_ROOT="$project" -e DASHBOARD_HOST=0.0.0.0 "$server" /app/dashboard-node "$app/server.mjs"
+docker exec -d -e DASHBOARD_PROJECT_ROOT="$project" -e DASHBOARD_HOST=0.0.0.0 -e DASHBOARD_PUBLIC_HOSTS=127.0.0.1:32768,localhost:32768 "$server" /app/dashboard-node "$app/server.mjs"
 for client in client client-debug; do
   root=/usr/local/apache2/htdocs/$client
   docker cp parameter.js "$studio:$root/dashboard-parameter.js"
@@ -30,6 +30,10 @@ docker exec -i "$studio" sh -c 'cat > /usr/local/apache2/conf/dashboard-app.site
 <FilesMatch "^(index\.html|dashboard-(bootstrap|parameter)\.js)$">
   Header set Cache-Control "no-cache"
 </FilesMatch>
+<Location "/dashboard/">
+  Require expr "tolower(req('Host')) == '127.0.0.1:32768' || tolower(req('Host')) == 'localhost:32768'"
+  ProxyPreserveHost On
+</Location>
 ProxyPass /dashboard/ http://dashboard-master-20261109-server:8100/dashboard/
 ProxyPassReverse /dashboard/ http://dashboard-master-20261109-server:8100/dashboard/
 CONF
