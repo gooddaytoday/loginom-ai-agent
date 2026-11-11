@@ -100,7 +100,7 @@ async function serveApp(response, publishRoot, key, asset) {
   }
 }
 
-export function dashboardServer({projectRoot, publishRoot}) {
+export function dashboardServer({projectRoot, publishRoot, maxSnapshots = 100}) {
   const snapshots = new Map()
   let current
   return createServer(async (request, response) => {
@@ -114,6 +114,8 @@ export function dashboardServer({projectRoot, publishRoot}) {
         const target = await snapshot(await body(request), projectRoot, publishRoot)
         snapshots.set(target.id, target)
         current = target
+        // Map keeps insertion order, so the first key is the oldest snapshot.
+        if (snapshots.size > maxSnapshots) snapshots.delete(snapshots.keys().next().value)
         return json(response, 201, target)
       }
       if (request.method === "GET") {
