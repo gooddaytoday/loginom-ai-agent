@@ -15,9 +15,13 @@ const binding = {
 }
 const other = { ...binding, packagePath: "/user/dashboard/B.lgp" }
 
-async function stand(t) {
+async function stand(t, options = {}) {
   const root = await mkdtemp(join(tmpdir(), "dashboard-test-"))
-  const server = dashboardServer({ projectRoot: root, publishRoot: join(root, "published") })
+  const server = dashboardServer({
+    projectRoot: root,
+    publishRoot: join(root, "published"),
+    maxSnapshots: options.maxSnapshots,
+  })
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
   t.after(async () => {
@@ -104,4 +108,20 @@ test("the snapshot service listens on loopback unless the stand opts in", async 
   await Promise.all([once(loopback, "listening"), once(open, "listening")])
   assert.equal(loopback.address().address, "127.0.0.1")
   assert.equal(open.address().address, "0.0.0.0")
+})
+
+test("only the newest snapshots stay available", async t => {
+  const server = await stand(t, { maxSnapshots: 2 })
+  const request = server.request
+  const data = {
+    binding, nodeName: "По убыванию ROI", schema: [{name: "budget", type: 3}], rows: [[500]],
+    parameters: [{name: "MinBudget", value: 0}],
+  }
+  const first = await request("targets", data)
+  const second = await request("targets", data)
+  const third = await request("targets", data)
+  await assert.rejects(request("targets/" + first.id), /returned 404/)
+  assert.deepEqual(await request("targets/" + second.id), second)
+  assert.deepEqual(await request("targets/" + third.id), third)
+  assert.deepEqual(await request("current"), third)
 })
