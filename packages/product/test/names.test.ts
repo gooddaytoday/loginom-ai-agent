@@ -9,7 +9,7 @@ import { trackedSnapshot } from "./tracked"
 const root = resolve(import.meta.dir, "../../..")
 const { paths: tracked, read } = trackedSnapshot(root)
 
-const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals"]
+const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals", "dashboard"]
 
 const NAME_CHAR = "[A-Za-z0-9._~-]"
 const NAME_END = `(?![A-Za-z0-9_~-]|\\.${NAME_CHAR})`
@@ -34,7 +34,8 @@ const names = manifests.map((path) => ({ path, name: JSON.parse(read(path)).name
 
 describe("package names", () => {
   test("upstream packages keep upstream names, fork packages keep the fork scope", () => {
-    const offenders = names.filter(({ name }) => {
+    const offenders = names.filter(({ path, name }) => {
+      if (path === "packages/dashboard/template/package.json") return name !== "loginom-dashboard"
       if (name === "opencode" || name.startsWith("@opencode-ai/")) return false
       return !FORK_ONLY.some((pkg) => name === `@loginom-ai-agent/${pkg}`)
     })
