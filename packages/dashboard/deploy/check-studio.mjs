@@ -62,7 +62,8 @@ async function check() {
         const node = page.locator("[data-tid$=" + JSON.stringify(nodeId) + "]:visible")
         await node.click()
         console.log(path, "Studio", version, "— узел выбран штатным кликом после запуска оболочки.")
-        const button = page.getByRole("button", { name: /^(Dashboard|Создать dashboard)$/ })
+        const form = page.locator('[data-tid$=";ModelForm"]').filter({ has: node })
+        const button = form.locator('[data-tid$=";tlbModel;dashboardApp"]:visible')
         const visible = await button.isVisible()
         console.log(path, visible ? "Кнопка оболочки видна." : "Кнопка оболочки не видна.")
         phase = "API адаптера"
