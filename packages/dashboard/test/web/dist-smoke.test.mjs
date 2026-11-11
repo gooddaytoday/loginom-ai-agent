@@ -104,5 +104,5 @@ test("the bundled entry point derives its checkout while launched from another d
   const target = await response.json()
   const checkout = resolve(import.meta.dirname, "../../../..")
   assert.equal(target.sourceDir, join(checkout, "dashboard/apps", target.key))
-  assert.equal(target.commands.publish, `node '${join(checkout, "dashboard/publish.mjs")}' ${target.id}`)
+  assert.equal(target.commands.publish, `node '${join(checkout, "packages/dashboard/script/publish.mjs")}' ${target.id}`)
 })

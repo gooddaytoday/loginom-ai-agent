@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { request } from "node:http"
 import { networkInterfaces, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -17,7 +17,7 @@ const binding = {
 const other = { ...binding, packagePath: "/user/dashboard/B.lgp" }
 
 async function stand(t, options = {}) {
-  const root = await mkdtemp(join(tmpdir(), "dashboard-test-"))
+  const root = await mkdtemp(join(tmpdir(), "dashboard checkout's test-"))
   const server = dashboardServer({
     projectRoot: root,
     publishRoot: join(root, "published"),
@@ -37,7 +37,7 @@ async function stand(t, options = {}) {
     assert.ok(response.ok, `${path} returned ${response.status}`)
     return response.json()
   }
-  return { base, request, publishRoot: join(root, "published") }
+  return { base, request, projectRoot: root, publishRoot: join(root, "published") }
 }
 
 test("published dashboard keeps its metadata private", async t => {
@@ -123,6 +123,14 @@ test("the first snapshot stays available by ID after opening another node", asyn
   assert.notEqual(a.sourceDir, b.sourceDir)
   assert.deepEqual(a.binding, binding)
   assert.deepEqual(a.rows, data.rows)
+  assert.equal(a.sourceDir, join(server.projectRoot, "dashboard/apps", a.key))
+  const script = join(server.projectRoot, "packages/dashboard/script/publish.mjs").replaceAll("'", "'\\''")
+  assert.deepEqual(a.commands, {
+    init: `node '${script}' ${a.id} --init`,
+    typecheck: "npm run typecheck",
+    build: "npm run build",
+    publish: `node '${script}' ${a.id}`,
+  })
   assert.deepEqual(await request("targets/" + a.id), a)
   assert.equal((await fetch(server.base + "/current")).status, 404)
 
@@ -381,7 +389,8 @@ test("source startup derives the checkout independently of the working directory
   const target = await response.json()
   const checkout = resolve(import.meta.dirname, "../../../..")
   assert.equal(target.sourceDir, join(checkout, "dashboard/apps", target.key))
-  assert.equal(target.commands.publish, `node '${join(checkout, "dashboard/publish.mjs")}' ${target.id}`)
+  await access(join(checkout, "packages/dashboard/script/publish.mjs"))
+  assert.equal(target.commands.publish, `node '${join(checkout, "packages/dashboard/script/publish.mjs")}' ${target.id}`)
 })
 
 test("invalid lookup bindings keep M0 error responses", async t => {

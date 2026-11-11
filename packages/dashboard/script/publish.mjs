@@ -5,20 +5,20 @@ import { fileURLToPath } from "node:url"
 
 const [id, option, ...extra] = process.argv.slice(2)
 if (!/^[a-f0-9-]{36}$/.test(id ?? "") || (option !== undefined && option !== "--init") || extra.length) {
-  throw Error("Использование: node dashboard/publish.mjs <ID снимка> [--init]")
+  throw Error("Использование: node packages/dashboard/script/publish.mjs <ID снимка> [--init]")
 }
 
 const response = await fetch("http://127.0.0.1:32768/dashboard/targets/" + id)
 if (!response.ok) throw Error(`Снимок ${id} недоступен: HTTP ${response.status}`)
 const snapshot = await response.json()
-const dashboard = fileURLToPath(new URL(".", import.meta.url))
+const dashboard = fileURLToPath(new URL("../../../dashboard/", import.meta.url))
+const template = fileURLToPath(new URL("../template/", import.meta.url))
 const apps = join(dashboard, "apps")
 if (snapshot.id !== id || !/^[a-f0-9]{64}$/.test(snapshot.key)) throw Error("Неверная привязка снимка")
 const sourceDir = join(apps, snapshot.key)
 if (sourceDir !== snapshot.sourceDir) throw Error("Каталог исходников не соответствует привязке")
 
 if (option === "--init") {
-  const template = join(dashboard, "template")
   const modules = await realpath(join(template, "node_modules"))
   await mkdir(apps, { recursive: true })
   const staging = await mkdtemp(join(apps, ".init-"))
@@ -37,7 +37,7 @@ if (option === "--init") {
 } else {
   if (await realpath(sourceDir) !== sourceDir) throw Error("Недопустимый путь к исходникам")
   // A fresh checkout has the app sources but no ignored node_modules link.
-  await symlink(await realpath(join(dashboard, "template/node_modules")), join(sourceDir, "node_modules"), "dir")
+  await symlink(await realpath(join(template, "node_modules")), join(sourceDir, "node_modules"), "dir")
     .catch(error => { if (error.code !== "EEXIST") throw error })
   execFileSync("npm", ["run", "typecheck"], { cwd: sourceDir, stdio: "inherit" })
   execFileSync("npm", ["run", "build"], { cwd: sourceDir, stdio: "inherit" })
