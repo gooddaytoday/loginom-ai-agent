@@ -103,11 +103,15 @@ async function serveApp(response, publishRoot, key, asset) {
   }
 }
 
-export function dashboardServer({projectRoot, publishRoot, maxSnapshots = 100, allowCurrent = false}) {
+export function dashboardServer({projectRoot, publishRoot, maxSnapshots = 100, allowCurrent = false, allowedHosts}) {
   const snapshots = new Map()
   let current
   return createServer(async (request, response) => {
     try {
+      const hosts = allowedHosts ?? ["localhost", "127.0.0.1", "[::1]"].map(host => `${host}:${request.socket.localPort}`)
+      if (!hosts.some(host => host.toLowerCase() === request.headers.host?.toLowerCase())) {
+        return json(response, 403, {error: "Forbidden host"})
+      }
       const path = request.url.split("?")[0]
       if (request.method === "POST" && path === "/dashboard/lookup") {
         const key = appKey(await body(request))
@@ -142,6 +146,7 @@ export function startDashboard(env = process.env) {
     projectRoot: env.DASHBOARD_PROJECT_ROOT ?? resolve(import.meta.dirname, ".."),
     publishRoot: env.DASHBOARD_PUBLISH_ROOT ?? "/workdir/dashboard-app/apps",
     allowCurrent: env.DASHBOARD_ALLOW_CURRENT === "1",
+    allowedHosts: env.DASHBOARD_PUBLIC_HOSTS?.split(",").map(host => host.trim()),
   })
   server.listen(Number(env.DASHBOARD_PORT ?? 8100), env.DASHBOARD_HOST ?? "127.0.0.1")
   return server
