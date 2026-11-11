@@ -4,6 +4,8 @@
 
 Локальные заметки репозитория прочитаны и ниже не выдаются за документацию вендора: `docs/research/2026-11-03-loginom-dashboard.md`, `docs/research/2026-11-09-dashboard-live-investigation.md`, `docs/research/loginom-dashboard-evidence/`, `dashboard/stand/`.
 
+Сверено с исходниками контейнерного установщика, официальной поставкой Linux 7.4.2 enterprise и образами dev-стенда: разделы «Сверка с исходниками установщика», «Сверка с поставкой Linux 7.4.2» и «Образы dev-стенда» в конце. Где справка и код расходятся, верен код.
+
 ## Что важно для dashboard
 
 Пользовательский React-dashboard некуда «встроить» штатным расширением. Loginom на Linux — это три компонента: Loginom Server, статический веб-клиент Studio за Apache и Loginom Integrator. Серверные редакции на Linux — Standard и Enterprise. Готового образа на Docker Hub нет: контейнеры собираются из закрытого архива дистрибутива.
@@ -67,10 +69,10 @@
 | Рабочий каталог Server | `/var/opt/loginom/server`, пользователь `loginom`, `660` |
 | Бинарники Integrator | `/opt/loginom/integrator`, root |
 | Рабочий каталог Integrator | `/var/opt/loginom/integrator`, пользователь `loginom`, `660` |
-| Веб-сервер | `apache2`; конфиги `/etc/apache2`; файлы клиента `/var/www/html/client` |
+| Веб-сервер | `apache2`; конфиги `/etc/apache2`; файлы клиента `/var/www/html/client` по справке, а по скрипту из поставки 7.4.2 — `/var/www/loginom` (см. «Сверка с поставкой Linux 7.4.2») |
 | BatchLauncher в архиве | `server/redist/BatchLauncher`, копируется туда, откуда его запускают |
 
-Служба Server: имя `loginom-server`, алиас `loginomd`, пользователь `loginom`, `OOMScoreAdjust=-200`, `TimeoutStopSec=11`, `Restart=on-failure`, `RestartSec=30`. Integrator: `loginom-integrator` / `loginomi`, `OOMScoreAdjust=-100`, `TimeoutStopSec=6`, тот же рестарт. [Установка службой](https://help.loginom.ru/adminguide/linux/server/loginom-linux.html). Имя unit веб-сервера в этой статье не названо. На образе Яндекс.Облака его проверяют как `apache2`. [Яндекс.Облако](https://help.loginom.ru/adminguide/yandex-cloud/index.html). Для RHEL в списке пакетов указан `httpd`; имя unit в прочитанных страницах не найдено.
+Служба Server: имя `loginom-server`, алиас `loginomd`, пользователь `loginom`, `OOMScoreAdjust=-200`, `TimeoutStopSec=11`, `Restart=on-failure`, `RestartSec=30`. Integrator: `loginom-integrator` / `loginomi`, `OOMScoreAdjust=-100`, `TimeoutStopSec=6`, тот же рестарт. [Установка службой](https://help.loginom.ru/adminguide/linux/server/loginom-linux.html). Имя unit веб-сервера в этой статье не названо. На образе Яндекс.Облака его проверяют как `apache2`. [Яндекс.Облако](https://help.loginom.ru/adminguide/yandex-cloud/index.html). Для RHEL в списке пакетов указан `httpd`; имя unit в прочитанных страницах не найдено. Закрыто поставкой 7.4.2: `httpd` на RHEL, `apache2` на Debian, `httpd2` на Alt (`install_http.sh`).
 
 Обновление службы: копия `/var/opt/loginom/` → `/var/opt/loginom-backup`, останов `loginomd` и `loginomi`, `sudo bash install_loginom.sh`, старт тех же алиасов. [Обновление службы](https://help.loginom.ru/adminguide/linux/server/update-native.html). С 7.3 пользовательский `server.json` при таком обновлении сохраняется. [7.3](https://loginom.ru/blog/release-73).
 
@@ -102,7 +104,7 @@ Studio ходит на Server по WebSocket: напрямую или через
 - Linux-служба — `/var/www/loginom/`;
 - контейнеры — `/var/opt/loginom-docker/http/`.
 
-[Конфигурация Studio](https://help.loginom.ru/adminguide/studio/config.html). Это расходится со статьёй установки, где файлы клиента лежат в `/var/www/html/client`. В примере SELinux файл монтируется внутрь контейнера как `/usr/local/apache2/htdocs/client/server.json`. [Fedora 43](https://help.loginom.ru/adminguide/linux/server/docker-Fedora_43.html). Какой из каталогов на native-установке содержит `index.html`, руководство одной фразой не фиксирует. Путь `/app-debug/` в прочитанной справке не найден.
+[Конфигурация Studio](https://help.loginom.ru/adminguide/studio/config.html). Это расходится со статьёй установки, где файлы клиента лежат в `/var/www/html/client`. В примере SELinux файл монтируется внутрь контейнера как `/usr/local/apache2/htdocs/client/server.json`. [Fedora 43](https://help.loginom.ru/adminguide/linux/server/docker-Fedora_43.html). Какой из каталогов на native-установке содержит `index.html`, руководство одной фразой не фиксирует. Скрипт `install_http.sh` из поставки 7.4.2 отвечает: `/var/www/loginom`. Путь `/app-debug/` в прочитанной справке не найден.
 
 Параметры `server.json`: `host` (null — хост веб-сервера), `wsport` (null → 8080), `wssport` (null → 8443), `wsproxy`, `path` (по умолчанию `ws/`), `secure`, `openid` (`auto` / не задан, `none`/`false`, `force`). Для Team и Standard `openid` может быть только `none`; у Enterprise по умолчанию параметр не задан. `force` сразу уводит на внешнего провайдера; локальный вход тогда только логином и паролем в URL. [Конфигурация Studio](https://help.loginom.ru/adminguide/studio/config.html).
 
@@ -216,36 +218,40 @@ JavaScript и Python — узлы сценария, не плагины веб-�
 
 ## Расхождения, которые нельзя сгладить
 
-- Файлы клиента native: `/var/www/html/client` в [установке](https://help.loginom.ru/adminguide/linux/server/loginom-linux.html) и `/var/www/loginom/` для `client.json` в [конфигурации Studio](https://help.loginom.ru/adminguide/studio/config.html).
+- Файлы клиента native: `/var/www/html/client` в [установке](https://help.loginom.ru/adminguide/linux/server/loginom-linux.html) и `/var/www/loginom/` для `client.json` в [конфигурации Studio](https://help.loginom.ru/adminguide/studio/config.html). Решено поставкой 7.4.2: `install_http.sh` ставит клиент и `client.json` в `/var/www/loginom`.
 - Контейнерный каталог конфигов Studio в той же статье — только `/var/opt/loginom-docker/http/`, тогда как Podman хранит конфиги в `$HOME/loginom/http`. [Установка Podman/Docker](https://help.loginom.ru/adminguide/linux/server/install-docker-podman.html).
 - Пример `wsproxy` в [конфигурации Studio](https://help.loginom.ru/adminguide/studio/config.html) показывает результирующий URL `ws://web-server-host:443/ws/` при том, что соседние разделы связывают 443 с `wss`. Это выглядит как опечатка страницы; схема из [веб-клиента](https://help.loginom.ru/adminguide/studio/index.html) согласована: порт страницы и `ws`/`wss` по протоколу страницы.
 - Поисковый индекс справки в день проверки ещё показывал `aspnetcore-runtime-6.0`. Загруженная в этот же день страница установки указывает `aspnetcore-runtime-8.0`, требования Integrator — .NET 8.0. В заметку попала загруженная страница.
 
 ## Не найдено в документации
 
+Часть пунктов закрыта поставкой 7.4.2 и исходниками установщика (пометки «закрыто»; см. разделы «Сверка» в конце).
+
 - Публичный образ Loginom на Docker Hub или в GitHub Container Registry.
-- Полный `httpd.conf` / virtual host Linux с `ProxyPass`, TLS и заголовками.
-- Каталог `index.html` одной фразой, если `/var/www/html/client` и `/var/www/loginom` — разные места.
+- Полный `httpd.conf` / virtual host Linux с `ProxyPass`, TLS и заголовками. Закрыто: `studio.site.conf` для Debian, RHEL и Alt лежит в `http/config-*` поставки 7.4.2, контейнерный — в `src/http/config` установщика.
+- Каталог `index.html` одной фразой, если `/var/www/html/client` и `/var/www/loginom` — разные места. Закрыто: поставка 7.4.2 ставит клиент в `/var/www/loginom`.
 - URL `/app-debug/`.
 - Параметр встраивания Studio (`embedded`) в `client.json`.
 - Плагин, свой визуализатор, официальная вставка произвольной страницы в веб-клиент.
 - REST API администрирования и проверка «пользователь X может изменить пакет Y».
 - Аутентификация входящего вызова REST/SOAP/MCP (кто имеет право дернуть опубликованный узел).
-- `Content-Security-Policy` и `X-Frame-Options` ответа Studio.
-- Числовой UID процесса в официальном образе.
-- Имя systemd unit веб-сервера на RHEL (`httpd` назван пакетом, unit — нет).
+- `Content-Security-Policy` и `X-Frame-Options` ответа Studio. По исходникам установщика защитных заголовков у Apache нет (кроме `TraceEnable off` и HSTS на HTTPS); в живом ответе они не снимались.
+- Числовой UID процесса в официальном образе. Для установки службами закрыто: `loginom` — UID 701, `loginomi` — UID 654; в контейнерах по исходникам установщика процессы работают от root.
+- Имя systemd unit веб-сервера на RHEL (`httpd` назван пакетом, unit — нет). Закрыто: `httpd` на RHEL, `apache2` на Debian, `httpd2` на Alt.
 - Версия новее 7.4.2 в блоге на 11 ноября 2026. Внутренний `7.5.0-alpha` есть только в стендах этого репозитория.
 
 ## Открытые вопросы владельцу
 
-1. Целевая линия — публичная 7.4.x (последняя найденная 7.4.2) или внутренний master, на котором уже стоят стенды dashboard? От этого зависит, есть ли MCP и Peer и совпадает ли каталог клиента со справкой.
-2. На трёх площадках (локальный Docker, голый Linux, удалённые контейнеры) включены ли `wsproxy` и HTTPS, и можно ли нам добавлять свой `Alias`/vhost в Apache, не обновляя файлы клиента?
-3. Какая редакция стоит на площадках — Standard или Enterprise? От этого зависят OpenID, LDAP, `disablenewsfetch` и MCP.
-4. Sidecar может монтировать `UserStorage` и состоять в группе `loginom`, или пакеты для него закрыты и данные узла он видит только через браузерную сессию?
-5. Если публичной проверки прав нет, достаточно ли собственного списка разрешений dashboard, не связанного с общими папками Loginom?
-6. Разрешено ли менять `index.html` поставки, или кнопка и iframe живут только в нашей копии статики, которую обновление `install_http.sh` / `setup.sh --update` может затереть?
-7. Нужно ли с живого Apache снять заголовки frame/CSP до проектирования iframe на другом origin?
-8. Кто владеет портами 80/443 на удалённых площадках — Apache Loginom или внешний обратный прокси, в который sidecar надо вписывать отдельно?
+Часть вопросов уже решена в [roadmap](../superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md): ответ записан после вопроса. Открытыми остались вопросы 3 и 8, вопрос 7 закрыт частично.
+
+1. Целевая линия — публичная 7.4.x (последняя найденная 7.4.2) или внутренний master, на котором уже стоят стенды dashboard? От этого зависит, есть ли MCP и Peer и совпадает ли каталог клиента со справкой. **Решено в roadmap:** поддерживаются обе линии, dev-стенд на master (приоритет 1) и release 7.4.x (приоритет 2), раздел «Цели и стенды».
+2. На трёх площадках (локальный Docker, голый Linux, удалённые контейнеры) включены ли `wsproxy` и HTTPS, и можно ли нам добавлять свой `Alias`/vhost в Apache, не обновляя файлы клиента? **Решено в roadmap:** `Alias` и vhost добавляются одним файлом `dashboard.site.conf` в каталог конфигурации Apache, файлы клиента не меняются; Studio работает и по HTTP, и по HTTPS, перенаправления нет. От `wsproxy` компоненты dashboard не зависят.
+3. Какая редакция стоит на площадках — Standard или Enterprise? От этого зависят OpenID, LDAP, `disablenewsfetch` и MCP. **Открыто:** roadmap редакцию не фиксирует. Схема от неё не зависит: dashboard эти возможности не использует.
+4. Sidecar может монтировать `UserStorage` и состоять в группе `loginom`, или пакеты для него закрыты и данные узла он видит только через браузерную сессию? **Решено в roadmap:** publisher монтирует `UserStorage` только на чтение и работает с UID процесса Loginom; для release это проверяет spike S2, на dev-стенде для этого нужен каталог хоста (путь Б).
+5. Если публичной проверки прав нет, достаточно ли собственного списка разрешений dashboard, не связанного с общими папками Loginom? **Решено в roadmap:** права проверяет сам Loginom (право записи в папку пакета), собственного списка нет.
+6. Разрешено ли менять `index.html` поставки, или кнопка и iframe живут только в нашей копии статики, которую обновление `install_http.sh` / `setup.sh --update` может затереть? **Решено в roadmap:** `index.html` не меняем, оболочка подключается конфигурацией Apache (`mod_substitute`).
+7. Нужно ли с живого Apache снять заголовки frame/CSP до проектирования iframe на другом origin? **Закрыто частично:** по исходникам установщика защитных заголовков у Apache нет (кроме `TraceEnable off` и HSTS на HTTPS); живой ответ снимается в spike S3 и S4.
+8. Кто владеет портами 80/443 на удалённых площадках — Apache Loginom или внешний обратный прокси, в который sidecar надо вписывать отдельно? **Открыто:** roadmap исходит из Apache Loginom и открывает отдельный порт хоста приложений (8101); внешний обратный прокси перед Apache не рассматривался.
 
 ## Сверка с исходниками установщика
 
@@ -258,7 +264,30 @@ JavaScript и Python — узлы сценария, не плагины веб-�
 - **Apache.** Образ `httpd:2.4-alpine`, клиент (`index.html`) запечён в образ. `httpd.conf` подключает `conf/*.site.conf`; загружены `mod_headers`, `mod_filter`, прокси и `mod_ssl`, `mod_substitute` не загружен. Сертификат задан через `Define SSL_CERT` и `SSL_KEY` в `env.conf`. Заголовков безопасности, кроме `TraceEnable off` и HSTS на HTTPS, нет; перенаправления с HTTP на HTTPS нет; у прокси `ProxyTimeout` 72 часа.
 - **Автозапуск.** Docker — `restart: unless-stopped`; Podman — строка `@reboot podman-compose -f … start` в crontab пользователя. Podman всегда вызывается с `-f`, поэтому `docker-compose.override.yml` не подхватывается.
 - **Сертификат по умолчанию** самоподписан на `localhost`, а его закрытый ключ лежит в дистрибутиве, то есть известен всем.
-- **Нет в release:** `client.json` (установщик его не создаёт) и путь `/app-debug/`.
+- **`client.json`.** Скрипт установщика его не создаёт, но файл приходит вместе с каталогом клиента (`COPY ./client`): см. «Сверка с поставкой Linux 7.4.2». Каталога `client` контейнерной поставки среди источников нет, поэтому наличие файла в контейнерах выведено по двум другим сборкам клиента.
+- **Нет в release:** путь `/app-debug/`.
 - **Неслитая ветка** `origin/rootless-container-user` переводит Loginom на UID 7001, Apache — на `www-data` и внутренние порты 4080 и 4443 и переписывает crontab.
 
 Как это учтено в архитектуре — в [roadmap](../superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md), раздел «Скрипты для стендов».
+
+## Сверка с поставкой Linux 7.4.2
+
+Проверено 2026-11-11 по официальной поставке Linux 7.4.2 enterprise (`loginom-install-linux-7.4.2-ent`): это установка прямо в систему, не контейнерная. Где справка и поставка расходятся, верна поставка.
+
+- **Состав.** `install_loginom.sh` по очереди запускает `http/install_http.sh`, `server/install_server.sh` и, если каталог есть, `integrator/install_integrator.sh`; все требуют root.
+- **Клиент.** Один: каталог `http/client/`, он ставится в `/var/www/loginom` (`CLIENT_DIR` в `install_http.sh`), а не в `/var/www/html/client`. Каталога `client-debug` и пути `/app-debug/` нет. Каталог клиента копируется поверх старого, сохраняется только `server.json`.
+- **`client.json`** в поставке есть: `http/client/client.json` с содержимым `{}`. Установка копирует его вместе с каталогом клиента, поэтому правка этого файла на стенде пропадёт при обновлении.
+- **Apache.** Раскладок три, дистрибутив определяется по файлам системы: Debian — `/etc/apache2`, сайт в `sites-available/studio.site.conf`, `a2ensite`, служба `apache2`; RHEL — `/etc/httpd/conf`, `studio.site.conf` рядом с `httpd.conf`, который подключает `Include conf/*.site.conf`, как в контейнерах, служба `httpd`; Alt — `/etc/httpd2/conf`, `sites-available`, служба `httpd2`.
+- **HTTPS** включён сразу: `Define USE_SSL 1`, сертификат по умолчанию `default-cert.crt` и `default-cert.key` из архива поставки (закрытый ключ известен всем). WebSocket-прокси выключен (`#Define USE_WS_PROXY 1`), как и в контейнерах.
+- **Пользователи.** Сервер работает от `loginom` (UID и GID 701), Integrator — от `loginomi` (UID 654) в группе GID 701, то есть в группе `loginom`.
+
+Это относится к `native.sh`, который в backlog (roadmap, раздел «`native.sh`»). Живая установка не проверялась: выводы сделаны по скриптам и конфигурации поставки.
+
+## Образы dev-стенда
+
+Проверено 2026-11-11 по слоям образов `dashboard-master-20261109` (`docker save`); в Docker образы не загружались.
+
+- Apache собран на `httpd` 2.4.68 alpine, той же базе, что у release (`FROM docker.io/httpd:2.4-alpine`). Модуль `mod_substitute.so` лежит в `modules/`, но по умолчанию не загружен: его загружает наш `dashboard.site.conf`.
+- Конфигурация взята из integration: загружены `mod_headers`, `mod_filter`, `mod_deflate`, `mod_brotli`, `mod_proxy`, `mod_proxy_http`, `mod_proxy_wstunnel`, `mod_rewrite`, подключается `conf/*.site.conf`. Виртуальных хостов, HTTPS и сжатия нет: `snippets/deflate.conf` в образе есть, но не подключён. `ProxyPreserveHost` не задан.
+- Сервер работает от UID 7001, томов нет, `UserStorage` лежит в слое контейнера (`/workdir/UserStorage`).
+- `client.json` лежит в обоих каталогах клиентов, `client` и `client-debug`.
