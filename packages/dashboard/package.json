@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsgo --noEmit -p tsconfig.web.json",
-    "build": "bun run script/build.ts"
+    "typecheck": "tsgo --noEmit -p tsconfig.web.json && tsgo --noEmit -p tsconfig.shell.json",
+    "build": "bun run script/build.ts",
+    "check:size": "bun run script/check-size.ts"
   },
   "dependencies": {
     "effect": "catalog:"
