@@ -8,26 +8,11 @@ server=dashboard-master-20261109-server
 app=/workdir/dashboard-app
 storage=/workdir/UserStorage/user/dashboard-roi
 
-if [[ ! -x template/node_modules/.bin/vite ]]; then (cd template && npm ci --no-audit --no-fund); fi
-docker exec "$server" mkdir -p "$app/apps" "$storage"
-for file in fixture/campaign.lgp fixture/dataset.csv; do
-  if ! docker exec "$server" test -e "$storage/${file##*/}"; then docker cp "$file" "$server:$storage/"; fi
-done
-docker cp server.mjs "$server:$app/server.mjs"
-if ! docker exec "$server" test -x /app/dashboard-node; then docker cp "$(command -v node)" "$server:/app/dashboard-node"; fi
-docker exec "$server" sh -c 'ps -eo pid,args | awk '\''$2 == "/app/dashboard-node" && $3 == "/workdir/dashboard-app/server.mjs" {print $1}'\'' | xargs -r kill'
-# Apache runs in the studio container, so this process must accept the Docker network address.
-# The server container publishes no ports and shares that network only with studio.
-docker exec -d -e DASHBOARD_PROJECT_ROOT="$project" -e DASHBOARD_HOST=0.0.0.0 -e DASHBOARD_PUBLIC_HOSTS=127.0.0.1:32768,localhost:32768 "$server" /app/dashboard-node "$app/server.mjs"
 config=$(mktemp -d)
 trap 'rm -rf "$config"' EXIT
 for client in client client-debug; do
   root=/usr/local/apache2/htdocs/$client
   docker cp "$studio:$root/client.json" "$config/$client.json"
-  docker cp parameter.js "$studio:$root/dashboard-parameter.js"
-  docker cp bootstrap.js "$studio:$root/dashboard-bootstrap.js"
-  docker exec "$studio" sed -i -e '/<script src="dashboard-\(probe\|parameter\|bootstrap\)\.js"><\/script>/d' \
-    -e '/<\/head>/i\<script src="dashboard-parameter.js"></script>\n<script src="dashboard-bootstrap.js"></script>' "$root/index.html"
 done
 node - "$config" <<'NODE'
 const {readFileSync, writeFileSync} = require("node:fs")
@@ -40,6 +25,25 @@ for (const config of configs) {
   writeFileSync(config.file, JSON.stringify(config.value))
 }
 NODE
+
+if [[ ! -x template/node_modules/.bin/vite ]]; then (cd template && npm ci --no-audit --no-fund); fi
+docker exec "$server" mkdir -p "$app/apps" "$storage"
+for file in fixture/campaign.lgp fixture/dataset.csv; do
+  if ! docker exec "$server" test -e "$storage/${file##*/}"; then docker cp "$file" "$server:$storage/"; fi
+done
+docker cp server.mjs "$server:$app/server.mjs"
+if ! docker exec "$server" test -x /app/dashboard-node; then docker cp "$(command -v node)" "$server:/app/dashboard-node"; fi
+docker exec "$server" sh -c 'ps -eo pid,args | awk '\''$2 == "/app/dashboard-node" && $3 == "/workdir/dashboard-app/server.mjs" {print $1}'\'' | xargs -r kill'
+# Apache runs in the studio container, so this process must accept the Docker network address.
+# The server container publishes no ports and shares that network only with studio.
+docker exec -d -e DASHBOARD_PROJECT_ROOT="$project" -e DASHBOARD_HOST=0.0.0.0 -e DASHBOARD_PUBLIC_HOSTS=127.0.0.1:32768,localhost:32768 "$server" /app/dashboard-node "$app/server.mjs"
+for client in client client-debug; do
+  root=/usr/local/apache2/htdocs/$client
+  docker cp parameter.js "$studio:$root/dashboard-parameter.js"
+  docker cp bootstrap.js "$studio:$root/dashboard-bootstrap.js"
+  docker exec "$studio" sed -i -e '/<script src="dashboard-\(probe\|parameter\|bootstrap\)\.js"><\/script>/d' \
+    -e '/<\/head>/i\<script src="dashboard-parameter.js"></script>\n<script src="dashboard-bootstrap.js"></script>' "$root/index.html"
+done
 docker exec "$studio" mkdir -p /usr/local/apache2/htdocs/dashboard-config
 docker cp "$config/." "$studio:/usr/local/apache2/htdocs/dashboard-config/"
 docker exec -i "$studio" sh -c 'cat > /usr/local/apache2/conf/dashboard-app.site.conf' <<'CONF'
