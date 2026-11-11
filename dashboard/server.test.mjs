@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -28,14 +28,42 @@ async function stand(t, options = {}) {
     await new Promise(resolve => server.close(resolve))
     await rm(root, { recursive: true, force: true })
   })
+  const base = `http://127.0.0.1:${server.address().port}/dashboard`
   const request = async (path, body) => {
     const options = body && {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)}
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/dashboard/${path}`, options)
+    const response = await fetch(`${base}/${path}`, options)
     assert.ok(response.ok, `${path} returned ${response.status}`)
     return response.json()
   }
-  return { request, publishRoot: join(root, "published") }
+  return { base, request, publishRoot: join(root, "published") }
 }
+
+test("published dashboard keeps its metadata private", async t => {
+  const server = await stand(t)
+  const app = await server.request("lookup", binding)
+  const version = join(server.publishRoot, ".versions", "example")
+  await mkdir(join(version, "assets"), { recursive: true })
+  await writeFile(join(version, "index.html"), '<script src="./assets/app.js"></script>')
+  await writeFile(join(version, "assets/app.js"), 'console.log("dashboard")')
+  await writeFile(join(version, "binding.json"), JSON.stringify(binding))
+  await writeFile(join(version, "sample.json"), JSON.stringify({ schema: [{ name: "budget", type: "number" }], rows: [[500]] }))
+  await symlink(version, join(server.publishRoot, app.key), "dir")
+  assert.equal((await server.request("lookup", binding)).exists, true)
+  const base = `${server.base}/apps/${app.key}/`
+  const page = await fetch(base)
+  assert.equal(page.status, 200)
+  assert.equal(await page.text(), '<script src="./assets/app.js"></script>')
+  const script = await fetch(base + "assets/app.js")
+  assert.equal(script.status, 200)
+  assert.equal(await script.text(), 'console.log("dashboard")')
+  for (const name of ["binding.json", "sample.json"]) {
+    await symlink(join(version, name), join(version, "assets", name + ".alias"))
+    const response = await fetch(base + name)
+    assert.equal(response.status, 404)
+    const alias = await fetch(base + "assets/" + name + ".alias")
+    assert.equal(alias.status, 404)
+  }
+})
 
 test("a package path separates applications even when node GUIDs match", async t => {
   const server = await stand(t)
