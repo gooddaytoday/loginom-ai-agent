@@ -11,8 +11,8 @@
 ## Точка продолжения
 
 - Причина доказана: getters/QI возвращают общую identity RPC proxy, dispose() отключает её для всех держателей. Обе цепочки переведены на штатное время жизни JS/FinalizationRegistry; configure commit/cancel и cancellation release сохранены.
-- RED: порог 50000 → закрыть пульт → штатный быстрый просмотр, ошибка финализированного proxy. GREEN: 50000/0/99000/0, каждый раз dashboard и штатный preview, затем native мастер MinBudget=0.00. Регрессия выполнялась без изменения пользовательской вкладки на отдельной копии.
+- RED: порог 50000 → закрыть dashboard → штатный быстрый просмотр, ошибка финализированного proxy. GREEN: 50000/0/99000/0, каждый раз dashboard и штатный preview, затем native мастер MinBudget=0.00. Регрессия выполнялась без изменения пользовательской вкладки на отдельной копии.
 - [Результат](/home/george/Documents/Codex/2026-11-10/dashboard-proxy-fix/green.json), [исходный сбой](/home/george/Documents/Codex/2026-11-10/dashboard-proxy-fix/before.json). Повтор: node /home/george/tmp/dashboard-proxy-20261110/check.cjs <метка>.
 - Независимое ревью: Approved. Syntax и оба HTTP-теста проходят. Файлы JS обоих клиентов совпадают с Git. Сервер/Node не перезапускались, свой пакет закрыт, своя сессия завершена, .lgp не изменён.
 - За пределами рабочего цикла, при logout, headless Chromium сообщает NotSupportedError WebAuthn и BGDisconnectedSessionException. Они записаны отдельно по фазе cleanup; BGDisconnectedProxyException во время работы отсутствует.
-- В уже открытой вкладке остаётся старый JS и повреждённые proxy. Пользователю нужно сохранить нужные изменения пакета и обновить страницу Loginom, затем открыть пульт заново.
+- В уже открытой вкладке остаётся старый JS и повреждённые proxy. Пользователю нужно сохранить нужные изменения пакета и обновить страницу Loginom, затем открыть dashboard заново.

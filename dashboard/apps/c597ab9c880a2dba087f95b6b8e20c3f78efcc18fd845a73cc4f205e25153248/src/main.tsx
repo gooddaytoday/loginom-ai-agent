@@ -12,7 +12,7 @@ function App() {
   async function load() {
     const adapter = dashboard
     if (!adapter) {
-      setError("Откройте пульт у узла Loginom.")
+      setError("Откройте dashboard у узла Loginom.")
       setBusy(false)
       return
     }
