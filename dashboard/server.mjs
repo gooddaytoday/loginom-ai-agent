@@ -87,6 +87,9 @@ async function serveApp(response, publishRoot, key, asset) {
     if (!dir.startsWith(root + sep)) return json(response, 404, {error: "Not found"})
     const file = await realpath(join(dir, requested))
     if (!file.startsWith(dir + sep)) return json(response, 404, {error: "Not found"})
+    if (["binding.json", "sample.json"].some(name => requested === name || file === join(dir, name))) {
+      return json(response, 404, {error: "Not found"})
+    }
     const data = await readFile(file)
     response.writeHead(200, {
       "content-type": mime[extname(file)] ?? "application/octet-stream",
