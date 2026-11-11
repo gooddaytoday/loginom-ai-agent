@@ -8,6 +8,7 @@ export async function fixture(
     status = "active",
     variableStatus = "active",
     variables = [{ name: "MinBudget", type: 1, value: 0 }],
+    lateForm = false,
     missingAPI,
     malformed,
   } = {},
@@ -68,7 +69,7 @@ export async function fixture(
               },
       })
     }
-    if (url.pathname === "/dashboard-bootstrap.js")
+    if (url.pathname === "/shell.js")
       return route.fulfill({ contentType: "text/javascript", body: shell })
     if (["/desktop-link", "/ordinary"].includes(url.pathname) || url.pathname.startsWith("/dashboard/apps/"))
       return route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Safe destination</title>" })
@@ -190,7 +191,18 @@ export async function fixture(
         if (missing === 'EndOperationEx') delete bg.EndOperationEx;
         if (missing === 'dtInteger') delete bg.TBGDataType.dtInteger;
         if (missing === 'IBGModelOutputSocket') delete bg.IBGModelOutputSocket;
-      </script><script src="/dashboard-bootstrap.js"></script>`,
+        if (${lateForm}) {
+          const mainForm = bg.app.Application.Instance.FMainForm;
+          bg.app.Application.Instance.FMainForm = null;
+          let listeners;
+          Ext.create = () => ({control: (selector, events) => {listeners = events}});
+          Ext.ComponentQuery.query = () => [];
+          window.fixture.showScenario = () => {
+            bg.app.Application.Instance.FMainForm = mainForm;
+            listeners?.afterrender(view);
+          };
+        }
+      </script><script src="/shell.js"></script>`,
     })
   })
   const page = await context.newPage()

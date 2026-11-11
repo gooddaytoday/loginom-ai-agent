@@ -309,3 +309,9 @@ test("missing required Studio interface identifier preserves native actions with
   assert.equal(await page.locator("#dashboard-tab-overlay, iframe").count(), 0)
   assert.deepEqual(errors, [])
 })
+
+test("Studio loads the shell before login and renders the workflow after login", async (t) => {
+  const { page } = await fixture(t, { lateForm: true })
+  await page.evaluate(() => window.fixture.showScenario())
+  await page.getByRole("button", { name: "Создать dashboard" }).waitFor()
+})

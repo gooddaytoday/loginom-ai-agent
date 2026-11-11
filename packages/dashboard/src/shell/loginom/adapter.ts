@@ -4,22 +4,20 @@ import type { Form, Node, Studio, Tab, View, Visual, TargetBinding, Update } fro
 export function connect() {
   const runtime = window as Window & Partial<Studio>
   const bg = runtime.bg
-  const Ext = runtime.Ext
   const mxEvent = runtime.mxEvent
   const Out = runtime.Out
   const ReleaseObject = runtime.ReleaseObject
-  if (!bg || !Ext || !mxEvent || typeof Out !== "function" || typeof ReleaseObject !== "function") return
+  if (!bg || !mxEvent || !Out || !ReleaseObject) return
   if (
     [
+      Out,
+      ReleaseObject,
       bg.AsyncInvoker,
       bg.selectAsyncValue,
       bg.ScopeFindObjectSelector,
       bg.ScopeFindObject,
       bg.EndOperationEx,
       bg.app?.Application?.Instance?.FMainForm?.GetActiveTab,
-      Ext.onReady,
-      Ext.create,
-      Ext.ComponentQuery?.query,
     ].some((method) => typeof method !== "function")
   )
     return
@@ -39,7 +37,7 @@ export function connect() {
     ].some((value) => value == null)
   )
     return
-  const studio = { bg, Ext, mxEvent, Out, ReleaseObject }
+  const studio = { bg, Out, ReleaseObject }
   const guid = (value: string) => String(value).replace(/[{}]/g, "").toLowerCase()
   async function binding(tab: Tab, form: Form, visual: Visual): Promise<TargetBinding> {
     const node = visual.GetData()
@@ -130,20 +128,10 @@ export function connect() {
     active,
     execute,
     parameters: (form: Form, update?: Update) => parameters(studio, form, update),
-    views(install: (view: View) => void) {
-      studio.Ext.onReady(() => {
-        const controller = studio.Ext.create("Ext.app.Controller", { id: "loginomDashboardApp" })
-        if (typeof controller?.control !== "function") return
-        controller.control("panel#pnlModelForm", { afterrender: install })
-        studio.Ext.ComponentQuery.query("panel#pnlModelForm")
-          .filter((view) => view.rendered)
-          .forEach(install)
-      })
-    },
     tab: () => studio.bg.app.Application.Instance.FMainForm.GetActiveTab(),
     listen(view: View, update: () => void, remove: () => void) {
       const selection = view.Controller.FDiagram.GetMxGraph().getSelectionModel()
-      selection.addListener(studio.mxEvent.CHANGE, update)
+      selection.addListener(mxEvent.CHANGE, update)
       view.on("hide", remove)
       view.on(
         "destroy",
@@ -156,4 +144,17 @@ export function connect() {
       )
     },
   }
+}
+
+// Uses.js loads the application asynchronously. Register with Ext up front;
+// the main form and the runtime APIs become available when a workflow renders.
+export function views(install: (view: View) => void) {
+  const Ext = (window as Window & Partial<Studio>).Ext
+  if ([Ext?.onReady, Ext?.create, Ext?.ComponentQuery?.query].some((method) => typeof method !== "function")) return
+  Ext!.onReady(() => {
+    const controller = Ext!.create("Ext.app.Controller", { id: "loginomDashboardApp" })
+    if (typeof controller?.control !== "function") return
+    controller.control("panel#pnlModelForm", { afterrender: install })
+    Ext!.ComponentQuery.query("panel#pnlModelForm").filter((view) => view.rendered).forEach(install)
+  })
 }
