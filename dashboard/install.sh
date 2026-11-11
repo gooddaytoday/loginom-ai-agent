@@ -16,7 +16,9 @@ done
 docker cp server.mjs "$server:$app/server.mjs"
 if ! docker exec "$server" test -x /app/dashboard-node; then docker cp "$(command -v node)" "$server:/app/dashboard-node"; fi
 docker exec "$server" sh -c 'ps -eo pid,args | awk '\''$2 == "/app/dashboard-node" && $3 == "/workdir/dashboard-app/server.mjs" {print $1}'\'' | xargs -r kill'
-docker exec -d -e DASHBOARD_PROJECT_ROOT="$project" "$server" /app/dashboard-node "$app/server.mjs"
+# Apache runs in the studio container, so this process must accept the Docker network address.
+# The server container publishes no ports and shares that network only with studio.
+docker exec -d -e DASHBOARD_PROJECT_ROOT="$project" -e DASHBOARD_HOST=0.0.0.0 "$server" /app/dashboard-node "$app/server.mjs"
 for client in client client-debug; do
   root=/usr/local/apache2/htdocs/$client
   docker cp parameter.js "$studio:$root/dashboard-parameter.js"
@@ -34,3 +36,15 @@ CONF
 docker exec "$studio" apachectl -t
 docker exec "$studio" apachectl -k graceful
 curl -fsS http://127.0.0.1:32768/app/dashboard-bootstrap.js >/dev/null
+# Node starts in the background. 404 on an unknown id means Apache reached it; 000 or 5xx does not.
+code=000
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 \
+    http://127.0.0.1:32768/dashboard/targets/00000000-0000-0000-0000-000000000000 || true)
+  if [[ "$code" == 404 ]]; then break; fi
+  sleep 0.5
+done
+if [[ "$code" != 404 ]]; then
+  printf 'Сервис снимков недоступен через Apache (HTTP %s). В контейнере server нужен DASHBOARD_HOST=0.0.0.0.\n' "$code" >&2
+  exit 1
+fi
