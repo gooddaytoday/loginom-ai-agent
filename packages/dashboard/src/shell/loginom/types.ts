@@ -49,7 +49,7 @@ export type Node = {
 export type Visual = { GetData(): Node; GetOutputPorts(): { SubType: number }[] }
 export type Tab = {
   View: { el: { dom: HTMLElement } }
-  FNode?: { data: { node?: { ModelUnitItem?: unknown; Guid: string } }; parentNode?: Tab["FNode"] }
+  FNode?: { data: { node?: { ModelUnitItem?: { get_Guid(): Promise<string> } } }; parentNode?: Tab["FNode"] }
 }
 export type View = {
   Controller: Form
