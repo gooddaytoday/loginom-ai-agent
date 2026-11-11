@@ -154,3 +154,4 @@
 - Какой процесс получает вкладка с адресом приложения (`chrome://process-internals`).
 - Работают ли React 19 и Recharts 3 под строгим `style-src` и Trusted Types на странице с графиком.
 - Позиции Firefox и Safari по `Connection-Allowlist` (страницы standards-positions не открывались).
+- Слой CSP отдельно от `Connection-Allowlist`: переход `location = "https://…"` на чужой адрес при принудительном `frame-src` на странице Studio. В Chromium 154 с заголовком этот переход блокирует сам `Connection-Allowlist`, поэтому обычный прогон набора вредоносных dashboard слой CSP не проверяет. Нужен прогон без заголовка (автотест на Chromium 154) и ручная проверка в Firefox.
