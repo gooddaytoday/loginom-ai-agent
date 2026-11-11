@@ -8,6 +8,7 @@ import { loginBrowser } from "../../loginom-runtime/src/connection-check.mjs"
 
 const mode = process.argv[2]
 const master = "http://127.0.0.1:32768"
+const timeoutMs = 30_000
 const shellPath = fileURLToPath(new URL("../dist/shell.js", import.meta.url))
 
 async function check() {
@@ -30,9 +31,10 @@ async function check() {
   // Exercise the same adapter as the installed bundle, using readable method names in RPC diagnostics.
   const adapter = execFileSync("bun", ["build", fileURLToPath(new URL("../src/shell/loginom/adapter.ts", import.meta.url)), "--target=browser", "--format=esm"])
   const moduleURL = "data:text/javascript;base64," + adapter.toString("base64")
-  for (const path of mode === "master" ? ["/app/", "/app-debug/"] : [url.pathname]) {
+  for (const entry of mode === "master" ? ["/app/", "/app-debug/"] : [url.pathname]) {
     const profile = await mkdtemp(join(tmpdir(), "dashboard-studio-"))
-    const target = new URL(path, url)
+    const path = mode === "master" ? entry : "/app/"
+    const target = new URL(entry, url)
     target.hash = "packages" + packagePath + "/" + unit + "/workflow"
     let context, phase = "вход"
     try {
@@ -42,8 +44,14 @@ async function check() {
       })
       context = session.context
       const page = context.pages()[0]
-      page.setDefaultTimeout(30_000)
+      page.setDefaultTimeout(timeoutMs)
+      const requireClient = () => {
+        const actual = new URL(page.url())
+        if (actual.origin !== url.origin || actual.pathname !== path)
+          throw Error("Не проверено: после входа ожидался клиент " + path)
+      }
       try {
+        requireClient()
         const version = await page.evaluate(() => window.bg?.app?.Version)
         if (mode === "7.4.2" && !/^7\.4\.2(?:$|[+-])/.test(version)) throw Error("Не проверено: ожидалась сборка 7.4.2.")
         phase = "запуск оболочки"
@@ -58,7 +66,11 @@ async function check() {
         const visible = await button.isVisible()
         console.log(path, visible ? "Кнопка оболочки видна." : "Кнопка оболочки не видна.")
         phase = "API адаптера"
-        const result = await page.evaluate(probe, { moduleURL, nodeName, packagePath })
+        const result = await withinTimeout(
+          page.evaluate(probe, { moduleURL, nodeName, packagePath, deadline: Date.now() + timeoutMs }),
+          "Не проверено: истекло время ожидания ответа Studio.",
+        )
+        requireClient()
         if (result) {
           console.error(path, result)
           throw Error(result)
@@ -92,18 +104,24 @@ async function closeSession(page, username, packagePath) {
         pkg.HasRunningNodes() || await map.FServerConnection.Session.IsPackageModified(pkg.Package)) return false
     return await map.ClosePackage(pkg, false, true) === true && map.PackageNodes.Count === 0
   }, { username, packagePath })
-  let timer
-  try {
-    if (!(await Promise.race([closing, new Promise(resolve => { timer = setTimeout(resolve, 30_000, false) })])))
-      throw Error("close failed")
-  } finally { clearTimeout(timer) }
+  if (!(await withinTimeout(closing, false))) throw Error("close failed")
   await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]').click()
   await page.locator('[data-tid="MF;AppMenuForm;btnLogOut"]').click()
   await page.locator('[data-tid="LoginForm;Login;edtUsername"] input').waitFor()
 }
 
+async function withinTimeout(operation, timeoutResult) {
+  let timer
+  const timeout = new Promise(resolve => { timer = setTimeout(resolve, timeoutMs, timeoutResult) })
+  try {
+    return await Promise.race([operation, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // Runs only on the authenticated page. No synthetic RPC results or dashboard service required.
-async function probe({ moduleURL, nodeName, packagePath }) {
+async function probe({ moduleURL, nodeName, packagePath, deadline }) {
   const missing = name => "Отсутствует API: " + name
   const members = (owner, methods, values = "") => {
     for (const [names, method] of [[methods, true], [values, false]])
@@ -124,7 +142,8 @@ async function probe({ moduleURL, nodeName, packagePath }) {
   if (!view) return "Не проверено: в активной вкладке нет формы сценария."
   const form = view.Controller
   const button = form?.Items?.tlbModel?.getComponent?.("dashboardApp")
-  if (!button && typeof window.Ext.app?.Controller?.prototype?.control !== "function") return missing("Ext.app.Controller.control")
+  if (!button && typeof window.Ext.create("Ext.app.Controller", { id: "dashboardApiProbe" })?.control !== "function")
+    return missing("Ext.app.Controller.control")
   if (button) {
     const buttonAPI = members(button, "setVisible setText")
     if (buttonAPI) return buttonAPI
@@ -152,6 +171,8 @@ async function probe({ moduleURL, nodeName, packagePath }) {
     if (assistAPI) return assistAPI
     const rows = await studio.parameters(form)
     if (!rows.length) return "Не проверено: нет числовой переменной для проверки параметров."
+    // A delayed RPC can resolve while the host is closing the session.
+    if (Date.now() >= deadline) return "Не проверено: истекло время ожидания ответа Studio."
     await studio.execute(node)
     const table = await studio.table(node, 1)
     if (!table.schema.length || !table.rows.length) return "Не проверено: нет строки для проверки чтения табличного выхода."
