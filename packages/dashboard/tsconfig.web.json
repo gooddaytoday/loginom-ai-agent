@@ -4,5 +4,5 @@
     "types": ["node", "bun"],
     "erasableSyntaxOnly": true
   },
-  "include": ["src/contract/**/*.ts", "src/web/**/*.ts", "script/build.ts"]
+  "include": ["src/contract/**/*.ts", "src/web/**/*.ts", "script/*.ts"]
 }

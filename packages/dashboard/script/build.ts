@@ -9,3 +9,13 @@ const result = await Bun.build({
   packages: "bundle",
 })
 if (!result.success) throw new AggregateError(result.logs, "Could not build dashboard service")
+
+const shell = await Bun.build({
+  entrypoints: [join(import.meta.dirname, "../src/shell/index.ts")],
+  outdir: join(import.meta.dirname, "../dist"),
+  naming: "shell.js",
+  target: "browser",
+  format: "iife",
+  minify: true,
+})
+if (!shell.success) throw new AggregateError(shell.logs, "Could not build dashboard shell")
