@@ -158,6 +158,41 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  dashboard-browser:
+    name: dashboard-browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install pinned Chromium system dependencies
+        working-directory: packages/loginom-runtime/client
+        run: |
+          "$LOGINOM_AI_AGENT_TEST_NODE" node_modules/playwright/cli.js install-deps chromium
+          # Keep the Chromium sandbox enabled, as in chromium-direct.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" "$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")/../lib/node_modules/npm/bin/npm-cli.js" ci --ignore-scripts'
+
+      - name: Verify dashboard browser behavior
+        working-directory: packages/dashboard
+        run: |
+          bun typecheck
+          bun run build
+          bun run check:size
+          bun run test:browser
+
   unit:
     name: unit
     runs-on: ubuntu-24.04
@@ -171,8 +206,8 @@ jobs:
         with:
           install-flags: --frozen-lockfile
 
-      # Exports LOGINOM_AI_AGENT_TEST_NODE (pinned Node) for the loginom-host process
-      # tests; turbo.json passes it through to `@loginom-ai-agent/loginom-host#test`.
+      # Exports LOGINOM_AI_AGENT_TEST_NODE for loginom-host and dashboard service
+      # tests; turbo.json passes the pinned executable through to both tasks.
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
 
