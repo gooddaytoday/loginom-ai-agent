@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { dashboardServer } from "./server.mjs"
+import { dashboardServer, startDashboard } from "./server.mjs"
 
 const binding = {
   server: "http://127.0.0.1:32768",
@@ -86,4 +86,22 @@ test("the first snapshot stays available by ID after opening another node", asyn
   await assert.rejects(request("targets", { ...data, sample: null }), /returned 400/)
   assert.deepEqual(await request("targets/" + fresh.id), fresh)
   assert.deepEqual(await request("targets/" + a.id), a)
+})
+
+test("the snapshot service listens on loopback unless the stand opts in", async t => {
+  const root = await mkdtemp(join(tmpdir(), "dashboard-listen-"))
+  const base = {
+    DASHBOARD_PROJECT_ROOT: root,
+    DASHBOARD_PUBLISH_ROOT: join(root, "published"),
+    DASHBOARD_PORT: "0",
+  }
+  const loopback = startDashboard(base)
+  const open = startDashboard({ ...base, DASHBOARD_HOST: "0.0.0.0" })
+  t.after(async () => {
+    await Promise.all([loopback, open].map(server => new Promise(resolve => server.close(resolve))))
+    await rm(root, { recursive: true, force: true })
+  })
+  await Promise.all([once(loopback, "listening"), once(open, "listening")])
+  assert.equal(loopback.address().address, "127.0.0.1")
+  assert.equal(open.address().address, "0.0.0.0")
 })

@@ -129,9 +129,14 @@ export function dashboardServer({projectRoot, publishRoot}) {
   })
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  dashboardServer({
-    projectRoot: process.env.DASHBOARD_PROJECT_ROOT ?? resolve(import.meta.dirname, ".."),
-    publishRoot: process.env.DASHBOARD_PUBLISH_ROOT ?? "/workdir/dashboard-app/apps",
-  }).listen(8100)
+// Loopback by default. The stand sets DASHBOARD_HOST=0.0.0.0 because Apache runs in another container.
+export function startDashboard(env = process.env) {
+  const server = dashboardServer({
+    projectRoot: env.DASHBOARD_PROJECT_ROOT ?? resolve(import.meta.dirname, ".."),
+    publishRoot: env.DASHBOARD_PUBLISH_ROOT ?? "/workdir/dashboard-app/apps",
+  })
+  server.listen(Number(env.DASHBOARD_PORT ?? 8100), env.DASHBOARD_HOST ?? "127.0.0.1")
+  return server
 }
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) startDashboard()
