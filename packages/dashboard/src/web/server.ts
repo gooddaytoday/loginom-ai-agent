@@ -12,7 +12,7 @@ function json(response: ServerResponse, status: number, data: unknown) {
   response.end(JSON.stringify(data))
 }
 
-async function body(request: IncomingMessage) {
+async function body(request: IncomingMessage): Promise<unknown> {
   if (request.headers["content-type"]?.split(";")[0] !== "application/json") throw Error("Expected application/json")
   const chunks: Buffer[] = []
   let length = 0
@@ -21,11 +21,14 @@ async function body(request: IncomingMessage) {
     if (length > 1024 * 1024) throw Error("Snapshot exceeds 1 MiB")
     chunks.push(chunk)
   }
-  return Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(Buffer.concat(chunks).toString())
+  // Native JSON errors are part of the M0 HTTP response. Schemas validate the parsed values below.
+  return JSON.parse(Buffer.concat(chunks).toString())
 }
 
 function appKey(input: unknown) {
-  const binding = Schema.decodeUnknownSync(Binding, { onExcessProperty: "preserve" })(input)
+  const decoded = Schema.decodeUnknownOption(Binding, { onExcessProperty: "preserve" })(input)
+  if (Option.isNone(decoded)) throw Error("Invalid Loginom binding")
+  const binding = decoded.value
   const guid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i
   if (
     !guid.test(binding.workflowGuid) ||
@@ -49,26 +52,25 @@ function appKey(input: unknown) {
 }
 
 async function snapshot(input: unknown, projectRoot: string, publishRoot: string): Promise<typeof Snapshot.Type> {
-  const decoded = Schema.decodeUnknownOption(SnapshotRequest, { onExcessProperty: "preserve" })(input)
-  if (Option.isNone(decoded)) throw Error("Invalid node, table or parameters")
-  const data = decoded.value
-  const key = appKey(data.binding)
+  const raw = input as Record<string, unknown>
+  const key = appKey(raw.binding)
   // Accept the previous client's payload while bootstrap and Node are rolled out.
-  let sample: unknown = data.sample === undefined ? { schema: data.schema, rows: data.rows } : data.sample
+  let sample: unknown = raw.sample === undefined ? { schema: raw.schema, rows: raw.rows } : raw.sample
   let tableSource: typeof Snapshot.Type.tableSource = sample === null ? "unavailable" : "live"
   if (sample === null) {
     try {
       const dir = join(publishRoot, key)
-      const binding = Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(
-        await readFile(join(dir, "binding.json"), "utf8"),
-      )
+      const binding: unknown = JSON.parse(await readFile(join(dir, "binding.json"), "utf8"))
       if (appKey(binding) !== key) throw Error("Published example binding differs")
-      sample = Schema.decodeUnknownSync(Schema.UnknownFromJsonString)(await readFile(join(dir, "sample.json"), "utf8"))
+      sample = JSON.parse(await readFile(join(dir, "sample.json"), "utf8"))
       tableSource = "published-example"
     } catch (error) {
       if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
     }
   }
+  const decoded = Schema.decodeUnknownOption(SnapshotRequest, { onExcessProperty: "preserve" })(input)
+  if (Option.isNone(decoded)) throw Error("Invalid node, table or parameters")
+  const data = decoded.value
   const table = Schema.decodeUnknownOption(TableSample, { onExcessProperty: "preserve" })(
     sample === null ? { schema: [], rows: [] } : sample,
   )

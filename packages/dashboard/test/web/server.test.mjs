@@ -383,3 +383,78 @@ test("source startup derives the checkout independently of the working directory
   assert.equal(target.sourceDir, join(checkout, "dashboard/apps", target.key))
   assert.equal(target.commands.publish, `node '${join(checkout, "dashboard/publish.mjs")}' ${target.id}`)
 })
+
+test("invalid lookup bindings keep M0 error responses", async t => {
+  const server = await stand(t)
+  for (const payload of [{}, null, [], 42, { ...binding, port: "0" }, { ...binding, nodeGuid: "wrong" }]) {
+    const response = await fetch(server.base + "/lookup", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+    })
+    assert.equal(response.status, 400)
+    assert.deepEqual(await response.json(), { error: "Invalid Loginom binding" })
+  }
+})
+
+test("invalid HTTP JSON keeps the native M0 parser message", async t => {
+  const server = await stand(t)
+  for (const [body, error] of [
+    ["{", "Expected property name or '}' in JSON at position 1 (line 1 column 2)"],
+    ["", "Unexpected end of JSON input"],
+  ]) for (const path of ["lookup", "targets"]) {
+    const response = await fetch(server.base + "/" + path, {
+      method: "POST", headers: { "content-type": "application/json" }, body,
+    })
+    assert.equal(response.status, 400)
+    assert.deepEqual(await response.json(), { error })
+  }
+})
+
+test("invalid target fields keep M0 binding and table error precedence", async t => {
+  const server = await stand(t)
+  const data = { binding, nodeName: "Errors", sample: { schema: [{ name: "n", type: 3 }], rows: [[1]] }, parameters: [] }
+  for (const [fields, error] of [
+    [{ binding: undefined }, "Invalid Loginom binding"],
+    [{ binding: {} }, "Invalid Loginom binding"],
+    [{ binding: { ...binding, port: "0" }, parameters: null }, "Invalid Loginom binding"],
+    [{ nodeName: "" }, "Invalid node, table or parameters"],
+    [{ nodeName: 42 }, "Invalid node, table or parameters"],
+    [{ sample: 42 }, "Invalid node, table or parameters"],
+    [{ sample: {} }, "Invalid node, table or parameters"],
+    [{ sample: undefined, schema: [], rows: [[1]] }, "Invalid node, table or parameters"],
+    [{ parameters: null }, "Invalid node, table or parameters"],
+    [{ parameters: [{ name: 42, value: 0 }] }, "Invalid node, table or parameters"],
+    [{ parameters: [{ name: "n", value: {} }] }, "Invalid node, table or parameters"],
+  ]) {
+    const response = await fetch(server.base + "/targets", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...data, ...fields }),
+    })
+    assert.equal(response.status, 400)
+    assert.deepEqual(await response.json(), { error })
+  }
+})
+
+test("published example errors keep M0 parser messages and precedence", async t => {
+  const server = await stand(t)
+  const { key } = await server.request("lookup", binding)
+  const dir = join(server.publishRoot, key)
+  await mkdir(dir, { recursive: true })
+  const sample = { schema: [{ name: "n", type: 3 }], rows: [[1]] }
+  const syntax = "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+  for (const [savedBinding, savedSample, fields, error] of [
+    ["{", JSON.stringify(sample), {}, syntax],
+    [JSON.stringify({}), JSON.stringify(sample), {}, "Invalid Loginom binding"],
+    [JSON.stringify(other), JSON.stringify(sample), { nodeName: "", parameters: null }, "Published example binding differs"],
+    [JSON.stringify(binding), "{", {}, syntax],
+    [JSON.stringify(binding), "{", { nodeName: "", parameters: null }, syntax],
+    [JSON.stringify(binding), JSON.stringify({}), {}, "Invalid node, table or parameters"],
+  ]) {
+    await writeFile(join(dir, "binding.json"), savedBinding)
+    await writeFile(join(dir, "sample.json"), savedSample)
+    const response = await fetch(server.base + "/targets", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ binding, nodeName: "Saved errors", sample: null, parameters: [], ...fields }),
+    })
+    assert.equal(response.status, 400)
+    assert.deepEqual(await response.json(), { error })
+  }
+})
