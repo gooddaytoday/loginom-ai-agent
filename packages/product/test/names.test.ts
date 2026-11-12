@@ -16,11 +16,7 @@ const NAME_END = `(?![A-Za-z0-9_~-]|\\.${NAME_CHAR})`
 const pluginName = "@loginom-ai-agent/plugin"
 const forkOnlyName = `@loginom-ai-agent/${FORK_ONLY[0]}`
 const pluginInstallName = new RegExp(`${pluginName}${NAME_END}`, "g")
-const pluginInstallFiles = new Set([
-  "packages/opencode/src/product/installation.ts",
-  "packages/opencode/test/product/plugin-dependency.test.ts",
-  "packages/product/test/names.test.ts",
-])
+const pluginInstallFiles = new Set(["packages/product/test/names.test.ts"])
 const forkScopeOutsideForkOnly = new RegExp(
   `@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})${NAME_END})${NAME_CHAR}+`,
 )
@@ -69,15 +65,13 @@ describe("package names", () => {
     expect(named(pluginName, `${pluginName}-next`)).toBe(true)
   })
 
-  test("the public plugin name is requested only by the background install seam and its test", () => {
+  // The background install requests @opencode-ai/plugin (owner decision 12.11); the retired name must not come back.
+  test("nothing requests the retired public plugin name", () => {
     const requesters = tracked
       .filter((path) => /\.(ts|tsx|js|mjs)$/.test(path))
       .filter((path) => !/^(docs\/|scripts\/upstream-sync\/)/.test(path) && path !== "packages/product/test/names.test.ts")
       .filter((path) => requestsPluginInstallName(read(path)))
-    expect(requesters.toSorted()).toEqual([
-      "packages/opencode/src/product/installation.ts",
-      "packages/opencode/test/product/plugin-dependency.test.ts",
-    ])
+    expect(requesters).toEqual([])
   })
 
   test("a longer package name that starts with the public plugin name is not a request for it", () => {

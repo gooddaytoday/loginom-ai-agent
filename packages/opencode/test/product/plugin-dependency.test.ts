@@ -46,7 +46,8 @@ const tuiLayer = (directory: string) =>
     Layer.provide(Layer.succeed(CurrentWorkingDirectory, directory)),
   )
 
-const publicName = "@loginom-ai-agent/plugin"
+const pluginPackage = await Bun.file(new URL("../../../plugin/package.json", import.meta.url)).json()
+const publicName = "@opencode-ai/plugin"
 
 server.instance("server config requests the public plugin package in the background", () =>
   Effect.gen(function* () {
@@ -60,7 +61,7 @@ server.instance("server config requests the public plugin package in the backgro
     const added = serverRequests.flatMap((request) => request.add)
     expect(added.length).toBeGreaterThan(0)
     expect(added.map((item) => item.name)).toEqual(added.map(() => publicName))
-    expect(added.map((item) => item.version)).toEqual(added.map(() => undefined))
+    expect(added.map((item) => item.version)).toEqual(added.map(() => pluginPackage.version))
   }),
 )
 
@@ -79,14 +80,11 @@ server.instance("tui config requests the public plugin package in the background
     const added = tuiRequests.flatMap((request) => request.add)
     expect(added.length).toBeGreaterThan(0)
     expect(added.map((item) => item.name)).toEqual(added.map(() => publicName))
-    expect(added.map((item) => item.version)).toEqual(added.map(() => undefined))
+    expect(added.map((item) => item.version)).toEqual(added.map(() => pluginPackage.version))
   }),
 )
 
-test("a release build requests the public plugin package at the product version", () => {
-  expect(pluginDependency({ local: false, version: "0.3.5" })).toEqual({ name: publicName, version: "0.3.5" })
-})
-
-test("a development build requests the latest public plugin package", () => {
-  expect(pluginDependency({ local: true, version: "local" })).toEqual({ name: publicName, version: undefined })
+test("the background install pins the plugin package this build ships", () => {
+  expect(pluginPackage.name).toBe(publicName)
+  expect(pluginDependency()).toEqual({ name: publicName, version: pluginPackage.version })
 })
