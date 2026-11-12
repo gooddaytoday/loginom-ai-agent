@@ -1,6 +1,72 @@
 import { expect, test } from "bun:test"
 import { EventEmitter } from "node:events"
-import { createQuitHandler } from "./shutdown"
+import { closeWindows, createQuitHandler } from "./shutdown"
+
+test("quit destroys an unresponsive window before stopping the backend", async () => {
+  const calls: string[] = []
+  const quit = Promise.withResolvers<void>()
+  const win = Object.assign(new EventEmitter(), {
+    isDestroyed: () => false,
+    close: () => {
+      calls.push("close")
+    },
+    // Do not emit closed: forced cleanup must finish even without that event.
+    destroy: () => {
+      calls.push("destroy")
+    },
+  })
+  const handler = createQuitHandler({
+    markQuitting() {},
+    closeWindows: () => closeWindows([win]),
+    stop: async () => {
+      calls.push("stop")
+    },
+    quit: () => {
+      calls.push("quit")
+      quit.resolve()
+    },
+    onError: (error) => {
+      throw error
+    },
+  })
+  handler({ preventDefault() {} })
+  await quit.promise
+  expect(calls).toEqual(["close", "destroy", "stop", "quit"])
+  expect(win.listenerCount("closed")).toBe(0)
+})
+
+test("responsive windows close immediately without being destroyed", async () => {
+  const calls: string[] = []
+  const win = Object.assign(new EventEmitter(), {
+    isDestroyed: () => false,
+    close: () => {
+      calls.push("close")
+      win.emit("closed")
+    },
+    destroy: () => {
+      calls.push("destroy")
+    },
+  })
+  await closeWindows([win])
+  expect(calls).toEqual(["close"])
+  expect(win.listenerCount("closed")).toBe(0)
+})
+
+test("already destroyed windows do not delay quit", async () => {
+  const calls: string[] = []
+  const win = Object.assign(new EventEmitter(), {
+    isDestroyed: () => true,
+    close: () => {
+      calls.push("close")
+    },
+    destroy: () => {
+      calls.push("destroy")
+    },
+  })
+  await closeWindows([win])
+  expect(calls).toEqual([])
+  expect(win.listenerCount("closed")).toBe(0)
+})
 
 test("quit waits for cleanup, coalesces repeated requests and admits the final quit", async () => {
   const calls: string[] = []
