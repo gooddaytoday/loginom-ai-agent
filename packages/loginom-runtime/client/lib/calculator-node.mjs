@@ -326,7 +326,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     // Closing the inspected LinReg apply draft asynchronously replaces its SVG
     // body. Settle that selection by reading, before issuing the first click;
     // retain the original observation/operation deadlines and gesture guards.
-    const settleApply=['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering'].includes(implementation?.type)&&operation.nodeApply.request.mode==='apply';
+    const settleApply=['datamining.lin_regression','datamining.log_regression','preprocessing.binning','preprocessing.coarse_classes','datamining.clustering','research.factor_analysis'].includes(implementation?.type)&&operation.nodeApply.request.mode==='apply';
     const selection=s=>s.ui.elements.filter(e=>
      (e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'
       ||e.tid===s.prepared_node_context.tid+';Label;Label'&&e.graph_node?.part==='label')
@@ -340,7 +340,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     // Loginom can leave a visible port without an SVG shape after port Done.
     // The normal node selection redraws it before the next graph checkpoint.
     await selectPreparedGraphNode(channel,graph,'select configured calculator after port commit',{
-     refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true});
+     refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true||implementation?.type==='research.factor_analysis'&&operation.nodeApply.request.mode==='apply'});
     const finish=await finishConfiguredGraph(channel,executionDriver,mode,ctx.node);
     if(training)finish.training=training;
     if(mode==='execute')finish.continuation_surface=finishedImportSurface(await channel.observe({
