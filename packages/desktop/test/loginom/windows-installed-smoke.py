@@ -36,6 +36,8 @@ def main():
         return 2
     script = pathlib.Path(__file__).with_suffix(".ps1")
     subprocess.run(["scp", "-O", str(script), args.host + ":" + remote + "/smoke.ps1"], check=True)
+    subprocess.run(["scp", "-O", str(script.with_name("windows-sidecar-smoke.mjs")),
+                    args.host + ":" + remote + "/windows-sidecar-smoke.mjs"], check=True)
     installer = args.installer
     if not installer.startswith("https://") and pathlib.Path(installer).is_file():
         subprocess.run(["scp", "-O", installer, args.host + ":" + remote + "/installer.exe"], check=True)
@@ -49,11 +51,12 @@ def main():
     result = powershell(command)
     # Always collect the result, including after a failed smoke. Evidence stays on the stand too.
     copy = subprocess.run(["scp", "-O", args.host + ":" + remote + "/report.json", str(args.output)])
+    probe = subprocess.run(["scp", "-O", args.host + ":" + remote + "/sidecar.json", str(args.output)])
     logs = subprocess.run(["scp", "-O", args.host + ":" + remote + "/logs.zip", str(args.output)])
     print("Windows evidence: " + remote, flush=True)
     if copy.returncode == 0:
         print("Local report: " + str(args.output / "report.json"), flush=True)
-    if copy.returncode != 0 or (result.returncode == 0 and logs.returncode != 0):
+    if copy.returncode != 0 or (result.returncode == 0 and (logs.returncode != 0 or probe.returncode != 0)):
         return 2
     return result.returncode
 
