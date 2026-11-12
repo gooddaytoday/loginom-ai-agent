@@ -35,6 +35,19 @@ test('metadata-only reference checks preserve an existing backend digest without
   } finally {await rm(root,{recursive:true,force:true});}
 });
 
+test('a reference snapshot of a just-written file settles past one file-time tick, so a same-size rewrite gets a new mtime',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'runtime-racy-reference-'));
+  try {
+    const source=join(root,'source.csv');await writeFile(source,'original');
+    const started=performance.now(),snapshot={...await inspectReferenceFile(source),sha256:null},elapsed=performance.now()-started;
+    // NTFS stamps file times from a clock that advances every 15.625 ms.
+    assert.ok(elapsed>=15.625,`snapshot settled after ${elapsed} ms`);
+    await writeFile(source,'modified');
+    assert.notEqual((await stat(source,{bigint:true})).mtimeNs,BigInt(snapshot.mtime_ns));
+    await assert.rejects(()=>verifyReferenceFile(snapshot),/LOGINOM_FILE_CHANGED/);
+  } finally {await rm(root,{recursive:true,force:true});}
+});
+
 test('runtime admits a large reference without a second copy or bytes in the descriptor; same grant is idempotent',async()=>{
   const root=await mkdtemp(join(tmpdir(),'runtime-reference-'));
   try {

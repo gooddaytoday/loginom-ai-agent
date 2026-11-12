@@ -2,6 +2,7 @@
 import { constants } from 'node:fs';
 import { lstat, open, realpath } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const fail = code => { throw Error(code); };
 const milliseconds = ns => Number(ns/1000000000n)*1000+Number(ns%1000000000n)/1000000;
@@ -20,12 +21,36 @@ export function referenceUploadBudget(size) {
   return Math.min(7200000,120000+Math.ceil(size/(5*1024*1024))*1000);
 }
 
+// File times come from a coarse clock: one tick is up to 15.625 ms on NTFS and
+// a jiffy on Linux. A same-size rewrite within the tick of the last write keeps
+// size, mtime, ctime and file ID, so such a "racy" snapshot cannot detect it.
+// A recently written file is stat'ed again at least one tick (monotonic time,
+// not the wall clock, which differs from file stamps by milliseconds on
+// Windows) after the previous stat returned: an unchanged identity then
+// predates every later write, which gets a newer mtime. No file bytes are read.
+const settledAgeMs = 2000;
+const timestampTickMs = 20;
+const racyAttempts = 5;
+
+async function statReferenceFile(path) {
+  const canonical=await realpath(path),s=await lstat(canonical,{bigint:true});
+  if(!s.isFile()||s.isSymbolicLink())fail('LOGINOM_FILE_NOT_REGULAR');
+  if(s.size<0n||s.size>BigInt(Number.MAX_SAFE_INTEGER))fail('LOGINOM_FILE_TOO_LARGE');
+  return identity(canonical,s);
+}
+
 export async function inspectReferenceFile(path) {
   try {
-    const canonical=await realpath(path),s=await lstat(canonical,{bigint:true});
-    if(!s.isFile()||s.isSymbolicLink())fail('LOGINOM_FILE_NOT_REGULAR');
-    if(s.size<0n||s.size>BigInt(Number.MAX_SAFE_INTEGER))fail('LOGINOM_FILE_TOO_LARGE');
-    return identity(canonical,s);
+    let snapshot=await statReferenceFile(path);
+    if(Date.now()-snapshot.mtime>=settledAgeMs)return snapshot;
+    for(let attempt=0;attempt<racyAttempts;attempt++) {
+      const observed=performance.now();
+      while(performance.now()-observed<timestampTickMs)await delay(timestampTickMs-(performance.now()-observed)+1);
+      const next=await statReferenceFile(path);
+      if(same(next,snapshot))return next;
+      snapshot=next;
+    }
+    fail('LOGINOM_FILE_CHANGED'); // Still being written.
   } catch(error) { mapError(error); }
 }
 
