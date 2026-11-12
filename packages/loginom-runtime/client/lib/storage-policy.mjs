@@ -142,7 +142,7 @@ export function storageListPattern(value) {
 // Reads the rows of the one open Files folder. File rows keep the row-bound
 // native size/mtime and the server_source_ref minted by observation; a list
 // is complete only when the native FileStore count or the scroll end proves it.
-const LIST_ENTRIES=200,LIST_BYTES=24000,LIST_SCROLLS=64,LIST_SCROLL_PX=400;
+const LIST_ENTRIES=200,LIST_BYTES=24000,LIST_REPLY_ENVELOPE=512,LIST_SCROLLS=64,LIST_SCROLL_PX=400;
 export async function listStorageDirectory({destination,pattern,guard,ready,roots,read,act}) {
   const filter=storageListPattern(pattern),seen=new Map();
   let native=null,end=false,owner=null,lastTop=null,direction=null,parent=0;
@@ -188,12 +188,15 @@ export async function listStorageDirectory({destination,pattern,guard,ready,root
   const matched=filter?files.filter(e=>filter.test(e.name)):files;
   let entries=[...matched,...folders],truncated=false;
   if(entries.length>LIST_ENTRIES){entries=entries.slice(0,LIST_ENTRIES);truncated=true;}
-  while(entries.length&&JSON.stringify(entries).length>LIST_BYTES){entries.pop();truncated=true;}
-  return {directory:destination,...(pattern!==undefined?{pattern}:{}),entries,files_matched:matched.length,
+  // UTF-8 bytes of the whole reply (Cyrillic names are 2 bytes per letter);
+  // LIST_REPLY_ENVELOPE covers the executor fields around output.
+  const reply=()=>({directory:destination,...(pattern!==undefined?{pattern}:{}),entries,files_matched:matched.length,
     files_other:files.length-matched.length,folders:folders.length,native_entry_count:native,
     complete:native!==null?seen.size+parent>=native:end,truncated,
     next_step:matched.length>16?'More than 16 matching files: a text-import mask accepts at most 16 verified sources; narrow the pattern.'
-      :'1 matching file: imports.text with source kind:"storage" and its server_source_ref. 2-16 files of one structure: ONE imports.text with settings.source.source_mask "<directory>/<pattern>" and source kind:"verified_sources" listing these refs in name order.'};
+      :'1 matching file: imports.text with source kind:"storage" and its server_source_ref. 2-16 files of one structure: ONE imports.text with settings.source.source_mask "<directory>/<pattern>" and source kind:"verified_sources" listing these refs in name order.'});
+  while(entries.length&&Buffer.byteLength(JSON.stringify(reply()))+LIST_REPLY_ENVELOPE>LIST_BYTES){entries.pop();truncated=true;}
+  return reply();
 }
 
 const sourceId={type:'string',minLength:1,maxLength:128,pattern:'^[A-Za-z0-9_.:-]+$'};
