@@ -1,6 +1,7 @@
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
+import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 const need=(v,m)=>{if(!v)throw Error('Logistic regression output: '+m);};
 export function logRegressionOutputColumns(configuration,port=0){
  const target=configuration.fields.filter(f=>f.usage_type===4);need(target.length===1,'one configured target required');
@@ -26,6 +27,9 @@ export async function configureLogRegressionOutputs(channel,configuration,p,mapp
   need(state.node_mapping.target_fields.length===expected.length&&expected.every(e=>state.node_mapping.target_fields.filter(f=>!f.excluded&&['name','label','type'].every(k=>f[k]===e[k])).length===1),'weighted prediction fields differ');
   await configureOutputAutosync(channel,false);
   state=await observe('weighted prediction mapping before ordering');
+  // A fresh weighted node can retain targets while its source cache is empty.
+  // Fetch once through the native UI, preserving the pinned output definition.
+  state=await ensureGroupingOutputSources(channel,state);
   if(state.node_mapping.target_fields.some((f,i)=>f.name!==expected[i].name))
    await reorderOutputFields(channel,expected.map(e=>state.node_mapping.target_fields.find(f=>f.name===e.name).record_id));
   state=await observe('stable weighted prediction layout');
