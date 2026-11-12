@@ -1,7 +1,7 @@
 import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
 import {createRedactor} from './redact.mjs';
 import {journalCopy} from './execution-journal.mjs';
-import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools} from './storage-policy.mjs';
+import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools,storageListPattern,listStorageDirectory} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
@@ -2800,14 +2800,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const runtime=Object.freeze({
     serverDownload(request,name,{signal,sourceOperation,deadlineAt}={}) {
       if(!serverDownloads)throw Error('Server download cache is unavailable');
-      if(name==='dock_storage_source')return (async()=>{
+      if(name==='dock_storage_source'||name==='dock_storage_list')return (async()=>{
         if(storageNavigating||serverDownloads.unsettled||running||pending
           ||nodeJobs.unsettled&&!(sourceOperation&&nodeJobs.active?.operation_id===sourceOperation)||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before locating a server source');
         checkId(request.operation_id);
-        const path=requireStorageDestination(request.path,getStorageBinding()?.directories,'inputs');
-        if(!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX/LGD');
-        const id=request.operation_id,signature='storage.source:'+path;
+        // A folder listing reads the same native Files rows; it never uploads,
+        // imports, creates or deletes anything on the server.
+        const listing=name==='dock_storage_list',directories=getStorageBinding()?.directories;
+        // LAB-1468 stage 0: folder and `<folder>/*.csv` paths were refused only
+        // after navigation. Name the listing tool before any browser action.
+        if(!listing&&typeof request.path==='string'&&(request.path.endsWith('/')||/[*?]/.test(request.path)||!/\.[^./]{1,8}$/.test(request.path)))
+          throw Error('dock_storage_source needs one exact file path, not a folder or mask; to see a server folder\'s files call dock_storage_list with the folder path and pattern');
+        const path=listing?requireStorageDestination(typeof request.path==='string'&&request.path.length>1?request.path.replace(/\/$/,''):request.path,directories,'inputs',{directory:true})
+          :requireStorageDestination(request.path,directories,'inputs');
+        if(!listing&&!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX/LGD');
+        if(listing)storageListPattern(request.pattern);
+        const id=request.operation_id,signature=(listing?'storage.list:'+JSON.stringify([path,request.pattern??null]):'storage.source:'+path);
         if(operations.has(id)||nodeJobs.has(id)||sourceReads.has(id))throw Error('Storage source operation ID conflicts');
         if(auxiliary.has(id)){
           const previous=auxiliary.get(id);
@@ -2830,7 +2839,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           for(let page=0;cursor;page++){
             // The table probe needs a delivered scroll owner, not every row.
             // Targeted row reads still consume all pages for their witness.
-            if(hasScrollAnchor(output))break;
+            if(!options.allPages&&hasScrollAnchor(output))break;
             if(page>=32)throw Error('Server storage observation page limit');
             const next=await runtime.observe({cursor,signal,deadlineAt:deadline});
             if(next.status!=='SUCCEEDED'||next.output.observation_id!==output.observation_id)throw Error('Server storage observation changed');
@@ -2923,7 +2932,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             const toolbar=await detail(initial,one(initial.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'main_toolbar'));
             await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'),'files_button'));
           }
-          let current=await directory();const destination=path.slice(0,path.lastIndexOf('/'));
+          let current=await directory();const destination=listing?path:path.slice(0,path.lastIndexOf('/'));
           if(current.file_storage.directory!==destination&&!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
             await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'),'files_root'));
             current=await directory('/');
@@ -2942,6 +2951,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part);
           }
           if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
+          if(listing){
+            const output=await listStorageDirectory({destination,pattern:request.pattern,guard,ready,roots,read,act});
+            const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.list',cleanup_complete:true,effect_possible:step>0,output};
+            auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_directory_listed',operation_id:id,outcome:result});return result;
+          }
           const state=await row(path.slice(path.lastIndexOf('/')+1));
           const file=one(state.ui.elements.filter(e=>e.storage_entry?.path===path&&e.storage_entry?.server_source_ref),'source_file');
           const result={result_version:'user-v1',operation_id:id,status:'SUCCEEDED',action_key:'storage.source',cleanup_complete:true,effect_possible:step>0,output:{source:file.storage_entry}};
@@ -2949,7 +2963,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           auxiliary.get(id).sourceSequence=operations.size;
           auxiliary.get(id).outcome=structuredClone(result);await onRecord({phase:'storage_source_located',operation_id:id,outcome:result});return result;
         }catch(error){
-          await onRecord({phase:'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
+          await onRecord({phase:listing?'storage_list_failed':'storage_source_failed',operation_id:id,error:{code:'STORAGE_SOURCE_REFUSED',message:String(error.message).slice(0,500)}});
           // Keep a bounded diagnostic in the tool result. Throwing through the
           // IPC boundary can collapse an observation refusal to CALL_UNCERTAIN.
           const reason=error.code==='UI_ROOT_STALE'?'observation_root_changed'
@@ -2959,7 +2973,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             :'storage_observation_refused';
           const unsettled=!!pending||running;
           const result={result_version:'user-v1',operation_id:id,status:unsettled?'AMBIGUOUS':'FAILED',
-            action_key:'storage.source',cleanup_complete:!unsettled,effect_possible:step>0,
+            action_key:listing?'storage.list':'storage.source',cleanup_complete:!unsettled,effect_possible:step>0,
             output:{},error:{code:'STORAGE_SOURCE_REFUSED',message:'Server storage navigation did not complete',details:{reason,
               ...(/^[A-Z_]{1,80}$/.test(error.code??'')?{code:error.code}:{}),
               ...(['main_toolbar','files_button','files_root','folder','source_file','storage_control'].includes(error.storageControl)?{control:error.storageControl}:{})}}};

@@ -1,0 +1,402 @@
+{
+ "package_path": "{{PACKAGE_PATH}}",
+ "nodes": [
+  {
+   "type": "imports.text"
+  }
+ ],
+ "outputs": [
+  {
+   "output_node_type": "imports.text",
+   "output_node_label": "transactions",
+   "output_port": 0,
+   "ordered": false,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "TransactionID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "AccountID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Amount",
+     "type": "real",
+     "label_any": true
+    },
+    {
+     "name": "Channel",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Attempts",
+     "type": "integer",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "TransactionID": "TX-0901",
+     "AccountID": "ACC-001",
+     "Amount": 1250.75,
+     "Channel": "mobile",
+     "Attempts": 1
+    },
+    {
+     "TransactionID": "TX-0902",
+     "AccountID": "ACC-002",
+     "Amount": 89.4,
+     "Channel": "web",
+     "Attempts": 2
+    },
+    {
+     "TransactionID": "TX-0903",
+     "AccountID": "ACC-001",
+     "Amount": 15000.5,
+     "Channel": "branch",
+     "Attempts": 1
+    },
+    {
+     "TransactionID": "TX-1001",
+     "AccountID": "ACC-003",
+     "Amount": 420.25,
+     "Channel": "web",
+     "Attempts": 3
+    },
+    {
+     "TransactionID": "TX-1002",
+     "AccountID": "ACC-004",
+     "Amount": 7.99,
+     "Channel": "mobile",
+     "Attempts": 1
+    },
+    {
+     "TransactionID": "TX-1003",
+     "AccountID": "ACC-002",
+     "Amount": 3100.6,
+     "Channel": "web",
+     "Attempts": 1
+    },
+    {
+     "TransactionID": "TX-1101",
+     "AccountID": "ACC-001",
+     "Amount": 999.95,
+     "Channel": "mobile",
+     "Attempts": 2
+    },
+    {
+     "TransactionID": "TX-1102",
+     "AccountID": "ACC-004",
+     "Amount": 61.3,
+     "Channel": "branch",
+     "Attempts": 1
+    }
+   ]
+  },
+  {
+   "output_node_type": "imports.text",
+   "output_node_label": "customers",
+   "output_port": 0,
+   "ordered": false,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "CustomerID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "FullName",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Segment",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "RiskScore",
+     "type": "real",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "CustomerID": "C-001",
+     "FullName": "Анна Смирнова",
+     "Segment": "retail",
+     "RiskScore": 0.15
+    },
+    {
+     "CustomerID": "C-002",
+     "FullName": "Игорь Волков",
+     "Segment": "premium",
+     "RiskScore": 0.62
+    },
+    {
+     "CustomerID": "C-003",
+     "FullName": "Ольга Ким",
+     "Segment": "retail",
+     "RiskScore": 0.33
+    },
+    {
+     "CustomerID": "C-004",
+     "FullName": "Павел Орлов",
+     "Segment": "business",
+     "RiskScore": 0.81
+    },
+    {
+     "CustomerID": "C-005",
+     "FullName": "Мария Белова",
+     "Segment": "retail",
+     "RiskScore": 0.07
+    }
+   ]
+  },
+  {
+   "output_node_type": "imports.text",
+   "output_node_label": "accounts",
+   "output_port": 0,
+   "ordered": false,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "AccountID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "CustomerID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Balance",
+     "type": "real",
+     "label_any": true
+    },
+    {
+     "name": "Status",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "OpenYear",
+     "type": "integer",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "AccountID": "ACC-001",
+     "CustomerID": "C-001",
+     "Balance": 15400.5,
+     "Status": "active",
+     "OpenYear": 2019
+    },
+    {
+     "AccountID": "ACC-002",
+     "CustomerID": "C-002",
+     "Balance": 320.75,
+     "Status": "active",
+     "OpenYear": 2021
+    },
+    {
+     "AccountID": "ACC-003",
+     "CustomerID": "C-003",
+     "Balance": 0.5,
+     "Status": "frozen",
+     "OpenYear": 2023
+    },
+    {
+     "AccountID": "ACC-004",
+     "CustomerID": "C-005",
+     "Balance": 98000.25,
+     "Status": "active",
+     "OpenYear": 2017
+    }
+   ]
+  },
+  {
+   "output_node_type": "imports.text",
+   "output_node_label": "beneficiaries",
+   "output_port": 0,
+   "ordered": false,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "BeneficiaryID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "AccountID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Bank",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Country",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "TransferLimit",
+     "type": "real",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "BeneficiaryID": "B-01",
+     "AccountID": "ACC-001",
+     "Bank": "Alfa Bank",
+     "Country": "RU",
+     "TransferLimit": 50000.5
+    },
+    {
+     "BeneficiaryID": "B-02",
+     "AccountID": "ACC-002",
+     "Bank": "Tinkoff",
+     "Country": "RU",
+     "TransferLimit": 12000.75
+    },
+    {
+     "BeneficiaryID": "B-03",
+     "AccountID": "ACC-003",
+     "Bank": "Kaspi",
+     "Country": "KZ",
+     "TransferLimit": 7500.25
+    },
+    {
+     "BeneficiaryID": "B-04",
+     "AccountID": "ACC-004",
+     "Bank": "Halyk",
+     "Country": "KZ",
+     "TransferLimit": 300.5
+    },
+    {
+     "BeneficiaryID": "B-05",
+     "AccountID": "ACC-001",
+     "Bank": "Belarusbank",
+     "Country": "BY",
+     "TransferLimit": 1500.9
+    }
+   ]
+  },
+  {
+   "output_node_type": "imports.text",
+   "output_node_label": "devices",
+   "output_port": 0,
+   "ordered": false,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "DeviceID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "CustomerID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Platform",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "LoginCount",
+     "type": "integer",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "DeviceID": "D-100",
+     "CustomerID": "C-001",
+     "Platform": "android",
+     "LoginCount": 42
+    },
+    {
+     "DeviceID": "D-101",
+     "CustomerID": "C-002",
+     "Platform": "ios",
+     "LoginCount": 7
+    },
+    {
+     "DeviceID": "D-102",
+     "CustomerID": "C-004",
+     "Platform": "web",
+     "LoginCount": 113
+    }
+   ]
+  },
+  {
+   "output_node_type": "imports.text",
+   "output_node_label": "risk_reference",
+   "output_port": 0,
+   "ordered": false,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "RuleCode",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Description",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Weight",
+     "type": "real",
+     "label_any": true
+    },
+    {
+     "name": "Threshold",
+     "type": "integer",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "RuleCode": "R01",
+     "Description": "Новое устройство",
+     "Weight": 0.35,
+     "Threshold": 1
+    },
+    {
+     "RuleCode": "R02",
+     "Description": "Крупная сумма",
+     "Weight": 0.5,
+     "Threshold": 10000
+    },
+    {
+     "RuleCode": "R03",
+     "Description": "Частые попытки",
+     "Weight": 0.25,
+     "Threshold": 3
+    },
+    {
+     "RuleCode": "R04",
+     "Description": "Новый получатель",
+     "Weight": 0.4,
+     "Threshold": 2
+    }
+   ]
+  }
+ ]
+}

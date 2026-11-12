@@ -73,6 +73,16 @@ The existing fixture uploader seeds exact original basenames with reject/equal-b
 verification. The model receives their server paths and obtains fresh storage
 references. Inline and small local admission otherwise prefix physical filenames.
 
+`text-folder-masks` uses `scenarios/text-folder-masks/task.md` (the owner's
+request without file names) and seeds its `data/` into six new folders under a
+new parent `<run> Silent Talk` (a space in the path): transactions 3 CSV plus
+README.txt, customers and beneficiaries 2 CSV, accounts, devices and
+risk_reference 1 CSV. The main run requires one Import per folder: the native
+`<folder>/*.csv` mask for 2+ CSV, the exact path for one, full typed port reads
+against the frozen `expected.json` (`oracle.py --check`), and Save. No CSV is
+exported; cold reexecutes the saved package without configuration and matches
+all six labelled outputs. Only task and folder paths reach the model.
+
 `tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
 `trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
 and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks

@@ -301,6 +301,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-multi-file-list.md',
                     data=node / 'fixtures/multi-file', input_files=['sales_2026-02.csv', 'sales_2026-01.csv', 'returns_2026-01.csv'],
                     base=None, expected_name='expected-list.json', oracle=node / 'acceptance/oracle-multi-file.py', text_list_sources=True)
+    if name == 'text-folder-masks':
+        src = REPO / 'scripts/node-acceptance/scenarios/text-folder-masks'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, expected_name='expected.json',
+                    oracle=src / 'oracle.py', text_folder_masks=TEXT_FOLDERS)
     if name in ['text-auto-types', 'text-auto-update']:
         node = REPO / 'docs/node-development/nodes/text-import'
         update = name == 'text-auto-update'
@@ -966,6 +970,65 @@ def check_text_mask(replies, mask):
         assert current['source'].get('file_info') == 'Имя файла' and current['source'].get('parallel_processing') is False, 'TEXT_MASK_SERVICE_SETTINGS'
         assert all(current[k] == saved[k] for k in ['source', 'columns', 'output_mapping']), 'TEXT_MASK_SETTINGS_CHANGED'
         assert format_values(current['format']) == format_values(saved['format']), 'TEXT_MASK_FORMAT_CHANGED'
+
+
+TEXT_FOLDERS = ('transactions', 'customers', 'accounts', 'beneficiaries', 'devices', 'risk_reference')
+
+
+def folder_source_metrics(events):
+    # Metric only (LAB-1468 stage 0: 8 refused folder/mask lookups on base).
+    calls = [e.get('part', {}) for _, e in events if e.get('type') == 'tool_use']
+    def refused(call):
+        state = call.get('state', {})
+        path = str((state.get('input') or {}).get('path', ''))
+        text = str(state.get('output') or state.get('error') or '')
+        return '"status":"SUCCEEDED"' not in text and (path.endswith('/') or '*' in path or not re.search(r'\.[^./]{1,8}$', path))
+    return dict(folder_source_refusals=sum(refused(c) for c in calls if str(c.get('tool', '')).endswith('dock_storage_source')),
+                storage_list_calls=sum(str(c.get('tool', '')).endswith('dock_storage_list') for c in calls))
+
+
+def check_text_folder_masks(replies, source_dir, data, expected, node_binary='node'):
+    # One Import per folder: the native mask for 2+ CSVs, the exact file for one.
+    reads = {}
+    for _, reply in replies:
+        for owner, port in ports(reply):
+            config = owner.get('configuration', {}).get('readback', {})
+            if owner.get('status') != 'SUCCEEDED' or config.get('kind') != 'text_import' or port.get('port') != 0: continue
+            parent, _, _ = config.get('source', {}).get('source_path', '').rpartition('/')
+            root, _, folder = parent.rpartition('/')
+            if root == source_dir: reads.setdefault(folder, []).append((owner, port, config))
+    assert sorted(reads) == sorted(TEXT_FOLDERS), 'TEXT_FOLDER_IMPORTS: ' + ','.join(sorted(reads))
+    tables, nodes = [], set()
+    for folder in TEXT_FOLDERS:
+        csvs = sorted(f.name for f in (data / folder).glob('*.csv'))
+        want = source_dir + '/' + folder + '/' + ('*.csv' if len(csvs) > 1 else csvs[0])
+        identities = {owner['node']['node_id'] for owner, _, _ in reads[folder]}
+        assert len(identities) == 1, 'TEXT_FOLDER_IMPORT_RECREATED: ' + folder
+        nodes |= identities
+        owner, port, config = reads[folder][-1]
+        assert config['source']['source_path'] == want, 'TEXT_FOLDER_SOURCE: ' + folder
+        assert port_path(owner, port), 'TEXT_FOLDER_PORT_INVALID: ' + folder
+        stage = next(o for o in expected['outputs'] if o['output_node_label'] == folder)
+        # The task asks for fields, types and row counts; a short sample is a
+        # valid read. Cold always matches every row of all six outputs.
+        assert port.get('row_count') == len(stage['rows']), 'TEXT_FOLDER_ROW_COUNT: ' + folder
+        assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
+            (c['name'], c['type']) for c in stage['columns']], 'TEXT_FOLDER_SCHEMA: ' + folder
+        if port.get('sample_complete') is not True: continue
+        tables.append(dict(actual=dict(node=owner['node'], type='imports.text', label=config.get('node_title', {}).get('label'),
+                                       output_port=0, data=port), expected=stage))
+    assert len(nodes) == len(TEXT_FOLDERS), 'TEXT_FOLDER_IMPORT_SHARED'
+    if not tables: return
+    # The same typed full-table matcher as cold: fields, types, rows per Import.
+    result = subprocess.run([str(node_binary), '--input-type=module', '-e', """
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {matchExpectedOutputs}=await import(pathToFileURL(process.argv[1]));
+for(const stage of JSON.parse(readFileSync(0,'utf8')))
+    matchExpectedOutputs([stage.actual],[stage.expected]);
+""", str(REPO / 'scripts/node-acceptance/expected-outputs.mjs')],
+        input=json.dumps(tables), text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, 'TEXT_FOLDER_PORT_VALUES: ' + result.stderr[:2000]
 
 
 def model_replies(events):
@@ -1891,6 +1954,8 @@ class Runner:
         # The one server directory whose paths the task receives for its sources.
         if spec.get('text_mask'): return self.text_mask_directory(login)
         if spec.get('text_list_sources'): return login['package_directory'].rstrip('/')
+        # A space in the parent path is part of the owner's observed request.
+        if spec.get('text_folder_masks'): return login['package_directory'].rstrip('/') + '/' + self.out.name + ' Silent Talk'
         return None
 
     def text_mask_inputs(self, spec, folder, login, build, *, late=False):
@@ -1927,6 +1992,7 @@ class Runner:
                 # Seed identity comes from case.json, never a copied task's old host path.
                 prompt = 'Загрузи ' + str(spec['local_file']) + ' в Loginom.\n'
         source_dir = self.source_dir(spec, login)
+        if spec.get('text_folder_masks'): prompt = prompt.replace('{{SOURCE_DIR}}', source_dir)
         expected = bind_source_dir(expected_for(spec, package), source_dir)
         if spec.get('lgd_empty_variant') or spec.get('lgd_export_compression'):
             for fmt in expected['lgd']['formats']:
@@ -1965,8 +2031,8 @@ class Runner:
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
                 prompt += '\nВыгрузи и скачай итоговые таблицы в файлы ' + ', '.join(exports) + '.'
-        if spec.get('variable_only') or spec.get('tree_only') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
-        if not exports and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
+        if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('upload_only') or rejection or refusal or execution_error or lgd_corrupt: exports = []
+        if not exports and not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('upload_only') and not rejection and not refusal and not execution_error and not lgd_corrupt:
             count = spec.get('export_count', 2 if src.parent.name == 'datamining-clustering' else 1)
             exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
             prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
@@ -1988,7 +2054,7 @@ class Runner:
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_export_cases') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for index, output in enumerate(expected['outputs']):
             if spec.get('excel_mode'): output['export_destination'] = destinations[index]
@@ -2049,6 +2115,16 @@ class Runner:
             self.phase('text-list-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
                        build / 'resources/loginom', folder / 'text-list-inputs.json', folder / 'text-list-inputs'], folder, timeout=300)
             prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
+            files = []
+        if spec.get('text_folder_masks'):
+            books = [dict(fixture=str(f), destination=source_dir + '/' + name + '/' + f.name)
+                     for name in spec['text_folder_masks'] for f in sorted((spec['data'] / name).iterdir()) if f.is_file()]
+            write(folder / 'text-folder-inputs.json', dict(login=login, overwrite='reject', books=books,
+                  text_folders=dict(parent=Path(source_dir).name, children=list(spec['text_folder_masks']))))
+            self.phase('text-folder-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
+                       build / 'resources/loginom', folder / 'text-folder-inputs.json', folder / 'text-folder-inputs'], folder, timeout=900)
+            delivered = read(folder / 'text-folder-inputs' / 'result.json')
+            assert [d['destination'] for d in delivered['delivered']] == [b['destination'] for b in books], 'TEXT_FOLDER_INPUT_DELIVERY_MISSING'
             files = []
         for file in files:
             if not file.is_file(): continue
@@ -2353,6 +2429,12 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if spec.get('text_folder_masks'):
+            self.current.update(folder_source_metrics(events))
+            check_text_folder_masks(replies, source_dir, spec['data'], expected, build / 'resources/loginom/bin/node')
+            assert any(save_confirmed(spec, o, package) for _, o in replies), 'SAVE_NOT_CONFIRMED'
+            self.current.update(save='PASS', csv='— (six imports)', **{'folder-masks': 'PASS'})
+            return session, expected, None, None
         if spec.get('tree_only'):
             assert self.current.get('tree-read') == 'PASS', 'TREE_READ_MISSING'
             self.current['csv'] = '— (tree)'
@@ -2680,7 +2762,7 @@ class Runner:
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, {**expected, 'variable_inventory': {**expected['variable_inventory'], 'links': proof['cold_links']}})
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if case == 'types300' else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'

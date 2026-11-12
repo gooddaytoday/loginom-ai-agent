@@ -40,6 +40,8 @@
 Если исходный файл уже в разрешённом хранилище Loginom, не загружай его повторно.
 Вызови `loginom_dock_storage_source` с точным `path` и новым `operation_id`,
 получи `output.source.server_source_ref`.
+Дана папка или маска без имён файлов — не передавай её в `dock_storage_source`:
+`loginom_dock_storage_list({path:"папка", pattern:"*.csv"})` вернёт файлы с их `server_source_ref`.
 Для серверного CSV/TSV/TXT больше 16 МиБ или неизвестного размера перед полным
 импортом обязательно выполни download→cache, профиль и точный scan.
 Готовый серверный источник и известные настройки формата не отменяют этот шаг.
