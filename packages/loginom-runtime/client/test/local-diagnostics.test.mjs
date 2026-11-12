@@ -91,16 +91,20 @@ test('diagnostics work in paths with spaces and Cyrillic and retain private perm
 test('diagnostic writer refuses linked directories before modifying the target', async t => {
   const root = await fixture(t), target = join(root, 'unrelated');
   await mkdir(target);
-  const acl = () => {
+  const acl = path => {
     const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
       '$ErrorActionPreference="Stop"; (Get-Acl -LiteralPath $env:DOCK_DIAGNOSTIC_PATH).Sddl'],
-    { encoding: 'utf8', env: { ...process.env, DOCK_DIAGNOSTIC_PATH: target } });
+    { encoding: 'utf8', env: { ...process.env, DOCK_DIAGNOSTIC_PATH: path } });
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();
   };
-  const before = process.platform === 'win32' ? acl() : null;
-  await symlink(target, join(root, 'diagnostics'), process.platform === 'win32' ? 'junction' : 'dir');
+  const link = join(root, 'diagnostics');
+  await symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  const before = process.platform === 'win32' ? [acl(target), acl(link)] : null;
   await assert.rejects(record(root, 'session', [{ event: 'task.end' }]), /Invalid diagnostic directory/);
   assert.deepEqual(await readdir(target), []);
-  if (process.platform === 'win32') assert.equal(acl(), before, 'junction target SDDL must stay unchanged');
+  if (process.platform === 'win32') {
+    assert.equal(acl(target), before[0], 'junction target SDDL must stay unchanged');
+    assert.equal(acl(link), before[1], 'junction SDDL must stay unchanged');
+  }
 });
