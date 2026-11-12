@@ -65,7 +65,7 @@ export function connect() {
     }
   }
 
-  async function table(node: Node, maxRows = Infinity) {
+  async function table(node: Node, maxRows = 10_000, limitSize = true) {
     // RPC getters return proxies shared with Loginom; the runtime manages their lifetime.
     const port = await (await node.get_OutputPorts()).getItem(0)
     const base = await port.get_Socket()
@@ -80,6 +80,8 @@ export function connect() {
     }
     const totalRows = await source.get_RowCount()
     const rows: (string | number | boolean | null)[][] = []
+    let truncated = totalRows > maxRows
+    let size = 0
     for (let r = 0, n = Math.min(totalRows, maxRows); r < n; r++) {
       const row = []
       for (let c = 0; c < schema.length; c++) {
@@ -91,11 +93,23 @@ export function connect() {
           row.push(Number(String(raw)))
         else if (type === studio.bg.TBGDataType.dtBoolean)
           row.push(raw === true || String(raw).toLowerCase() === "true")
-        else row.push(String(raw))
+        else {
+          const text = String(raw)
+          row.push(limitSize ? text.slice(0, 10_000) : text)
+          if (limitSize && text.length > 10_000) truncated = true
+        }
+      }
+      if (limitSize) {
+        const length = JSON.stringify(row).length
+        if (size + length > 5_000_000) {
+          truncated = true
+          break
+        }
+        size += length
       }
       rows.push(row)
     }
-    return { schema, rows, truncated: rows.length < totalRows, totalRows }
+    return { schema, rows, truncated, totalRows }
   }
 
   const active = async (node: Node) => (await node.get_Status()) === studio.bg.TBGModelNodeStatus.mnsActive

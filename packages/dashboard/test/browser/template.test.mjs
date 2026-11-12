@@ -109,20 +109,22 @@ test("the template shows loading, error, empty, data and truncated states", asyn
   await frame.getByRole("status").filter({ hasText: "Строк в результате: 1 из 2: показана часть" }).waitFor()
 })
 
-test("the template changes from data to loading during a header calculation", async t => {
+test("the template reports truncated rows and changes to loading during a header calculation", async t => {
   const { root, key, hash } = await buildTemplate(t)
-  const app = await fixture(t, { published: true, app: join(root, key, hash) })
+  const app = await fixture(t, { published: true, app: join(root, key, hash), table: {
+    schema: [{ name: "count", type: 1 }], rows: Array.from({ length: 10_001 }, (_, index) => [index]),
+  } })
   await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
   await app.page.locator('iframe[title="Dashboard"]').waitFor()
   const frame = app.frame() ?? await app.page.waitForEvent("framenavigated", { predicate: frame => frame.url().startsWith(app.appOrigin + "/apps/") })
-  await frame.getByRole("status").filter({ hasText: "Строк в результате: 1" }).waitFor()
+  await frame.getByRole("status").filter({ hasText: "Строк в результате: 10000 из 10001: показана часть" }).waitFor()
   await app.page.evaluate(() => { window.fixture.wait = true })
   await app.page.getByLabel("MinBudget", { exact: true }).fill("17")
   await app.page.getByLabel("MinBudget", { exact: true }).press("Enter")
   await app.page.waitForFunction(() => window.fixture.finish)
   await frame.getByRole("status").filter({ hasText: "Идёт расчёт" }).waitFor()
   await app.page.evaluate(() => { window.fixture.wait = false; window.fixture.finish() })
-  await frame.getByRole("status").filter({ hasText: "Строк в результате: 1" }).waitFor()
+  await frame.getByRole("status").filter({ hasText: "Строк в результате: 10000 из 10001: показана часть" }).waitFor()
   assert.match(await frame.locator("body").textContent(), /MinBudget = 17/)
   assert.deepEqual(app.errors, [])
 })

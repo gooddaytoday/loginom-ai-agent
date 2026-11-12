@@ -2,6 +2,46 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { fixture } from "./fixture.mjs"
 
+test("dashboard tables retain at most ten thousand rows and report the full count", async t => {
+  const app = await fixture(t, { published: true, table: {
+    schema: [{ name: "count", type: 1 }], rows: Array.from({ length: 10_001 }, (_, index) => [index]),
+  } })
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  const { table } = await app.settled()
+  assert.equal(table.rows.length, 10_000)
+  assert.equal(table.totalRows, 10_001)
+  assert.equal(table.truncated, true)
+  assert.deepEqual(table.rows.at(-1), [9999])
+})
+
+test("dashboard tables crop long string cells and mark the result as truncated", async t => {
+  const app = await fixture(t, { published: true, table: {
+    schema: [{ name: "text", type: 2 }], rows: [["x".repeat(10_000) + "y"]],
+  } })
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  const { table } = await app.settled()
+  assert.equal(table.rows[0][0].length, 10_000)
+  assert.equal(table.rows[0][0].at(-1), "x")
+  assert.equal(table.totalRows, 1)
+  assert.equal(table.truncated, true)
+  assert.equal(app.snapshots[0].sample.rows[0][0].length, 10_001)
+  assert.equal(app.snapshots[0].sample.rows[0][0].at(-1), "y")
+})
+
+test("dashboard tables fit the serialized row budget without splitting a row", async t => {
+  const app = await fixture(t, { published: true, table: {
+    schema: [{ name: "text", type: 2 }], rows: Array.from({ length: 600 }, () => ["x".repeat(10_000)]),
+  } })
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  const { table } = await app.settled()
+  assert.ok(table.rows.length > 0 && table.rows.length < 600)
+  const size = table.rows.reduce((size, row) => size + JSON.stringify(row).length, 0)
+  assert.ok(size <= 5_000_000)
+  assert.ok(size + JSON.stringify(table.rows[0]).length > 5_000_000)
+  assert.equal(table.totalRows, 600)
+  assert.equal(table.truncated, true)
+})
+
 test("the shell opens an isolated app and delivers the first SDK state", async t => {
   const app = await fixture(t, { published: true })
   await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()

@@ -106,7 +106,8 @@ function start() {
         const parameters = () => studio.parameters(form)
         const available = await parameters()
         const capture = async (params = available) => {
-          const sample = !errors.has(lookup.key) && (await studio.active(node)) ? await studio.table(node, 12) : null
+          // Desktop samples retain their original values; size limits apply only to sandbox state.
+          const sample = !errors.has(lookup.key) && (await studio.active(node)) ? await studio.table(node, 12, false) : null
           if (overlay !== section) return
           return snapshotResponse(await post("targets", {
             binding: target,
