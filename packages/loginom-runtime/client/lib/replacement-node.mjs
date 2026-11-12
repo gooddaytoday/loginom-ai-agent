@@ -1,18 +1,19 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {validateReplacementParameters,validateReplacementInputParameters} from './replacement-parameters.mjs';
-import {preflightReplacementSource} from './replacement-preflight.mjs';
+import {preflightReplacementSource,configureExternalReplacementInputs} from './replacement-preflight.mjs';
 import {configureReplacement} from './replacement-procedure.mjs';
 import {configureReplacementOutput} from './replacement-output.mjs';
 import {replacementConfigurationReadback} from './replacement-readback.mjs';
 import {replacementParametersSchema} from './node-api.mjs';
 import {configureReplacementInlineMapping} from './replacement-output.mjs';
 const parameterSchema=structuredClone(replacementParametersSchema);
-parameterSchema.description='Internal replacement tables: exact, regex, or mixed. Mixed uses string exact pairs plus regex_pairs, exact first; case_sensitive required for exact table, inline (?i) for regex. Each supplied rule replaces both tables. Boolean result_type: true/false to.value, other null or keep (Variant). Exact result_type changes the constant type (omitted=input type); keys retain type, to/other.value use result_type. No automatic conversion of unmatched text. Different result_type requires other null/value, datetime requires null with local ISO whole seconds. Regex: string patterns, ordered first match replaces the whole cell with a literal string ($1 stays literal); omit case_sensitive/precision, use inline (?i), other keep/null only. Exact string rules require case_sensitive and omit precision. Integer/real rules require precision>=0 (hundredths) and omit case_sensitive; absolute inclusive tolerance, nearest key, ties choose larger. Nonzero precision adds real <field>_Delta=key-input. Large Int64 values must be decimal strings, never rounded JSON numbers. Existing-node patches preserve omitted rules and output_mode.';
-const ruleSchema=parameterSchema.properties.rules.items;
+parameterSchema.description='Exact: typed pairs; string case_sensitive or numeric precision>=0 (hundredths), nearest key, ties larger, nonzero adds _Delta=key-input. Int64: decimal strings. result_type defaults to input; other keep with changed type only for Boolean (Variant). Boolean requires other null/keep, datetime null and local ISO whole seconds. Regex: ordered string patterns to literal whole-cell constants ($1 literal); inline (?i), no case_sensitive/precision, other keep/null. Mixed: string pairs before regex_pairs; case_sensitive controls exact only. A supplied internal rule replaces both tables. External: string keys/results from table input 1, explicit external:{port:1,value,replacement,information,unused} covering all mapped fields; no pairs/regex_pairs, case_sensitive required, other keep/null. Duplicate keys fail. Existing omission preserves rules/output_mode.';
+const ruleSchema=parameterSchema.properties.rules.items.anyOf[0];
 ruleSchema.properties.case_sensitive.description='Required for exact/mixed string rules. For regex omit; use inline (?i). Omit this key completely for integer and real rules.';
 ruleSchema.properties.precision.description='Required for integer/real: finite nonnegative absolute tolerance, at most two decimal places; 0=exact. Nearest key wins, ties choose larger. Nonzero adds real _Delta=key-input (null if unmatched). Omit for string.';
-export function createReplacementNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.replace_columns',modes:['exact','regex','mixed'],revision:'replacement-v1-internal-6',readback:replacementConfigurationReadback,parameterSchema,
+export function createReplacementNodeSupport(config){const implementation=options=>({
+ type:'transform.replace_columns',modes:['exact','regex','mixed','external'],revision:'replacement-v1-external-1',readback:replacementConfigurationReadback,parameterSchema,
+ ...(options?.operation.parameters.mode==='external'?{configureInputs:configureExternalReplacementInputs}:{}),
  validate:validateReplacementParameters,validateInput:validateReplacementInputParameters,preflight:preflightReplacementSource,
  configurationObservation:{condition:'replacement configuration page',readReplacement:true,ready:s=>s.wizard?.stage==='replacement'&&s.node_replacement?.verified===true},
  async configure(channel,p,{request}){
@@ -24,4 +25,7 @@ export function createReplacementNodeSupport(config){return createTabularTransfo
   const done=await channel.observe({condition:'replacement accepted by Loginom',ready:s=>s.wizard?.stage==='done'});
   return {...changed,...(inline_mapping?{inline_mapping}:{}),validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
  },configureOutput:configureReplacementOutput,
-});}
+});
+ const support=createTabularTransformNodeSupport(config,implementation());
+ return {...support,nodeApplyDriverFactory:options=>createTabularTransformNodeSupport(config,implementation(options)).nodeApplyDriverFactory(options)};
+}

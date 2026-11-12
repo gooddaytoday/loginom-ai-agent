@@ -45,7 +45,7 @@ RULES = (
     ((C + 'enrich-*.mjs', 'docs/node-development/nodes/transform-enrichdata/acceptance/**'), ('live-ui',), ('enrich-data-left', 'enrich-data-composite', 'enrich-three-lookups', 'enrich-four-lookups')),
     ((C + 'join-*.mjs', 'docs/node-development/nodes/join/acceptance/**'), ('live-ui',), ('join-right', 'join-full', 'join-difference', 'join-full-no-keys', 'join-cross')),
     ((C + 'reform-*.mjs', 'scripts/node-acceptance/reform-cache.mjs', 'docs/node-development/nodes/field-parameters/acceptance/v040/**'), ('live-ui',), ('s3', 'reform-rename-lossy', 'reform-cache')),
-    ((C + 'replacement-*.mjs',), ('live-ui',), ('replace-boolean', 'replace-mixed', 'replace-keep-variant', 'regex-add', 'regex-replace', 's3')),
+    ((C + 'replacement-*.mjs',), ('live-ui',), ('replace-external', 'replace-boolean', 'replace-mixed', 'replace-keep-variant', 'regex-add', 'regex-replace', 's3')),
     ((C + 'union-*.mjs', 'docs/node-development/nodes/union/acceptance/**',
       'scripts/node-acceptance/tests/union-two-stage.test.mjs',
       'packages/product/skills/loginom-automation/references/nodes/transform.union_data.md'),

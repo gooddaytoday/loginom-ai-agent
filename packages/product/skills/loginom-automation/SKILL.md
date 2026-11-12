@@ -188,7 +188,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
 |Доли итогов, веса, сезонная разгруппировка|`transform.ungroup_data` / shares, computed, seasonal|[читать](references/nodes/transform.ungroup_data.md)|
-| Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
+| Замена | `transform.replace_columns` / exact, regex, mixed, external | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
 | Календарные признаки, строки дат | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
 | Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
