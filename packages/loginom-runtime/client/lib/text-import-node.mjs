@@ -399,10 +399,10 @@ export async function restoreImportOutputLayout(channel,before,native,mappings,c
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const parameterSchema=structuredClone(textImportParametersSchema);
-  parameterSchema.properties.preview_only.description='Native format/type preview FIRST. Storage+source_path/encoding; Close/no inputs,mappings,read. Reuse node.';
-  parameterSchema.properties.source_switch.description='After scan+Save: profile_id/save_operation_id, source_path only. Done or Execute/0; no mappings.';
-  parameterSchema.properties.source.description='Required except unchanged Execute. Unchanged existing Execute may omit source. Ordered verified_sources.';
-  parameterSchema.properties.settings.description='New: source/format, columns or detection; existing patch.';
+  parameterSchema.properties.preview_only.description='Native preview FIRST; storage+source_path[/encoding]; Close, reuse node.';
+  parameterSchema.properties.source_switch.description='After scan+Save: profile_id/save_operation_id; source_path only.';
+  parameterSchema.properties.source.description='Required except unchanged Execute. Unchanged existing Execute may omit source.';
+  parameterSchema.properties.settings.description='New source/format+columns/detection; existing patch.';
   const nodeApplyHandlers=new Map([['imports.text',{revision:'text-import-output-v2',modes:['delimited'],
     parameter_schema:parameterSchema,binding_schema:importBindingSchema,
     configurationReadback:textImportConfigurationReadback,

@@ -48,15 +48,17 @@ No order/speed guarantee.
 ## Auto-detected types
 
 User types win. Else correct only sample contradictions: leading zeros → string;
-numeric separators → verify values; date strings/NULL → check parsing.
+wrong decimals → correct; date strings/NULL → check parsing.
 Check types/values/NULL/seconds; report types/date format.
-Sample → `settings.format.date_format`/`date_separator`:
-dd.MM or dd/MM → `dd/mm/yyyy`, `.` or `/`; ISO (-, T) → `yyyy/mm/dd`, `-`.
-Ambiguous dates: user convention or ask.
+`settings.format`: sample → `date_format`/`date_separator`:
+dd.MM or dd/MM → `dd/mm/yyyy`, . or /; ISO → `yyyy/mm/dd`, -.
+Ambiguous dates: user convention/ask.
+Numeric amounts with spaces: Import string, then Calculator real with same name,
+`Val(Replace(Field," ","",True))`. Keep NULL; verify values. Val uses local decimal separator.
 
 Types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),
 `settings.analysis`: `rows`, `refresh` (`all`=fields/types, `types`=types).
-Prefer `new`; omit `columns` unless correcting. Reuse preview node: COMPLETE source/format.
+`new`: omit `columns` unless correcting. Reuse node: complete source/format.
 `all`: fields/types appear only after Execute; omit `columns`/output `mappings`.
 For manual fields use `new`/`none`. With `new`, separate-call manual types on SAME node
 survive `source_path` changes. `refresh` erases manual types: only on request.
