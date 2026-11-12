@@ -47,7 +47,7 @@ test('runtime admits a large reference without a second copy or bytes in the des
     assert.equal(Object.hasOwn(artifact,'data'),false);
     assert.deepEqual(await readdir(join(root,'artifacts')),[]);
     const lease=await store.stageUpload(artifact.artifact_id);
-    assert.equal(lease.path,source);
+    assert.equal(lease.path,reference.snapshot.canonical_path);
     assert.deepEqual(await lease.verify(),artifact);
     await lease.release();
     await assert.rejects(()=>lease.verify(),/released/);

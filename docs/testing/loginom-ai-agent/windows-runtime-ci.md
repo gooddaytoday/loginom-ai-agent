@@ -1,6 +1,7 @@
 # Windows runtime CI coverage
 
-`test.yml` runs `windows-runtime` on `windows-2022` for pull requests, release
+`test.yml` runs the `windows-runtime` client/runtime/host matrix on
+`windows-2022` for pull requests, release
 branches and reusable release gates. `setup-loginom-inputs` reads the product
 pins (Node 24.19.0, Chromium 1246), checks the downloaded Node version and browser
 directory, and installs locked client dependencies even on a cache hit. Tests
@@ -53,6 +54,11 @@ Linux-only Docker/X11 skills acceptance and macOS Keychain acceptance are not
 Windows coverage. This source-test gate complements installed
 `release-windows-desktop` acceptance.
 
+The managed-shutdown fixture delivers SIGINT/SIGTERM handler events through
+private test IPC on Windows, where `child.kill()` forcibly terminates a process.
+POSIX keeps real signals; EOF, process exit and kernel clipboard ownership are
+real on both platforms. This does not certify native console Ctrl+C delivery.
+
 The existing `windows-native-check.yml` also executes `process`, `environment`,
 `windows-powershell`, `cli-credentials`, `cli-install-windows` and `cli-manifest`
 on Windows 2022 and 2025 when host paths change (or on manual dispatch).
@@ -60,9 +66,10 @@ on Windows 2022 and 2025 when host paths change (or on manual dispatch).
 part of every `test.yml` run and its reusable release gate, independent of those
 path filters.
 
-Each suite has a separate failing step and a log in the `windows-runtime-*`
-artifact (14-day retention). Runtime and host suites still execute after a
-client-test failure so the run exposes all three results; no failure is ignored.
+Each suite has an independent job and a log in its `windows-client-*`,
+`windows-runtime-*` or `windows-host-*` artifact (14-day retention).
+`fail-fast: false` keeps a client failure from cancelling runtime or host;
+no failure is ignored. Only host jobs install the Bun workspace dependencies.
 Node suites use TAP so assertion details are written immediately, including
 when a later test retains an open handle. Each suite has its own step timeout
-within the job's 30-minute limit.
+within the job's 20-minute limit.
