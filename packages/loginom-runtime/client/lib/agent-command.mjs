@@ -1,6 +1,8 @@
 import { delimiter, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import crossSpawn from 'cross-spawn';
+import escape from 'cross-spawn/lib/util/escape.js';
 import which from 'which';
 
 function environmentValue(env, name) {
@@ -34,8 +36,21 @@ export function createAgentLauncher(command, { env = process.env, cwd = process.
     executable: executable || null,
     run(args, options = {}) {
       if (resolutionError) return { executable: null, error: resolutionError, status: null, signal: null, stdout: null, stderr: null };
-      // cross-spawn handles CMD shims and argument escaping; EXE and POSIX
-      // executables retain direct execution. Do not enable options.shell.
+      // cross-spawn only double-escapes shims under node_modules/.bin. Global
+      // npm shims also forward %*, so their arguments undergo two CMD parses.
+      if (process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(executable)) {
+        if (!existsSync(executable)) return { executable, error: Object.assign(new Error('Agent command not found'), { code: 'ENOENT' }), status: null, signal: null, stdout: null, stderr: null };
+        const command = [escape.command(executable), ...args.map(arg => {
+          // CRT quoting must double the ENTIRE backslash run before quotes and
+          // the closing quote. cross-spawn 7.0.6 only doubles its last slash.
+          const quoted = '"' + String(arg).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/g, '$1$1') + '"';
+          return escape.command(escape.command(quoted));
+        })].join(' ');
+        const result = spawnSync(process.env.ComSpec || process.env.comspec || 'cmd.exe',
+          ['/d', '/v:off', '/s', '/c', `"${command}"`],
+          { ...options, env, cwd, shell: false, windowsVerbatimArguments: true });
+        return { ...result, executable };
+      }
       const spawn = process.platform === 'win32' && /\.(?:exe|com)$/i.test(executable) ? spawnSync : crossSpawn.sync;
       const result = spawn(executable, args, { ...options, env, cwd, shell: false });
       return { ...result, executable };

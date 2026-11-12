@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { createRedactor } from './redact.mjs';
 import { summarizeDiagnosticUsage, formatCacheSummary } from './diagnostic-usage.mjs';
+import { privatePath, protectWindowsDirectory } from './platform.mjs';
 
 const id = value => createHash('sha256').update(value).digest('hex');
 const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
@@ -11,15 +12,20 @@ const limits = { days: 30, bytes: 2 * 1024 ** 3, sessionBytes: 256 * 1024 ** 2, 
 
 async function privateDirectory(path) {
   await mkdir(path, { recursive: true, mode: 0o700 });
+  protectWindowsDirectory(path);
   const stat = await lstat(path);
-  if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o077)) throw Error('Invalid diagnostic directory');
+  if (!stat.isDirectory() || stat.isSymbolicLink() || !privatePath(stat)) throw Error('Invalid diagnostic directory');
+  // Windows mode bits do not describe privacy. Apply the same restricted,
+  // inheritable user/SYSTEM ACL as the Dock state directory before writing.
 }
 
 async function append(path, text) {
+  const existing = await lstat(path).catch(e => { if (e.code !== 'ENOENT') throw e; return null; });
+  if (existing && (existing.isSymbolicLink() || !existing.isFile() || !privatePath(existing))) throw Error('Invalid diagnostic file');
   const file = await open(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
   try {
     const stat = await file.stat();
-    if (!stat.isFile() || (stat.mode & 0o077)) throw Error('Invalid diagnostic file');
+    if (!stat.isFile() || !privatePath(stat)) throw Error('Invalid diagnostic file');
     await file.writeFile(text);
   } finally { await file.close(); }
 }
