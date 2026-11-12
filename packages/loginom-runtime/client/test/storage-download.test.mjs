@@ -328,7 +328,8 @@ test('no-progress timer cancels and drains a stalled transfer even without statu
  const registry=createServerDownloadRegistry({directory:join(f.root,'silent'),inspect:async()=>({...source(),bytes:2*1024**3}),
   download:async({path,signal})=>{await writeFile(path,'a');started=true;
    await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();}});
- registry.start(f.request);while(!started)await new Promise(resolve=>setImmediate(resolve));
+ registry.start(f.request);while(!started&&registry.status('download').state==='running')await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(started,true,JSON.stringify(registry.status('download')));
  t.mock.timers.tick(120000);await registry.cleanup();
  const result=registry.status('download');
  assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_NO_PROGRESS');
@@ -434,7 +435,8 @@ test('cancel drains the actual transfer before deleting partials; IDs cannot rep
  let transfers=0,release;
  const f=await fixture(t,async({path,signal})=>{transfers++;await writeFile(path,'a');
   await new Promise(resolve=>{release=resolve;signal.addEventListener('abort',resolve,{once:true});});signal.throwIfAborted();});
- f.registry.start(f.request);while(!release)await new Promise(resolve=>setTimeout(resolve,1));
+ f.registry.start(f.request);while(!release&&f.registry.status('download').state==='running')await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(typeof release,'function',JSON.stringify(f.registry.status('download')));
  f.registry.start(f.request);assert.equal(transfers,1);
  assert.throws(()=>f.registry.start({...f.request,server_source_ref:'other'}),/different/);
  f.registry.cancel('download');const result=await settled(f.registry);
@@ -483,7 +485,8 @@ test('aborting a long status wait releases the caller without cancelling the ret
   await writeFile(path,'a');active=true;
   await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();
  });
- f.registry.start(f.request);while(!active)await new Promise(resolve=>setTimeout(resolve,1));
+ f.registry.start(f.request);while(!active&&f.registry.status('download').state==='running')await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(active,true,JSON.stringify(f.registry.status('download')));
  const controller=new AbortController();
  const waiting=f.registry.wait('download',{timeoutMs:60000,signal:controller.signal});
  controller.abort(Error('owner interrupted'));

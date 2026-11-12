@@ -317,7 +317,7 @@ test.each(["success", "refused", "private-error", "bad-ack", "bad-exit", "timeou
     expect(files).toHaveLength(1)
     const text = await readFile(join(directory, files[0]), "utf8")
     expect(text).not.toContain("private-secret")
-    expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600)
+    if (process.platform !== "win32") expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600)
     const result = JSON.parse(text)
     expect(result.request_error).toBe(mode === "timeout" ? "LOGINOM_RUNTIME_TIMEOUT"
       : mode === "refused" ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : mode === "private-error" ? "LOGINOM_RUNTIME_FAILED" : null)

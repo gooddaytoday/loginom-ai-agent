@@ -164,23 +164,25 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       expect(await readFile(join(destination, "licenses/Golos-OFL.txt")))
         .toEqual(await readFile(join(productSkillsDirectory, "package-docs/assets/fonts/OFL.txt")))
       const script = join(destination, "skills/package-docs/scripts/package-docs.mjs")
+      const environment = { LANG: "C.UTF-8", ...(process.platform === "win32"
+        ? { SystemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT } : {}) }
       const skeleton = Bun.spawn([join(destination, manifest.node), script, "skeleton", "--lgp",
         join(import.meta.dir, "fixtures/package-docs/demo.lgp"), "--directory", root],
-        { cwd: root, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
-      const paths = new Response(skeleton.stdout).json()
+        { cwd: root, env: environment, stdout: "pipe", stderr: "pipe" })
+      const paths = new Response(skeleton.stdout).text()
       const errors = new Response(skeleton.stderr).text()
       expect(await skeleton.exited).toBe(0)
       expect(await errors).toBe("")
-      const report = (await paths).report
+      const report = JSON.parse(await paths).report
       await writeFile(report, (await readFile(report, "utf8")).replace(/PLACEHOLDER_[A-Z_0-9]+/g, "Описание сценария."))
       const emit = Bun.spawn([join(destination, manifest.node), script, "emit", "--lgp",
         join(import.meta.dir, "fixtures/package-docs/demo.lgp"), "--directory", root],
-        { cwd: root, env: { LANG: "C.UTF-8" }, stdout: "pipe", stderr: "pipe" })
-      const result = new Response(emit.stdout).json()
+        { cwd: root, env: environment, stdout: "pipe", stderr: "pipe" })
+      const result = new Response(emit.stdout).text()
       const failure = new Response(emit.stderr).text()
       expect(await emit.exited).toBe(0)
       expect(await failure).toBe("")
-      expect((await readFile((await result).output)).subarray(0, 8).toString()).toBe("%PDF-1.4")
+      expect((await readFile(JSON.parse(await result).output)).subarray(0, 8).toString()).toBe("%PDF-1.4")
       for (const path of [
         "loginom-automation/SKILL.md",
         "loginom-automation/references/workflow.md",
