@@ -1,6 +1,7 @@
 import { lookupResponse, snapshotResponse } from "./response"
 import { connect, views } from "./loginom/adapter"
-import type { Frame, Update, View } from "./loginom/types"
+import { mountDashboard, sandboxFrame } from "./frame"
+import type { Update, View } from "./loginom/types"
 
 const message = (error: unknown) => String((error as { message?: unknown } | null)?.message ?? error)
 start()
@@ -29,9 +30,15 @@ function start() {
     }
     const errors = new Map<string, string>()
     const tab = studio.tab
-    const close = () => {
+    let stopFrame: (() => void) | undefined
+    const remove = () => {
+      stopFrame?.()
+      stopFrame = undefined
       overlay?.remove()
       overlay = undefined
+    }
+    const close = () => {
+      remove()
       update()
     }
 
@@ -98,29 +105,34 @@ function start() {
         if (overlay !== section) return
         const parameters = () => studio.parameters(form)
         const available = await parameters()
-        const sample = !errors.has(lookup.key) && (await studio.active(node)) ? await studio.table(node, 12) : null
-        if (overlay !== section) return
-        const snapshot = snapshotResponse(
-          await post("targets", {
+        const capture = async (params = available) => {
+          const sample = !errors.has(lookup.key) && (await studio.active(node)) ? await studio.table(node, 12) : null
+          if (overlay !== section) return
+          return snapshotResponse(await post("targets", {
             binding: target,
             nodeName: await studio.name(node),
-            sample,
-            parameters: available,
-          }),
-        )
-        if (overlay !== section) return
+            sample: sample ? { schema: sample.schema, rows: sample.rows } : null,
+            parameters: params.map(parameter => ({ name: parameter.name, value: parameter.value })),
+          }))
+        }
+        const snapshot = await capture()
+        if (overlay !== section || !snapshot) return
         title.textContent = snapshot.nodeName
-        const chatUrl =
+        const chatUrl = (id: string) =>
           "loginom-ai-agent://dashboard?id=" +
-          encodeURIComponent(snapshot.id) +
+          encodeURIComponent(id) +
           "&action=" +
-          (lookup.exists ? "edit" : "create")
-        if (!lookup.exists) {
-          const chat = document.createElement("a")
-          chat.href = chatUrl
-          chat.target = "_blank"
-          chat.rel = "noopener"
-          chat.textContent = "Открыть чат в Desktop"
+          (lookup.hash !== null ? "edit" : "create")
+        const desktopLink = (id: string) => {
+          const link = document.createElement("a")
+          link.href = chatUrl(id)
+          link.target = "_blank"
+          link.rel = "noopener"
+          link.textContent = "Открыть чат в Desktop"
+          return link
+        }
+        if (lookup.hash === null) {
+          const chat = desktopLink(snapshot.id)
           note.replaceChildren("Опишите dashboard для узла «" + snapshot.nodeName + "» в чате. ", chat)
           // A long first execution can outlive the browser's user gesture. The same link remains clickable.
           chat.click()
@@ -130,55 +142,89 @@ function start() {
         chat.type = "button"
         chat.textContent = "Изменить в чате"
         chat.style.cssText = "cursor:pointer;text-decoration:underline;padding:7px 6px"
-        chat.onclick = () => window.open(chatUrl, "_blank", "noopener")
+        chat.onclick = () => {
+          const task = pending.then(async () => {
+            if (overlay !== section) return
+            const fresh = await capture(await parameters())
+            if (overlay !== section || !fresh) return
+            // A queued calculation can outlive the user gesture required for opening Desktop.
+            if (!navigator.userActivation?.isActive) {
+              note.replaceChildren("Продолжите в Desktop: ", desktopLink(fresh.id))
+              section.append(note)
+              return
+            }
+            window.open(chatUrl(fresh.id), "_blank", "noopener")
+          })
+          pending = task.catch((e: unknown) => {
+            if (overlay !== section) return
+            note.textContent = "Dashboard: " + message(e)
+            section.append(note)
+          })
+        }
         back.before(chat)
-        const state = async () => {
-          const params = await parameters()
+        const state = async (params = available) => {
           const error = errors.get(lookup.key) ?? null
           return {
-            value: params[0]?.value ?? null,
-            parameters: params,
-            table: !error && (await studio.active(node)) ? await studio.table(node) : null,
+            type: "state" as const,
+            parameters: params.map(parameter => ({ name: parameter.name, value: parameter.value })),
+            table: error === null && (await studio.active(node)) ? await studio.table(node) : null,
             error,
+            busy: false,
           }
         }
-        const run = (update?: Update) => {
+        let current = await state()
+        if (overlay !== section) return
+        const run = (update: Update) => {
           busy++
           const task = pending.then(async () => {
+            dashboard.send({ ...current, busy: true })
             try {
-              if (update) await studio.parameters(form, update)
+              await studio.parameters(form, update)
               await studio.execute(node)
               errors.delete(lookup.key)
-              return await state()
             } catch (e: unknown) {
               errors.set(lookup.key, message(e))
-              return await state()
             }
+            current = await parameters().then(state).catch((e: unknown) => ({
+              type: "state" as const, parameters: [], table: null, error: message(e), busy: false,
+            }))
+            dashboard.send(current)
           })
           pending = task.then(finish, finish)
-          return task
         }
-        const frame = document.createElement("iframe") as Frame
+        const path = document.createElement("span")
+        path.textContent = target.packagePath
+        title.after(path)
+        available.forEach(parameter => {
+          const label = document.createElement("label")
+          label.textContent = parameter.name + " "
+          const input = document.createElement("input")
+          input.type = "number"
+          input.step = "any"
+          input.value = parameter.value === null ? "" : String(parameter.value)
+          input.style.cssText = "width:8em;padding:4px"
+          input.onchange = () => {
+            const value = input.valueAsNumber
+            const valid = Number.isFinite(value) && (!parameter.integer || Number.isSafeInteger(value))
+            input.setCustomValidity(valid ? "" : "Недопустимое значение параметра")
+            if (!valid) return input.reportValidity()
+            run({ name: parameter.name, value })
+          }
+          label.append(input)
+          chat.before(label)
+        })
+        const frame = sandboxFrame(lookup.appOrigin + "/apps/" + lookup.key + "/" + lookup.hash + "/")
         frame.title = "Dashboard"
         frame.style.cssText = "border:0;flex:1;width:100%;min-height:0"
-        frame.addEventListener("load", () => frame.contentDocument?.addEventListener("keydown", escape, true))
-        frame.dashboard = {
-          state: async () => {
-            await pending
-            return state()
+        const dashboard = mountDashboard(frame, {
+          close,
+          silent: () => {
+            note.textContent = "Dashboard не ответил"
+            frame.replaceWith(note)
           },
-          change: (value, name = available[0]?.name) => {
-            if (
-              !Number.isFinite(value) ||
-              !available.some((p) => p.name === name) ||
-              (name === "MinBudget" && value < 0)
-            )
-              return Promise.reject(Error("Недопустимое значение параметра."))
-            return run({ name, value })
-          },
-          run: () => run(),
-        }
-        frame.src = "/dashboard/apps/" + lookup.key + "/"
+        })
+        stopFrame = dashboard.stop
+        dashboard.send(current)
         note.remove()
         section.append(frame)
       } catch (e: unknown) {
@@ -198,15 +244,14 @@ function start() {
         const node = studio.tableNode(visual)
         if (!node) return
         const lookup = lookupResponse(await post("lookup", await studio.binding(tab(), form, node)))
-        if (seq === revision && !view.destroyed) button.setText(lookup.exists ? "Dashboard" : "Создать dashboard")
+        if (seq === revision && !view.destroyed) button.setText(lookup.hash !== null ? "Dashboard" : "Создать dashboard")
       } catch {
         /* Opening the button reports the service error in the tab. */
       }
     }
     studio.listen(view, update, () => {
       revision++
-      overlay?.remove()
-      overlay = undefined
+      remove()
     })
     update()
   }

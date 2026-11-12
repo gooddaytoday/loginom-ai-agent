@@ -35,7 +35,7 @@ export async function parameters(studio: Pick<Studio, "bg" | "Out">, form: Form,
         await value.set_AsVariant(update.value)
       }
       const actual = await value.get_AsVariant()
-      rows.push({ name, value: actual == null ? null : Number(String(actual)) })
+      rows.push({ name, value: actual == null ? null : Number(String(actual)), integer: type === studio.bg.TBGDataType.dtInteger })
     }
     if (update && !rows.some((row) => row.name === update.name))
       throw Error("Числовая переменная не найдена: " + update.name)

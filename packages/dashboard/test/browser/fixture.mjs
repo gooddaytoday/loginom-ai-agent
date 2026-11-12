@@ -1,10 +1,24 @@
-import { readFile } from "node:fs/promises"
+import { execFileSync } from "node:child_process"
+import { once } from "node:events"
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { createServer } from "node:http"
+import { tmpdir } from "node:os"
+import { isAbsolute, join, resolve } from "node:path"
+import { appHost } from "../../dist/server.mjs"
 import { chromium } from "../../../loginom-runtime/client/node_modules/playwright-core/index.mjs"
+
+const sdk = execFileSync("bun", ["build", resolve(import.meta.dirname, "../../src/sdk/loginom.ts"), "--target=browser", "--format=esm"])
 
 export async function fixture(
   t,
   {
     published = false,
+    popupBlocking = false,
+    app = "recorder",
+    mode = "normal",
+    lookupMode = mode,
+    connectionAllowlist = true,
+    table = { schema: [{ name: "count", type: 1 }], rows: [[42]] },
     status = "active",
     variableStatus = "active",
     variables = [{ name: "MinBudget", type: 1, value: 0 }],
@@ -13,10 +27,20 @@ export async function fixture(
     malformed,
   } = {},
 ) {
-  const browser = await chromium.launch({ channel: "chromium", headless: true, chromiumSandbox: true })
+  const browser = await chromium.launch({
+    channel: "chromium", headless: true, chromiumSandbox: true,
+    ...(popupBlocking && { ignoreDefaultArgs: ["--disable-popup-blocking"] }),
+  })
   t.after(() => browser.close())
   const context = await browser.newContext()
   await context.addInitScript(() => {
+    window.channels = 0
+    const Channel = window.MessageChannel
+    window.MessageChannel = class extends Channel {
+      constructor() { super(); window.channels++ }
+    }
+    window.violations = []
+    addEventListener("securitypolicyviolation", event => window.violations.push({ directive: event.violatedDirective, blockedURI: event.blockedURI }))
     window.blockedDesktopLinks = 0
     window.desktopOpens = []
     const open = window.open.bind(window)
@@ -38,58 +62,23 @@ export async function fixture(
       true,
     )
   })
-  const origin = "http://127.0.0.1:39999"
-  const shell = await readFile(new URL("../../dist/shell.js", import.meta.url), "utf8")
-  const snapshots = []
-  await context.route("**/*", async (route) => {
-    const url = new URL(route.request().url())
-    if (url.origin !== origin) return route.abort()
-    if (url.pathname === "/dashboard/lookup")
-      return route.fulfill({
-        json:
-          malformed === "lookup"
-            ? { exists: "yes", key: 17 }
-            : {
-                exists: published,
-                key: "a".repeat(64),
-                hash: published ? "b".repeat(64) : null,
-                appOrigin: origin,
-                mode: "normal",
-              },
-      })
-    if (url.pathname === "/dashboard/targets") {
-      snapshots.push(route.request().postDataJSON())
-      return route.fulfill({
-        json:
-          malformed === "snapshot"
-            ? { id: 17, nodeName: null }
-            : {
-                id: "00000000-0000-4000-8000-000000000001",
-                key: "a".repeat(64),
-                nodeName: "Fixture node",
-                sourceDir: "/fixture",
-                binding: snapshots.at(-1).binding,
-                schema: [{ name: "count", type: 1 }],
-                rows: [[42]],
-                tableSource: "live",
-                parameters: snapshots.at(-1).parameters,
-                adapter: "window.frameElement.dashboard",
-                commands: { init: "init", typecheck: "typecheck", build: "build", publish: "publish" },
-              },
-      })
-    }
-    if (url.pathname === "/shell.js")
-      return route.fulfill({ contentType: "text/javascript", body: shell })
-    if (["/desktop-link", "/ordinary"].includes(url.pathname) || url.pathname.startsWith("/dashboard/apps/"))
-      return route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Safe destination</title>" })
-    if (url.pathname !== "/app/") return route.abort()
-    return route.fulfill({
-      contentType: "text/html",
-      body: `<!doctype html><meta charset="utf-8">
+  const root = await mkdtemp(join(tmpdir(), "dashboard-browser-"))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const dir = join(root, "a".repeat(64), "b".repeat(64))
+  await mkdir(join(root, "a".repeat(64)))
+  await cp(isAbsolute(app) ? app : resolve(import.meta.dirname, "apps", app), dir, { recursive: true })
+  if (app === "recorder") await writeFile(join(dir, "assets/loginom.js"), sdk)
+  const reservation = createServer().listen(0, "127.0.0.1")
+  await once(reservation, "listening")
+  const port = reservation.address().port
+  await new Promise(resolve => reservation.close(resolve))
+  const appOrigin = `http://dashboards.localhost:${port}`
+  const csp = (await readFile(new URL("../../deploy/studio.csp", import.meta.url), "utf8")).trim().replace("<DASH>", appOrigin)
+  const html = `<!doctype html><meta charset="utf-8">
       <title>Loginom fixture</title><main id="model" style="position:relative;height:200px"></main><a href="/ordinary">Ordinary link</a><button onclick="window.fixture.native = true">Native action</button>
       <script>
         addEventListener('beforeunload', event => {event.preventDefault(); event.returnValue = ''});
-        window.fixture = {status: ${JSON.stringify(status)}, calls: 0, rows: [[42]], wait: false};
+        window.fixture = {status: ${JSON.stringify(status)}, calls: 0, columns: ${JSON.stringify(table.schema)}, rows: ${JSON.stringify(table.rows)}, wait: false};
         const node = {
           get_Guid: async () => 'node-guid',
           get_DisplayName: async () => 'Fixture node',
@@ -103,7 +92,7 @@ export async function fixture(
           get_OutputPorts: async () => ({getItem: async () => ({
             get_Socket: async () => ({QueryInterface: async () => ({
               get_Output: async () => ({QueryInterface: async () => ({
-                get_Columns: async () => ({get_Count: async () => 1, getItem: async () => ({get_Name: async () => 'count', get_DataType: async () => 1})}),
+                get_Columns: async () => ({get_Count: async () => window.fixture.columns.length, getItem: async index => ({get_Name: async () => window.fixture.columns[index].name, get_DataType: async () => window.fixture.columns[index].type})}),
                 get_RowCount: async () => window.fixture.rows.length,
                 AsVariant: async (row, column) => window.fixture.rows[row][column]
               })})
@@ -212,10 +201,72 @@ export async function fixture(
             listeners?.afterrender(view);
           };
         }
-      </script><script src="/shell.js"></script>`,
-    })
+      </script><script src="/shell.js"></script>`
+  const studio = createServer((request, response) => {
+    if (["/desktop-link", "/ordinary"].includes(request.url)) {
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" })
+      return response.end("<!doctype html><title>Safe destination</title>")
+    }
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-security-policy": csp })
+    response.end(html)
   })
+  studio.listen(0, "127.0.0.1")
+  await once(studio, "listening")
+  t.after(() => new Promise(resolve => studio.close(resolve)))
+  const origin = `http://127.0.0.1:${studio.address().port}`
+  const reports = []
+  const host = appHost({ buildsRoot: root, appOrigin, clientOrigins: [origin], mode, connectionAllowlist, log: line => reports.push(line) })
+  host.listen(port, "127.0.0.1")
+  await once(host, "listening")
+  t.after(() => new Promise(resolve => host.close(resolve)))
+  let clientHits = 0
+  const shell = await readFile(new URL("../../dist/shell.js", import.meta.url), "utf8")
+  const snapshots = []
   const page = await context.newPage()
+  await page.route(origin + "/**", async (route) => {
+    if (route.request().frame().parentFrame()) clientHits++
+    const url = new URL(route.request().url())
+    if (url.pathname === "/dashboard/lookup")
+      return route.fulfill({
+        json:
+          malformed === "lookup"
+            ? { exists: "yes", key: 17 }
+            : {
+                exists: published,
+                key: "a".repeat(64),
+                hash: published ? "b".repeat(64) : null,
+                appOrigin,
+                mode: lookupMode,
+              },
+      })
+    if (url.pathname === "/dashboard/targets") {
+      snapshots.push(route.request().postDataJSON())
+      return route.fulfill({
+        json:
+          malformed === "snapshot"
+            ? { id: 17, nodeName: null }
+            : {
+                id: "00000000-0000-4000-8000-" + String(snapshots.length).padStart(12, "0"),
+                key: "a".repeat(64),
+                nodeName: snapshots.at(-1).nodeName,
+                sourceDir: "/fixture",
+                binding: snapshots.at(-1).binding,
+                schema: [{ name: "count", type: 1 }],
+                rows: [[42]],
+                tableSource: "live",
+                parameters: snapshots.at(-1).parameters,
+                adapter: "window.frameElement.dashboard",
+                commands: { init: "init", typecheck: "typecheck", build: "build", publish: "publish" },
+              },
+      })
+    }
+    if (url.pathname === "/shell.js")
+      return route.fulfill({ contentType: "text/javascript", body: shell })
+    if (["/desktop-link", "/ordinary"].includes(url.pathname))
+      return route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Safe destination</title>" })
+    if (url.pathname !== "/app/") return route.abort()
+    return route.continue()
+  })
   page.setDefaultTimeout(5_000)
   const dialogs = []
   const errors = []
@@ -225,8 +276,27 @@ export async function fixture(
     void dialog.dismiss()
   })
   await page.goto(origin + "/app/")
+  const frame = () => page.frames().find(frame => frame.url().startsWith(appOrigin + "/apps/"))
+  const states = async () => {
+    await page.locator('iframe[title="Dashboard"]').waitFor()
+    const current = frame() ?? await page.waitForEvent("framenavigated", { predicate: frame => frame.url().startsWith(appOrigin + "/apps/") })
+    await current.waitForFunction(() => window.states?.length)
+    return current.evaluate(() => window.states)
+  }
+  const settled = async (count = 0) => {
+    await page.locator('iframe[title="Dashboard"]').waitFor()
+    const current = frame() ?? await page.waitForEvent("framenavigated", { predicate: frame => frame.url().startsWith(appOrigin + "/apps/") })
+    await current.waitForFunction(count => window.states?.length > count && window.states.at(-1).busy === false, count)
+    return current.evaluate(() => window.states.at(-1))
+  }
   return {
     page,
+    frame,
+    states,
+    settled,
+    appOrigin,
+    reports,
+    clientHits: () => clientHits,
     errors,
     dialogs,
     origin,

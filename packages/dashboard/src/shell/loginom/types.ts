@@ -1,21 +1,8 @@
-import type { Binding, Parameter, TableSample } from "../../contract/snapshot"
+import type { Binding } from "../../contract/snapshot"
 
 export type TargetBinding = typeof Binding.Type
-export type Parameters = ReadonlyArray<typeof Parameter.Type>
-export type Table = typeof TableSample.Type
+export type Parameters = ReadonlyArray<{ name: string; value: number | null; integer: boolean }>
 export type Update = { name: string; value: number }
-export type State = {
-  value: string | number | boolean | null
-  parameters: Parameters
-  table: Table | null
-  error: string | null
-}
-export type Dashboard = {
-  state(): Promise<State>
-  change(value: number, name?: string): Promise<State>
-  run(): Promise<State>
-}
-export type Frame = HTMLIFrameElement & { dashboard?: Dashboard }
 export type OutValue = { value?: unknown }
 type Collection<T> = { get_Count(): Promise<number>; getItem(index: number): Promise<T> }
 type Variable = {

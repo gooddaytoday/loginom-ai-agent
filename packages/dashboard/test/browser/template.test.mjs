@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path"
 import test from "node:test"
 import { appHost } from "../../dist/server.mjs"
 import { chromium } from "../../../loginom-runtime/client/node_modules/playwright-core/index.mjs"
+import { fixture } from "./fixture.mjs"
 
 const state = {
   type: "state", parameters: [{ name: "Budget", value: 17 }],
@@ -15,7 +16,7 @@ const state = {
   error: null, busy: false,
 }
 
-async function template(t) {
+async function buildTemplate(t) {
   const root = await mkdtemp(join(tmpdir(), "dashboard-template-"))
   t.after(() => rm(root, { recursive: true, force: true }))
   const key = "a".repeat(64)
@@ -24,6 +25,11 @@ async function template(t) {
     cwd: resolve(import.meta.dirname, "../../template"),
     env: { ...process.env, PATH: dirname(process.execPath) + ":" + process.env.PATH },
   })
+  return { root, key, hash }
+}
+
+async function template(t) {
+  const { root, key, hash } = await buildTemplate(t)
   const reservation = createServer().listen(0, "127.0.0.1")
   await once(reservation, "listening")
   const port = reservation.address().port
@@ -84,4 +90,46 @@ test("the template displays parameter names and values as text", async t => {
   assert.match(text, /Budget = 17/)
   assert.match(text, /Unset = не задан/)
   assert.equal(await frame.locator("input").count(), 0)
+})
+
+test("the template shows loading, error, empty, data and truncated states", async t => {
+  const { frame, send } = await template(t)
+  await frame.getByRole("status").filter({ hasText: "Идёт расчёт" }).waitFor()
+  await send(state)
+  await frame.getByRole("status").filter({ hasText: "Строк в результате: 1" }).waitFor()
+  await send({ ...state, busy: true })
+  await frame.getByRole("status").filter({ hasText: "Идёт расчёт" }).waitFor()
+  await send({ ...state, table: null, error: "Fixture calculation failed" })
+  await frame.getByRole("alert").filter({ hasText: "Fixture calculation failed" }).waitFor()
+  await send({ ...state, table: { ...state.table, rows: [], totalRows: 0 } })
+  await frame.getByRole("status").filter({ hasText: "Нет данных" }).waitFor()
+  await send(state)
+  await frame.getByRole("status").filter({ hasText: "Строк в результате: 1" }).waitFor()
+  await send({ ...state, table: { ...state.table, truncated: true, totalRows: 2 } })
+  await frame.getByRole("status").filter({ hasText: "Строк в результате: 1 из 2: показана часть" }).waitFor()
+})
+
+test("the template changes from data to loading during a header calculation", async t => {
+  const { root, key, hash } = await buildTemplate(t)
+  const app = await fixture(t, { published: true, app: join(root, key, hash) })
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.page.locator('iframe[title="Dashboard"]').waitFor()
+  const frame = app.frame() ?? await app.page.waitForEvent("framenavigated", { predicate: frame => frame.url().startsWith(app.appOrigin + "/apps/") })
+  await frame.getByRole("status").filter({ hasText: "Строк в результате: 1" }).waitFor()
+  await app.page.evaluate(() => { window.fixture.wait = true })
+  await app.page.getByLabel("MinBudget", { exact: true }).fill("17")
+  await app.page.getByLabel("MinBudget", { exact: true }).press("Enter")
+  await app.page.waitForFunction(() => window.fixture.finish)
+  await frame.getByRole("status").filter({ hasText: "Идёт расчёт" }).waitFor()
+  await app.page.evaluate(() => { window.fixture.wait = false; window.fixture.finish() })
+  await frame.getByRole("status").filter({ hasText: "Строк в результате: 1" }).waitFor()
+  assert.match(await frame.locator("body").textContent(), /MinBudget = 17/)
+  assert.deepEqual(app.errors, [])
+})
+
+test("the template opened outside a frame explains how to open it from Studio", async t => {
+  const { page, frame } = await template(t)
+  const standalone = await page.context().newPage()
+  await standalone.goto(frame.url())
+  await standalone.getByRole("status").filter({ hasText: "Откройте dashboard кнопкой Dashboard в Studio" }).waitFor()
 })

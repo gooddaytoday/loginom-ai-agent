@@ -78,8 +78,9 @@ export function connect() {
       const col = await cols.getItem(i)
       schema.push({ name: await col.get_Name(), type: await col.get_DataType() })
     }
+    const totalRows = await source.get_RowCount()
     const rows: (string | number | boolean | null)[][] = []
-    for (let r = 0, n = Math.min(await source.get_RowCount(), maxRows); r < n; r++) {
+    for (let r = 0, n = Math.min(totalRows, maxRows); r < n; r++) {
       const row = []
       for (let c = 0; c < schema.length; c++) {
         const raw = await source.AsVariant(r, c)
@@ -94,7 +95,7 @@ export function connect() {
       }
       rows.push(row)
     }
-    return { schema, rows }
+    return { schema, rows, truncated: rows.length < totalRows, totalRows }
   }
 
   const active = async (node: Node) => (await node.get_Status()) === studio.bg.TBGModelNodeStatus.mnsActive
