@@ -24,7 +24,7 @@ export async function helpFixture(t, options) {
 }
 
 // Writes the same layout into a caller-owned directory, for example <resources>/help.
-export async function writeHelp(root, { pages = PAGES, aliases = ALIASES, tamper } = {}) {
+export async function writeHelp(root, { pages = PAGES, aliases = ALIASES, tamper, source = { kind: 'site', url: 'https://help.loginom.ru/userguide/' } } = {}) {
   await mkdir(root, { recursive: true });
   const files = [];
   for (const [path, text] of Object.entries(pages).sort()) {
@@ -34,7 +34,7 @@ export async function writeHelp(root, { pages = PAGES, aliases = ALIASES, tamper
     files.push({ path, sha256: createHash('sha256').update(text).digest('hex'), bytes: Buffer.byteLength(text) });
   }
   if (tamper) await writeFile(join(root, 'loginom-help', tamper), 'changed');
-  await writeFile(join(root, 'help-manifest.json'), JSON.stringify({ protocol: 1, loginom_version: '7.4', files }));
+  await writeFile(join(root, 'help-manifest.json'), JSON.stringify({ protocol: 1, ...(source ? { source } : {}), loginom_version: '7.4', files }));
   await writeFile(join(root, 'aliases.jsonl'), aliases.map(item => JSON.stringify(item)).join('\n') + '\n');
   return root;
 }
