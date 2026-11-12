@@ -37,6 +37,8 @@ print(json.dumps(dict(spec={k:str(v) if hasattr(v,'__fspath__') else v for k,v i
  assert.equal(spec.base,null);
  const expected=JSON.parse(readFileSync(spec.source+'/'+spec.expected_name,'utf8'));
  assert.deepEqual(expected.outputs.map(o=>[o.output_port,o.rows.map(r=>r.RowID)]),[[0,[1,2,3]],[1,[4,5,6]]]);
+ // Owner decision v040-filter-value-list-order: saved Filter autosync reorders fields after reopen.
+ assert.deepEqual(expected.outputs.map(o=>o.column_order),['any','any']);
  assert.ok(cases.includes('row-filter-value-list'));
  execFileSync('python3',[spec.oracle,'--check'],{encoding:'utf8'});
 });
