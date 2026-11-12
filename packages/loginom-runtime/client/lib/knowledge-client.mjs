@@ -98,10 +98,11 @@ async function loadHelp(root) {
     const text = bytes.toString('utf8');
     pages.set(file.path, { path: file.path, text, title: text.match(/^#{1,6}\s+(.+)$/m)?.[1].trim() ?? file.path });
   }
+  const site = typeof manifest.source?.url === 'string' && manifest.source.url.startsWith('https://') ? manifest.source.url.replace(/\/*$/, '/') : undefined;
   const aliases = await readFile(join(root, 'aliases.jsonl'), 'utf8').then(
     text => text.split('\n').filter(line => line.trim()).map(line => JSON.parse(line)),
     error => { if (error.code === 'ENOENT') return []; throw error; });
-  return { pages, dirs: directories(pages), index: buildIndex(pages, aliases) };
+  return { pages, site, dirs: directories(pages), index: buildIndex(pages, aliases) };
 }
 
 function directories(pages) {
@@ -199,7 +200,7 @@ function search(help, args) {
   const blocks = hits.map(({ score, item }, i) => {
     const page = help.pages.get(item.path);
     const body = args.read_content === true ? item.text.slice(0, 6000) : excerpt(item.text, words);
-    return `${i + 1}. ${uriOf(item.path)}  — ${page.title}${item.heading === page.title ? '' : ` > ${item.heading}`} (line ${item.line}, score ${score.toFixed(2)})\n${body}`;
+    return `${i + 1}. ${uriOf(item.path)}  — ${page.title}${item.heading === page.title ? '' : ` > ${item.heading}`} (line ${item.line}, score ${score.toFixed(2)})\n${siteLine(help, item.path)}${body}`;
   });
   return text(fit(blocks, `\n\nRead a whole page with the read tool, for example uris: "${uriOf(hits[0].item.path)}".`));
 }
@@ -222,7 +223,7 @@ function read(help, args) {
     const path = target.file ?? (target.dir !== undefined && help.pages.has(`${target.dir}/README.md`) ? `${target.dir}/README.md` : undefined);
     if (path) {
       found++;
-      blocks.push(`=== ${uriOf(path)} ===\n${help.pages.get(path).text}`);
+      blocks.push(`=== ${uriOf(path)} ===\n${siteLine(help, path)}${help.pages.get(path).text}`);
       continue;
     }
     if (target.error) blocks.push(`=== ${quote(item)} ===\n${target.error}`);
@@ -352,6 +353,13 @@ function fit(blocks, footer, separator = '\n\n') {
   return out.join(separator) + footer;
 }
 
+// The page on the Help site, the inverse of scripts/loginom-help/update.py: data/x.md -> x.html, data/x/README.md -> x/.
+export function helpPageUrl(site, path) {
+  const rel = path.replace(/^data\//, '').replace(/(^|\/)README\.md$/, '$1').replace(/\.md$/, '.html');
+  return new URL(rel.split('/').map(encodeURIComponent).join('/'), site).href;
+}
+// Answers cite this address; a site URL rebuilt from the viking:// path lands on a redirect to the Help root.
+const siteLine = (help, path) => help.site ? `Site URL: ${helpPageUrl(help.site, path)}\n` : '';
 const uriOf = path => path ? `${HELP_URI}/${path}` : HELP_URI;
 const text = value => ({ content: [{ type: 'text', text: value }] });
 const failure = value => ({ ...text(value), isError: true });
