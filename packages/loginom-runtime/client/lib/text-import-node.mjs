@@ -557,17 +557,18 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
             // Entering this page only loads local defaults. Ask Loginom itself
             // to recognize delimiters/date formats and recalculate definitions.
             const suggestReady=s=>s.wizard?.stage==='text_import_format'
-              &&s.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout'
               &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';ImportTextFileParamsWizard;btnSuggestFormat'
                 &&e.allowed_actions.includes('click')).length===1;
-            const suggest=await read('text_import_format','native import format detection available',suggestReady);
+            const parsedReady=s=>suggestReady(s)&&s.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout';
+            const suggest=await read('text_import_format','native import format detection available',parsedReady,
+              {importColumnPage:{offset:0,limit:8}});
             await channel.perform({condition:'native import format detection',initialObservation:suggest,
               ready:suggestReady,confirmIdentity:s=>s.dom_epoch,
               identity:s=>({owner:s.wizard.owner_context,root_ref:s.wizard.root_ref}),
               resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>
                 e.tid===s.wizard.root_tid+';ImportTextFileParamsWizard;btnSuggestFormat'
                 &&e.allowed_actions.includes('click')),'Native import format detection button required').ref})});
-            await read('text_import_format','native import format detected',suggestReady);
+            await read('text_import_format','native import format detected',parsedReady,{importColumnPage:{offset:0,limit:8}});
             // Recognition can also choose the header. Read the actual source
             // page again instead of reporting the pre-recognition defaults.
             await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner,read,ready:isTextImportSourceReady});
