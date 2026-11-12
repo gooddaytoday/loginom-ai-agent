@@ -1,6 +1,6 @@
 # Продолжение dashboard + Desktop на другом компьютере
 
-Текущее продолжение M1 после паузы 12 ноября 2026: [checkpoint для другого агента](../docs/testing/loginom-ai-agent/dashboard-m1-handoff.md).
+Текущее состояние M1 на 12 ноября 2026: [checkpoint для продолжения](../docs/testing/loginom-ai-agent/dashboard-m1-handoff.md).
 
 Рабочая ветка M1 — `dashboard-m1`. Она содержит стенд, исходники брендированного
 Desktop и передачу выбранного узла в одну просьбу чата. Отдельная ветка Desktop
