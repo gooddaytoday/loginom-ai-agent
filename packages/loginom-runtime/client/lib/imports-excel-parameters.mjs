@@ -1,8 +1,9 @@
 import {importSourceSchema,validateImportSource} from './storage-policy.mjs';
+import {isUnchangedTextImportExecution} from './node-read-contract.mjs';
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
- source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion.'},
+ source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion. Omit when bound.'},
  sheet_name:{...text(120),description:'Exact worksheet; exclusive with named_range. Omit both=first initially, preserve during source_switch.'},
  named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange. Select the native named range, only its columns; exclusive with sheet_name.'},
  extend_range:{type:'boolean',description:'Only with named_range. false/omitted=defined boundaries; true=continue its columns to the last populated row. Reconfigure the same node to change this.'},
@@ -12,21 +13,32 @@ export const excelSettingsSchema=object({
   type:{type:'string',enum:['string','integer','real','datetime','boolean']},
   data_kind:{type:'string',enum:['Непрерывный','Дискретный']},
  },['name','label','type'])},
-},['source_path']);
+},[]);
 export const excelParametersSchema=object({
  source:importSourceSchema,
  excel:excelSettingsSchema,
  source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Existing Excel import only: after exact XLSX scan and package.save_checkpoint, supply profile_id and save_operation_id; excel contains source_path and optional sheet_name only. Preserves columns and mapping, independently reopens, executes once and compares completed output N with the backend scan. Never supply expected_records.'},
 },['source','excel']);
+export const validExcelPath=path=>typeof path==='string'&&path.length<=2048&&/^\/(?!\/)/.test(path)&&/\.xlsx$/i.test(path)
+ &&!/[|*?%\\\x00-\x1f]/.test(path)&&path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..');
 export function validateExcelParameters(p,mode,r){
  const need=(v,m)=>{if(!v)throw Error('Excel import: '+m);};
+ if(isUnchangedTextImportExecution({...r,parameters:p,mode}))return;
  const switching=Object.hasOwn(p??{},'source_switch');
+ need((r.variable_inputs??[]).every(i=>i.kind==='variables'&&i.input===0),'only variables input 0 (native Input_Var-1) is supported');
+ if(r.bindings?.length){
+  const code=(v,c)=>{if(!v)throw Error(c+': /excel/source_path');};
+  code(r.finish!=='close'&&!switching,'BINDING_PARAMETER_UNSUPPORTED');
+  code(!Object.hasOwn(p?.excel??{},'source_path'),'BINDING_CONFLICT');
+  code(r.target.kind==='existing'||r.variable_inputs?.length===1,'BINDING_PORT_MISMATCH');
+  need(p?.source?.kind==='storage','bound file requires parameters.source from dock_storage_source');
+  p={...p,excel:{...p.excel,source_path:'/binding-validation.xlsx'}};
+ }
  need(mode==='xlsx'&&p&&Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='excel,source','source and excel settings are required, mode xlsx');
  validateImportSource(p.source);
  const e=p.excel;
  need(e&&Object.keys(e).every(k=>Object.hasOwn(excelSettingsSchema.properties,k)),'unsupported Excel setting');
- need(typeof e.source_path==='string'&&e.source_path.length<=2048&&/^\/(?!\/)/.test(e.source_path)&&/\.xlsx$/i.test(e.source_path)
-  &&!/[|*?%\\\x00-\x1f]/.test(e.source_path)&&e.source_path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..'),'one explicit verified XLSX storage path is required');
+ need(validExcelPath(e.source_path),'one explicit verified XLSX storage path is required');
  need(e.sheet_name===undefined||typeof e.sheet_name==='string'&&e.sheet_name.length>0&&e.sheet_name.length<=120&&!/[\x00-\x1f]/.test(e.sheet_name),'invalid sheet name');
  if(Object.hasOwn(e,'named_range'))need(typeof e.named_range==='string'&&e.named_range.length>0&&e.named_range.length<=120&&!/[\x00-\x1f]/.test(e.named_range),'invalid named_range');
  need(e.named_range===undefined||e.sheet_name===undefined,'sheet_name and named_range are mutually exclusive');

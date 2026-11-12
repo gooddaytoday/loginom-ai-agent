@@ -3722,7 +3722,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               // request. Its later graph preflight must not navigate Files or
               // inspect an inactive storage view while holding the node gate.
               const entry=[...auxiliary.values()].findLast(e=>e.signature==='storage.source:'+path);
-              if(request.target.type!=='imports.text'||entry?.outcome?.status!=='SUCCEEDED'||!entry?.sourceObservation
+              if(!['imports.text','imports.excel'].includes(request.target.type)||entry?.outcome?.status!=='SUCCEEDED'||!entry?.sourceObservation
                 ||entry.boundImportOperation&&entry.boundImportOperation!==operation.id)
                 throw Error('BINDING_SOURCE_UNVERIFIED: observe the current input file with dock_storage_source before Execute');
               const ref=entry.outcome.output.source.server_source_ref;

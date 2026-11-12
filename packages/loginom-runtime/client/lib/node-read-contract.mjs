@@ -26,14 +26,15 @@ export function isUnchangedTransformExecution(request,handler){
 // An empty existing Import patch requests execution of its current native
 // configuration, not a new file or an upload receipt from a previous session.
 export function isUnchangedTextImportExecution(request){
- return request?.target?.type==='imports.text'&&request.target.kind==='existing'
+ const excel=request?.target?.type==='imports.excel',key=excel?'excel':'settings';
+ return (excel||request?.target?.type==='imports.text')&&request.target.kind==='existing'
   &&!request.bindings?.length
-  &&request.mode==='delimited'&&request.finish==='execute'
+  &&request.mode===(excel?'xlsx':'delimited')&&request.finish==='execute'
   &&Array.isArray(request.inputs)&&request.inputs.length===0
   &&Array.isArray(request.mappings)&&request.mappings.length===0
-  &&request.parameters&&Object.keys(request.parameters).join(',')==='settings'
-  &&request.parameters.settings&&typeof request.parameters.settings==='object'
-  &&!Array.isArray(request.parameters.settings)&&Object.keys(request.parameters.settings).length===0
+  &&request.parameters&&Object.keys(request.parameters).join(',')===key
+  &&request.parameters[key]&&typeof request.parameters[key]==='object'
+  &&!Array.isArray(request.parameters[key])&&Object.keys(request.parameters[key]).length===0
   &&Array.isArray(request.read?.ports)&&request.read.ports.length===1&&request.read.ports[0]===0;
 }
 function retainedMappingSchemas(node,sourceId,type){

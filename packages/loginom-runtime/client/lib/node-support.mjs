@@ -18,7 +18,7 @@ import {createBinningNodeSupport} from './binning-node.mjs';
 import {createSamplingNodeSupport} from './sampling-node.mjs';
 import {createDataPartitionNodeSupport} from './data-partition-node.mjs';
 import {createLogRegressionNodeSupport} from './log-regression-node.mjs';
-import {createExcelImportNodeSupport} from './imports-excel-node.mjs';
+import {createExcelImportNodeSupport,excelBindingHooks} from './imports-excel-node.mjs';
 import {createRestRequestNodeSupport} from './rest-request-node.mjs';
 import {createLinRegressionNodeSupport} from './linregression-node.mjs';
 import {createAutoCorrelationNodeSupport} from './auto-correlation-node.mjs';
@@ -150,9 +150,9 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,...(type==='imports.text'&&readOnly&&options.operation.parameters.finish==='execute'?{async beforeTarget(ctx){
+  return {...drivers,...(['imports.text','imports.excel'].includes(type)&&readOnly&&options.operation.parameters.finish==='execute'?{async beforeTarget(ctx){
    const value=await drivers.beforeTarget?.(ctx);
-   const prepared=await prepareImportBinding(options,ctx,config,{saved:true});
+   const prepared=await prepareImportBinding(options,ctx,config,{saved:true,...(type==='imports.excel'?excelBindingHooks:{})});
    if(prepared){
     const channel=importBindingChannel(options,ctx,config,options.operation.parameters.target.ref);
     options.operation.importBindingInventory=await readImportBindings(channel,prepared);
