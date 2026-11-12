@@ -251,6 +251,13 @@ jobs:
             -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy -PayloadMutation MissingSkill
           $redExit = $LASTEXITCODE
           $red = Get-Content -LiteralPath (Join-Path $redRoot "report.json") -Raw | ConvertFrom-Json
+          # Always observe the pristine candidate too, including after an
+          # unexpected negative-control failure, without accepting either failure.
+          & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
+            -Installer $installer[0].FullName `
+            -RunRoot (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
+            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy
+          $greenExit = $LASTEXITCODE
           if ($redExit -ne 1 -or $red.status -ne 'FAIL' -or
               @($red.checks | Where-Object { $_.id -eq 'sidecar-bundled-skills' -and $_.status -eq 'FAIL' -and $_.detail -match 'names/count differ' }).Count -ne 1) {
             throw "Missing installed skill was not rejected by the sidecar catalog check"
@@ -262,10 +269,7 @@ jobs:
             throw "Mutated candidate cleanup failed"
           }
           Write-Host 'PASS negative control: missing installed loginom-automation makes smoke FAIL'
-          & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
-            -Installer $installer[0].FullName `
-            -RunRoot (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
-            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy
+          if ($greenExit -ne 0) { throw "Pristine installed Desktop smoke failed with exit $greenExit" }
 
       - name: Upload installed Desktop smoke diagnostics
         if: always()

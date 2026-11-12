@@ -153,14 +153,6 @@ async function main([port, resources, profile, output, seconds]) {
     }
     assert.ok(backend?.url, "Installed sidecar did not initialize")
     assert.match(backend.url, /^http:\/\/127\.0\.0\.1:\d+$/)
-    while (Date.now() < deadline) {
-      result.connection = await evaluate(`require('electron').BrowserWindow.getAllWindows()[0].webContents.executeJavaScript('window.api.loginom.status()')`)
-      assert.equal(result.connection.generation, 1, "Encrypted offline fixture was not restored")
-      assert.ok(!result.connection.failure && result.connection.state !== "recoverable-error", "Local Help startup failed")
-      if (result.connection.state === "ready") break
-      await new Promise(resolve => setTimeout(resolve, 500))
-    }
-    assert.equal(result.connection?.state, "ready", "Local Help did not become ready")
     const workspace = join(profile, "workspace")
     await evaluate(`require('node:fs').mkdirSync(${JSON.stringify(workspace)}, { recursive: true }); true`)
     call = async (path, method = "GET", body) => {
@@ -180,6 +172,14 @@ async function main([port, resources, profile, output, seconds]) {
       return `count=${result.skills.actual.length}; ${result.skills.actual.join(", ")}`
     })
     await check("sidecar-local-help", async () => {
+      while (Date.now() < deadline) {
+        result.connection = await evaluate(`require('electron').BrowserWindow.getAllWindows()[0].webContents.executeJavaScript('window.api.loginom.status()')`)
+        assert.equal(result.connection.generation, 1, "Encrypted offline fixture was not restored")
+        assert.ok(!result.connection.failure && result.connection.state !== "recoverable-error", "Local Help startup failed")
+        if (result.connection.state === "ready") break
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      assert.equal(result.connection?.state, "ready", "Local Help did not become ready")
       const agents = await call("/agent")
       const agent = agents.find(agent => agent.mode === "primary" && !agent.hidden)
       assert.ok(agent, "Sidecar must expose a primary agent")
@@ -197,6 +197,8 @@ async function main([port, resources, profile, output, seconds]) {
   } catch (error) {
     checks.push({ id: "sidecar-probe", status: "FAIL", detail: error.stack })
   } finally {
+    result.startupFailures = await readFile(join(profile, "desktop/loginom/knowledge/1/startup-failures.jsonl"), "utf8").catch(() => undefined)
+    if (result.startupFailures) console.error("KNOWLEDGE_STARTUP " + result.startupFailures)
     if (session && call) await call(`/session/${session.id}`, "DELETE").catch(error => checks.push({ id: "sidecar-session-cleanup", status: "FAIL", detail: error.message }))
     socket?.close()
     provider.closeAllConnections()
