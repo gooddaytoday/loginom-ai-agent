@@ -14,14 +14,14 @@ export function auditImportBindings(events,initial,final){
  assert.equal(events[patch].request.target.ref.node_id,b.source.ref.node_id);
  const value=final.variable_inventory.outputs[0].variables.find(v=>v.name==='CsvPath').value;
  assert.deepEqual(events[patch].request.parameters.variables,[{name:'CsvPath',type:'string',value}]);
- const second=checkpoints.find(c=>c.index>patch&&c.result.node.node_id===first.result.node.node_id&&matches(c,final)&&c.result.execution.execution_id!==first.result.execution.execution_id);
- assert.ok(second,'IMPORT_BINDING_FINAL_SAME_NODE');assert.deepEqual(second.result.configuration.bindings.map(x=>[x.parameter,x.variable.name,x.variable.type,x.source.ref.node_id]),[[b.parameter,'CsvPath','string',b.source.ref.node_id]]);
- for(const c of [first,second])assert.deepEqual(c.result.output.ports[0].schema.map(f=>f.name),initial.outputs[0].columns.map(f=>f.name),'IMPORT_BINDING_FIELD_ORDER');
  for(const [index,e] of events.entries()){
   if(index<=first.index||e.phase!=='node_apply_prepared'||e.request?.target?.type!=='imports.text')continue;
   const r=e.request;assert.equal(r.target.kind,'existing','IMPORT_BINDING_SECOND_NODE');assert.equal(r.target.ref.node_id,first.result.node.node_id);
   assert.ok(r.mode==='read_existing_output'||JSON.stringify(r.parameters)==='{"settings":{}}'&&!r.inputs.length&&!r.mappings.length&&!r.variable_inputs?.length&&!r.bindings?.length,'IMPORT_BINDING_RECONFIGURED');
  }
+ const second=checkpoints.find(c=>c.index>patch&&c.result.node.node_id===first.result.node.node_id&&matches(c,final)&&c.result.execution.execution_id!==first.result.execution.execution_id);
+ assert.ok(second,'IMPORT_BINDING_FINAL_SAME_NODE');assert.ok(Array.isArray(second.result.configuration?.bindings),'IMPORT_BINDING_FINAL_BINDINGS');assert.deepEqual(second.result.configuration.bindings.map(x=>[x.parameter,x.variable.name,x.variable.type,x.source.ref.node_id]),[[b.parameter,'CsvPath','string',b.source.ref.node_id]]);
+ for(const c of [first,second])assert.deepEqual(c.result.output.ports[0].schema.map(f=>f.name),initial.outputs[0].columns.map(f=>f.name),'IMPORT_BINDING_FIELD_ORDER');
  const source=c=>c.result.node?.node_id===b.source.ref.node_id?c.result.configuration?.readback?.variables??c.result.output?.variable_ports?.[0]?.variables:undefined;
  const before=checkpoints.filter(c=>c.index<first.index).map(source).filter(Boolean).at(-1),after=checkpoints.filter(c=>c.index>patch).map(source).find(Boolean);
  assert.ok(before&&after,'IMPORT_BINDING_SOURCE_INVENTORY');assert.deepEqual(before.map(v=>[v.id,v.index,v.name,v.type]),after.map(v=>[v.id,v.index,v.name,v.type]));

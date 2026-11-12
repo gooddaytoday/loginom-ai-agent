@@ -460,7 +460,12 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         const storage=p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref)
           :p.source.kind==='verified_sources'?await Promise.all(p.source.sources.map(s=>s.kind==='storage'?resolveStorageSource?.(s.server_source_ref):undefined)):undefined;
         if(operation.parameters?.bindings?.length&&storage)p={...p,settings:{...p.settings,source:{...p.settings.source,source_path:storage.destination}}};
-        sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),storage);
+        try{sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),storage);}
+        catch(error){
+          if(error.message==='Storage source exact destination differs'&&operation.parameters?.target?.kind==='existing'&&!operation.parameters.bindings?.length)
+            error.message+='; bound Import rerun after CsvPath change: omit parameters.source; send parameters:{settings:{}}, bindings:[], empty inputs/mappings';
+          throw error;
+        }
         if(sourceSwitch){
           if(p.source.kind==='storage'){
             requireValue(scanReceipt?.basis==='backend_exact_scan'&&scanReceipt.profile_id===sourceSwitch.profile_id,

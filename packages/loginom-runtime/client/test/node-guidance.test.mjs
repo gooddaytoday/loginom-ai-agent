@@ -54,6 +54,8 @@ test('text Import delimited guidance keeps every rule in compact English',async 
   /server bytes/,/UPLOAD_PATH_CONFLICT/,/saved.node/,/upload_operation_id/,/double quote/,/large-files\.md/,/separate Import Execute/,
   /variant_as_general_type:true/,/redetect strings/,/auto_detect_columns/,/only after Execute/,/output `mappings`/,/refresh/,/erases manual types/,/binding_schema/,/variables\.to_table/,/Cancel deactivates/,
   /Calculator\/JS/,/Export\/Save outside the mask directory/,/max 16/,/EACH Execute/,/verified `parameters\.source`/,/CsvPath/,/configuration\.bindings/,/parallel_processing:false\/true/,/max_threads:"auto"\|2\|4\|8\|16\|32/,/full row multisets\/duplicates\/NULL/])assert.match(text,rule);
+ assert.match(text,/First bound Import: verified `parameters\.source` \+ `bindings`/);
+ assert.match(text,/Rerun after CsvPath change[^.]*`parameters:\{settings:\{\}\}` WITHOUT `source`, `bindings:\[\]`/);
  assert.doesNotMatch(description.guidance.replace(/^# .*\n/,'').replace(/\(\.\.\/large-files\.md#[^)]*\)/,''),/[А-Яа-яЁё]/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/imports.text.md')))<=6000);
 });
