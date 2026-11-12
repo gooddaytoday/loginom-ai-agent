@@ -184,7 +184,7 @@ async function probe({ moduleURL, nodeName, packagePath, deadline }) {
   const nodeAPI = members(node, "get_DisplayName get_Guid get_OutputPorts get_Status ActivateCancellable")
   if (nodeAPI) return nodeAPI
   try {
-    if (await node.get_DisplayName() !== nodeName || (await studio.binding(tab, form, visual)).packagePath !== packagePath)
+    if (await node.get_DisplayName() !== nodeName || (await studio.binding(tab, form, node)).packagePath !== packagePath)
       return "Не проверено: выбран другой узел или пакет."
     // Check writable RPC members on the real numerical variable without changing or saving the fixture.
     const vars = form.FDiagram.VariablesNode?.GetData()
