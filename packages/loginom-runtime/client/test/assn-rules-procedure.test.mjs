@@ -6,10 +6,10 @@ function fixture(kind,values){
  const fields=['T','I'].map((name,index)=>({index,name,label:name,record_id:'r'+index,field_id:String(index),type:'string',data_kind:'Дискретный',usage_type:index?roles.item:roles.transaction}));
  const sources=fields.map(f=>({...f,record_id:'source:'+f.record_id}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...owner,input_port:{port:0}},source_fields:sources,target_fields:sources.map(f=>({...f,record_id:'input:'+f.record_id,source:f}))};
- const native={pedMinSupport:5,pedMinConfidence:50,pedNItemsMax:2,pedMinLift:1,pedNConsequentMax:1,pedExcludeLargeSupportItems:false,pedSelectColumn:false,pedExcludeSingleItems:false,...values};
+ const native={pedMaxSupport:90,pedMinSupport:5,pedMinConfidence:50,pedNItemsMax:2,pedMinLift:1,pedNConsequentMax:1,pedExcludeLargeSupportItems:false,pedSelectColumn:false,pedExcludeSingleItems:false,...values};
  const pending={},actions=[];let stage='input_mapping';
  const snapshot=()=>{
-  const control=stage==='assn_rules'?Object.keys(native).map(k=>({tid:'root;AssnRulesWizard;'+k+';ValueControl',ref:'value:'+k,allowed_actions:['fill','press']})):[];
+  const control=stage==='assn_rules'?[{tid:'root;AssnRulesWizard;cntExcludeLargeSupportItems;cnt;chb;InputEl',ref:'exclude',allowed_actions:['click']},...Object.keys(native).map(k=>({tid:'root;AssnRulesWizard;'+k+';ValueControl',ref:'value:'+k,allowed_actions:['fill','press']}))]:[];
   const node_assn_rules=stage==='input_mapping'?{verified:true,inventory_complete:true,node_context:owner,fields:structuredClone(fields),roles}
    :stage==='assn_rules_auxiliary'?{verified:true,kind:'auxiliary',field_count:0}
    :stage==='assn_rules'?{verified:true,kind:'parameters',switches:{pedMinLift:false},values:structuredClone(native)}:undefined;
@@ -17,7 +17,8 @@ function fixture(kind,values){
  };
  const channel={async observe({ready}){const s=snapshot();assert.equal(ready(s),true);return s;},
   async perform({ready,resolve}){const s=snapshot();assert.equal(ready(s),true);const a=resolve(s);actions.push(a);
-   if(a.verb==='click'&&a.ref==='close')stage='closed';
+   if(a.verb==='click'&&a.ref==='exclude')native.pedExcludeLargeSupportItems=!native.pedExcludeLargeSupportItems;
+   else if(a.verb==='click'&&a.ref==='close')stage='closed';
    else if(a.verb==='wizard_step')stage=a.expected_stage;
    else if(a.verb==='fill')pending[a.ref.slice(6)]=Number(a.text);
    else if(a.verb==='press'){const k=a.ref.slice(6);native[k]=pending[k];}}};
@@ -72,7 +73,7 @@ test('apply beforeGraphExecute skips graph inspection and native training',async
  await assert.rejects(driver.finishGraph('execute',{document_id:node.document_id,workflow_ref:workflow,node,deadline}),error=>error===continued);
 });
 
-for(const values of [{pedSelectColumn:true},{pedExcludeSingleItems:true},{pedExcludeLargeSupportItems:true},{pedNItemsMax:4},{pedNConsequentMax:3},{pedMinSupport:101}])
+for(const values of [{pedSelectColumn:true},{pedExcludeSingleItems:true},{pedNItemsMax:4},{pedNConsequentMax:3},{pedMinSupport:101},{pedMaxSupport:101}])
  test('apply refuses unsupported saved settings and discards its draft: '+JSON.stringify(values),async()=>{
   const f=fixture('existing',values);
   await assert.rejects(f.run(undefined,'apply'),error=>{
@@ -82,3 +83,26 @@ for(const values of [{pedSelectColumn:true},{pedExcludeSingleItems:true},{pedExc
   assert.equal(f.actions.at(-1).ref,'close');
   assert.ok(f.actions.every(a=>['wizard_step','click'].includes(a.verb)));
  });
+
+test('support exclusion toggles the visible native group, preserves omitted state and disables explicitly',async()=>{
+ const enabled=fixture('new',{});const result=await enabled.run({exclude_support_above_pct:90});
+ assert.equal(result.configuration.exclude_support_above_pct,90);
+ assert.equal(enabled.actions.filter(a=>a.ref==='exclude').length,1);
+ const saved=fixture('existing',{pedExcludeLargeSupportItems:true,pedMaxSupport:90});
+ assert.equal((await saved.run({})).configuration.exclude_support_above_pct,90);
+ assert.equal(saved.actions.filter(a=>a.ref==='exclude').length,0);
+ const disabled=fixture('existing',{pedExcludeLargeSupportItems:true,pedMaxSupport:90});
+ assert.equal((await disabled.run({exclude_support_above_pct:null})).configuration.exclude_support_above_pct,null);
+ assert.equal(disabled.actions.filter(a=>a.ref==='exclude').length,1);
+});
+test('apply preserves saved maximum support exclusion without parameter edits',async()=>{
+ const f=fixture('existing',{pedExcludeLargeSupportItems:true,pedMaxSupport:90});
+ assert.equal((await f.run(undefined,'apply')).configuration.exclude_support_above_pct,90);
+ assert.ok(f.actions.every(a=>a.verb==='wizard_step'));
+});
+
+test('an exclusion threshold patch commits the observed numeric percentage',async()=>{
+ const f=fixture('existing',{pedExcludeLargeSupportItems:true,pedMaxSupport:90});
+ assert.equal((await f.run({exclude_support_above_pct:80})).configuration.exclude_support_above_pct,80);
+ assert.deepEqual(f.actions.filter(a=>a.ref==='value:pedMaxSupport'),[{verb:'fill',text:'80',ref:'value:pedMaxSupport'},{verb:'press',key:'Tab',ref:'value:pedMaxSupport'}]);
+});
