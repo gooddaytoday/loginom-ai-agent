@@ -46,3 +46,36 @@ test('both outputs use distinct native ports and propagate incomplete samples',a
  await assert.rejects(readLogRegressionOutputs(channel,{...read,ports:[0,1]},ctx,mapped),/distinct/);
  await assert.rejects(readLogRegressionOutputs(channel,{...read,ports:[2]},ctx,mapped));
 });
+
+
+for(const mixed of [false,true])test('weighted predictions pin factor/target/passthrough order through native mapping, mixed='+mixed,async()=>{
+ const c={mode:'enter',fields:[{name:'RowID',label:'RowID',type:'integer',usage_type:0},...configuration.fields,
+  {name:'Note',label:'Note',type:'string',usage_type:0},{name:'Weight',label:'Weight',type:'real',usage_type:7}]};
+ const expected=['PredictionEvent','PredictionProbability','ActualEvent','Response_predicted','X','Response','RowID','Note','Weight'];
+ assert.deepEqual(logRegressionOutputColumns(c).map(f=>f.name),expected);
+ const schema=logRegressionOutputColumns(c),order=mixed?[...schema.slice(0,4),schema[6],schema[4],schema[5],...schema.slice(7)]:schema;
+ const source_fields=schema.map((f,index)=>({...f,index,record_id:'s'+index,field_id:String(index)}));
+ let mapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,
+  source_fields,target_fields:order.map((f,index)=>({...f,index,group_index:index,record_id:'p'+f.name,excluded:false,source:source_fields.find(s=>s.name===f.name)}))},selected;
+ const actions=[],finished=[];
+ const channel={async openOutputPort(port){assert.equal(port,0);},async observe(options){
+  const offset=options.outputColumnPage?.offset??0,fields=mapping.target_fields.slice(offset,offset+8).map(f=>({...f,status:'observed',name_ref:f.record_id,selected:f.record_id===selected}));
+  const s={node_mapping:structuredClone(mapping),wizard:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'output',
+   output_columns:{auto_sync:{status:'observed',value:mapping.autosync,ref:'auto'},fields,
+    page:{status:'complete_definition_page',schema_id:'schema',offset,limit:8,total_columns:schema.length,returned:fields.length,next_offset:offset+fields.length===schema.length?null:offset+fields.length}}},
+   ui:{elements:[{tid:'W;DerivedDataSourceOutputSocketWizard;btnAutoSyncThroughColumns',ref:'auto',allowed_actions:['click']},{tid:'W;DerivedDataSourceOutputSocketWizard;btnMoveMappingColumnUp',ref:'move',allowed_actions:['click']},...mapping.target_fields.map(f=>({ref:f.record_id,allowed_actions:['click']}))]}};
+  assert.ok(options.ready(s),options.condition);return s;
+ },async perform(options){
+  const s=options.initialObservation;assert.ok(options.ready(s));const a=options.resolve(s);actions.push(a);
+  if(a.ref==='auto'){mapping.autosync=false;return;}
+  if(a.ref!=='move'){selected=a.ref;return;}
+  const i=mapping.target_fields.findIndex(f=>f.record_id===selected);assert.ok(i>0);
+  [mapping.target_fields[i-1],mapping.target_fields[i]]=[mapping.target_fields[i],mapping.target_fields[i-1]];
+  mapping.target_fields=mapping.target_fields.map((f,index)=>({...f,index,group_index:index}));
+ }};
+ const result=await configureLogRegressionOutputs(channel,c,{},[],async(mode,port,definition)=>{finished.push(mode);assert.equal(port,true);assert.equal(definition.definition_complete,true);});
+ assert.equal(mapping.autosync,false);assert.deepEqual(mapping.target_fields.map(f=>f.name),expected);
+ assert.deepEqual(mapping.source_fields,source_fields);assert.deepEqual(finished,['done']);
+ assert.equal(actions.some(a=>a.ref==='move'),mixed);assert.deepEqual(result.ports[0].schema.map(f=>f.name),expected);
+ await configureLogRegressionOutputs({}, {...c,mode:'apply'},{},[],()=>assert.fail('apply must preserve saved output settings'));
+});
