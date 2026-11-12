@@ -197,7 +197,7 @@ function matchesCell(cell,column,want,coarseBound=false){
  const nativeRequired=column.type==='variant'||want&&typeof want==='object';
  if(nativeRequired&&cell.type!==column.type)return false;
  if(nativeRequired){
-  const tags={null:1,real:5,datetime:7,string:8,boolean:11,integer:20};
+  const tags={null:1,real:5,datetime:7,string:8,boolean:11,integer:column.native_variable===true&&cell.native?.tag===3?3:20};
   if(cell.precision!=='exact_native'||cell.native?.tag!==tags[cell.cell_type])return false;
  }
  if(want===null)return cell.is_null===true&&cell.value===null&&(!nativeRequired||cell.cell_type==='null');
@@ -403,9 +403,11 @@ export function parseExpectedVariableInventory(expected){
  for(const o of v.outputs){
   need(o&&Object.keys(o).every(k=>['node','port','ordered','column_order','variables'].includes(k))&&selector(o.node)&&ordinal(o.port)
    &&(o.column_order===undefined||['exact','any'].includes(o.column_order))&&(o.ordered===undefined||typeof o.ordered==='boolean')&&(o.node.type!=='variables.user'||o.port===4)&&Array.isArray(o.variables)&&o.variables.length<=128,'EXPECTED_VARIABLE_OUTPUT_INVALID');
-  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','type','value','tolerance'].includes(k))
-   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string','datetime'].includes(x.type)
-   &&Object.hasOwn(x,'value')&&(x.value===null||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'||x.type==='datetime'&&typeof x.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(x.value)&&Number.isFinite(Date.parse(x.value+'Z'))),'EXPECTED_VARIABLE_VALUE_INVALID');
+  for(const x of o.variables)need(x&&Object.keys(x).every(k=>['name','label','label_any','type','value','tolerance','native_tag'].includes(k))
+   &&typeof x.name==='string'&&x.name.length>0&&(x.label===undefined||typeof x.label==='string')&&['integer','real','boolean','string','datetime','variant'].includes(x.type)
+   &&Object.hasOwn(x,'value')&&(x.label_any===undefined||typeof x.label_any==='boolean')
+   &&(x.type!=='variant'||[1,3,5,7,8,11,20].includes(x.native_tag))
+   &&(x.value===null||x.type==='variant'&&x.value&&typeof x.value==='object'&&['integer','real','boolean','string','datetime'].includes(x.value.cell_type)&&Object.hasOwn(x.value,'value')||x.type==='integer'&&Number.isSafeInteger(x.value)||x.type==='real'&&typeof x.value==='number'&&Number.isFinite(x.value)||x.type==='boolean'&&typeof x.value==='boolean'||x.type==='string'&&typeof x.value==='string'||x.type==='datetime'&&typeof x.value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(x.value)&&Number.isFinite(Date.parse(x.value+'Z'))),'EXPECTED_VARIABLE_VALUE_INVALID');
   for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
    &&Object.keys(x.tolerance).length>0&&Object.keys(x.tolerance).every(k=>['abs','rel'].includes(k)&&typeof x.tolerance[k]==='number'&&Number.isFinite(x.tolerance[k])&&x.tolerance[k]>=0),'EXPECTED_VARIABLE_TOLERANCE_INVALID');
   for(const x of o.variables)if(x.tolerance!==undefined)need(x.type==='real'&&x.tolerance&&typeof x.tolerance==='object'&&!Array.isArray(x.tolerance)
@@ -432,7 +434,11 @@ export function matchVariableInventoryOutput(output,want){
  if(want.column_order!=='any'&&want.ordered===true)need(output.variables.every((v,i)=>v.index===i&&v.name===want.variables[i].name),'COLD_VARIABLE_ORDER_MISMATCH');
  for(const x of want.variables){
   const a=output.variables.find(v=>v.name===x.name),cell=a?.cell;
-  need(a&&a.type===x.type&&(x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
+  if(x.type==='variant'){
+   need(a&&a.type==='variant'&&cell?.type==='variant'&&(x.label_any||x.label===undefined||a.label===x.label)
+    &&cell.native?.tag===x.native_tag&&matchesCell(cell,{type:'variant',native_variable:true},x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);continue;
+  }
+  need(a&&a.type===x.type&&(x.label_any||x.label===undefined||a.label===x.label)&&cell?.type===x.type&&cell.is_null===(x.value===null)
    &&(x.value===null?cell.value===null:x.type==='integer'?cell.precision==='exact_integer'&&cell.value===String(x.value):x.type==='real'?cell.precision==='17_significant_digits'&&(x.tolerance?matchesCell(cell,x,x.value):(want.node.type==='variables.column_union'?Math.abs(cell.value-x.value)<=Math.max(1e-12,1e-12*Math.abs(x.value)):Object.is(cell.value,x.value))):x.type==='datetime'?matchesCell(cell,x,x.value):cell.value===x.value),'COLD_VARIABLE_VALUE_MISMATCH:'+x.name);
  }
  return true;

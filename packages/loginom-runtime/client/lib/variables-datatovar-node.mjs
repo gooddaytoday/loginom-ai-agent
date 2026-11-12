@@ -6,7 +6,7 @@ import {preflightDataToVarSource} from './variables-datatovar-preflight.mjs';
 
 export function createDataToVarNodeSupport(config){
  return createTabularTransformNodeSupport(config,{
-  type:'variables.from_table',mode:'aggregate',revision:'datatovar-v1-internal-1',
+  type:'variables.from_table',mode:'aggregate',revision:'datatovar-variant-w1-internal-2',
   parameterSchema:dataToVarParametersSchema,readback:dataToVarConfigurationReadback,
   validate:validateDataToVarParameters,preflight:preflightDataToVarSource,
   configurationObservation:{condition:'table-to-variables configuration page',readDataToVar:true,

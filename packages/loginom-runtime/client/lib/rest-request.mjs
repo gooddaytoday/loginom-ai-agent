@@ -156,8 +156,52 @@ export async function restRequestCapability(page,t,readContext){
   await advance();
   const allowed=['Настройка пользовательских заголовков','Дополнительные параметры','Настройка выходных столбцов'];
   for(let i=0;i<6;i++){
-   const caption=(await title()).trim();if(caption==='Описание узла')return {verified:true,cleanup_complete:true,effect_possible:effect,configuration,node_context:{...t.node,verified:true}};
+   const caption=(await title()).trim();if(caption==='Описание узла'){
+    need(t.headers===undefined||configuration.headers,'custom headers page was not reached');
+    return {verified:true,cleanup_complete:true,effect_possible:effect,configuration,node_context:{...t.node,verified:true}};
+   }
    need(allowed.includes(caption),'unexpected REST wizard page: '+caption);
+   if(caption==='Настройка пользовательских заголовков'&&t.headers!==undefined){
+    const headers=root+';RESTCustomHeadersWizard',grid=headers+';grdCustomHeaders;tbl';
+    const readHeaders=async()=>{
+     await guard();return find(grid).evaluate((table,{root,headers})=>{
+      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+      if(exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||!c.FCardLayout.getActiveItem().el.dom.contains(table)||exact(headers+';grdCustomHeaders;tbl').length!==1)throw Error('Owned REST header grid changed');
+      const cells=key=>[...table.querySelectorAll('[data-tid^='+JSON.stringify(headers+';'+key+';StringPropEdit')+'][data-tid$=";PropContainer;ValueContainer;ValueControl"]')];
+      const names=cells('colName'),values=cells('colHeaderValue'),deletes=[...table.querySelectorAll('[data-tid^='+JSON.stringify(headers+';colDelete_')+']')];
+      if(names.length>32||names.length!==values.length||names.length!==deletes.length)throw Error('REST literal header inventory is unavailable');
+      const field=e=>{const input=e.querySelector('input'),field=Ext.getCmp(e.id);
+       if(!input||input.disabled||input.readOnly||field?.el?.dom!==e||field.inputEl?.dom!==input||!e.getBoundingClientRect().width||typeof field.getValue()!=='string')throw Error('REST header literal field unavailable');
+       return {tid:e.getAttribute('data-tid'),value:field.getValue()};};
+      return names.map((e,i)=>({name:field(e),value:field(values[i]),delete_tid:deletes[i].getAttribute('data-tid')}));
+     },{root,headers});
+    };
+    let rows=await readHeaders();
+    if(JSON.stringify(rows.map(r=>r.name.value))!==JSON.stringify(t.headers.map(h=>h.name))){
+     while(rows.length){
+      const count=rows.length;await click(rows[0].delete_tid);
+      rows=await wait('header removed',async()=>{const r=await readHeaders();return r.length===count-1?r:null;});
+     }
+     for(const h of t.headers){
+      const count=(await readHeaders()).length;await click(headers+';btnAddHeader');
+      rows=await wait('header added',async()=>{const r=await readHeaders();return r.length===count+1?r:null;});
+      const row=rows.at(-1);await quiet();await guard();await point(row.name.tid);effect=true;
+      await find(row.name.tid).locator('input').fill(h.name,{timeout:remaining()});await find(row.name.tid).locator('input').press('Tab',{timeout:remaining()});
+      await wait('header name committed',async()=>(await readHeaders()).at(-1)?.name.value===h.name);
+     }
+    }
+    rows=await readHeaders();
+    for(let index=0;index<t.headers.length;index++){
+     const row=rows[index],h=t.headers[index];
+     if(row.value.value===h.value)continue;
+     await quiet();await guard();await point(row.value.tid);effect=true;
+     await find(row.value.tid).locator('input').fill(h.value,{timeout:remaining()});await find(row.value.tid).locator('input').press('Tab',{timeout:remaining()});
+     await wait('header value committed',async()=>(await readHeaders())[index]?.value.value===h.value);
+    }
+    const observed=(await readHeaders()).map(r=>({name:r.name.value,value:r.value.value}));
+    need(observed.length===t.headers.length&&observed.every((h,i)=>h.name===t.headers[i].name&&h.value===t.headers[i].value),'custom header readback differs');
+    configuration.headers=observed;
+   }
    if(caption==='Дополнительные параметры'&&t.new_node===true){
     const advanced=root+';AdditionalParamsWizard';
     const readDefaults=async()=>{await guard();return page.evaluate(({advanced})=>{
