@@ -61,8 +61,8 @@ def expected(case):
         if case == "external":
             # Input numbers define membership, not a promised output identity.
             # Observation, not claimed: in this distinct-WoE case the native
-            # output was renumbered in increasing WoE order (cycle 3 verifies
-            # it on the stand first). Equal-WoE ordering is outside the proposal.
+            # output was renumbered in increasing WoE order. Equal-WoE ordering
+            # is outside the proposal.
             result["outputs"][1]["rows"].sort(key=lambda r: r["WoE"])
             for number, item in enumerate(result["outputs"][1]["rows"]):
                 item["ClassNumber"] = number
@@ -141,14 +141,18 @@ def expected(case):
 
 
 def external_contrast(result):
-    """Supplied singleton partition {B} | {A} | {C} that automatic training cannot produce.
+    """Supplied partition {B} | {A,C} that automatic training cannot produce.
 
-    LAB-1324 probe, Loginom 7.4.2 (not claimed as a contract): the external role
-    rejects a class number shared by several categories ("does not contain the
-    unique value A"), so every supplied class here has one category. Automatic
-    training at max_classes=2 has at most two classes; the supplied partition has
-    three, so ports 0-2 differ from it. Observation, not claimed: output numbers
-    follow increasing WoE (run 1794209858242266964: A=0, B=1, C=2).
+    Не приёмочный: Loginom 7.4.2 отклоняет внешнее разбиение, ожидается
+    `COARSE_EXTERNAL_UNSUPPORTED` (решение v040-kk-c3-external).
+
+    Every class has events and non-events (no zero-share rule), WoE values are
+    distinct and the supplied numbers already follow increasing WoE, so the
+    expected depends on neither observation above. Port 1 layout for a
+    multi-category class (one row per UniqueValue with class statistics) and
+    the class marks are not observed: stand verification, first step of cycle 3.
+    Significance="Высокая" at total IV 0.572 is also a stand reconciliation item:
+    it was observed only at IV 1.66 and 3.64.
     """
     rows = BASE["source"]("external-contrast")
     with (ROOT / "fixtures" / "external-contrast-classes.csv").open(newline="", encoding="utf-8") as source:
@@ -156,37 +160,47 @@ def external_contrast(result):
     assert {r["ColumnName"] for r in definitions} == {"Segment"}
     numbers = {r["UniqueValue"]: int(r["ClassNumber"]) for r in definitions}
     assert len(numbers) == len(definitions) and set(numbers) == {r["Segment"] for r in rows}
-    assert len(set(numbers.values())) == len(numbers) == 3  # singletons only
-    max_classes = 2
-    assert len(numbers) > max_classes  # automatic training cannot reach it
+    members = {k: sorted(v for v in numbers if numbers[v] == k) for k in sorted(set(numbers.values()))}
+    assert members == {0: ["B"], 1: ["A", "C"]}
     events = sum(r["Target"] == "yes" for r in rows)
     non_events = len(rows) - events
     with localcontext() as context:
         context.prec = 50
-        classes = []
-        for value in numbers:
-            group = [r for r in rows if r["Segment"] == value]
+
+        def stats(categories):
+            group = [r for r in rows if r["Segment"] in categories]
             e = sum(r["Target"] == "yes" for r in group)
             n = len(group) - e
             assert e > 0 and n > 0
             pe, pn = Decimal(e) / events, Decimal(n) / non_events
             woe = (pn / pe).ln()
-            classes.append(dict(value=value, group=group, e=e, n=n, woe=woe, iv=(pn - pe) * woe))
-        classes.sort(key=lambda c: c["woe"])
-        assert len({c["woe"] for c in classes}) == len(classes)
-        for number, c in enumerate(classes):
-            c["number"] = number
-        supplied = sum(c["iv"] for c in classes)
-        by_value = {c["value"]: c for c in classes}
+            return dict(group=group, e=e, n=n, woe=woe, iv=(pn - pe) * woe)
+
+        def total(partition):
+            return sum(stats(part)["iv"] for part in partition)
+
+        classes = {k: stats(v) for k, v in members.items()}
+        assert classes[0]["woe"] < classes[1]["woe"]
+        supplied = total(members.values())
+        # The supplied {A,C} is not contiguous in event-rate order, so no merge
+        # of neighbours equals it; the IV-optimal neighbour merge is much larger.
+        rate = {c: Decimal(stats([c])["e"]) / len(stats([c])["group"]) for c in "ABC"}
+        ordered = sorted("ABC", key=lambda c: rate[c])
+        assert ordered == ["C", "B", "A"]
+        adjacent = [[ordered[:1], ordered[1:]], [ordered[:2], ordered[2:]]]
+        assert all(sorted(map(sorted, p)) != sorted(members.values()) for p in adjacent)
+        assert max(total(p) for p in adjacent) - supplied > Decimal("1")
+        marks = {0: "[B]", 1: "[A,C]"}
         result["outputs"][1]["rows"] = [dict(Group=0, ColumnName="Segment", ColumnDisplayName="Segment",
-            ClassNumber=c["number"], UniqueValue=c["value"], ClassMark="[" + c["value"] + "]", EventsCount=c["e"],
-            NonEventsCount=c["n"], EventRate=c["e"] / len(c["group"]), NonEventRate=c["n"] / len(c["group"]),
+            ClassNumber=k, UniqueValue=value, ClassMark=marks[k], EventsCount=c["e"], NonEventsCount=c["n"],
+            EventRate=c["e"] / len(c["group"]), NonEventRate=c["n"] / len(c["group"]),
             LowerBound=None, UpperBound=None, WoE=float(c["woe"]), IV=float(c["iv"]),
-            Weight=len(c["group"]) / len(rows), IncludeUpperBound=None, PreQuantingApplied=None) for c in classes]
-        result["outputs"][0]["rows"] = [r | {"Segment_ClassNum": by_value[r["Segment"]]["number"],
-            "Segment_ClassMark": "[" + r["Segment"] + "]",
-            "Segment_ClassSignificant": float(by_value[r["Segment"]]["iv"])} for r in rows]
-        assert supplied > Decimal("1")
+            Weight=len(c["group"]) / len(rows), IncludeUpperBound=None, PreQuantingApplied=None)
+            for k, c in classes.items() for value in members[k]]
+        result["outputs"][0]["rows"] = [r | {"Segment_ClassNum": numbers[r["Segment"]],
+            "Segment_ClassMark": marks[numbers[r["Segment"]]],
+            "Segment_ClassSignificant": float(classes[numbers[r["Segment"]]]["iv"])} for r in rows]
+        assert supplied > Decimal("0.5")
         result["outputs"][2]["rows"] = [dict(ColumnName="Segment", ColumnDisplayName="Segment",
             EventsCount=events, NonEventsCount=non_events, EventRate=events / len(rows),
             NonEventRate=non_events / len(rows), TotalEventsCount=len(rows),
