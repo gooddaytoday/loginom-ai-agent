@@ -83,7 +83,9 @@ export async function readGraph(page, task) {
         const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedFactorAnalysis=type==='research.factor_analysis' && previous && previous.nodeTid!==tid && p.FSubType===1;
-        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis;
+        // A bound Excel filename renames the node to its %Variable% caption.
+        const renamedExcel=type==='imports.excel' && previous && previous.nodeTid!==tid && p.FSubType===1;
+        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis || renamedExcel;
         const renamedVariablePort=previous&&previous.nodeTid!==tid&&p.FType===1&&p.FSubType===3
           &&['bg-vendor-icon-calcvariables','bg-vendor-icon-datatovariables'].includes(n.FIconCls)
           &&finishes.some(({context,trace})=>context?.verified===true&&context.surface==='graph'
