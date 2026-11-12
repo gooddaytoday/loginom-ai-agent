@@ -99,7 +99,10 @@ test('mapped continuation reads back every observed import format field, includi
  page.add('div',gridTid+';normalHeaderCt;0','',undefined,header).attrs.class='x-column-header x-column-header-first x-column-header-last';
  ['A','Amount','Вещественный','Непрерывный'].forEach((text,row)=>page.add('div',gridTid+';normalHeaderCt;0_'+row,text,undefined,body));
  page.add('div',null,'',undefined,page.add('div',gridTid+';normalHeaderCt;0_4','',undefined,body)).attrs.class='x-grid-checkcolumn x-grid-checkcolumn-checked';
+ const variant=page.add('div',p+'edtVariantAsGeneralType;ValueControl','',undefined,form);variant.attrs.class='x-form-cb-checked';
+ page.add('div',p+'edtVariantAsGeneralType;ValueControl;DisplayEl','',undefined,variant).attrs.class='x-form-checkbox';
  const format=(await page.observe()).wizard.settings;
+ assert.equal(format.fields.variant_as_general_type.value,true);
  assert.equal(format.fields.auto_detect_columns.value,'Только новые');assert.equal(format.fields.analysis_rows.value,'25');
  const oldDocument=globalThis.document;let read;
  try{globalThis.document=page.document;read=readRetainedImportFormatBrowser({rootTid});}finally{globalThis.document=oldDocument;}
@@ -111,5 +114,5 @@ test('mapped continuation reads back every observed import format field, includi
  const base={node:configured.node,configured:configured.configured,source:configured.source,retained:{...read,node_context:context},
   surface:{prepared_node_context:context,wizard:{stage:'done',completion:structuredClone(completion)},node_mapping:structuredClone(mapping)},mapped:{native_mapping:mapping,completion}};
  assert.equal(verifyMappedImportContinuation(base),true);
- for(const key of ['auto_detect_columns','analysis_rows']){const f=structuredClone(base);f.retained.values[key]='changed';assert.equal(verifyMappedImportContinuation(f),false,key);}
+ for(const key of ['auto_detect_columns','analysis_rows','variant_as_general_type']){const f=structuredClone(base);f.retained.values[key]='changed';assert.equal(verifyMappedImportContinuation(f),false,key);}
 });

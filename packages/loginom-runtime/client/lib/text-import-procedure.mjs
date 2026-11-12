@@ -7,10 +7,83 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const types = { integer: 'Целый', real: 'Вещественный', string: 'Строковый', boolean: 'Логический', datetime: 'Дата/Время' };
 const kinds = ['Неопределенное', 'Непрерывный', 'Дискретный'];
 function requireValue(condition, message) { if (!condition) throw new Error(message); }
+const titleModes={automatic:'Автоматическая метка',custom:'Пользовательская метка'};
+function validateNodeTitle(title) {
+  requireValue(title&&typeof title==='object'&&!Array.isArray(title)
+    &&Object.keys(title).every(k=>['mode','label'].includes(k))&&Object.hasOwn(titleModes,title.mode), 'Invalid node_title');
+  requireValue(title.mode==='automatic'?!Object.hasOwn(title,'label')
+    :typeof title.label==='string'&&title.label.length<=120&&title.label.trim().length>0
+      &&!/[;|<>"'\\\x00-\x1f]/.test(title.label), 'Custom node_title requires a safe nonblank label; automatic forbids label');
+}
+
+export async function configureTextImportTitle(channel,title) {
+  if(title)validateNodeTitle(title);
+  const ready=s=>s.wizard?.status==='observed'&&s.wizard.stage==='done'&&s.wizard.completion?.ready===true;
+  let state=await channel.observe({condition:'Text Import title on Done',ready});
+  const owner=state.wizard.owner_context,root=state.wizard.root_ref;
+  const sameOwner=s=>ready(s)&&s.wizard.root_ref===root&&same(s.wizard.owner_context,owner);
+  if(title){
+    const mode=titleModes[title.mode];
+    if(state.wizard.completion.fields.label_mode.value!==mode){
+      // Loginom may replace the custom caption with the file name a tick after
+      // the mode readback; Done must not keep the previous custom caption.
+      const previous=state.wizard.completion.fields.label.value;
+      const captionReady=s=>title.mode!=='automatic'||s.wizard.completion.fields.label.value!==previous;
+      const choice=(s,kind)=>{
+        const f=s.wizard.completion.fields.label_mode;
+        return one(s.ui.elements.filter(e=>e.wizard_combo?.kind===kind
+          &&e.wizard_combo.field.scope==='node_title'&&e.wizard_combo.field.name==='label_mode'
+          &&e.wizard_combo.field.root_ref===s.wizard.root_ref
+          &&e.wizard_combo.field.owner_ref===f.owner_ref&&e.wizard_combo.field.input_ref===f.input_ref
+          &&(kind==='picker'||e.wizard_combo.label===mode)), 'Exact Text Import title '+kind+' unavailable');
+      };
+      await channel.perform({condition:'Text Import title picker',initialObservation:state,ready:sameOwner,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'click',ref:choice(s,'picker').ref})});
+      state=await channel.observe({condition:'Text Import title choices',ready:s=>sameOwner(s)
+        &&s.ui.elements.some(e=>e.wizard_combo?.field.scope==='node_title'&&e.wizard_combo.kind==='option'&&e.wizard_combo.label===mode)});
+      await channel.perform({condition:'Text Import title mode',initialObservation:state,ready:sameOwner,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'select_wizard_option',ref:choice(s,'option').ref})});
+      state=await channel.observe({condition:'Text Import title mode readback',ready:s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode&&captionReady(s)});
+    }
+    if(title.mode==='custom'&&state.wizard.completion.fields.label.value!==title.label){
+      const labelReady=s=>sameOwner(s)&&s.wizard.completion.fields.label_mode.value===mode;
+      await channel.perform({condition:'Text Import custom title',initialObservation:state,ready:labelReady,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'fill',ref:s.wizard.completion.fields.label.input_ref,text:title.label})});
+      state=await channel.observe({condition:'Text Import custom title entered',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
+      await channel.perform({condition:'Text Import custom title commit',initialObservation:state,ready:labelReady,
+        identity:s=>s.wizard.owner_context,resolve:s=>({verb:'press',ref:s.wizard.completion.fields.label.input_ref,key:'Tab'})});
+      state=await channel.observe({condition:'Text Import custom title readback',ready:s=>labelReady(s)&&s.wizard.completion.fields.label.value===title.label});
+    }
+  }
+  return structuredClone(state.wizard.completion);
+}
 // Native «Автоопределение столбцов» labels. An omitted mode keeps native settings.
 export const autoDetectLabels={none:'Нет',new:'Только новые',all:'Все'};
 const autoDetectMode=label=>Object.keys(autoDetectLabels).find(k=>autoDetectLabels[k]===label);
 export const autoTypesRequested=p=>['new','all'].includes(p?.format?.auto_detect_columns)||!!p?.analysis?.refresh;
+export const fileInfoLabels={none:'Нет',name:'Имя файла'};
+const threadChoices=['auto',2,4,8,16,32];
+export function textImportSourceMask(source) {
+  const mask=source.source_mask;
+  requireValue(typeof mask==='string'&&mask.length<=2048&&mask.startsWith('/')&&!mask.startsWith('//')
+    &&!Object.hasOwn(source,'source_path')&&!Object.hasOwn(source,'source_paths')
+    &&!/[｜|?%\\\x00-\x1f\[\]{}]/.test(mask)
+    &&mask.split('/').slice(1).every(p=>p&&p!=='.'&&p!=='..')
+    &&!mask.slice(0,mask.lastIndexOf('/')).includes('*')&&mask.slice(mask.lastIndexOf('/')+1).includes('*'),
+    'source_mask requires * in the basename of one storage directory; never source_path(s)');
+  return mask;
+}
+export function textImportSourcePaths(source) {
+  const list=Object.hasOwn(source,'source_paths');
+  requireValue(!list||!Object.hasOwn(source,'source_path'),'Choose source_path or source_paths');
+  const paths=list?source.source_paths:[source.source_path];
+  requireValue(Array.isArray(paths)&&paths.length>=1&&paths.length<=16&&paths.every(p=>typeof p==='string'),'Explicit source paths required');
+  const nonempty=list?paths.filter(p=>p!==''):paths;
+  requireValue(nonempty.length>0&&nonempty.join('｜').length<=2048&&new Set(nonempty).size===nonempty.length
+    &&nonempty.every(p=>/^\/(?!\/)/.test(p)&&!/[｜|*?%\\\x00-\x1f]/.test(p)
+      &&p.split('/').slice(1).every(x=>x&&x!=='.'&&x!=='..')),'Explicit storage paths required; no masks, duplicates or empty list');
+  return nonempty;
+}
 function validateAnalysis(a) {
   requireValue(a&&typeof a==='object'&&!Array.isArray(a)&&Object.keys(a).length>0
     &&Object.keys(a).every(k=>['rows','refresh'].includes(k)),'Invalid analysis settings');
@@ -67,24 +140,29 @@ export function isTextImportSourceReady(state) {
 function validateSettings(p,maxColumns) {
   requireValue(p && typeof p === 'object' && !Array.isArray(p), 'Text import parameters are required');
   const auto=autoTypesRequested(p);
-  requireValue(Object.keys(p).filter(k=>k!=='analysis').sort().join(',') === (auto&&!Object.hasOwn(p,'columns')?'format,source':'columns,format,source'), 'Unexpected text import parameters');
+  requireValue(Object.keys(p).filter(k=>!['analysis','node_title'].includes(k)).sort().join(',') === (auto&&!Object.hasOwn(p,'columns')?'format,source':'columns,format,source'), 'Unexpected text import parameters');
+  if(Object.hasOwn(p,'node_title'))validateNodeTitle(p.node_title);
   if(Object.hasOwn(p,'analysis'))validateAnalysis(p.analysis);
-  requireValue(p.source && Object.keys(p.source).sort().join(',') === 'encoding,first_line_as_title,rows_to_skip,source_path', 'Source parameters are incomplete');
-  requireValue(typeof p.source.source_path === 'string' && /^\/(?!\/)/.test(p.source.source_path)
-    && p.source.source_path.length <= 2048 && !/[|*?%\\\x00-\x1f]/.test(p.source.source_path)
-    && p.source.source_path.split('/').slice(1).every(x => x && x !== '.' && x !== '..'), 'One explicit storage path is required');
+  requireValue(p.source&&['encoding','first_line_as_title','rows_to_skip'].every(k=>Object.hasOwn(p.source,k))
+    &&Object.keys(p.source).every(k=>['encoding','first_line_as_title','rows_to_skip','source_path','source_paths','source_mask','file_info','parallel_processing','max_threads'].includes(k)), 'Source parameters are incomplete');
+  if(Object.hasOwn(p.source,'source_mask'))textImportSourceMask(p.source);
+  else textImportSourcePaths(p.source);
+  if(Object.hasOwn(p.source,'file_info'))requireValue(Object.hasOwn(fileInfoLabels,p.source.file_info),'Invalid file_info');
+  if(Object.hasOwn(p.source,'parallel_processing'))requireValue(typeof p.source.parallel_processing==='boolean','Invalid parallel_processing');
+  if(Object.hasOwn(p.source,'max_threads'))requireValue(threadChoices.includes(p.source.max_threads),'Invalid max_threads');
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
   requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
     && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
   const formatKeys=['delimiter','decimal_separator','null_marker','text_qualifier'];
   requireValue(p.format && formatKeys.every(k=>Object.hasOwn(p.format,k))
-    &&Object.keys(p.format).every(k=>[...formatKeys,'multiple_delimiters','date_format','date_separator','auto_detect_columns'].includes(k)), 'Format parameters are incomplete');
+    &&Object.keys(p.format).every(k=>[...formatKeys,'multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns'].includes(k)), 'Format parameters are incomplete');
   if(Object.hasOwn(p.format,'auto_detect_columns'))requireValue(Object.hasOwn(autoDetectLabels,p.format.auto_detect_columns),'Invalid auto_detect_columns');
   for (const name of formatKeys) {
     const value=p.format[name];
     requireValue(typeof value === 'string' && value.length <= (name === 'null_marker' ? 256 : 1)
       && !/[\x00\r\n]/.test(value), 'Invalid format value: ' + name);
   }
+  if(Object.hasOwn(p.format,'variant_as_general_type'))requireValue(typeof p.format.variant_as_general_type==='boolean','Invalid variant_as_general_type');
   if(Object.hasOwn(p.format,'multiple_delimiters'))requireValue(typeof p.format.multiple_delimiters==='boolean','Invalid multiple_delimiters');
   if(Object.hasOwn(p.format,'date_format'))requireValue(['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'].includes(p.format.date_format),'Invalid date_format');
   if(Object.hasOwn(p.format,'date_separator'))requireValue(['.','/','\\','-'].includes(p.format.date_separator),'Invalid date_separator');
@@ -124,7 +202,7 @@ export class ImportInitialSettingsError extends Error {
 export function validateInitialExistingImportSettings(parameters,verifiedSourcePath) {
   try {
     validateTextImportFieldsRequest(parameters);
-    requireValue(parameters.source.source_path===verifiedSourcePath,'Existing source does not match the verified upload');
+    requireValue((Object.hasOwn(parameters.source,'source_mask')?textImportSourceMask(parameters.source):textImportSourcePaths(parameters.source).join('｜'))===verifiedSourcePath,'Existing source does not match the verified upload');
     requireValue(parameters.columns===undefined||parameters.columns.some(c=>c.used),'Import output requires at least one used field');
   } catch(error) {
     throw new ImportInitialSettingsError(error.message);
@@ -133,14 +211,16 @@ export function validateInitialExistingImportSettings(parameters,verifiedSourceP
 
 export function validateTextImportPatch(p) {
   const object=value=>value && typeof value==='object' && !Array.isArray(value);
-  requireValue(object(p) && Object.keys(p).every(k=>['source','format','columns','analysis'].includes(k)), 'Invalid import settings patch');
+  requireValue(object(p) && Object.keys(p).every(k=>['source','format','columns','analysis','node_title'].includes(k)), 'Invalid import settings patch');
+  if(Object.hasOwn(p,'node_title'))validateNodeTitle(p.node_title);
   if(Object.hasOwn(p,'analysis'))validateAnalysis(p.analysis);
   requireValue(!(p.format?.auto_detect_columns==='all'&&p.columns?.length),allModeColumns);
   const source={source_path:'/validation.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true};
   const format={delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
   for(const [name,defaults] of Object.entries({source,format})) {
     if(!Object.hasOwn(p,name))continue;
-    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='format'&&['multiple_delimiters','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
+    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='source'&&['source_paths','source_mask','file_info','parallel_processing','max_threads'].includes(k)||name==='format'&&['multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns'].includes(k)), 'Unknown import patch '+name);
+    if(name==='source'&&['source_paths','source_mask'].some(k=>Object.hasOwn(p.source,k))&&!Object.hasOwn(p.source,'source_path'))delete defaults.source_path;
     Object.assign(defaults,p[name]);
   }
   requireValue(!Object.hasOwn(p,'columns') || Array.isArray(p.columns)&&p.columns.length<=1000,'Invalid column patch list');
@@ -370,6 +450,10 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(boundSource?{...parameters,source:{...parameters.source,source_path:'/binding-validation.csv'}}:parameters);
   parameters=structuredClone(parameters);
   if(patch)parameters={source:parameters.source??{},format:parameters.format??{},columns:parameters.columns??[],...(parameters.analysis?{analysis:parameters.analysis}:{})};
+  const requested=structuredClone(parameters);
+  // Serialize only after validation; preflight verifies every path separately.
+  if(parameters.source?.source_paths){parameters.source.source_path=textImportSourcePaths(parameters.source).join('｜');delete parameters.source.source_paths;}
+  if(Object.hasOwn(parameters.source??{},'source_mask')){parameters.source.source_path=textImportSourceMask(parameters.source);delete parameters.source.source_mask;}
   requireValue(owner?.status === 'observed' && owner.node?.tid && owner.path?.length, 'An observed wizard owner is required');
   let currentOwner = owner;
   let columnOffset=0;
@@ -386,7 +470,13 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
         : stage === 'text_import_format' ? w.settings?.fields : null;
       const names = stage === 'text_import_file' ? Object.keys(parameters.source)
         : stage === 'text_import_format' ? Object.keys(parameters.format) : [];
-      if (!names.every(name => fields?.[name]?.status === 'observed' && fields[name].truncated !== true)) return false;
+      // A format picker or an open column editor can temporarily hide the new Variant checkbox.
+      // Its own mutation still requires field(); the final format readback after editors close stays strict.
+      const formatPicker=stage==='text_import_format'&&(w.import_column_editor!=null||state.ui.elements.some(e=>e.wizard_combo?.kind==='option'
+        &&(e.wizard_combo.field?.scope??'import_format')==='import_format'&&e.wizard_combo.field?.root_ref===w.root_ref
+        &&Object.hasOwn(parameters.format,e.wizard_combo.field.name)&&e.allowed_actions?.includes('select_wizard_option')));
+      if (!names.every(name => fields?.[name]?.status === 'observed' && fields[name].truncated !== true
+        || name==='variant_as_general_type'&&!Object.hasOwn(fields??{},name)&&formatPicker)) return false;
       if (stage === 'output_mapping' && w.output_columns?.definition_coverage?.status !== 'complete_configured_rows') return false;
       if (stage === 'done' && state.ui.elements.filter(e => e.tid === w.root_tid + ';btnDone'
         && e.allowed_actions?.includes('finish_wizard')).length !== 1) return false;
@@ -418,8 +508,8 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   // is no retained schema to inspect until complete source settings are applied.
   if(patch&&!boundSource&&sourceBaseline.fields.source_path.value==='') {
     requireValue(!patch.preserveSchema,'LOGINOM_IMPORT_SCHEMA_CHANGED: source switch requires a saved configured import');
-    validateInitialExistingImportSettings(parameters,patch.verifiedSourcePath);
-    return configureImport(channel,parameters,owner,true);
+    validateInitialExistingImportSettings(requested,patch.verifiedSourcePath);
+    return configureImport(channel,requested,owner,true);
   }
   if(patch && !boundSource && parameters.source.source_path===undefined)requireValue(sourceBaseline.fields.source_path.value===patch.verifiedSourcePath,'Existing source does not match the verified upload');
   let formatBaseline,columnBaseline;
@@ -441,22 +531,26 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner:currentOwner,read,ready:isTextImportSourceReady});
   }
 
-  for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title']) {
+  for (const name of ['source_path', 'encoding', 'rows_to_skip', 'first_line_as_title','file_info','parallel_processing','max_threads']) {
+    const sequential=name==='parallel_processing'&&(requested.source?.source_paths||requested.source?.source_mask)
+      &&!Object.hasOwn(requested.source,'parallel_processing');
+    if(sequential)parameters.source.parallel_processing=false;
+    if(['file_info','parallel_processing','max_threads'].includes(name)&&!Object.hasOwn(parameters.source,name))continue;
     if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
     let s = await read('text_import_file'), f = field(s, name, true);
     const encoding = fieldsOnly && name==='encoding' ? resolveTextImportEncoding(parameters.source.encoding):null;
-    const desired = encoding ? encoding.label : name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];
+    const desired = encoding ? encoding.label : name==='file_info'?fileInfoLabels[parameters.source[name]]:name==='max_threads'?(parameters.source[name]==='auto'?'Автоопределение':String(parameters.source[name])): name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];
     if (f.value === desired) continue;
-    if(encoding) {
+    if(encoding||['file_info','max_threads'].includes(name)) {
       const picker=one(s.ui.elements.filter(e=>e.wizard_combo?.kind==='picker'&&e.wizard_combo.field.scope==='import_source'
-        &&e.wizard_combo.field.name==='encoding'&&e.wizard_combo.field.owner_ref===f.owner_ref),'Code page picker unavailable');
+        &&e.wizard_combo.field.name===name&&e.wizard_combo.field.root_ref===s.wizard.root_ref&&e.wizard_combo.field.owner_ref===f.owner_ref),'Source picker unavailable');
       await act(s,{verb:'click',ref:picker.ref});
       s=await read('text_import_file','code page option visible',state=>state.ui.elements.filter(e=>e.wizard_combo?.kind==='option'
-        &&e.wizard_combo.field.scope==='import_source'&&e.wizard_combo.field.name==='encoding'&&e.wizard_combo.label===encoding.label).length===1);
+        &&e.wizard_combo.field.scope==='import_source'&&e.wizard_combo.field.name===name&&e.wizard_combo.label===desired).length===1);
       const option=one(s.ui.elements.filter(e=>e.wizard_combo?.kind==='option'&&e.wizard_combo.field.scope==='import_source'
-        &&e.wizard_combo.field.name==='encoding'&&e.wizard_combo.label===encoding.label),'Exact code page option unavailable');
+        &&e.wizard_combo.field.name===name&&e.wizard_combo.field.root_ref===s.wizard.root_ref&&e.wizard_combo.field.owner_ref===f.owner_ref&&e.wizard_combo.label===desired),'Exact source option unavailable');
       await act(s,{verb:'select_wizard_option',ref:option.ref});
-    } else if (name === 'first_line_as_title') await act(s, { verb: 'set_checked', ref: f.display_ref, checked: desired });
+    } else if (['first_line_as_title','parallel_processing'].includes(name)) await act(s, { verb: 'set_checked', ref: f.display_ref, checked: desired });
     else {
       await act(s, { verb: 'fill', ref: f.input_ref, text: desired });
       s = await read('text_import_file'); f = field(s, name, true);
@@ -480,9 +574,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     const text=name==='auto_detect_columns'?autoDetectLabels[requested]:requested;
     let s = await read('text_import_format'); const f = field(s, name);
     if (f.value === text) continue;
-    if(name==='multiple_delimiters'){
+    if(name==='multiple_delimiters'||name==='variant_as_general_type'){
       await act(s,{verb:'set_checked',ref:f.display_ref,checked:text});
-      await read('text_import_format','multiple delimiters applied',state=>state.wizard.settings?.fields[name]?.value===text);
+      await read('text_import_format','format checkbox applied',state=>state.wizard.settings?.fields[name]?.value===text);
       continue;
     }
     // Native editable combo resolves typed NULL to the first case-insensitive

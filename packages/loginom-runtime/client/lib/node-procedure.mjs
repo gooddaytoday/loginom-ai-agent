@@ -266,7 +266,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async readOutputPort(request) {
       checkBudget();
       const readType=(operation.nodeApply?.request??operation.parameters)?.target?.type;
-      if(['variables.to_table','imports.lgd'].includes(readType))request={...request,typedVariants:true};
+      if(['variables.to_table','imports.lgd','imports.text'].includes(readType))request={...request,typedVariants:true};
       // Exact reads of these ports refused Variant cells as unverified_precision; ordinary reads keep their envelope.
       if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns'].includes(readType))
         request={...request,typedVariants:true,...(readType==='transform.replace_columns'?{variantEmptyIsNull:true}:{})};
@@ -600,7 +600,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           wizardConfirmation??=wizardCloseBinding(roots.output);
         }
         const portals = wizard?.status === 'observed' ? (roots.output.ui?.elements??[]).filter(e =>
-          (e.tid?.startsWith(wizard.root_tid + ';') || readBinning&&wizard.stage==='binning'&&e.tid==='MethodSettingFrame;cbbSDBinsMode;ValueControl;boundlist' || wizard.stage==='table_tree' && e.tid?.startsWith('EditDataTreeNodeDefForm;') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && (e.tid.endsWith(';boundlist') || wizard.stage==='field_parameters'&&e.tid.startsWith(wizard.root_tid+';ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl;boundlist-')&&/;boundlist-\d+$/.test(e.tid))) : [];
+          (e.tid?.startsWith(wizard.root_tid + ';') || readBinning&&wizard.stage==='binning'&&['MethodSettingFrame;cbbSDBinsMode;ValueControl;boundlist','MethodSettingFrame;cbbMatchingObservationsMode;ValueControl;boundlist'].includes(e.tid) || wizard.stage==='table_tree' && e.tid?.startsWith('EditDataTreeNodeDefForm;') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && (e.tid.endsWith(';boundlist') || wizard.stage==='field_parameters'&&e.tid.startsWith(wizard.root_tid+';ReformColumnsWizard;pedDataSourceCachingMethod;ValueControl;boundlist-')&&/;boundlist-\d+$/.test(e.tid))) : [];
         if(portals.length>1)throw new Error('Node procedure dropdown owner is ambiguous');
         // Dropdowns live outside the wizard subtree. Reading the unique
         // portal plus fixed wizard guards avoids scanning unrelated file tabs.

@@ -154,13 +154,14 @@ test('installed import discovery supplies its complete parameter vocabulary on t
   for (const card of cards) assert.ok(card.parameter_schema, card.type);
   const schema = cards.find(card => card.type === 'imports.text').parameter_schema;
   assert.deepEqual(schema.required, ['settings']);
-  assert.match(schema.properties.source.description, /Required for new imports and configuration changes/);
-  assert.match(schema.properties.source.description, /Omit source only to execute an unchanged existing Import/);
+  assert.match(schema.properties.source.description, /Required except unchanged Execute/);
+  assert.match(schema.properties.source.description, /Unchanged existing Execute may omit source/);
   for (const key of ['source', 'settings']) {
     const { description, ...shape } = schema.properties[key];
     assert.deepEqual(shape, nodeApplyInputSchema.properties.parameters.properties[key]);
   }
-  assert.deepEqual(Object.keys(schema.properties.settings.properties), ['source', 'format', 'columns', 'analysis']);
+  assert.deepEqual(Object.keys(schema.properties.settings.properties), ['source', 'format', 'columns', 'analysis', 'node_title']);
+  assert.deepEqual(schema.properties.settings.properties.node_title.properties.mode.enum, ['automatic', 'custom']);
   schema.properties.settings.properties.columns.maxItems = 0;
   const fresh = describeNodeTypes(['imports.text'], {}, new Map(), support.nodeApplyHandlers)[0];
   assert.equal(fresh.parameter_schema.properties.settings.properties.columns.maxItems, 1000);

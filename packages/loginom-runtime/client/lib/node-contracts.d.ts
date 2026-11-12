@@ -417,7 +417,7 @@ export interface ElimOutlierConfigurationReadback {
 
 export interface ElimOutlierEditConfigurationReadback extends Omit<ElimOutlierConfigurationReadback,'mode'|'fields'> {
  mode:'edit';
- fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep'|'mean'|'median'|'most_probable';extreme_policy:'keep'|'mean'|'median'|'most_probable'}>;
+ fields:Array<{name:string;method:'sd'|'iqr';outlier_factor:number;extreme_factor:number;outlier_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';extreme_policy:'keep'|'mean'|'median'|'most_probable'|'limit'|'delete'|'constant';outlier_constant?:number;extreme_constant?:number}>;
 }
 
 export interface LogRegressionConfigurationReadback {
@@ -473,6 +473,7 @@ export interface CoarseClassesConfigurationReadback {
  output_mappings: BinningConfigurationReadback['output_mappings']; package_persistence_verified: false;
 }
 
+export interface CoarseClassesFrozenConfigurationReadback extends CoarseClassesConfigurationReadback { frozen: true; frozen_partition: {input_field: string; locked: true; edited: boolean; classes: {number: number; lower: number | null; upper: number | null}[]}; }
 export interface FactorAnalysisConfigurationReadback {
   kind: 'factor_analysis'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'pca_fixed'; features: string[];
@@ -504,9 +505,11 @@ export interface EnrichConfigurationReadback {
 export interface UngroupParameters {
  ungroup?: {keys:Array<{total:string;support:string}>;value_field:string;item_field:string;share_field:string;
   rounding:{format:'none'}|{format:'precision'|'multiple';value:number};balance:'none'|'last'|'proportional'|'equal'};
+ seasonality?: {total_order_field:string;support_order_field:string;period:'year';multiplier:1;index_count:12;rare_density:0.25;absent_periods:1;novelty_periods:1;max_history_periods:0};
 }
 export interface UngroupConfigurationReadback extends Omit<JoinConfigurationReadback,'kind'|'mode'|'keys'|'case_sensitive'|'include_joined_keys'> {
- kind:'ungroup';mode:'shares'|'computed';ungroup:NonNullable<UngroupParameters['ungroup']>;
+ kind:'ungroup';mode:'shares'|'computed'|'seasonal';ungroup:NonNullable<UngroupParameters['ungroup']>&{total_order_field?:string;support_order_field?:string};
+ seasonality?:{period:'year';multiplier:number;index_count:number;rare_density:number;absent_periods:number;novelty_periods:number;max_history_periods:number};
 }
 
 export interface UserVariablesParameters {

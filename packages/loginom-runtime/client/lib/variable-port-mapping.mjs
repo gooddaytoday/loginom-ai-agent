@@ -87,7 +87,8 @@ export async function configureVariablePortMapping(page,task,readNode,openPort,d
    // Preserve the established primitive readback; decode W2 additions exactly.
    if(d.DataType===2||d.DataType===3){
     const decoded=eval('('+decoderCode+')')(d.ValueIsNull?null:value,d.DataType===2?'datetime':'real');
-    if(decoded.limitations.length)throw Error('Variable mapping scalar precision is unverified');
+    // The mapping readback has no non-finite marker; keep refusing NaN/±Inf here.
+    if(decoded.limitations.length||decoded.cell.non_finite)throw Error('Variable mapping scalar precision is unverified');
     value=decoded.cell.value;
    }
    return {id:d.ID,index,name:d.Name,label:d.DisplayName,type:d.DataType,origin_type:d.OriginType,usage:d.UsageType,description:d.Description,

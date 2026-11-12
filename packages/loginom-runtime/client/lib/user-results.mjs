@@ -67,14 +67,14 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   if(data?.variable_ports){
     output.variable_ports=data.variable_ports.map(port=>({...pick(port,['port','kind','port_guid','fresh','source','native_source','read_id','execution_id','complete','count','completeness','package_modified']),
       variables:port.variables.map(variable=>({...pick(variable,['id','index','name','label','type']),
-        cell:pick(variable.cell,['type','value','decimal','representation','precision','is_null'])}))}));
+        cell:pick(variable.cell,['type','value','decimal','representation','precision','is_null','non_finite'])}))}));
   }
   if (data?.ports) output.ports = data.ports.map(port => {
     if(port.port_kind==='tree')return pick(port,['port','port_guid','port_kind','fresh','execution_id','freshness_basis','tree','sample_complete']);
     const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'freshness_basis', 'read_limit', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations','full_import_verification']);
     value.schema = value.schema.map(column => pick(column, ['index', 'name', 'label', 'type', 'data_kind']));
     value.sample = value.sample.map(row => row.map(cell => {
-      const compact = pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text', 'precision', 'is_null', 'timezone', 'cell_type', 'native']);
+      const compact = pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text', 'precision', 'is_null', 'timezone', 'cell_type', 'native', 'non_finite']);
       if (compact.value === compact.display_text) delete compact.display_text;
       return compact;
     }));

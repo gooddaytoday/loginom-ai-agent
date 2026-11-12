@@ -17,6 +17,18 @@ import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
 import {createActionRuntime,executorTools,makeArtifactUploadCode,makeNativeOutputDownloadCode,makeArtifactDownloadCode,
   rebindNodeTargetLinkEpochs,readNodeTargetLinkValidation,makeCapabilityCode,withBrowserReceipt,parseCapabilityResult} from '../../lib/executor.mjs';
 
+// The SDK client compiles every advertised outputSchema on each listTools().
+// The bridge advertises several identical large schemas, so compile each
+// distinct schema once per client; every tool keeps the same Ajv validation.
+class SchemaCachingValidator extends AjvJsonSchemaValidator {
+  #validators = new Map();
+  getValidator(schema) {
+    const key = JSON.stringify(schema);
+    if (!this.#validators.has(key)) this.#validators.set(key, super.getValidator(schema));
+    return this.#validators.get(key);
+  }
+}
+
 // Exercise the actual bridge request handler and MCP Server/Client protocol.
 // Only external services, catalog delivery and browser transport are replaced;
 // no localhost listener, real browser, credentials or model is involved.
@@ -119,7 +131,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     }
     assert.equal(browserEnvironment.PLAYWRIGHT_BROWSERS_PATH, session.browserRoot);
     assert.equal(browserEnvironment.DOCK_TEST_SECRET, undefined);
-    client = new ProtocolClient({ name: 'test-agent', version: '1.0.0' });
+    client = new ProtocolClient({ name: 'test-agent', version: '1.0.0' }, { jsonSchemaValidator: new SchemaCachingValidator() });
     const [agentTransport, bridgeTransport] = InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(bridgeTransport), client.connect(agentTransport)]);
     assert.match(client.getInstructions(), /activate.*loginom-automation/i);
@@ -293,7 +305,7 @@ test('MCP application refusals remain typed normal content and the same connecti
       browserRoot:session.browserRoot,metadata:{...session.metadata,sessionId:'unit-bridge-compact'},async save(){},
       artifactStore:await createArtifactStore({directory:join(compactDirectory,'input')})};
     bridge=await createBridge({...config,resultProfile:'user-v1',stateDir:compactDirectory},compactSession);
-    client=new ProtocolClient({name:'test-compact-agent',version:'1.0.0'});
+    client=new ProtocolClient({name:'test-compact-agent',version:'1.0.0'},{jsonSchemaValidator:new SchemaCachingValidator()});
     const [compactAgentTransport,compactBridgeTransport]=InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(compactBridgeTransport),client.connect(compactAgentTransport)]);
     const compactTools=await client.listTools(),contextTool=compactTools.tools.find(t=>t.name==='dock_node_read');

@@ -144,23 +144,23 @@ test('manual refuses a boundary crossing the next observed interval before any e
  assert.deepEqual(f.calls,[]);assert.deepEqual(f.intervals,f.before);
 });
 
-async function frequencyCurrent({stale=false}={}){
+async function frequencyCurrent({stale=false,initial='next',requested='current'}={}){
  const field={index:0,record_id:'X',label:'X',type:'real',method_code:4,bins_count:0,automatic:false};
  const key='cbbMatchingObservationsMode;ValueControl',owner='MethodSettingFrame;'+key,calls=[];
  const c={verified:true,binding_ready:true,fields:[field],selected:field,state:'settings',intervals:[],
   frame:{record_id:'X',switches:[],controls:{[key]:owner},values:{'cbbTileCount;ValueControl':2,chkRoundingLevel:false,'chkLowerLimitOpen;ValueControl':false,'chkUpperLimitOpen;ValueControl':false,'chkSummTile;ValueControl':false}},
-  settings:{method:'frequency',size:2,limits:null,ties:'next',sums:false,rounding:false,lower_open:false,upper_open:false}};
- const s={wizard:{root_tid:'W',stage:'binning'},node_binning:c,ui:{elements:[{tid:owner,ref:'picker',allowed_actions:['click']}]}};
+  settings:{method:'frequency',size:2,limits:null,ties:initial,sums:false,rounding:false,lower_open:false,upper_open:false}};
+ const s={wizard:{root_tid:'W',stage:'binning'},node_binning:c,ui:{elements:[{tid:owner+';trg_picker',ref:'picker',allowed_actions:['click']},{tid:'W;btnNext',ref:'advance',allowed_actions:['wizard_step']}]}};
  const channel={observe:async o=>{assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
   assert.ok(o.ready(s));const a=o.resolve(s);calls.push(a);
   if(a.ref==='picker')s.ui.elements=[{tid:owner+';boundlist;1',label:'Сохранять в текущем',ref:'current',allowed_actions:['click']},
    {tid:'foreign;boundlist;1',label:'Сохранять в текущем',ref:'foreign',allowed_actions:['click']},
    {tid:owner+';boundlist;0',label:'Добавлять в следующий',ref:'next',allowed_actions:['click']}];
-  else if(a.ref==='current'){if(!stale)c.settings.ties='current';s.ui.elements=[{tid:'W;btnNext',ref:'advance',allowed_actions:['wizard_step']}];}
+  else if(['current','next'].includes(a.ref)){if(!stale)c.settings.ties=a.ref;s.ui.elements=[{tid:'W;btnNext',ref:'advance',allowed_actions:['wizard_step']}];}
   else if(a.verb==='wizard_step')s.wizard.stage=a.expected_stage;
   else assert.fail('unexpected tie choice '+JSON.stringify(a));
  }};
- const run=()=>configureBinning(channel,{binning:{field:'X',method:'frequency',size:2,ties:'current'}},
+ const run=()=>configureBinning(channel,{binning:{field:'X',method:'frequency',size:2,...(requested===null?{}:{ties:requested})}},
   {request:{mode:'internal'},inputMapping:{target_fields:[{name:'X',label:'X',type:'real'}]}});
  return {run,calls};
 }
@@ -171,6 +171,15 @@ test('frequency current selects the owned native option and returns observed cur
 test('frequency current refuses stale next readback before accepting the wizard',async()=>{
  const f=await frequencyCurrent({stale:true});await assert.rejects(f.run(),/final settings differ/);
  assert.equal(f.calls.some(a=>a.verb==='wizard_step'),false);
+});
+test('frequency default next resets saved current via the owned picker',async()=>{
+ const f=await frequencyCurrent({initial:'current',requested:null});
+ const r=await f.run();assert.equal(r.configuration.ties,'next');
+ assert.deepEqual(f.calls.filter(a=>a.verb==='click').map(a=>a.ref),['picker','next']);
+});
+test('frequency current already selected does not replay the picker',async()=>{
+ const f=await frequencyCurrent({initial:'current'}),r=await f.run();
+ assert.equal(r.configuration.ties,'current');assert.equal(f.calls.some(a=>a.verb==='click'),false);
 });
 
 async function automaticMode(method,{stale=false,manual=false}={}){
