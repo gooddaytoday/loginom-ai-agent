@@ -47,14 +47,14 @@ No order/speed guarantee.
 
 ## Auto-detected types
 
-User types win. Else correct only sample contradictions: leading zeros → string;
-wrong decimals → correct; date strings/NULL → check parsing.
-Check types/values/NULL/seconds; report types/date format.
-`settings.format`: sample → `date_format`/`date_separator`:
-dd.MM or dd/MM → `dd/mm/yyyy`, . or /; ISO → `yyyy/mm/dd`, -.
+User types win. Fix only sample contradictions: leading-zero IDs → string;
+wrong decimals → correct; date strings/NULL → `date_format`/`date_separator`.
+dd.MM/dd/MM → `dd/mm/yyyy`, . or /; ISO → `yyyy/mm/dd`, -.
 Ambiguous dates: user convention/ask.
-Numeric amounts with spaces: Import string, then Calculator real with same name,
-`Val(Replace(Field," ","",True))`. Keep NULL; verify values. Val uses local decimal separator.
+Single-file spaced decimal amounts default real. Temporary Import string →
+Calculator `Val(Replace(Field," ","",True))`, same name; local decimal, NULL.
+Before Export/report: read Calculator output, verify real/values/NULL.
+Report final types/date format; check seconds.
 
 Types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),
 `settings.analysis`: `rows`, `refresh` (`all`=fields/types, `types`=types).
