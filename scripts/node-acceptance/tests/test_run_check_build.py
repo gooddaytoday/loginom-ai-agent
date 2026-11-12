@@ -37,12 +37,11 @@ def prepare(repo, home, head, out, started=None, mutate=False, builds=None):
             if builds: builds.wait(timeout=5)
             source = kwargs['cwd'].parents[1]
             assert not runner.git('status', '--porcelain', cwd=source)
-            # The stand key reaches only the build environment, never its argv.
-            assert kwargs['env']['LOGINOM_MCP_API_KEY'] == 'stand-key'
-            assert not any('stand-key' in str(part) for part in command)
+            # Builds ship Loginom Help; no knowledge service key reaches the build.
+            assert 'LOGINOM_MCP_API_KEY' not in kwargs['env']
             build = cache / 'cli'
-            (build / 'resources/loginom').mkdir(parents=True)
-            (build / 'resources/loginom/knowledge-key').write_text(kwargs['env']['LOGINOM_MCP_API_KEY'])
+            (build / 'resources/loginom/help').mkdir(parents=True)
+            (build / 'resources/loginom/help/help-manifest.json').write_text('{}')
             runner.write(build / 'cli-manifest.json', {'metadata': {'sourceCommit': head, 'sourceDirty': False}})
 
     instance.phase = phase
@@ -50,7 +49,6 @@ def prepare(repo, home, head, out, started=None, mutate=False, builds=None):
     try:
         with patch.object(runner, 'git', side_effect=lambda *args, cwd=repo: git(*args, cwd=cwd)), \
              patch.object(runner.Path, 'home', return_value=home), \
-             patch.object(runner, 'KNOWLEDGE_KEY', home / '.config/loginom-ai-agent/mcp-api-key'), \
              patch.dict(runner.os.environ, {k: v for k, v in os.environ.items() if k != 'LOGINOM_MCP_API_KEY'}, clear=True):
             instance.build()
         out.put(None)
@@ -68,7 +66,6 @@ class BuildPreparationTests(unittest.TestCase):
         (self.home / '.cache/loginom-bootstrap/node/pinned/bin').mkdir(parents=True)
         (self.home / '.cache/loginom-bootstrap/node/pinned/bin/node').touch()
         (self.home / '.config/loginom-ai-agent').mkdir(parents=True)
-        (self.home / '.config/loginom-ai-agent/mcp-api-key').write_text('stand-key\n')
         for args in [('init', '-q'), ('config', 'user.name', 'Test'), ('config', 'user.email', 'test@example.invalid')]:
             runner.git(*args, cwd=self.repo)
         (self.repo / 'packages/cli/bin').mkdir(parents=True)
@@ -136,12 +133,6 @@ class BuildPreparationTests(unittest.TestCase):
         (source / 'other.txt').write_text('changed contents\n')
         prepare(self.repo, self.home, self.head, out)
         self.assertEqual(out.get(timeout=1), 'Dirty build source')
-
-    def test_build_requires_the_stand_knowledge_key(self):
-        (self.home / '.config/loginom-ai-agent/mcp-api-key').unlink()
-        out = multiprocessing.get_context('fork').Queue()
-        prepare(self.repo, self.home, self.head, out)
-        self.assertIn('LOGINOM_MCP_API_KEY', out.get(timeout=1))
 
     def test_install_cannot_hide_content_changes(self):
         out = multiprocessing.get_context('fork').Queue()

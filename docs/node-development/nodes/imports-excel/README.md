@@ -10,6 +10,8 @@
 
 Ограничения: Только XLSX, без named ranges и автоопределения типов; source_switch без изменения columns/mappings.
 
+Решение (решение владельца `v040-scope-expansion`, 12.11.2026): C7, C4, C8, C5 — с границами доказательства источника, принятыми у `imports.text`; C6 XLSM отложен. См. конец [подплана](plan.md).
+
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [imports-excel-node.mjs](../../../../packages/loginom-runtime/client/lib/imports-excel-node.mjs):1–157; [imports-excel-parameters.mjs](../../../../packages/loginom-runtime/client/lib/imports-excel-parameters.mjs):1–50; [imports.excel.md](../../../../packages/product/skills/loginom-automation/references/nodes/imports.excel.md):1–26. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
 ## Исторические материалы и план расширений

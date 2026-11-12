@@ -7,8 +7,9 @@ import { watch } from "node:fs"
 import { createLoginomHost } from "../src/host"
 import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
-import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { launchNodeHost } from "../src/node-client"
+import { stageHeldKnowledge } from "./fixtures/knowledge"
 
 async function buildNodeHost(output: string) {
   // Isolate Bun.build: repeated in-process builds in Bun's test runner can fail
@@ -22,28 +23,33 @@ async function buildNodeHost(output: string) {
   return join(output, "node-host.mjs")
 }
 
+// "held" keeps the Help catalog pending in a stub entry; the other modes run the
+// real entry over <resources>/help, absent or with a changed page.
 async function fixture(
   error: string,
-  options: Parameters<typeof knowledgeServer>[1] = {},
+  help: "shipped" | "held" | "missing" | "tampered" = "shipped",
   holdStart = false,
   failClose = false,
 ) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "connection-validation-"))
-  const cleanup: (() => void | Promise<void>)[] = []
-  const server = await knowledgeServer({ after: (callback) => cleanup.push(callback) }, options)
   const resources = join(directory, "resources")
   const root = join(directory, "profile")
   const marker = join(directory, "browser-validation")
   await mkdir(join(resources, "bin"), { recursive: true })
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await symlink(node, join(resources, "bin/node"))
+  const catalog = await stageHeldKnowledge(join(directory, "held-knowledge.mjs"), join(directory, "catalog-gate"))
   await symlink(
-    fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
+    help === "held"
+      ? join(directory, "held-knowledge.mjs")
+      : fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
     join(resources, "runtime/src/knowledge-entry.mjs"),
   )
-  // Only the browser boundary is controlled. Help uses the real entry, SDK and HTTP MCP.
+  if (help !== "missing")
+    await writeHelp(join(resources, "help"), help === "tampered" ? { tamper: "data/README.md" } : {})
+  // Only the browser boundary is controlled. Help uses the real entry over shipped Help files.
   await writeFile(
     join(resources, "runtime/src/managed-entry.mjs"),
     `import {writeFileSync} from 'node:fs';
@@ -63,12 +69,11 @@ async function fixture(
       if (message.operation === 'close') process.send({id:message.id,result:{closed:${!failClose}}},()=>process.exit(${failClose ? 1 : 0}));
     });`,
   )
-  await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-  await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET\n")
+  await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({}))
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
   return {
     host,
-    server,
+    catalog,
     root,
     resources,
     marker,
@@ -80,9 +85,9 @@ async function fixture(
     },
     async close() {
       try {
+        await catalog.release()
         await host.close()
       } finally {
-        for (const callback of cleanup) await callback()
         await rm(directory, { recursive: true, force: true })
       }
     },
@@ -92,7 +97,7 @@ async function fixture(
 test.each(["host", "node"])(
   "Host shutdown cancels browser validation while its handshake is pending: %s",
   async (mode) => {
-    const f = await fixture("", {}, true)
+    const f = await fixture("", "shipped", true)
     const owner =
       mode === "host"
         ? f.host
@@ -143,7 +148,7 @@ test.each(["host", "node"])(
 test.each(["host", "node"])(
   "cancelled browser validation cannot hide failed cleanup: %s",
   async (mode) => {
-    const f = await fixture("", {}, true, true)
+    const f = await fixture("", "shipped", true, true)
     const owner =
       mode === "host"
         ? f.host
@@ -197,10 +202,6 @@ test.each([
       const browser = JSON.parse(await readFile(f.marker, "utf8"))
       expect(browser.validation).toBe(true)
       await expect(access(`/proc/${browser.pid}`)).rejects.toMatchObject({ code: "ENOENT" })
-      expect(f.server.requests.length).toBeGreaterThan(0)
-      expect(f.server.requests.map((request) => request.authorization)).toEqual(
-        f.server.requests.map(() => "Bearer UNIT-NONSECRET"),
-      )
       await f.host.api.save({ validationId: validation.validationId, revision: 0 })
       await f.host.settled()
       await f.host.catalog(1)
@@ -212,7 +213,7 @@ test.each([
       expect((await f.host.api.status()).failure).toBeUndefined()
       expect(await connectionStore(join(f.root, "connection"), credentials("linux")).read()).toMatchObject({
         url: f.candidate.url,
-        // The built-in key is read from the resources and never stored with the connection.
+        // Shipped Help needs no key, so none is stored with the connection.
         apiKey: "",
         password: f.candidate.password.value,
       })
@@ -221,9 +222,9 @@ test.each([
           run: "docs",
           id: "help",
           name: "read",
-          arguments: { uri: "Help/node.md" },
+          arguments: { uris: "data/processors/integration/rest-request.md" },
         }),
-      ).toMatchObject({ content: [{ type: "text", text: expect.stringContaining("Help/node.md") }] })
+      ).toMatchObject({ content: [{ type: "text", text: expect.stringContaining("# REST-запрос") }] })
       expect(f.host.hasRuntime(1, "docs")).toBe(false)
       expect(f.host.journal.pending()).toEqual([])
     } finally {
@@ -265,45 +266,41 @@ test.each(["", "LOGINOM_LOGIN_REJECTED"])(
   15_000,
 )
 
-test("browser validation starts only after the real Help catalog is complete", async () => {
-  const entered = Promise.withResolvers<void>()
-  const release = Promise.withResolvers<void>()
-  const f = await fixture("", {
-    list: async () => {
-      entered.resolve()
-      await release.promise
-      return { tools: f.server.tools }
-    },
-  })
+test("browser validation starts only after the Help catalog is complete", async () => {
+  const f = await fixture("", "held")
   const checking = f.host.api.check(f.candidate)
   void checking.catch(() => {})
   try {
-    await entered.promise
+    await f.catalog.entered()
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
-    release.resolve()
+    await f.catalog.release()
     expect((await checking).browser).toEqual({ state: "verified" })
     expect(await f.host.api.status()).toMatchObject({ state: "unconfigured", browser: { state: "unknown" } })
   } finally {
-    release.resolve()
+    await f.catalog.release()
     await checking.catch(() => {})
     await f.close()
   }
 }, 15_000)
 
-test("a failed Help service cannot start browser validation", async () => {
-  const f = await fixture("LOGINOM_LOGIN_UNAVAILABLE", {
-    initialize: () => {
-      throw Error("REMOTE-PRIVATE-TEXT")
-    },
-  })
-  try {
-    await expect(f.host.api.check(f.candidate)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
-    await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
-    expect((await f.host.api.status()).generation).toBe(0)
-  } finally {
-    await f.close()
-  }
-}, 15_000)
+test.each(["missing", "tampered"] as const)(
+  "unavailable shipped Help cannot start browser validation or produce a save token: %s",
+  async (help) => {
+    const f = await fixture("LOGINOM_LOGIN_UNAVAILABLE", help)
+    try {
+      await expect(f.host.api.check(f.candidate)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+      await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
+      expect(await f.host.api.status()).toMatchObject({ state: "unconfigured", generation: 0 })
+      await expect(f.host.api.save({ revision: 0, validationId: "never-issued" })).rejects.toThrow(
+        "LOGINOM_VALIDATION_EXPIRED",
+      )
+      expect(await connectionStore(join(f.root, "connection"), credentials("linux")).read()).toBeUndefined()
+    } finally {
+      await f.close()
+    }
+  },
+  15_000,
+)
 
 test("unexpected runtime failures do not become a successful browser warning or leak secrets", async () => {
   const f = await fixture("REMOTE-PRIVATE-TEXT")
@@ -318,41 +315,13 @@ test("unexpected runtime failures do not become a successful browser warning or 
   }
 }, 15_000)
 
-test("a rejected or missing built-in Help key cannot start browser validation or produce a save token", async () => {
-  const f = await fixture("LOGINOM_LOGIN_UNAVAILABLE")
-  try {
-    await writeFile(join(f.resources, "knowledge-key"), "WRONG-NONSECRET")
-    // A key sent by an older client would be accepted by the server, but it is never used.
-    const legacy = { ...f.candidate, apiKey: { operation: "replace" as const, value: "UNIT-NONSECRET" } }
-    await expect(f.host.api.check(legacy)).rejects.toThrow("LOGINOM_KNOWLEDGE_AUTH_FAILED")
-    await rm(join(f.resources, "knowledge-key"))
-    await expect(f.host.api.check(legacy)).rejects.toThrow("LOGINOM_CONNECTION_CHECK_FAILED")
-    await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
-    expect(await f.host.api.status()).toMatchObject({ state: "unconfigured", generation: 0 })
-    await expect(f.host.api.save({ revision: 0, validationId: "never-issued" })).rejects.toThrow(
-      "LOGINOM_VALIDATION_EXPIRED",
-    )
-    expect(await connectionStore(join(f.root, "connection"), credentials("linux")).read()).toBeUndefined()
-  } finally {
-    await f.close()
-  }
-}, 15_000)
-
 test("Host shutdown cancels the pending Help validation before any browser check", async () => {
-  const entered = Promise.withResolvers<void>()
-  const release = Promise.withResolvers<void>()
-  const f = await fixture("", {
-    list: async () => {
-      entered.resolve()
-      await release.promise
-      return { tools: f.server.tools }
-    },
-  })
+  const f = await fixture("", "held")
   const checking = f.host.api.check(f.candidate)
   void checking.catch(() => {})
   const deadline: { timer?: ReturnType<typeof setTimeout> } = {}
   try {
-    await entered.promise
+    await f.catalog.entered()
     await f.host.close()
     await expect(
       Promise.race([
@@ -365,7 +334,7 @@ test("Host shutdown cancels the pending Help validation before any browser check
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
   } finally {
     clearTimeout(deadline.timer)
-    release.resolve()
+    await f.catalog.release()
     await checking.catch(() => {})
     await f.close()
   }

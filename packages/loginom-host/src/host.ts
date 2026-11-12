@@ -92,20 +92,12 @@ export async function createLoginomHost(options: {
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
-        endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
         ...(deadline !== undefined ? { startupDeadline: deadline } : {}),
       },
       signal,
     ).catch(startupFailure)
-  }
-  // The knowledge service accepts the key built into the resources; the key a
-  // user saved with an older build is never sent. Release builds always carry
-  // the key; without one the knowledge entry refuses to start.
-  async function withKnowledgeKey(connection: ActiveConnection) {
-    const apiKey = await readFile(join(resources, "knowledge-key"), "utf8").catch(() => "")
-    return { ...connection, apiKey: apiKey.trim() }
   }
   function startupFailure(error: unknown): never {
     // Recoverable readiness/browser failures must not hide uncertain child cleanup.
@@ -118,12 +110,10 @@ export async function createLoginomHost(options: {
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
-      async check(candidate, signal) {
+      async check(connection, signal) {
         signal?.throwIfAborted()
-        const connection = await withKnowledgeKey(candidate)
         const chat = randomUUID()
         try {
-          const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
           const knowledge = await superviseKnowledge(
             {
               node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -131,8 +121,7 @@ export async function createLoginomHost(options: {
               // Knowledge has no mutable cwd state; retain its private close evidence after validation cleanup.
               stateDir: join(root, "knowledge", String(connection.generation)),
               generation: connection.generation,
-              endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
-              apiKey: connection.apiKey,
+              helpRoot: join(resources, "help"),
               environment,
             },
             signal,
@@ -168,16 +157,13 @@ export async function createLoginomHost(options: {
           ])
         }
       },
-      async prepare(candidate) {
-        const connection = await withKnowledgeKey(candidate)
-        const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+      async prepare(connection) {
         const knowledge = await superviseKnowledge({
           node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
           entry: join(resources, "runtime/src/knowledge-entry.mjs"),
           stateDir: join(root, "knowledge", String(connection.generation)),
           generation: connection.generation,
-          endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
-          apiKey: connection.apiKey,
+          helpRoot: join(resources, "help"),
           environment,
         }).catch(startupFailure)
         const catalog = knowledge.request("list")

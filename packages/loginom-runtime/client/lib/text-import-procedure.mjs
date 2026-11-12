@@ -61,7 +61,15 @@ export async function configureTextImportTitle(channel,title) {
 export const autoDetectLabels={none:'Нет',new:'Только новые',all:'Все'};
 const autoDetectMode=label=>Object.keys(autoDetectLabels).find(k=>autoDetectLabels[k]===label);
 export const autoTypesRequested=p=>['new','all'].includes(p?.format?.auto_detect_columns)||!!p?.analysis?.refresh;
-export const fileInfoLabels={none:'Нет',name:'Имя файла'};
+export const fileInfoLabels={none:'Нет',name:'Имя файла',relative_path:'Относительный путь',absolute_path:'Абсолютный путь',
+  name_time:'Имя файла, Время модификации',relative_path_time:'Относительный путь, Время модификации',
+  absolute_path_time:'Абсолютный путь, Время модификации'};
+export function textImportServiceFields(label) {
+  if(label===undefined||label===fileInfoLabels.none)return [];
+  const mode=Object.keys(fileInfoLabels).find(k=>fileInfoLabels[k]===label);
+  requireValue(mode,'Unknown observed file_info');
+  return [{name:'FileName',type:'string'},...(mode.endsWith('_time')?[{name:'FileTime',type:'datetime'}]:[])];
+}
 const threadChoices=['auto',2,4,8,16,32];
 export function textImportSourceMask(source) {
   const mask=source.source_mask;
@@ -149,7 +157,12 @@ function validateSettings(p,maxColumns) {
   else textImportSourcePaths(p.source);
   if(Object.hasOwn(p.source,'file_info'))requireValue(Object.hasOwn(fileInfoLabels,p.source.file_info),'Invalid file_info');
   if(Object.hasOwn(p.source,'parallel_processing'))requireValue(typeof p.source.parallel_processing==='boolean','Invalid parallel_processing');
-  if(Object.hasOwn(p.source,'max_threads'))requireValue(threadChoices.includes(p.source.max_threads),'Invalid max_threads');
+  if(Object.hasOwn(p.source,'max_threads')){
+    requireValue(threadChoices.includes(p.source.max_threads),'Invalid max_threads');
+    requireValue(p.source.parallel_processing!==false
+      &&(!['source_paths','source_mask'].some(k=>Object.hasOwn(p.source,k))||p.source.parallel_processing===true),
+      'max_threads requires parallel_processing:true');
+  }
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
   requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
     && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
@@ -503,6 +516,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   // Source and format are caller decisions. No automatic type detection result
   // is treated as confirmation of the requested schema.
   const sourceBaseline=patch?(await read('text_import_file','existing source initialized',isTextImportSourceReady)).wizard.import_source:null;
+  if(patch&&Object.hasOwn(parameters.source,'max_threads')&&parameters.source.parallel_processing!==true)requireValue(sourceBaseline.fields.max_threads?.enabled!==false,'max_threads requires parallel_processing:true');
   if(patch&&boundSource)requireValue(sourceBaseline.fields.source_path.variable_mode===true,'BINDING_SOURCE_UNVERIFIED');
   // A discarded first configuration leaves a graph node with no source. There
   // is no retained schema to inspect until complete source settings are applied.
@@ -538,6 +552,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     if(['file_info','parallel_processing','max_threads'].includes(name)&&!Object.hasOwn(parameters.source,name))continue;
     if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
     let s = await read('text_import_file'), f = field(s, name, true);
+    if(name==='max_threads')requireValue(f.enabled!==false,'max_threads requires parallel_processing:true');
     const encoding = fieldsOnly && name==='encoding' ? resolveTextImportEncoding(parameters.source.encoding):null;
     const desired = encoding ? encoding.label : name==='file_info'?fileInfoLabels[parameters.source[name]]:name==='max_threads'?(parameters.source[name]==='auto'?'Автоопределение':String(parameters.source[name])): name === 'rows_to_skip' ? String(parameters.source[name]) : parameters.source[name];
     if (f.value === desired) continue;

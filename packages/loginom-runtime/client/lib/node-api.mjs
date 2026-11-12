@@ -29,7 +29,7 @@ const choice=(...values)=>({type:'string',enum:values});
 const boolean={type:'boolean'};
 const array=(items,maxItems,minItems=0)=>({type:'array',items,maxItems,minItems});
 const ref=object({document_id:id,workflow_id:id,node_id:id});
-const sourceSettings=object({source_path:text(2048),source_paths:array({type:'string',maxLength:2048},16,1),source_mask:text(2048),file_info:choice('none','name'),parallel_processing:boolean,max_threads:{enum:['auto',2,4,8,16,32]},encoding:text(80),rows_to_skip:integer(0,1000000),first_line_as_title:boolean},[]);
+const sourceSettings=object({source_path:text(2048),source_paths:array({type:'string',maxLength:2048},16,1),source_mask:text(2048),file_info:choice('none','name','relative_path','absolute_path','name_time','relative_path_time','absolute_path_time'),parallel_processing:boolean,max_threads:{enum:['auto',2,4,8,16,32]},encoding:text(80),rows_to_skip:integer(0,1000000),first_line_as_title:boolean},[]);
 const textImportSourceSchema={oneOf:[...importSourceSchema.oneOf,object({kind:{const:'verified_sources'},sources:array(importSourceSchema,16,1)})]};
 const format=object({delimiter:{type:'string',minLength:1,maxLength:1},decimal_separator:choice('.',','),
  null_marker:{type:'string',maxLength:256},text_qualifier:{type:'string',maxLength:1},multiple_delimiters:boolean,variant_as_general_type:boolean,date_format:choice('dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'),date_separator:choice('.','/','\\','-'),auto_detect_columns:choice('none','new','all')},[]);
@@ -227,7 +227,7 @@ export const textImportParametersSchema=object({
  source:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source),
   description:'Required except unchanged Execute. Verified storage/delivery refs; bytes/SHA must match. List: kind:verified_sources,sources:[refs] in source_paths order. Unchanged existing Execute may omit source: settings:{}, inputs/mappings:[], read.ports:[0].'},
  settings:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.settings),
-  description:'New: source,format,columns (or native detection). Existing: patch; omission preserves. Lists: source_paths plus verified_sources in file order. file_info none/name adds native FileName.'},
+  description:'New: source,format,columns (or detection). Existing: patch; omission preserves. Binding replaces source_path. Lists: source_paths + ordered verified_sources.'},
 },['settings']);
 // Cross-field restrictions survive the compact user envelope. Runtime guards
 // remain authoritative after optional defaults are expanded.
