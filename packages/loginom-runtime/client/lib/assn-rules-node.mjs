@@ -8,6 +8,10 @@ import {trainConfiguredNode} from './node-execution-procedure.mjs';
 const need=(value,message)=>{if(!value)throw Error('Association rules: '+message);};
 export function createAssnRulesNodeSupport(config){const support=createTabularTransformNodeSupport(config,{
  type:'datamining.assn_rules',modes:['fp_growth','apply'],revision:'assn-rules-v1-internal-2',parameterSchema:assnRulesParametersSchema,
+ async beforeInput(options,ctx){
+  const graph=await options.operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline);
+  need(graph.links.filter(e=>e.target===ctx.node.node_id).every(e=>e.input===0),'auxiliary input is unsupported');
+ },
  validate:validateAssnRulesParameters,validateInput:(p,resolved,native)=>resolveAssnRulesRoles(p,resolved.fields??native.target_fields),readback:assnRulesConfigurationReadback,
  configurationObservation:{condition:'assn-rules feature roles',readAssnRules:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_assn_rules?.verified===true},
  async configure(channel,p,context){

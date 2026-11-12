@@ -384,7 +384,7 @@ export interface AssnRulesConfigurationReadback {
   kind: 'assn_rules'; scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; mode: 'fp_growth' | 'apply'; transaction_field: string; item_field: string;
   min_support_pct: number; min_confidence_pct: number; max_items: 2 | 3;
-  min_lift: number; singletons: true; consequence_limit: 1 | 2;
+  min_lift: number; exclude_support_above_pct: number | null; singletons: true; consequence_limit: 1 | 2;
   training: ClusteringConfigurationReadback['training']; package_persistence_verified: false;
 }
 

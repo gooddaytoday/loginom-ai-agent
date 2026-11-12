@@ -145,3 +145,13 @@ Enum строковые. Readback подтверждает сохранённы�
 До этапа 1 требуется решение о бизнес-проекции без доверительных границ:
 независимый oracle непостоянного estimator и интервалов отсутствует.
 Полная сезонность остаётся discovery_required, runtime не менялся.
+
+## Решение владельца v040-scope-expansion (12.11.2026)
+
+Края сезонности: исходы **zero и null** — критерий PASS по
+`expected-seasonal-zero.json` и `expected-seasonal-null.json` (наблюдённые
+native-исходы LAB-1166). **empty** (`empty-support`, `empty-totals`) — честный
+отказ обработчика, а не пустой результат: `expected-seasonal-empty-*.json`
+с 0/0 строк критерием не являются. Текст отказа и его expected в штатном
+формате run-check (`refusal` либо `execution_error`, как края Автокорреляции)
+фиксируются в цикле до прогонов. См. [seasonal-proposal.md](acceptance/seasonal-proposal.md).

@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,182040,'5a70f409eba617842787ce73633cacf4736756679bdceef6fdf23e5139a84916'],
+  [nodeApiTools,182846,'a7c43f123be163bdaafcf1e9fff208c436f9bd8bb1359d37d301c9ce42ddd187'],
   [nodeApiTools.map(userNodeTool),13183,'03d4f81d1e939ce5aacbdf33a3cb9c09ae7405eed44544cfbc4c91264a4c9623'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -254,7 +254,9 @@ test('Forward scoped selection passes the public schema and real registered hand
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,mode:'enter'}),/only in forward/);
 });
 
-test('replacement Boolean and mixed registrations reach the production parameter validator',async()=>{
+test('replacement Boolean, mixed and external registrations reach the production parameter validator',async()=>{
+ const {NODE_TYPES}=await import('../lib/node-contracts.mjs');
+ assert.equal(NODE_TYPES['transform.replace_columns'].additional_tabular_inputs,true);
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
  const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
  const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
