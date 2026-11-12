@@ -30,14 +30,12 @@ csv=b'amount\n10\n20\n25\n'
 if attachment_mode: (workspace/'sales.csv').write_bytes(csv)
 (bundle/'bin').mkdir(parents=True); (bundle/'runtime/src').mkdir(parents=True)
 (bundle/'bin/node').symlink_to(repo/'packages/desktop/resources/loginom/bin/node')
-(bundle/'resource-manifest.json').write_text(json.dumps({'endpoint':'https://example.test'}))
-# The built-in knowledge key; the fixture runtime starts only with it.
-(bundle/'knowledge-key').write_text('fixture-key')
+(bundle/'resource-manifest.json').write_text(json.dumps({}))
 (bundle/'runtime/src/managed-entry.mjs').write_text('''import { appendFileSync, existsSync } from 'node:fs';
 appendFileSync(new URL('../../fixture-pids.jsonl', import.meta.url),JSON.stringify([process.pid,process.ppid])+'\\n');
 process.on('message', m => {
  if(m.operation==='start')appendFileSync(new URL('../../fixture-starts.jsonl', import.meta.url),JSON.stringify({chat:m.input.chat,headless:m.input.headless})+'\\n');
- if(m.operation==='start'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../starting',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{protocol:1,generation:m.input.connection.apiKey==='fixture-key' && m.input.connection.password==='' ? m.input.generation : -1,chat:m.input.chat,checked:true,ready:true}}),delayed?2000:0);}
+ if(m.operation==='start'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../starting',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{protocol:1,generation:m.input.connection.apiKey==='' && m.input.connection.password==='' ? m.input.generation : -1,chat:m.input.chat,checked:true,ready:true}}),delayed?2000:0);}
  if(m.operation==='list')process.send({id:m.id,result:{tools:[{name:'probe',description:'Probe the private TUI host',inputSchema:{type:'object',properties:{}}}]}});
  if(m.operation==='call'){appendFileSync(new URL('../../fixture-calls.jsonl',import.meta.url),JSON.stringify(m.input)+'\\n');process.send({id:m.id,result:{recoveryPending:false,result:{content:[{type:'text',text:'TUI private host completed'}]}}});}
  if(m.operation==='admit')process.send({id:m.id,result:{admitted:true}});

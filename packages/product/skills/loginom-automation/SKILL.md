@@ -237,7 +237,7 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 
 ## Справка и происхождение
 
-[Источники](references/sources.md) — корни справки, поиск и атрибуция.
+[Источники](references/sources.md) — справка Loginom, как в ней искать, атрибуция.
 
 Используй доступные инструменты Help `loginom_find`, `loginom_search`,
 `loginom_read`, `loginom_grep`, `loginom_glob`, `loginom_list`, `loginom_tree`.

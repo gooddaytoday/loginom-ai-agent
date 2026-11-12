@@ -113,7 +113,6 @@ test("actual managed entry reads live bridge work and dispatching over private I
     stateDir: join(directory, "state"),
     generation: 1,
     chat: "chat",
-    endpoint: "http://example.test",
     connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
     environment: {},
   })
@@ -160,7 +159,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
   await stageKnowledgeFixture(directory)
   await mkdir(join(directory, "bin"))
   await symlink(node, join(directory, "bin/node"))
-  await Bun.write(join(directory, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
+  await Bun.write(join(directory, "resource-manifest.json"), JSON.stringify({}))
   const root = join(directory, "host")
   const codec = credentials("linux")
   const store = connectionStore(join(root, "connection"), codec)

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
-import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
+import { productHelpDirectory, productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { verifyBundledSkills } from "../src/bundled-skills"
 import { ripgrepPins } from "../script/ripgrep-resource"
 
@@ -138,15 +138,19 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
     const root = await mkdtemp(join(tmpdir(), "loginom-stage-product-skills-"))
     try {
       const destination = join(root, "resources")
-      await stageResources({ destination, node, browsers, target, flavor: "cli", knowledgeKey: " UNIT-NONSECRET\n" })
-      // The built-in key is a separate inventoried resource, never part of the manifest itself.
-      expect(await readFile(join(destination, "knowledge-key"), "utf8")).toBe("UNIT-NONSECRET")
-      expect(await readFile(join(destination, "resource-manifest.json"), "utf8")).not.toContain("UNIT-NONSECRET")
+      await stageResources({ destination, node, browsers, target, flavor: "cli" })
+      // Loginom Help ships as inventoried resource files; no knowledge service key or endpoint is staged.
+      await expect(stat(join(destination, "knowledge-key"))).rejects.toMatchObject({ code: "ENOENT" })
+      expect(await readFile(join(destination, "help/help-manifest.json"), "utf8")).toBe(
+        await readFile(join(productHelpDirectory, "help-manifest.json"), "utf8"),
+      )
       const skills = await verifyBundledSkills(destination)
       expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs"])
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
-      expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "help/help-manifest.json")).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(false)
+      expect(manifest).not.toHaveProperty("endpoint")
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("licenses/ripgrep/")
       const rg = process.platform === "win32" ? "ripgrep/rg.exe" : "ripgrep/rg"

@@ -178,8 +178,6 @@ async function handle(message) {
       state.browser = authenticated.context
       const config = {
         resources: input.resources,
-        endpoint: input.endpoint,
-        apiKey: input.connection.apiKey,
         // Preparation must bind to the same canonical path used by private login.
         loginomUrl: loginomAddress(input.connection.url),
         stateDir: input.stateDir,

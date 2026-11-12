@@ -290,11 +290,9 @@ At a phase deadline, SIGINT goes to the CLI owner first, with 100 seconds for
 normal close/ACK. If it stays alive, the process group receives SIGINT and
 another 40-second wait, then SIGKILL as the final fallback.
 Builds use a detached clean source tree and `nice -n 19`; mas2 uses `--baseline`.
-They embed the knowledge service key like release builds: `LOGINOM_MCP_API_KEY`
-from the environment or `~/.config/loginom-ai-agent/mcp-api-key` (mode 600) on
-the stand; it reaches only the build environment. The pair `api_key` is no longer
-sent to setup. A supplied build must have matching SHA, `sourceDirty=false` and
-`resources/loginom/knowledge-key`.
+Builds ship Loginom Help in `resources/loginom/help`; no knowledge service key is
+needed. The pair `api_key` is no longer sent to setup. A supplied build must have
+matching SHA, `sourceDirty=false` and `resources/loginom/help/help-manifest.json`.
 The total budget is shared by sequential scenarios. If it expires before a
 scenario starts (including its first load/spacing gate), that scenario is
 `NOT_RUN` with reason `BATCH_BUDGET_EXHAUSTED`, displayed as

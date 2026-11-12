@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
+import { writeHelp } from "../../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { acquireProfile } from "../../src/cli/profile"
 
 export async function standaloneFixture(binary?: string) {
@@ -46,14 +47,13 @@ export async function standaloneFixture(binary?: string) {
       ])
       expect({ buildExit, buildError, buildOutput }).toEqual({ buildExit: 0, buildError: "", buildOutput: "" })
       await copyProductSkillsFixture(bundle)
-      // The fake knowledge server accepts this built-in key.
-      await writeFile(join(bundle, "knowledge-key"), "UNIT-NONSECRET")
+      // A small shipped Help; tests that need it unavailable remove or change it.
+      await writeHelp(join(bundle, "help"))
       await writeFile(
         join(bundle, "resource-manifest.json"),
         JSON.stringify({
           protocol: 1,
           node: "bin/node",
-          endpoint: "http://127.0.0.1:1/mcp",
           files: await resourceInventory(bundle),
         }),
       )
