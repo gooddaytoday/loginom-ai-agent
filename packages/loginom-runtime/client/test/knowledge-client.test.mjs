@@ -69,8 +69,11 @@ test('list, tree, glob and grep browse the shipped tree', async t => {
   const { call } = await client(t);
   assert.match((await call('list', { uri: `${HELP_URI}/data/processors/func/calc-func` })).text, /datetime\.md — Дата\/Время функции/);
   const tree = (await call('tree', {})).text;
-  assert.match(tree, /^ {2}data\/$/m);
-  assert.match(tree, /^ {6}transformation\/$/m);
+  assert.match(tree, /^ {2}README\.md — Loginom — руководство пользователя$/m);
+  assert.match(tree, /^ {6}calc\/$/m);
+  // The Help root opens the main page and the top level of the data tree.
+  assert.match((await call('read', { uris: HELP_URI })).text, /^=== .*\/data\/README\.md ===/);
+  assert.match((await call('list', { uri: HELP_URI })).text, /\/data\/processors\/$/m);
   const glob = await call('glob', { pattern: '**/rest-request*' });
   assert.match(glob.text, /rest-request\.md — REST-запрос/);
   const grep = await call('grep', { uri: HELP_URI, pattern: ['AddDay\\(', 'Left\\('], node_limit: 5 });
@@ -87,6 +90,24 @@ test('replies stay inside the agent output limit', async t => {
   const reply = await call('read', { uris: Object.keys(pages) });
   assert.ok(Buffer.byteLength(reply.text) <= 44000, `${Buffer.byteLength(reply.text)} bytes`);
   assert.match(reply.text, /reply limit reached: \d more item/);
+  const echo = await call('find', { query: 'нет такого слова '.repeat(5000) });
+  assert.ok(Buffer.byteLength(echo.text) <= 44000, `${Buffer.byteLength(echo.text)} bytes`);
+});
+
+test('a catastrophic pattern from the model fails fast instead of stalling Help', async t => {
+  const pages = { 'data/slow.md': '# Медленно\n\n' + 'Слово '.repeat(40) + 'конец\n' };
+  const { call } = await client(t, { pages, aliases: [] });
+  for (const [name, args] of [
+    ['grep', { uri: HELP_URI, pattern: '([А-Яа-я]+ ?)+\\(', case_insensitive: true }],
+    ['glob', { pattern: '*'.repeat(40) + 'Z' }],
+  ]) {
+    const started = performance.now();
+    const reply = await call(name, args);
+    assert.ok(performance.now() - started < 10000, `${name} took ${Math.round(performance.now() - started)} ms`);
+    if (name === 'grep') assert.match(reply.text, /takes too long/);
+    assert.equal(reply.isError, name === 'grep');
+  }
+  assert.match((await call('grep', { uri: HELP_URI, pattern: 'a'.repeat(70000) + '{9999999}' })).text, /invalid pattern|No matches/);
 });
 
 test('a changed Help file refuses startup instead of serving unverified text', async t => {
