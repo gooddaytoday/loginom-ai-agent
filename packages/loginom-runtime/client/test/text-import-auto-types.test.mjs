@@ -12,14 +12,14 @@ const source={source_path:'/test/typed.csv',encoding:'UTF-8',rows_to_skip:0,firs
 const format={delimiter:';',text_qualifier:'"',null_marker:'NULL',decimal_separator:'.'};
 
 // Minimal native wizard: «Автоопределение столбцов» combo, rows field and both refresh buttons.
-function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет',initialVariant=false,hideVariantInPicker=false,hideVariant=false}={}) {
+function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет',initialVariant=false,hideVariantInPicker=false,hideVariant=false,initialPath='/test/typed.csv'}={}) {
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
  let variant=initialVariant;
- let stage='text_import_file',mode=initialMode,rows='25',opened=false,columns=existing?structuredClone(retained):native();
+ let stage='text_import_file',mode=initialMode,rows='25',opened=false,columns=existing?structuredClone(retained):native(),path=initialPath;
  const gestures=[],initial=structuredClone(columns);
  const field=(value,extra={})=>({status:'observed',truncated:false,value,...extra});
  const state=(offset=0)=>({wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:owner,
-  import_source:{fields:Object.fromEntries(Object.entries({source_path:'/test/typed.csv',connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true}).map(([k,v])=>[k,field(v,{input_ref:k,display_ref:k})]))},
+  import_source:{fields:Object.fromEntries(Object.entries({source_path:path,connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true}).map(([k,v])=>[k,field(v,{input_ref:k,display_ref:k})]))},
   settings:{fields:{...(!hideVariant&&(!opened||!hideVariantInPicker)?{variant_as_general_type:field(variant,{display_ref:'variant'})}:{}),...Object.fromEntries(Object.entries(format).map(([k,v])=>[k,field(v,{input_ref:k})])),
    auto_detect_columns:field(mode,{owner_ref:'auto-owner',input_ref:'auto-input',enabled:true,read_only:true}),
    analysis_rows:field(rows,{owner_ref:'rows-owner',input_ref:'rows-input',enabled:mode!=='Нет',read_only:false})}},
@@ -34,6 +34,8 @@ function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет
  const channel={observe:async options=>{const s=structuredClone(state(options.importColumnPage?.offset??0));if(!options.ready(s))throw Error('Observation refused: '+options.condition);return s;},
   act:async action=>{
    gestures.push(action);
+   if(action.verb==='fill'&&action.ref==='source_path'){path=action.text;return;}
+   if(action.verb==='press'&&action.ref==='source_path'&&action.key==='Tab')return;
    if(action.verb==='set_checked'&&action.ref==='variant'){variant=action.checked;return;}
    if(action.verb==='wizard_step'){stage=action.expected_stage;return;}
    if(action.verb==='click'&&action.ref==='auto-picker'){opened=true;return;}
@@ -49,6 +51,19 @@ function fixture({existing=true,retained=native().slice(0,5),initialMode='Нет
  return {owner,channel,gestures,initial,get mode(){return mode;},get rows(){return rows;}};
 }
 const brief=cs=>cs.map(({name,type})=>name+':'+type).join(',');
+
+for(const mode of ['new','all'])test('discarded preview keeps native detection without injecting a manual schema: '+mode,async()=>{
+ const f=fixture({existing:false,initialPath:''});
+ const settings={source,format:{...format,auto_detect_columns:mode}};
+ const before=structuredClone(settings);
+ const result=await configureTextImportPatch(f.channel,settings,f.owner,source.source_path);
+ assert.equal(result.verified,true);
+ assert.equal(result.source.fields.source_path.value,source.source_path);
+ assert.equal(result.format.fields.auto_detect_columns.value,autoDetectLabels[mode]);
+ assert.deepEqual(result.columns.map(({name,type})=>({name,type})),native().map(({name,type})=>({name,type})));
+ assert.deepEqual(settings,before);
+ assert.equal(f.gestures.filter(a=>a.verb==='fill'&&a.ref==='source_path').length,1);
+});
 
 test('auto type settings are validated and stay optional',()=>{
  const base={source,format:{...format}};

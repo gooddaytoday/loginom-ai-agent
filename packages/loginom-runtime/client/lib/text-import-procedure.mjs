@@ -207,7 +207,7 @@ export const validateTextImportFieldsRequest=p=>{
 
 export class ImportInitialSettingsError extends Error {
   constructor(reason) {
-    super('Existing import has no saved source. Supply complete settings.source including an explicit source_path matching the verified upload, complete settings.format and nonempty settings.columns; the upload reference does not supply settings. '+reason);
+    super('Existing import has no saved source. Supply complete settings.source including an explicit source_path matching the verified upload, complete settings.format and either nonempty settings.columns or native auto_detect_columns=new/all without columns; the upload reference does not supply settings. '+reason);
     this.name='ImportInitialSettingsError';
   }
 }
@@ -462,7 +462,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   if(boundSource)requireValue(parameters.source?.source_path===undefined,'BINDING_CONFLICT');
   (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(boundSource?{...parameters,source:{...parameters.source,source_path:'/binding-validation.csv'}}:parameters);
   parameters=structuredClone(parameters);
-  if(patch)parameters={source:parameters.source??{},format:parameters.format??{},columns:parameters.columns??[],...(parameters.analysis?{analysis:parameters.analysis}:{})};
+  if(patch)parameters={source:parameters.source??{},format:parameters.format??{},
+    ...(autoTypesRequested(parameters)&&!Object.hasOwn(parameters,'columns')?{}:{columns:parameters.columns??[]}),
+    ...(parameters.analysis?{analysis:parameters.analysis}:{})};
   const requested=structuredClone(parameters);
   // Serialize only after validation; preflight verifies every path separately.
   if(parameters.source?.source_paths){parameters.source.source_path=textImportSourcePaths(parameters.source).join('｜');delete parameters.source.source_paths;}

@@ -25,7 +25,7 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
   }));
   const source=fields(c.source,['source_path','connection','encoding','rows_to_skip','first_line_as_title',
     ...['file_info','parallel_processing','max_threads'].filter(k=>c.source?.fields?.[k]?.status==='observed')]);
-  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','variant_as_general_type','date_format','date_separator'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
+  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns','analysis_rows'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
   requireValue(typeof source.first_line_as_title==='boolean'
     &&Object.entries(source).every(([k,v])=>typeof v===(['first_line_as_title','parallel_processing'].includes(k)?'boolean':'string'))
     &&Object.entries(format).every(([k,v])=>typeof v===(['multiple_delimiters','variant_as_general_type'].includes(k)?'boolean':'string')),'invalid observed field types');

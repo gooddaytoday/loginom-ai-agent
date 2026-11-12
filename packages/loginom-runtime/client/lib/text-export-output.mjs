@@ -41,7 +41,14 @@ export async function navigateExportDirectory({directory,inDirectory,row,act}){
   const part=parts[index];s=await row(part);
   need(s.file_storage?.directory===current&&JSON.stringify(s.workflow_ref)===workflow,'Export storage parent differs');
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(part)&&e.label===part&&e.storage_entry?.kind==='folder'));
-  await act(s,e,'double_click');s=await inDirectory(ancestors,s);
+  await act(s,e,'double_click');s=await inDirectory(undefined,s);
+  // Native folder reuse can restore a preview tab below the destination.
+  // Return only that confirmed descendant to Files; unrelated folders refuse.
+  if(s.file_storage.directory.startsWith(directory+'/')){
+   await act(s,one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы')));
+   s=await inDirectory(['/'],s);
+  }
+  need(ancestors.includes(s.file_storage.directory),'Export storage is outside the requested ancestry');
  }
  need(s.file_storage.directory===directory,'Export destination not reached');return s;
 }

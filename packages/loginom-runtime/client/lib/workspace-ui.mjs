@@ -3670,6 +3670,13 @@ function readRenderedInputMapping(observation) {
         && other.closest('.x-grid-item')===storageRow && visible(other) && !sensitive(other);}) : [];
       const storageEntry=storageRow ? {row_ref:refOf(storageRow),selected:storageRow.classList.contains('x-grid-item-selected'),
         kind:storageTypes.length===1 && textOf(storageTypes[0],true)==='Папка' ? 'folder':'unknown'} : null;
+      if(storageEntry) {
+        // Native FileStore size of the open folder (files and folders): a
+        // listing compares it with the distinct rows it actually observed.
+        const gridTid=tid.split(';colName_')[0]+';pnlFileStorage';
+        const grid=storageRow.closest('[data-tid='+JSON.stringify(gridTid)+']'),inventory=grid&&storageInventory(grid,gridTid);
+        if(inventory&&inventory.store.isLoading?.()===false&&inventory.store.getCount()===inventory.count)storageEntry.directory_entries=inventory.count;
+      }
       if(storageEntry&&storageEntry.kind!=='folder') {
         // Loginom 7.4.2 renders 1702 bytes as "1,702". Display text is not
         // byte identity: use the cached file record bound to this exact row.

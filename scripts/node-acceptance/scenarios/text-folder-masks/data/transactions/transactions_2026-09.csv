@@ -1,0 +1,4 @@
+TransactionID,AccountID,Amount,Channel,Attempts
+TX-0901,ACC-001,1250.75,mobile,1
+TX-0902,ACC-002,89.4,web,2
+TX-0903,ACC-001,15000.5,branch,1

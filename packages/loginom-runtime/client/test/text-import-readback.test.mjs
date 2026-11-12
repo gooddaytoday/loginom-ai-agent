@@ -39,3 +39,15 @@ test('public readback cannot claim package persistence or lose identity',()=>{
  for(const patch of [{package_persistence_verified:true},{node:null},{receipt_ids:[]},{scope:'saved_package'}])
   assert.equal(check({status:'applied',readback:{...readback,...patch}}).valid,false);
 });
+
+test('native detection mode and analysis size come from observed settings',()=>{
+ const input=fixture(),fields=input.phases[0].value.format.fields;
+ fields.auto_detect_columns={status:'observed',value:'Только новые'};
+ fields.analysis_rows={status:'observed',value:'4'};
+ const readback=textImportConfigurationReadback(input);
+ assert.equal(readback.format.auto_detect_columns,'Только новые');
+ assert.equal(readback.format.analysis_rows,'4');
+ assert.equal(check({status:'applied',readback}).valid,true);
+ fields.auto_detect_columns.truncated=true;
+ assert.throws(()=>textImportConfigurationReadback(input),/auto_detect_columns/);
+});

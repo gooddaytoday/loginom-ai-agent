@@ -1,0 +1,4 @@
+BeneficiaryID,AccountID,Bank,Country,TransferLimit
+B-03,ACC-003,Kaspi,KZ,7500.25
+B-04,ACC-004,Halyk,KZ,300.5
+B-05,ACC-001,Belarusbank,BY,1500.9

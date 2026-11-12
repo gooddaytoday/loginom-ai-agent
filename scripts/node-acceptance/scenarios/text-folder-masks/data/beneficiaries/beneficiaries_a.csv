@@ -1,0 +1,3 @@
+BeneficiaryID,AccountID,Bank,Country,TransferLimit
+B-01,ACC-001,Alfa Bank,RU,50000.5
+B-02,ACC-002,Tinkoff,RU,12000.75
