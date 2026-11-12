@@ -3,6 +3,9 @@ const keys=['input_field','target_field','event_value','partition','min_class_pe
 export function validateCoarseClassesParameters(p,mode,r){
  need(p&&typeof p==='object'&&!Array.isArray(p),'parameters must be an object');
  need(['internal','apply'].includes(mode),'use internal to train or apply to preserve saved classes');
+ // LAB-1324, owner decision 12.11: Loginom 7.4.2 does not apply a ready external
+ // class table to a discrete predictor; refuse before the target phase or any gesture.
+ if(mode==='internal'&&p.coarse_classes?.partition==='external')throw Error('Coarse classes: COARSE_EXTERNAL_UNSUPPORTED: Loginom 7.4.2 does not apply a ready external class table (input 1) to a discrete predictor. Next step: submit a NEW operation_id with partition:"automatic" on input 0 only (frozen:true keeps the trained classes on retraining) and tell the user that a ready external partition is unavailable.');
  if(mode==='apply'){
   need(Object.keys(p).length===0,'apply requires parameters:{} without training or settings edits');
   if(r)need(r.target.kind==='existing'&&r.inputs.length===0&&r.mappings.length===0&&r.finish==='execute','apply requires existing node, inputs:[], mappings:[], finish:execute');

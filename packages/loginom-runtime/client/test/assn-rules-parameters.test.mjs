@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateAssnRulesParameters,resolveAssnRulesRoles} from '../lib/assn-rules-parameters.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
+import {createAssnRulesNodeSupport} from '../lib/assn-rules-node.mjs';
 const p={transaction_field:'Transaction',item_field:'Item',min_support_pct:50,min_confidence_pct:60,max_items:2};
 const request={target:{kind:'new'},inputs:[{input:0}],mappings:[],read:{ports:[0,1]}};
 test('association rules register FP-Growth and preserve omitted existing settings',()=>{
@@ -53,7 +54,36 @@ test('public dispatch admits all registered association-rule ports before the pr
   budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
  for(const ports of [[2],[1,2],[0,1,2]])
   await dispatchNodeApi(runtime,'dock_node_apply',{...envelope,read:{ports,sample_rows:100,require_exact_numbers:true}});
+ for(const threshold of [90,null])await dispatchNodeApi(runtime,'dock_node_apply',{...envelope,parameters:{...p,exclude_support_above_pct:threshold},read:{ports:[0,1],sample_rows:100,require_exact_numbers:true}});
  for(const type of ['transform.calculator','datamining.clustering'])
   assert.throws(()=>validateNodeApplyEnvelope({...envelope,target:{...envelope.target,type},read:{ports:[2]}}),/must be <= 1/);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,read:{ports:[3],sample_rows:100,require_exact_numbers:true}}),/must be <= 2/);
+});
+
+test('maximum support exclusion admits only finite percentages or explicit disable and keeps auxiliary inputs unsupported',()=>{
+ for(const value of [0,90,100,null])validateAssnRulesParameters({...p,exclude_support_above_pct:value},'fp_growth',request);
+ for(const value of [-1,101,NaN,Infinity,'90',true])assert.throws(()=>validateAssnRulesParameters({...p,exclude_support_above_pct:value},'fp_growth',request));
+ for(const parameters of [{selected_item_field:'Item'},{contain_selected_items:true}])assert.throws(()=>validateAssnRulesParameters({...p,...parameters},'fp_growth',request));
+ for(const r of [request,{...request,target:{kind:'existing'}}])assert.throws(()=>validateAssnRulesParameters({...p,exclude_support_above_pct:90},'fp_growth',{...r,inputs:[{input:0},{input:1}]}),/auxiliary/);
+});
+
+test('existing auxiliary input refuses before input mapping mutates the node',async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'rules'};
+ const workflow_ref={workflow_id:'wf',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+ const graph={links:[{source:'purchases',target:'rules',output:0,input:0},
+  {source:'selected',target:'rules',output:0,input:1}]};
+ const before=structuredClone(graph),calls=[];
+ const operation={id:'auxiliary',parameters:{mode:'fp_growth'},
+  nodeApply:{request:{document_id:'doc',workflow_ref,target:{kind:'existing',ref:node},finish:'execute',inputs:[],parameters:{}}},
+  nodeTargetAdapter:{observe:async(request,deadline)=>{
+   assert.deepEqual(request,{document_id:'doc',workflow_ref});assert.equal(deadline,ctx.deadline);
+   calls.push('graph');return graph;
+  }}};
+ const ctx={document_id:'doc',workflow_ref,node,receipt_id:'auxiliary:input_mapping',deadline:Date.now()+10000};
+ const drivers=createAssnRulesNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyDriverFactory({
+  operation,execute:async()=>{calls.push('browser');throw Error('Unexpected browser access');},
+  onRecord:async()=>{calls.push('record');throw Error('Unexpected mutation journal entry');},now:Date.now,
+ });
+ await assert.rejects(drivers.mapPorts([],ctx),/Association rules: auxiliary input is unsupported/);
+ assert.deepEqual(calls,['graph']);assert.deepEqual(graph,before);
 });

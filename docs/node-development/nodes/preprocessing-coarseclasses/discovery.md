@@ -431,6 +431,11 @@ Next принял эту карту и открыл обычную страни�
 выполнения ниже. Минимальный CSV с тремя полями остаётся not_checked.
 
 
+**Исправление LAB-1324:** `chkUseFineClassesBinning` при роли «Входное» — режим fine
+classes (класс на каждую категорию, внешний вход не применяется), а не готовое
+внешнее разбиение; ниже описан именно он. Роль «Входное (внешнее разбиение)»
+в 7.4.2 таблицу не принимает (README modes, LAB-1324).
+
 На следующей странице для Segment включён
 `CoarseClassesSettingsFrame;chkUseFineClassesBinning;ValueControl` (готовое
 разбиение), min=5/max=2/uniformity=0; Target=target, event=yes.

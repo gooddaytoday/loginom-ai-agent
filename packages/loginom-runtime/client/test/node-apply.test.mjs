@@ -162,6 +162,37 @@ for(const close of [true,false])test('saved-model intermediate finish guard '+ty
  if(close!==preserve){assert.equal(result.pending_phase,'node_finish');assert.ok(!f.calls.includes('execute'));}
 });
 
+test('saved factor analysis apply accepts Cancel and rejects committing its inspection draft',async()=>{
+ const {createFactorAnalysisNodeSupport}=await import('../lib/factor-analysis-node.mjs');
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'research.factor_analysis',ref:node};p.mode='apply';p.parameters={};
+ f.handlers.set(p.target.type,createFactorAnalysisNodeSupport({}).nodeApplyHandlers.get(p.target.type));
+ f.drivers.configureCalculator=async()=>({verified:true,cleanup_complete:true,settings_applied:false,
+  configuration:{verified:true,mode:'apply',node_context:node,fields:['X','Y'].map(name=>({name,usage_type:3})),criterion:'fixed',factors:2,rotation:'none',output_cap:false},
+  validation:{status:'observed_saved_settings'}});
+ f.drivers.mapPorts=async()=>({verified:true,cleanup_complete:true,ports:[]});
+ f.drivers.finish=async mode=>{assert.equal(mode,'done');return {verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false};};
+ f.drivers.finishGraph=async mode=>({verified:true,cleanup_complete:true,mode,settings_applied:false,execution_id:'execution1'});
+ const result=await f.run(p);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(result.configuration.readback.mode,'apply');assert.equal(result.configuration.readback.training.status,'not_requested');
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'done',settings_applied:true,execution_started:false});
+ const rejected=await applyNode({request:p,operation:{id:p.operation_id},handlers:f.handlers,drivers:f.drivers,record:async e=>e,now:()=>1});
+ assert.equal(rejected.status,'AMBIGUOUS');assert.match(rejected.error.message,/must discard/);
+});
+
+for(const phase of ['configure','output_mapping'])test('known factor apply refusal releases only the cancelled owned draft: '+phase,async()=>{
+ const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
+ p.target={kind:'existing',type:'research.factor_analysis',ref:node};p.mode='apply';
+ const refusal=()=>{throw Object.assign(Error('unsupported saved PCA settings'),{nodePhaseRefusal:{phase,status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+  verification:'factor_analysis_apply_preserved',proof:{closed:{verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,node_context:{...node,verified:true}}}}});};
+ f.handlers.set(p.target.type,{revision:'apply',modes:['apply'],validate:()=>{},output_wizard:'separate',configure:phase==='configure'?refusal:async()=>({verified:true,cleanup_complete:true})});
+ f.drivers.finish=async()=>({verified:true,cleanup_complete:true,mode:'close',settings_applied:false,draft_discarded:true,execution_started:false});
+ f.drivers.finishGraph=()=>assert.fail('refused apply cannot execute');
+ if(phase==='output_mapping')f.drivers.mapPorts=async(_,ctx)=>ctx.receipt_id.endsWith(':output_mapping')?refusal():{verified:true,cleanup_complete:true};
+ const result=await f.run(p);assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(f.operation.nodeApply.pending,null);
+ assert.ok(!f.calls.includes('execute'));
+});
+
 test('saved LinRegression apply discards its inspection draft and reports no training',async()=>{
  const {createLinRegressionNodeSupport}=await import('../lib/linregression-node.mjs');
  const f=fixture(),p=request(),node={document_id:'doc',workflow_id:'workflow',node_id:'node1'};
