@@ -4,6 +4,7 @@ import {validateVariableBindings} from '../lib/variable-binding-parameters.mjs';
 import {validateExcelParameters} from '../lib/imports-excel-parameters.mjs';
 import {excelConfigureCapability} from '../lib/imports-excel-procedure.mjs';
 import {isUnchangedTextImportExecution} from '../lib/node-read-contract.mjs';
+import {isUnchangedExcelImportExecution} from '../lib/imports-excel-parameters.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 
 const binding={parameter:'/excel/source_path',variable:{kind:'variables',input:0,name:'ExcelPath'}};
@@ -33,9 +34,9 @@ test('a bound workbook replaces the literal path, keeps explicit columns and ref
 });
 test('SAME Excel node re-executes unchanged with excel:{} and no reconfiguration',()=>{
  const r={target:{kind:'existing',type:'imports.excel',ref:{node_id:'excel'}},mode:'xlsx',parameters:{excel:{}},inputs:[],mappings:[],variable_inputs:[],finish:'execute',read:{ports:[0]}};
- for(const bindings of [undefined,[]])assert.equal(isUnchangedTextImportExecution({...r,bindings}),true);
+ for(const bindings of [undefined,[]])assert.equal(isUnchangedExcelImportExecution({...r,bindings}),true);assert.equal(isUnchangedTextImportExecution(r),false);
  for(const patch of [{bindings:[binding]},{parameters:{excel:{header_rows:1}}},{parameters:{excel:{},source:p.source}},{mode:'delimited'},{finish:'done'},{target:{kind:'new',type:'imports.excel'}}])
-  assert.equal(isUnchangedTextImportExecution({...r,...patch}),false);
+  assert.equal(isUnchangedExcelImportExecution({...r,...patch}),false);
  assert.doesNotThrow(()=>validateExcelParameters(r.parameters,r.mode,r));
 });
 

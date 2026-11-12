@@ -1,5 +1,4 @@
 import {importSourceSchema,validateImportSource} from './storage-policy.mjs';
-import {isUnchangedTextImportExecution} from './node-read-contract.mjs';
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
@@ -19,11 +18,15 @@ export const excelParametersSchema=object({
  excel:excelSettingsSchema,
  source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Existing Excel import only: after exact XLSX scan and package.save_checkpoint, supply profile_id and save_operation_id; excel contains source_path and optional sheet_name only. Preserves columns and mapping, independently reopens, executes once and compares completed output N with the backend scan. Never supply expected_records.'},
 },['source','excel']);
+// An empty existing Excel patch executes its saved native configuration.
+export const isUnchangedExcelImportExecution=r=>r?.target?.type==='imports.excel'&&r.target.kind==='existing'&&!r.bindings?.length
+ &&r.mode==='xlsx'&&r.finish==='execute'&&Array.isArray(r.inputs)&&r.inputs.length===0&&Array.isArray(r.mappings)&&r.mappings.length===0
+ &&!(r.variable_inputs?.length)&&JSON.stringify(r.parameters)==='{"excel":{}}'&&JSON.stringify(r.read?.ports)==='[0]';
 export const validExcelPath=path=>typeof path==='string'&&path.length<=2048&&/^\/(?!\/)/.test(path)&&/\.xlsx$/i.test(path)
  &&!/[|*?%\\\x00-\x1f]/.test(path)&&path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..');
 export function validateExcelParameters(p,mode,r){
  const need=(v,m)=>{if(!v)throw Error('Excel import: '+m);};
- if(isUnchangedTextImportExecution({...r,parameters:p,mode}))return;
+ if(isUnchangedExcelImportExecution({...r,parameters:p,mode}))return;
  const switching=Object.hasOwn(p??{},'source_switch');
  need((r.variable_inputs??[]).every(i=>i.kind==='variables'&&i.input===0),'only variables input 0 (native Input_Var-1) is supported');
  if(r.bindings?.length){

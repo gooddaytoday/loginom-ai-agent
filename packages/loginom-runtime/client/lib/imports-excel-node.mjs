@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {verifyFullImportCount,verifyImportSchema,verifyTextImportSource} from './text-import-node.mjs';
-import {excelParametersSchema,validateExcelParameters,validExcelPath} from './imports-excel-parameters.mjs';
+import {excelParametersSchema,validateExcelParameters,validExcelPath,isUnchangedExcelImportExecution} from './imports-excel-parameters.mjs';
 import {importBindingSchema,prepareImportBinding,readImportBindings,resolveImportBindingValue} from './import-bindings.mjs';
 import {makeExcelConfigureCode} from './imports-excel-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
@@ -78,7 +78,10 @@ export function createExcelImportNodeSupport(config){
   configurationObservation:{condition:'owned Excel source wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},
   configureInputs:async()=>verified({not_applicable:true}),
  };
- return {nodeApplyHandlers:createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
+ const nodeApplyHandlers=createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers;
+ // SAME bound node re-executes its saved file pointer through the read path.
+ nodeApplyHandlers.get('imports.excel').unchangedExecution=isUnchangedExcelImportExecution;
+ return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,receiptOptions}=options;
   const request=operation.nodeApply?.request??operation.parameters,switching=request?.parameters?.source_switch,bound=!!operation.parameters?.bindings?.length;
   let channel,sourceReceipt,saveReceipt,beforeConfiguration,beforeMapping,schemaBefore,schemaAfter,committedConfiguration;
