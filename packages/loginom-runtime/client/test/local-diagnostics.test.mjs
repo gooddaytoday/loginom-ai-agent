@@ -91,6 +91,11 @@ test('diagnostics work in paths with spaces and Cyrillic and retain private perm
 test('diagnostic writer refuses linked directories before modifying the target', async t => {
   const root = await fixture(t), target = join(root, 'unrelated');
   await mkdir(target);
+  if (process.platform === 'win32') {
+    // Make ACL mutation observable even when TEMP already has a private DACL.
+    const grant = spawnSync('icacls.exe', [target, '/inheritance:e', '/grant', '*S-1-5-32-545:(OI)(CI)RX'], { encoding: 'utf8' });
+    assert.equal(grant.status, 0, grant.stderr);
+  }
   const acl = path => {
     const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
       '$ErrorActionPreference="Stop"; (Get-Acl -LiteralPath $env:DOCK_DIAGNOSTIC_PATH).Sddl'],
@@ -100,11 +105,20 @@ test('diagnostic writer refuses linked directories before modifying the target',
   };
   const link = join(root, 'diagnostics');
   await symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir');
-  const before = process.platform === 'win32' ? [acl(target), acl(link)] : null;
+  const linkAcl = () => {
+    const result = spawnSync('icacls.exe', [link, '/L'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  if (process.platform === 'win32') {
+    const grant = spawnSync('icacls.exe', [link, '/L', '/inheritance:e', '/grant', '*S-1-5-32-545:(OI)(CI)RX'], { encoding: 'utf8' });
+    assert.equal(grant.status, 0, grant.stderr);
+  }
+  const before = process.platform === 'win32' ? [acl(target), linkAcl()] : null;
   await assert.rejects(record(root, 'session', [{ event: 'task.end' }]), /Invalid diagnostic directory/);
   assert.deepEqual(await readdir(target), []);
   if (process.platform === 'win32') {
     assert.equal(acl(target), before[0], 'junction target SDDL must stay unchanged');
-    assert.equal(acl(link), before[1], 'junction SDDL must stay unchanged');
+    assert.equal(linkAcl(), before[1], 'junction ACL must stay unchanged');
   }
 });
