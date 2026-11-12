@@ -15,8 +15,8 @@ The job runs each complete file, including its existing platform conditions.
 | Artifact files, MAX_PATH, Unicode basenames, permissions, symlinks, hashes and cleanup | `artifacts.test.mjs`, `artifact-download.test.mjs`, `artifact-upload.test.mjs`, `artifact-verification.test.mjs`, `file-reference.test.mjs` |
 | Local attachments and paths containing Cyrillic and spaces | `host-inputs.test.mjs`, `host-artifacts.test.mjs`, `storage-download.test.mjs`, `storage-source.test.mjs` |
 | Private configuration, durable files, links, redaction and permissions | `config.test.mjs`, `history.test.mjs`, `archive.test.mjs`, `execution-journal.test.mjs`, `local-diagnostics.test.mjs`, `runtime-pin.test.mjs`, `skill.test.mjs` |
-| Command launchers, install pointers and runtime discovery | `agent-command.test.mjs`, `install.test.mjs`, `install-profile.test.mjs`, `hook-runtime.test.mjs`, `hooks.test.mjs` |
-| Browser launch, temporary paths and download scripts | `browser-launch.test.mjs`, `browser-temp.test.mjs`, `browser-downloads.test.mjs` |
+| Command launchers, install pointers and runtime discovery | `agent-command.test.mjs`, `install.test.mjs`, `install-profile.test.mjs`, `hook-runtime.test.mjs`, `hooks.test.mjs`, `landing.test.mjs` |
+| Browser launch, temporary paths, environment, diagnostics and download scripts | `browser-launch.test.mjs`, `browser-temp.test.mjs`, `browser-downloads.test.mjs`, `bridge.test.mjs`, `connection-check-windows.test.mjs` |
 | Child processes, clipboard socket ownership, cancellation and shutdown | `clipboard.test.mjs`, `clipboard-shutdown.test.mjs`, `managed-shutdown.test.mjs`, `managed-signal-order.test.mjs` |
 | Text encodings, UTF-8 and Windows-1251 | `text-import-encoding.test.mjs`, `text-export.test.mjs`, `text-export-cp1251.test.mjs` |
 
@@ -52,6 +52,13 @@ Existing POSIX-only cases retain their platform conditions. In particular,
 Linux-only Docker/X11 skills acceptance and macOS Keychain acceptance are not
 Windows coverage. This source-test gate complements installed
 `release-windows-desktop` acceptance.
+
+The existing `windows-native-check.yml` also executes `process`, `environment`,
+`windows-powershell`, `cli-credentials`, `cli-install-windows` and `cli-manifest`
+on Windows 2022 and 2025 when host paths change (or on manual dispatch).
+`windows-runtime` makes this host subset, and the additional suites above,
+part of every `test.yml` run and its reusable release gate, independent of those
+path filters.
 
 Each suite has a separate failing step and a log in the `windows-runtime-*`
 artifact (14-day retention). Runtime and host suites still execute after a
