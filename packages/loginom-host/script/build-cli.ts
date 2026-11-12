@@ -1,5 +1,6 @@
 import { $ } from "bun"
 import { buildPhase } from "./build-phase"
+import { verifyBunBaselineArchive } from "./native-resource-candidates"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
@@ -57,15 +58,10 @@ if (process.platform === "win32" && process.env.LOGINOM_CLI_BASELINE_CHILD !== "
   const runtime = await mkdtemp(join(tmpdir(), "loginom-cli-bun-"))
   try {
     const url = `https://github.com/oven-sh/bun/releases/download/bun-v${bunNotice.version}`
-    const checksums = await fetch(`${url}/SHASUMS256.txt`)
-    if (!checksums.ok) throw Error("LOGINOM_BUN_DOWNLOAD_FAILED")
-    const expected = (await checksums.text()).match(/^([a-fA-F0-9]{64})\s+\*?bun-windows-x64-baseline\.zip\r?$/m)?.[1]
-    if (!expected) throw Error("LOGINOM_BUN_CHECKSUM_MISSING")
     const response = await fetch(`${url}/bun-windows-x64-baseline.zip`)
     if (!response.ok) throw Error("LOGINOM_BUN_DOWNLOAD_FAILED")
     const archive = Buffer.from(await response.arrayBuffer())
-    if (createHash("sha256").update(archive).digest("hex") !== expected.toLowerCase())
-      throw Error("LOGINOM_BUN_CHECKSUM_MISMATCH")
+    verifyBunBaselineArchive(archive)
     await Bun.write(join(runtime, "bun.zip"), archive)
     await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
     await $`${join(runtime, "bun-windows-x64-baseline/bun.exe")} ${import.meta.path} ${args}`.env({
