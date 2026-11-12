@@ -39,11 +39,12 @@ test('a reference snapshot of a just-written file settles past one file-time tic
   const root=await mkdtemp(join(tmpdir(),'runtime-racy-reference-'));
   try {
     const source=join(root,'source.csv');await writeFile(source,'original');
-    const snapshot=await inspectReferenceFile(source);
+    const started=performance.now(),snapshot={...await inspectReferenceFile(source),sha256:null},elapsed=performance.now()-started;
     // NTFS stamps file times from a clock that advances every 15.625 ms.
-    assert.ok(Date.now()-snapshot.mtime>15.625,`snapshot mtime is ${Date.now()-snapshot.mtime} ms old`);
+    assert.ok(elapsed>=15.625,`snapshot settled after ${elapsed} ms`);
     await writeFile(source,'modified');
     assert.notEqual((await stat(source,{bigint:true})).mtimeNs,BigInt(snapshot.mtime_ns));
+    await assert.rejects(()=>verifyReferenceFile(snapshot),/LOGINOM_FILE_CHANGED/);
   } finally {await rm(root,{recursive:true,force:true});}
 });
 
