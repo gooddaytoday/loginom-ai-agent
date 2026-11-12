@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {parseExpectedVariableInventory,matchVariableInventoryOutput} from '../expected-outputs.mjs';
 import {auditDataToVarHistory,auditDataToVarResult,DATATOVAR_RESULT_CASES} from '../variables-datatovar.mjs';
 
@@ -9,6 +10,20 @@ const want=variant=>({node:{type:'variables.from_table'},port:0,ordered:true,var
 const output=w=>({kind:'variables',port:0,port_guid:'port',fresh:true,complete:true,source:'execution',native_source:'VariablesForm',execution_id:'exec',read_id:'read',count:5,
  completeness:{count:5,store_count:5,unique_ids:5,loaded:true},variables:w.variables.map((v,index)=>({id:index,index,name:v.name,label:v.label,type:v.type,
  cell:{type:v.type,is_null:v.value===null,value:v.type==='integer'&&v.value!==null?String(v.value):v.value,...(v.value!==null?{precision:v.type==='integer'?'exact_integer':'17_significant_digits',...(v.type==='real'?{representation:'binary64',decimal:String(v.value)}:{})}:{})}}))});
+
+test('W1 matcher requires the confirmed native int32 tag and rejects inferred or partial Variant output',()=>{
+ const w={node:{type:'variables.from_table'},port:0,ordered:true,variables:[{name:'V_Mode',label_any:true,type:'variant',native_tag:3,value:{cell_type:'integer',value:2}}]};
+ parseExpectedVariableInventory({variable_inventory:{outputs:[w]}});
+ const a={...output(w),count:1,completeness:{count:1,store_count:1,unique_ids:1,loaded:true}};
+ a.variables[0].cell={type:'variant',cell_type:'integer',is_null:false,value:'2',decimal:'2',precision:'exact_native',representation:'decimal_integer',native:{tag:3,encoding:'signed-int32-le',bits:32,bytes_le:'02000000'}};
+ assert.equal(matchVariableInventoryOutput(a,w),true);
+ for(const corrupt of [o=>delete o.variables[0].cell.native,o=>o.variables[0].cell.native.tag=20,
+  o=>o.variables[0].cell.precision='formatted_display',o=>o.variables[0].cell.value='3',o=>o.count=0]){
+  const bad=structuredClone(a);corrupt(bad);assert.throws(()=>matchVariableInventoryOutput(bad,w));
+ }
+ const fixture=new URL('../../../docs/node-development/nodes/variables-datatovar/acceptance/aggregate-types/oracle.py',import.meta.url);
+ assert.match(execFileSync('python3',[fixture.pathname,'--w1-check'],{encoding:'utf8'}),/W1 oracle: PASS/);
+});
 
 test('DataToVar variable matcher accepts approved ordered typed fixtures, NULL and empty input',()=>{
  for(const variant of ['initial','updated','null','empty']){

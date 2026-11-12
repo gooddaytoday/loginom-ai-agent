@@ -4,15 +4,16 @@ import {createNativeVariantReader} from './variant-native-read.mjs';
 import {decodeVariantFrame} from './variant-native-decode.mjs';
 import {adaptCell} from './variant-native-values.mjs';
 import {collectNativeRuntime} from './collapse-native-runtime.mjs';
-import {nativeRuntimePins} from './collapse-native-runtime-pins.mjs';
-const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins};
+import {nativeRuntimePins,nativeVariablePins} from './collapse-native-runtime-pins.mjs';
+const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins,
+ variables:readNativeVariableCells.toString(),variablePins:nativeVariablePins};
 
 export function makeNodeVariableOutputCode(binding,options){
  validatePreparedNodeContext(binding);
  if(!Number.isInteger(options?.port)||options.port<0||options.port>99||!Number.isSafeInteger(options.deadline)
   ||typeof options.operation_id!=='string'||options.execution?.verified!==true||options.execution.owner_verified!==true
   ||options.execution.status!=='completed'||['execution_id','process_id','process_record_id'].some(k=>typeof options.execution[k]!=='string'))throw Error('Variable read requires a completed owned execution');
- return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options,builtin_snapshot:false})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()})`;
+ return `async page=>(${readNodeVariableOutput.toString()})(page,${JSON.stringify({binding,...options,builtin_snapshot:false})},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${readVariableRecords.toString()},${decodePortCell.toString()},${JSON.stringify(variantCapability)})`;
 }
 
 // Private preflight snapshot: it never fabricates an execution receipt.
@@ -23,12 +24,14 @@ export function makeBuiltinVariablesPreviewCode(binding,options){
 }
 
 // Executable variable sources use the native VariablesForm after a real Execute.
-// No server/data-source proxy is invoked and no wizard is opened on this path.
-export async function readNodeVariableOutput(page,task,readNode,readOutputs,readRecords,decode){
- const b=task.binding,root=b.workflow_ref.prefix+';ModelForm;PreviewWindow';let effect=false,opened=false,output,error;
+// Scalar previews retain their original path. Variant values use the pinned
+// native getter, bound to this complete preview and completed execution.
+export async function readNodeVariableOutput(page,task,readNode,readOutputs,readRecords,decode,variant){
+ const b=task.binding,root=b.workflow_ref.prefix+';ModelForm;PreviewWindow';let effect=false,opened=false,output,error,pending=false,nativeRead=false;
  const remaining=()=>{const n=task.deadline-Date.now();if(n<=0)throw Error('Variable output deadline');return n;};
  const at=t=>page.locator('[data-tid='+JSON.stringify(t)+']:visible');
- const inspect=mode=>page.evaluate(({task,mode,recordsCode,decoderCode})=>{
+ const inspect=mode=>page.evaluate(async({task,mode,recordsCode,decoderCode,variant})=>{
+  const snapshot=()=>{
   const b=task.binding,a=bg.app,p=globalThis.__loginomDockPreparationV1,exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
   const rs=[...(p?.receipts?.values()??[])].filter(r=>r.phase==='verified'&&r.workflowId===b.workflow_ref.workflow_id&&r.nodeTargetWorkflowNode),r=rs[0];
   if(location.origin!==task.origin||a.Version!==task.build||p?.document!==document||p.id!==b.document_id||!rs.length
@@ -39,7 +42,7 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
   if(ns.length!==1||n.FRunning||(task.builtin_snapshot?n.FIconCls!=='bg-vendor-icon-modelvariables':n.FIconCls==='bg-vendor-icon-modelvariables'||n.FStatus!==1))throw Error('Active executable variable node required');
   const ports=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FGuid===task.port_guid),port=ports[0];
   if(ports.length!==1||port.parent!==n||port.FCell.parent!==n.FCell||port.FType!==1||port.FSubType!==3||(!task.builtin_snapshot&&port.FStatus!==1)||!port.data)throw Error('Active variable output owner changed');
-  let cached;
+  let cached,processIdentity=[];
   if(task.builtin_snapshot){
    const ordered=n.FPorts.flatMap(list=>list.FCollection).filter(p=>p.FType===1&&p.FSubType===3);
    cached=r.nodeTargetPortIdentities?.get(port);
@@ -61,6 +64,7 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
    ||matches.length!==1||matches[0].data.Status!==3||matches[0].data.ErrorDetails!==''||!String(matches[0].data.id).startsWith(parts[1]+'.')
    ||own.some(v=>BigInt(String(v.data.id).split('.')[0])>BigInt(parts[1])))throw Error('Variable execution is stale or incomplete');
   let ancestor=parents.get(matches[0]);while(ancestor&&ancestor!==groups[0])ancestor=parents.get(ancestor);if(ancestor!==groups[0])throw Error('Variable execution process owner differs');
+  processIdentity=[store,nativeRoot,groups[0],matches[0],...own];
   }
   const point=e=>{const box=e.getBoundingClientRect(),x=box.x+box.width/2,y=box.y+box.height/2,hit=document.elementFromPoint(x,y);if(!visible(e)||x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw Error('Variable read target covered');return {x,y};};
   const root=b.workflow_ref.prefix+';ModelForm;PreviewWindow',pf=m.FPreviewManager?.FPreviewForm,windows=exact(root).filter(visible);
@@ -81,8 +85,21 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
   const forms=exact(root+';PreviewForm;VariablesForm').filter(visible),es=exact(root+';PreviewForm;VariablesForm;grdValuePreview'),grid=es.length===1&&Ext.getCmp(es[0].id),form=forms.length===1&&Ext.getCmp(forms[0].id)?.Controller;
   if(forms.length!==1||!windows[0].contains(forms[0])||form?.constructor?.name!=='VariablesForm'||form.FView.el.dom!==forms[0]||form.FModelNode!==n.data
    ||Object.values(pf.FFormCache).filter(v=>v===form).length!==1||!grid||grid.el.dom!==es[0]||!forms[0].contains(es[0])||grid.getStore()!==form.FVariablesStore)throw Error('Bound native VariablesForm required');
-  return eval('('+recordsCode+')')(grid.getStore(),'preview',eval('('+decoderCode+')'));
- },{task,mode,recordsCode:readRecords.toString(),decoderCode:decode.toString()});
+  const store=grid.getStore(),records=eval('('+recordsCode+')'),decode=eval('('+decoderCode+')');
+  if(!task.builtin_snapshot&&store.getData().items.some(r=>r.data.DataType===6))return {native:true,port,store,
+   metadata:records(store,'preview',decode,false,{metadataOnly:true}),
+   identities:[p,r,card,m,n,n.data,port,port.data,port.data.$,port.data.$S,form,grid,store,...processIdentity,...store.getData().items],
+   fingerprint:JSON.stringify(store.getData().items.map(r=>r.data.ValueVariant))};
+  return records(store,'preview',decode);
+  };
+  const initial=snapshot();if(!initial.native)return initial;
+  const stable=()=>{const current=snapshot();if(!current.native||current.identities.length!==initial.identities.length
+   ||current.identities.some((v,i)=>v!==initial.identities[i])||current.fingerprint!==initial.fingerprint
+   ||JSON.stringify(current.metadata)!==JSON.stringify(initial.metadata))throw Error('Variable native owner/store/execution changed');};
+  const result=await eval('('+variant.variables+')')(initial.port,initial.metadata,{deadline:task.deadline,stable},variant);
+  if(result.error)return {native_error:result.error,native_pending:result.pending};
+  stable();return {...eval('('+recordsCode+')')(initial.store,'preview',eval('('+decoderCode+')'),false,{variantCells:result.cells}),native_read:true};
+ },{task,mode,recordsCode:readRecords.toString(),decoderCode:decode.toString(),variant});
  try{
   const before=await readNode(page,b);if(!before.verified||before.surface!=='graph')throw Error('Variable output graph unavailable');
   if(task.builtin_snapshot){
@@ -96,14 +113,69 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
   const point=await inspect('port');effect=true;await page.mouse.click(point.x,point.y,{button:'right'});
   await at('mn;mniShowDataPreview').waitFor({state:'visible',timeout:remaining()});const command=await inspect('menu');await page.mouse.click(command.x,command.y);opened=true;
   await page.waitForFunction(t=>{const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],grid=es.length===1&&Ext.getCmp(es[0].id);return typeof grid?.getStore==='function'&&grid.getStore().isLoading()===false&&grid.getStore().complete===true&&grid.getStore().loadCount>=1;},root+';PreviewForm;VariablesForm;grdValuePreview',{timeout:remaining()});
-  output={...await inspect('inventory'),port:task.port,kind:'variables',port_guid:task.port_guid,read_id:task.operation_id,
+  const inventory=await inspect('inventory');
+  if(inventory.native_error){pending=inventory.native_pending;throw Error(inventory.native_error);}
+  nativeRead=inventory.native_read===true;delete inventory.native_read;
+  output={...inventory,port:task.port,kind:'variables',port_guid:task.port_guid,read_id:task.operation_id,
    execution_id:task.builtin_snapshot?null:task.execution.execution_id,source:task.builtin_snapshot?'snapshot':'execution',native_source:'VariablesForm',fresh:!task.builtin_snapshot,freshness_basis:task.builtin_snapshot?'active_builtin_variables_preview':'completed_execution_variables_preview'};
  }catch(cause){error=String(cause.message).slice(0,500);}
  let clean=!effect;
- if(effect)try{if(opened){const point=await inspect('close');await page.mouse.click(point.x,point.y);await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});}
-  else await page.keyboard.press('Escape');const after=await readNode(page,b);clean=after.verified===true&&after.surface==='graph';}catch{clean=false;}
+ if(effect&&!pending)try{if(opened){const point=await inspect('close');await page.mouse.click(point.x,point.y);await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});}
+  else await page.keyboard.press('Escape');
+  // Native preview redraw can retain an unbound hover port until pointer exit.
+  if(nativeRead)await page.mouse.move(10,10);
+  const after=await readNode(page,b);clean=after.verified===true&&after.surface==='graph';}catch{clean=false;}
  const nodeContext=clean?await readNode(page,b):null;
  return {status:output&&!error&&clean?'SUCCEEDED':effect?'AMBIGUOUS':'NOT_APPLIED',verified:!!output&&!error&&clean,effect_possible:effect,cleanup_complete:clean,node_context:nodeContext,...(output&&!error&&clean?{output,...(task.builtin_snapshot?{source_active:true,independent_readback:true,variables:output.variables}:{})}:{}),...(error?{error}:{})};
+}
+
+// Fixed W1 chain and method1141 only. No generic method IDs or inferred tags.
+// Timeout/uncertain native release retains all proxies for browser shutdown.
+export async function readNativeVariableCells(port,metadata,{deadline,stable},capability){
+ const need=(ok,message)=>{if(!ok)throw Error('Variable native read: '+message);};
+ const session=port.data.$S,handles=[],methods=[];let reader,bytes=0,cells,error,pending=false;
+ const check=()=>{
+  stable();need(Date.now()<deadline,'deadline');
+  need(port.data.$S===session&&session.$FDisposed===false&&session.$FPendingDisconnect===false&&session.$FTransportStatus===0
+   &&session.$T?.FFinished===false&&session.$T.FDisconnected===false&&session.$T.$FSocket?.readyState===1,'session');
+  for(const h of handles)need(h.proxy.$S===session&&h.proxy.$===h.identity&&h.identity.$I===h.interfaceId
+   &&h.identity.$OW===h.owner&&h.identity.$O===h.object,'proxy identity');
+  for(const m of methods)need(m.object[m.name]===m.fn,'loaded variable implementation changed');
+ };
+ const pin=async(object,name,key)=>{check();const fn=object[name];need(typeof fn==='function','method '+key);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(fn))))).map(n=>n.toString(16).padStart(2,'0')).join('');
+  need(hash===capability.variablePins[key],'loaded implementation '+key);methods.push({object,name,fn});check();};
+ const call=async fn=>{check();const value=await fn();check();return value;};
+ const acquire=async(fn,interfaceId)=>call(async()=>{const proxy=await fn(),identity=proxy?.$;
+  handles.push({proxy,identity,interfaceId,owner:identity?.$OW,object:identity?.$O});
+  need(proxy&&identity&&identity.$I===interfaceId&&Number.isInteger(identity.$OW)&&identity.$OW>=0&&Number.isInteger(identity.$O),'interface'+interfaceId);return proxy;});
+ try{
+  need(port.data.$?.$I===1081&&metadata.complete===true&&metadata.count<=128,'variable port/count');
+  await pin(port.data,'get_Output','port_output');const output=await acquire(()=>port.data.get_Output(),0);
+  await pin(output,'QueryInterface','query');const variables=await acquire(()=>output.QueryInterface(bg.IBGVariables),541);
+  await pin(variables,'get_Count','count');await pin(variables,'getItem','item');
+  need(await call(()=>variables.get_Count())===metadata.count,'native count differs');
+  cells=Array(metadata.count);
+  for(const v of metadata.variables.filter(v=>v.type==='variant')){
+   const item=await acquire(()=>variables.getItem(v.index),511);
+   need(await call(()=>item.get_ID())===v.id&&await call(()=>item.get_Index())===v.index
+    &&await call(()=>item.get_Name())===v.name&&await call(()=>item.get_DisplayName())===v.label
+    &&await call(()=>item.get_DataType())===6,'native variable metadata differs: '+v.name);
+   await pin(item,'get_Value','value');const value=await acquire(()=>item.get_Value(),427);
+   await pin(value,'get_AsVariant','as_variant');
+   need(bytes<512*1024,'native byte bound');
+   reader=await eval('('+capability.read+')')(value,{deadline,stable:check,variableValue:true},eval('('+capability.decode+')'),eval('('+capability.collect+')'),capability.pins);
+   const raw=await reader.read(0,0);bytes+=raw.frame_size;need(bytes<=512*1024,'native byte bound');
+   cells[v.index]=eval('('+capability.adapt+')')(raw,{type:'variant'},{variableValue:true,dateProfile:'loginom-7.4.2-native-oadate',civilTime:raw.civilTime},eval('('+capability.decode+')'));
+  }
+  need(await call(()=>variables.get_Count())===metadata.count,'native count changed');check();
+ }catch(cause){error=String(cause.message).slice(0,500);}
+ finally{
+  pending=reader?.unsettled===true;
+  if(!pending)for(const h of handles.reverse())try{await h.proxy?.dispose();}catch{pending=true;error='Variable native proxy release failed';}
+ }
+ if(!error&&!pending)try{stable();}catch(cause){error=String(cause.message).slice(0,500);}
+ return error||pending?{error:error??'Variable native request unsettled',pending}:{cells};
 }
 
 // The native reader indexes the ordered list passed to GetReader; array row

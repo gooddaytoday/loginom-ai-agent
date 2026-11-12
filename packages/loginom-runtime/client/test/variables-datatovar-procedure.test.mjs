@@ -66,7 +66,7 @@ test('DataToVar refuses unsupported/missing fields and incomplete preservation b
  for(const p of [spec('missing'),spec('Category'),spec('Category',['median']),spec('X',['variance']),{fields:[]}]){
   const f=fixture();await assert.rejects(configureDataToVar(f.channel,p));assert.equal(f.moves(),0);
  }
- for(const [type,functions]of [['integer',16384],['string',1],['boolean',8192],['variant',2]]){
+ for(const [type,functions]of [['integer',16384],['string',1],['boolean',8192],['variant',1]]){
   const f=fixture();Object.assign(f.fields[0],{type,functions});await assert.rejects(configureDataToVar(f.channel,{}),/unsupported/);assert.equal(f.moves(),0);
  }
  const existing=fixture();Object.assign(existing.fields[0],{type:'string',functions:8192|2});

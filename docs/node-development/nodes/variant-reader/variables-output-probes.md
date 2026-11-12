@@ -6,6 +6,9 @@
 не реализация W1 и не приёмочный PASS. Runtime, схемы, skill, oracle и
 критерии не менялись. Публичный Variant-выход по-прежнему недоступен.
 
+Этот раздел описывает первый checkpoint. Продолжение после решения
+`v040-variant-w1-rpc` и подтверждённый канал — в конце документа.
+
 ## Пакет и воспроизведение
 
 Назначенная worker-пара, только `https://app.loginom.ai/app/?testable=true`.
@@ -131,3 +134,75 @@ subtype oracle остаются not_checked. Приёмочный `datatovar-var
 (`discovery.jsonl:41` и `:60`); оба Chromium закрыты.
 Следующий шаг после решения — завершить native-пробы, затем минимальный
 W1 reader по плану с red→green и обязательной живой приёмкой.
+
+## Подтверждённый W1 RPC после решения владельца
+
+Решение `v040-variant-w1-rpc` разрешило исследовать и ввести pinned канал.
+Тот же собственный пакет, новая сессия; исходный JavaScript не менялся.
+Для дат и real в диагностический DataToVar добавлены агрегаты исходных D/N.
+Журнал продолжения — `rpc-probes/discovery.jsonl`, вне Git.
+
+Native-цепочка подтверждена вызовами и загруженными реализациями:
+
+| Объект | Interface | Метод | Результат |
+|---|---:|---:|---|
+| Выходной переменный порт | 1081 | 2826, get_Output | generic interface0 |
+| output.QueryInterface(IBGVariables) | 0 → 541 | штатный QueryInterface | коллекция текущего выхода |
+| Коллекция | 541 | 778 / 779 | Count / элемент interface511 |
+| Переменная | 511 | 1510, get_Value | value interface427 |
+| Значение | 427 | 1141, get_AsVariant | scalar native frame, без аргументов |
+
+Метод 1141 использует request static size 20, response static size 12.
+В этой пробе frame size 60. Байты декодированы существующим
+`decodeVariantFrame`; методы и критические реализации сверяются по SHA-256.
+Имена, ID, индексы и DataType всех 13 переменных совпали с полным preview.
+
+| Переменные | Объявленный тип | Native tag / значение |
+|---|---|---|
+| V_Mode, V_First, V_Last | Variant | **3, signed int32, 2** |
+| V_Min | Variant | 11, false |
+| V_Max | Variant | 8, x |
+| V_Only | Variant | 1, NULL |
+| V_Count, V_Uniq, V_Null | integer | 20, 5 / 3 / 1 |
+| D (first) | datetime | 7, OADate 46024.12783707176 |
+| N_Avg | real | 5, binary64 4.5 |
+
+Tag3 объясняет прежний отказ P2/P3: decoder узнавал int32, но публичный
+`adaptCell` допускал только tag20. W1 допускает tag3 исключительно через
+закрытый `variableValue` путь; табличный schema/reader сохраняет прежний
+набор допусков. Tag4 и Empty не объявляются поддержанными.
+Дата здесь получена из переменной с объявленным datetime, не Variant;
+самостоятельная Variant-date и empty/all-NULL остаются отдельными пробами.
+
+Reader читает только Variant-переменные через этот RPC. Остальные ячейки
+сохраняют прежний scalar decoder и envelope. Перед каждым обращением и
+после ответа сверяются документ, workflow, native node/port, собственный
+завершённый процесс, preview/grid/store, записи и metadata. RPC-элементы
+сверяются с preview по ID/index/name/label/DataType, коллекция — по Count,
+прокси — по сессии и owner/object/interface. Методы цепочки pinned.
+Ограничения: 128 переменных, 512 KiB native frames, 1 MiB полного ответа,
+исходный deadline и максимум 30 секунд на native frame.
+Request/response и прокси освобождаются; pending/uncertain request сохраняет
+прокси до закрытия браузера и не позволяет заявить cleanup или частичный успех.
+
+Прямой прогон production-кода дал полный SUCCEEDED с точными шестью
+Variant-ячейками и прежними scalar-ячейками. После закрытия native preview
+выход указателя завершает наблюдённый redraw hover-порта перед graph read;
+клик не повторяется, существующие owner/process guards сохраняются.
+Приёмочный сценарий — `datatovar-variant`: исходный source-only пакет,
+девять V-агрегатов, native tags по этой пробе, метки `label_any`, полный
+порядок и выход 0. Модель получает задачу и путь пакета; expected и oracle
+остаются вне её входов. Математические значения вычисляет существующий
+независимый oracle (`--w1-check`), native subtype ожидания заданы отдельно.
+
+Подготовленный JavaScript-источник имеет защищённые UI refs выхода:
+обычный preflight отказал `Upstream port is not interactable` до создания
+узла. Для DataToVar при явном `finish:"execute"` добавлен отдельный путь
+через существующие owned selection и execution driver. Он выполняет
+связанный сохранённый источник, получает подтверждённый process binding
+и читает только схему (`sampleRows:0`) через completed-port reader.
+Редактор, F3 и настройки JavaScript не открываются; публичные JS refs
+сохраняют прежние запреты. Done/Close, чужой владелец и не-нулевой порт
+отказывают до жестов. Для остальных обработчиков новый hook не задан.
+Полный `runNodeApply` нового DataToVar от такого источника дал SUCCEEDED
+и все девять V-переменных; исходный JavaScript и данные сохранились.

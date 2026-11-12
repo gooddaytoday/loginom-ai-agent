@@ -45,18 +45,18 @@ test('DataToVar resolves exact technical names and numeric types, with canonical
  assert.equal(resolveDataToVarParameters(specification(),[{...fields[0],type:'real'}]).fields[0].input.type,'real');
 });
 
-test('DataToVar admits the native per-type function matrix and refuses Variant',()=>{
+test('DataToVar admits the native per-type function matrix including exact W1 Variant',()=>{
  const all=Object.keys(DATA_TO_VAR_FUNCTIONS),scalar=['count','min','max','mode','unique_count','null_count','first','last','only'];
  const typed=type=>[{name:'F',label:'F',type,record_id:'f'}];
  assert.equal(resolveDataToVarParameters(specification('F',[...all].reverse()),typed('real')).fields[0].mask,16383);
  assert.deepEqual(resolveDataToVarParameters(specification('F',all),typed('integer')).fields[0].aggregations,all);
  assert.equal(resolveDataToVarParameters(specification('F',[...scalar,'concat']),typed('string')).fields[0].mask,16382&~(1|16|32|128));
- for(const type of ['boolean','datetime']){
+ for(const type of ['boolean','datetime','variant']){
   assert.equal(resolveDataToVarParameters(specification('F',scalar),typed(type)).fields[0].mask,8014);
   assert.throws(()=>resolveDataToVarParameters(specification('F',['first','concat']),typed(type)),/does not support concat/);
  }
  for(const a of ['sum','avg','median','standard_deviation'])assert.throws(()=>resolveDataToVarParameters(specification('F',[a]),typed('string')),new RegExp('does not support '+a));
- assert.throws(()=>resolveDataToVarParameters(specification('F',['count']),typed('variant')),/integer, real, string, boolean or datetime/);
+ assert.equal(resolveDataToVarParameters(specification('F',scalar),typed('variant')).fields[0].mask,8014);
  assert.equal(dataToVarParametersSchema.properties.fields.items.properties.aggregations.maxItems,14);
  assert.deepEqual(dataToVarParametersSchema.properties.fields.items.properties.aggregations.items.enum,all);
 });

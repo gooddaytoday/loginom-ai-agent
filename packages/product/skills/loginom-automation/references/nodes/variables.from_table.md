@@ -7,6 +7,10 @@
 с `type:"variables.from_table"`, `mode:"aggregate"`. Узел получает таблицу
 через `inputs:[{source:NodeRef,output:0,input:0}]` и создаёт исходный порт
 переменных 0. Табличного выхода и обучения нет.
+Для сохранённого JavaScript-источника используй `finish:"execute"`:
+обработчик выполняет связанный источник и читает его схему без открытия
+редактора. Код и данные источника сохраняются; предварительно менять их
+или добавлять мост ради чтения не требуется.
 
 Полная настройка выбранных полей:
 `parameters:{fields:[{field:{kind:"input_field",name:"N"},aggregations:["median","mode","standard_deviation","unique_count","null_count","first","last","only","concat"]}]}`.
@@ -20,9 +24,11 @@ sum,count,min,max,avg,median,mode,standard_deviation,unique_count,null_count,fir
 |---|---|
 | integer/real | все 14 |
 | string | count,min,max,mode,unique_count,null_count,first,last,only,concat |
-| boolean/datetime | count,min,max,mode,unique_count,null_count,first,last,only |
+| boolean/datetime/Variant | count,min,max,mode,unique_count,null_count,first,last,only |
 
-Variant в этом узле не поддерживается: не выбирай такое поле.
+Variant сохраняется в min/max/mode/first/last/only. Читай `cell_type` и
+`native` точного W1-выхода; JS-число не доказывает подтип. Count/unique_count/
+null_count по Variant возвращают integer. Не добавляй мостовые узлы ради чтения.
 Count считает все строки, включая NULL; unique_count — разные непустые
 значения; null_count — пропуски. Пустая строка — значение, false — не NULL.
 Sum, avg, median и standard_deviation (выборочное) имеют тип real; count,
