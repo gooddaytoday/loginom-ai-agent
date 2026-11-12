@@ -385,6 +385,30 @@ jobs:
           bun packages/desktop/scripts/release/verify-artifact.ts --manifest "$dist/windows-release-manifest.json" --artifact "$dist/loginom-ai-agent-win-x64.exe" --unpacked "$dist/win-unpacked" --report "$dist/static-nsis.json"
           if ($LASTEXITCODE -ne 0) { throw "Installer verification failed" }
           if ((Get-AuthenticodeSignature -LiteralPath "$dist/loginom-ai-agent-win-x64.exe").Status -ne "NotSigned") { throw "Expected unsigned Windows candidate" }
+      # Same script and mode as loginom-windows.yml; any FAIL check fails this job and so the release gate.
+      - name: Install, launch and uninstall Desktop installer
+        timeout-minutes: 15
+        env:
+          # The installed app inherits the step environment; it needs no build-time S3 key.
+          LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ""
+          LOGINOM_UPDATES_S3_READ_SECRET_KEY: ""
+        run: |
+          & ./packages/desktop/test/loginom/windows-installed-smoke.ps1 `
+            -Installer "$env:RUNNER_TEMP/windows/desktop/loginom-ai-agent-win-x64.exe" `
+            -RunRoot "$env:RUNNER_TEMP/windows-installed-smoke" `
+            -ExpectedVersion $env:LOGINOM_AI_AGENT_VERSION -Channel $env:LOGINOM_AI_AGENT_CHANNEL -AllowServer -KeepProxy
+          if ($LASTEXITCODE -ne 0) { throw "Installed Desktop smoke failed" }
+      # Not a loginom-* name: the release job attaches every loginom-* artifact to the GitHub Release.
+      - name: Upload installed Desktop smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-installed-smoke
+          path: |
+            ${{ runner.temp }}/windows-installed-smoke/report.json
+            ${{ runner.temp }}/windows-installed-smoke/logs.zip
+          if-no-files-found: warn
+          retention-days: 14
       - name: Collect Windows artifacts
         run: |
           $upload = New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/windows-upload"

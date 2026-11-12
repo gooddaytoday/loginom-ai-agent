@@ -10,7 +10,7 @@
 | NAT | `windows-native-check.yml` | push в любую ветку при изменении `loginom-host`, `apps.ts`, profile-windows | windows-2022 и 2025 |
 | CAND | `loginom-windows.yml` | dispatch; PR только из `v040-batch-*` или в `dev`/`loginom`; обычный PR в v040 — skipped | windows-2022 |
 | REL | `release.yml` job windows | тег и dispatch candidate | windows-2025 |
-| SMK | установленный smoke `windows-installed-smoke.ps1`, #1023 (включает #1025), не влит | будет шагом CAND; в REL его нет | windows-2022 |
+| SMK | установленный smoke `windows-installed-smoke.ps1`, #1023 (включает #1025) | шаг CAND и шаг REL после verify-artifact (гейт выпуска) | windows-2022 (CAND), windows-2025 (REL) |
 | L | `test.yml` unit/desktop/e2e и `turbo test` | только Linux | ubuntu-24.04 |
 | Стенд | ручная приёмка по `windows.md` | Windows 11 x64 | — |
 
@@ -21,7 +21,7 @@
 | Функция | Автотесты (пути) | На Windows | Только стенд |
 | --- | --- | --- | --- |
 | Сборка NSIS и CLI ZIP | `script/build-windows.ps1`; `desktop/electron-builder.config.test.ts`, `scripts/release/artifact.test.ts` | CAND, REL | подпись, SmartScreen |
-| Установка/удаление NSIS (`oneClick`, `/currentuser`) | статично `scripts/release/verify-artifact.ts` (MZ, хеш ресурсов, exe не запускается); SMK: тихая установка, запись «Установленные приложения», ярлык, удаление с сохранением данных | REL статично; SMK не влит | PKG-01/02, REMOVE-01, переустановка |
+| Установка/удаление NSIS (`oneClick`, `/currentuser`) | статично `scripts/release/verify-artifact.ts` (MZ, хеш ресурсов, exe не запускается); SMK: тихая установка, запись «Установленные приложения», ярлык, удаление с сохранением данных | REL статично и SMK; CAND SMK | PKG-01/02, REMOVE-01, переустановка |
 | Обновление (feed, политика, 0.3.x → 0.4.0) | `desktop/src/main/update-*.test.ts`, `updater-*.test.ts`; `test/loginom/updater/` — только AppImage | нет (L) | UPDATE-01 с 0.3.6/0.3.8/0.3.9 |
 | Первый запуск, онбординг | SMK: запуск в профиле онбординга, версия в `main.log`, server ready, окно, выход 0 | SMK | UI-01 (три поля, пустой пароль) |
 | Настройки Loginom | `app/test-browser/settings-loginom.test.ts`, `settings-keybinds`, `toast-owner` | REL | UI-02 |
@@ -50,7 +50,7 @@
 | # | Пробел | Где закрыть | Объём |
 | --- | --- | --- | --- |
 | 1 | Обновление NSIS с 0.3.6/0.3.8/0.3.9 до 0.4.0: настройки, учётные данные, чаты | стенд Win 11; затем SMK-режим «установить N, обновить до N+1» по образцу AppImage | стенд 1 ч на версию; автомат 2–3 дня |
-| 2 | SMK не влит и не входит в REL; без него выпуск не запускает установленный Desktop | влить #1023, вызвать скрипт в REL после verify-artifact | 0,5 дня |
+| 2 | Закрыт: REL запускает SMK на собранном установщике после verify-artifact, режим как в CAND (`-AllowServer -KeepProxy`, канал и версия сборки); FAIL валит job windows и выпуск, WARN — нет; `report.json` и `logs.zip` — артефакт `windows-installed-smoke` (не попадает в Release) | `release.yml` job windows | — |
 | 3 | CAND автоматизирует DPAPI: сохранение, выход и чтение новым процессом; повреждение и отказ без plaintext | `loginom-windows.yml`, шаг `Desktop safeStorage DPAPI across Electron restarts`: установленный через сборку `node_modules/electron` (тот же pin, что у Desktop), production-кодек; недоступность адаптера задана явно для проверки отказа. Реальная недоступность safeStorage завершает шаг ошибкой. Evidence: `safe-storage-{write,read,unavailable}.json` | Осталось: SEC-01 в NSIS Desktop и другой пользователь на стенде; REL пока без этого шага |
 | 4 | CAND запускает собранный CLI из ZIP по документированному пути | `loginom-windows.yml`, шаг `Install, execute and remove the CLI ZIP candidate`: чистая распаковка, отдельный `LOCALAPPDATA`, `install.cmd` → launcher `--version` → `verify-cli-candidate.ts` на установленном payload → исходный `uninstall.cmd`. Проверяет удаление файлов/receipt/lock и неизменность uninstall-реестра и PATH; два пустых каталога installer сохраняет штатно. Evidence: `cli-installed-smoke.json` | Осталось: вход/задача/TUI на стенде; REL пока без этого шага |
 | 5 | Поколения подключения, восстановление, узлы, справка, навыки проверяются только на Linux (пути, rename/fsync NTFS, процессы) | Windows CI: `desktop` `src/main/loginom` и `loginom-host` connection/package-docs/bundled-skills в NAT; клиентские тесты узлов оставить на L | 1–2 дня (часть может упасть на путях) |
