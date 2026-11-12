@@ -22,6 +22,36 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_excel_destinations_reach_seed_and_oracle_books(self):
+        for name in ['excel-export-numeric', 'excel-export-replace']:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                folder, workspace = root / 'run', root / 'workspace'
+                folder.mkdir(); workspace.mkdir()
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+                phases = []
+                def phase(name, *args, **kwargs):
+                    phases.append(name)
+                    if name == 'model': raise InterruptedError
+                with patch.object(instance, 'phase', side_effect=phase):
+                    with self.assertRaises(InterruptedError):
+                        instance.model(name, folder, root / 'profile', workspace, '/own/run.lgp',
+                                       {'package_directory': '/own/'}, root / 'build')
+                expected = runner.read(folder / 'expected.json')
+                destinations = ['/own/' + root.name + '-' + folder.parent.name + '-' + b['filename']
+                                for b in expected['excel_books']]
+                self.assertEqual([b['export_destination'] for b in expected['excel_books']], destinations)
+                self.assertEqual(expected['outputs'], expected['excel_books'])
+                for destination in destinations:
+                    self.assertIn(destination, (folder / 'task.md').read_text())
+                if name == 'excel-export-replace':
+                    seeds = runner.read(folder / 'seed-config.json')['books']
+                    self.assertEqual([b['destination'] for b in seeds], destinations)
+                    self.assertEqual(phases, ['excel-seeds', 'model'])
+                else:
+                    self.assertEqual(phases, ['model'])
+
     def test_text_parallel_uses_frozen_tables_and_original_input_names(self):
         case = runner.scenario('text-parallel')
         self.assertTrue(case['text_parallel'])
