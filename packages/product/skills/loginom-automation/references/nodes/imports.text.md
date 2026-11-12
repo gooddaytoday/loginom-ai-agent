@@ -5,12 +5,12 @@ Existing Import: confirmed source CSV before Execute/read; else ask.
 Reads add a visualizer even after refusal. `NOT_APPLIED`/`effect_possible=false`:
 report/ask CSV; no cleanup baseline/Save.
 
-Server preview: `dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
-`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}` returns
-`output.server_profile`; discard without Execute. Known
-`settings.source.encoding`; garbled UTF-8 Cyrillic: refresh `dock_storage_source`,
-retry `CP1251`. Preview proves no rare types. Reuse ref after download/sampling;
-closed empty node: full sample settings from local profile.
+Native preview FIRST; compare ORIGINAL text.
+`dock_node_apply` `parameters:{source:{kind:"storage",server_source_ref:"…"},preview_only:true,settings:{source:{source_path:"…"}}}`,
+`finish:"close"`, `inputs:[]`, `mappings:[]`, `read:{ports:[]}`:
+`output.server_profile`: native format/types, no Execute. Known `settings.source.encoding`;
+garbled: fresh `dock_storage_source`, `CP1251`. No rare types proof.
+Reuse after download/sampling with full sample settings.
 
 Import output renames/types: edit SAME Import's `settings.columns`, no Reform.
 "Do not reconfigure CSV loading": keep `settings.source`/`settings.format`/`mappings`,
@@ -18,9 +18,8 @@ fields/order; edit requested fields only. Deliver this session's attachment with
 `overwrite=reject`; compare server bytes before path reuse. Never bypass
 `UPLOAD_PATH_CONFLICT` via path/policy changes or saved-node activation.
 
-New Import: omitted `source_path` uses upload_operation_id's path.
-Defaults: UTF-8, header 1, skip 0, comma, decimal point, empty NULL, double quote.
-Set types/names.
+New: omitted `source_path`=upload_operation_id's path.
+Fallback: UTF-8, header 1, skip 0, comma, decimal point, empty NULL, double quote.
 
 `source_switch`: [switch to full file](../large-files.md#переключение-на-полный-файл); no separate Import Execute.
 
@@ -48,13 +47,19 @@ No order/speed guarantee.
 
 ## Auto-detected types
 
+User types win. Else correct only sample contradictions: leading zeros → string;
+numeric separators → verify values; date strings/NULL → check parsing.
+Check types/values/NULL/seconds; report types/date format.
+Sample → `settings.format.date_format`/`date_separator`:
+dd.MM or dd/MM → `dd/mm/yyyy`, `.` or `/`; ISO (-, T) → `yyyy/mm/dd`, `-`.
+Ambiguous dates: user convention or ask.
+
 Types: `settings.format.auto_detect_columns` (`none`/`new`/`all`),
-`settings.analysis`: `rows`, `refresh` (`all` — fields and types anew, `types` —
-types only). New node: omit `columns`; check `output` schema.
+`settings.analysis`: `rows`, `refresh` (`all`=fields/types, `types`=types).
+Prefer `new`; omit `columns` unless correcting. Reuse preview node: COMPLETE source/format.
 `all`: fields/types appear only after Execute; omit `columns`/output `mappings`.
-For manual fields use `new`/`none`. `new`: manual types set in a separate call
-on the SAME node survive `source_path` changes. `refresh` erases
-manual types: only on request.
+For manual fields use `new`/`none`. With `new`, separate-call manual types on SAME node
+survive `source_path` changes. `refresh` erases manual types: only on request.
 
 Mixed types: `settings.format.variant_as_general_type:true` and
 `settings.analysis.refresh:"types"` on the same Import; no Calculator/JS. Use false

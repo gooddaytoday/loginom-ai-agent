@@ -78,6 +78,9 @@ export interface TextImportConfigurationReadback {
   output_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>};
 }
+export interface TextImportDetectionConfigurationReadback extends TextImportConfigurationReadback {
+  format: TextImportConfigurationReadback['format'] & {auto_detect_columns?: string; analysis_rows?: string};
+}
 export interface JavascriptConfigurationReadback {
   kind: 'javascript'; scope: 'observed_after_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'independent_owned_source_readback'; schema_mode: 'code' | 'declared';

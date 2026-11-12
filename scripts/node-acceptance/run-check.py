@@ -257,6 +257,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name == 'text-autodetect-types':
+        root = REPO / 'docs/node-development/nodes/text-import/acceptance/autodetect'
+        return dict(source=root, prompt=root / 'task.md', data=root / 'data', base=None,
+                    input_files=['ru.csv', 'iso.csv', 'slash.csv'], export_count=3)
     if name == 'text-file-info':
         node = REPO / 'docs/node-development/nodes/text-import'
         return dict(source=node / 'acceptance/extended', prompt=REPO / 'scripts/node-acceptance/scenarios/text-file-info/task.md',

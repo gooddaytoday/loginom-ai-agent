@@ -14,8 +14,7 @@ const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 // Existing JS describe exception: [JS plan, J21](../../../../docs/node-development/nodes/programming-javascript/plan.md).
 // boundedUserToolReply below also enforces this limit on the complete JS wire reply.
 const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET,
- // Owner decision v040-text-budget-13k; actual C6 card must stay <=12156.
- 'imports.text':13000});
+ 'imports.text':12000});
 
 test('user-v1 model receives dock_node_apply within 20000 bytes',t=>{
  const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');
@@ -49,7 +48,7 @@ test('every registered user-v1 node card fits its type budget',async t=>{
    if(['programming.javascript','imports.text','transform.filter_data','transform.ungroup_data','transform.col_union_data'].includes(type))t.diagnostic(JSON.stringify({type,modes,card_bytes:bytes(description.node_types[0]),wire_bytes:bytes(reply)}));
    assert.equal(boundedUserToolReply(reply,{tool:'dock_action_describe'}),reply,type+': '+modes);
    const card=description.node_types[0];
-   if(type==='imports.text')assert.ok(bytes(card)<=12156,`Text Import C6 card: ${bytes(card)} > 12156`);
+   if(type==='imports.text')assert.ok(bytes(card)<=12000,`Text Import card: ${bytes(card)} > 12000`);
    assert.equal(typeof card.guidance,'string');
    assert.deepEqual(card.guidance_modes,original.modes);
    const budget=NODE_CARD_BUDGET_EXCEPTIONS[type]??12000;
