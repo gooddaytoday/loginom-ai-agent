@@ -28,7 +28,7 @@ export async function configureLogRegressionRoles(channel,p,inputMapping){
   s=await channel.observe({condition:'bound regression role editor',ready:pickerReady});
   await channel.perform({condition:'open regression role choices',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'click',ref:unique(s,e=>choice(e,'picker')&&e.allowed_actions.includes('click')).ref})});
-  const label={0:'Не задано',3:'Входное',4:'Выходное'}[wanted.usage_type];
+  const label={0:'Не задано',3:'Входное',4:'Выходное',5:'Вес'}[wanted.usage_type];
   s=await channel.observe({condition:'regression role option',ready:s=>editor(s)&&s.ui.elements.some(e=>choice(e,'option')&&e.wizard_combo.label===label)});
   await channel.perform({condition:'select regression role',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'select_wizard_option',ref:unique(s,e=>choice(e,'option')&&e.wizard_combo.label===label).ref})});
@@ -55,7 +55,7 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   resolve:s=>({verb:'wizard_step',ref:one(s,e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'),'Next unavailable').ref,expected_stage:destination})});
  await next('input_mapping','normalization');
  let state=await observe('normalization','complete logistic normalizers');const baseline=state.node_logregression;
- const used=roles.configuration.fields.filter(f=>f.usage_type!==0);
+ const used=roles.configuration.fields.filter(f=>[3,4].includes(f.usage_type));
  need(baseline.fields.length===used.length&&new Set(baseline.fields.map(f=>f.name)).size===used.length
   &&baseline.fields.every(f=>used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1
    &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(mode==='enter'||f.importance===1&&f.irremovable===false):Number.isInteger(f.norm_type))),
@@ -188,7 +188,7 @@ async function configureLogRegressionApply(channel,p){
  await saved(roles.fields.every((f,i)=>f.usage_type===expected[i].usage_type),'roles');
  await next('input_mapping','normalization');
  state=await observe('normalization','saved logistic normalization');
- const normalization=state.node_logregression.fields,used=roles.fields.filter(f=>f.usage_type!==0);
+ const normalization=state.node_logregression.fields,used=roles.fields.filter(f=>[3,4].includes(f.usage_type));
  await saved(normalization.length===used.length&&new Set(normalization.map(f=>f.name)).size===used.length
   &&normalization.every(f=>used.some(role=>['name','label','type','index'].every(k=>role[k]===f[k]))
    &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(p.normalization===undefined||f.norm_type==={none:0,standardize:5}[p.normalization]):Number.isInteger(f.norm_type)))&&new Set(normalization.filter(f=>p.input_fields.includes(f.name)).map(f=>f.norm_type)).size===1,'normalization');

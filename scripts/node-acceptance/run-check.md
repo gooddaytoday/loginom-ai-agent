@@ -1047,3 +1047,8 @@ recommend-holdout.csv из fixtures/v040. Oracle сохраняет правил
 проверяет H1→B (.75/.75/1); переобучение holdout даёт ноль правил.
 Аудит требует обучение и apply одного GUID, без повторного Train;
 оба полных typed-порта 1/2, два CSV, Save, cold без настройки и cleanup.
+
+`logreg-weights`: Enter с частотными весами Real, 32×9 полных значений.
+Только утверждённые task-weights.md и weighted.csv передаются модели;
+независимый modes/oracle.py и expected.json остаются в harness.
+Weight сохраняется в прогнозе, не используется как фактор. CSV/Save/cold/cleanup.

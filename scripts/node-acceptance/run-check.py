@@ -626,6 +626,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
                     expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
                     input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
+    if name == 'logreg-weights':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/weights'
+        return dict(source=src, prompt=src / 'task-weights.md', data=src / 'data', base=None,
+                    input_files=['weighted.csv'], expected_name='expected.json',
+                    oracle=src.parent / 'oracle.py')
+
     if name == 'logreg-ridge':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/ridge'
         return dict(source=src, prompt=src / 'task-ridge.md', data=src / 'data', base=None,
