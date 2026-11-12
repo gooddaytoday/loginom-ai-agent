@@ -1,5 +1,8 @@
 # Выход переменных Variant (W1) для «Таблицы в переменные» — этап 0
 
+Частичные native-пробы LAB-1445 и нерешённая граница канала:
+[variables-output-probes.md](variables-output-probes.md).
+
 Назначение LAB-1191. База `origin/v040@0263a21987`; опора — план общего
 reader (#906, `variant-reader-plan@d72c70e829`, `variant-reader/plan.md`)
 и цикл 1 табличного reader (#922, `variant-native-tags@e2e32e63bb`).
