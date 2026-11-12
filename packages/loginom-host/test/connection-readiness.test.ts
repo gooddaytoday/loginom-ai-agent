@@ -171,3 +171,54 @@ test("Help observations preserve pending activation and durable failure and igno
     expect((await service.api.status()).help).toEqual({ state: "ready" })
   } finally { await service.close(); await rm(directory, { recursive: true, force: true }) }
 }, 180000)
+
+test("saving a new generation keeps the old Help failure out of its activation result", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "help-failure-save-"))
+  const store = connectionStore(join(directory, "connection"), credentials("linux"))
+  await store.stage({ mode: "custom", endpoint: "http://fixture.test/mcp", generation: 1, revision: 1,
+    url: "http://stand.test/app/", username: "user", apiKey: "fixture", password: "" })
+  await store.activate(1)
+  const entered = Promise.withResolvers<void>()
+  const activate = Promise.withResolvers<void>()
+  let oldHelp: Parameters<import("../src/connection/connection-service").RuntimeHandle["observeHelp"]>[0] | undefined
+  const service = await connectionService(store, {
+    async check() { return { help: { state: "connection-required" }, browser: { state: "unknown" } } },
+    async prepare(connection) {
+      if (connection.generation === 2) {
+        entered.resolve()
+        await activate.promise
+      }
+      return {
+        observeHelp(listener) {
+          if (connection.generation === 1) oldHelp = listener
+          listener({ state: connection.generation === 1 ? "ready" : "connection-required" })
+        },
+        async close() {},
+      }
+    },
+  })
+  try {
+    await service.settled()
+    const lease = service.acquire("held")!
+    oldHelp!({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+    expect((await service.api.status()).failure).toBe("LOGINOM_RUNTIME_START_FAILED")
+    const checked = await service.api.check({ mode: "cloud", revision: 1, url: "http://next.test/app/",
+      username: "next", password: { operation: "preserve" }, verifyBrowser: false })
+    const saved = await service.api.save({ revision: 1, validationId: checked.validationId })
+    expect(saved.state).toBe("pending")
+    expect(saved.help.state).toBe("recoverable-error")
+    expect(saved.failure).toBeUndefined()
+    lease.release()
+    await entered.promise
+    expect((await service.api.status()).state).toBe("starting")
+    expect((await service.api.status()).failure).toBeUndefined()
+    activate.resolve()
+    await service.settled()
+    expect(await service.api.status()).toMatchObject({ generation: 2, state: "connection-required", mode: "cloud" })
+    expect((await service.api.status()).failure).toBeUndefined()
+  } finally {
+    activate.resolve()
+    await service.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})

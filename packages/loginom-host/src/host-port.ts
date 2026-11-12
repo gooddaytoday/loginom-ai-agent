@@ -65,6 +65,10 @@ function recoverableCatalogFailure(error: unknown) {
       "LOGINOM_KNOWLEDGE_UNAVAILABLE",
       "LOGINOM_KNOWLEDGE_FAILED",
       "LOGINOM_KNOWLEDGE_CATALOG_INVALID",
+      "LOGINOM_CLOUD_UNAVAILABLE",
+      "LOGINOM_CLOUD_PROTOCOL_INVALID",
+      "LOGINOM_CLOUD_CONNECTION_REQUIRED",
+      "LOGINOM_STORE_WRITE_FAILED",
     ].includes(error.message) &&
     (!(error instanceof RuntimeStartupError) || error.cleanupConfirmed)
   )

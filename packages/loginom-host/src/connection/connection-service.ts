@@ -121,6 +121,7 @@ export async function connectionService(
   }
   function view(): Loginom.View {
     const current = state.active
+    const failure = state.failure ?? (state.pending ? undefined : state.helpFailure)
     return {
       mode: current?.mode ?? "cloud",
       endpoint: current?.endpoint,
@@ -138,7 +139,7 @@ export async function connectionService(
       state:
         recovery?.pending().length || state.failure === "LOGINOM_STORE_READ_FAILED" ? "recoverable-error" : state.phase,
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
-      ...(state.failure || state.helpFailure ? { failure: state.failure ?? state.helpFailure } : {}),
+      ...(failure ? { failure } : {}),
     }
   }
   function progress() {

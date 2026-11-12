@@ -81,7 +81,7 @@ try {
       JSON.stringify({
         executable,
         directory,
-        connection: { apiKey: secret.apiKey, password: "", username: record.username, url: record.url },
+        connection: { endpoint: record.endpoint, apiKey: secret.apiKey, password: "", username: record.username, url: record.url },
         config: { mcp: { "windows-oauth": { type: "remote", url: new URL("/mcp", http.url.href).toString() } } },
         xiaomi,
       }),

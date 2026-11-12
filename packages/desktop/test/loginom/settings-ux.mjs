@@ -208,8 +208,11 @@ try {
   )
   await expect(form.locator('[data-component="loginom-cloud-card"]')).toContainText(expiry)
   await expect(form.getByRole("button", { name: "https://loginom.ai/device", exact: true })).toBeVisible()
+  await expect.poll(async () => (await counters()).links).toEqual(["https://loginom.ai/device"])
   await form.getByRole("button", { name: "https://loginom.ai/device", exact: true }).click()
-  assert.deepEqual((await counters()).links, ["https://loginom.ai/device"])
+  await expect.poll(async () => (await counters()).links).toEqual([
+    "https://loginom.ai/device", "https://loginom.ai/device",
+  ])
   await expect(footerClose()).toBeEnabled()
   await form.getByRole("button", { name: cancelName }).click()
   await expect(form.getByRole("button", { name: connectName })).toBeEnabled()

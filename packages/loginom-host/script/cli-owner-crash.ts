@@ -33,6 +33,7 @@ if (credentialProfile) {
   if (!secret || typeof secret !== "object" || !("apiKey" in secret) || !("password" in secret) ||
     typeof secret.apiKey !== "string" || typeof secret.password !== "string")
     throw Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
+  config.endpoint = record.endpoint
   config.api_key = secret.apiKey
   config.loginom_url = record.url
   config.workflow_profile = { passwordless_login: secret.password === "", loginom_user: record.username }
@@ -54,6 +55,8 @@ const setup = Bun.spawn([executable, "loginom", "setup", "--stdin-json", "--form
   env,
   stdin: new Blob([
     JSON.stringify({
+      mode: "custom",
+      endpoint: config.endpoint,
       apiKey: config.api_key,
       password: "",
       username: config.workflow_profile.loginom_user,

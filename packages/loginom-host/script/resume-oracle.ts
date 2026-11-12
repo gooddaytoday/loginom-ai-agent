@@ -45,6 +45,7 @@ try {
         prompt: "Reopen the previously saved package for inspection, then observe its roots. Do not change or save it.",
       },
       connection: {
+        endpoint: config.endpoint,
         apiKey: config.api_key,
         password: "",
         url: config.loginom_url,

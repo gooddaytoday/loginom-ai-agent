@@ -334,6 +334,36 @@ test("HTTP429 polling observes Retry-After and the interval", async () => {
   }
 })
 
+test("interrupted token response bodies retry within the device polling interval", async () => {
+  for (const status of [200, 400]) {
+    const f = await fixture()
+    const ended = gate()
+    const delays: number[] = []
+    let tokens = 0
+    const auth = await createCloudAuth({
+      store: f.store,
+      endpoints: f.endpoints,
+      wait: async (ms) => { delays.push(ms) },
+      fetch(input, init) {
+        if (input.endsWith("/device/token") && ++tokens === 1)
+          return Promise.resolve(new Response(new ReadableStream({
+            start(controller) { controller.error(new TypeError("socket-private-canary")) },
+          }), { status }))
+        return fetch(input, init)
+      },
+      changed() { if (!auth.status().pending) ended.resolve() },
+    })
+    try {
+      await auth.start()
+      await ended.promise
+      expect(auth.status()).toEqual({ connected: true, email: pair.user.email })
+      expect(tokens).toBe(2)
+      expect(delays).toEqual([1000, 1000])
+      expect(await f.store.read()).toMatchObject({ installationKey: pair.installationKey, dock: pair.dock })
+    } finally { await auth.close(); await f.cleanup() }
+  }
+})
+
 test("temporary polling failures wait and cannot extend the original expiry", async () => {
   const f = await fixture((request) =>
     request.url.endsWith("/device/token") ? new Response(null, { status: 503 }) : undefined,
@@ -944,6 +974,45 @@ test("refresh responses from a retired epoch cannot mutate a new login", async (
   }
 })
 
+test("a failed refresh write and read-back retain the confirmed credentials until storage recovers", async () => {
+  let clock = Date.now()
+  let unavailable = false
+  const fresh = { primary: { apiKey: "fresh-primary" }, reserve: { apiKey: "fresh-reserve" } }
+  const f = await fixture(request => request.url.endsWith("/dock-credentials") ? Response.json({ dock: fresh }) : undefined)
+  const previous = { kind: "loginom-cloud-v1" as const, installationKey: pair.installationKey, email: pair.user.email, dock: pair.dock }
+  await f.store.write(previous)
+  const auth = await createCloudAuth({
+    store: {
+      ...f.store,
+      async read() {
+        if (unavailable) throw Error("read-private-canary")
+        return f.store.read()
+      },
+      async write(value) {
+        if (unavailable) throw Error("write-private-canary")
+        await f.store.write(value)
+      },
+    },
+    endpoints: f.endpoints,
+    now: () => clock,
+    changed() {},
+  })
+  const refresh = () => auth.refresh({ deadline: clock + 3000, signal: new AbortController().signal })
+  try {
+    unavailable = true
+    await expect(refresh()).rejects.toThrow("LOGINOM_STORE_WRITE_FAILED")
+    expect(auth.credentials()).toEqual(previous)
+    expect(auth.status()).toEqual({ connected: true, email: pair.user.email })
+    expect(auth.revision()).toBe(0)
+    unavailable = false
+    expect(await f.store.read()).toEqual(previous)
+    clock += 30_000
+    await refresh()
+    expect(auth.credentials()?.dock).toEqual(fresh)
+    expect((await f.store.read())?.dock).toEqual(fresh)
+  } finally { await auth.close(); await f.cleanup() }
+})
+
 test("post-rename fsync failure reconciles controller revision and status with actual disk", async () => {
   const f = await fixture((request) =>
     request.url.endsWith("/dock-credentials")
@@ -1243,6 +1312,45 @@ test("cancel aborts a hung token fetch without retrying an aborted attempt", asy
   } finally {
     await auth.close()
     await f.cleanup()
+  }
+})
+
+test("cancel after exchange accepts the consumed bootstrap session while retaining installation revoke failures", async () => {
+  for (const [status, expected] of [
+    [204, { connected: false }],
+    [503, { connected: false, failure: "LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED" }],
+  ] as const) {
+    const f = await fixture(request => {
+      if (request.url.endsWith("/revoke-session")) return new Response(null, { status: 401 })
+      if (request.method === "DELETE") return new Response(null, { status })
+      return undefined
+    })
+    const writing = gate()
+    const release = gate()
+    const auth = await createCloudAuth({
+      store: { ...f.store, async write(value) {
+        writing.resolve()
+        await release.promise
+        await f.store.write(value)
+      } },
+      endpoints: f.endpoints,
+      wait: async () => {},
+      changed() {},
+    })
+    try {
+      await auth.start()
+      await writing.promise
+      const cancellation = auth.cancel()
+      release.resolve()
+      await cancellation
+      expect(auth.status()).toEqual(expected)
+      expect(await f.store.read()).toBeUndefined()
+      const deletion = f.calls.find(call => call.path.endsWith("/connections/current"))
+      const revoke = f.calls.find(call => call.path.endsWith("/revoke-session"))
+      expect(deletion?.headers.get("x-api-key")).toBe(pair.installationKey)
+      expect(revoke?.headers.get("authorization")).toBe("Bearer bootstrap-secret")
+      expect(revoke?.body).toEqual({ token: "bootstrap-secret" })
+    } finally { release.resolve(); await auth.close(); await f.cleanup() }
   }
 })
 

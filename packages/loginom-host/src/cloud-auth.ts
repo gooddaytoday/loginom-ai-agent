@@ -119,7 +119,10 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       const delay = /^\d+(\.\d+)?$/.test(header) ? Number(header) * 1000 : Math.max(0, Date.parse(header) - now())
       throw Object.assign(Error("rate_limited"), { retryAfter: Number.isFinite(delay) ? delay : 0 })
     }
-    const parsed: unknown = await response.json().catch(() => undefined)
+    const bodyText = await response.text().catch(() => {
+      throw Error("LOGINOM_CLOUD_UNAVAILABLE")
+    })
+    const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(bodyText))
     if (
       parsed &&
       typeof parsed === "object" &&
@@ -141,7 +144,7 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       )
     )
       throw Error("access_revoked")
-    if (!response.ok) throw Object.assign(Error("LOGINOM_CLOUD_UNAVAILABLE"), { retryable: false })
+    if (!response.ok) throw Object.assign(Error("LOGINOM_CLOUD_UNAVAILABLE"), { retryable: false, status: response.status })
     const result = Schema.decodeUnknownOption(schema)(parsed)
     if (Option.isNone(result)) throw Error("LOGINOM_CLOUD_PROTOCOL_INVALID")
     return result.value
@@ -153,7 +156,8 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
       try {
         await options.store.write(record)
       } catch {
-        const actual = await options.store.read().catch(() => undefined)
+        // A failed read cannot disprove the last confirmed in-memory record.
+        const actual = await options.store.read().catch(() => saved)
         if (attempt !== epoch) throw Error("LOGINOM_STORE_WRITE_FAILED")
         // Failed logout can leave an old record that is intentionally disabled.
         if (
@@ -345,7 +349,9 @@ export async function createCloudAuth(options: CloudAuthOptions): Promise<CloudA
               new AbortController().signal,
               { Authorization: `Bearer ${token.access_token}` },
               deadline,
-            ).catch(() => {
+            ).catch((error: unknown) => {
+              // A completed exchange consumes this exact bootstrap session on the site.
+              if (installationKey && error instanceof Error && "status" in error && error.status === 401) return
               if (login === controller) failure = "LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED"
             })
           }

@@ -742,6 +742,23 @@ describe("Loginom settings", () => {
       f.dispose()
     }
   })
+  test("a clean form adopts deferred cloud settings when activation requires sign-in", async () => {
+    const f = setup({ state: "pending", revision: 2 })
+    try {
+      await f.form.load()
+      f.update({ state: "connection-required", mode: "cloud", generation: 2,
+        server: "primary", username: "next", folder: "/next", help: { state: "connection-required" } })
+      await f.form.refresh()
+      expect(f.form.state.mode).toBe("cloud")
+      expect(f.form.state.username).toBe("next")
+      expect(f.form.state.baseline?.generation).toBe(2)
+      expect(f.form.dirty()).toBe(false)
+      f.form.edit({ url: "http://new.test/app/" })
+      await f.form.submit(false)
+      expect(f.checks[0]).toMatchObject({ revision: 2, mode: "cloud", username: "next" })
+    } finally { f.dispose() }
+  })
+
   test("status refresh preserves a dirty draft and its original revision", async () => {
     const f = setup()
     try {

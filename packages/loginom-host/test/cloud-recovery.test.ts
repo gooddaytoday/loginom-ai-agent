@@ -797,3 +797,82 @@ test("one Help call cannot refresh again after its one reserve transition", asyn
     expect(reserveReads).toBe(1)
   } finally { await f.close() }
 }, 240000)
+
+test("a cloud refresh outage preserves local automation tools and diagnostics", async () => {
+  let refreshes = 0
+  const f = await fixture({ async request(_body, _request, response) {
+    response.writeHead(401)
+    response.end()
+    return true
+  } }, {}, () => { refreshes++; return new Response(null, { status: 503 }) })
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const port = loginomHostPort({ postMessage: value => replies.emit("message", { data: value }),
+    on: requests.on.bind(requests), start() {} }, f.host)
+  const client = transport({ postMessage: value => requests.emit("message", { data: value }),
+    on: replies.on.bind(replies), start() {} })
+  try {
+    await f.host.settled()
+    await expect(f.host.catalog(1)).rejects.toThrow("LOGINOM_CLOUD_UNAVAILABLE")
+    await client.request("acquire", { run: "local", session: "local" })
+    await client.request("scope", { run: "local", mode: "bind",
+      scope: { taskMessageID: "msg_original", profile: "loginom-automation" } })
+    expect(await client.request("tools", { run: "local" })).toMatchObject({
+      tools: [{ name: "dock_prepare" }, { name: "dock_diagnostics" }],
+    })
+    expect(await client.request("call", { run: "local", name: "dock_diagnostics", args: {},
+      userMessage: "msg_original" })).toMatchObject({ structuredContent: { state: "recoverable-error" } })
+    expect((await f.host.api.status()).cloud.connected).toBe(true)
+    expect(f.reserve.requests).toHaveLength(0)
+    expect(refreshes).toBe(1)
+    expect(await readdir(f.options.root)).not.toContain("runtime")
+  } finally {
+    client.close()
+    await port.close()
+    await f.close()
+  }
+}, 30_000)
+
+test("a revoked cloud installation keeps local tools available during catalog recovery", async () => {
+  let unavailable = true
+  let refreshes = 0
+  const f = await fixture({ async request(_body, _request, response) {
+    response.writeHead(unavailable ? 503 : 401)
+    response.end()
+    return true
+  } }, { async request(_body, _request, response) {
+    response.writeHead(503)
+    response.end()
+    return true
+  } }, () => {
+    refreshes++
+    return Response.json({ error: { code: "access_revoked", message: "Installation disconnected" } }, { status: 403 })
+  })
+  const requests = new EventEmitter()
+  const replies = new EventEmitter()
+  const port = loginomHostPort({ postMessage: value => replies.emit("message", { data: value }),
+    on: requests.on.bind(requests), start() {} }, f.host)
+  const client = transport({ postMessage: value => requests.emit("message", { data: value }),
+    on: replies.on.bind(replies), start() {} })
+  try {
+    await f.host.settled()
+    await expect(f.host.catalog(1)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+    const reserveRequests = f.reserve.requests.length
+    unavailable = false
+    await client.request("acquire", { run: "local", session: "local" })
+    await client.request("scope", { run: "local", mode: "bind",
+      scope: { taskMessageID: "msg_original", profile: "loginom-automation" } })
+    expect(await client.request("tools", { run: "local" })).toMatchObject({
+      tools: [{ name: "dock_prepare" }, { name: "dock_diagnostics" }],
+    })
+    expect(await f.host.api.status()).toMatchObject({ cloud: { connected: false }, help: { state: "connection-required" } })
+    expect(await cloudStore(join(f.options.root, "connection"), credentials("linux")).read()).toBeUndefined()
+    expect(f.reserve.requests).toHaveLength(reserveRequests)
+    expect(refreshes).toBe(1)
+    expect(await readdir(f.options.root)).not.toContain("runtime")
+  } finally {
+    client.close()
+    await port.close()
+    await f.close()
+  }
+}, 30_000)

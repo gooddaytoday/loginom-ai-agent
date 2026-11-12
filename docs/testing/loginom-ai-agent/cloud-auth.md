@@ -534,3 +534,56 @@ prepare-startup retry/twice/deadline cases. Они отдельно воспро
 Независимые ревью auth, readiness, origin/UI/CLI и TUI завершены без новых
 замечаний. Установленный GUI, compiled CLI и native Windows/macOS не запускались.
 Существующий settings-ux.mjs дополнен регрессиями для будущего installed прогона.
+
+## Повторная проверка девяти замечаний, 2026-11-12
+
+База `7ae5bbb3f7`, ветка `dock-cloud-auth`.
+[План исправлений](../../superpowers/plans/2026-11-12-cloud-review-fixes.md)
+прошёл независимое ревью до изменений. Проверки используют временные профили,
+локальные HTTP/MCP fixtures, Bun1.3.14 и pinned Node24.19.0. Ambient proxy
+переменные Bun очищены, как и в предыдущей source-приёмке.
+
+| Замечание | Проверка и исправление |
+| --- | --- |
+| F1 | Ошибка read-back после сбоя записи больше не сбрасывает подтверждённые credentials в памяти. Успешное чтение по-прежнему сверяет результат post-rename/fsync. |
+| F2 | Сохранение нового поколения не наследует ошибку Help старого поколения. Durable/local ошибки остаются явными. |
+| F3 | Чистая форма принимает поля отложенного поколения с `connection-required`. Dirty draft и проверка ревизии сохраняются. |
+| F4 | При временной ошибке или подтверждённом отзыве во время refresh остаются локальные `dock_prepare` и `dock_diagnostics`. Отмена, дедлайн и cleanup продолжают завершаться ошибкой. |
+| F5 | Сетевой сбой чтения тела ответа `/device/token` сохраняет повтор опроса в исходном interval/expiry. Полный malformed JSON и терминальные HTTP4xx завершают вход. |
+| F6 | Ожидаемый bootstrap401 после обмена не создаёт ложное предупреждение отмены. Неуспешный DELETE и сетевой сбой очистки сохраняют предупреждение и общий budget5с. |
+| F7 | Desktop oracle/OAuth получают endpoint из явной конфигурации или custom-профиля через все вызывающие драйверы. |
+| F8 | CLI oracle/crash setup передаёт `mode: custom`, endpoint и ключ через stdin. |
+| F9 | Desktop settings-ux проверяет автоматическое открытие ссылки и последующее ручное открытие раздельно. |
+
+Все девять замечаний подтверждены. Для каждого исправления получен RED до
+изменения и GREEN после него. Независимое ревью всех исправлений — Approved.
+
+| Проверка | Результат |
+| --- | --- |
+| Host cloud-auth/cloud-store | 76 PASS, 0 FAIL, 374 assertions |
+| Host connection-readiness/connection-validation/cloud-recovery/cloud-readiness | 84 PASS, 0 FAIL, 491 assertions |
+| App settings-loginom | 37 PASS, 0 FAIL, 176 assertions |
+| Acceptance Dock setup, owner-crash, crash-contract, oracle-provider, resume-oracle | 7 PASS, 0 FAIL, 40 assertions |
+| `bun typecheck` в loginom-host, app, desktop, opencode | PASS, exit0 в каждом пакете |
+| Pinned Node `--check` для settings-ux.mjs | PASS |
+| Desktop connection-service/connection-store/host-port, timeout30с | 37 PASS, 0 FAIL, 117 assertions |
+| CLI loginom-management/standalone-preflight/standalone-status | 37 PASS, 1 SKIP, 0 FAIL, 369 assertions |
+| Host host-port/knowledge/host/connection-migration/transport/node-host | 90 PASS, 1 SKIP, 0 FAIL, 642 assertions |
+| Git secret scan staged и `git diff --check` | PASS |
+
+Все выбранные прогоны завершились exit0. Всего 368 PASS и 2 SKIP.
+Пропущенные тесты требуют отдельных compiled CLI/cloud fixtures и не объявлены
+пройденными. Повторять старые source/installed итоги как проверку новой сборки нельзя.
+
+Первый расширенный Desktop-прогон с default timeout5с получил 8 failures и
+3 последующие cleanup errors. Повтор с timeout30с завершился 37 PASS, 0 FAIL и без cleanup errors.
+Изменения кода между этими двумя прогонами отсутствовали.
+Полный изолированный settings-ux на frozen source build `b536a2e8cb` не дошёл
+до UI-проверок из-за тайм-аута Electron launch и login-shell probe. Контроллер
+формы подтвердил оба открытия ссылки, исправленный GUI-скрипт прошёл проверку
+синтаксиса. Installed GUI, Windows/macOS и production здесь не проверены.
+
+Локальные журналы и отчёты находятся в
+`$HOME/storage/tmp/cloud-auth-nine-checks-U8B0eY/` и файлах
+`cloud-auth-nine-{auth,state,acceptance}-report.md` в том же временном корне.
+Чужое незакоммиченное изменение prompt сайта сохранено.

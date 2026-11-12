@@ -164,7 +164,7 @@ export function createLoginomSettings(api: Loginom.API | undefined, saved: (view
       if (
         !dirty() &&
         pending() &&
-        current.state === "ready" &&
+        (current.state === "ready" || current.state === "connection-required") &&
         (current.revision !== state.baseline?.revision || current.generation !== state.baseline?.generation)
       )
         apply(current)
