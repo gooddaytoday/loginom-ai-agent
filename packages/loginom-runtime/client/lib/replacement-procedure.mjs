@@ -3,7 +3,8 @@ import {observeReplacementOutputPolicy} from './replacement-output.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
-const normalized=(r,mode)=>({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,...(r.result_type&&r.result_type!==r.input_fields.find(f=>f.name===r.selected).type?{result_type:r.result_type}:{}),pairs:r.pairs.filter(p=>mode!=='mixed'||p.collection_id===0).map(({from,to})=>({from,to})),...(mode==='mixed'?{regex_pairs:r.pairs.filter(p=>p.collection_id===1).map(({from,to})=>({from,to}))}:{}),other:r.other,...(mode==='regex'?{}:r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
+const orderedExternal=rule=>({...rule,external:{...rule.external,information:[...rule.external.information].sort(),unused:[...rule.external.unused].sort()}});
+const normalized=(r,mode)=>r.mode==='external'?orderedExternal({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,external:{port:1,value:r.external_fields.find(f=>f.usage===3)?.name,replacement:r.external_fields.find(f=>f.usage===4)?.name,information:r.external_fields.filter(f=>f.usage===6).map(f=>f.name),unused:r.external_fields.filter(f=>f.usage===0).map(f=>f.name)},other:r.other,case_sensitive:r.case_sensitive}):({field:{kind:'input_field',name:r.selected},type:r.input_fields.find(f=>f.name===r.selected).type,...(r.result_type&&r.result_type!==r.input_fields.find(f=>f.name===r.selected).type?{result_type:r.result_type}:{}),pairs:r.pairs.filter(p=>mode!=='mixed'||p.collection_id===0).map(({from,to})=>({from,to})),...(mode==='mixed'?{regex_pairs:r.pairs.filter(p=>p.collection_id===1).map(({from,to})=>({from,to}))}:{}),other:r.other,...(mode==='regex'?{}:r.input_fields.find(f=>f.name===r.selected).type==='string'?{case_sensitive:r.case_sensitive}:{precision:r.precision})});
 const pairKeys=ps=>ps.map(p=>[replacementValueKey(p.from),replacementValueKey(p.to)]);
 export function replacementRealEditorText(value,separator){
  need(typeof value==='number'&&Number.isFinite(value),'Finite replacement real required');
@@ -31,6 +32,7 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
  const ready=s=>s.wizard?.stage==='replacement'&&s.node_replacement?.verified===true;
  const observe=(condition,extra=()=>true)=>channel.observe({condition,readReplacement:true,ready:s=>ready(s)&&extra(s.node_replacement)});
  let state=await observe('replacement input inventory'),baseline=state.node_replacement;
+ need(mode==='external'||!baseline.input_fields.some(f=>f.mode==='external'),'Existing external replacement field requires mode external; manual exact/regex/mixed patches are not supported on this node');
  resolveReplacementParameters(p,baseline.input_fields);
  const control=(s,suffix,verb='click')=>{const tid=s.wizard.root_tid+';ReplaceColumnsWizard;'+suffix,es=s.ui.elements.filter(e=>(e.tid===tid||['fill','press'].includes(verb)&&e.identity?.anchor_tid===tid)&&e.allowed_actions.includes(verb));need(es.length===1,'Replacement control unavailable: '+suffix);return es[0];};
  const act=async(suffix,verb='click',args={})=>{const group=/;GroupHeader;([01]);AddButton$/.exec(suffix);const s=group?await revealReplacementAdd(channel,observe,ready,group[1]==='1'?'regex':'exact'):await observe('replacement control '+suffix);return channel.perform({condition:'replacement '+suffix,initialObservation:s,ready,identity:()=>({field:s.node_replacement.selected,suffix}),resolve:s=>({verb,ref:control(s,suffix,verb).ref,...args})});};
@@ -39,7 +41,7 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
   let s=await observe('replacement row readiness');
   for(let n=0;n<130;n++){
    if(s.ui.elements.some(e=>e.replacement_field?.field_key===name&&e.replacement_field.role===role&&e.replacement_field.part===part&&(id===undefined||e.replacement_field.record_id===id)&&e.allowed_actions.includes('click')))return s;
-   const rows=role==='field'?s.node_replacement.input_fields:s.node_replacement.pairs,at=rows.findIndex(r=>role==='field'?r.name===name:r.record_id===id);
+   const rows=role==='field'?s.node_replacement.input_fields:role==='external'?s.node_replacement.external_fields:s.node_replacement.pairs,at=rows.findIndex(r=>role==='field'?r.name===name:r.record_id===id);
    const visible=s.ui.elements.filter(e=>e.replacement_field?.role===role&&e.replacement_field.part===part&&e.scroll&&e.allowed_actions.includes('scroll')).sort((a,b)=>rows.findIndex(r=>r.record_id===a.replacement_field.record_id)-rows.findIndex(r=>r.record_id===b.replacement_field.record_id));
    need(at>=0&&visible.length&&n<129,'Replacement row cannot be revealed');const first=rows.findIndex(r=>r.record_id===visible[0].replacement_field.record_id),last=rows.findIndex(r=>r.record_id===visible.at(-1).replacement_field.record_id),direction=at<first?-1:at>last?1:0;
    need(direction,'Replacement row obscured');const anchor=visible[Math.floor(visible.length/2)],before=anchor.scroll;
@@ -54,9 +56,9 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
   return (await observe('replacement selected field',r=>r.selected===name)).node_replacement;
  };
  const oldRules=[];
- for(const f of baseline.input_fields.filter(f=>f.mode==='manual')){const r=await select(f.name);need(!r.editor_open,'Existing replacement row editor is active');need(!r.mode||r.mode===mode||mode==='mixed','Existing replacement mode differs; use mode mixed for both tables');oldRules.push(normalized(r,mode));}
+ for(const f of baseline.input_fields.filter(f=>f.mode==='manual'||mode==='external'&&f.mode==='external')){const r=await select(f.name);need(!r.editor_open,'Existing replacement row editor is active');need(mode==='external'||!r.mode||r.mode===mode||mode==='mixed','Existing replacement mode differs; use mode mixed for both tables');oldRules.push(normalized(r,mode==='external'?r.mode??'exact':mode));}
  if(newNode)need(oldRules.length===0,'New replacement has unexpected rules');
- if(oldRules.length)validateReplacementParameters({rules:oldRules},mode,{target:{kind:'existing'},inputs:[],read:{ports:[]},mappings:[],finish:'done'});
+ if(oldRules.length&&mode!=='external')validateReplacementParameters({rules:oldRules},mode,{target:{kind:'existing'},inputs:[],read:{ports:[]},mappings:[],finish:'done'});
  let outputMode=p.output_mode,modeProof=null,inventoryRefresh=null;
  if(outputMode===undefined&&p.rules!==undefined){
   // Read the saved policy before touching any rule. All navigation stays in
@@ -89,6 +91,31 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
  }
  for(const rule of p.rules??[]){
   let r=await select(rule.field.name);
+  if(mode==='external'){
+   if(r.mode!=='external'){
+    await gesture(rule.field.name,'field','mode');
+    const s=await observe('external replacement source choices'),prefix=s.wizard.root_tid+';ReplaceColumnsWizard;grdDataList;tbl;celleditor;cbx;boundlist;';
+    const choices=s.ui.elements.filter(e=>e.tid?.startsWith(prefix)&&!['Ввод_вручную','Не_заменять'].includes(e.tid.slice(prefix.length))&&e.allowed_actions.includes('click'));
+    need(choices.length===1,'Exactly one external table source required');await act(choices[0].tid.slice((s.wizard.root_tid+';ReplaceColumnsWizard;').length));
+    r=(await observe('external source selected',r=>r.mode==='external')).node_replacement;
+   }
+   const e=rule.external,names=[e.value,e.replacement,...e.information,...e.unused];
+   need(names.length===r.external_fields.length&&r.external_fields.every(f=>names.includes(f.name)),'External roles must cover current mapped fields');
+   need(r.external_fields.find(f=>f.name===e.value)?.type===rule.type&&r.external_fields.find(f=>f.name===e.replacement)?.type===rule.type,'External key/replacement types differ');
+   // Clear occupied roles before assigning: native editors hide roles in use.
+   for(const f of r.external_fields){
+    if(f.usage!==0){await gesture(rule.field.name,'external','usage',f.record_id);await act('grdInputSource;tbl;celleditor;cbx;boundlist;Не_используемое');}
+   }
+   for(const [name,usage,label] of [[e.value,3,'Значение'],[e.replacement,4,'Замена'],...e.information.map(name=>[name,6,'Информационное'])]){
+    r=(await observe('external role identity')).node_replacement;const f=r.external_fields.find(f=>f.name===name);
+    await gesture(rule.field.name,'external','usage',f.record_id);await act('grdInputSource;tbl;celleditor;cbx;boundlist;'+label);
+    await observe('external role applied',r=>r.external_fields.find(f=>f.name===name)?.usage===usage);
+   }
+   if(r.case_sensitive!==rule.case_sensitive)await act('chkCaseSensitivity;DisplayEl','set_checked',{checked:rule.case_sensitive});
+   if(r.other.mode!==rule.other.mode){await act('cbxReplaceOther;trg_picker');await act('cbxReplaceOther;boundlist;'+{keep:'Не_заменять',null:'На_пропущенное'}[rule.other.mode]);}
+   r=(await observe('complete external field readback')).node_replacement;
+   need(same(normalized(r,mode),orderedExternal(rule)),'External replacement field readback differs');continue;
+  }
   if(r.input_fields.find(f=>f.name===rule.field.name).mode==='none'){
    await gesture(rule.field.name,'field','mode');await act('grdDataList;tbl;celleditor;cbx;boundlist;Ввод_вручную');
    r=(await observe('manual replacement mode applied',r=>r.input_fields.find(f=>f.name===rule.field.name).mode==='manual')).node_replacement;
@@ -144,11 +171,12 @@ export async function configureReplacement(channel,p,{newNode=false,mode='exact'
   r=(await observe('complete replacement field readback')).node_replacement;
   need((r.result_type??rule.type)===resultType&&same(pairKeys(r.pairs.filter(p=>mode!=='mixed'||p.collection_id===0)),pairKeys(rule.pairs))&&(mode!=='mixed'||same(pairKeys(r.pairs.filter(p=>p.collection_id===1)),pairKeys(rule.regex_pairs??[])))&&r.other.mode===rule.other.mode&&(rule.other.mode!=='value'||replacementValueKey(r.other.value)===replacementValueKey(rule.other.value))&&(mode==='regex'?r.mode==='regex':rule.type==='string'?r.case_sensitive===rule.case_sensitive:r.precision===rule.precision),'Replacement field readback differs');
  }
+ const external_sources=[],external_input_fields=[];
  const expected=oldRules.filter(r=>!p.rules?.some(w=>w.field.name===r.field.name)).concat(p.rules??[]),rules=[];
- for(const f of baseline.input_fields){const current=(await observe('replacement final membership')).node_replacement.input_fields.find(x=>x.name===f.name);need(current.mode===(expected.some(r=>r.field.name===f.name)?'manual':'none'),'Unrequested replacement mode changed');if(current.mode==='manual')rules.push(normalized(await select(f.name),mode));}
- for(const {result_type,...baseRule} of expected){const rule={...baseRule,...(mode==='mixed'?{regex_pairs:baseRule.regex_pairs??[]}:{}),...(result_type&&result_type!==baseRule.type?{result_type}:{})},actual=rules.find(r=>r.field.name===rule.field.name);need(actual&&same(pairKeys(actual.pairs),pairKeys(rule.pairs))&&same({...actual,pairs:[]},{...rule,pairs:[],...(rule.other.mode==='value'?{other:{mode:'value',value:{...rule.other.value,value:(rule.result_type??rule.type)==='integer'&&rule.other.value.value!==null?String(rule.other.value.value):rule.other.value.value}}}:{} )}),'Final replacement rule differs');}
+ for(const f of baseline.input_fields){const current=(await observe('replacement final membership')).node_replacement.input_fields.find(x=>x.name===f.name);need(current.mode===(expected.find(r=>r.field.name===f.name)?.external?'external':expected.some(r=>r.field.name===f.name)?'manual':'none'),'Unrequested replacement mode changed');if(current.mode==='manual'||current.mode==='external'){const observed=await select(f.name);rules.push(normalized(observed,mode==='external'?observed.mode??'exact':mode));if(observed.mode==='external'){external_sources.push({field:f.name,source:observed.replace_source});external_input_fields.splice(0,external_input_fields.length,...observed.external_fields);}}}
+ for(const {result_type,...baseRule} of expected){if(baseRule.external){need(same(rules.find(r=>r.field.name===baseRule.field.name),orderedExternal(baseRule)),'Final external rule differs');continue;}const rule={...baseRule,...(mode==='mixed'?{regex_pairs:baseRule.regex_pairs??[]}:{}),...(result_type&&result_type!==baseRule.type?{result_type}:{})},actual=rules.find(r=>r.field.name===rule.field.name);need(actual&&same(pairKeys(actual.pairs),pairKeys(rule.pairs))&&same({...actual,pairs:[]},{...rule,pairs:[],...(rule.other.mode==='value'?{other:{mode:'value',value:{...rule.other.value,value:(rule.result_type??rule.type)==='integer'&&rule.other.value.value!==null?String(rule.other.value.value):rule.other.value.value}}}:{} )}),'Final replacement rule differs');}
  state=await observe('replacement final owner');
  const schema=fields=>fields.map(({record_id,name,label,type})=>({record_id,name,label,type}));
  need(same(schema(state.node_replacement.input_fields),schema(baseline.input_fields)),'Replacement input identity changed');
- return {verified:true,cleanup_complete:true,effect_possible:!!p.rules?.length,configuration:{...state.node_replacement,mode,rules,requested_output_mode:p.output_mode??null,effective_output_mode:outputMode??null,input_inventory_refresh:inventoryRefresh},preservation:{unrequested_rules:true,input_identity:true}};
+ return {verified:true,cleanup_complete:true,effect_possible:!!p.rules?.length,configuration:{...state.node_replacement,...(mode==='external'?{external_sources,external_input_fields}:{}),mode,rules,requested_output_mode:p.output_mode??null,effective_output_mode:outputMode??null,input_inventory_refresh:inventoryRefresh},preservation:{unrequested_rules:true,input_identity:true}};
 }

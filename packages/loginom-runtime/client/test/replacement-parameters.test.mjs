@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateReplacementParameters,validateReplacementValue,resolveReplacementParameters} from '../lib/replacement-parameters.mjs';
+import {validateReplacementParameters,validateReplacementValue,resolveReplacementParameters,resolveExternalReplacementParameters} from '../lib/replacement-parameters.mjs';
 const value=(value,type='string')=>({type,value});
 const params=()=>({output_mode:'add',rules:[{field:{kind:'input_field',name:'Category'},type:'string',case_sensitive:true,pairs:[{from:value(null),to:value('Missing')},{from:value(''),to:value('Empty')},{from:value('null'),to:value('Literal')}],other:{mode:'keep'}}]});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
@@ -87,4 +87,13 @@ test('mixed mode validates exact keys independently of ordered regex pairs',()=>
  assert.doesNotThrow(()=>validateReplacementParameters(p,'mixed',request));
  assert.throws(()=>validateReplacementParameters(p,'exact',request),/mixed/);
  for(const change of [r=>r.regex_pairs[0].from.value='a*',r=>r.regex_pairs[0].to.value=null,r=>r.result_type='integer',r=>r.case_sensitive=undefined]){const bad=structuredClone(p);change(bad.rules[0]);assert.throws(()=>validateReplacementParameters(bad,'mixed',request));}
+});
+
+test('external roles cover both effective input schemas before mutation',()=>{
+ const p={output_mode:'replace',rules:[{field:{kind:'input_field',name:'Code'},type:'string',case_sensitive:true,other:{mode:'keep'},external:{port:1,value:'Value',replacement:'Replacement',information:['Info'],unused:['Ignored']}}]};
+ const r={...request,inputs:[{input:0},{input:1}]},schemas=[[{name:'Code',type:'string'}],['Value','Replacement','Info','Ignored'].map(name=>({name,type:'string'}))];
+ assert.doesNotThrow(()=>validateReplacementParameters(p,'external',r));assert.doesNotThrow(()=>resolveExternalReplacementParameters(p,schemas));
+ for(const change of [p=>p.rules[0].pairs=[],p=>p.rules[0].regex_pairs=[],p=>p.rules[0].external.port=2,p=>p.rules[0].external.unused=['Value'],p=>p.rules[0].type='integer']){const bad=structuredClone(p);change(bad);assert.throws(()=>validateReplacementParameters(bad,'external',r));}
+ for(const change of [s=>s[1].pop(),s=>s[1][0].type='integer',s=>s[0].push({name:'CodeInfo',type:'string'}),s=>s[1][0].name='MappedValue']){const bad=structuredClone(schemas);change(bad);assert.throws(()=>resolveExternalReplacementParameters(p,bad));}
+ assert.throws(()=>validateReplacementParameters(p,'exact',r));
 });

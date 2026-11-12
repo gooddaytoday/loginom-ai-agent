@@ -72,3 +72,12 @@ test('Boolean result icon and cached values retain false and typed NULL',()=>{
   const r=f.read();assert.equal(r.verified,true);assert.equal(r.result_type,'boolean');assert.equal(r.pairs[0].to.value,value);
  }
 });
+
+test('external mode reads only the complete local role store and current source GUID',()=>{
+ const f=fixture();f.fields[0].data.ReplaceMode=2;f.fields[0].data.ReplaceSource='rules-guid';
+ const rows=['Value','Replacement','Info','Ignored'].map((Name,i)=>({isModel:true,internalId:'e'+i,data:{Name,DisplayName:Name,DataType:5,UsageType:[3,4,6,0][i]}}));
+ const proxy={$className:'bg.ext.CollectionProxy',pendingOperations:{}},store={$className:'Ext.data.Store',getProxy:()=>proxy,getData:()=>({items:rows}),getCount:()=>rows.length,isLoading:()=>false};
+ f.addControl('grdInputSource',{getStore:()=>store});
+ f.pairs[0].data.ReplaceByType=1;const r=f.read();assert.equal(r.verified,true,r.reason);assert.equal(r.replace_source,'rules-guid');assert.deepEqual(Array.from(r.external_fields,f=>f.usage),[3,4,6,0]);assert.equal(r.pairs.length,0);
+ for(const change of [()=>store.isLoading=()=>true,()=>proxy.pendingOperations.x={},()=>rows[0].data.UsageType=5]){change();assert.equal(f.read().verified,false);}
+});
