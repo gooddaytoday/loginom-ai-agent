@@ -103,7 +103,7 @@ for(const fault of ['foreign','changed','unpinned'])test('fixed1141 retains the 
  assert.equal(counters.releasedRequests,counters.requests);
 });
 
-for(const fault of ['none','metadata','count','implementation','owner','release'])test('W1 native chain binds metadata and releases proxies without partial publication: '+fault,async()=>{
+for(const fault of ['none','metadata','count','implementation','owner','port-owner','release'])test('W1 native chain binds metadata and releases proxies without partial publication: '+fault,async()=>{
  const f=transportFixture({variableValue:true,changed:fault==='owner'});
  f.environment.frames=[{payload:[3,0,2,0,0,0,0,0,1,0]}];f.environment.fault=fault;
  vm.runInContext(`
@@ -111,7 +111,7 @@ for(const fault of ['none','metadata','count','implementation','owner','release'
  var proxy=(id,object,extra)=>Object.assign({$S:source.$S,$:{$I:id,$OW:0,$O:object},async dispose(){disposed++;if(fault==='release')throw Error('release failed');}},extra);
  var value=source;value.get_AsVariant=function(){};value.dispose=async()=>{disposed++;};
  var item=proxy(511,4,{async get_ID(){return 7;},async get_Index(){return 0;},async get_Name(){return fault==='metadata'?'other':'V';},async get_DisplayName(){return 'Value';},async get_DataType(){return 6;},async get_Value(){return value;}});
- var variables=proxy(541,3,{async get_Count(){return fault==='count'?2:1;},async getItem(){return item;}});
+ var variables=proxy(541,3,{async get_Count(){if(fault==='port-owner')port.data.$.$O++;return fault==='count'?2:1;},async getItem(){return item;}});
  var output=proxy(0,2,{async QueryInterface(){return variables;}});
  var port={data:proxy(1081,1,{async get_Output(){return output;}})};
  var bg={IBGVariables:{}};

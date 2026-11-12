@@ -88,7 +88,8 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
   const store=grid.getStore(),records=eval('('+recordsCode+')'),decode=eval('('+decoderCode+')');
   if(!task.builtin_snapshot&&store.getData().items.some(r=>r.data.DataType===6))return {native:true,port,store,
    metadata:records(store,'preview',decode,false,{metadataOnly:true}),
-   identities:[p,r,card,m,n,n.data,port,port.data,port.data.$,port.data.$S,form,grid,store,...processIdentity,...store.getData().items],
+   identities:[p,r,card,m,n,n.data,n.data.$,n.data.$?.$I,n.data.$?.$OW,n.data.$?.$O,n.data.$S,
+    port,port.data,port.data.$,port.data.$?.$I,port.data.$?.$OW,port.data.$?.$O,port.data.$S,form,grid,store,...processIdentity,...store.getData().items],
    fingerprint:JSON.stringify(store.getData().items.map(r=>r.data.ValueVariant))};
   return records(store,'preview',decode);
   };
@@ -133,9 +134,12 @@ export async function readNodeVariableOutput(page,task,readNode,readOutputs,read
 // Timeout/uncertain native release retains all proxies for browser shutdown.
 export async function readNativeVariableCells(port,metadata,{deadline,stable},capability){
  const need=(ok,message)=>{if(!ok)throw Error('Variable native read: '+message);};
- const session=port.data.$S,handles=[],methods=[];let reader,bytes=0,cells,error,pending=false;
+ const session=port.data.$S,portIdentity=port.data.$,portOwner=portIdentity?.$OW,portObject=portIdentity?.$O,handles=[],methods=[];
+ let reader,bytes=0,cells,error,pending=false;
  const check=()=>{
   stable();need(Date.now()<deadline,'deadline');
+  need(port.data.$===portIdentity&&portIdentity?.$I===1081&&Number.isInteger(portOwner)&&portOwner>=0&&Number.isInteger(portObject)
+   &&portIdentity.$OW===portOwner&&portIdentity.$O===portObject,'port identity');
   need(port.data.$S===session&&session.$FDisposed===false&&session.$FPendingDisconnect===false&&session.$FTransportStatus===0
    &&session.$T?.FFinished===false&&session.$T.FDisconnected===false&&session.$T.$FSocket?.readyState===1,'session');
   for(const h of handles)need(h.proxy.$S===session&&h.proxy.$===h.identity&&h.identity.$I===h.interfaceId
