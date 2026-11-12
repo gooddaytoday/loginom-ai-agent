@@ -159,6 +159,77 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows-runtime:
+    name: windows-runtime
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: packages/loginom-runtime/client/.node-version
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.3.14"
+      - name: Install locked workspace dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+      - name: Resolve pinned test browser
+        working-directory: packages/loginom-runtime/client
+        run: |
+          set -euo pipefail
+          browser=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'const fs = require("node:fs"); const browser = require("playwright").chromium.executablePath(); fs.accessSync(browser); process.stdout.write(browser)')
+          echo "LOGINOM_DOCK_TEST_BROWSER=$browser" >> "$GITHUB_ENV"
+      - name: Verify platform-dependent client tests
+        working-directory: packages/loginom-runtime/client
+        run: |
+          set -euo pipefail
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2 \
+            test/agent-command.test.mjs test/archive.test.mjs test/artifacts.test.mjs \
+            test/artifact-download.test.mjs test/artifact-upload.test.mjs test/artifact-verification.test.mjs \
+            test/browser-downloads.test.mjs test/browser-launch.test.mjs test/browser-temp.test.mjs \
+            test/clipboard.test.mjs test/clipboard-shutdown.test.mjs test/config.test.mjs \
+            test/execution-journal.test.mjs test/file-reference.test.mjs test/history.test.mjs \
+            test/hook-runtime.test.mjs test/hooks.test.mjs test/host-artifacts.test.mjs test/host-inputs.test.mjs \
+            test/install.test.mjs test/install-profile.test.mjs test/local-diagnostics.test.mjs \
+            test/managed-shutdown.test.mjs test/managed-signal-order.test.mjs \
+            test/platform-windows.test.mjs test/runtime-pin.test.mjs test/skill.test.mjs \
+            test/storage-download.test.mjs test/storage-source.test.mjs \
+            test/text-export.test.mjs test/text-export-cp1251.test.mjs test/text-import-encoding.test.mjs \
+            2>&1 | tee "$RUNNER_TEMP/windows-client-tests.log"
+      - name: Verify complete supervised runtime suite
+        if: ${{ !cancelled() }}
+        working-directory: packages/loginom-runtime
+        run: |
+          set -euo pipefail
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2 test/*.test.mjs \
+            2>&1 | tee "$RUNNER_TEMP/windows-runtime-tests.log"
+      - name: Verify platform-dependent host tests
+        if: ${{ !cancelled() }}
+        working-directory: packages/loginom-host
+        run: |
+          set -euo pipefail
+          bun test \
+            test/process.test.ts test/environment.test.ts test/windows-powershell.test.ts \
+            test/cli-install-windows.test.ts test/cli-install.test.ts test/cli-credentials.test.ts \
+            test/keychain-platform.test.ts test/keychain-envelope.test.ts \
+            test/system-proxy.test.ts test/system-proxy-behavior.test.ts test/system-proxy-io.test.ts \
+            test/file-reference.test.ts test/file-reference-ipc.test.ts test/inputs.test.ts \
+            test/node-host.test.ts test/runtime-startup.test.ts test/transport.test.ts \
+            test/host.test.ts test/parallel-calls.test.ts test/saved-package-shutdown.test.ts \
+            test/cli-owner-crash.test.ts test/cli-manifest.test.ts test/cli-source-snapshot.test.ts \
+            test/bundled-ripgrep.test.ts test/stage-resources.test.ts \
+            2>&1 | tee "$RUNNER_TEMP/windows-host-tests.log"
+      - name: Upload Windows runtime evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-runtime-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-*-tests.log
+          if-no-files-found: error
+          retention-days: 14
+
   unit:
     name: unit
     runs-on: ubuntu-24.04
