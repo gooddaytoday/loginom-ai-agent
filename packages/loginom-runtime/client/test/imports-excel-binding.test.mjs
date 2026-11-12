@@ -133,3 +133,17 @@ for(const kind of ['no-variables','literal'])test('saved '+kind+' Excel keeps pl
  assert.equal(f.witnesses(),0);assert.equal(f.operation.importBindingInventory,undefined);
  if(kind==='no-variables')assert.deepEqual(f.actions,[]);
 });
+
+test('bound and unchanged Excel requests pass the public schema and node.apply validation',async()=>{
+ const {nodeApplyInputSchema}=await import('../lib/node-api.mjs'),{validateActionParameters}=await import('../lib/action-catalog.mjs'),{validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const handlers=createCandidateNodeSupport({}).nodeApplyHandlers,ref={document_id:'doc',workflow_id:'flow',node_id:'excel'};
+ const base={operation_id:'excel',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  inputs:[],mode:'xlsx',mappings:[],finish:'execute',read:{ports:[0],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:300000,execute_ms:300000,total_ms:300000}};
+ const bound={...base,target:{kind:'new',type:'imports.excel'},parameters:p,bindings:[binding],
+  variable_inputs:[{kind:'variables',input:0,output:4,source:{document_id:'doc',workflow_id:'flow',node_id:'vars'}}]};
+ const unchanged={...base,target:{kind:'existing',type:'imports.excel',ref},parameters:{excel:{}},bindings:[]};
+ for(const r of [bound,unchanged]){
+  assert.doesNotThrow(()=>validateActionParameters(nodeApplyInputSchema,r));
+  const {handler}=validateNodeApplyRequest(r,handlers);assert.equal(handler.unchangedExecution(r),r===unchanged);
+ }
+});

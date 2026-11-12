@@ -36,11 +36,12 @@ for(const fault of ['literal','second node','sentinel','variable identity','reco
  assert.throws(()=>auditImportBindings(e,initial,final));
 });
 
-async function coldReadFixture({alias=false,blocked=false}={}){
+async function coldReadFixture({alias=false,blocked=false,excel=false}={}){
  const real=await import('../../../packages/loginom-runtime/client/lib/import-bindings.mjs');
+ const excelNode=await import('../../../packages/loginom-runtime/client/lib/imports-excel-node.mjs');
  const node={document_id:'doc',workflow_id:'wf',node_id:'import'},source={...node,node_id:'source'};
  const sourceName=alias?'FilePath':'CsvPath',events=[];let selected=false,opened=false,mappingCalls=0;
- const proof={verified:true,cleanup_complete:true,independent_readback:true,variables:[{id:7,name:sourceName,type:'string',cell:{type:'string',is_null:false,value:'/own/b.csv'}}]};
+ const path=excel?'/own/b.xlsx':'/own/b.csv',proof={verified:true,cleanup_complete:true,independent_readback:true,variables:[{id:7,name:sourceName,type:'string',cell:{type:'string',is_null:false,value:path}}]};
  const mapping={kind:'variables',port:0,port_guid:'input',fields:[{id:9,index:0,name:'CsvPath',label:'CsvPath',type:5,source:{id:7,name:sourceName,type:5}}]};
  const field={status:'observed',variable_mode:true,truncated:false,variable_caption:'CsvPath',row_id:'row'};
  const owner={status:'observed',node:{tid:'flow>Import',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'n',label:'Import'},{tid:'settings',label:'Settings'}]};
@@ -49,11 +50,13 @@ async function coldReadFixture({alias=false,blocked=false}={}){
   ...(selected?[{ref:'settings',tid:'N;Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}}]:[])]}});
  const channel={observe:async o=>{if(blocked)throw Error('owned graph is not ready');const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{const s=state();assert.ok(o.ready(s),o.condition);const a=o.resolve(s);
   if(a.ref==='body'){selected=true;events.push('select');}else if(a.ref==='settings'){opened=true;events.push('field-open');}else if(a.ref==='cancel'){opened=false;events.push('field-cancel');}else assert.fail('unexpected write');
-  return {status:'SUCCEEDED',cleanup_complete:true,output:state()};},readVariablePortMapping:async()=>{mappingCalls++;if(!selected||opened)throw Error('port context menu absent without prepared target');events.push('mapping');return {verified:true,cleanup_complete:true,independent_readback:true,mapping};}};
- const graph={nodes:[{ref:node,type:'imports.text'},{ref:source,type:'variables.user'}],variable_links:[{source:'source',target:'import',kind:'variables',input:0,output:4,target_port_guid:'input'}]};
- const expected={binding_inventory:[{node:{type:'imports.text'},parameter:'/settings/source/source_path',mode:'variable',variable:{name:'CsvPath',type:'string',id:9},source:{type:'variables.user',output:4}}]};
+  return {status:'SUCCEEDED',cleanup_complete:true,output:state()};},readExcelImportSource:async()=>{assert.equal(opened,true);events.push('excel-source');return {verified:true,node_context:node,configuration:{source:{binding_field:{...field,variable_caption:'CsvPath ( '+path+' )',value:path}}}};},
+  readVariablePortMapping:async()=>{mappingCalls++;if(!selected||opened)throw Error('port context menu absent without prepared target');events.push('mapping');return {verified:true,cleanup_complete:true,independent_readback:true,mapping};}};
+ const type=excel?'imports.excel':'imports.text';
+ const graph={nodes:[{ref:node,type},{ref:source,type:'variables.user'}],variable_links:[{source:'source',target:'import',kind:'variables',input:0,output:4,target_port_guid:'input'}]};
+ const expected={binding_inventory:[{node:{type},parameter:excel?'/excel/source_path':'/settings/source/source_path',mode:'variable',variable:{name:'CsvPath',type:'string',id:9},source:{type:'variables.user',output:4}}]};
  const {observeImportBindingInventory}=await import('../import-bindings.mjs');
- return {events,get mappingCalls(){return mappingCalls;},run:()=>observeImportBindingInventory({load:async()=>real,graph,expected,channelFor:ref=>ref.node_id==='source'?{configureUserVariables:async()=>{selected=false;events.push('source-cancel');return proof;}}:channel,record:async()=>events.push('record')})};
+ return {events,get mappingCalls(){return mappingCalls;},run:()=>observeImportBindingInventory({load:async path=>path.endsWith('imports-excel-node.mjs')?excelNode:real,graph,expected,channelFor:ref=>ref.node_id==='source'?{configureUserVariables:async()=>{selected=false;events.push('source-cancel');return proof;}}:channel,record:async()=>events.push('record')})};
 }
 for(const alias of [false,true])test('cold Import restores the prepared target through the real field reader before W1; source alias='+alias,async()=>{
  const f=await coldReadFixture({alias}),inventory=await f.run();assert.equal(inventory[0].bindings[0].source.variable_id,7);
@@ -96,4 +99,9 @@ test('Excel source-only update keeps the Excel GUID and accepts only {excel:{}} 
  const reconfigured=excelHistory();
  reconfigured.splice(4,0,{phase:'node_apply_prepared',request:{target:{kind:'existing',type:'imports.excel',ref:reconfigured[1].result.node},parameters:{settings:{}},inputs:[],mappings:[]}});
  assert.throws(()=>auditImportBindings(reconfigured,excelInitial,excelFinal),/IMPORT_BINDING_RECONFIGURED/);
+});
+test('cold Excel reads its own W1 variable caption through the same prepared target order',async()=>{
+ const f=await coldReadFixture({excel:true}),inventory=await f.run(),b=inventory[0].bindings[0];
+ assert.equal(b.parameter,'/excel/source_path');assert.equal(b.source.variable_id,7);
+ assert.deepEqual(f.events,['source-cancel','select','field-open','excel-source','field-cancel','mapping','record']);
 });

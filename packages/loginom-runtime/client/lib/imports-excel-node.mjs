@@ -41,7 +41,9 @@ export function excelReadback({node,phases,operation_id}){
   return {index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,excluded:f.excluded,source_name:source.name};
  });
  need(linked.size===m.source_fields.length,'output source coverage differs');
- return {kind:'excel_import',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',source:c.source,auto_detect:c.auto_detect,columns:c.columns,
+ // The bound W1 caption is reported only by configuration.bindings.
+ const {binding_field,...source}=c.source;
+ return {kind:'excel_import',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',source,auto_detect:c.auto_detect,columns:c.columns,
   receipt_ids:[configured,saved,mapped,finished].map(p=>p.receipt_id),output_mapping:{port:0,autosync:m.autosync,fields},package_persistence_verified:false};
 }
 

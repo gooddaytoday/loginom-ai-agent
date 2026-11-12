@@ -362,6 +362,14 @@ test('bound Excel import rebinds only the same Output_Data-0 after its variable 
   await assert.rejects(g.binding(),/Visible port identity|Prepared graph document changed/);
  }
 });
+test('bound Excel import keeps its variables input after the %Variable% caption',async()=>{
+ const f=fixture();f.node.FIconCls=NODE_TYPES['imports.excel'].icon_class;f.input();f.variable();await f.read();f.rename('Input_Var-0');
+ assert.equal((await f.read()).complete,true);
+ for(const change of [f=>f.wrongHit(),f=>f.duplicatePort(),f=>f.rename('Input_Var-1'),f=>f.rename('Output_Var-0'),f=>{f.port.FGuid='foreign';}]){
+  const g=fixture();g.node.FIconCls=NODE_TYPES['imports.excel'].icon_class;g.input();g.variable();await g.read();g.rename('Input_Var-0');change(g);
+  await assert.rejects(g.read(),/Visible port identity|Prepared graph document changed|Variable port/);
+ }
+});
 test('caption rebinding remains refused for other node types',async()=>{
  for(const type of ['transform.calculator','programming.javascript']){
   const f=fixture();f.node.FIconCls=NODE_TYPES[type].icon_class;await f.read();f.rename();
