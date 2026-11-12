@@ -1,5 +1,6 @@
 import { delimiter, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import crossSpawn from 'cross-spawn';
 import escape from 'cross-spawn/lib/util/escape.js';
 import which from 'which';
@@ -38,7 +39,13 @@ export function createAgentLauncher(command, { env = process.env, cwd = process.
       // cross-spawn only double-escapes shims under node_modules/.bin. Global
       // npm shims also forward %*, so their arguments undergo two CMD parses.
       if (process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(executable)) {
-        const command = [escape.command(executable), ...args.map(arg => escape.argument(arg, true))].join(' ');
+        if (!existsSync(executable)) return { executable, error: Object.assign(new Error('Agent command not found'), { code: 'ENOENT' }), status: null, signal: null, stdout: null, stderr: null };
+        const command = [escape.command(executable), ...args.map(arg => {
+          // CRT quoting must double the ENTIRE backslash run before quotes and
+          // the closing quote. cross-spawn 7.0.6 only doubles its last slash.
+          const quoted = '"' + String(arg).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/g, '$1$1') + '"';
+          return escape.command(escape.command(quoted));
+        })].join(' ');
         const result = spawnSync(process.env.ComSpec || process.env.comspec || 'cmd.exe',
           ['/d', '/v:off', '/s', '/c', `"${command}"`],
           { ...options, env, cwd, shell: false, windowsVerbatimArguments: true });

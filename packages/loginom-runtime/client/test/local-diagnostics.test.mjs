@@ -67,7 +67,7 @@ test('diagnostics work in paths with spaces and Cyrillic and retain private perm
   if (process.platform === 'win32') {
     // Check the actual ACL, rather than Windows' synthetic POSIX mode bits.
     const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-      '$a=Get-Acl -LiteralPath $env.DOCK_DIAGNOSTIC_PATH; ' +
+      '$ErrorActionPreference="Stop"; $a=Get-Acl -LiteralPath $env:DOCK_DIAGNOSTIC_PATH; ' +
       'ConvertTo-Json -Compress @{protected=$a.AreAccessRulesProtected; rules=@($a.Access | ForEach-Object { ' +
       '@{sid=$_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value; rights=[int]$_.FileSystemRights} }); ' +
       'sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value}'],

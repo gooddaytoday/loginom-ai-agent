@@ -49,6 +49,7 @@ test('arguments survive shim execution including JSON, empty values and shell me
   const f = await fixture(t);
   const args = ['', 'space here', 'кириллица', 'a"b', 'trailing\\', 'a&b|c<d>e^f', '%DOCK_TEST_MARKER%', '!variable!', '(parens)',
     '"&echo INJECTED&"', '^&', 'кавычки " и & пробелы', 'backslash\\"quote', 'two trailing\\\\',
+    ...[1, 2, 3, 4].flatMap(n => ['slashes' + '\\'.repeat(n) + '"quoted', 'space end' + '\\'.repeat(n)]),
     JSON.stringify({ command: 'C:\\Users\\Test Person\\dock.cmd', args: ['a"b', '&', ''] })];
   const result = createAgentLauncher('codex', { env: f.env, cwd: f.root }).run(args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   assert.equal(result.status, 0, result.stderr);
