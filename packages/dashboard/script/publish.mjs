@@ -1,6 +1,9 @@
 import { execFileSync } from "node:child_process"
-import { cp, mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from "node:fs/promises"
-import { basename, join } from "node:path"
+import { createHash } from "node:crypto"
+import { existsSync } from "node:fs"
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises"
+import { homedir } from "node:os"
+import { basename, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const [id, option, ...extra] = process.argv.slice(2)
@@ -8,12 +11,11 @@ if (!/^[a-f0-9-]{36}$/.test(id ?? "") || (option !== undefined && option !== "--
   throw Error("Использование: node packages/dashboard/script/publish.mjs <ID снимка> [--init]")
 }
 
-const response = await fetch("http://127.0.0.1:32768/dashboard/targets/" + id)
+const response = await fetch((process.env.DASHBOARD_BASE ?? "http://127.0.0.1:32768") + "/dashboard/targets/" + id)
 if (!response.ok) throw Error(`Снимок ${id} недоступен: HTTP ${response.status}`)
 const snapshot = await response.json()
-const dashboard = fileURLToPath(new URL("../../../dashboard/", import.meta.url))
 const template = fileURLToPath(new URL("../template/", import.meta.url))
-const apps = join(dashboard, "apps")
+const apps = process.env.DASHBOARD_APPS ?? fileURLToPath(new URL("../../../dashboard/apps/", import.meta.url))
 if (snapshot.id !== id || !/^[a-f0-9]{64}$/.test(snapshot.key)) throw Error("Неверная привязка снимка")
 const sourceDir = join(apps, snapshot.key)
 if (sourceDir !== snapshot.sourceDir) throw Error("Каталог исходников не соответствует привязке")
@@ -41,37 +43,41 @@ if (option === "--init") {
     .catch(error => { if (error.code !== "EEXIST") throw error })
   execFileSync("npm", ["run", "typecheck"], { cwd: sourceDir, stdio: "inherit" })
   execFileSync("npm", ["run", "build"], { cwd: sourceDir, stdio: "inherit" })
-  const dist = join(sourceDir, "dist")
-  await writeFile(join(dist, "binding.json"), JSON.stringify(snapshot.binding) + "\n")
   if (snapshot.tableSource === "unavailable") throw Error("В снимке нет примера результата: выполните узел и откройте Dashboard заново")
-  await writeFile(join(dist, "sample.json"), JSON.stringify({ schema: snapshot.schema, rows: snapshot.rows }) + "\n")
-
-  const container = "dashboard-master-20261109-server"
-  const root = "/workdir/dashboard-app/apps"
-  const docker = (...args) => execFileSync("docker", args, { encoding: "utf8" })
-  docker("exec", container, "mkdir", "-p", root)
-  const staging = docker("exec", container, "mktemp", "-d", `${root}/.${snapshot.key}.XXXXXX`).trim()
+  const dist = join(sourceDir, "dist")
+  const builds = process.env.DASHBOARD_BUILDS ?? join(homedir(), "loginom-dashboard/builds")
+  const keyDir = join(builds, snapshot.key)
+  await mkdir(keyDir, { recursive: true, mode: 0o700 })
+  const staging = await mkdtemp(join(keyDir, ".build-"))
   try {
-    docker("cp", dist + "/.", container + ":" + staging)
-    // Switch the whole directory at once, after every file has arrived.
-    docker("exec", container, "sh", "-ec", `
-      dest=$1
-      stage=$2
-      key=$3
-      previous=$(readlink "$dest" || true)
-      if [ -d "$dest/assets" ]; then
-        mkdir -p "$stage/assets"
-        cp -aln "$dest/assets/." "$stage/assets/"
-      fi
-      ln -s "$(basename "$stage")" "$stage/.switch"
-      mv -Tf "$stage/.switch" "$dest"
-      case "$previous" in ."$key".??????) rm -rf -- "$(dirname "$dest")/$previous";; esac
-    `, "sh", `${root}/${snapshot.key}`, staging, snapshot.key)
-  } catch (error) {
-    // After a successful switch, a cleanup failure must not delete the published app.
-    docker("exec", container, "sh", "-ec", 'if [ "$(readlink "$1" || true)" != "${2##*/}" ]; then rm -rf -- "$2"; fi',
-      "sh", `${root}/${snapshot.key}`, staging)
-    throw error
+    await cp(dist, staging, { recursive: true })
+    // Hash the completed private copy; another build may replace files in dist.
+    const files = (await readdir(staging, { recursive: true, withFileTypes: true }))
+      .filter(entry => entry.isFile())
+      .map(entry => relative(staging, join(entry.parentPath, entry.name)))
+      .sort()
+    const sha = createHash("sha256")
+    for (const file of files) {
+      const bytes = await readFile(join(staging, file))
+      sha.update(file).update("\0").update(String(bytes.length)).update("\0").update(bytes)
+    }
+    const hash = sha.digest("hex")
+    const target = join(keyDir, hash)
+    if (!existsSync(target)) {
+      // A concurrent publication of identical bytes may win the rename.
+      await rename(staging, target).catch(error => { if (!existsSync(target)) throw error })
+    }
+    const replace = async (name, text) => {
+      const temp = join(keyDir, `.${name}.${process.pid}.tmp`)
+      await writeFile(temp, text, { mode: 0o600 })
+      await rename(temp, join(keyDir, name))
+    }
+    await replace("binding.json", JSON.stringify(snapshot.binding) + "\n")
+    await replace("sample.json", JSON.stringify({ schema: snapshot.schema, rows: snapshot.rows }) + "\n")
+    // Switch lookup only after the complete build and its private metadata exist.
+    await replace("current", hash + "\n")
+    console.log(`Опубликовано: ${target}`)
+  } finally {
+    await rm(staging, { recursive: true, force: true })
   }
-  console.log(`Опубликовано: /dashboard/apps/${snapshot.key}/`)
 }

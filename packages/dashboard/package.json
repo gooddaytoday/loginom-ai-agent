@@ -9,7 +9,7 @@
     "check:size": "bun run script/check-size.ts",
     "test": "bun run build && bun run test:coverage && \"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/web/dist-smoke.test.mjs test/web/shell-contract.test.mjs",
     "test:coverage": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test --experimental-test-coverage --test-coverage-include='**/src/web/**' --test-coverage-lines=90 --test-coverage-functions=90 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./script/check-web-coverage.mjs --test-reporter-destination=stdout test/web/server.test.mjs test/web/apps.test.mjs",
-    "test:browser": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/browser/*.test.mjs"
+    "test:browser": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/browser/*.test.mjs test/publish/*.test.mjs"
   },
   "dependencies": {
     "effect": "catalog:"
