@@ -61,8 +61,8 @@ def expected(case):
         if case == "external":
             # Input numbers define membership, not a promised output identity.
             # Observation, not claimed: in this distinct-WoE case the native
-            # output was renumbered in increasing WoE order (cycle 3 verifies
-            # it on the stand first). Equal-WoE ordering is outside the proposal.
+            # output was renumbered in increasing WoE order. Equal-WoE ordering
+            # is outside the proposal.
             result["outputs"][1]["rows"].sort(key=lambda r: r["WoE"])
             for number, item in enumerate(result["outputs"][1]["rows"]):
                 item["ClassNumber"] = number
@@ -142,6 +142,9 @@ def expected(case):
 
 def external_contrast(result):
     """Supplied partition {B} | {A,C} that automatic training cannot produce.
+
+    Не приёмочный: Loginom 7.4.2 отклоняет внешнее разбиение, ожидается
+    `COARSE_EXTERNAL_UNSUPPORTED` (решение v040-kk-c3-external).
 
     Every class has events and non-events (no zero-share rule), WoE values are
     distinct and the supplied numbers already follow increasing WoE, so the

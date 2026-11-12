@@ -45,7 +45,7 @@ test('every registered user-v1 node card fits its type budget',async t=>{
   for(const modes of [undefined,...original.modes.map(mode=>[mode]),original.modes]){
    description.node_types=await loader.describeNodes([original],modes);
    const reply={content:[{type:'text',text:JSON.stringify(description)}]};
-   if(['programming.javascript','imports.text','transform.filter_data','transform.ungroup_data','transform.col_union_data'].includes(type))t.diagnostic(JSON.stringify({type,modes,card_bytes:bytes(description.node_types[0]),wire_bytes:bytes(reply)}));
+   if(['programming.javascript','imports.text','transform.filter_data','transform.ungroup_data','transform.col_union_data','transform.replace_columns'].includes(type))t.diagnostic(JSON.stringify({type,modes,card_bytes:bytes(description.node_types[0]),wire_bytes:bytes(reply)}));
    assert.equal(boundedUserToolReply(reply,{tool:'dock_action_describe'}),reply,type+': '+modes);
    const card=description.node_types[0];
    if(type==='imports.text')assert.ok(bytes(card)<=12000,`Text Import card: ${bytes(card)} > 12000`);

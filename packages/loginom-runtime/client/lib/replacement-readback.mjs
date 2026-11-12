@@ -4,14 +4,15 @@ export function replacementConfigurationReadback({node,phases,operation_id}){
  const owner=c=>c?.verified===true&&['document_id','workflow_id','node_id'].every(k=>c[k]===node[k]);
  const receipt=name=>{const xs=phases.filter(p=>p.phase===name),p=xs[0];need(xs.length===1&&p.status==='verified'&&p.receipt_id===operation_id+':'+name&&p.value?.verified===true&&p.value.cleanup_complete===true,'verified '+name);return p;};
  const input=receipt('input_mapping'),configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
- const c=configured.value.configuration,m=mapped.value.native_mapping,im=input.value.native_mapping;
+ const c=configured.value.configuration,m=mapped.value.native_mapping,im=input.value.native_mapping??input.value.ports?.find(p=>p.port===0)?.native_mapping;
+ const inputFinish=input.value.finish??input.value.ports?.find(p=>p.port===0)?.finish;
  need(c?.verified&&c.inventory_complete&&owner(c.node_context)&&c.rules?.length,'replacement configuration owner');
  need(configured.value.validation?.status==='accepted_by_loginom_next'&&owner(configured.value.validation.node_context),'replacement validation');
  need(saved.value.settings_applied===true&&saved.value.mode==='done'&&owner(saved.value.node_context)
   &&finished.value.settings_applied===true&&['done','execute'].includes(finished.value.mode)&&owner(finished.value.node_context),'replacement finish');
  need(m?.verified&&m.inventory_complete&&m.source_identity_verified
   &&owner(m.node_context)&&m.node_context.output_port?.port===0&&mapped.value.finish?.settings_applied===true,'derived output owner');
- need(im?.verified&&im.inventory_complete&&owner(im.node_context)&&im.node_context.input_port?.port===0&&input.value.finish?.settings_applied===true,'input owner');
+ need(im?.verified&&im.inventory_complete&&owner(im.node_context)&&im.node_context.input_port?.port===0&&inputFinish?.settings_applied===true,'input owner');
  const inputFields=im.target_fields.map(f=>{const source=f.source;need(source&&im.source_fields.some(s=>s.record_id===source.record_id&&s.name===source.name),'input source');return {...pick(f,['index','name','label','type','data_kind']),source_name:source.name};});
  need(JSON.stringify(inputFields.map(f=>pick(f,['name','label','type'])))===JSON.stringify(c.input_fields.map(f=>pick(f,['name','label','type']))),'input schema differs');
  need(['supplement','replace','default'].includes(m.produce_mode),'verified output mode');
@@ -24,7 +25,10 @@ export function replacementConfigurationReadback({node,phases,operation_id}){
   return {...pick(f,['index','name','label','type','data_kind','excluded']),source_name:source.name};
  });
  need(linked.size===m.source_fields.length,'derived source coverage');
- return {kind:'replacement',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'exact',
+ const external=c.mode==='external'?input.value.ports?.find(p=>p.port===1):null;
+ if(c.mode==='external'){need(external?.native_mapping?.verified&&owner(external.native_mapping.node_context)&&external.native_mapping.node_context.input_port?.port===1&&external.finish?.settings_applied===true,'external input owner');need(c.external_sources?.length&&c.external_sources.every(s=>s.source===external.native_mapping.node_context.input_port.port_guid),'external source differs from input 1');}
+ return {kind:c.mode==='external'?'replacement_external':'replacement',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:c.mode??'exact',
   rules:structuredClone(c.rules),output_mode:m.produce_mode==='supplement'?'add':'replace',
+  ...(external?{input_mappings:input.value.ports.map(p=>({port:p.port,autosync:p.native_mapping.autosync,fields:p.native_mapping.target_fields.map(f=>({...pick(f,['index','name','label','type','data_kind']),source_name:f.source.name}))})),external_sources:c.external_sources}:{}),
   input_mapping:{port:0,autosync:im.autosync,fields:inputFields},output_mapping:{port:0,autosync:m.autosync,fields:output},package_persistence_verified:false};
 }
