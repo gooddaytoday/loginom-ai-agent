@@ -12,11 +12,11 @@ const limits = { days: 30, bytes: 2 * 1024 ** 3, sessionBytes: 256 * 1024 ** 2, 
 
 async function privateDirectory(path) {
   await mkdir(path, { recursive: true, mode: 0o700 });
+  protectWindowsDirectory(path);
   const stat = await lstat(path);
   if (!stat.isDirectory() || stat.isSymbolicLink() || !privatePath(stat)) throw Error('Invalid diagnostic directory');
   // Windows mode bits do not describe privacy. Apply the same restricted,
   // inheritable user/SYSTEM ACL as the Dock state directory before writing.
-  protectWindowsDirectory(path);
 }
 
 async function append(path, text) {

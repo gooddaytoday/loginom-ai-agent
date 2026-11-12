@@ -47,7 +47,7 @@ test('selects the agent from the supplied PATH and pins it through later native 
 
 test('arguments survive shim execution including JSON, empty values and shell metacharacters', async t => {
   const f = await fixture(t);
-  const args = ['', 'space here', 'кириллица', 'a"b', 'trailing\\', 'a&b|c<d>e^f', '%DOCK_TEST_MARKER%', '!variable!', '(parens)',
+  const args = ['', 'space here', 'кириллица', 'a"b', 'trailing\\', 'a&b|c<d>e^f', '%DOCK_TEST_MARKER%', '%DOCK_TEST_MARKER:o=X%', '!variable!', '(parens)',
     '"&echo INJECTED&"', '^&', 'кавычки " и & пробелы', 'backslash\\"quote', 'two trailing\\\\',
     ...[1, 2, 3, 4].flatMap(n => ['slashes' + '\\'.repeat(n) + '"quoted', 'space end' + '\\'.repeat(n)]),
     JSON.stringify({ command: 'C:\\Users\\Test Person\\dock.cmd', args: ['a"b', '&', ''] })];
@@ -103,4 +103,17 @@ test('version failures distinguish launch, exit code, signal and version mismatc
   assert.ok(agentVersionGuidance('codex', { status: 0, stdout: 'x'.repeat(10000) }).length < 500);
   for (const version of ['0.149.1', '0.153.2']) assert.equal(agentVersionGuidance('codex', { status: 0, stdout: 'codex-cli ' + version }), '');
   for (const version of ['0.148.9', '1.0.0']) assert.match(agentVersionGuidance('codex', { status: 0, stdout: 'codex-cli ' + version }), /не поддерживается/);
+});
+
+
+test('CMD shims explicitly reject carriage returns and newlines before launch', { skip: !windows }, async t => {
+  const f = await fixture(t);
+  const launcher = createAgentLauncher('codex', { env: f.env, cwd: f.root });
+  for (const arg of ['line\nbreak', 'line\rbreak']) {
+    const result = launcher.run([arg], { encoding: 'utf8' });
+    assert.equal(result.error?.code, 'EINVAL');
+    assert.match(result.error.message, /CMD.*argument/i);
+    assert.equal(result.status, null);
+    assert.equal(result.stdout, null);
+  }
 });
