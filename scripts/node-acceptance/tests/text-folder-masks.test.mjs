@@ -15,9 +15,9 @@ assert [o['output_node_label'] for o in e['outputs']]==list(r.TEXT_FOLDERS)
 assert (c['data']/'transactions/README.txt').is_file()
 assert '{{SOURCE_DIR}}' in c['prompt'].read_text()
 d='/own/1 Silent Talk'
-def reply(folder,path,node,rows):
+def reply(folder,path,node,rows,complete=True):
  out=next(o for o in e['outputs'] if o['output_node_label']==folder)
- port=dict(port=0,port_kind='table',sample_complete=True,row_count=rows,schema=[],sample=[])
+ port=dict(port=0,port_kind='table',sample_complete=complete,row_count=rows,schema=[dict(name=c['name'],type=c['type']) for c in out['columns']],sample=[])
  return dict(status='SUCCEEDED',node=dict(node_id=node),configuration=dict(readback=dict(kind='text_import',
   node_title=dict(mode='custom',label=folder),source=dict(source_path=d+'/'+folder+'/'+path))),output=dict(ports=[port]))
 paths=dict(transactions='*.csv',customers='*.csv',accounts='accounts.csv',beneficiaries='*.csv',devices='devices.csv',risk_reference='risk_rules.csv')
@@ -38,6 +38,11 @@ bad=copy.deepcopy(good);bad.append((9,reply('devices','devices.csv','other',3)))
 refused(bad,'TEXT_FOLDER_IMPORT_RECREATED')
 bad=copy.deepcopy(good);bad[0][1]['output']['ports'][0]['row_count']=1
 refused(bad,'TEXT_FOLDER_ROW_COUNT')
+bad=copy.deepcopy(good);bad[1][1]['output']['ports'][0]['schema'][-1]['type']='string'
+refused(bad,'TEXT_FOLDER_SCHEMA')
+# Short samples (LAB-1468 r2 model.stdout:145) prove fields/types/N only; cold matches rows.
+partial=[(i,reply(f,paths[f],f,len(next(o for o in e['outputs'] if o['output_node_label']==f)['rows']),False)) for i,f in enumerate(r.TEXT_FOLDERS)]
+r.check_text_folder_masks(partial,d,c['data'],e,'/bin/false')
 call=lambda tool,path,out:dict(type='tool_use',part=dict(tool=tool,state=dict(input=dict(path=path),output=out)))
 ev=[(1,call('loginom_dock_storage_source',d+'/transactions/*.csv','{"status":"FAILED"}')),
  (2,call('loginom_dock_storage_source',d+'/accounts/accounts.csv','{"status":"SUCCEEDED"}')),

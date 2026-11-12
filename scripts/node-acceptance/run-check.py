@@ -975,12 +975,18 @@ def check_text_folder_masks(replies, source_dir, data, expected, node_binary='no
         nodes |= identities
         owner, port, config = reads[folder][-1]
         assert config['source']['source_path'] == want, 'TEXT_FOLDER_SOURCE: ' + folder
-        assert port_path(owner, port) and port.get('sample_complete') is True, 'TEXT_FOLDER_PORT_INCOMPLETE: ' + folder
+        assert port_path(owner, port), 'TEXT_FOLDER_PORT_INVALID: ' + folder
         stage = next(o for o in expected['outputs'] if o['output_node_label'] == folder)
+        # The task asks for fields, types and row counts; a short sample is a
+        # valid read. Cold always matches every row of all six outputs.
         assert port.get('row_count') == len(stage['rows']), 'TEXT_FOLDER_ROW_COUNT: ' + folder
+        assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
+            (c['name'], c['type']) for c in stage['columns']], 'TEXT_FOLDER_SCHEMA: ' + folder
+        if port.get('sample_complete') is not True: continue
         tables.append(dict(actual=dict(node=owner['node'], type='imports.text', label=config.get('node_title', {}).get('label'),
                                        output_port=0, data=port), expected=stage))
     assert len(nodes) == len(TEXT_FOLDERS), 'TEXT_FOLDER_IMPORT_SHARED'
+    if not tables: return
     # The same typed full-table matcher as cold: fields, types, rows per Import.
     result = subprocess.run([str(node_binary), '--input-type=module', '-e', """
 import {readFileSync} from 'node:fs';
