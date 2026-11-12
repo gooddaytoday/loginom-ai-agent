@@ -76,3 +76,15 @@ test('Boolean and mixed configuration use owned editors and reexecution preserve
   actions.length=0;assert.deepEqual((await configureReplacement(channel,{}, {mode})).configuration.rules,[rule]);assert.equal(actions.length,0);
  }
 });
+
+test('external replacement assigns owned roles and retains source on an empty patch',async()=>{
+ const {configureReplacement}=await import('../lib/replacement-procedure.mjs');
+ const native={verified:true,inventory_complete:true,input_fields:[{record_id:'f',name:'Code',label:'Code',type:'string',mode:'external',replace_source:'rules-guid'}],selected:'Code',mode:'external',result_type:'string',replace_source:'rules-guid',external_fields:['Value','Replacement','Info','Ignored'].map((name,i)=>({record_id:'r'+i,name,label:name,type:'string',usage:0})),pairs:[],other:{mode:'keep'},case_sensitive:true,editor_open:false};
+ const state={wizard:{root_tid:'w',stage:'replacement'},node_replacement:native,ui:{elements:[]}},actions=[];let selected;
+ const sync=()=>{state.ui.elements=native.external_fields.map(f=>({ref:f.record_id,replacement_field:{role:'external',field_key:'Code',part:'usage',record_id:f.record_id},allowed_actions:['click']})).concat(['Значение','Замена','Информационное','Не_используемое'].map(label=>({ref:label,tid:'w;ReplaceColumnsWizard;grdInputSource;tbl;celleditor;cbx;boundlist;'+label,allowed_actions:['click']})));};
+ const channel={observe:async o=>{sync();assert.ok(o.ready(state),o.condition);return structuredClone(state);},perform:async o=>{sync();const a=o.resolve(state);actions.push(a);if(a.ref.startsWith('r'))selected=native.external_fields.find(f=>f.record_id===a.ref);else selected.usage={'Значение':3,'Замена':4,'Информационное':6,'Не_используемое':0}[a.ref];}};
+ const rule={field:{kind:'input_field',name:'Code'},type:'string',case_sensitive:true,other:{mode:'keep'},external:{port:1,value:'Value',replacement:'Replacement',information:['Info'],unused:['Ignored']}};
+ const configured=await configureReplacement(channel,{rules:[rule],output_mode:'replace'},{mode:'external'});
+ assert.deepEqual(configured.configuration.rules,[rule]);assert.deepEqual(configured.configuration.external_sources,[{field:'Code',source:'rules-guid'}]);assert.deepEqual(native.external_fields.map(f=>f.usage),[3,4,6,0]);
+ actions.length=0;assert.deepEqual((await configureReplacement(channel,{}, {mode:'external'})).configuration.rules,[rule]);assert.equal(actions.length,0);
+});
