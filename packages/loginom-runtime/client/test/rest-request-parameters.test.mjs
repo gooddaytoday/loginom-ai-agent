@@ -90,3 +90,13 @@ test('C2 literal headers replace explicitly, preserve on omission and validate b
   assert.throws(()=>validateRestRequestParameters({...parameters(),headers},'request',request),/header/i);
  }
 });
+for(const name of ['X-Api-Key','api-key','X-Auth-Token','x-access-token','X-CSRF-Token','Token','X-Secret','X-Password','X-Auth','Service-ApiKey-Id','AUTHORIZATION','Cookie','proxy-authorization','Set-Cookie'])
+test('C2 refuses credential header before mutation: '+name,()=>{
+ assert.throws(()=>validateRestRequestParameters({...parameters(),headers:[{name,value:'private'}]},'request',request),/credential headers/);
+});
+for(const name of ['Content-Type','content-length','HOST'])test('C2 refuses native transport header before mutation: '+name,()=>{
+ assert.throws(()=>validateRestRequestParameters({...parameters(),headers:[{name,value:'override'}]},'request',request),/transport headers/);
+});
+test('C2 accepts harmless header names containing partial credential words',()=>{
+ for(const name of ['X-Lab-Cycle','X-Author','X-Tokenizer','X-Secretariat'])assert.doesNotThrow(()=>validateRestRequestParameters({...parameters(),headers:[{name,value:'public'}]},'request',request));
+});

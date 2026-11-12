@@ -156,7 +156,10 @@ export async function restRequestCapability(page,t,readContext){
   await advance();
   const allowed=['Настройка пользовательских заголовков','Дополнительные параметры','Настройка выходных столбцов'];
   for(let i=0;i<6;i++){
-   const caption=(await title()).trim();if(caption==='Описание узла')return {verified:true,cleanup_complete:true,effect_possible:effect,configuration,node_context:{...t.node,verified:true}};
+   const caption=(await title()).trim();if(caption==='Описание узла'){
+    need(t.headers===undefined||configuration.headers,'custom headers page was not reached');
+    return {verified:true,cleanup_complete:true,effect_possible:effect,configuration,node_context:{...t.node,verified:true}};
+   }
    need(allowed.includes(caption),'unexpected REST wizard page: '+caption);
    if(caption==='Настройка пользовательских заголовков'&&t.headers!==undefined){
     const headers=root+';RESTCustomHeadersWizard',grid=headers+';grdCustomHeaders;tbl';
@@ -175,7 +178,10 @@ export async function restRequestCapability(page,t,readContext){
     };
     let rows=await readHeaders();
     if(JSON.stringify(rows.map(r=>r.name.value))!==JSON.stringify(t.headers.map(h=>h.name))){
-     for(const row of rows){await click(row.delete_tid);await wait('header removed',async()=>(await readHeaders()).every(r=>r.delete_tid!==row.delete_tid));}
+     while(rows.length){
+      const count=rows.length;await click(rows[0].delete_tid);
+      rows=await wait('header removed',async()=>{const r=await readHeaders();return r.length===count-1?r:null;});
+     }
      for(const h of t.headers){
       const count=(await readHeaders()).length;await click(headers+';btnAddHeader');
       rows=await wait('header added',async()=>{const r=await readHeaders();return r.length===count+1?r:null;});
@@ -193,7 +199,7 @@ export async function restRequestCapability(page,t,readContext){
      await wait('header value committed',async()=>(await readHeaders())[index]?.value.value===h.value);
     }
     const observed=(await readHeaders()).map(r=>({name:r.name.value,value:r.value.value}));
-    need(JSON.stringify(observed)===JSON.stringify(t.headers),'custom header readback differs');
+    need(observed.length===t.headers.length&&observed.every((h,i)=>h.name===t.headers[i].name&&h.value===t.headers[i].value),'custom header readback differs');
     configuration.headers=observed;
    }
    if(caption==='Дополнительные параметры'&&t.new_node===true){

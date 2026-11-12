@@ -15,7 +15,7 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
    const element={id:tid,querySelector:()=>input,getAttribute:()=>tid,getBoundingClientRect:()=>({width:100})};
    row[key+'Element']=element;headerFields[tid]={el:{dom:element},inputEl:{dom:input},getValue:()=>row[key]};
   }
-  row.deleteElement={getAttribute:()=>headerBase+';colDelete_header'+id};headerRows.push(row);
+  row.deleteElement={getAttribute:()=>headerBase+';colDelete_header'+(options.reindexDeletes?headerRows.indexOf(row):id)};headerRows.push(row);
  };
  for(const h of options.savedHeaders??[])addHeader(h.name,h.value);
  const headerTable={querySelectorAll:s=>s.includes('colName;')?headerRows.map(r=>r.nameElement):s.includes('colHeaderValue;')?headerRows.map(r=>r.valueElement):headerRows.map(r=>r.deleteElement)};
@@ -47,7 +47,7 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
  const app={Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace}}}}};
  const scope=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app,TBGHTTPVerb:{httpGET:0,httpPOST:1,httpPUT:2,httpDELETE:3,httpPATCH:4}},Ext:{getCmp:id=>headerFields[id]??fields[id]??component}});
  const evaluate=(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')',scope)(arg));
- const captions=['Настройка запроса','Настройка пользовательских заголовков','Дополнительные параметры','Описание узла'];
+ const captions=['Настройка запроса',...(options.skipHeaders?[]:['Настройка пользовательских заголовков']),'Дополнительные параметры','Описание узла'];
  let body='',bodyPickerOpen=false;
  const page={evaluate,waitForTimeout:async ms=>options.tick?.(ms),locator:selector=>({
   locator:()=>({inputValue:async()=>body,fill:async value=>{
@@ -70,7 +70,7 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
   if(lastSelector.includes(';btnAutoLink')){
    autoLinks++;if(options.stall!=='bindings')draw.FLinks=Object.fromEntries(columnRows.map((c,i)=>[i,[foreign==='column'?{data:{...c.data}}:c,foreign==='parameter'?{data:{...parameterRows[i].data}}:parameterRows[i]]]));
   }else if(lastSelector.includes(';btnAddHeader')){addHeader();}
-  else if(lastSelector.includes(';colDelete_header')){headerRows.splice(headerRows.findIndex(r=>lastSelector.includes(';colDelete_header'+r.id+'"')),1);}
+  else if(lastSelector.includes(';colDelete_header')){const index=headerRows.findIndex(r=>lastSelector==='[data-tid='+JSON.stringify(r.deleteElement.getAttribute('data-tid'))+']');if(index>=0)headerRows.splice(index,1);}
   else if(lastSelector.includes(';edtMessageBodyColumn;trg_picker')){bodyPickerOpen=true;}
   else if(lastSelector.includes(';boundlist;Body')){body='Body';bodyPickerOpen=false;}
   else if(lastSelector.includes(';btnNext')){if(options.stall!=='transition')stage++;nextClicks++;}
@@ -97,6 +97,20 @@ test('C2 replaces multiple saved headers and preserves empty literal values',asy
  const headers=[{name:'X-One',value:''},{name:'X-Two',value:'Привет & + /'}];
  const f=fixture(null,false,null,{empty:true,savedHeaders:[{name:'X-Old',value:'old'}]}),r=await f.run(headers);
  assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,headers);
+});
+for(const reversed of [false,true])test('C2 header readback ignores object key order: '+reversed,async()=>{
+ const headers=[reversed?{value:'first',name:'X-Lab-Cycle'}:{name:'X-Lab-Cycle',value:'first'}];
+ const r=await fixture(null,false,null,{empty:true}).run(headers);
+ assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,[{name:'X-Lab-Cycle',value:'first'}]);
+});
+test('C2 deletes multiple saved headers when native delete tids are reindexed',async()=>{
+ const f=fixture(null,false,null,{empty:true,reindexDeletes:true,savedHeaders:[{name:'X-One',value:'one'},{name:'X-Two',value:'two'}]});
+ const r=await f.run([{name:'X-Remaining',value:'kept'}]);
+ assert.equal(r.verified,true,r.error);assert.deepEqual(r.configuration.headers,[{name:'X-Remaining',value:'kept'}]);
+});
+test('C2 refuses success if the custom headers page was skipped',async()=>{
+ const r=await fixture(null,false,null,{empty:true,skipHeaders:true}).run([]);
+ assert.equal(r.verified,false);assert.match(r.error,/custom headers page was not reached/);
 });
 
 for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 configures native '+method+' and reads body binding',async()=>{

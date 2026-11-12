@@ -18,7 +18,8 @@ export function validateRestRequestParameters(p,mode,r){
    need(typeof h.name==='string'&&h.name.length<=128&&/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(h.name),'header name must be an HTTP token');
    const name=h.name.toLowerCase();
    need(!names.has(name),'header names must be unique ignoring case');names.add(name);
-   need(!['authorization','proxy-authorization','cookie','set-cookie'].includes(name),'credential headers are unsupported');
+   need(!['authorization','proxy-authorization','cookie','set-cookie','x-api-key','api-key','x-auth-token','x-access-token','x-csrf-token'].includes(name)&&!/(^|-)(api-?key|token|secret|password|auth)(-|$)/i.test(name),'credential headers are unsupported');
+   need(!['content-type','content-length','host'].includes(name),'native transport headers are unsupported');
    need(typeof h.value==='string'&&h.value.length<=2048&&!/[\x00-\x1f\x7f]/.test(h.value),'header value must be a bounded literal without control characters');
   }
  }
