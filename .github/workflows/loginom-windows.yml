@@ -86,6 +86,8 @@ jobs:
       - name: Run package-local checks
         shell: pwsh
         run: |
+          & $env:LOGINOM_CI_NODE_SOURCE --test packages/desktop/test/loginom/windows-installed-smoke.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Installed smoke regression tests failed" }
           Push-Location packages/desktop
           try {
             & $env:LOGINOM_CI_BUN_PATH typecheck
@@ -136,6 +138,27 @@ jobs:
             cli = [ordered]@{ name = $archive[0].Name; bytes = $archive[0].Length; sha256 = $actual }
           }
           $summary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output "ci-summary.json") -Encoding utf8
+
+      - name: Install, launch and uninstall Desktop candidate
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $installer = @(Get-ChildItem -LiteralPath (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "desktop") -Filter "*-win-x64.exe" -File)
+          if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer" }
+          $version = (Get-Content -LiteralPath packages/desktop/package.json -Raw | ConvertFrom-Json).version
+          & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
+            -Installer $installer[0].FullName `
+            -EvidenceDirectory (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
+            -Version $version -Channel dev -NodePath $env:LOGINOM_CI_NODE_SOURCE
+
+      - name: Upload installed Desktop smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loginom-windows-installed-smoke-${{ github.run_id }}
+          path: ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload short-lived unsigned candidates
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
