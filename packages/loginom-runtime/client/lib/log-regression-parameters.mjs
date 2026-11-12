@@ -40,5 +40,5 @@ export function resolveLogRegressionRoles(parameters,fields){
  for(const name of p.input_fields){const f=fields.find(f=>f.name===name);need(f&&['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный','predictor must be an observed continuous numeric field: '+name);}
  const target=fields.find(f=>f.name===p.target_field);need(target&&target.type==='string'&&target.data_kind==='Дискретный','target must be an observed discrete string field');
  if(p.weight_field!==undefined){const weight=fields.find(f=>f.name===p.weight_field);need(weight&&weight.type==='real','weight_field requires an observed Real field; Loginom 7.4.2 has no Integer Weight role');}
- return fields.map(f=>({...f,usage_type:p.input_fields.includes(f.name)?3:f.name===p.target_field?4:f.name===p.weight_field?5:0}));
+ return fields.map(f=>({...f,usage_type:p.input_fields.includes(f.name)?3:f.name===p.target_field?4:f.name===p.weight_field?7:0}));
 }

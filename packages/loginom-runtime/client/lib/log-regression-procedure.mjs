@@ -28,7 +28,7 @@ export async function configureLogRegressionRoles(channel,p,inputMapping){
   s=await channel.observe({condition:'bound regression role editor',ready:pickerReady});
   await channel.perform({condition:'open regression role choices',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'click',ref:unique(s,e=>choice(e,'picker')&&e.allowed_actions.includes('click')).ref})});
-  const label={0:'Не задано',3:'Входное',4:'Выходное',5:'Вес'}[wanted.usage_type];
+  const label={0:'Не задано',3:'Входное',4:'Выходное',7:'Вес'}[wanted.usage_type];
   s=await channel.observe({condition:'regression role option',ready:s=>editor(s)&&s.ui.elements.some(e=>choice(e,'option')&&e.wizard_combo.label===label)});
   await channel.perform({condition:'select regression role',initialObservation:s,ready:editor,identity:()=>original,
    resolve:s=>({verb:'select_wizard_option',ref:unique(s,e=>choice(e,'option')&&e.wizard_combo.label===label).ref})});

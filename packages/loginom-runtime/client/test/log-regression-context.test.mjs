@@ -171,6 +171,7 @@ test('Ridge native details wait for initialized setup, finite lambda and editabl
 
 
 test('logistic role reader retains a Real frequency weight outside predictor normalization',()=>{
- const f=fixture();f.records[3].data.DataType=3;f.records[3].data.UsageType=5;
- const r=f.read();assert.equal(r.verified,true);assert.equal(r.fields[3].usage_type,5);assert.equal(r.fields[3].type,'real');
+ const f=fixture();f.records[3].data.DataType=3;f.records[3].data.UsageType=7;
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.fields[3].usage_type,7);assert.equal(r.fields[3].type,'real');
+ f.records[3].data.DataType=4;assert.equal(f.read().verified,false);
 });

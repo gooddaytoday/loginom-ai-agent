@@ -38,7 +38,7 @@ test('logistic roles keep identifiers and comments and require a discrete string
 
 const globalFields=fields;
 function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLabels=['7 (no)','2 (yes)'],mode='enter',selection,regularization,needsScroll=false,initialCriterion=1,normalization,initialNorm=0,existing=false,corruptTarget=false,weightType}={}){
- const fields=weightType?[...globalFields,{name:"Weight",label:"Weight",type:weightType,data_kind:"Непрерывный",usage_type:5,index:4,field_id:"4",record_id:"role-4"}]:globalFields;
+ const fields=weightType?[...globalFields,{name:"Weight",label:"Weight",type:weightType,data_kind:"Непрерывный",usage_type:7,index:4,field_id:"4",record_id:"role-4"}]:globalFields;
  const source_fields=fields.map(f=>({record_id:'source-'+f.index,field_id:f.field_id,name:f.name,label:f.label,type:f.type}));
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
  const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
@@ -144,7 +144,7 @@ test('readback binds training, event and cutoff to committed settings and separa
  const result=logRegressionConfigurationReadback(candidate);assert.equal(result.threshold,0.8);assert.equal(result.event,'yes');assert.equal(result.training.execution_id,'teach');assert.equal(result.package_persistence_verified,false);
  c.normalization=[{name:'X',norm_type:5},{name:'Target',norm_type:9}];
  assert.equal(logRegressionConfigurationReadback(candidate).normalization,'standardize');
- c.fields=[...fields,{name:'Weight',type:'real',usage_type:5}];
+ c.fields=[...fields,{name:'Weight',type:'real',usage_type:7}];
  assert.equal(logRegressionConfigurationReadback(candidate).weight_field,'Weight');
  c.fields=fields;
  c.mode='ridge';c.regularization={lambda_ridge:1};
@@ -259,13 +259,13 @@ test('Ridge requires one explicit finite positive lambda and rejects selection o
 
 test('Real frequency weight is distinct from factors and Integer refuses before role edits',async()=>{
  const f=fixture({weightType:'real'}),result=await f.run();
- assert.deepEqual(result.configuration.fields.map(f=>f.usage_type),[0,3,4,0,5]);
+ assert.deepEqual(result.configuration.fields.map(f=>f.usage_type),[0,3,4,0,7]);
  assert.deepEqual(result.configuration.normalization.map(f=>f.name),['X','Target']);
  const applied=await fixture({mode:'apply',weightType:'real'}).run();
- assert.equal(applied.configuration.fields.at(-1).usage_type,5);
+ assert.equal(applied.configuration.fields.at(-1).usage_type,7);
  const weighted={logistic:{...logistic,weight_field:'Weight'}};
  const schema=[...fields,{name:'Weight',type:'real',data_kind:'Непрерывный',usage_type:0}];
- assert.equal(resolveLogRegressionRoles(weighted,schema).at(-1).usage_type,5);
+ assert.equal(resolveLogRegressionRoles(weighted,schema).at(-1).usage_type,7);
  for(const type of ['integer','string','boolean','variant']){
   assert.throws(()=>resolveLogRegressionRoles(weighted,[...fields,{name:'Weight',type,data_kind:'Непрерывный'}]),/Real|real/);
  }
