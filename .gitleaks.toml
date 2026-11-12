@@ -2,3 +2,23 @@ title = "Loginom secret protection"
 
 [extend]
 useDefault = true
+
+[[rules]]
+id = "personal-home-path"
+description = "Personal home directory in a committed file"
+regex = '''(?:^|[^[:alnum:]_.-])/(?:home|Users)/([^/\s\\'"<>`]+)'''
+secretGroup = 1
+
+[[rules.allowlists]]
+regexTarget = "secret"
+regexes = ['^(?:user|test-user)$']
+
+[[rules]]
+id = "personal-windows-home-path"
+description = "Personal Windows home directory in a committed file"
+regex = '''(?i)(?:^|[^[:alnum:]_])[a-z]:[\\/]+Users[\\/]+([^/\\\r\n"'<>`]+)'''
+secretGroup = 1
+
+[[rules.allowlists]]
+regexTarget = "secret"
+regexes = ['(?i)^(?:user|test-user)$']
