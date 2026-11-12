@@ -20,11 +20,12 @@ const repo = resolve(import.meta.dir, "../../..")
 const args = process.argv.slice(2)
 const destination = args[0]
 const noArchive = args.slice(1).includes("--no-archive")
-// Linux x64 hosts without AVX2 (for example Ivy Bridge Xeons) need Bun's
-// baseline runtime; the default native build stays unchanged.
-const baseline = args.slice(1).includes("--baseline")
+// Windows x64 clients can lack AVX2 even when the build runner supports it.
+// Ship Bun's baseline runtime there; Linux can opt in for older x64 CPUs.
+const baseline = process.platform === "win32" || args.slice(1).includes("--baseline")
 if (args.slice(1).some((arg) => arg !== "--no-archive" && arg !== "--baseline")) throw new Error("Unknown build option")
-if (baseline && (process.platform !== "linux" || process.arch !== "x64")) throw new Error("Baseline builds are linux-x64 only")
+if (baseline && (!["linux", "win32"].includes(process.platform) || process.arch !== "x64"))
+  throw new Error("Baseline builds require linux-x64 or win32-x64")
 if (!destination || !isAbsolute(destination)) throw new Error("Provide a new absolute artifact directory")
 if (await Bun.file(join(destination, "cli-manifest.json")).exists()) throw new Error("Artifact already exists")
 await lstat(destination).then(

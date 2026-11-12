@@ -63,6 +63,17 @@ jobs:
           "LOGINOM_CI_NODE_SOURCE=$node" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "LOGINOM_CI_BUN_PATH=$bun" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Record Windows execution environment
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber | ConvertTo-Json -Compress
+          Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer, Model, HypervisorPresent | ConvertTo-Json -Compress
+          Get-CimInstance Win32_Processor | Select-Object Name | ConvertTo-Json -Compress
+          @{ AVX = [System.Runtime.Intrinsics.X86.Avx]::IsSupported; AVX2 = [System.Runtime.Intrinsics.X86.Avx2]::IsSupported; AVX512F = [System.Runtime.Intrinsics.X86.Avx512F]::IsSupported } | ConvertTo-Json -Compress
+          Get-Item -LiteralPath $env:LOGINOM_CI_BUN_PATH -Stream * | Select-Object Stream, Length | ConvertTo-Json -Compress
+          & powershell.exe -NoProfile -NonInteractive -Command 'Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled | ConvertTo-Json -Compress; Get-MpPreference | Select-Object EnableControlledFolderAccess, AttackSurfaceReductionRules_Ids, AttackSurfaceReductionRules_Actions | ConvertTo-Json -Compress; Get-ProcessMitigation -System; Get-ProcessMitigation -Name loginom-ai-agent-cli.exe'
+          if ($LASTEXITCODE -ne 0) { throw "Cannot record Windows execution environment" }
+
       - name: Provision pinned Chromium input
         working-directory: packages/loginom-runtime/client
         shell: pwsh
