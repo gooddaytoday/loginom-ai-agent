@@ -725,6 +725,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task-scalar-types.md' if scalars else 'task-aggregates.md'), data=src.parent / 'fixtures',
                     input_files=['aggregate-types.csv' if scalars else 'aggregate-numeric.csv'], base=None, expected_name=expected, variable_initial_name=expected,
                     variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name == 'datatovar-variant':
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        return dict(source=src, prompt=src / 'task-variant.md', data=src / 'variant-input',
+                    input_files=[], base=None, source_package=src.parent / 'fixtures/aggregate-source.lgp',
+                    expected_name='expected-variant-run.json', variable_initial_name='expected-variant-run.json',
+                    variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',

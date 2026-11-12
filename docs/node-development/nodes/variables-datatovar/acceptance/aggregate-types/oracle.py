@@ -169,6 +169,33 @@ def check_inputs(data):
 def main():
     data = json.loads((FIXTURES / 'aggregate-types.json').read_text(encoding='utf-8'))
     check_inputs(data)
+    if '--w1' in sys.argv or '--w1-check' in sys.argv:
+        # Subtypes/tags confirmed through W1 interface427/method1141, LAB-1445.
+        # Values still come from the independent authored-data aggregation.
+        tags = {'V_Min': ('boolean', 11), 'V_Max': ('string', 8),
+                'V_Mode': ('integer', 3), 'V_First': ('integer', 3),
+                'V_Last': ('integer', 3), 'V_Only': ('null', 1)}
+        variables = inventory(data, ['V'])['variables']
+        for variable in variables:
+            variable.pop('label')
+            variable['label_any'] = True
+            if variable['type'] == 'variant':
+                subtype, tag = tags[variable['name']]
+                variable['native_tag'] = tag
+                if subtype != 'null':
+                    variable['value'] = {'cell_type': subtype, 'value': variable['value']}
+        run = {'package_path': '{{PACKAGE_PATH}}',
+               'nodes': [{'type': 'programming.javascript', 'label_any': True},
+                         {'type': 'variables.from_table', 'label_any': True}], 'outputs': [],
+               'variable_inventory': {'outputs': [{'node': {'type': 'variables.from_table'},
+                                                  'port': 0, 'ordered': True, 'variables': variables}]}}
+        text = json.dumps(run, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
+        if '--w1-check' in sys.argv:
+            assert (HERE.parent / 'expected-variant-run.json').read_text(encoding='utf-8') == text
+            print('W1 oracle: PASS; 9 variables; native tags confirmed in LAB-1445')
+        else:
+            print(text, end='')
+        return
     result = {'status': 'proposal_pending_owner_approval',
               'native_subtypes_verified': False,
               'numeric': inventory(data, ['N', 'K']),

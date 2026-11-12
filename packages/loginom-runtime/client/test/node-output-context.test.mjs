@@ -92,6 +92,20 @@ function variableStore(){
  const items=values.map(([DataType,ValueVariant],Index)=>({isModel:true,data:{ID:Index,Index,Name:'v'+Index,DisplayName:'V'+Index,DataType,ValueVariant,DisplayValue:ValueVariant,ValueIsNull:ValueVariant===null,OriginType:1}}));
  return {items,complete:true,loadCount:1,getTotalCount:()=>items.length,isLoading:()=>false,getCount:()=>items.length,getData:()=>({items})};
 }
+test('W1 Variant requires native cells for the full inventory and never falls back to the JS number',()=>{
+ const s=variableStore();s.items[1].data.DataType=6;s.items[1].data.ValueVariant=2;
+ assert.throws(()=>readVariableRecords(s,'preview',decodePortCell),/metadata/);
+ const metadata=readVariableRecords(s,'preview',decodePortCell,false,{metadataOnly:true});
+ assert.equal(metadata.variables[1].type,'variant');assert.equal(metadata.variables[1].cell,undefined);
+ const cell={type:'variant',cell_type:'integer',value:'2',precision:'exact_native',is_null:false,native:{tag:3,encoding:'signed-int32-le',bytes_le:'02000000',bits:32}};
+ const cells=Array(s.items.length);cells[1]=cell;
+ assert.equal(readVariableRecords(s,'preview',decodePortCell,false,{variantCells:cells}).variables[1].cell,cell);
+ for(const bad of [[],[cell],Array(s.items.length).fill({...cell,precision:'unverified'}),Array(s.items.length).fill({...cell,cell_type:undefined})])
+  assert.throws(()=>readVariableRecords(s,'preview',decodePortCell,false,{variantCells:bad}),/native Variant/);
+ assert.throws(()=>readVariableRecords(s,'values',decodePortCell,false,{variantCells:cells}),/metadata/);
+ s.items[1].data.ValueVariant=undefined;
+ assert.throws(()=>readVariableRecords(s,'preview',decodePortCell,false,{variantCells:cells}),/not loaded/);
+});
 for(const mode of ['preview','values'])test('W1 complete native variable inventory distinguishes NULL, false, zero and empty string: '+mode,()=>{
  const s=variableStore(),r=readVariableRecords(s,mode,decodePortCell);
  assert.deepEqual(r.variables.map(v=>v.cell.value),[false,'0','',null]);assert.deepEqual(r.variables.map(v=>v.cell.is_null),[false,false,false,true]);

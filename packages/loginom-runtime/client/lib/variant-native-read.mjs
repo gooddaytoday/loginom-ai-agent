@@ -1,10 +1,11 @@
 // Generic completed-port capability. The owning port reader supplies its
 // existing source/execution guards; no Preview/static-import provenance is used.
 // Serialized into that reader, so all dependencies are explicit.
-export async function createNativeVariantReader(source,{deadline,stable},decode,collect,pins) {
+export async function createNativeVariantReader(source,{deadline,stable,variableValue=false},decode,collect,pins) {
  const need=(ok,message)=>{if(!ok)throw Error('Variant read: '+message);};
  const session=source.$S,identity=source.$,owner=identity?.$OW,object=identity?.$O;
- need(identity?.$I===116&&Number.isInteger(owner)&&Number.isInteger(object),'interface116 source required');
+ const interfaceId=variableValue?427:116;
+ need(typeof variableValue==='boolean'&&identity?.$I===interfaceId&&Number.isInteger(owner)&&Number.isInteger(object),'interface'+interfaceId+' source required');
  const initial=collect(session),from=Date.FromOADate,bias=Date.AddBias;
  const hash=async fn=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(fn))))).map(n=>n.toString(16).padStart(2,'0')).join('');
  for(const [key,fn] of Object.entries(initial.functions))need(await hash(fn)===pins.functions[key],'loaded implementation changed: '+key);
@@ -16,7 +17,7 @@ export async function createNativeVariantReader(source,{deadline,stable},decode,
   stable();need(!retired&&Date.now()<deadline,'retired or deadline');
   need(session.$FDisposed===false&&session.$FPendingDisconnect===false&&session.$FTransportStatus===0
    &&session.$T?.FFinished===false&&session.$T.FDisconnected===false&&session.$T.$FSocket?.readyState===1,'session transport not live');
-  need(source.$S===session&&source.$===identity&&identity.$OW===owner&&identity.$O===object&&identity.$I===116,'source changed');
+  need(source.$S===session&&source.$===identity&&identity.$OW===owner&&identity.$O===object&&identity.$I===interfaceId,'source changed');
   const current=collect(session);
   need(initial.objects.every((o,i)=>o===current.objects[i])&&JSON.stringify(initial.constants)===JSON.stringify(current.constants)
    &&Object.keys(initial.functions).every(k=>initial.functions[k]===current.functions[k]),'loaded runtime changed');
@@ -29,12 +30,13 @@ export async function createNativeVariantReader(source,{deadline,stable},decode,
   get unsettled(){return pending>0||uncertain;},
   async read(row,column){
    need(Number.isSafeInteger(row)&&row>=0&&Number.isInteger(column)&&column>=0&&column<10000,'cell bounds');
+   need(!variableValue||row===0&&column===0,'single variable value bounds');
    check();need(bytes<512*1024,'native byte budget');
    let request;
    try{
-    request=session.$M.GetDynamicData();check(request);request.set_StaticDataSize(32);
-    request.InitializeMethodCallMessage(owner,object,321,0);
-    request.WriteParameter(0,row);request.WriteParameter$a(8,column);
+    request=session.$M.GetDynamicData();check(request);request.set_StaticDataSize(variableValue?20:32);
+    request.InitializeMethodCallMessage(owner,object,variableValue?1141:321,0);
+    if(!variableValue){request.WriteParameter(0,row);request.WriteParameter$a(8,column);}
    }catch(error){try{request?.Release();}catch{uncertain=true;}throw error;}
    const cell=await new Promise((resolve,reject)=>{
     pending++;
