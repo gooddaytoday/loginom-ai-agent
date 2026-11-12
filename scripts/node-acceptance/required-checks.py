@@ -90,7 +90,7 @@ RULES = (
     ((C + 'clustering-*.mjs',), ('live-ui',), ('clustering-apply', 'clustering-gmeans', 'n19', 'r1', 'r2', 'clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
     (('docs/node-development/nodes/datamining-clustering/acceptance/scaling/**',), ('live-ui',),
      ('clustering-scale-minus-one-one', 'clustering-scale-zero-one', 'clustering-scale-absolute')),
-    ((C + 'factor-analysis-*.mjs', 'docs/node-development/nodes/research-factoranalysis/acceptance/**'), ('live-ui',), ('factor-pca', 'factor-retrain', 'factor-auto', 'factor-cap', 'factor-rotation')),
+    ((C + 'factor-analysis-*.mjs', 'docs/node-development/nodes/research-factoranalysis/acceptance/**'), ('live-ui',), ('factor-pca', 'factor-retrain', 'factor-auto', 'factor-cap', 'factor-rotation', 'factor-apply')),
     ((C + 'assn-rules-*.mjs', 'scripts/node-acceptance/assnrules-holdout.mjs', 'scripts/node-acceptance/assnrules-exclude.mjs', 'packages/product/skills/loginom-automation/references/nodes/datamining.assn_rules.md', 'docs/node-development/nodes/datamining-assnrules/acceptance/**', 'docs/node-development/nodes/datamining-assnrules/fixtures/v040/**'), ('live-ui',), ('assnrules-exclude', 'assnrules-holdout', 'assnrules-recommend', 'assnrules-consequents', 'assnrules-basic', 'assnrules-length', 'assnrules-retrain')),
     (('scripts/node-acceptance/clustering-normalized.mjs',
       'docs/node-development/nodes/datamining-clustering/acceptance/normalized/**'), ('live-ui',), ('clustering-normalized',)),
