@@ -73,7 +73,7 @@ import { migrate } from "./migrate"
 import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
-import { createQuitHandler } from "./shutdown"
+import { closeWindows, createQuitHandler } from "./shutdown"
 
 const TEST_ONBOARDING = process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1"
 const SIDECAR_VERSION = process.env.LOGINOM_AI_AGENT_SIDECAR_V2 === "1" ? "v2" : "v1"
@@ -270,6 +270,7 @@ const main = Effect.gen(function* () {
     "before-quit",
     createQuitHandler({
       markQuitting: setAppQuitting,
+      closeWindows: () => closeWindows(BrowserWindow.getAllWindows()),
       stop: async () => {
         // Inspect Host work before shutdown cancels it. A busy/unknown Host skips
         // this close; autoInstallOnAppQuit stays false, including after download.
