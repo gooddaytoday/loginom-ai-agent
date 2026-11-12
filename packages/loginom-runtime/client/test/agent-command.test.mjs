@@ -47,7 +47,7 @@ test('selects the agent from the supplied PATH and pins it through later native 
 
 test('arguments survive shim execution including JSON, empty values and shell metacharacters', async t => {
   const f = await fixture(t);
-  const args = ['', 'space here', 'кириллица', 'a"b', 'trailing\\', 'a&b|c<d>e^f', '%DOCK_TEST_MARKER%', '%DOCK_TEST_MARKER:o=X%', '!variable!', '(parens)',
+  const args = ['', 'space here', 'кириллица', 'a"b', 'trailing\\', 'a&b|c<d>e^f', ...(!windows ? ['%DOCK_TEST_MARKER%', '%DOCK_TEST_MARKER:o=X%'] : []), '!variable!', '(parens)',
     '"&echo INJECTED&"', '^&', 'кавычки " и & пробелы', 'backslash\\"quote', 'two trailing\\\\',
     ...[1, 2, 3, 4].flatMap(n => ['slashes' + '\\'.repeat(n) + '"quoted', 'space end' + '\\'.repeat(n)]),
     JSON.stringify({ command: 'C:\\Users\\Test Person\\dock.cmd', args: ['a"b', '&', ''] })];
@@ -106,10 +106,10 @@ test('version failures distinguish launch, exit code, signal and version mismatc
 });
 
 
-test('CMD shims explicitly reject carriage returns and newlines before launch', { skip: !windows }, async t => {
+test('CMD shims explicitly reject percent expansion and line breaks before launch', { skip: !windows }, async t => {
   const f = await fixture(t);
   const launcher = createAgentLauncher('codex', { env: f.env, cwd: f.root });
-  for (const arg of ['line\nbreak', 'line\rbreak']) {
+  for (const arg of ['%DOCK_TEST_MARKER%', '%DOCK_TEST_MARKER:o=X%', '100%', 'line\nbreak', 'line\rbreak']) {
     const result = launcher.run([arg], { encoding: 'utf8' });
     assert.equal(result.error?.code, 'EINVAL');
     assert.match(result.error.message, /CMD.*argument/i);

@@ -39,6 +39,11 @@ export function createAgentLauncher(command, { env = process.env, cwd = process.
       // cross-spawn only double-escapes shims under node_modules/.bin. Global
       // npm shims also forward %*, so their arguments undergo two CMD parses.
       if (process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(executable)) {
+        // CMD expands percent expressions even inside quoted arguments. Refuse
+        // them and line breaks before either CMD parse can change the command.
+        if (args.some(arg => /[%\r\n]/.test(String(arg)))) return { executable,
+          error: Object.assign(new Error('Unsupported CMD argument: percent signs and line breaks are not allowed'), { code: 'EINVAL' }),
+          status: null, signal: null, stdout: null, stderr: null };
         if (!existsSync(executable)) return { executable, error: Object.assign(new Error('Agent command not found'), { code: 'ENOENT' }), status: null, signal: null, stdout: null, stderr: null };
         const command = [escape.command(executable), ...args.map(arg => {
           // CRT quoting must double the ENTIRE backslash run before quotes and
