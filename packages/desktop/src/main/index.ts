@@ -42,8 +42,10 @@ import {
   type SidecarListener,
 } from "./server"
 import { configuredProxy, startWithProxyFallback } from "./proxy-env"
+import { shouldUseProxyRelay, startProxyRelay } from "./proxy-relay"
 import {
   formatSystemProxyLog,
+  currentSystemProxyStatus,
   loopbackNoProxy,
   publishSystemProxyStatus,
   startSystemProxyDetection,
@@ -176,6 +178,7 @@ const main = Effect.gen(function* () {
   let serverStarting: ReturnType<typeof spawnLocalServer> | undefined
   let stopping: Promise<void> | undefined
   let systemProxy: SystemProxyDetection | undefined
+  let proxyRelay: Awaited<ReturnType<typeof startProxyRelay>> | undefined
   const stopSidecars = () => {
     systemProxy?.stop()
     stopping ??= (async () => {
@@ -187,6 +190,7 @@ const main = Effect.gen(function* () {
         )
         await killSidecar()
       } finally {
+        await proxyRelay?.stop()
         wslServers.stopAll()
         await (await loginomStarting)?.close()
       }
@@ -227,10 +231,15 @@ const main = Effect.gen(function* () {
   startSession()
   // Явный прокси из login shell должен быть известен до запуска читателей ОС.
   const shellEnv = preferAppEnv(app.getPath("userData"))
-  systemProxy = startSystemProxyDetection({
-    environment: process.env,
-    enabled: systemProxyEnabled(),
-  })
+  // The v2 background CLI daemon outlives Desktop and keeps its environment, so it
+  // would keep a dead relay address; it stays on the detected system proxy.
+  const useSystemProxyRelay = SIDECAR_VERSION !== "v2" && shouldUseProxyRelay(systemProxyEnabled(), process.env)
+  if (!useSystemProxyRelay) {
+    systemProxy = startSystemProxyDetection({
+      environment: process.env,
+      enabled: systemProxyEnabled(),
+    })
+  }
   subscribeSystemProxyStatus((status) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win.isDestroyed()) continue
@@ -297,10 +306,22 @@ const main = Effect.gen(function* () {
   const serverReady = Deferred.makeUnsafe<ServerReadyData, unknown>()
 
   yield* Effect.promise(() => app.whenReady())
-  try {
-    systemProxy?.useChromium((url) => session.defaultSession.resolveProxy(url))
-  } catch (error) {
-    logger.warn("system proxy browser probe unavailable", error)
+  if (stopping) return
+  if (useSystemProxyRelay) {
+    proxyRelay = yield* Effect.promise(() =>
+      startProxyRelay({
+        resolveProxy: (url) => session.defaultSession.resolveProxy(url),
+        onNotice: (notice) => logger.warn(`system proxy: ${notice.code}`, { address: notice.detail }),
+        onStatus: (status) => publishSystemProxyStatus({ ...status, enabled: systemProxyEnabled() }),
+      }),
+    )
+    logger.log("system proxy: relay", { address: proxyRelay.url })
+    if (stopping) {
+      yield* Effect.promise(() => proxyRelay!.stop())
+      return
+    }
+    // Status resolution must not delay backend/window startup on a slow PAC.
+    void proxyRelay.status().then((status) => publishSystemProxyStatus({ ...status, enabled: systemProxyEnabled() }))
   }
 
   if (!TEST_ONBOARDING) migrate()
@@ -332,7 +353,10 @@ const main = Effect.gen(function* () {
     },
     proxy: async () => {
       const result = await systemProxy?.result
-      return { ...process.env, ...(systemProxyEnabled() ? result?.environment : undefined) }
+      return {
+        ...process.env,
+        ...(systemProxyEnabled() ? (proxyRelay?.environment ?? result?.environment) : undefined),
+      }
     },
     systemProxyEnabled,
   })
@@ -382,6 +406,11 @@ const main = Effect.gen(function* () {
       if (setNativeTranslations(bundle)) createMenu(menuDeps)
     },
     systemProxyEnabled,
+    systemProxyStatus: async () => {
+      const status = proxyRelay ? await proxyRelay.status() : currentSystemProxyStatus()
+      publishSystemProxyStatus({ ...status, enabled: systemProxyEnabled() })
+      return { ...status, enabled: systemProxyEnabled() }
+    },
   })
   registerWslIpcHandlers(wslServers)
   const updateStartupTimer = setTimeout(() => void desktopUpdater.start(), 45_000)
@@ -414,7 +443,7 @@ const main = Effect.gen(function* () {
     if (SIDECAR_VERSION === "v2") {
       logger.log("spawning v2 sidecar")
       const sidecar = yield* Effect.promise(() =>
-        startBackgroundCli(logger, shellEnv?.XDG_STATE_HOME, proxyResult?.environment),
+        startBackgroundCli(logger, shellEnv?.XDG_STATE_HOME, proxyRelay?.environment ?? proxyResult?.environment),
       )
       yield* Deferred.succeed(serverReady, {
         url: sidecar.url,
@@ -463,14 +492,17 @@ const main = Effect.gen(function* () {
     logger.log("spawning sidecar", { url })
     const started = yield* Effect.promise(() =>
       startWithProxyFallback({
+        // The relay owns PAC fallback; a backend restart must not bypass it.
         proxy: testSidecarProxy
           ? { HTTPS_PROXY: testSidecarProxy, https_proxy: testSidecarProxy, NODE_USE_ENV_PROXY: "1" }
-          : (proxyResult?.environment ?? configuredProxy(process.env)),
+          : proxyRelay
+            ? undefined
+            : (proxyResult?.environment ?? configuredProxy(process.env)),
         start: (proxy) => {
           attempt += 1
           const starting = spawnLocalServer(hostname, port, password, {
             userDataPath: app.getPath("userData"),
-            proxyEnvironment: proxy,
+            proxyEnvironment: testSidecarProxy ? proxy : (proxyRelay?.environment ?? proxy),
             withoutProxy: attempt > 1,
             loginom,
             onStdout: (message) => writeLog("server", message),

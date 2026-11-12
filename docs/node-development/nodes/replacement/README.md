@@ -8,7 +8,7 @@
 
 Зарегистрирован `transform.replace_columns` / `exact`, `regex`. exact и regex; внутренняя таблица правил; output_mode add/replace; политика отсутствия совпадения. exact: rules[].result_type string/integer/real/datetime; пропуск сохраняет входной type. type/from — тип ключа; to и other.value — тип результата.
 
-Ограничения: При смене result_type other.keep запрещён, чтобы не создавать Variant; для datetime только other.null и локальное ISO-время с целыми секундами. Boolean-правил нет. Regex остаётся string; ограниченный набор ASCII-паттернов, групп, [0-9], положительного {n}, якорей и inline (?i), без zero-length совпадений; внешние правила не поддержаны.
+Ограничения: При смене result_type other.keep запрещён, чтобы не создавать Variant; для datetime только other.null и локальное ISO-время с целыми секундами. Boolean-правил нет. Regex остаётся string; ограниченный набор ASCII-паттернов, групп, [0-9], положительного {n}, якорей и inline (?i), без zero-length совпадений; внешние правила пока не поддержаны — внешняя таблица (LAB-1102) разрешена, 2 цикла (решение владельца `v040-scope-expansion`, 12.11.2026, конец [подплана](plan.md)).
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [replacement-node.mjs](../../../../packages/loginom-runtime/client/lib/replacement-node.mjs):1–27; [replacement-parameters.mjs](../../../../packages/loginom-runtime/client/lib/replacement-parameters.mjs):1–91; [transform.replace_columns.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.replace_columns.md):1–49. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

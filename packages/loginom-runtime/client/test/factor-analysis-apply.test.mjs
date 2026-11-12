@@ -9,6 +9,7 @@ import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 
 const request={mode:'apply',target:{kind:'existing'},inputs:[],mappings:[],finish:'execute',read:{ports:[0,1]}};
 const node={document_id:'doc',workflow_id:'flow',node_id:'pca'};
+const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'scenario',label:'Scenario'}]};
 const fields=['RowID','X','Y','Z','Tag'].map((name,index)=>({index,name,label:name,type:index===0?'integer':index===4?'string':'real',data_kind:index===4?'Дискретный':'Непрерывный',usage_type:index>0&&index<4?3:0}));
 
 function fixture(patch={}){
@@ -56,6 +57,45 @@ test('apply input phase skips the native mapping editor',async()=>{
  const driver=support.nodeApplyDriverFactory({operation:{id:'apply',parameters:{mode:'apply'},nodeApply:{request}},execute:()=>assert.fail('input mapping must be untouched')});
  const mapped=await driver.mapPorts([],{receipt_id:'apply:input_mapping'});
  assert.equal(mapped.settings_applied,false);assert.equal(mapped.effect_possible,false);
+});
+
+test('apply graph Execute skips graph adapter observation and Teach before graph selection',async()=>{
+ const graphRead=Error('reached graph selection observation');
+ let observations=0;
+ const support=createFactorAnalysisNodeSupport({});
+ const driver=support.nodeApplyDriverFactory({
+  operation:{id:'apply',parameters:{mode:'apply'},nodeApply:{request,node},
+   nodeTargetAdapter:{observe(){assert.fail('apply must not inspect sources for training');}}},
+  now:Date.now,onRecord:async row=>row,
+  execute:async()=>{observations++;throw graphRead;},
+ });
+ await assert.rejects(()=>driver.finishGraph('execute',{document_id:node.document_id,workflow_ref:workflow,node,deadline:Date.now()+10000}),error=>error===graphRead);
+ assert.equal(observations,1);
+});
+
+test('apply finish Done cancels the wizard draft instead of committing or training',async()=>{
+ let closed=false,pending;
+ const actions=[];
+ const state=()=>({origin:'https://loginom.test',loginom_build:'7.4.2',dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+  prepared_node_context:{...node,verified:true,surface:closed?'graph':'wizard',locked:false},
+  wizard:closed?{status:'absent'}:{status:'observed',stage:'factor_analysis',root_tid:'wizard',root_ref:'root',owner_context:{status:'observed',node}},
+  ui:{dialogs:[],masks:[],truncated:{dialogs:false,masks:false},elements:closed?[]:[
+   {tid:'wizard;btnClose',ref:'ui-close',allowed_actions:['click']},
+   {tid:'wizard;btnDone',ref:'ui-done',allowed_actions:['finish_wizard']},
+  ]}});
+ const support=createFactorAnalysisNodeSupport({targetOrigin:'https://loginom.test',targetBuild:'7.4.2'});
+ const driver=support.nodeApplyDriverFactory({operation:{id:'apply',action:{action_key:'node.apply',revision:'1'},parameters:{mode:'apply'},nodeApply:{request,node}},
+  now:Date.now,receiptOptions:()=>({}),onRecord:async row=>{if(row.phase==='node_step_prepared')pending=row;return structuredClone(row);},
+  execute:async()=>{
+   if(!pending)return {status:'SUCCEEDED',output:state()};
+   const row=pending;pending=null;actions.push(row.action);closed=true;
+   return {operation_id:row.internal_operation_id,action_key:'ui.act',status:'SUCCEEDED',effect_possible:true,cleanup_complete:true,trace:[]};
+  },
+ });
+ const result=await driver.finish('done',{document_id:node.document_id,workflow_ref:workflow,node,deadline:Date.now()+10000});
+ assert.deepEqual(actions,[{verb:'click',ref:'ui-close'}]);
+ assert.equal(result.mode,'close');assert.equal(result.draft_discarded,true);
+ assert.equal(result.settings_applied,false);assert.equal(result.execution_started,false);
 });
 
 test('apply readback requires Cancel, preserved settings and absence of training',async()=>{
