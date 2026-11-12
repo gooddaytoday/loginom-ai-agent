@@ -30,6 +30,8 @@ test('metadata-only reference checks preserve an existing backend digest without
     assert.equal(snapshot.mtime_ns,String((await stat(source,{bigint:true})).mtimeNs));
     assert.deepEqual(await verifyReferenceFile(snapshot),snapshot);
     assert.deepEqual(await readdir(root),['source.csv']);
+    await writeFile(source,'modified'); // Same byte length as "original"; native Node must detect the metadata change.
+    await assert.rejects(()=>verifyReferenceFile(snapshot),/LOGINOM_FILE_CHANGED/);
   } finally {await rm(root,{recursive:true,force:true});}
 });
 
