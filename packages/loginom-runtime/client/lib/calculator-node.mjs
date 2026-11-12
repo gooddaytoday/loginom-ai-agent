@@ -340,7 +340,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     // Loginom can leave a visible port without an SVG shape after port Done.
     // The normal node selection redraws it before the next graph checkpoint.
     await selectPreparedGraphNode(channel,graph,'select configured calculator after port commit',{
-     refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true});
+     refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true||implementation?.type==='research.factor_analysis'&&operation.nodeApply.request.mode==='apply'});
     const finish=await finishConfiguredGraph(channel,executionDriver,mode,ctx.node);
     if(training)finish.training=training;
     if(mode==='execute')finish.continuation_surface=finishedImportSurface(await channel.observe({
