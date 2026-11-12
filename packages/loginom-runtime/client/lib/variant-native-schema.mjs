@@ -20,6 +20,12 @@ export const nativeCellSchema={anyOf:[
    semantic_scope:fixed('browser_civil_time'),civil_time_verified:fixed(true),epoch_verified:fixed(true)},
   {decimal:str,timezone:{type:'string',minLength:1,maxLength:128}}),
 ]};
+// The W1 interface427 value getter also returns native signed int32 Variant.
+// Keep it outside the table schema until that table boundary is admitted.
+const variableInt32=scalar('integer',3,'decimal_integer',decimal,{encoding:fixed('signed-int32-le'),bits:fixed(32),bytes_le:{type:'string',pattern:'^[a-f0-9]{8}$'}},{decimal});
+export const nativeVariableCellSchema={anyOf:[...nativeCellSchema.anyOf,
+ {...variableInt32,properties:{...variableInt32.properties,type:fixed('variant')}},
+]};
 export const nativePortProperties={
  exact_table:obj({rows:{type:'array',maxItems:50,items:{type:'array',minItems:1,maxItems:8,items:nativeCellSchema}},complete:fixed(true)}),
  read_coverage:obj({cells_read:{...integer,maximum:400},rows_read:{...integer,maximum:50},columns_read:{...integer,maximum:8},table_complete:fixed(true)}),

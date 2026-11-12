@@ -4,10 +4,11 @@ import {chromium} from 'playwright-core';
 import {adaptCell,temporalProfile} from '../lib/variant-native-values.mjs';
 import {decodeVariantFrame} from '../lib/variant-native-decode.mjs';
 import {createNativeVariantReader} from '../lib/variant-native-read.mjs';
+import {readNativeVariableCells} from '../lib/node-port-output.mjs';
 import {createHash,webcrypto} from 'node:crypto';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
-import {nativeCellSchema} from '../lib/variant-native-schema.mjs';
+import {nativeCellSchema,nativeVariableCellSchema} from '../lib/variant-native-schema.mjs';
 
 // Logical bytes observed on mas3, Loginom 7.4.2, VarToData vdtrRows.
 // Transport padding and unused scalar slots are deliberately omitted.
@@ -45,9 +46,9 @@ test('civil datetime is additive; the legacy scalar envelope remains unchanged',
  for(const bad of [{...cell,timezone:''},{...cell,value:'2026-01-02'}, {...cell,native:{...cell.native,civil_time_verified:false}}])assert.equal(validate(bad).valid,false);
 });
 
-function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false}={}){
+function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false,variableValue=false}={}){
  const environment={crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,DataView,setTimeout,clearTimeout,decode:decodeVariantFrame,
-  frames:observedRows,pins:{},deferred,foreign,changed,unpinned};
+  frames:observedRows,pins:{},deferred,foreign,changed,unpinned,variableValue};
  const context=vm.createContext(environment);
  // Exact observed frontend implementations, pinned by the production reader.
  vm.runInContext(`Date.FromOADate=function (d) {
@@ -63,8 +64,8 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
         return result;
     };
  var counters={requests:0,releasedRequests:0,releasedResponses:0},next;
- var source={$:{$I:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
-  counters.requests++;return {row:0,column:0,set_StaticDataSize(){},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==321||flag!==0)throw Error('wrong method');},
+ var source={$:{$I:variableValue?427:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
+  counters.requests++;return {row:0,column:0,set_StaticDataSize(size){if(variableValue&&size!==20)throw Error('variable parameter size');},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==(variableValue?1141:321)||flag!==0)throw Error('wrong method');},
    WriteParameter(offset,row){if(offset!==0)throw Error('row offset');this.row=row;},WriteParameter$a(offset,column){if(offset!==8)throw Error('column offset');this.column=column;},get_MessageID(){return 101;},Release(){counters.releasedRequests++;}};
  }},DispatchMessageAsync(request,exceptions){
   if(exceptions!==false)throw Error('exception unmarshalling');
@@ -79,8 +80,57 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
  var make=${createNativeVariantReader.toString()};`,context);
  environment.pins={constants:{},functions:{send:createHash('sha256').update(vm.runInContext('source.$S.DispatchMessageAsync.toString()',context)).digest('hex')}};
  if(unpinned)environment.pins.functions.send='bad';
- return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable},decode,collect,pins)`,context)};
+ return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue},decode,collect,pins)`,context)};
 }
+
+test('observed W1 interface427/method1141 uses no row/column parameters and retains int32 subtype',async()=>{
+ const f=transportFixture({variableValue:true});
+ f.environment.frames=[{tag:3,payload:[3,0,2,0,0,0,0,0,1,0],frame_size:60}];
+ const reader=await f.run(),raw=await reader.read(0,0);
+ const cell=adaptCell(raw,{type:'variant'},{variableValue:true});
+ assert.equal(cell.value,'2');assert.equal(cell.cell_type,'integer');
+ assert.deepEqual(cell.native,{tag:3,encoding:'signed-int32-le',bytes_le:'02000000',bits:32});
+ assert.equal(new AjvJsonSchemaValidator().getValidator(nativeVariableCellSchema)(cell).valid,true);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(nativeCellSchema)(cell).valid,false);
+ assert.throws(()=>adaptCell(raw,{type:'variant'}),/unsupported native tag/);
+ assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context)),{requests:1,releasedRequests:1,releasedResponses:1});
+});
+
+for(const fault of ['foreign','changed','unpinned'])test('fixed1141 retains the native binding/implementation guard: '+fault,async()=>{
+ const f=transportFixture({variableValue:true,[fault]:true});
+ await assert.rejects(async()=>{const reader=await f.run();await reader.read(0,0);});
+ const counters=JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context));
+ assert.equal(counters.releasedRequests,counters.requests);
+});
+
+for(const fault of ['none','metadata','count','implementation','owner','port-owner','release'])test('W1 native chain binds metadata and releases proxies without partial publication: '+fault,async()=>{
+ const f=transportFixture({variableValue:true,changed:fault==='owner'});
+ f.environment.frames=[{payload:[3,0,2,0,0,0,0,0,1,0]}];f.environment.fault=fault;
+ vm.runInContext(`
+ var disposed=0;
+ var proxy=(id,object,extra)=>Object.assign({$S:source.$S,$:{$I:id,$OW:0,$O:object},async dispose(){disposed++;if(fault==='release')throw Error('release failed');}},extra);
+ var value=source;value.get_AsVariant=function(){};value.dispose=async()=>{disposed++;};
+ var item=proxy(511,4,{async get_ID(){return 7;},async get_Index(){return 0;},async get_Name(){return fault==='metadata'?'other':'V';},async get_DisplayName(){return 'Value';},async get_DataType(){return 6;},async get_Value(){return value;}});
+ var variables=proxy(541,3,{async get_Count(){if(fault==='port-owner')port.data.$.$O++;return fault==='count'?2:1;},async getItem(){return item;}});
+ var output=proxy(0,2,{async QueryInterface(){return variables;}});
+ var port={data:proxy(1081,1,{async get_Output(){return output;}})};
+ var bg={IBGVariables:{}};
+ var metadata={complete:true,count:1,variables:[{id:7,index:0,name:'V',label:'Value',type:'variant'}]};
+ var functions={port_output:port.data.get_Output,query:output.QueryInterface,count:variables.get_Count,item:variables.getItem,value:item.get_Value,as_variant:value.get_AsVariant};
+ var variablePins={};
+ var runVariables=${readNativeVariableCells.toString()};
+ `,f.context);
+ for(const key of ['port_output','query','count','item','value','as_variant'])
+  vm.runInContext(`variablePins.${key}=${JSON.stringify(createHash('sha256').update(vm.runInContext(`functions.${key}.toString()`,f.context)).digest('hex'))}`,f.context);
+ if(fault==='implementation')vm.runInContext("variablePins.item='bad'",f.context);
+ f.environment.capability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:vm.runInContext('collect.toString()',f.context),pins:f.environment.pins,variablePins:vm.runInContext('variablePins',f.context)};
+ const result=await vm.runInContext(`runVariables(port,metadata,{deadline:Date.now()+5000,stable},capability)`,f.context);
+ if(fault==='none'){assert.equal(result.cells[0].value,'2');assert.equal(result.cells[0].native.tag,3);assert.equal(result.error,undefined);}
+ else{assert.ok(result.error);assert.equal(result.cells,undefined);assert.equal(result.pending,fault==='release');}
+ assert.ok(vm.runInContext('disposed',f.context)>0);
+ const counts=JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context));
+ assert.equal(counts.releasedRequests,counts.requests);assert.equal(counts.releasedResponses,fault==='owner'?0:counts.requests);
+});
 
 test('generic fixed321 reader reads observed frames and releases every request and response',async()=>{
  const f=transportFixture(),reader=await f.run();

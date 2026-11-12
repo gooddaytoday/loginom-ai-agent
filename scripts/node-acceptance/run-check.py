@@ -645,6 +645,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=variant / 'task.md', data=variant / 'data', base=None,
                     expected_name='length/expected.json' if name == 'assnrules-length' else 'expected.json',
                     input_files=['length.csv' if name == 'assnrules-length' else 'transactions.csv'], export_count=2)
+    if name == 'logreg-weights':
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/weights'
+        return dict(source=src, prompt=src / 'task-weights.md', data=src / 'data', base=None,
+                    input_files=['weighted.csv'], expected_name='expected.json',
+                    oracle=src.parent / 'oracle.py')
+
     if name == 'logreg-ridge':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/ridge'
         return dict(source=src, prompt=src / 'task-ridge.md', data=src / 'data', base=None,
@@ -723,6 +729,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task-scalar-types.md' if scalars else 'task-aggregates.md'), data=src.parent / 'fixtures',
                     input_files=['aggregate-types.csv' if scalars else 'aggregate-numeric.csv'], base=None, expected_name=expected, variable_initial_name=expected,
                     variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
+    if name == 'datatovar-variant':
+        src = REPO / 'docs/node-development/nodes/variables-datatovar/acceptance'
+        return dict(source=src, prompt=src / 'task-variant.md', data=src / 'variant-input',
+                    input_files=[], base=None, source_package=src.parent / 'fixtures/aggregate-source.lgp',
+                    expected_name='expected-variant-run.json', variable_initial_name='expected-variant-run.json',
+                    variable_only=True, variable_audit=name, variable_read_path='port', oracle=REPO / 'scripts/node-acceptance/variables-datatovar.mjs')
     if name == 'variables-calculator':
         src = REPO / 'docs/node-development/nodes/variables-calculator/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None, expected_name='expected-run.json',
@@ -761,13 +773,18 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete']:
+    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers']:
         src = REPO / 'docs/node-development/nodes/integration-restrequest'
         case = name.removeprefix('rest-')
         return dict(source=src / 'acceptance/modes' / case,
                     prompt=src / 'acceptance' / ('task-' + case + '.md'),
                     data=src / 'fixtures/modes', input_files=['requests.csv'], base=None,
                     expected_name='expected.json', oracle=src / 'acceptance/modes/oracle.py')
+    if name == 'replace-external':
+        node = REPO / 'docs/node-development/nodes/replacement'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-external.md',
+                    data=node / 'fixtures/extended', input_files=['input.csv', 'rules-unique.csv'], base=None,
+                    expected_name='expected-external.json')
     if name == 'replace-exact':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task-exact.md', data=src / 'data', base=None, expected_name='expected-exact.json')

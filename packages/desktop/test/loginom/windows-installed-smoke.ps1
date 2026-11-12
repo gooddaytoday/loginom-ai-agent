@@ -1,4 +1,4 @@
-# Windows PowerShell 5.1+, no Node/Bun/browser or GUI automation dependency.
+# Windows PowerShell 5.1+; probes use only the candidate's bundled Node.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Installer,
@@ -8,6 +8,7 @@ param(
     [ValidatePattern('^[a-fA-F0-9]{64}$')][string]$ExpectedSha256,
     [ValidateRange(20,600)][int]$TimeoutSeconds = 120,
     [ValidateSet('Window','Inspector')][string]$CloseMethod = 'Window',
+    [ValidateSet('None','MissingSkill')][string]$PayloadMutation = 'None',
     [switch]$AllowServer,
     [switch]$KeepProxy
 )
@@ -17,7 +18,7 @@ $ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $checks = [Collections.Generic.List[object]]::new()
 $report = [ordered]@{ schemaVersion=1; startedAt=(Get-Date).ToUniversalTime().ToString('o');
-    installer=$Installer; expectedVersion=$ExpectedVersion; channel=$Channel; closeMethod=$CloseMethod;
+    installer=$Installer; expectedVersion=$ExpectedVersion; channel=$Channel; closeMethod=$CloseMethod; payloadMutation=$PayloadMutation;
     scriptSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant(); checks=$checks }
 $slug = 'loginom-ai-agent' + $(if ($Channel -ne 'prod') { '-' + $Channel })
 $appId = 'com.loginom.aiagent' + $(if ($Channel -ne 'prod') { '.' + $Channel })
@@ -170,16 +171,27 @@ try {
         Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $exe } | Select-Object -ExpandProperty FullName)
     Check 'shortcut' ($links.Count -gt 0) ($links -join '; ')
     $report.shortcuts = $links
-    if ($CloseMethod -eq 'Inspector') {
-        # SSH session 0 may have no visible window; expose app.quit only on loopback for this run.
-        $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
-        $listener.Start()
-        $inspectorPort = $listener.LocalEndpoint.Port
-        $listener.Stop()
-        $mainProcess = Start-Process -FilePath $exe -ArgumentList "--inspect=127.0.0.1:$inspectorPort" -PassThru
-    } else {
-        $mainProcess = Start-Process -FilePath $exe -PassThru
+    if ($PayloadMutation -eq 'MissingSkill') {
+        # Damage only this disposable installation; retain the original manifest
+        # so the sidecar catalog must still satisfy its declared inventory.
+        Remove-Item -LiteralPath (Join-Path $resources 'skills\loginom-automation\SKILL.md')
     }
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    $inspectorPort = $listener.LocalEndpoint.Port
+    $listener.Stop()
+    # Pause before startup to seed the encrypted offline profile, then execute
+    # production startup and tools. The inspector is accessible only on loopback.
+    $mainProcess = Start-Process -FilePath $exe -ArgumentList "--inspect-brk=127.0.0.1:$inspectorPort" -PassThru
+    $probeFile = Join-Path $RunRoot 'sidecar.json'
+    & (Join-Path $resources 'bin\node.exe') (Join-Path $PSScriptRoot 'windows-sidecar-smoke.mjs') `
+        $inspectorPort $resources $profile $probeFile $TimeoutSeconds
+    $probeExit = $LASTEXITCODE
+    if (Test-Path -LiteralPath $probeFile) {
+        $probe = Get-Content -LiteralPath $probeFile -Raw | ConvertFrom-Json
+        foreach ($item in $probe.checks) { Check $item.id ($item.status -eq 'PASS') $item.detail }
+    }
+    Check 'sidecar-probe-exit' ($probeExit -eq 0) "Installed Node probe exit=$probeExit; sidecar.json"
     $logs = Join-Path $profile 'desktop\logs'
     $report.logs = $logs
     $ready = Wait-For {
@@ -266,7 +278,7 @@ public static class SmokeWindows {
         } catch { Check 'cleanup' $false $_.Exception.Message }
         # Collect errors even when startup throws, and include shutdown/cleanup failures.
         Check-Logs $profile
-        foreach ($id in @('silent-install','installed-apps','install-path','bundled-help-manifest','no-retired-endpoint','shortcut','app-starting-version','server-ready','processes-alive','graceful-close','clean-exit-code','silent-uninstall','shortcut-removed','preserves-user-data')) {
+        foreach ($id in @('silent-install','installed-apps','install-path','bundled-help-manifest','no-retired-endpoint','shortcut','sidecar-bundled-skills','sidecar-local-help','sidecar-probe-exit','app-starting-version','server-ready','processes-alive','graceful-close','clean-exit-code','silent-uninstall','shortcut-removed','preserves-user-data')) {
             if (-not @($checks | Where-Object id -eq $id).Count) { Check $id $false 'Not reached; see execution/cleanup failure' }
         }
     }

@@ -3,14 +3,15 @@ import {readPreparedNodeContext,validatePreparedNodeContext} from './node-contex
 
 // Only a fully loaded, bounded native Ext store is a complete variable set.
 // Value/$self RPC proxies are deliberately never inspected or invoked.
-export function readVariableRecords(store,mode,decode,allowIndexGaps=false){
+export function readVariableRecords(store,mode,decode,allowIndexGaps=false,{metadataOnly=false,variantCells}={}){
  const need=(ok,message)=>{if(!ok)throw Error('Variable inventory: '+message);};
+ need(!metadataOnly||mode==='preview','metadata-only preview required');
  const items=store?.getData?.()?.items,count=store?.getCount?.();
  need(['preview','values'].includes(mode)&&store.isLoading()===false&&Array.isArray(items)
   &&Number.isSafeInteger(count)&&count>=0&&count<=128&&items.length===count,'count/store/loading');
  if(mode==='preview')need(store.complete===true&&store.loadCount>=1&&store.getTotalCount()===count,'preview total/load completeness');
  const variables=items.map((record,index)=>{
-  const d=record?.data,type={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string'}[d?.DataType];
+  const d=record?.data,type={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',...(mode==='preview'&&(metadataOnly||Array.isArray(variantCells))?{6:'variant'}:{})}[d?.DataType];
   // Native delete leaves the survivors' old Index values until the wizard is reopened.
   need(record?.isModel===true&&(allowIndexGaps===true?Number.isSafeInteger(d?.Index)&&d.Index>=index&&(index===0||d.Index>items[index-1].data.Index):d.Index===index)&&(Number.isSafeInteger(d.ID)&&d.ID>=0||typeof d.ID==='string'&&d.ID.length>0&&d.ID.length<=128)
    &&typeof d.Name==='string'&&d.Name.length>0&&d.Name.length<=128&&typeof d.DisplayName==='string'&&d.DisplayName.length<=1024&&type,'record metadata/type');
@@ -18,7 +19,10 @@ export function readVariableRecords(store,mode,decode,allowIndexGaps=false){
   const raw=mode==='values'?(d.ValueIsNull?null:d.DisplayValue):d.ValueVariant;
   // Undefined is absence of a loaded value, never an explicit NULL.
   need(raw!==undefined,'value not loaded');
-  const decoded=decode(raw,type);need(decoded.limitations.length===0,'scalar precision');
+  if(metadataOnly)return {id:d.ID,index,name:d.Name,label:d.DisplayName,type};
+  const decoded=type==='variant'?{cell:variantCells?.[index],limitations:[]}:decode(raw,type);need(decoded.limitations.length===0,'scalar precision');
+  if(type==='variant')need(variantCells.length===count&&decoded.cell?.type==='variant'&&decoded.cell.precision==='exact_native'
+   &&['integer','real','boolean','string','datetime','null'].includes(decoded.cell.cell_type),'native Variant subtype required');
   return {id:d.ID,index,name:d.Name,label:d.DisplayName,type,cell:decoded.cell};
  });
  const unique=new Set(variables.map(v=>JSON.stringify(v.id))).size;

@@ -102,6 +102,13 @@ destination. Несколько путей, в том числе одинако�
 `requires an active source output`. В продолжении после открытия пакета
 сохранение не доказывает активность выхода.
 
+Для `variables.user/values` после изменения значений выполни
+`package.save_checkpoint`, затем отдельный `dock_node_read` от успешной
+values-операции с `read:{ports:[],variable_ports:[4]}`. Получи полный snapshot
+с новым `read_id` до `package.save_as`, повторного открытия и завершения задачи.
+`configuration.readback` подтверждает изменение настроек; сохранённые значения
+показывай по этому отдельному snapshot.
+
 Если пользователь называет поле или колонку (`RequestId`, `Key`, `EchoPath`…),
 выходное техническое имя должно быть ровно таким, как в просьбе: без приставок
 (`Returned`), переводов и суффиксов. Соблюдай это при создании полей и mapping,
@@ -198,7 +205,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
 |Доли итогов, веса, сезонная разгруппировка|`transform.ungroup_data` / shares, computed, seasonal|[читать](references/nodes/transform.ungroup_data.md)|
-| Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
+| Замена | `transform.replace_columns` / exact, regex, mixed, external | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
 | Календарные признаки, строки дат | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
 | Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
@@ -217,6 +224,11 @@ Execute вычисляющих узлов ради чтения, ответа и
 именно этот узел либо подтверждена конкретная операция, недоступная стандартной
 композиции. До выбора JS прочитай границы допуска в [файле узла](references/nodes/programming.javascript.md).
 Существующие JS-узлы не удаляй автоматически.
+Для агрегатов готового JS-источника передай его NodeRef прямо в
+`variables.from_table`, `finish:"execute"`: обработчик выполнит источник.
+«Сохранить исходник» означает оставить код и данные без изменений. Не открывай
+мастер и не вызывай `loginom_dock_node_read` с `kind:"source"` или `kind:"context"`
+только ради этого; чтение кода нужно при явном запросе посмотреть или изменить код.
 
 Путь ресурса копируй из ссылки или списка буквально: не сокращай и не набирай вручную.
 Перед созданием первого узла прочитай [порядок работы](references/workflow.md).

@@ -94,7 +94,7 @@ export function readLogRegressionBrowser(prefix) {
   if(!r?.isModel||!id||ids.has(id)||!Number.isSafeInteger(d?.ID)||d.ID<0||fieldIds.has(d.ID)||d.Index!==index
    ||typeof d.Name!=='string'||!d.Name||d.Name.length>128||names.has(d.Name.toLowerCase())
    ||typeof d.DisplayName!=='string'||d.DisplayName.length>256||!types[d.DataType]||!kinds[d.DataKind]
-   ||![0,3,4].includes(d.UsageType)||d.GroupField!==''||d.Broken!==false||d.ReverseBroken!==false)return fail('logregression_record');
+   ||![0,3,4,7].includes(d.UsageType)||d.UsageType===7&&d.DataType!==3||d.GroupField!==''||d.Broken!==false||d.ReverseBroken!==false)return fail('logregression_record');
   ids.add(id);fieldIds.add(d.ID);names.add(d.Name.toLowerCase());
   fields.push({index,record_id:id,field_id:String(d.ID),name:d.Name,label:d.DisplayName,type:types[d.DataType],
    data_kind:kinds[d.DataKind],usage_type:d.UsageType,origin_type:d.OriginType,selected:selection.includes(r)});

@@ -4,10 +4,9 @@ const need=(ok,message)=>{if(!ok)throw Error('Table to variables: '+message);};
 export const DATA_TO_VAR_FUNCTIONS=Object.freeze({sum:1,count:2,min:4,max:8,avg:16,median:32,mode:64,standard_deviation:128,
  unique_count:256,null_count:512,first:1024,last:2048,only:4096,concat:8192});
 const SCALAR=['count','min','max','mode','unique_count','null_count','first','last','only'];
-// Native per-type availability observed in the factor editor. Variant is not
-// admitted: its variable output has no approved exact reader yet.
+// Native per-type availability; W1 reads each Variant subtype from method1141.
 export const DATA_TO_VAR_TYPE_FUNCTIONS=Object.freeze({integer:Object.keys(DATA_TO_VAR_FUNCTIONS),real:Object.keys(DATA_TO_VAR_FUNCTIONS),
- string:[...SCALAR,'concat'],boolean:SCALAR,datetime:SCALAR});
+ string:[...SCALAR,'concat'],boolean:SCALAR,datetime:SCALAR,variant:SCALAR});
 export const dataToVarMask=(type,functions)=>Number.isSafeInteger(functions)&&functions>0&&Object.hasOwn(DATA_TO_VAR_TYPE_FUNCTIONS,type)
  &&(functions&~DATA_TO_VAR_TYPE_FUNCTIONS[type].reduce((m,a)=>m|DATA_TO_VAR_FUNCTIONS[a],0))===0;
 const name=v=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(v);
@@ -20,7 +19,7 @@ export const dataToVarParametersSchema={type:'object',additionalProperties:false
   items:{type:'object',additionalProperties:false,properties:{
    field:{type:'object',additionalProperties:false,properties:{kind:{const:'input_field'},name:{type:'string',minLength:1,maxLength:128}},required:['kind','name']},
    aggregations:{type:'array',minItems:1,maxItems:14,uniqueItems:true,items:{type:'string',enum:Object.keys(DATA_TO_VAR_FUNCTIONS)},
-    description:'Native order as listed. integer/real: all; string: no sum,avg,median,standard_deviation; boolean/datetime: also no concat. count includes NULL; unique_count/null_count skip/count NULL. sum,avg,median,standard_deviation (sample) are real; counts integer; min,max,mode,first,last,only keep the input type; only is NULL unless one distinct value. concat: string, comma, no wrapper, unique, appearance order.'},
+    description:'Native order as listed. integer/real: all; string: no sum,avg,median,standard_deviation; boolean/datetime/variant: also no concat. Variant min/max/mode/first/last/only preserve type and exact native cell_type. count includes NULL; unique_count/null_count skip/count NULL. sum,avg,median,standard_deviation (sample) are real; counts integer; min,max,mode,first,last,only keep the input type; only is NULL unless one distinct value. concat: string, comma, no wrapper, unique, appearance order.'},
   },required:['field','aggregations']}}}};
 
 function validateSpecification(p){
@@ -65,7 +64,7 @@ export function resolveDataToVarParameters(p,fields){
  return {fields:p.fields.map(f=>{
   const input=fields.find(x=>x.name===f.field.name);need(input,'input field is missing: '+f.field.name);
   const allowed=DATA_TO_VAR_TYPE_FUNCTIONS[input.type];
-  need(allowed,'an integer, real, string, boolean or datetime input field is required: '+f.field.name);
+  need(allowed,'an integer, real, string, boolean, datetime or variant input field is required: '+f.field.name);
   const refused=f.aggregations.filter(a=>!allowed.includes(a));
   need(!refused.length,f.field.name+' ('+input.type+') does not support '+refused.join(',')+'; allowed: '+allowed.join(','));
   const aggregations=Object.keys(DATA_TO_VAR_FUNCTIONS).filter(a=>f.aggregations.includes(a));

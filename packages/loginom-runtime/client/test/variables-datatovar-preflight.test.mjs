@@ -1,8 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {preflightDataToVarSource,preflightInactiveDataToVarSource} from '../lib/variables-datatovar-preflight.mjs';
+import {preflightDataToVarSource,preflightInactiveDataToVarSource,preflightExecutedDataToVarSource} from '../lib/variables-datatovar-preflight.mjs';
 
 const parameters={fields:[{field:{kind:'input_field',name:'X'},aggregations:['sum','count','min','max','avg']}]};
+
+for(const fault of ['done','close','port','native-index','owner','inventory'])test('saved JS DataToVar schema path refuses unowned or non-executing requests before any gesture: '+fault,async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'source'};
+ const source={binding:{node},port:{index:0,native_index:0,port_guid:'p'},state:{node_outputs:{verified:true},prepared_node_context:{...node,verified:true,surface:'graph'}}};
+ const options={operation:{parameters:{finish:['done','close'].includes(fault)?fault:'execute'}},execute:()=>assert.fail('no browser dispatch')};
+ if(fault==='port')source.port.index=1;if(fault==='native-index')source.port.native_index=1;
+ if(fault==='owner')source.state.prepared_node_context.node_id='foreign';if(fault==='inventory')source.state.node_outputs.verified=false;
+ await assert.rejects(preflightExecutedDataToVarSource(options,{},source),e=>e.nodePhaseRefusal?.effect_possible===false&&e.nodePhaseRefusal.cleanup_complete===true);
+});
 
 test('DataToVar preflight preserves the existing schema path and refuses a missing new-node input before browser calls',async()=>{
  const options={operation:{parameters:{target:{kind:'existing'},parameters,inputs:[],mappings:[]}},execute:()=>assert.fail('no browser call')};
