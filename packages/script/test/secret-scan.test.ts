@@ -14,6 +14,7 @@ afterEach(async () => {
 async function repo() {
   const root = await mkdtemp(join(tmpdir(), "secret-test-"))
   roots.push(root)
+  await Bun.write(join(root, ".gitleaks.toml"), Bun.file(new URL("../../../.gitleaks.toml", import.meta.url)))
   git(root, "init", "-q")
   git(root, "config", "user.name", "Secret scan test")
   git(root, "config", "user.email", "test@example.invalid")
@@ -50,6 +51,122 @@ test("staged scan blocks a secret without printing its value", async () => {
   expect(result.output).toContain("config.txt")
   expect(result.output).toContain("github-pat")
   expect(result.output).not.toContain(token)
+})
+
+test.each(["home", "Users"])("staged scan blocks a /%s home path without printing it", async (home) => {
+  const root = await repo()
+  const personal = ["", home, "private-person", "project"].join("/")
+  await Bun.write(join(root, "notes.md"), `Workspace: ${personal}\n`)
+  git(root, "add", "notes.md")
+  const result = run(root, "staged")
+  expect(result.code).toBe(2)
+  expect(result.output).toContain("notes.md")
+  expect(result.output).toContain("personal-home-path")
+  expect(result.output).not.toContain(personal)
+  expect(result.output).not.toContain("private-person")
+})
+
+test.each(["\\", "\\\\", "/"])("staged scan blocks a Windows home path with %s separators", async (separator) => {
+  const root = await repo()
+  const personal = ["c:", "users", "Private Person", "project"].join(separator)
+  await Bun.write(join(root, "notes.md"), `{"workspace":"${personal}"}\n`)
+  git(root, "add", "notes.md")
+  const result = run(root, "staged")
+  expect(result.code).toBe(2)
+  expect(result.output).toContain("personal-windows-home-path")
+  expect(result.output).not.toContain(personal)
+  expect(result.output).not.toContain("Private Person")
+})
+
+test("staged scan accepts explicit home placeholders and system paths", async () => {
+  const root = await repo()
+  const examples = [
+    "$HOME/project",
+    "%USERPROFILE%\\project",
+    "packages/app",
+    "/usr/bin/bun",
+    "/etc/config",
+    "/workspace/project",
+    ...["user", "test-user", "<user>"].flatMap((user) => [
+      ...["home", "Users"].map((home) => ["", home, user, "project"].join("/")),
+      ...["\\", "\\\\", "/"].map((separator) => ["C:", "Users", user, "project"].join(separator)),
+    ]),
+  ]
+  await Bun.write(join(root, "notes.md"), examples.join("\n"))
+  git(root, "add", "notes.md")
+  expect(run(root, "staged").code).toBe(0)
+})
+
+test.each(["home", "Users", "windows"])("home placeholders cannot hide another %s path or credential", async (home) => {
+  const root = await repo()
+  const path = (user: string) =>
+    home === "windows" ? ["C:", "Users", user, "project"].join("\\") : ["", home, user, "project"].join("/")
+  const personal = path("user-private")
+  const token = "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k"
+  await Bun.write(
+    join(root, "notes.md"),
+    `${path("user")} ${personal}\n${personal} ${path("user")}\n${path("user")} ${token}\n`,
+  )
+  git(root, "add", "notes.md")
+  const result = run(root, "staged")
+  expect(result.code).toBe(2)
+  const findings = result.output
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
+  expect(findings.filter((finding) => finding.rule?.startsWith("personal-")).map((finding) => finding.line)).toEqual([
+    1, 2,
+  ])
+  expect(result.output).toContain("github-pat")
+  expect(result.output).not.toContain(personal)
+  expect(result.output).not.toContain(token)
+})
+
+test("home path scanning checks the index instead of an unstaged replacement", async () => {
+  const root = await repo()
+  const personal = ["", "home", "private-person", "project"].join("/")
+  await Bun.write(join(root, "notes.md"), personal)
+  git(root, "add", "notes.md")
+  await Bun.write(join(root, "notes.md"), "$HOME/project")
+  expect(run(root, "staged").code).toBe(2)
+  git(root, "add", "notes.md")
+  await Bun.write(join(root, "notes.md"), personal)
+  expect(run(root, "staged").code).toBe(0)
+})
+
+test("range and pre-push scans retain a home path removed in a later commit", async () => {
+  const root = await repo()
+  const base = git(root, "rev-parse", "HEAD")
+  const personal = ["", "Users", "private-person", "project"].join("/")
+  await Bun.write(join(root, "notes.md"), personal)
+  git(root, "add", "notes.md")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "added")
+  const source = git(root, "rev-parse", "HEAD")
+  git(root, "rm", "-q", "notes.md")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "removed")
+  const head = git(root, "rev-parse", "HEAD")
+  for (const result of [
+    run(root, "range", base, head),
+    invoke(root, ["push", "origin"], `refs/heads/topic ${head} refs/heads/topic ${base}\n`),
+  ]) {
+    expect(result.code).toBe(2)
+    expect(result.output).toContain("personal-home-path")
+    expect(result.output).toContain(source)
+    expect(result.output).not.toContain(personal)
+  }
+})
+
+test("staged scan blocks a home path inside an indexed lgp", async () => {
+  const root = await repo()
+  const personal = ["", "home", "private-person", "project"].join("/")
+  await Bun.write(join(root, "settings.xml"), `<path>${personal}</path>`)
+  expect(Bun.spawnSync(["zip", "-q", "package.lgp", "settings.xml"], { cwd: root }).exitCode).toBe(0)
+  git(root, "add", "package.lgp")
+  const result = run(root, "staged")
+  expect(result.code).toBe(2)
+  expect(result.output).toContain("package.lgp!settings.xml")
+  expect(result.output).toContain("personal-home-path")
+  expect(result.output).not.toContain(personal)
 })
 
 test("staged scan checks the indexed lgp even if the working copy is clean", async () => {
@@ -409,6 +526,8 @@ test("valid TAR.GZ members are actually scanned", async () => {
 
 test("TAR links are treated as metadata without following external targets", async () => {
   const root = await repo()
+  // Isolate credential detection from the personal path stored in the link metadata.
+  await Bun.write(join(root, ".gitleaks.toml"), "[extend]\nuseDefault = true\n")
   await Bun.write(join(root, "outside.txt"), "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k")
   expect(
     Bun.spawnSync(
