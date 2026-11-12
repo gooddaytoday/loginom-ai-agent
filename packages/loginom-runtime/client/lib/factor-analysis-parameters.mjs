@@ -1,5 +1,10 @@
 const need=(v,m)=>{if(!v)throw Error('Factor analysis: '+m);};
 export function validateFactorAnalysisParameters(p,mode,r){
+ if(mode==='apply'){
+  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===0,'apply requires parameters:{} to preserve saved settings');
+  need(r.target.kind==='existing'&&r.inputs.length===0&&r.mappings.length===0&&r.finish==='execute','apply requires an existing trained node, inputs:[], mappings:[] and finish execute');
+  need(r.read.ports.every(port=>port===0||port===1),'apply reads scores (0) and saved loadings (1)');return;
+ }
  need(['pca_fixed','pca_eigenvalue','pca_variance'].includes(mode),'unsupported PCA mode');
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>k==='factor_analysis'),'use parameters.factor_analysis only');
  const a=p.factor_analysis;

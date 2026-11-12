@@ -831,6 +831,15 @@ class RunCheckTests(unittest.TestCase):
             self.assertEqual(expected['outputs'][0]['output_node_type'], 'transform.replace_columns')
             self.assertEqual(len(expected['outputs'][0]['columns']), 5)
 
+    def test_replacement_external_uses_both_original_csvs_and_private_expected(self):
+        case = runner.scenario('replace-external')
+        self.assertEqual(case['prompt'].name, 'task-external.md')
+        self.assertEqual(case['input_files'], ['input.csv', 'rules-unique.csv'])
+        self.assertEqual(case['expected_name'], 'expected-external.json')
+        expected = runner.expected_for(case, '/test/external.lgp')
+        self.assertEqual(len(expected['outputs'][0]['rows']), 8)
+        self.assertEqual(len(expected['outputs'][0]['columns']), 6)
+
     def test_variant_reader_cases_use_only_task_input_and_oracle_expected(self):
         for name, task, data, rows, node_type in [('variant-reader-collapse', 'task-collapse.md', 'mixed.csv', 15, 'transform.collapse_columns')]:
             case = runner.scenario(name)

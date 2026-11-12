@@ -7,14 +7,14 @@ export function replacementSources(configuration,mode){
  const changed=new Set(configuration.rules.map(r=>r.field.name));
  return configuration.input_fields.flatMap(f=>{
   const original={name:f.name,label:f.label,type:f.type},rule=configuration.rules.find(r=>r.field.name===f.name);if(!changed.has(f.name))return [original];
-  return [...(mode==='add'?[original]:[]),{name:f.name+(mode==='add'?'_Replace':''),label:f.label+' Замена',type:rule.other?.mode==='keep'&&(rule.result_type??f.type)!==f.type?'variant':rule.result_type??f.type},{name:f.name+'_Replaced',label:f.label+' Заменен',type:'boolean'},...(rule.precision>0?[{name:f.name+'_Delta',label:f.label+' Отклонение',type:'real'}]:[])];
+  return [...(mode==='add'?[original]:[]),{name:f.name+(mode==='add'?'_Replace':''),label:f.label+' Замена',type:rule.other?.mode==='keep'&&(rule.result_type??f.type)!==f.type?'variant':rule.result_type??f.type},{name:f.name+'_Replaced',label:f.label+' Заменен',type:'boolean'},...(rule.precision>0?[{name:f.name+'_Delta',label:f.label+' Отклонение',type:'real'}]:[]),...(rule.external?.information??[]).map(name=>{const info=configuration.external_input_fields.find(f=>f.name===name);need(info,'External information field missing');return {name:f.name+name,label:info.label,type:info.type,external_information:true};})];
  });
 }
 export function validateReplacementSources(configuration,native){
  need(native?.verified&&native.inventory_complete&&native.source_identity_verified,'Complete replacement output required');
  const mode=native.produce_mode==='supplement'?'add':['replace','default'].includes(native.produce_mode)?'replace':null;
  const sources=replacementSources(configuration,mode);
- need(sources.length===native.source_fields.length&&new Set(native.source_fields.map(f=>f.name)).size===sources.length&&native.source_fields.every(s=>sources.some(f=>f.name===s.name&&f.label===s.label&&f.type===s.type)),'Replacement generated schema differs');
+ need(sources.length===native.source_fields.length&&new Set(native.source_fields.map(f=>f.name)).size===sources.length&&native.source_fields.every(s=>sources.some(f=>f.name===s.name&&(f.external_information||f.label===s.label)&&f.type===s.type)),'Replacement generated schema differs');
  const expectedMode=configuration.effective_output_mode??configuration.requested_output_mode;
  if(expectedMode)need(mode===expectedMode,'Replacement output mode differs');
  return native.target_fields.filter(f=>f.source===null&&!f.excluded);
@@ -56,7 +56,7 @@ export async function configureReplacementOutput(channel,configuration,parameter
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
  let s=await setMode(channel,configuration);s=await ensureGroupingOutputSources(channel,s);
  validateReplacementSources(configuration,s.node_mapping);
- const mode=s.node_mapping.produce_mode==='supplement'?'add':'replace',sources=replacementSources(configuration,mode).map(f=>({...f,used:true})),requested={direction:'output',port:0,...mapping},changes=[];
+ const mode=s.node_mapping.produce_mode==='supplement'?'add':'replace',sources=replacementSources(configuration,mode).map(f=>({...f,...(f.external_information?{label:s.node_mapping.source_fields.find(n=>n.name===f.name).label}:{}),used:true})),requested={direction:'output',port:0,...mapping},changes=[];
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);
  if(requested.fields||requested.changes){changes.push(await configureOutputFields(channel,requested,sources));s=await channel.observe({condition:'replacement edited output',readMappings:true,ready});const resolved=resolveConfiguredOutputMapping(requested,sources,s.node_mapping);changes.push(await reorderOutputFields(channel,resolved.fields.map(f=>f.current.record_id)));}
  if(requested.autosync!==undefined)changes.push(await configureOutputAutosync(channel,requested.autosync));

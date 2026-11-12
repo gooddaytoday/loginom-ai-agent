@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 
 test('model schema inventory pins W1 variable inputs and excludes private cold windows',()=>{
  for(const [tools,bytes,hash] of [
-  [nodeApiTools,180514,'a0a1a8aec3a9e559b87c3cb6e5a571bfbffcee607492515d7aa4ebca3a3348a3'],
+  [nodeApiTools,183020,'c964b4876a7a7d84ce1a62ea91e759cf4b7f177d519887467ba39a9c78d4899b'],
   [nodeApiTools.map(userNodeTool),13183,'03d4f81d1e939ce5aacbdf33a3cb9c09ae7405eed44544cfbc4c91264a4c9623'],
  ]){
   const json=JSON.stringify(tools.map(t=>t.inputSchema));
@@ -254,7 +254,9 @@ test('Forward scoped selection passes the public schema and real registered hand
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...request,mode:'enter'}),/only in forward/);
 });
 
-test('replacement Boolean and mixed registrations reach the production parameter validator',async()=>{
+test('replacement Boolean, mixed and external registrations reach the production parameter validator',async()=>{
+ const {NODE_TYPES}=await import('../lib/node-contracts.mjs');
+ assert.equal(NODE_TYPES['transform.replace_columns'].additional_tabular_inputs,true);
  const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
  const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
  const support=createCandidateNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
@@ -268,4 +270,7 @@ test('replacement Boolean and mixed registrations reach the production parameter
  const mixed=structuredClone(request);mixed.mode='mixed';const rule=mixed.parameters.rules[0];delete rule.result_type;rule.pairs[0].to={type:'string',value:'EXACT-FIRST'};rule.regex_pairs=[{from:{type:'string',value:'AB-([0-9]{2})'},to:{type:'string',value:'REGEX'}}];rule.other={mode:'keep'};
  await dispatchNodeApi(runtime,'dock_node_apply',mixed);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...mixed,mode:'exact'}),/mixed/);
+ const external=structuredClone(request);external.mode='external';external.parameters.rules=[{field:{kind:'input_field',name:'Code'},type:'string',case_sensitive:true,other:{mode:'keep'},external:{port:1,value:'Value',replacement:'Replacement',information:['Info'],unused:['Ignored']}}];
+ await dispatchNodeApi(runtime,'dock_node_apply',external);
+ external.parameters.rules[0].pairs=[];await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',external),/external replacement/);
 });
