@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createLogRegressionNodeSupport} from '../lib/log-regression-node.mjs';
+import {createFactorAnalysisNodeSupport} from '../lib/factor-analysis-node.mjs';
 
-function applyGraphReplay(fault) {
+function applyGraphReplay(fault,createSupport=createLogRegressionNodeSupport) {
  const node={document_id:'doc',workflow_id:'flow',node_id:'regression'};
  const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'scenario',label:'Scenario'}]};
  const tid='MF;TF-1;Graph;Prediction',records=[],actions=[];
@@ -16,7 +17,7 @@ function applyGraphReplay(fault) {
    tid,ref:reads<=2?'ui-old-body':fault==='unstable'?'ui-body-'+reads:'ui-new-body',scope:'graph',
    graph_node:{part:'body'},signature:{tag:'g'},bounding_box:{x:636,y:140,width:56,height:104},
    allowed_actions:['click'],interaction:{state:'point_observed'}}]}});
- const support=createLogRegressionNodeSupport({targetOrigin:'https://loginom.test',targetBuild:'7.4.2'});
+ const support=createSupport({targetOrigin:'https://loginom.test',targetBuild:'7.4.2'});
  const driver=support.nodeApplyDriverFactory({operation,now:Date.now,receiptOptions:()=>({}),
   onRecord:async row=>{records.push(structuredClone(row));if(row.phase==='node_step_prepared')pending=row;return structuredClone(row);},
   execute:async code=>{
@@ -42,3 +43,9 @@ for(const fault of ['foreign','unstable'])test('apply graph settlement retains '
  assert.equal(f.operation.deadline,f.deadline);
 });
 
+
+test('factor apply settles the cancelled wizard body before graph selection',async()=>{
+ const f=applyGraphReplay(undefined,createFactorAnalysisNodeSupport);await f.run();
+ assert.deepEqual(f.actions,[{verb:'click',ref:'ui-new-body'}]);
+ assert.equal(f.operation.deadline,f.deadline);
+});

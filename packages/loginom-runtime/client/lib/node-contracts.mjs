@@ -17,7 +17,7 @@ const definitions = [
   ['imports.lgd','Loginom Data файл','importnative',0,1,false,['native'],'integration/import/ldf.md'],
   ['exports.lgd','Loginom Data файл','exportnative',1,0,false,['native'],'integration/export/ldf.md'],
   ['preprocessing.coarse_classes','Конечные классы','coarseclasses',1,3,false,['internal','apply'],'processors/preprocessing/coarse-classes.md'],
-  ['research.factor_analysis','Факторный анализ','factoranalysis',1,2,false,['pca_fixed','pca_eigenvalue','pca_variance'],'processors/scrutiny/factor-analysis.md'],
+  ['research.factor_analysis','Факторный анализ','factoranalysis',1,2,false,['pca_fixed','pca_eigenvalue','pca_variance','apply'],'processors/scrutiny/factor-analysis.md'],
   ['trees.from_table','Таблица в дерево','datatotree',1,0,false,['manual_structure'],'processors/data-trees/table-to-tree.md'],
   ['trees.to_json','Дерево в JSON','treetojson',0,1,false,['serialize'],'processors/data-trees/tree-to-json.md'],
   ['datamining.assn_rules','Ассоциативные правила','assnrules',2,3,false,['fp_growth','apply'],'processors/datamining/association-rules.md'],

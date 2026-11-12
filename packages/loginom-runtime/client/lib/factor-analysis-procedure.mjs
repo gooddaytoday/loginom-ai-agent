@@ -3,6 +3,7 @@ import {bindReformInput} from './reform-input.mjs';
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
 import {configureDerivedInlineMapping} from './grouping-inline-mapping.mjs';
 import {factorAnalysisInlineSources} from './factor-analysis-output.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
 const need=(v,m)=>{if(!v)throw Error('FactorAnalysis: '+m);};
 const semantic=fs=>fs.map(({selected,origin_type,...f})=>f);
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -49,6 +50,7 @@ export async function configureFactorAnalysisRoles(channel,p,inputMapping){
 }
 
 export async function configureFactorAnalysis(channel,p,{inputMapping,request}){
+ if(request?.mode==='apply')return configureFactorAnalysisApply(channel);
  const roles=await configureFactorAnalysisRoles(channel,p,inputMapping);
  const one=(s,predicate,message)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,message);return es[0];};
  const next=async(stage,destination)=>channel.perform({condition:'factor analysis '+stage+' accepted',ready:s=>s.wizard?.stage===stage,identity:s=>s.prepared_node_context,
@@ -108,4 +110,30 @@ export async function configureFactorAnalysis(channel,p,{inputMapping,request}){
  }
  const done=await channel.observe({condition:'PCA accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...configuration,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+}
+
+// Inspect and Cancel: committing an unchanged wizard can invalidate the model.
+async function configureFactorAnalysisApply(channel){
+ const observe=stage=>channel.observe({condition:'inspect saved PCA '+stage,readFactorAnalysis:true,ready:s=>s.wizard?.stage===stage&&s.node_factor_analysis?.verified===true});
+ const saved=async(value,message)=>{
+  if(value)return;
+  const error=Error('FactorAnalysis apply: unsupported saved '+message+'; no training requested');
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'factor_analysis_apply_preserved',proof:{closed:await closePreparedWizard(channel)}};throw error;
+ };
+ const roles=(await observe('input_mapping')).node_factor_analysis,features=roles.fields.filter(f=>f.usage_type===3);
+ await saved(features.length>=2&&roles.fields.every(f=>f.usage_type===0||f.usage_type===3)&&features.every(f=>['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный'),'continuous numeric roles');
+ await channel.perform({condition:'inspect saved PCA parameters',ready:s=>s.wizard?.stage==='input_mapping',identity:s=>s.prepared_node_context,
+  resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));need(es.length===1,'Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:'factor_analysis'};}});
+ const state=await observe('factor_analysis'),c=state.node_factor_analysis,criterion=['eigenvalue','variance','fixed'][c.criterion],rotation=['none','varimax','quartimax'][c.rotation];
+ await saved(criterion&&rotation&&Object.values(c.switches).every(v=>v===false),'criterion, rotation or bindings');
+ await saved(Number.isSafeInteger(c.factors)&&c.factors>=1&&c.factors<=features.length,'factor count');
+ const eigenvalue=c.values.pedEigenValuesThreshold,variance_percent=c.values.pedCumDispersion,output_factors=c.values.pedNOutFactorsMax;
+ await saved(criterion!=='eigenvalue'||Number.isFinite(eigenvalue)&&eigenvalue>=0.1&&eigenvalue<=1.5,'eigenvalue threshold');
+ await saved(criterion!=='variance'||Number.isFinite(variance_percent)&&variance_percent>=1&&variance_percent<=100,'variance threshold');
+ await saved(typeof c.output_cap==='boolean'&&(!c.output_cap||Number.isSafeInteger(output_factors)&&output_factors>=1&&output_factors<=128),'output cap');
+ return {verified:true,cleanup_complete:true,effect_possible:false,settings_applied:false,
+  configuration:{...roles,mode:'apply',criterion,rotation,factors:c.factors,output_cap:c.output_cap,output_factors:c.output_cap?output_factors:false,
+   ...(criterion==='eigenvalue'?{eigenvalue}:{}),...(criterion==='variance'?{variance_percent}:{}),node_context:state.prepared_node_context},
+  validation:{status:'observed_saved_settings',node_context:state.prepared_node_context}};
 }
