@@ -62,3 +62,38 @@ for(const alias of [false,true])test('cold Import restores the prepared target t
 test('cold Import never starts port mapping when the prepared field/readiness gate refuses',async()=>{
  const f=await coldReadFixture({blocked:true});await assert.rejects(f.run(),/owned graph is not ready/);assert.equal(f.mappingCalls,0);assert.deepEqual(f.events,['source-cancel']);
 });
+
+const excelRoot=new URL('../../../docs/node-development/nodes/imports-excel/acceptance/excel-import-binding/',import.meta.url);
+const excelInitial=JSON.parse(readFileSync(new URL('expected-initial.json',excelRoot))),excelFinal=JSON.parse(readFileSync(new URL('expected.json',excelRoot)));
+test('Excel binding scenario registers both workbooks, three exports and the shared audit',()=>{
+ execFileSync('python3',['-B','-c',`import importlib.util
+s=importlib.util.spec_from_file_location('r','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('excel-import-binding')
+assert c['input_files']==['sales-a.xlsx','sales-b.xlsx'] and c['export_count']==3 and all((c['data']/f).exists() for f in c['input_files'])
+assert c['import_initial']=='excel-import-binding/expected-initial.json' and c['prompt'].name=='task.md'
+assert c['import_binding']==('imports.excel','/excel/source_path','ExcelPath')
+assert m.scenario('import-bindings')['import_binding']==('imports.text','/settings/source/source_path','CsvPath')
+`],{cwd:new URL('../../../',import.meta.url)});
+ execFileSync('python3',['-B',new URL('oracle.py',excelRoot).pathname]);
+});
+function excelHistory(){
+ const e=history(),value=excelFinal.variable_inventory.outputs[0].variables[0].value;
+ const rename=v=>v.name==='CsvPath'?{...v,name:'ExcelPath'}:v;
+ for(const x of e){
+  if(x.result?.configuration?.readback)x.result.configuration.readback.variables=x.result.configuration.readback.variables.map(rename);
+  if(x.request)x.request.parameters.variables=[{name:'ExcelPath',type:'string',value}];
+ }
+ const table=(want,item)=>{item.result.node={...item.result.node,node_id:'excel'};item.result.configuration.bindings=[{...item.result.configuration.bindings[0],parameter:'/excel/source_path',variable:{name:'ExcelPath',type:'string',kind:'variables'}}];
+  const id=item.result.execution.execution_id;
+  item.result.output.ports=want.outputs.map(o=>({port:o.output_port,fresh:true,execution_id:id,row_count:o.rows.length,sample_complete:true,precision:{numbers_verified:true},
+   schema:o.columns.map(c=>({name:c.name,label:c.label,type:c.type})),sample:o.rows.map(r=>o.columns.map(c=>({type:c.type,is_null:false,value:String(r[c.name]),precision:'exact_integer'})))}));};
+ table(excelInitial,e[1]);table(excelFinal,e[4]);return e;
+}
+test('Excel source-only update keeps the Excel GUID and accepts only {excel:{}} re-execution',()=>{
+ const e=excelHistory();
+ e.splice(4,0,{phase:'node_apply_prepared',request:{target:{kind:'existing',type:'imports.excel',ref:e[1].result.node},parameters:{excel:{}},inputs:[],mappings:[]}});
+ assert.equal(auditImportBindings(e,excelInitial,excelFinal).status,'PASS');
+ const reconfigured=excelHistory();
+ reconfigured.splice(4,0,{phase:'node_apply_prepared',request:{target:{kind:'existing',type:'imports.excel',ref:reconfigured[1].result.node},parameters:{settings:{}},inputs:[],mappings:[]}});
+ assert.throws(()=>auditImportBindings(reconfigured,excelInitial,excelFinal),/IMPORT_BINDING_RECONFIGURED/);
+});
