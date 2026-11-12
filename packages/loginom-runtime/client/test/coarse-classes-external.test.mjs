@@ -1,166 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import {validateCoarseClassesParameters} from '../lib/coarse-classes-parameters.mjs';
-import {acceptCoarseClassesExternalPage,configureCoarseClasses,completeExternalLinks} from '../lib/coarse-classes-procedure.mjs';
-import {readCoarseClassesBrowser} from '../lib/coarse-classes-context.mjs';
-import {coarseClassesParametersSchema} from '../lib/node-api.mjs';
-import {NODE_TYPES} from '../lib/node-contracts.mjs';
 
+// LAB-1324, owner decision 12.11: Loginom 7.4.2 does not apply a ready external
+// partition to a discrete predictor (probes (б)/(в), runs 1794209858242266964 and
+// 1794213272022742203). The request is refused in validation, before any gesture.
 const external={input_field:'Segment',target_field:'Target',event_value:'yes',partition:'external',min_class_percent:5,max_classes:2,uniformity_percent:0};
-const request=(inputs,kind='new')=>({target:{kind},inputs:inputs.map(input=>({input,source:{node_id:'n'+input},output:0})),mappings:[],finish:'execute',read:{ports:[0,1,2]}});
+const refusal=/COARSE_EXTERNAL_UNSUPPORTED.*Loginom 7\.4\.2.*partition:"automatic"/s;
 
-test('external partition is a public discrete mode with the ready class table on additional input 1',()=>{
- assert.ok(coarseClassesParametersSchema.properties.coarse_classes.properties.partition.enum.includes('external'));
- assert.equal(NODE_TYPES['preprocessing.coarse_classes'].additional_tabular_inputs,true);
- assert.doesNotThrow(()=>validateCoarseClassesParameters({coarse_classes:external},'internal',request([0,1])));
- assert.doesNotThrow(()=>validateCoarseClassesParameters({coarse_classes:external},'internal',request([],'existing')));
- for(const r of [request([0]),request([0,1,2]),request([0,0])])assert.throws(()=>validateCoarseClassesParameters({coarse_classes:external},'internal',r));
- for(const patch of [{frozen:true},{cut:7}])assert.throws(()=>validateCoarseClassesParameters({coarse_classes:{...external,...patch}},'internal'));
- assert.throws(()=>validateCoarseClassesParameters({coarse_classes:{...external,partition:'automatic'}},'internal',request([0,1])),/input 1 only with partition external/);
+test('external partition is refused with a code and a working next step',()=>{
+ assert.throws(()=>validateCoarseClassesParameters({coarse_classes:external},'internal'),refusal);
+ assert.throws(()=>validateCoarseClassesParameters({coarse_classes:{...external,frozen:true}},'internal'),refusal);
 });
 
-test('external links need one identifier, class number and category column',()=>{
- assert.equal(completeExternalLinks([{kind:1},{kind:2},{kind:3}]),true);
- assert.equal(completeExternalLinks([{kind:1},{kind:2},{kind:3},{kind:0}]),true);
- for(const links of [[{kind:1},{kind:2}],[{kind:1},{kind:2},{kind:3},{kind:4}],[{kind:1},{kind:1},{kind:2},{kind:3}],[]])assert.equal(completeExternalLinks(links),false);
-});
-
-function externalChannel({stage='coarse_classes_external',auto=true}={}){
- const names=['ColumnName','ClassNumber','UniqueValue'],gestures=[];let links=names.map((name,index)=>({index,name,kind:0}));
- const snapshot=()=>structuredClone({wizard:{stage,root_tid:'w'},prepared_node_context:{verified:true},
-  node_coarse_classes:stage==='coarse_classes_external'?{verified:true,external:{links}}:{verified:true,fields:[],settings:{}},
-  ui:{elements:[{tid:'w;btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:'w;CoarseClassesWizard;grdExternalBinningLinks;colAutoMappingColumnKind',ref:'auto',allowed_actions:['click']}]}});
- return {gestures,channel:{observe:async o=>{const s=snapshot();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
-  const a=o.resolve(snapshot());gestures.push(a);
-  if(a.ref==='auto'&&auto)links=links.map((l,i)=>({...l,kind:i+1}));
-  if(a.verb==='wizard_step')stage=a.expected_stage;
- }}};
-}
-
-test('external page auto-links ColumnName/ClassNumber/UniqueValue and advances to field roles',async()=>{
- const {channel,gestures}=externalChannel();
- const result=await acceptCoarseClassesExternalPage(channel,{mode:'internal',parameters:{coarse_classes:external}});
- assert.deepEqual(result.links.map(l=>[l.name,l.kind]),[['ColumnName',1],['ClassNumber',2],['UniqueValue',3]]);
- assert.equal(result.auto_mapped,true);
- assert.deepEqual(gestures.map(a=>a.ref),['auto','next']);
-});
-
-test('external page refuses incomplete links and mismatched partitions before Next',async()=>{
- await assert.rejects(acceptCoarseClassesExternalPage(externalChannel({auto:false}).channel,{mode:'internal',parameters:{coarse_classes:external}}),/external class links readback/);
- const {channel,gestures}=externalChannel();
- await assert.rejects(acceptCoarseClassesExternalPage(channel,{mode:'internal',parameters:{coarse_classes:{...external,partition:'automatic'}}}),/use partition external/);
+test('the public dock_node_apply path refuses external classes before any graph or UI gesture',async()=>{
+ const {nodeApiTools,dispatchNodeApi}=await import('../lib/node-api.mjs');
+ const {createCandidateNodeSupport}=await import('../lib/node-support.mjs');
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
+ const gestures=[];
+ const runtime={tools:nodeApiTools,startNodeApply:args=>{validateNodeApplyRequest(args,handlers);gestures.push('apply');return {status:'SUCCEEDED'};}};
+ const source=id=>({document_id:'doc',workflow_id:'wf',node_id:id});
+ const envelope={operation_id:'coarse-external',contract_revision:'1.0.0',document_id:'doc',
+  workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+  target:{kind:'new',type:'preprocessing.coarse_classes',position:{x:320,y:280}},
+  mode:'internal',parameters:{coarse_classes:external},mappings:[],finish:'execute',read:{ports:[0,1,2],sample_rows:100,require_exact_numbers:true},
+  budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ for(const inputs of [[{source:source('main'),output:0,input:0},{source:source('classes'),output:0,input:1}],[{source:source('main'),output:0,input:0}]])
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,inputs}),refusal);
+ await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,parameters:{coarse_classes:{...external,partition:'automatic'}},
+  inputs:[{source:source('main'),output:0,input:0},{source:source('classes'),output:0,input:1}]}),/one input 0 required/);
  assert.deepEqual(gestures,[]);
- await assert.rejects(acceptCoarseClassesExternalPage(externalChannel({stage:'coarse_classes'}).channel,{mode:'internal',parameters:{coarse_classes:external}}),/requires the ready class table/);
- assert.equal(await acceptCoarseClassesExternalPage(externalChannel({stage:'coarse_classes'}).channel,{mode:'internal',parameters:{coarse_classes:{...external,partition:'automatic'}}}),null);
-});
-
-test('external predictor uses the native role input (external partition), never the fine-classes checkbox (LAB-1324 probe)',async()=>{
- const fields=[{name:'Segment',label:'Segment',type:'string',data_kind:'Дискретный',index:0,record_id:'s',role:'input',frozen:false,external:false},
-  {name:'Target',label:'Target',type:'string',data_kind:'Дискретный',index:1,record_id:'t',role:'target',frozen:false,external:false}];
- let stage='coarse_classes',selected=fields[0],picker=false;const gestures=[];
- const root='w',frame=root+';CoarseClassesWizard-1;CoarseClassesSettingsFrame;',owner=frame+'cbxColumnPurpose;boundlist;';
- const options=['Не выбрано','Входное','Входное (внешнее разбиение)','Входное (замороженное)','Выходное'];
- const model={input_field:'Segment',locked:false,edited:false,classes:[0,1,2].map(number=>({number,lower:null,upper:null}))};
- const snapshot=()=>structuredClone({wizard:{stage,root_tid:root},prepared_node_context:{verified:true},
-  node_coarse_classes:{verified:true,fields,selected,model,settings:{event_value:selected.name==='Target'?'yes':null,min_class_percent:fields[0].external?null:5,max_classes:fields[0].external?null:2,uniformity_percent:fields[0].external?null:0,fine_classes:false}},
-  ui:{elements:[{tid:root+';btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:frame+'chkUseFineClassesBinning;ValueControl;DisplayEl',ref:'fine',allowed_actions:['set_checked']},
-   {tid:frame+'cbxColumnPurpose;trg_picker',ref:'picker',allowed_actions:['click']},
-   ...(picker?options.map(label=>({tid:owner+label.replaceAll(' ','_'),label,ref:'option:'+label,allowed_actions:['click']})):[]),
-   ...fields.map(f=>({tid:root+';CoarseClassesWizard-1;colColumnDisplayName_'+f.name,ref:f.name,allowed_actions:['click']}))]}});
- const channel={observe:async o=>{const s=snapshot();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
-  const a=o.resolve(snapshot());gestures.push(a);
-  if(a.verb==='wizard_step')stage=a.expected_stage;
-  else if(a.ref==='fine')assert.fail('fine-classes checkbox must not be used for external');
-  else if(a.ref==='picker')picker=true;
-  else if(a.ref.startsWith('option:')){assert.equal(a.ref,'option:Входное (внешнее разбиение)');picker=false;fields[0].external=true;selected=fields[0];}
-  else selected=fields.find(f=>f.name===a.ref);
- }};
- const links=[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}];
- const result=await configureCoarseClasses(channel,{coarse_classes:external},{request:{mode:'internal'},inputMapping:{target_fields:fields.map(({role,frozen,external,...f})=>f)},external:{links}});
- assert.deepEqual(result.configuration.external_partition,{links,role:'external',model});
- assert.equal(result.configuration.partition,'external');
- assert.ok(gestures.some(a=>a.ref==='option:Входное (внешнее разбиение)'));
- assert.equal(gestures.filter(a=>a.verb==='wizard_step').length,5);
-});
-
-test('roles reader maps native ColumnPurpose 2 to an external input without analytic settings',()=>{
- const prefix='MF;TF-1',base=prefix+';WizrdMCF;CoarseClassesWizard-1',elements=[],components={};
- const el=(tid,parent)=>{const e={id:'e'+elements.length,tid,parent,getAttribute:()=>tid,getBoundingClientRect:()=>({left:0,top:0,right:100,bottom:100,width:100,height:100}),checkVisibility:()=>true,contains:x=>x===e||x?.parent===e};elements.push(e);return e;};
- const root=el(base),wizard=el(prefix+';WizrdMCF'),w={el:{dom:wizard},[Symbol('LockQueue')]:{IsEmpty:true}};
- const records=[['Segment',2],['Target',4]].map(([name,purpose],index)=>({internalId:'r'+index,data:{Index:index,Name:name,DisplayName:name,DataType:5,DataKind:2,ColumnPurpose:purpose}}));
- const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,isLoading:()=>false};
- const gridEl=el(base+';grdColumns',root),selection=[records[0]];
- class CoarseClassesWizard{}
- const controller=Object.assign(new CoarseClassesWizard(),{FColumnsStore:store,FWizardForm:{FView:w}});
- const role=el(base+';CoarseClassesSettingsFrame;cbxColumnPurpose',root);
- Object.assign(components,{[root.id]:{el:{dom:root},'@@TestCmpController':controller},[wizard.id]:w,[gridEl.id]:{el:{dom:gridEl},getStore:()=>store,getSelectionModel:()=>({getSelection:()=>selection})},[role.id]:{el:{dom:role},getValue:()=>2}});
- const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
- const r=JSON.parse(JSON.stringify(vm.runInNewContext('('+readCoarseClassesBrowser.toString()+')('+JSON.stringify(prefix)+')',context)));
- assert.equal(r.verified,true,r.reason);
- assert.deepEqual([r.selected.role,r.selected.external,r.selected.frozen],['input',true,false]);
-});
-
-test('external links page reader returns owned grid kinds and names',()=>{
- const prefix='MF;TF-1',elements=[],components={};
- const el=(tid,parent)=>{const e={id:'e'+elements.length,tid,parent,getAttribute:()=>tid,getBoundingClientRect:()=>({left:0,top:0,right:100,bottom:100,width:100,height:100}),checkVisibility:()=>true,contains:x=>x===e||x?.parent===e||x?.parent?.parent===e};elements.push(e);return e;};
- const wizard=el(prefix+';WizrdMCF'),page=el(prefix+';WizrdMCF;CoarseClassesWizard',wizard),grid=el(prefix+';WizrdMCF;CoarseClassesWizard;grdExternalBinningLinks',page);
- // Observed native record keys (run 1794207511032523192, events:514).
- const records=[['ColumnName',1],['ClassNumber',2],['UniqueValue',3]].map(([DisplayName,ClassParamsColumnKind],Index)=>({data:{Index,DisplayName,DataType:5,ClassParamsColumnKind,AllowedColumnKinds:[0,1]}}));
- const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,isLoading:()=>false};
- components[wizard.id]={el:{dom:wizard},[Symbol('LockQueue')]:{IsEmpty:true}};components[grid.id]={el:{dom:grid},getStore:()=>store};
- const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1)))}};
- const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readCoarseClassesBrowser.toString()+')('+JSON.stringify(prefix)+')',context)));
- assert.deepEqual(read(),{verified:true,external:{links:[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}]},settings_applied:false});
- records[1].data.ClassParamsColumnKind='2';
- assert.deepEqual(read(),{verified:false,reason:'coarse_classes_external_link',record_keys:['Index','DisplayName','DataType','ClassParamsColumnKind','AllowedColumnKinds'],kind_type:'string'});
-});
-
-test('coarse classes add_input consumes its single native Input_Add (LAB-1324 events:439)',async()=>{
- const {verifyNodeTargetEffect}=await import('../lib/node-target.mjs');
- const ref={document_id:'d',workflow_id:'w',node_id:'cc'};
- const graph=(inputs,other_ports,type='preprocessing.coarse_classes')=>({complete:true,document_id:'d',workflow_ref:{prefix:'MF;TF-1',workflow_id:'w'},dom_epoch:1,foreign_links:[],links:[],
-  nodes:[{ref,type,label:'Конечные классы',dom_epoch:2,position:{x:400,y:208},inputs,outputs:[0,1,2],other_ports,locked:false}]});
- const effect=(before)=>({kind:'add_input',parameters:{ref,input:1},before});
- assert.deepEqual(verifyNodeTargetEffect(effect(graph([0],['Input_Add'])),graph([0,1],[])),{});
- assert.equal(verifyNodeTargetEffect(effect(graph([0],['Input_Add'])),graph([0,1],['Input_Var-1'])),null);
- assert.equal(verifyNodeTargetEffect(effect(graph([0],['Input_Add'],'transform.col_union_data')),graph([0,1],[],'transform.col_union_data')),null);
-});
-
-test('port 1 rows of one class number form one materialized class; the contrast expected has three',async()=>{
- const {coarseClassesMaterializedModel}=await import('../lib/coarse-classes-output.mjs');
- const {readFile}=await import('node:fs/promises');
- const expected=JSON.parse(await readFile(new URL('../../../../docs/node-development/nodes/preprocessing-coarseclasses/acceptance/modes/expected-external-contrast.json',import.meta.url),'utf8'));
- const [p1,p2]=[1,2].map(port=>expected.outputs.find(o=>o.output_port===port));
- const cell=(type,value)=>({type,value:type==='integer'?String(value):value,is_null:false,precision:type==='real'?'17_significant_digits':type==='integer'?'exact_integer':'display_text'});
- const names=['ColumnName','ClassNumber','ClassMark','WoE','IV'],types=['string','integer','string','real','real'];
- const port=(n,rows,cols,ts)=>({port:n,fresh:true,sample_complete:true,row_count:rows.length,schema:cols.map(name=>({name})),sample:rows.map(r=>cols.map((c,i)=>cell(ts[i],r[c])))});
- const ports=rows=>[port(1,rows,names,types),port(2,p2.rows,['ColumnName','IV'],['string','real'])];
- const model=coarseClassesMaterializedModel(ports(p1.rows));
- assert.deepEqual(model.classes.map(c=>c.number),[0,1,2]);assert.equal(model.total_iv,p2.rows[0].IV);
- // Native port-1 layout of a class with several categories: one row per UniqueValue.
- const merged=[p1.rows[0],{...p1.rows[1],UniqueValue:'X'},p1.rows[1]];
- assert.deepEqual(coarseClassesMaterializedModel(ports(merged)).classes.map(c=>c.number),[0,1]);
- const split=structuredClone(merged);split[2].WoE=0;
- assert.throws(()=>coarseClassesMaterializedModel(ports(split)),/class rows differ/);
- assert.throws(()=>coarseClassesMaterializedModel(ports([...p1.rows,p1.rows[0]])),/duplicate model class identity/);
-});
-
-test('external internal readback matches the published node result schema',async()=>{
- const {coarseClassesConfigurationReadback}=await import('../lib/coarse-classes-readback.mjs');
- const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
- const {AjvJsonSchemaValidator}=await import('@modelcontextprotocol/sdk/validation/ajv');
- const node={document_id:'doc',workflow_id:'flow',node_id:'node'},operation_id='op',ref=id=>({document_id:'doc',workflow_id:'flow',node_id:id});
- const cell=(type,value)=>({type,value,is_null:false,precision:type==='real'?'17_significant_digits':type==='integer'?'exact_integer':'display_text'});
- const ports=[{port:1,fresh:true,sample_complete:true,row_count:3,schema:['ColumnName','ClassNumber','ClassMark','WoE','IV'].map(name=>({name})),sample:[['Segment','0','[B]',-1,.3],['Segment','1','[A,C]',.5,.2],['Segment','1','[A,C]',.5,.2]].map(r=>r.map((v,i)=>cell(['string','integer','string','real','real'][i],v)))},{port:2,fresh:true,sample_complete:true,row_count:1,schema:[{name:'ColumnName'},{name:'IV'}],sample:[[cell('string','Segment'),cell('real',.5)]]}];
- const links=[{index:0,name:'ColumnName',kind:1},{index:1,name:'ClassNumber',kind:2},{index:2,name:'UniqueValue',kind:3}];
- const model={input_field:'Segment',locked:false,edited:false,classes:[{number:0,lower:null,upper:null},{number:1,lower:null,upper:null}]};
- const configuration={verified:true,node_context:node,mode:'internal',state:'settings',classes:[],total_iv:null,input_field:'Segment',target_field:'Target',event_value:'yes',partition:'external',frozen:false,min_class_percent:null,max_classes:null,uniformity_percent:null,roles:[{name:'Segment',role:'input'},{name:'Target',role:'target'}],external_partition:{links,role:'external',model}};
- const training={status:'trained',node,execution_id:'train',source:[{node:ref('main'),output:0,input:0},{node:ref('classes'),output:0,input:1}]};
- const values={input_mapping:{},configure:{configuration,validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{ports:[0,1,2].map(port=>({port,schema:[{name:'X',label:'X',type:'string',data_kind:'Дискретный'}]}))},finish:{mode:'execute',settings_applied:true,execution_id:'execute',training},read:{ports}};
- const phases=Object.entries(values).map(([phase,value])=>({phase,status:'verified',receipt_id:operation_id+':'+phase,value:{verified:true,cleanup_complete:true,...value}}));
- const readback=coarseClassesConfigurationReadback({node,phases,operation_id});
- assert.deepEqual(readback.external_partition,{links,role:'external',model});
- const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
- const r=validate(readback);assert.equal(r.valid,true,JSON.stringify(r.errorMessage??r).slice(0,600));
+ // Automatic discrete training on input 0 stays admitted.
+ await dispatchNodeApi(runtime,'dock_node_apply',{...envelope,parameters:{coarse_classes:{...external,partition:'automatic'}},inputs:[{source:source('main'),output:0,input:0}]});
+ assert.deepEqual(gestures,['apply']);
 });
