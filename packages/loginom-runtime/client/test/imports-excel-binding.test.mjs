@@ -40,7 +40,7 @@ test('SAME Excel node re-executes unchanged with excel:{} and no reconfiguration
  assert.doesNotThrow(()=>validateExcelParameters(r.parameters,r.mode,r));
 });
 
-function wizard({initial=null,observed}={}){
+function wizard({initial=null,observed,literalHidden=false}={}){
  const root='MF;TF;WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
  const value='/own/inputs/a.xlsx',option=file+'edtFileName;VariableControl;boundlist;row-7';
  let stage=0,target,caption=initial;const clicks=[],fills=[];
@@ -50,7 +50,7 @@ function wizard({initial=null,observed}={}){
  const locator=tid=>({count:async()=>tid==='masks'?0:1,locator:()=>locator(tid),inputValue:async()=>values.get(tid)??'',
   fill:async v=>{fills.push(tid);values.set(tid,String(v));},press:async()=>{},
   evaluate:async fn=>{if(fn.toString().includes('getBoundingClientRect')){target=tid;return{x:1,y:1};}return true;},
-  isVisible:async()=>tid===root+';btnError'?false:tid===file+'edtFileName;ValueControl'?stage===0:tid===grid?stage===1:tid.includes('ColumnsMappingEngineOutputPortWizard')?stage===2:tid===root+';DoneWizard'?stage===3:true});
+  isVisible:async()=>tid===root+';btnError'?false:tid===file+'edtFileName;ValueControl'?stage===0&&!literalHidden:tid===file+'edtFileName;VariableControl'?stage===0&&caption!==null:tid===grid?stage===1:tid.includes('ColumnsMappingEngineOutputPortWizard')?stage===2:tid===root+';DoneWizard'?stage===3:true});
  const source=()=>({source_path:caption?.slice('ExcelPath ( '.length,-2)??'',binding_field:{status:'observed',variable_mode:true,variable_caption:observed??caption,row_id:'7',value,value_length_utf16:value.length,truncated:false},
   sheet_method:'По имени',sheet:values.get(file+'cbbTableName;ValueContainer;cbx'),header_rows:Number(values.get(file+'edtTitleRowCount;ValueControl')),whole_sheet:true,blank_rows:'Импортировать'});
  const page={locator:s=>s.startsWith('.x-mask')?locator('masks'):locator(JSON.parse(s.slice('[data-tid='.length,-1))),
@@ -68,6 +68,11 @@ test('Excel W1 switches the filename to the mapped variable without a literal pa
  assert.ok(!w.fills.includes(w.file+'edtFileName;ValueControl'));
  assert.equal(result.configuration.source.source_path,w.value);
  assert.equal(result.configuration.source.binding_field.variable_caption,'ExcelPath ( '+w.value+' )');
+});
+test('a saved bound W1 with the literal path hidden is ready through its variable control',async()=>{
+ const w=wizard({initial:'ExcelPath ( /own/inputs/a.xlsx )',literalHidden:true});
+ w.page.waitForTimeout=async()=>{w.t.deadline=0;};
+ const result=await w.run();assert.equal(result.verified,true,result.error);assert.ok(!w.clicks.some(c=>c.includes('edtFileName')));
 });
 test('an already selected variable is retained; a different observed selection refuses before Next',async()=>{
  const kept=wizard({initial:'ExcelPath ( /own/inputs/a.xlsx )'}),ok=await kept.run();

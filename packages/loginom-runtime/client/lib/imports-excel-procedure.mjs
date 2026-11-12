@@ -52,7 +52,8 @@ export async function excelConfigureCapability(page,t,readContext){
   const advance=async()=>{const before=await panel();await click(find(root+';btnNext'));await wait('wizard page transition',async()=>{
    const error=find(root+';btnError');if(await error.count()===1&&await error.isVisible())throw Error((await error.getAttribute('data-qtip'))??'Loginom refused the Excel page');return await panel()!==before;
   });await quiet();};
-  await wait('Excel source page',()=>find(file+'edtFileName;ValueControl').isVisible());
+  // A variable-bound filename hides the literal path behind its VariableControl.
+  await wait('Excel source page',async()=>await find(file+'edtFileName;ValueControl').isVisible()||await find(file+'edtFileName;VariableControl').isVisible());
   if(!t.inspect){
   if(t.binding){
    // Select the mapped variable; its independently read value is the file.
