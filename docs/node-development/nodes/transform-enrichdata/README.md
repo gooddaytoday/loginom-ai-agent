@@ -8,7 +8,7 @@
 
 Зарегистрирован `transform.enrich_data` / `left`. Левое обогащение основного входа 0 одним или двумя справочниками 1/2; составные ключи, префиксы; NULL совпадает с NULL, дубликаты расширяют все сочетания.
 
-Ограничения: Без других join, третьего справочника, конверсий и переменных; пропуск настроек сохраняет их только при неизменных источниках. Для точного порядка нужен полный output mapping autosync=false.
+Ограничения: Без других join, третьего справочника, конверсий и переменных; пропуск настроек сохраняет их только при неизменных источниках. Для точного порядка нужен полный output mapping autosync=false. `coverage=full` не делается (решение владельца `v040-scope-expansion`, 12.11.2026): общий gate не меняется.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [enrich-node.mjs](../../../../packages/loginom-runtime/client/lib/enrich-node.mjs):1–39; [enrich-parameters.mjs](../../../../packages/loginom-runtime/client/lib/enrich-parameters.mjs):1–87; [transform.enrich_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.enrich_data.md):1–46. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

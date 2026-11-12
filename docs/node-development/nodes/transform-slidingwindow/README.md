@@ -8,7 +8,7 @@ Runtime type / mode: transform.sliding_window / lag.
 
 Зарегистрирован `transform.sliding_window` / `lag`. Окна по полям; три политики неполных записей; список окон заменяется целиком; пропуск параметров сохраняет настройки.
 
-Ограничения: Только lag; управляющие переменные и остальные режимы вне среза.
+Ограничения: Только lag; управляющие переменные и остальные режимы вне среза. Агрегаты по окну и сглаживание — ограничение Loginom 7.4.2, цикл не планируется (решение владельца `v040-scope-expansion`, 12.11.2026).
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [sliding-window-node.mjs](../../../../packages/loginom-runtime/client/lib/sliding-window-node.mjs):1–30; [sliding-window-parameters.mjs](../../../../packages/loginom-runtime/client/lib/sliding-window-parameters.mjs):1–34; [transform.sliding_window.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.sliding_window.md):1–16. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
