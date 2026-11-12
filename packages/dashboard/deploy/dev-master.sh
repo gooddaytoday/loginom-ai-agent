@@ -56,7 +56,7 @@ if [[ $1 == uninstall ]]; then
   docker exec "$studio" rm -f /usr/local/apache2/conf/dashboard-app.site.conf
   reload_apache
   stop_service
-  docker exec "$server" rm -f /app/dashboard-node "$app/server.mjs"
+  docker exec -u 0 "$server" rm -f /app/dashboard-node "$app/server.mjs"
   client_json original
   echo "Dashboard удалён; каждый клиент читает свой оригинальный client.json."
   exit
@@ -125,7 +125,7 @@ for file in campaign.lgp dataset.csv; do
   docker exec -i "$server" sh -ec 'if [ ! -e "$1" ] && [ ! -L "$1" ]; then set -C; cat > "$1"; fi' sh "$storage/$file" < "dashboard/fixture/$file"
 done
 docker cp "$node_bin" "$server:/app/dashboard-node.new"
-docker exec "$server" mv -f /app/dashboard-node.new /app/dashboard-node
+docker exec -u 0 "$server" mv -f /app/dashboard-node.new /app/dashboard-node
 stop_service
 docker cp "$pkg/dist/server.mjs" "$server:$app/server.mjs"
 docker exec -d -e DASHBOARD_PROJECT_ROOT="$project" -e DASHBOARD_HOST=0.0.0.0 -e DASHBOARD_ALLOW_CURRENT=0 \
