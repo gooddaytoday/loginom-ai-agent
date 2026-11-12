@@ -28,6 +28,7 @@ test("original grant binds path, owner and optional exact digest without staging
     const store = fileReferences(join(root, "references")),
       source = join(root, "source.csv")
     await writeFile(source, "region;amount\nNorth;25\n", { mode: 0o640 })
+    const mode = (await stat(source)).mode
     const snapshot = { ...(await inspectReferenceFile(source)), sha256: null }
     const reference = await store.reserve(owner, "source.csv", snapshot)
     expect(reference.snapshot).toEqual(snapshot)
@@ -48,7 +49,7 @@ test("original grant binds path, owner and optional exact digest without staging
       await expect(store.commit(owner, forged)).rejects.toThrow("LOGINOM_INPUT_INVALID")
     expect(await store.commit(owner, reference)).toEqual(reference)
     expect(await store.commit(owner, reference)).toEqual(reference)
-    expect((await stat(source)).mode & 0o777).toBe(0o640)
+    expect((await stat(source)).mode).toBe(mode)
     await store.close()
     expect(await readFile(source, "utf8")).toContain("North;25")
     expect(await readdir(root)).toEqual(["source.csv"])

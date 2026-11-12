@@ -164,7 +164,7 @@ test.each(["ready", "close"])(
     const root = join(fixture.directory, "knowledge-profile-" + mode)
     const marker = join(root, "forbidden-browser")
     await mkdir(join(resources, "bin"), { recursive: true })
-    await symlink(fixture.node, join(resources, "bin/node"))
+    await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
     const catalog = await stageHeldKnowledge(
       join(resources, "runtime/src/knowledge-entry.mjs"),
       join(fixture.directory, "knowledge-gate-" + mode),

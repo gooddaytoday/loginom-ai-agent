@@ -70,6 +70,8 @@ Each suite has an independent job and a log in its `windows-client-*`,
 `windows-runtime-*` or `windows-host-*` artifact (14-day retention).
 `fail-fast: false` keeps a client failure from cancelling runtime or host;
 no failure is ignored. Only host jobs install the Bun workspace dependencies.
+Host files run in separate Bun processes and the job fails if any process fails,
+so a native Bun crash cannot hide the remaining files.
 Node suites use TAP so assertion details are written immediately, including
 when a later test retains an open handle. Each suite has its own step timeout
 within the job's 20-minute limit.

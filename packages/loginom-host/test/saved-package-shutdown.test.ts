@@ -27,7 +27,7 @@ async function configuredRuntime(directory: string, source: string) {
   await mkdir(join(resources, "bin"), { recursive: true })
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await stageKnowledgeFixture(resources)
-  await symlink(fixture.node, join(resources, "bin/node"))
+  await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
   await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), source)
   await mkdir(root, { recursive: true, mode: 0o700 })
@@ -121,7 +121,7 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     await mkdir(join(resources, "bin"), { recursive: true })
     await mkdir(join(resources, "runtime/src"), { recursive: true })
     await stageKnowledgeFixture(resources)
-    await symlink(fixture.node, join(resources, "bin/node"))
+    await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
     await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
     // Real compiled Host and real Node IPC; the external browser runtime is a
     // controlled boundary. This proves routing, not package closure in Loginom.

@@ -221,7 +221,10 @@ jobs:
         working-directory: packages/loginom-host
         run: |
           set -euo pipefail
-          bun test \
+          {
+          host_failed=0
+          # A Bun crash in one file must not hide the remaining Windows cases.
+          for test_file in \
             test/process.test.ts test/environment.test.ts test/windows-powershell.test.ts \
             test/cli-install-windows.test.ts test/cli-install.test.ts test/cli-credentials.test.ts \
             test/keychain-platform.test.ts test/keychain-envelope.test.ts \
@@ -230,8 +233,11 @@ jobs:
             test/node-host.test.ts test/runtime-startup.test.ts test/transport.test.ts \
             test/host.test.ts test/parallel-calls.test.ts test/saved-package-shutdown.test.ts \
             test/cli-owner-crash.test.ts test/cli-manifest.test.ts test/cli-source-snapshot.test.ts \
-            test/bundled-ripgrep.test.ts test/stage-resources.test.ts \
-            2>&1 | tee "$RUNNER_TEMP/windows-host-tests.log"
+            test/bundled-ripgrep.test.ts test/stage-resources.test.ts; do
+            bun test "$test_file" || host_failed=1
+          done
+          exit "$host_failed"
+          } 2>&1 | tee "$RUNNER_TEMP/windows-host-tests.log"
       - name: Upload Windows runtime evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
