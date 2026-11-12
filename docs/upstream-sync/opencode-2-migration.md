@@ -1,6 +1,6 @@
 # Переезд форка на OpenCode 2 (v2.2.7): исследование для 0.5.0
 
-Состояние на 12.11.2026. Форк `v040@9d482b7ebf2463b3a65125178a2477e316c94b06` (OpenCode v1.19.5, `810c0eba`), upstream `v2.2.7` (`fedc6f208aa2bd54c1019227214568083f6380ad`). Ссылки `путь:строка` даны по дереву `v2.2.7`, с пометкой «форк:» — по `9d482b7e`. Решение владельца `opencode2-for-050`: в 0.4.0 переезда нет. Теги получены `git fetch --filter=blob:none` из `https://github.com/anomalyco/opencode.git` в `refs/upstream/*`.
+Состояние на 12.11.2026. Форк `v040@9d482b7ebf2463b3a65125178a2477e316c94b06` (OpenCode v1.19.5, `810c0eba`), upstream `v2.2.7` (`fedc6f208aa2bd54c1019227214568083f6380ad`). Ссылки `путь:строка` даны по дереву `v2.2.7`, с пометкой «форк:» — по `9d482b7e`. Решение владельца `opencode2-for-050`: в 0.4.0 переезда нет.
 
 ## 1. Устройство OpenCode 2
 
@@ -104,7 +104,7 @@ git 2.43.0, ort, `merge.directoryRenames=conflict`, без rerere. База `055
 | GUI-плагины Desktop | `packages/gui-plugins`, `CHANGELOG.md:113` | настройки Loginom и `package-docs` можно сделать без правок `app` |
 | Браузерный плагин | `packages/plugin-browser/README.md:3-6` | вкладки Desktop через CDP, только при подключённом Desktop; `loginom-runtime` (работает и из CLI) не заменяет |
 | `process-daemon` | `packages/process-daemon/README.md:1-12` | PTY на Rust; нашего кода не заменяет |
-| Миграция v1 → v2 | раздел 1, «Хранилище» | основа миграции 0.4 → 0.5 |
+| Прокси, Windows | `desktop/src/main/lifecycle/environment.ts:73`; NSIS `oneClick`, `perMachine: false` (`electron-builder.config.ts:184-187`) | прокси только из окружения — WinINET и `proxy-relay` остаются за форком; установщик как у форка |
 
 ## 5. Риски
 
@@ -120,7 +120,7 @@ git 2.43.0, ort, `merge.directoryRenames=conflict`, без rerere. База `055
 | Обновление Desktop с 0.4.x | обновление — GUI-плагин, хранилище — drizzle (`desktop/src/main/storage/migration/*`), лента — opencode.ai | сохранить `appId` и ленту форка; UPDATE-01 |
 | Windows | DPAPI Desktop — `safeStorage`, в v2 его нет; `process-daemon` — новая нативная часть | Windows-чек-лист целиком |
 | Версии | Bun 1.3.14 → 1.4.4 (против решения 2 ADR-0001), Effect beta.83 → 4.1.0, TS 5.8 → 6.0, Electron 42 → 44 | решение по Bun; `loginom-host` и `runtime` на Bun 1.4.4 |
-| Темп upstream | 6593 коммита с 09.10 по 10.11 | зафиксировать тег, догнать одним слиянием в конце |
+| Темп upstream | 6593 коммита с 09.10 по 10.11 | зафиксировать тег, догнать одним слиянием |
 | Лицензии | MIT: корень, 26 пакетов, `process-daemon` (`Cargo.toml:7`) | лицензии зависимостей Rust — не проверено |
 
 ## 6. План для 0.5.0
