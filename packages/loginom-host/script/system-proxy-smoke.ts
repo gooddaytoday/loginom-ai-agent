@@ -84,7 +84,7 @@ async function assertWindowsProxy() {
     `,
       ],
       {
-        env: sidecarEnvironment(environment),
+        env: sidecarEnvironment(environment, result.environment),
         stdout: "inherit",
         stderr: "inherit",
       },
