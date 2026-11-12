@@ -96,7 +96,9 @@ def run(args, workspace):
         lgp = source / "Исходный сценарий.LGP"
     shutil.copyfile(fixtures / "demo.lgp", lgp)
     original = hashlib.sha256(lgp.read_bytes()).hexdigest()
-    reserved = ["package-docs", "loginom-automation", "package_docs"]
+    # Keep the installed acceptance matrix aligned with packages/product/src/skills.ts.
+    product_skills = ["loginom-automation", "package-docs", "package-linter"]
+    reserved = [*product_skills, "package_docs"]
     if args.reserved_diagnostics == "skills":
         for name in reserved:
             directory = workspace / ".agents/skills" / name
@@ -335,7 +337,7 @@ def run(args, workspace):
     system = "\n".join(message["content"] for message in first["messages"]
         if message.get("role") == "system" and isinstance(message.get("content"), str))
     discovered = re.findall(r"<skill>\s*<name>(.*?)</name>.*?<location>(.*?)</location>\s*</skill>", system, re.S)
-    expected_names = ["customize-opencode"] if args.modified_skill else ["customize-opencode", "loginom-automation", "package-docs"]
+    expected_names = sorted(["customize-opencode", *([] if args.modified_skill else product_skills)])
     assert sorted(name for name, _ in discovered) == expected_names, "Workspace must expose only trusted, valid skills"
     assert "UNTRUSTED" not in system, "External reserved skill must not enter the model catalog"
     if args.reserved_diagnostics:
@@ -344,7 +346,7 @@ def run(args, workspace):
     bundled = args.binary.parent.parent / "resources/loginom/skills"
     for name, location in discovered:
         if name != "customize-opencode":
-            assert location == str(bundled / name / "SKILL.md"), "Both product skills must come from the installed bundle"
+            assert location == str(bundled / name / "SKILL.md"), "Product skills must come from the installed bundle"
     # No public standalone export API; settled permission evidence is read-only.
     for catalog in catalogs:
         if "package_docs_run" in catalog:
