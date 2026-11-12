@@ -49,5 +49,34 @@ jobs:
             bun test src/main/apps.test.ts
             if ($LASTEXITCODE -ne 0) { throw "Native application resolution failed on repetition $_" }
           }
-      - name: Read system proxy
-        run: bun packages/loginom-host/script/system-proxy-smoke.ts
+      - name: Configure isolated WinINET proxy
+        run: |
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
+            throw 'Proxy fixture requires a disposable GitHub-hosted runner'
+          }
+          $settings = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+          Set-ItemProperty -Path $settings -Name ProxyEnable -Type DWord -Value 1
+          Set-ItemProperty -Path $settings -Name ProxyServer -Value '127.0.0.1:18797'
+          Set-ItemProperty -Path $settings -Name ProxyOverride -Value ''
+          Set-ItemProperty -Path $settings -Name AutoDetect -Type DWord -Value 0
+          Remove-ItemProperty -Path $settings -Name AutoConfigURL -ErrorAction SilentlyContinue
+          # A missing sidecar proxy must fail locally, without contacting OpenAI.
+          $hosts = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
+          Copy-Item -LiteralPath $hosts -Destination "$env:RUNNER_TEMP\system-proxy-hosts"
+          Add-Content -LiteralPath $hosts -Encoding ascii -Value "`n127.0.0.1 api.openai.com auth.openai.com"
+      - name: Assert system proxy in sidecar
+        timeout-minutes: 2
+        run: bun packages/loginom-host/script/system-proxy-smoke.ts --assert-windows
+      - name: Disable WinINET proxy and restore hosts
+        if: always()
+        run: |
+          $settings = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+          Set-ItemProperty -Path $settings -Name ProxyEnable -Type DWord -Value 0
+          if ((Get-ItemProperty -Path $settings -Name ProxyEnable).ProxyEnable -ne 0) {
+            throw 'WinINET proxy was not disabled'
+          }
+          $backup = "$env:RUNNER_TEMP\system-proxy-hosts"
+          if (Test-Path -LiteralPath $backup) {
+            Copy-Item -LiteralPath $backup -Destination (Join-Path $env:SystemRoot 'System32\drivers\etc\hosts')
+          }
+          Write-Host 'WinINET ProxyEnable=0; hosts restored'
