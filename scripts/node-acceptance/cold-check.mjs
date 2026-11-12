@@ -1,6 +1,7 @@
 import {verifyN18JavascriptStep} from './n18-cold.mjs';
 import {observeSortingSaved} from './sorting-modes.mjs';
 import {observeColUnionSavedSettings} from './col-union-settings.mjs';
+import {observeAssnRulesExclusionSaved} from './assnrules-exclude.mjs';
 
 import {applyColdExpected,checkApplyRound,observeApplySavedSettings} from './clustering-apply.mjs';
 import {checkGmeansRound,checkGmeansSeedRepeat,observeGmeansSavedSettings,gmeansColdExpected} from './clustering-gmeans.mjs';
@@ -309,6 +310,12 @@ page = context.pages()[0]
    const settings=await observeColUnionSavedSettings({load,channel:channelFor(nodes[0].ref,'col-union-saved'),expected});
    await record({phase:'col_union_saved_settings',node:nodes[0].ref,...settings});
   }
+  if(expected.assnrules_exclusion){
+   const nodes=graph.nodes.filter(n=>n.type==='datamining.assn_rules');
+   if(nodes.length!==1)throw Error('ASSNRULES_EXCLUDE_ONE_SAVED_NODE');
+   state.assnrulesExclusion=await observeAssnRulesExclusionSaved({load,channel:channelFor(nodes[0].ref,'exclusion-saved'),expected});
+   await record({phase:'assnrules_exclusion_saved_settings',node:nodes[0].ref,...state.assnrulesExclusion});
+  }
   if(expected.logreg_normalization){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');
    if(nodes.length!==1)throw Error('LOGREG_NORMALIZATION_ONE_SAVED_NODE');
@@ -611,6 +618,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
     ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),
     ...(state.bindingInventory?{binding_inventory:state.bindingInventory}:{}),
     ...(state.treeOutputs?{tree_outputs:state.treeOutputs}:{}),
