@@ -19,3 +19,5 @@ const shell = await Bun.build({
   minify: true,
 })
 if (!shell.success) throw new AggregateError(shell.logs, "Could not build dashboard shell")
+
+await Bun.write(join(import.meta.dirname, "../template/src/loginom.ts"), Bun.file(join(import.meta.dirname, "../src/sdk/loginom.ts")))

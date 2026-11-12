@@ -178,6 +178,8 @@ test("the first snapshot stays available by ID after opening another node", asyn
   assert.notEqual(a.sourceDir, b.sourceDir)
   assert.deepEqual(a.binding, binding)
   assert.deepEqual(a.rows, data.rows)
+  assert.match(a.adapter, /onState/)
+  assert.doesNotMatch(a.adapter, /frameElement/)
   assert.equal(a.sourceDir, join(server.projectRoot, "dashboard/apps", a.key))
   const script = join(server.projectRoot, "packages/dashboard/script/publish.mjs").replaceAll("'", "'\\''")
   assert.deepEqual(a.commands, {
