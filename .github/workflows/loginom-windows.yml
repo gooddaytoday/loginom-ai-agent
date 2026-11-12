@@ -137,6 +137,39 @@ jobs:
           }
           $summary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output "ci-summary.json") -Encoding utf8
 
+      # #1023 is not merged into v040 yet. Use its reviewed smoke without
+      # bringing another copy of the scripts into this branch.
+      - name: Checkout installed smoke from windows-ci-smoke
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: 287fff220889e70ca1f9f30da368662dcb208ae9
+          path: .installed-smoke-source
+          sparse-checkout: packages/desktop/test/loginom
+          persist-credentials: false
+
+      - name: Install, launch and uninstall Desktop candidate
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $installer = @(Get-ChildItem -LiteralPath (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "desktop") -Filter "*-win-x64.exe" -File)
+          if ($installer.Count -ne 1) { throw "Expected exactly one Desktop installer" }
+          $version = (Get-Content -LiteralPath packages/desktop/package.json -Raw | ConvertFrom-Json).version
+          & .\.installed-smoke-source\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
+            -Installer $installer[0].FullName `
+            -RunRoot (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
+            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy
+
+      - name: Upload installed Desktop smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loginom-windows-installed-smoke-${{ github.run_id }}
+          path: |
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/report.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/logs.zip
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload short-lived unsigned candidates
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
