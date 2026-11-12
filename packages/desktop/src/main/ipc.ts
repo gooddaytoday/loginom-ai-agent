@@ -5,6 +5,7 @@ import { basename, join } from "node:path"
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from "electron"
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
+import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
 import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
@@ -56,6 +57,7 @@ type Deps = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   setNativeTranslations: (bundle: DesktopNativeBundle) => void
   systemProxyEnabled: () => boolean
+  systemProxyStatus: () => Promise<SystemProxyStatus>
 }
 
 export function registerIpcHandlers(deps: Deps) {
@@ -68,10 +70,7 @@ export function registerIpcHandlers(deps: Deps) {
 
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
-  ipcMain.handle("get-system-proxy-status", () => ({
-    ...currentSystemProxyStatus(),
-    enabled: deps.systemProxyEnabled(),
-  }))
+  ipcMain.handle("get-system-proxy-status", () => deps.systemProxyStatus())
   ipcMain.handle("set-system-proxy-enabled", (_event: IpcMainInvokeEvent, enabled: boolean) => {
     getStore().set(SYSTEM_PROXY_ENABLED_KEY, enabled === true)
     publishSystemProxyStatus({ ...currentSystemProxyStatus(), enabled: enabled === true })
@@ -239,7 +238,7 @@ export function registerIpcHandlers(deps: Deps) {
 
   ipcMain.handle("reveal-path", async (_event: IpcMainInvokeEvent, path: string, options?: { checkOnly?: boolean }) => {
     const exists = await stat(path).then(
-      (info) => options?.checkOnly ? info.isFile() : true,
+      (info) => (options?.checkOnly ? info.isFile() : true),
       () => false,
     )
     if (!exists) return false
