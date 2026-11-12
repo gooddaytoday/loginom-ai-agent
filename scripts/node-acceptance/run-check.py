@@ -119,6 +119,10 @@ def scenario(name, case_root=None, *, cases=None):
                     export_count=2 if variant == 'empty' else 4,
                     expected_name='expected.json' if variant == 'mixed' else 'expected-mixed-none.json' if variant == 'none' else 'expected-' + variant + ('-final.json' if variant != 'empty' else '.json'),
                     filter_initial=None if variant == 'empty' else 'expected-' + ('mixed' if variant == 'none' else variant) + '-initial.json')
+    if name == 'row-filter-value-list':
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-value-list.md', data=node / 'fixtures/v040',
+                    input_files=['rows.csv'], oracle=node / 'acceptance/oracle-v040.py', expected_name='expected-v040.json', base=None)
     if name in ['enrich-data-left', 'enrich-data-composite']:
         src = REPO / 'docs/node-development/nodes/transform-enrichdata/acceptance'
         composite = name == 'enrich-data-composite'
