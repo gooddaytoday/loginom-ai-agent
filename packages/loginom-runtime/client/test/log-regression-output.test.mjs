@@ -48,9 +48,10 @@ test('both outputs use distinct native ports and propagate incomplete samples',a
 });
 
 
-for(const mixed of [false,true])test('weighted predictions pin factor/target/passthrough order through native mapping, mixed='+mixed,async()=>{
+for(const regrouped of [false,true])for(const mixed of [false,true])test('weighted predictions pin factor/target/passthrough order through native mapping, regrouped='+regrouped+', mixed='+mixed,async()=>{
  const c={mode:'enter',fields:[{name:'RowID',label:'RowID',type:'integer',usage_type:0},...configuration.fields,
   {name:'Note',label:'Note',type:'string',usage_type:0},{name:'Weight',label:'Weight',type:'real',usage_type:7}]};
+ if(regrouped)c.fields=[c.fields[1],c.fields[2],c.fields[4],c.fields[0],c.fields[3]];
  const expected=['PredictionEvent','PredictionProbability','ActualEvent','Response_predicted','X','Response','RowID','Note','Weight'];
  assert.deepEqual(logRegressionOutputColumns(c).map(f=>f.name),expected);
  const schema=logRegressionOutputColumns(c),order=mixed?[...schema.slice(0,4),schema[6],schema[4],schema[5],...schema.slice(7)]:schema;

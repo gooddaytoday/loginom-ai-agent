@@ -12,7 +12,7 @@ export function logRegressionOutputColumns(configuration,port=0){
   {name:'PredictionProbability',label:'Вероятность события|Прогноз',type:'real'},
   {name:'ActualEvent',label:'Событие|Факт',type:'boolean'},
   {name:target[0].name+'_predicted',label:target[0].label+'|Прогноз',type:'string'},
-  ...(configuration.fields.some(f=>f.usage_type===7)?[...configuration.fields.filter(f=>f.usage_type===3),...target,...configuration.fields.filter(f=>![3,4].includes(f.usage_type))]:configuration.fields).map(({name,label,type,data_kind})=>({name,label,type,data_kind}))];
+  ...(configuration.fields.some(f=>f.usage_type===7)?[...configuration.fields.filter(f=>f.usage_type===3),...target,...configuration.fields.filter(f=>![3,4,7].includes(f.usage_type)),...configuration.fields.filter(f=>f.usage_type===7)]:configuration.fields).map(({name,label,type,data_kind})=>({name,label,type,data_kind}))];
 }
 export async function configureLogRegressionOutputs(channel,configuration,p,mappings,finishWizard){
  need(mappings.length===0,'mapping overrides are outside stage 1');
