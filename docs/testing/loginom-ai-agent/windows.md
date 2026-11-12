@@ -72,6 +72,12 @@ Electron `app.quit()` через Node inspector на случайном loopback
 Smoke не заменяет полную матрицу ниже: он не проверяет бизнес-сценарии,
 DPAPI, обновление, отображение UI и подпись релизного gate.
 
+`crash-log-absent` проверяет буквальное отсутствие файла: информационный
+`crash reporter started` в `crash.log` тоже даёт FAIL. Это отдельно от
+`no-minidumps` и `no-error-lines` (ERROR/FATAL, uncaught/unhandled rejection).
+Наличие такого файла само по себе не доказывает падение; смотрите его содержимое
+и остальные строки отчёта. WARN остаются в приложенных журналах для разбора.
+
 ## 1. Машина и входные материалы
 
 - Нативная Windows 11 x64, обычный пользователь. Записать edition, build ОС и архитектуру. Windows Server, Windows ARM64 и WSL не заменяют эту конфигурацию.
