@@ -943,6 +943,18 @@ def check_text_mask(replies, mask):
 TEXT_FOLDERS = ('transactions', 'customers', 'accounts', 'beneficiaries', 'devices', 'risk_reference')
 
 
+def folder_source_metrics(events):
+    # Metric only (LAB-1468 stage 0: 8 refused folder/mask lookups on base).
+    calls = [e.get('part', {}) for _, e in events if e.get('type') == 'tool_use']
+    def refused(call):
+        state = call.get('state', {})
+        path = str((state.get('input') or {}).get('path', ''))
+        text = str(state.get('output') or state.get('error') or '')
+        return '"status":"SUCCEEDED"' not in text and (path.endswith('/') or '*' in path or not re.search(r'\.[^./]{1,8}$', path))
+    return dict(folder_source_refusals=sum(refused(c) for c in calls if str(c.get('tool', '')).endswith('dock_storage_source')),
+                storage_list_calls=sum(str(c.get('tool', '')).endswith('dock_storage_list') for c in calls))
+
+
 def check_text_folder_masks(replies, source_dir, data, expected, node_binary='node'):
     # One Import per folder: the native mask for 2+ CSVs, the exact file for one.
     reads = {}
@@ -2380,6 +2392,7 @@ class Runner:
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
         if spec.get('text_folder_masks'):
+            self.current.update(folder_source_metrics(events))
             check_text_folder_masks(replies, source_dir, spec['data'], expected, build / 'resources/loginom/bin/node')
             assert any(save_confirmed(spec, o, package) for _, o in replies), 'SAVE_NOT_CONFIRMED'
             self.current.update(save='PASS', csv='— (six imports)', **{'folder-masks': 'PASS'})

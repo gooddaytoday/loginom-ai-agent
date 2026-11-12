@@ -2808,8 +2808,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         // A folder listing reads the same native Files rows; it never uploads,
         // imports, creates or deletes anything on the server.
         const listing=name==='dock_storage_list',directories=getStorageBinding()?.directories;
-        if(!listing&&typeof request.path==='string'&&(request.path.endsWith('/')||!/\.[^./]{1,8}$/.test(request.path)))
-          throw Error('dock_storage_source needs one exact file path; to see a server folder\'s files call dock_storage_list with the folder path');
+        // LAB-1468 stage 0: folder and `<folder>/*.csv` paths were refused only
+        // after navigation. Name the listing tool before any browser action.
+        if(!listing&&typeof request.path==='string'&&(request.path.endsWith('/')||/[*?]/.test(request.path)||!/\.[^./]{1,8}$/.test(request.path)))
+          throw Error('dock_storage_source needs one exact file path, not a folder or mask; to see a server folder\'s files call dock_storage_list with the folder path and pattern');
         const path=listing?requireStorageDestination(typeof request.path==='string'&&request.path.length>1?request.path.replace(/\/$/,''):request.path,directories,'inputs',{directory:true})
           :requireStorageDestination(request.path,directories,'inputs');
         if(!listing&&!/\.(csv|tsv|txt|xlsx|lgd)$/i.test(path))throw Error('Server source must be CSV/TSV/TXT/XLSX/LGD');

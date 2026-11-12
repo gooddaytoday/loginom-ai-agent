@@ -38,6 +38,11 @@ bad=copy.deepcopy(good);bad.append((9,reply('devices','devices.csv','other',3)))
 refused(bad,'TEXT_FOLDER_IMPORT_RECREATED')
 bad=copy.deepcopy(good);bad[0][1]['output']['ports'][0]['row_count']=1
 refused(bad,'TEXT_FOLDER_ROW_COUNT')
+call=lambda tool,path,out:dict(type='tool_use',part=dict(tool=tool,state=dict(input=dict(path=path),output=out)))
+ev=[(1,call('loginom_dock_storage_source',d+'/transactions/*.csv','{"status":"FAILED"}')),
+ (2,call('loginom_dock_storage_source',d+'/accounts/accounts.csv','{"status":"SUCCEEDED"}')),
+ (3,call('loginom_dock_storage_list',d+'/customers','{"status":"SUCCEEDED"}'))]
+assert r.folder_source_metrics(ev)==dict(folder_source_refusals=1,storage_list_calls=1)
 `],{encoding:'utf8'});
  assert.equal(result.status,0,result.stderr);
 });

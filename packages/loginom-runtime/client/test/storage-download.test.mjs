@@ -519,6 +519,8 @@ test('folder listing returns every native Files row with its own storage referen
  assert.ok(tool);assert.equal(tool.annotations.readOnlyHint,true);
  // The observed refusal (LAB-1468): a folder given to the single-file locator.
  await assert.rejects(r.serverDownload({operation_id:'folder-as-file',path:dir+'/'},'dock_storage_source'),/dock_storage_list/);
+ await assert.rejects(r.serverDownload({operation_id:'mask-as-file',path:dir+'/*.csv'},'dock_storage_source'),/dock_storage_list/);
+ await assert.rejects(r.serverDownload({operation_id:'bare-folder',path:dir},'dock_storage_source'),/dock_storage_list/);
  await assert.rejects(r.serverDownload({operation_id:'foreign',path:'/foreign/transactions'},'dock_storage_list'));
  await assert.rejects(r.serverDownload({operation_id:'bad-pattern',path:dir,pattern:'*.csv|*.txt'},'dock_storage_list'),/\* only/);
  const result=await r.serverDownload({operation_id:'list',path:dir+'/',pattern:'*.csv'},'dock_storage_list');
