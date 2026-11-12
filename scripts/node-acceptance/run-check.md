@@ -206,6 +206,11 @@ and NULL retained as distinct values through CSV, Save and cold reexecution.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
 
+`factor-apply`: утверждённый `task-apply.md`, matrix.csv → update.csv на том же
+обученном PCA-узле без Teach. Проверяет Real scores и прежние нагрузки двух
+портов через независимый sign-aware matcher; CSV, Save, cold и cleanup штатные.
+Oracle и expected модели не передаются.
+
 `excel-import-named`: утверждённый C3, `SalesRange` строго B:C (2 строки),
 затем продолжение до последней заполненной строки на том же узле (3 строки).
 Два CSV проверяются отдельно; внутренние typed-checkpoints подтверждают оба
