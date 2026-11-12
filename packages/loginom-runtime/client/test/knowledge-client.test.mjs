@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createKnowledgeClient, HELP_URI } from '../lib/knowledge-client.mjs';
+import { createKnowledgeClient, HELP_URI, helpPageUrl } from '../lib/knowledge-client.mjs';
 import { helpFixture } from './support/help-fixture.mjs';
 
 async function client(t, options) {
@@ -54,7 +54,7 @@ test('find respects target_uri, read_content and refuses retired sources', async
 test('read maps .html links and directories to shipped pages and suggests pages for a wrong path', async t => {
   const { call } = await client(t);
   const html = await call('read', { uris: `${HELP_URI}/data/processors/integration/rest-request.html` });
-  assert.match(html.text, new RegExp(`^=== ${HELP_URI}/data/processors/integration/rest-request\\.md ===\\n# REST-запрос`));
+  assert.match(html.text, new RegExp(`^=== ${HELP_URI}/data/processors/integration/rest-request\\.md ===\\nSite URL: .*/rest-request\\.html\\n# REST-запрос`));
   assert.match((await call('read', { uris: 'processors/transformation/calc/' })).text, /# Калькулятор/);
   const both = await call('read', { uris: ['processors/func/calc-func/string.md', 'processors/trees/missing.md'] });
   assert.equal(both.isError, false);
@@ -63,6 +63,25 @@ test('read maps .html links and directories to shipped pages and suggests pages 
   const missing = await call('read', { uris: 'processors/integration/rest.md' });
   assert.equal(missing.isError, true);
   assert.match(missing.text, /Similar pages:\n- .*rest-request\.md — REST-запрос/);
+});
+
+test('read and find give the page address on the Help site, not one rebuilt from the URI', async t => {
+  const site = 'https://help.loginom.ru/userguide/';
+  assert.equal(helpPageUrl(site, 'data/processors/func/calc-func/datetime.md'), `${site}processors/func/calc-func/datetime.html`);
+  assert.equal(helpPageUrl(site, 'data/README.md'), site);
+  assert.equal(helpPageUrl(site, 'data/admin/README.md'), `${site}admin/`);
+  assert.equal(helpPageUrl(site, 'data/справка/мой файл.md'), `${site}%D1%81%D0%BF%D1%80%D0%B0%D0%B2%D0%BA%D0%B0/%D0%BC%D0%BE%D0%B9%20%D1%84%D0%B0%D0%B9%D0%BB.html`);
+  const { call } = await client(t);
+  const read = await call('read', { uris: ['processors/func/calc-func/datetime.md', 'processors/transformation/calc/', HELP_URI] });
+  assert.match(read.text, new RegExp(`datetime\\.md ===\\nSite URL: ${site}processors/func/calc-func/datetime\\.html\\n# Дата/Время`));
+  assert.match(read.text, new RegExp(`calc/README\\.md ===\\nSite URL: ${site}processors/transformation/calc/\\n# Калькулятор`));
+  assert.match(read.text, new RegExp(`data/README\\.md ===\\nSite URL: ${site}\\n# Loginom`));
+  const found = (await call('find', { query: 'AddDay', limit: 1 })).text.split('\n');
+  assert.match(found[0], /^1\. .*datetime\.md /);
+  assert.equal(found[1], `Site URL: ${site}processors/func/calc-func/datetime.html`);
+  // Without a site in the manifest there is no address to give.
+  const bare = await client(t, { source: null });
+  assert.doesNotMatch((await bare.call('read', { uris: 'processors/func/calc-func/datetime.md' })).text, /Site URL/);
 });
 
 test('list, tree, glob and grep browse the shipped tree', async t => {
@@ -157,4 +176,25 @@ test('every node card help_path opens a shipped Help page', { skip: !existsSync(
     if (result.isError) broken.push(`${node.type}: ${node.sources.help_path}`);
   }
   assert.deepEqual(broken, []);
+});
+
+test('every shipped Help page gives a site address that opens the same page again', { skip: !existsSync(join(shipped, 'help-manifest.json')) }, async () => {
+  const manifest = JSON.parse(await readFile(join(shipped, 'help-manifest.json'), 'utf8'));
+  const site = manifest.source.url;
+  assert.equal(site, 'https://help.loginom.ru/userguide/');
+  const knowledge = await createKnowledgeClient({ helpRoot: shipped });
+  const urls = new Set(), wrong = [];
+  for (const { path } of manifest.files) {
+    const result = await knowledge.call({ run: 'r', id: path, name: 'read', arguments: { uris: path } });
+    const [head, line] = result.content[0].text.split('\n');
+    const url = line.replace(/^Site URL: /, '');
+    urls.add(url);
+    if (head !== `=== ${HELP_URI}/${path} ===` || url !== helpPageUrl(site, path) || !url.startsWith(site) || !/(\.html|\/)$/.test(url)) wrong.push(`${path}: ${line}`);
+    // The site path read back through the tool resolves to the page it came from (the site has its own data/ section).
+    const back = await knowledge.call({ run: 'r', id: url, name: 'read', arguments: { uris: `${HELP_URI}/data/${decodeURI(url.slice(site.length))}` } });
+    if (!back.content[0].text.startsWith(`=== ${HELP_URI}/${path} ===\n`)) wrong.push(`${path}: ${url} reads back as ${back.content[0].text.split('\n')[0]}`);
+  }
+  assert.equal(manifest.files.length, 310);
+  assert.equal(urls.size, manifest.files.length);
+  assert.deepEqual(wrong, []);
 });

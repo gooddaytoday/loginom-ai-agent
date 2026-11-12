@@ -20,7 +20,7 @@ def expected():
     return {'package_path': '{{PACKAGE_PATH}}', 'null_marker': 'NULL',
             'nodes': [{'type': 'transform.filter_data'}], 'outputs': [
                 {'output_node_type': 'transform.filter_data', 'output_port': port,
-                 'ordered': False, 'column_order': 'exact', 'columns': columns,
+                 'ordered': False, 'column_order': 'any', 'columns': columns,
                  'rows': [r for r in rows if (r['Region'] in ('North', 'South')) == (port == 0)]}
                 for port in (0, 1)]}
 
