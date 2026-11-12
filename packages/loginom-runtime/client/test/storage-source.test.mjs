@@ -155,6 +155,9 @@ test('bound Import rerun with parameters.source names the source-free rerun requ
  assert.deepEqual(error.nodePhaseRefusal,{phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
  const fresh=await driverFor({target:{kind:'new'},bindings:[]}).verifySource(p).then(()=>assert.fail('refused'),e=>e);
  assert.equal(fresh.message,'Storage source exact destination differs');
+ const explicit={...p,settings:{source:{source_path:'/worker/other.csv'}}};
+ const wrongPath=await driverFor({target:{kind:'existing'},bindings:[]}).verifySource(explicit).then(()=>assert.fail('refused'),e=>e);
+ assert.equal(wrongPath.message,'Storage source exact destination differs');
 });
 test('schema verification covers every column attribute, order, parsing and output mapping',()=>{
  const field={index:0,name:'A',label:'Amount',type:'real',data_kind:'Непрерывный',used:true};

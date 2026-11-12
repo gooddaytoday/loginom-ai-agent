@@ -462,7 +462,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         if(operation.parameters?.bindings?.length&&storage)p={...p,settings:{...p.settings,source:{...p.settings.source,source_path:storage.destination}}};
         try{sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),storage);}
         catch(error){
-          if(error.message==='Storage source exact destination differs'&&operation.parameters?.target?.kind==='existing'&&!operation.parameters.bindings?.length)
+          if(error.message==='Storage source exact destination differs'&&operation.parameters?.target?.kind==='existing'&&!operation.parameters.bindings?.length
+            &&!Object.hasOwn(p.settings?.source??{},'source_path'))
             error.message+='; bound Import rerun after CsvPath change: omit parameters.source; send parameters:{settings:{}}, bindings:[], empty inputs/mappings';
           throw error;
         }
