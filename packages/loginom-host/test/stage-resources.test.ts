@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
 import { productHelpDirectory, productSkillsDirectory } from "@loginom-ai-agent/product/skills"
@@ -164,9 +164,11 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       expect(await readFile(join(destination, "licenses/Golos-OFL.txt")))
         .toEqual(await readFile(join(productSkillsDirectory, "package-docs/assets/fonts/OFL.txt")))
       const script = join(destination, "skills/package-docs/scripts/package-docs.mjs")
+      const alias = join(root, "docs entry alias")
+      await symlink(dirname(script), alias, process.platform === "win32" ? "junction" : "dir")
       const environment = { LANG: "C.UTF-8", ...(process.platform === "win32"
         ? { SystemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT } : {}) }
-      const skeleton = Bun.spawn([join(destination, manifest.node), script, "skeleton", "--lgp",
+      const skeleton = Bun.spawn([join(destination, manifest.node), "--preserve-symlinks-main", join(alias, "package-docs.mjs"), "skeleton", "--lgp",
         join(import.meta.dir, "fixtures/package-docs/demo.lgp"), "--directory", root],
         { cwd: root, env: environment, stdout: "pipe", stderr: "pipe" })
       const paths = new Response(skeleton.stdout).text()
