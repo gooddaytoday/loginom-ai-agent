@@ -86,7 +86,8 @@ jobs:
       - name: Run package-local checks
         shell: pwsh
         run: |
-          & $env:LOGINOM_CI_NODE_SOURCE --test packages/desktop/test/loginom/windows-installed-smoke.test.mjs
+          & .\packages\desktop\test\loginom\windows-installed-smoke.test.ps1 `
+            -RipgrepPath .\packages\desktop\resources\loginom\ripgrep\rg.exe
           if ($LASTEXITCODE -ne 0) { throw "Installed smoke regression tests failed" }
           Push-Location packages/desktop
           try {
@@ -148,15 +149,17 @@ jobs:
           $version = (Get-Content -LiteralPath packages/desktop/package.json -Raw | ConvertFrom-Json).version
           & .\packages\desktop\test\loginom\windows-installed-smoke.ps1 `
             -Installer $installer[0].FullName `
-            -EvidenceDirectory (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
-            -Version $version -Channel dev -NodePath $env:LOGINOM_CI_NODE_SOURCE
+            -RunRoot (Join-Path $env:LOGINOM_WINDOWS_OUTPUT "installed-smoke") `
+            -ExpectedVersion $version -Channel dev -AllowServer -KeepProxy
 
       - name: Upload installed Desktop smoke diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: loginom-windows-installed-smoke-${{ github.run_id }}
-          path: ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/
+          path: |
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/report.json
+            ${{ env.LOGINOM_WINDOWS_OUTPUT }}/installed-smoke/logs.zip
           if-no-files-found: warn
           retention-days: 7
 
