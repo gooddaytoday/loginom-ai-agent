@@ -7,7 +7,7 @@ import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
-import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { stageHeldKnowledge } from "./fixtures/knowledge"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
@@ -160,35 +160,20 @@ test("a non-boolean recovery mode is rejected before the host starts", async () 
 test.each(["ready", "close"])(
   "private Help preflight waits for the catalog or cancels on shutdown: %s",
   async (mode) => {
-    const cleanup: (() => void | Promise<void>)[] = []
-    const entered = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
-    const server = await knowledgeServer(
-      { after: (callback) => cleanup.push(callback) },
-      {
-        list: async () => {
-          entered.resolve()
-          await release.promise
-          return { tools: server.tools }
-        },
-      },
-    )
     const resources = join(fixture.directory, "knowledge-resources-" + mode)
     const root = join(fixture.directory, "knowledge-profile-" + mode)
     const marker = join(root, "forbidden-browser")
     await mkdir(join(resources, "bin"), { recursive: true })
-    await mkdir(join(resources, "runtime/src"), { recursive: true })
     await symlink(fixture.node, join(resources, "bin/node"))
-    await symlink(
-      join(import.meta.dir, "../../loginom-runtime/src/knowledge-entry.mjs"),
+    const catalog = await stageHeldKnowledge(
       join(resources, "runtime/src/knowledge-entry.mjs"),
+      join(fixture.directory, "knowledge-gate-" + mode),
     )
     await writeFile(
       join(resources, "runtime/src/managed-entry.mjs"),
       `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
     )
-    await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-    await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET")
+    await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({}))
     await mkdir(root, { recursive: true, mode: 0o700 })
     if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
     const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
@@ -215,7 +200,7 @@ test.each(["ready", "close"])(
         generation: 1,
         url: "http://127.0.0.1:1/app/?custom=preserve",
       })
-      await entered.promise
+      await catalog.entered()
       const settled = { value: false }
       const readiness = host.request("connection.ready", {}).finally(() => {
         settled.value = true
@@ -224,7 +209,7 @@ test.each(["ready", "close"])(
       await host.request("connection.status", {})
       expect(settled.value).toBe(false)
       if (mode === "ready") {
-        release.resolve()
+        await catalog.release()
         expect(await readiness).toMatchObject({ state: "ready", generation: 1 })
       } else {
         await host.close()
@@ -233,9 +218,8 @@ test.each(["ready", "close"])(
       }
       await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
     } finally {
-      release.resolve()
+      await catalog.release()
       await host.close().catch(() => {})
-      for (const callback of cleanup) await callback()
       if (process.platform === "darwin") {
         const child = Bun.spawn(
           [

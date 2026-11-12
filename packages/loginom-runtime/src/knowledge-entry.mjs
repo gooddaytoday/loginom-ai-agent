@@ -1,8 +1,9 @@
 import { createKnowledgeClient, knowledgeRequestKey, validateKnowledgeInterrupt } from '../client/lib/knowledge-client.mjs';
+import { isAbsolute } from 'node:path';
 import { startupDiagnostic } from '../client/lib/catalog.mjs';
 
 process.umask(0o077);
-const state = { client: undefined, closing: undefined, controller: new AbortController(), startupDiagnostics: [], apiKey: undefined };
+const state = { client: undefined, closing: undefined, controller: new AbortController(), startupDiagnostics: [] };
 const requests = new Set();
 const calls = new Map();
 const send = (message, disconnect = false) => {
@@ -44,18 +45,11 @@ async function handle(message) {
       if (state.client) throw Error('LOGINOM_ALREADY_STARTED');
       const input = message.input;
       if (!input || input.protocol !== 1 || !Number.isSafeInteger(input.generation) || input.generation < 1
-        || typeof input.endpoint !== 'string' || !URL.canParse(input.endpoint) || typeof input.apiKey !== 'string'
-        || Object.keys(input).some(key => !['protocol', 'generation', 'endpoint', 'apiKey'].includes(key)))
+        || typeof input.helpRoot !== 'string' || !isAbsolute(input.helpRoot)
+        || Object.keys(input).some(key => !['protocol', 'generation', 'helpRoot'].includes(key)))
         throw Error('LOGINOM_START_INVALID');
-      const endpoint = new URL(input.endpoint);
-      if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.hash)
-        throw Error('LOGINOM_START_INVALID');
-      state.apiKey = input.apiKey;
-      state.client = createKnowledgeClient(input, state.controller.signal, {
-        deadline: Date.now() + 120000,
-        onFailure: (error, detail) => state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error, [input.apiKey]) }),
-      });
-      // Readiness is observed through list; admission of start does not wait for the network.
+      state.client = createKnowledgeClient(input, state.controller.signal);
+      // Readiness is observed through list; admission of start does not wait for the Help index.
       void state.client.catch(() => {});
       send({ id: message.id, result: { protocol: 1, generation: input.generation, started: true } });
       return;
@@ -88,7 +82,7 @@ async function handle(message) {
   } catch (error) {
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'LOGINOM_KNOWLEDGE_FAILED';
     if (['start', 'list'].includes(message.operation) && !state.startupDiagnostics.length)
-      state.startupDiagnostics.push({ phase: 'knowledge.catalog', retry: false, error: startupDiagnostic(error, [state.apiKey]) });
+      state.startupDiagnostics.push({ phase: 'knowledge.catalog', retry: false, error: startupDiagnostic(error) });
     send({ id: message.id, error: code, startupFailure: error?.startupFailure, ...(['start', 'list'].includes(message.operation)
       ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === 'close');
   }

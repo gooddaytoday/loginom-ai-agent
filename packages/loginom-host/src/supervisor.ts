@@ -13,7 +13,6 @@ export type Launch = {
   stateDir: string
   generation: number
   chat: string
-  endpoint: string
   connection: { apiKey: string; password: string; url: string; username: string }
   actionManifestUri?: string
   actionManifestSha256?: string
@@ -31,7 +30,7 @@ export type Launch = {
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }
-export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
+export type KnowledgeLaunch = ProcessLaunch & { helpRoot: string }
 
 export class RuntimeStartupError extends Error {
   constructor(
@@ -106,7 +105,7 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
 // Both use the same private transport and acknowledged cleanup contract.
 export async function supervise(input: Launch, signal?: AbortSignal) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
-  // Browser validation follows the separate key-only Help check in Host.
+  // Browser validation follows the separate local Help check in Host.
   const runtime = await superviseProcess(
     { ...input, diagnosticSecrets: [input.connection.apiKey, input.connection.password, input.connection.username] },
     { ...input, environment: undefined, protocol: 1 },
@@ -130,13 +129,13 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
 }
 
 export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortSignal) {
+  if (!isAbsolute(input.helpRoot)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const runtime = await superviseProcess(
-    { ...input, diagnosticSecrets: [input.apiKey] },
+    input,
     {
       protocol: 1,
       generation: input.generation,
-      endpoint: input.endpoint,
-      apiKey: input.apiKey,
+      helpRoot: input.helpRoot,
     },
     120_000,
     signal,

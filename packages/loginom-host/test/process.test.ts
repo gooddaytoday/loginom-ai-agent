@@ -31,7 +31,6 @@ process.on('message', message => {
       generation: 7,
       chat: "one",
       environment: { ...process.env, OPENAI_API_KEY: "provider-secret-must-not-reach-runtime" },
-      endpoint: "https://example.test/mcp",
       connection: { apiKey: "private-key", password: "", url: "http://example.test", username: "user" },
     })
     expect(child.ready).toMatchObject({ generation: 7, ready: true })
@@ -45,7 +44,6 @@ process.on('message', message => {
         stateDir: directory,
         generation: 7,
         chat: "one",
-        endpoint: "https://example.test/mcp",
         connection: { apiKey: "wrong", password: "", url: "http://example.test", username: "user" },
       }),
     ).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
@@ -80,7 +78,6 @@ test("runtime cleanup requires both a close acknowledgement and a clean exit", a
         stateDir: directory,
         generation: 1,
         chat: "cleanup",
-        endpoint: "https://example.test",
         connection: { apiKey: "fixture", password: "", url: "https://example.test", username: "test" },
       })
       await expect(child.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
@@ -113,7 +110,6 @@ test("IPC disconnect rejects in-flight requests even while the runtime stays ali
     stateDir: directory,
     generation: 1,
     chat: "disconnect",
-    endpoint: "https://example.test",
     connection: { apiKey: "fixture", password: "", url: "https://example.test", username: "test" },
   })
   const deadline = Promise.withResolvers<string[]>()

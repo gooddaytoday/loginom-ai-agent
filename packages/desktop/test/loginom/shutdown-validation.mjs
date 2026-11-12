@@ -6,9 +6,9 @@ import { once } from "node:events"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
-import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
-// Opt-in native acceptance. Uses only private profiles and local HTTP fixtures.
+// Opt-in native acceptance. Uses only private profiles and local HTTP fixtures;
+// Help is the one shipped in the tested executable's resources/loginom/help.
 const executable = process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE
 const report = process.env.LOGINOM_AI_AGENT_TEST_REPORT
 const source = process.env.LOGINOM_AI_AGENT_TEST_SOURCE_SHA
@@ -30,12 +30,6 @@ async function processes() {
 
 for (const phase of ["navigation", "login-form"]) {
   const profile = await mkdtemp(join(tmpdir(), "desktop-validation-shutdown-"))
-  const cleanup = []
-  // The tested executable carries the knowledge key it was built with.
-  const help = await knowledgeServer(
-    { after: (callback) => cleanup.push(callback) },
-    { apiKey: process.env.LOGINOM_MCP_API_KEY ?? "UNIT-NONSECRET" },
-  )
   const entered = Promise.withResolvers()
   const release = Promise.withResolvers()
   const http = createServer(async (request, response) => {
@@ -83,7 +77,6 @@ for (const phase of ["navigation", "login-form"]) {
         LOGINOM_AI_AGENT_TEST_ROOT: profile,
         LOGINOM_AI_AGENT_TEST_ONBOARDING: "1",
         LOGINOM_AI_AGENT_TEST_HEADLESS: "1",
-        LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT: help.endpoint,
         LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
       },
     })
@@ -186,7 +179,6 @@ for (const phase of ["navigation", "login-form"]) {
     await application?.close().catch(() => {})
     http.closeAllConnections()
     await new Promise((resolve) => http.close(resolve))
-    for (const callback of cleanup) await callback()
     await rm(profile, { recursive: true, force: true })
   }
 }

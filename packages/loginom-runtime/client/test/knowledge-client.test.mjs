@@ -1,246 +1,139 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
-import { knowledgeServer } from './support/knowledge-server.mjs';
+import { existsSync } from 'node:fs';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createKnowledgeClient, HELP_URI } from '../lib/knowledge-client.mjs';
+import { helpFixture } from './support/help-fixture.mjs';
 
-for (const stage of ['initialize', 'tools/list']) for (const failures of [1, 2]) {
-  test(`catalog startup ${stage}: ${failures} transient HTTP failures, at most one retry`, async t => {
-    let attempts = 0;
-    const server = await knowledgeServer(t, { request(body, request, response) {
-      if (body?.method !== stage) return false;
-      if (++attempts > failures) return false;
-      response.writeHead(503); response.end('temporary catalog outage'); return true;
-    } });
-    const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-    const starting = createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-    if (failures === 1) {
-      const knowledge = await starting;
-      assert.equal(knowledge.tools.length, 7); await knowledge.close();
-    } else await assert.rejects(starting);
-    assert.equal(attempts, 2);
-    assert.equal(server.calls.length, 0);
-  });
+async function client(t, options) {
+  const knowledge = await createKnowledgeClient({ helpRoot: await helpFixture(t, options) });
+  t.after(() => knowledge.close());
+  let n = 0;
+  const call = async (name, args) => {
+    const result = await knowledge.call({ run: 'run-1', id: `call-${++n}`, name, arguments: args });
+    return { text: result.content.map(item => item.text).join('\n'), isError: result.isError === true };
+  };
+  return { knowledge, call };
 }
 
-test('initialization and listTools share a single retry allowance', async t => {
-  let initialized = 0, listed = 0;
-  const server = await knowledgeServer(t, { request(body, request, response) {
-    if (body?.method === 'initialize' && ++initialized === 1 || body?.method === 'tools/list' && ++listed === 1) {
-      response.writeHead(503); response.end('temporary'); return true;
-    }
-    return false;
-  } });
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  await assert.rejects(createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }));
-  assert.equal(initialized, 2); assert.equal(listed, 1);
+test('catalog keeps the seven read-only tool names and a stable digest', async t => {
+  const { knowledge } = await client(t);
+  assert.deepEqual(knowledge.tools.map(tool => tool.name).sort(), ['find', 'glob', 'grep', 'list', 'read', 'search', 'tree']);
+  const again = await createKnowledgeClient({ helpRoot: await helpFixture(t) });
+  assert.equal(knowledge.catalogSha256, again.catalogSha256);
+  await assert.rejects(knowledge.call({ run: 'r', id: 'i', name: 'write', arguments: {} }), /LOGINOM_KNOWLEDGE_TOOL_DENIED/);
+  await assert.rejects(knowledge.call({ run: '', id: 'i', name: 'read', arguments: {} }), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
 });
 
-test('semantic catalog failure is not retried', async t => {
-  let listed = 0;
-  const server = await knowledgeServer(t, { list() { listed++; throw Error('invalid catalog'); } });
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  await assert.rejects(createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }));
-  assert.equal(listed, 1);
+test('find reaches a Calculator function by a name from another system through build-time synonyms', async t => {
+  const { call } = await client(t);
+  const found = await call('find', { query: 'функции калькулятор дата DateOf IncDay' });
+  assert.equal(found.isError, false);
+  assert.match(found.text.split('\n')[0], new RegExp(`^1\\. ${HELP_URI}/data/processors/func/calc-func/datetime\\.md .*> AddDay`));
+  assert.match((await call('search', { query: 'Excel LEFT first characters' })).text.split('\n')[0], /string\.md .*> Left/);
+  // A page-level synonym points at the page itself, not at the synonym text.
+  const rest = await call('find', { query: 'HTTP API call' });
+  assert.match(rest.text, /rest-request\.md/);
+  assert.doesNotMatch(rest.text, /web request headers/);
 });
 
-test('startup classification preserves only safe nested network and protocol evidence', async () => {
-  const { knowledgeStartupFailure } = await import('../lib/knowledge-client.mjs');
-  const error = new TypeError('fetch failed: PRIVATE-BODY https://private.test/?key=PRIVATE-KEY', {
-    cause: new AggregateError([
-      Object.assign(Error('PRIVATE-MESSAGE'), { code: 'ECONNREFUSED', headers: { authorization: 'PRIVATE-KEY' } }),
-      Object.assign(Error('PRIVATE-MESSAGE'), { code: 'PRIVATE-KEY' }),
-      Object.assign(Error('PRIVATE-MESSAGE'), { code: 'UND_ERR_CONNECT_TIMEOUT' }),
-    ]),
-  });
-  assert.deepEqual(knowledgeStartupFailure(error, 'connect_initialize', 17, false), {
-    stage: 'connect_initialize', error_class: 'TypeError', code: null,
-    cause_codes: ['ECONNREFUSED', 'UND_ERR_CONNECT_TIMEOUT'], aborted: false, timeout: true, elapsed_ms: 17,
-  });
-  assert.deepEqual(knowledgeStartupFailure(Object.assign(Error('PRIVATE-BODY'), { name: 'PRIVATE-KEY', code: 403 }),
-    'catalog', 1, false), {
-    stage: 'catalog', error_class: 'Unknown', code: 403, cause_codes: [], aborted: false, timeout: false, elapsed_ms: 1,
-  });
-  for (const code of ['ETIMEDOUT', -32001])
-    assert.equal(knowledgeStartupFailure(Object.assign(Error('PRIVATE-MESSAGE'), { code }),
-      'connect_initialize', 1, false).timeout, true);
-
+test('find respects target_uri, read_content and refuses retired sources', async t => {
+  const { call } = await client(t);
+  const scoped = await call('find', { query: 'дни', target_uri: `${HELP_URI}/data/processors/transformation` });
+  assert.doesNotMatch(scoped.text, /datetime\.md/);
+  const full = await call('find', { query: 'DaysBetween', read_content: true, limit: 1 });
+  assert.match(full.text, /Возвращает полное количество дней между двумя датами/);
+  const retired = await call('find', { query: 'link', target_uri: 'viking://resources/loginom-dock/sources/e2e-tests' });
+  assert.equal(retired.isError, true);
+  assert.match(retired.text, /no longer shipped/);
+  assert.equal((await call('find', { query: '' })).isError, true);
 });
 
-test('knowledge reads real authenticated MCP schemas and Help without browser modules or a child process', async t => {
-  const server = await knowledgeServer(t);
-  const hooks = registerHooks({ resolve(specifier, context, next) {
-    if (/playwright|^(?:node:)?child_process$/.test(specifier)
-      || /(?:^|\/)lib\/(?:bridge|session)\.mjs$/.test(specifier))
-      throw Error('BROWSER_DEPENDENCY_FORBIDDEN');
-    return next(specifier, context);
-  } });
-  t.after(() => hooks.deregister());
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  t.after(() => knowledge.close());
-  assert.deepEqual(knowledge.tools.map(tool => tool.name).toSorted(), ['find', 'glob', 'grep', 'list', 'read', 'search', 'tree']);
-  assert.deepEqual(knowledge.tools.find(tool => tool.name === 'read'), server.tools.find(tool => tool.name === 'read'));
-  const uri = 'viking://resources/loginom-dock/sources/loginom-help/README.md';
-  const reply = await knowledge.call({ run: 'run-a', id: 'read-1', name: 'read', arguments: { uri } });
-  assert.deepEqual(JSON.parse(reply.content[0].text), { name: 'read', arguments: { uri } });
-  assert.equal(server.calls.length, 1);
-  assert.ok(server.requests.every(request => request.authorization === 'Bearer UNIT-NONSECRET'));
-  assert.match(knowledge.catalogSha256, /^[a-f0-9]{64}$/);
+test('read maps .html links and directories to shipped pages and suggests pages for a wrong path', async t => {
+  const { call } = await client(t);
+  const html = await call('read', { uris: `${HELP_URI}/data/processors/integration/rest-request.html` });
+  assert.match(html.text, new RegExp(`^=== ${HELP_URI}/data/processors/integration/rest-request\\.md ===\\n# REST-запрос`));
+  assert.match((await call('read', { uris: 'processors/transformation/calc/' })).text, /# Калькулятор/);
+  const both = await call('read', { uris: ['processors/func/calc-func/string.md', 'processors/trees/missing.md'] });
+  assert.equal(both.isError, false);
+  assert.match(both.text, /# Строковые функции/);
+  assert.match(both.text, /File not found/);
+  const missing = await call('read', { uris: 'processors/integration/rest.md' });
+  assert.equal(missing.isError, true);
+  assert.match(missing.text, /Similar pages:\n- .*rest-request\.md — REST-запрос/);
 });
 
-test('knowledge refuses requests after close with its own lifecycle error', async t => {
-  const server = await knowledgeServer(t);
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  await knowledge.close();
-  await assert.rejects(() => knowledge.call({ run: 'run-a', id: 'later', name: 'read', arguments: { uri: 'help' } }),
-    /LOGINOM_KNOWLEDGE_CLOSED/);
-  assert.equal(server.calls.length, 0);
+test('list, tree, glob and grep browse the shipped tree', async t => {
+  const { call } = await client(t);
+  assert.match((await call('list', { uri: `${HELP_URI}/data/processors/func/calc-func` })).text, /datetime\.md — Дата\/Время функции/);
+  const tree = (await call('tree', {})).text;
+  assert.match(tree, /^ {2}data\/$/m);
+  assert.match(tree, /^ {6}transformation\/$/m);
+  const glob = await call('glob', { pattern: '**/rest-request*' });
+  assert.match(glob.text, /rest-request\.md — REST-запрос/);
+  const grep = await call('grep', { uri: HELP_URI, pattern: ['AddDay\\(', 'Left\\('], node_limit: 5 });
+  assert.match(grep.text, /datetime\.md:5: \*\*AddDay\(Дата, Количество\)\*\*/);
+  assert.match(grep.text, /string\.md:5:/);
+  assert.equal((await call('grep', { uri: HELP_URI, pattern: '(' })).isError, true);
+  assert.equal((await call('list', { uri: `${HELP_URI}/data/README.md` })).isError, true);
 });
 
-test('interrupting one run cancels its concurrent Help request and leaves the other run intact', async t => {
-  const started = new Map(['a', 'b'].map(name => [name, Promise.withResolvers()]));
-  const finished = new Map(['a', 'b'].map(name => [name, Promise.withResolvers()]));
-  const server = await knowledgeServer(t, { call: async request => {
-    const name = request.arguments.uri;
-    started.get(name).resolve();
-    return finished.get(name).promise;
-  } });
-  t.after(() => { for (const gate of finished.values()) gate.resolve({ content: [] }); });
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  t.after(() => knowledge.close());
-  const a = knowledge.call({ run: 'run-a', id: 'same-id', name: 'read', arguments: { uri: 'a' } });
-  const rejected = assert.rejects(a, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  void rejected.catch(() => {});
-  const b = knowledge.call({ run: 'run-b', id: 'same-id', name: 'read', arguments: { uri: 'b' } });
-  void b.catch(() => {});
-  await Promise.all([...started.values()].map(gate => gate.promise));
-  knowledge.interrupt({ run: 'run-a' });
-  await rejected;
-  const result = { content: [{ type: 'text', text: 'Run B Help' }] };
-  finished.get('b').resolve(result);
-  assert.deepEqual(await b, result);
-  assert.equal(server.calls.length, 2);
-  finished.get('a').resolve({ content: [] });
+test('replies stay inside the agent output limit', async t => {
+  const big = '# Большая страница\n\n' + 'Строка справки с текстом. '.repeat(1400) + '\n';
+  const pages = Object.fromEntries(Array.from({ length: 4 }, (_, i) => [`data/big/page-${i}.md`, big]));
+  const { call } = await client(t, { pages, aliases: [] });
+  const reply = await call('read', { uris: Object.keys(pages) });
+  assert.ok(Buffer.byteLength(reply.text) <= 44000, `${Buffer.byteLength(reply.text)} bytes`);
+  assert.match(reply.text, /reply limit reached: \d more item/);
 });
 
-test('close aborts and drains the active Help request before resolving', async t => {
-  const started = Promise.withResolvers();
-  const finish = Promise.withResolvers();
-  const server = await knowledgeServer(t, { call: async () => {
-    started.resolve();
-    return finish.promise;
-  } });
-  t.after(() => finish.resolve({ content: [] }));
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  t.after(() => knowledge.close());
-  const call = knowledge.call({ run: 'run-a', id: 'request-a', name: 'read', arguments: { uri: 'help' } });
-  const rejected = assert.rejects(call, /LOGINOM_KNOWLEDGE_CLOSED/);
-  void rejected.catch(() => {});
-  await started.promise;
-  await knowledge.close();
-  await rejected;
-  assert.equal(server.calls.length, 1);
+test('a changed Help file refuses startup instead of serving unverified text', async t => {
+  const helpRoot = await helpFixture(t, { tamper: 'data/README.md' });
+  await assert.rejects(createKnowledgeClient({ helpRoot }), /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
+  await assert.rejects(createKnowledgeClient({ helpRoot: 'relative/help' }), /LOGINOM_CONFIG_REQUIRED/);
 });
 
-test('a missing Help API key is rejected before any network request', async t => {
-  const server = await knowledgeServer(t);
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  await assert.rejects(() => createKnowledgeClient({ endpoint: server.endpoint, apiKey: '' }), /LOGINOM_CONFIG_REQUIRED/);
-  assert.equal(server.requests.length, 0);
+// The shipped corpus: every Calculator function is found by its exact name.
+const shipped = fileURLToPath(new URL('../../../product/help', import.meta.url));
+test('shipped Help finds each Calculator function by name', { skip: !existsSync(join(shipped, 'help-manifest.json')) }, async () => {
+  const knowledge = await createKnowledgeClient({ helpRoot: shipped });
+  const manifest = JSON.parse(await readFile(join(shipped, 'help-manifest.json'), 'utf8'));
+  const names = [];
+  for (const file of manifest.files.filter(item => item.path.startsWith('data/processors/func/calc-func/'))) {
+    const text = await readFile(join(shipped, 'loginom-help', file.path), 'utf8');
+    for (const [, name] of text.matchAll(/^#{2,4}\s+([A-Z][A-Za-z0-9]+)\s*$/gm)) names.push([name, file.path]);
+  }
+  assert.ok(names.length > 100, `${names.length} functions`);
+  // Every function carries build-time synonyms; scripts/loginom-help/aliases.py lists missing ones.
+  const aliases = (await readFile(join(shipped, 'aliases.jsonl'), 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line));
+  assert.deepEqual(names.filter(([name, path]) => !aliases.some(item => item.path === path && item.fn === name)).map(([name]) => name), []);
+  const missed = [];
+  for (const [name, path] of names) {
+    const result = await knowledge.call({ run: 'r', id: name, name: 'find', arguments: { query: name, limit: 3 } });
+    if (!result.content[0].text.split('\n\n').some(block => block.includes(`${path} `) && block.includes(`> ${name} `))) missed.push(name);
+  }
+  assert.deepEqual(missed, []);
 });
 
-test('a partial remote Help catalog cannot become ready', async t => {
-  const server = await knowledgeServer(t, { names: ['read', 'write'] });
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  await assert.rejects(async () => {
-    const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-    await knowledge.close();
-  },
-    /LOGINOM_KNOWLEDGE_CATALOG_INVALID/);
-  assert.equal(server.calls.length, 0);
+test('shipped Help documents the Loginom line the bundled action catalogs target', { skip: !existsSync(join(shipped, 'help-manifest.json')) }, async () => {
+  const { loginom_version } = JSON.parse(await readFile(join(shipped, 'help-manifest.json'), 'utf8'));
+  const releases = fileURLToPath(new URL('../../executor/catalog-releases/', import.meta.url));
+  for (const release of await readdir(releases)) {
+    const { compatibility } = JSON.parse(await readFile(join(releases, release, 'manifest.json'), 'utf8'));
+    assert.equal(compatibility.loginom_build.split('.').slice(0, 2).join('.'), loginom_version, release);
+  }
 });
 
-test('unknown, mutable catalog and browser tool names cannot reach the remote service', async t => {
-  const server = await knowledgeServer(t);
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  t.after(() => knowledge.close());
-  knowledge.tools.push(server.tools.find(tool => tool.name === 'write'));
-  for (const name of ['write', 'dock_prepare', 'browser_navigate', 'READ'])
-    await assert.rejects(() => knowledge.call({ run: 'run-a', id: name, name, arguments: { uri: 'help' } }),
-      /LOGINOM_KNOWLEDGE_TOOL_DENIED/);
-  assert.equal(server.calls.length, 0);
-});
-
-test('an already aborted request never reaches the remote service', async t => {
-  const server = await knowledgeServer(t);
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  t.after(() => knowledge.close());
-  const controller = new AbortController();
-  controller.abort(Error('PRE_ABORTED'));
-  await assert.rejects(() => knowledge.call({ run: 'run-a', id: 'read', name: 'read', arguments: { uri: 'help' } },
-    controller.signal), /PRE_ABORTED/);
-  assert.equal(server.calls.length, 0);
-});
-
-test('a concurrent duplicate request id cannot overwrite the first cancellation owner', async t => {
-  const started = Promise.withResolvers();
-  const finish = Promise.withResolvers();
-  const server = await knowledgeServer(t, { call: async () => { started.resolve(); return finish.promise; } });
-  t.after(() => finish.resolve({ content: [] }));
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const knowledge = await createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  t.after(() => knowledge.close());
-  const input = { run: 'run-a', id: 'duplicate', name: 'read', arguments: { uri: 'help' } };
-  const active = knowledge.call(input);
-  const rejected = assert.rejects(active, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  void rejected.catch(() => {});
-  await started.promise;
-  await assert.rejects(() => knowledge.call(input), /LOGINOM_KNOWLEDGE_REQUEST_BUSY/);
-  knowledge.interrupt({ run: 'run-a', id: 'duplicate' });
-  await rejected;
-  assert.equal(server.calls.length, 1);
-});
-
-test('startup cancellation interrupts a pending remote catalog read', async t => {
-  const started = Promise.withResolvers();
-  const finish = Promise.withResolvers();
-  const server = await knowledgeServer(t, { list: async () => {
-    started.resolve();
-    return finish.promise;
-  } });
-  t.after(() => finish.resolve({ tools: server.tools }));
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const controller = new AbortController();
-  const starting = createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }, controller.signal);
-  void starting.then(knowledge => knowledge.close(), () => {});
-  const rejected = assert.rejects(starting, /STARTUP_STOPPED/);
-  void rejected.catch(() => {});
-  await started.promise;
-  controller.abort(Error('STARTUP_STOPPED'));
-  await rejected;
-});
-
-test('startup cancellation also interrupts a pending MCP initialization', async t => {
-  const started = Promise.withResolvers();
-  const finish = Promise.withResolvers();
-  const server = await knowledgeServer(t, { initialize: async () => {
-    started.resolve();
-    await finish.promise;
-  } });
-  t.after(() => finish.resolve());
-  const { createKnowledgeClient } = await import('../lib/knowledge-client.mjs');
-  const controller = new AbortController();
-  const starting = createKnowledgeClient({ endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' }, controller.signal);
-  void starting.then(knowledge => knowledge.close(), () => {});
-  const rejected = assert.rejects(starting, /INITIALIZATION_STOPPED/);
-  void rejected.catch(() => {});
-  await started.promise;
-  controller.abort(Error('INITIALIZATION_STOPPED'));
-  await rejected;
-  assert.equal(server.calls.length, 0);
+test('every node card help_path opens a shipped Help page', { skip: !existsSync(join(shipped, 'help-manifest.json')) }, async () => {
+  const { NODE_TYPES } = await import('../lib/node-contracts.mjs');
+  const knowledge = await createKnowledgeClient({ helpRoot: shipped });
+  const broken = [];
+  for (const node of Object.values(NODE_TYPES)) {
+    const uri = `${node.sources.help_root}/${node.sources.help_path}`;
+    const result = await knowledge.call({ run: 'r', id: node.type, name: 'read', arguments: { uris: uri } });
+    if (result.isError) broken.push(`${node.type}: ${node.sources.help_path}`);
+  }
+  assert.deepEqual(broken, []);
 });

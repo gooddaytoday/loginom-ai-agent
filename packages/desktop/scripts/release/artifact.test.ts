@@ -262,7 +262,7 @@ function releaseManifest(platform: "linux" | "win32") {
       profiles: "profile/loginom/runtime",
       secretStore: windows ? "electron-safeStorage-dpapi-current-user" : "plaintext-private-0600",
     },
-    connection: { schemaVersion: 1, generationProtocol: 1, knowledgeEndpoint: "https://example.test" },
+    connection: { schemaVersion: 1, generationProtocol: 1 },
     updater: { feed: null, channel: "prod", previousVersion: null },
     signing: { status: "unsigned", identity: null, notarized: false },
     installation: {

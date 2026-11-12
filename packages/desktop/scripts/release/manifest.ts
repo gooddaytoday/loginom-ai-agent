@@ -55,7 +55,6 @@ export const Manifest = Schema.Struct({
   connection: Schema.Struct({
     schemaVersion: Schema.Literal(1),
     generationProtocol: Schema.Literal(1),
-    knowledgeEndpoint: text,
   }),
   updater: Schema.Struct({ feed: nullable, channel: text, previousVersion: nullable }),
   signing: Schema.Struct({

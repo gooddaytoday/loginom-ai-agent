@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url"
 
 // This export is Node-only. The browser-facing Product entry must not import it.
 export const productSkillsDirectory = fileURLToPath(new URL("../skills/", import.meta.url))
+// Loginom Help shipped with the product: help-manifest.json, loginom-help/data/**.md and aliases.jsonl.
+export const productHelpDirectory = fileURLToPath(new URL("../help/", import.meta.url))
 export const reservedSkillNames = ["loginom-automation", "package-docs"] as const
 export const obsoleteSkillNames = ["package_docs"] as const
 

@@ -399,13 +399,7 @@ operation_id на том же узле. После подтверждённой 
 
 ## Справка и происхождение
 
-[Источники](references/sources.md) объясняют поиск и атрибуцию:
-
-| Назначение                                 | Корень                                                 |
-| ------------------------------------------ | ------------------------------------------------------ |
-| Назначение узла, настройки, формулы, типы  | `viking://resources/loginom-dock/sources/loginom-help` |
-| Закреплённые исходники UI-процедур         | `viking://resources/loginom-dock/sources/e2e-tests`    |
-| Оригинальный skill и история происхождения | `viking://resources/loginom-dock/sources/ai-skills`    |
+[Источники](references/sources.md) — справка Loginom, как в ней искать, атрибуция.
 
 Используй доступные инструменты Help `loginom_find`, `loginom_search`,
 `loginom_read`, `loginom_grep`, `loginom_glob`, `loginom_list`, `loginom_tree`.
