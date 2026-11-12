@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - ".gitattributes"
       - ".github/workflows/loginom-windows.yml"
       - "bun.lock"
       - "package.json"
@@ -180,13 +181,13 @@ jobs:
       - name: Run package-local checks
         shell: pwsh
         run: |
-          & $env:LOGINOM_CI_NODE_SOURCE --test packages/desktop/test/loginom/windows-sidecar-smoke.test.mjs
-          if ($LASTEXITCODE -ne 0) { throw "Installed sidecar probe regression tests failed" }
           & .\packages\desktop\test\loginom\windows-installed-smoke.test.ps1 `
             -RipgrepPath .\packages\desktop\resources\loginom\ripgrep\rg.exe
           if ($LASTEXITCODE -ne 0) { throw "Installed smoke regression tests failed" }
           Push-Location packages/desktop
           try {
+            & $env:LOGINOM_CI_NODE_SOURCE --test test/loginom/committed-hash-attributes.test.mjs test/loginom/windows-sidecar-smoke.test.mjs
+            if ($LASTEXITCODE -ne 0) { throw "Committed hash attributes / installed sidecar probe regression tests failed" }
             & $env:LOGINOM_CI_BUN_PATH typecheck
             if ($LASTEXITCODE -ne 0) { throw "Desktop typecheck failed" }
             & $env:LOGINOM_CI_BUN_PATH test electron-builder.config.test.ts scripts/copy-icons.test.ts scripts/release/artifact.test.ts src/main/apps.test.ts
