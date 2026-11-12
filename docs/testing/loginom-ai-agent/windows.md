@@ -1,6 +1,72 @@
-# Windows 11+ x64: передача агенту нативной приёмки
+# Windows 11+ x64: установленный Desktop и нативная приёмка
 
 Прочитать [общий протокол и сценарии](README.md) и создать [отчёт](report-template.md). Это инструкция будущего прогона, не подтверждение совместимости. Начальное состояние при отсутствии Loginom EXE/release manifest: **BLOCKED**.
+
+## Автоматический smoke установленного NSIS с Linux
+
+На выделенном Windows 11 x64 стенде с SSH запускается полный цикл
+`/S /currentuser` → установленный EXE → штатное закрытие через `WM_CLOSE` →
+`Uninstall … /S /currentuser`. На Linux нужны Python 3 и OpenSSH (`ssh`, `scp`),
+на Windows — штатный Windows PowerShell 5.1. Node/Bun/отдельный Chrome не нужны.
+Команда из корня checkout на mas:
+
+```sh
+python3 packages/desktop/test/loginom/windows-installed-smoke.py \
+  'C:\lab\loginom-ai-agent-0.3.9-win-x64.exe' \
+  --host winstand --channel prod --version 0.3.9 --output ./windows-v039
+```
+
+Первый аргумент — абсолютный путь на Windows, локальный Linux EXE (будет
+скопирован на стенд) или HTTPS URL (скачивается на стенде). `--version` —
+ожидаемая версия **внутри пакета**, а не имя ветки: кандидат `v040` может ещё
+содержать `0.3.9`. Для кандидата workflow используйте `--channel dev` и
+`--sha256 <desktop.sha256 из ci-summary.json>`; каждый запуск требует нового
+`--output`. SSH alias должен быть настроен заранее, пароль не запрашивается.
+
+Кандидат без публикации:
+
+```sh
+gh run list --workflow loginom-windows.yml --branch v040 --status success
+gh run list --workflow loginom-windows.yml --branch local-help --status success
+# Если успешного кандидата нет:
+gh workflow run loginom-windows.yml --ref v040
+gh run list --workflow loginom-windows.yml --branch v040
+gh run watch <run-id> --exit-status
+gh run download <run-id> --name loginom-windows-unsigned-<run-id> --dir ./windows-candidate
+```
+
+Выберите EXE, версию и канал того же artifact, проверьте `commit` и
+`desktop.sha256` в `ci-summary.json`. `release.yml` собирает релизные кандидаты
+и draft releases; `loginom-windows.yml` — отдельный Windows development
+кандидат. Эти сборки не запускают установленный Desktop на Windows 11.
+
+Скрипт печатает таблицу PASS/FAIL и возвращает 0 только при полном PASS
+(1 — отказ проверки, 2 — ошибка транспорта/получения отчёта). `report.json`
+содержит hash, подпись, ОС, регистрацию Installed Apps, путь EXE, ярлыки,
+PID/пути процессов и результаты. `logs.zip` содержит журналы изолированного
+профиля. Оба файла скачиваются в `--output`; оригиналы и профиль остаются в
+уникальном `C:\lab\loginom-smoke\<id>` для диагностики, путь печатается в конце.
+Отчёты и журналы не коммитить.
+
+Проверяются версия и `packaged/onboardingTest` в `app starting`, `server ready`,
+живой главный процесс и дочерние процессы, отсутствие `crash.log`, minidump и
+ошибок в журналах, отсутствие процессов из каталога установки после закрытия,
+удаление файлов/регистрации/ярлыков. Зависший процесс принудительно убирается
+только по принадлежащему установке PID и делает результат FAIL. Удаление
+проверяет `preservesUserData=true` по маркеру в обычном `%APPDATA%\<appId>` и
+сохранению журналов в `LOGINOM_AI_AGENT_TEST_ROOT`; собственный маркер затем
+удаляется. Существующие пользовательские данные не удаляются. Тестовый режим
+использует in-memory DB, поэтому история чатов/upgrade этим smoke не доказаны.
+
+Стенд должен быть выделен этому прогону. Уже установленный продукт выбранного
+канала — отказ preflight: сначала удалите его явно. Существующие установки и
+процессы не заменяются. Установка идёт в новый каталог внутри RunRoot, поэтому
+обычный путь установки по умолчанию требует отдельной проверки. Во время теста
+и после него `ProxyEnable=0`; профиль сети, firewall и задачи планировщика
+скрипт не меняет. Скрипт всегда пытается удалить собственную установку, включая
+неуспешный запуск. `cleanup=FAIL` требует ручной уборки именно этой установки.
+Smoke не заменяет полную матрицу ниже: он не проверяет бизнес-сценарии,
+DPAPI, обновление, отображение UI и подпись релизного gate.
 
 ## 1. Машина и входные материалы
 
@@ -88,7 +154,8 @@ Get-AuthenticodeSignature -LiteralPath $AgentInstaller |
 ```
 
 `BrowserSource` должен содержать
-`chromium-1243\chrome-win64\chrome.exe`. Для повторного локального запуска с
+`chromium-1246\chrome-win64\chrome.exe` (revision берётся из
+`packages/product/loginom-release.json`). Для повторного локального запуска с
 уже установленными зависимостями допустим `-SkipInstall`; release-проверка из
 чистого checkout должна выполнять установку по lockfile.
 
@@ -97,7 +164,8 @@ Get-AuthenticodeSignature -LiteralPath $AgentInstaller |
 Workflow [loginom-windows.yml](../../../.github/workflows/loginom-windows.yml)
 запускается вручную и для затрагивающих Windows-сборку pull request. Он работает
 на `windows-2022`, использует portable Node 24.19.0 и Bun 1.3.14 из закреплённых
-setup actions, отдельно готовит Chromium revision 1243 и передаёт абсолютные
+setup actions, отдельно готовит Chromium revision из `loginom-release.json`
+(сейчас 1246) и передаёт абсолютные
 пути `-NodeSource`, `-BrowserSource` и `-BunPath` в единый сценарий.
 
 CI выполняет clean-checkout `-Product Both`, package-local typecheck/тесты,
@@ -135,11 +203,9 @@ bun run build
 bun run package:win --x64 --publish never
 ```
 
-Выход текущей сборки — `packages/desktop/dist/`. `prebuild` запускается как lifecycle script и строит Node backend; в dev возможна загрузка существующего upstream CLI. `package:win` определён как electron-builder; `--publish never` запрещает публикацию. Не запускать существующий `.github/workflows/publish.yml` как готовый релиз Loginom: в нём пока upstream owner/channel/signing.
+Выход package-local сборки — `packages/desktop/dist/`. `prebuild` запускается как lifecycle script и строит Node backend. `package:win` определён как electron-builder; `--publish never` запрещает публикацию. Актуальная общая сборка Desktop/CLI и draft release находится в [release.yml](../../../.github/workflows/release.yml); Windows development кандидат — в `loginom-windows.yml`. Старые названия `loginom-desktop.yml`/`publish.yml` не являются командами текущего выпуска.
 
-После изменения renderer дополнительно выполнить `bun typecheck` из `packages/app`; после backend — из текущего `packages/opencode`, а **после согласованного переименования — из `packages/opencode`**. Нужные тесты запускать только из своего package directory; конкретные новые Loginom test paths должны быть указаны в manifest/плане реализации, их здесь ещё нет. Тесты из корня запрещены, `tsc` напрямую не запускать.
-
-В текущем checkout отсутствует `packages/desktop/native`, хотя packaging config его упоминает. Это наблюдение исходников, не результат сборки: при соответствующем отказе нужно восстановить объявленную dependency/build stage либо исправить состав пакета. Не создавать пустую папку ради зелёной сборки.
+После изменения renderer дополнительно выполнить `bun typecheck` из `packages/app`; после backend — из `packages/opencode`. Нужные тесты запускать только из своего package directory. Тесты из корня запрещены, `tsc` напрямую не запускать. Для packaging: `bun test electron-builder.config.test.ts scripts/release/artifact.test.ts` из `packages/desktop`; Windows workflow содержит дополнительные package-local проверки.
 
 После каждого исправления пересобрать артефакт, записать новый commit/patch и SHA256, затем повторить изменённые и зависимые сценарии на чистом тестовом снимке. Результаты старого hash нельзя приписывать новому EXE.
 
