@@ -2,6 +2,7 @@
 // backend shutdown and Host/Chromium cleanup finish, then admit the repeated quit.
 export function createQuitHandler(input: {
   markQuitting(): void
+  closeWindows(): Promise<void>
   stop(): Promise<void>
   quit(): void
   onError(error: unknown): void
@@ -13,6 +14,9 @@ export function createQuitHandler(input: {
     if (stopped) return
     event.preventDefault()
     stopping ??= Promise.resolve()
+      // Let synchronous before-quit listeners (including drafts.flush) finish,
+      // then close renderers before interrupting their in-flight backend calls.
+      .then(() => input.closeWindows())
       .then(() => input.stop())
       .catch(input.onError)
       .finally(() => {

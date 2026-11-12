@@ -270,6 +270,17 @@ const main = Effect.gen(function* () {
     "before-quit",
     createQuitHandler({
       markQuitting: setAppQuitting,
+      closeWindows: async () => {
+        await Promise.all(
+          BrowserWindow.getAllWindows().map(
+            (win) =>
+              new Promise<void>((resolve) => {
+                win.once("closed", () => resolve())
+                win.close()
+              }),
+          ),
+        )
+      },
       stop: async () => {
         // Inspect Host work before shutdown cancels it. A busy/unknown Host skips
         // this close; autoInstallOnAppQuit stays false, including after download.
