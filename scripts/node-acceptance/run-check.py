@@ -597,6 +597,12 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-exclude':
+        node = REPO / 'docs/node-development/nodes/datamining-assnrules'
+        src = node / 'acceptance/v040'
+        return dict(source=src, prompt=src / 'task-exclude.md', data=node / 'fixtures/v040', base=None,
+                    input_files=['train.csv'], export_count=2, expected_name='expected-exclude.json',
+                    cold_expected_name='expected-exclude-cold.json')
     if name == 'assnrules-holdout':
         node = REPO / 'docs/node-development/nodes/datamining-assnrules'
         src = node / 'acceptance/v040'
