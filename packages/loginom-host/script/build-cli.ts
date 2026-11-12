@@ -4,6 +4,7 @@ import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
+import { tmpdir } from "node:os"
 import { stageResources } from "./stage-resources"
 import { buildNodeHost } from "./build-node-host"
 import { buildCliInstaller } from "./build-cli-installer"
@@ -50,6 +51,32 @@ const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
 if (process.platform === "win32" && (!systemRoot || !isAbsolute(systemRoot)))
   throw Error("LOGINOM_ARCHIVER_UNAVAILABLE")
 const archiver = process.platform === "win32" ? join(systemRoot!, "System32/tar.exe") : "/usr/bin/tar"
+// Bun 1.3.14 can fail to extract its downloaded Windows baseline target.
+// Build with the verified baseline executable itself so compile reuses it.
+if (process.platform === "win32" && process.env.LOGINOM_CLI_BASELINE_CHILD !== "1") {
+  const runtime = await mkdtemp(join(tmpdir(), "loginom-cli-bun-"))
+  try {
+    const url = `https://github.com/oven-sh/bun/releases/download/bun-v${bunNotice.version}`
+    const checksums = await fetch(`${url}/SHASUMS256.txt`)
+    if (!checksums.ok) throw Error("LOGINOM_BUN_DOWNLOAD_FAILED")
+    const expected = (await checksums.text()).match(/^([a-fA-F0-9]{64})\s+\*?bun-windows-x64-baseline\.zip\r?$/m)?.[1]
+    if (!expected) throw Error("LOGINOM_BUN_CHECKSUM_MISSING")
+    const response = await fetch(`${url}/bun-windows-x64-baseline.zip`)
+    if (!response.ok) throw Error("LOGINOM_BUN_DOWNLOAD_FAILED")
+    const archive = Buffer.from(await response.arrayBuffer())
+    if (createHash("sha256").update(archive).digest("hex") !== expected.toLowerCase())
+      throw Error("LOGINOM_BUN_CHECKSUM_MISMATCH")
+    await Bun.write(join(runtime, "bun.zip"), archive)
+    await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
+    await $`${join(runtime, "bun-windows-x64-baseline/bun.exe")} ${import.meta.path} ${args}`.env({
+      ...process.env,
+      LOGINOM_CLI_BASELINE_CHILD: "1",
+    })
+  } finally {
+    await rm(runtime, { recursive: true, force: true })
+  }
+  process.exit(0)
+}
 const sourceEntries = new Map<string, string>()
 const source = await cliSourceSnapshot(repo, sourceEntries)
 const work = await mkdtemp(join(dirname(destination), ".cli-build-"))
