@@ -145,7 +145,10 @@ export function storageListPattern(value) {
 const LIST_ENTRIES=200,LIST_BYTES=24000,LIST_SCROLLS=64,LIST_SCROLL_PX=400;
 export async function listStorageDirectory({destination,pattern,guard,ready,roots,read,act}) {
   const filter=storageListPattern(pattern),seen=new Map();
-  let native=null,end=false,owner=null,lastTop=null,direction=null;
+  let native=null,end=false,owner=null,lastTop=null,direction=null,parent=0;
+  // Loginom 7.4.2 renders the parent link as a `..` row of unknown kind
+  // (LAB-1468 stage 0); it is a FileStore record but not a folder entry.
+  const isUp=e=>e.label==='..'&&e.storage_entry.kind==='unknown';
   const isRow=(s,e)=>typeof e.tid==='string'&&e.tid.startsWith(s.workflow_ref?.prefix+';FileStorageForm;colName_')&&e.storage_entry;
   for(let step=0;;step++){
     guard();
@@ -153,17 +156,18 @@ export async function listStorageDirectory({destination,pattern,guard,ready,root
       const r=await roots(),tables=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+';FileStorageForm;pnlFileStorage;tbl');
       return tables.length===1?read({rootRef:tables[0].ref,observationId:r.observation_id,allPages:true}):null;
     },s=>s.file_storage?.status==='observed'&&s.file_storage.directory===destination
-      &&s.ui.elements.filter(e=>isRow(s,e)).every(e=>e.storage_entry.kind==='folder'
+      &&s.ui.elements.filter(e=>isRow(s,e)).every(e=>isUp(e)||e.storage_entry.kind==='folder'
         ||e.storage_entry.kind==='file'&&typeof e.storage_entry.server_source_ref==='string'));
     const rows=state.ui.elements.filter(e=>isRow(state,e));
     for(const e of rows){
       const entry=e.storage_entry;
       if(Number.isSafeInteger(entry.directory_entries))native=entry.directory_entries;
+      if(isUp(e)){parent=1;continue;}
       seen.set(entry.kind+':'+e.label,entry.kind==='file'
         ?{name:e.label,kind:'file',path:entry.path,bytes:entry.bytes,mtime:entry.mtime,server_source_ref:entry.server_source_ref}
         :{name:e.label,kind:'folder',path:(destination==='/'?'':destination)+'/'+e.label});
     }
-    if(native!==null&&seen.size>=native||seen.size>=LIST_ENTRIES*5)break;
+    if(native!==null&&seen.size+parent>=native||seen.size>=LIST_ENTRIES*5)break;
     const anchors=rows.filter(e=>e.scroll&&e.allowed_actions?.includes('scroll')&&e.interaction?.state==='point_observed');
     const scroll=anchors[0]?.scroll;
     if(!scroll||step>=LIST_SCROLLS)break;
@@ -187,7 +191,7 @@ export async function listStorageDirectory({destination,pattern,guard,ready,root
   while(entries.length&&JSON.stringify(entries).length>LIST_BYTES){entries.pop();truncated=true;}
   return {directory:destination,...(pattern!==undefined?{pattern}:{}),entries,files_matched:matched.length,
     files_other:files.length-matched.length,folders:folders.length,native_entry_count:native,
-    complete:native!==null?seen.size>=native:end,truncated,
+    complete:native!==null?seen.size+parent>=native:end,truncated,
     next_step:matched.length>16?'More than 16 matching files: a text-import mask accepts at most 16 verified sources; narrow the pattern.'
       :'1 matching file: imports.text with source kind:"storage" and its server_source_ref. 2-16 files of one structure: ONE imports.text with settings.source.source_mask "<directory>/<pattern>" and source kind:"verified_sources" listing these refs in name order.'};
 }

@@ -497,8 +497,10 @@ test('folder listing returns every native Files row with its own storage referen
  const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
  const names=['transactions_2026-10.csv','README.txt','transactions_2026-09.csv','transactions_2026-11.csv'];
  const rows=()=>[...names.map((name,i)=>({...element('ui-row-'+i,page.prefix+';FileStorageForm;colName_'+name),label:name,
-  storage_entry:{kind:'file',path:dir+'/'+name,bytes:100+i,mtime:'2026-11-0'+(i+1)+'T00:00:00.000Z',bytes_source:'native_file_store',directory_entries:5}})),
-  {...element('ui-row-folder',page.prefix+';FileStorageForm;colName_archive'),label:'archive',storage_entry:{kind:'folder',directory_entries:5}}];
+  storage_entry:{kind:'file',path:dir+'/'+name,bytes:100+i,mtime:'2026-11-0'+(i+1)+'T00:00:00.000Z',bytes_source:'native_file_store',directory_entries:6}})),
+  {...element('ui-row-folder',page.prefix+';FileStorageForm;colName_archive'),label:'archive',storage_entry:{kind:'folder',directory_entries:6}},
+  // Observed parent link row (LAB-1468 stage 0 model.stdout:35): unknown kind.
+  {...element('ui-row-up',page.prefix+';FileStorageForm;colName_..'),label:'..',storage_entry:{kind:'unknown',selected:true,directory_entries:6}}];
  const evaluate=page.evaluate.bind(page);let gestures=0;
  page.evaluate=async(fn,arg)=>{
   if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
@@ -523,7 +525,7 @@ test('folder listing returns every native Files row with its own storage referen
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(records.filter(x=>/storage_list/.test(x.phase))));
  const out=result.output;
  assert.equal(out.directory,dir);assert.equal(out.complete,true);assert.equal(out.truncated,false);
- assert.equal(out.native_entry_count,5);assert.equal(out.files_matched,3);assert.equal(out.files_other,1);assert.equal(out.folders,1);
+ assert.equal(out.native_entry_count,6);assert.equal(out.files_matched,3);assert.equal(out.files_other,1);assert.equal(out.folders,1);
  assert.deepEqual(out.entries.map(e=>[e.kind,e.name]),[['file','transactions_2026-09.csv'],['file','transactions_2026-10.csv'],['file','transactions_2026-11.csv'],['folder','archive']]);
  const files=out.entries.filter(e=>e.kind==='file');
  assert.ok(files.every(e=>/^storage-/.test(e.server_source_ref)&&e.path===dir+'/'+e.name&&Number.isSafeInteger(e.bytes)&&e.mtime));
