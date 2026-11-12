@@ -8,6 +8,7 @@ type Notice = SystemProxyStatus["notices"][number]
 type Target = { host: string; port: number; authority: string }
 type Route = { kind: "DIRECT" } | (Target & { kind: "PROXY" | "HTTPS" | "SOCKS5" })
 const TIMEOUT = 5000
+const STATUS_URL = "https://api.openai.com/v1/models"
 const MAX_HEADER = 64 * 1024
 
 export function shouldUseProxyRelay(enabled: boolean, environment: NodeJS.ProcessEnv) {
@@ -78,7 +79,8 @@ export async function startProxyRelay(input: {
     } satisfies Record<string, string>,
     async status(): Promise<SystemProxyStatus> {
       try {
-        return statusFor(await resolveRoutes("https://api.anthropic.com/"))
+        // First of MODEL_PROXY_URLS: the product talks to OpenAI by default.
+        return statusFor(await resolveRoutes(STATUS_URL))
       } catch (error) {
         const code = error instanceof Error && error.message === "PROXY_RESOLVE_TIMEOUT" ? "timeout" : "internal"
         return { state: "failed", enabled: true, notices: [lastError ?? { code }] }
@@ -133,8 +135,12 @@ export async function startProxyRelay(input: {
     }
   }
 
+  // Publish only when the outcome changes: every connection reaches here, and
+  // each status update is broadcast to all windows.
   function report(notice: Notice, routes: Route[]) {
+    const changed = lastError?.code !== notice.code || lastError?.detail !== notice.detail
     lastError = notice
+    if (!changed) return
     input.onNotice?.(notice)
     input.onStatus?.(statusFor(routes))
   }
@@ -150,7 +156,8 @@ export async function startProxyRelay(input: {
       const endpoint = route.kind === "DIRECT" ? target : route
       failed = endpoint.authority
       // A misconfigured PAC pointing at this listener must not recurse either.
-      if (endpoint.port === port && ["127.0.0.1", "localhost", "::1"].includes(endpoint.host)) continue
+      if (endpoint.port === port && (["localhost", "::1", "0.0.0.0"].includes(endpoint.host) || endpoint.host.startsWith("127.")))
+        continue
       // Deliberately never use http.request/fetch: main's global env proxy may
       // be active, and routing through it would bypass Chromium or form a loop.
       const socket = track(
@@ -199,8 +206,10 @@ export async function startProxyRelay(input: {
           }
           if (code < 200 || code >= 300) throw new Error("PROXY_CONNECT_REJECTED")
         }
-        lastError = undefined
-        input.onStatus?.(statusFor(routes))
+        if (lastError) {
+          lastError = undefined
+          input.onStatus?.(statusFor(routes))
+        }
         return { socket, route, routes }
       } catch {
         socket.destroy()
@@ -275,16 +284,15 @@ export async function startProxyRelay(input: {
         )
       // The request explicitly asks upstream to close. Advertise that on the
       // response too, including upstreams which insist on keep-alive.
+      // 407 too: the client must not retry on this socket, the relay serves one request per connection.
       client.write(
-        responseCode(header) === 407
-          ? header
-          : Buffer.from(
-              header
-                .toString("latin1")
-                .replace(/\r\nConnection:[^\r\n]*/gi, "")
-                .replace(/\r\n\r\n$/, "\r\nConnection: close\r\n\r\n"),
-              "latin1",
-            ),
+        Buffer.from(
+          header
+            .toString("latin1")
+            .replace(/\r\nConnection:[^\r\n]*/gi, "")
+            .replace(/\r\n\r\n$/, "\r\nConnection: close\r\n\r\n"),
+          "latin1",
+        ),
       )
       upstream.once("error", () => client.destroy())
       upstream.once("close", () => client.end())

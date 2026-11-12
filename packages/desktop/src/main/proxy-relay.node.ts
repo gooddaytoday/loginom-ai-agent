@@ -319,6 +319,7 @@ test("plain HTTP 407 is reported without replaying the request", async () => {
   assert.ok(response.includes("407 Proxy Authentication Required"))
   assert.ok(response.includes("Proxy-Authenticate: Negotiate"))
   assert.ok(response.includes("authenticate"))
+  assert.ok(response.includes("Connection: close"))
   assert.equal(count, 1)
   assert.deepEqual((await local.status()).notices, [{ code: "auth-required", detail: upstream }])
 })
@@ -351,7 +352,7 @@ test("status queries resolve Chromium again for the status URL", async () => {
   assert.equal((await local.status()).https, "127.0.0.1:3068")
   route = "DIRECT"
   assert.equal((await local.status()).state, "direct")
-  assert.deepEqual(urls, Array(3).fill("https://api.anthropic.com/"))
+  assert.deepEqual(urls, Array(3).fill("https://api.openai.com/v1/models"))
 })
 
 test("a malformed upstream CONNECT response falls back in order", async () => {
@@ -386,6 +387,58 @@ test("a PAC pointing at the relay fails without recursion", async () => {
   assert.ok((await exchange(local.url, connectRequest("example.test:443"))).includes("502 Bad Gateway"))
   assert.equal(calls, 1)
   assert.equal((await local.status()).notices[0].code, "unreachable")
+})
+
+test("status is published only when the outcome changes, not per connection", async () => {
+  const target = await echo()
+  const published: string[] = []
+  let route = "DIRECT"
+  const local = await startProxyRelay({
+    resolveProxy: async () => route,
+    onStatus: (status: { state: string }) => published.push(status.state),
+  })
+  cleanup.push(() => local.stop())
+  for (let i = 0; i < 3; i++) assert.ok((await exchange(local.url, connectRequest(target))).includes("tunnel-payload"))
+  assert.deepEqual(published, [])
+  route = "PROXY 127.0.0.1:0"
+  for (let i = 0; i < 2; i++) assert.ok((await exchange(local.url, connectRequest(target))).includes("502 Bad Gateway"))
+  route = "DIRECT"
+  for (let i = 0; i < 2; i++) assert.ok((await exchange(local.url, connectRequest(target))).includes("tunnel-payload"))
+  assert.deepEqual(published, ["failed", "direct"])
+})
+
+test("a CONNECT response split across packets is read whole", async () => {
+  const target = await echo()
+  const upstream = await listen(
+    net.createServer((socket) =>
+      socket.once("data", (chunk) => {
+        const authority = chunk.toString().split(" ")[1]
+        const [host, port] = authority.split(":")
+        const forward = net.connect({ host, port: Number(port) }, () => {
+          socket.write("HTTP/1.1 200 Conn")
+          setTimeout(() => {
+            socket.write("ection Established\r\n\r\n")
+            socket.pipe(forward).pipe(socket)
+          }, 50)
+        })
+        forward.on("error", () => socket.destroy())
+      }),
+    ),
+  )
+  const local = await relay(async () => `PROXY ${upstream}`)
+  assert.ok((await exchange(local.url, connectRequest(target))).includes("tunnel-payload"))
+})
+
+test("a PAC pointing at the relay through 0.0.0.0 fails without recursion", async () => {
+  let route = "DIRECT"
+  let calls = 0
+  const local = await relay(async () => {
+    calls++
+    return route
+  })
+  route = `PROXY 0.0.0.0:${new URL(local.url).port}`
+  assert.ok((await exchange(local.url, connectRequest("example.test:443"))).includes("502 Bad Gateway"))
+  assert.equal(calls, 1)
 })
 
 test("relay selection keeps the existing checkbox, off flag and explicit-env priorities", () => {

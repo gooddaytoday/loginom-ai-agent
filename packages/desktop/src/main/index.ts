@@ -231,7 +231,9 @@ const main = Effect.gen(function* () {
   startSession()
   // Явный прокси из login shell должен быть известен до запуска читателей ОС.
   const shellEnv = preferAppEnv(app.getPath("userData"))
-  const useSystemProxyRelay = shouldUseProxyRelay(systemProxyEnabled(), process.env)
+  // The v2 background CLI daemon outlives Desktop and keeps its environment, so it
+  // would keep a dead relay address; it stays on the detected system proxy.
+  const useSystemProxyRelay = SIDECAR_VERSION !== "v2" && shouldUseProxyRelay(systemProxyEnabled(), process.env)
   if (!useSystemProxyRelay) {
     systemProxy = startSystemProxyDetection({
       environment: process.env,
