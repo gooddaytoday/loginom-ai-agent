@@ -6,7 +6,7 @@ import { createHash } from "node:crypto"
 import { buildKeychain } from "../../../loginom-host/script/build-keychain"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
-import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { writeHelp } from "../../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
 
 const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
@@ -35,7 +35,7 @@ test("startup timeout retains the writer through Help close and permits a real s
     await symlink(bundledNode, join(bundle, "bin/node"))
     if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
     await cp(host, join(bundle, "host"), { recursive: true })
-    await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test" }))
+    await writeFile(join(bundle, "resource-manifest.json"), JSON.stringify({}))
     await writeFile(
       join(bundle, "runtime/src/knowledge-entry.mjs"),
       `import fs from "node:fs";
@@ -332,18 +332,13 @@ test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancella
   "management commands share durable setup and recovery semantics through the real Node host: %s",
   async (phase) => {
     const directory = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-management-")))
-    const cleanup: (() => void | Promise<void>)[] = []
     try {
       const bundle = join(directory, "bundle")
       const profile = join(directory, "profile")
       const files = await copyProductSkillsFixture(bundle)
-      const help = await knowledgeServer(
-        { after: (callback) => cleanup.push(callback) },
-        { apiKey: "private-setup-key" },
-      )
+      await writeHelp(join(bundle, "help"))
       await mkdir(join(bundle, "bin"), { recursive: true })
       await mkdir(join(bundle, "runtime/src"), { recursive: true })
-      await writeFile(join(bundle, "knowledge-key"), "private-setup-key")
       await symlink(bundledNode, join(bundle, "bin/node"))
       if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
       await cp(host, join(bundle, "host"), { recursive: true })
@@ -353,7 +348,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancella
       )
       await writeFile(
         join(bundle, "resource-manifest.json"),
-        JSON.stringify({ protocol: 1, endpoint: help.endpoint, files }),
+        JSON.stringify({ protocol: 1, files }),
       )
       // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
       await writeFile(
@@ -421,7 +416,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancella
       expect(
         await command(
           ["setup", "--stdin-json"],
-          // Older setup scripts still send a key; the built-in one is used and never stored.
+          // Older setup scripts still send a key; it is ignored and never stored.
           JSON.stringify({ apiKey: "legacy-setup-key", password: "initial-password" }),
         ),
       ).toMatchObject({
@@ -827,7 +822,6 @@ test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancella
         await provider.dispose()
       }
     } finally {
-      for (const callback of cleanup) await callback()
       if (process.platform === "darwin") {
         const root = await realpath(join(directory, "profile/loginom")).catch(() => undefined)
         if (root) {

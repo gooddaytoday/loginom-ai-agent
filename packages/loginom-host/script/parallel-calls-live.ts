@@ -44,7 +44,6 @@ const child = supervise({
   generation: 1,
   chat,
   connection,
-  endpoint: manifest.endpoint,
   actionManifestUri: manifest.actionManifestUri,
   actionManifestSha256: manifest.actionManifestSha256,
   acceptanceCleanupPackage: path,

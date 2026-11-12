@@ -5,7 +5,6 @@ import { cp, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promis
 import { dirname, join, resolve } from "node:path"
 import { connectionStore } from "@loginom-ai-agent/loginom-host/connection/connection-store"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
-import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
 import { pdfText } from "../../../loginom-host/test/package-docs-pdf"
 import { standaloneFixture, invoke } from "../fixture/standalone"
 import { testProviderConfig } from "../lib/test-provider"
@@ -25,22 +24,8 @@ test.each(["pdf", "docx", "md"] as const)(
     const original = createHash("sha256")
       .update(await readFile(input))
       .digest("hex")
-    const cleanup: (() => void | Promise<void>)[] = []
     const help = "viking://resources/loginom-dock/sources/loginom-help"
     const procedure = help + "/data/processors/transformation/calc/README.md"
-    const knowledge = await knowledgeServer(
-      { after: (callback) => cleanup.push(callback) },
-      {
-        call: async (params: { name: string }) => ({
-          content: [
-            {
-              type: "text",
-              text: params.name === "find" ? procedure : "Калькулятор вычисляет значения полей по формулам.",
-            },
-          ],
-        }),
-      },
-    )
     const requests: Request[] = []
     const actions: { name: string; arguments: Record<string, unknown> }[] = []
     const provider = Bun.serve({
@@ -66,11 +51,20 @@ test.each(["pdf", "docx", "md"] as const)(
             expect(output(2)).toContain("TBGCalcData")
             return { name: "package_docs_run", arguments: { operation: "skeleton", lgp: input } }
           }
-          if (step === 4) return { name: "loginom_find", arguments: { uri: help } }
-          if (step === 5) return { name: "loginom_read", arguments: { uri: procedure } }
+          if (step === 4)
+            return {
+              name: "loginom_find",
+              arguments: { query: "Калькулятор", target_uri: help + "/data/processors/transformation/calc" },
+            }
+          if (step === 5) {
+            expect(output(4)).toContain(procedure)
+            return { name: "loginom_read", arguments: { uris: procedure } }
+          }
           if (step === 6) return { name: "read", arguments: { filePath: JSON.parse(output(3)).report } }
           if (step === 7) {
-            expect(output(5)).toContain("Калькулятор вычисляет значения полей по формулам.")
+            // The shipped Help page itself, not a model paraphrase.
+            expect(output(5)).toContain(`=== ${procedure} ===`)
+            expect(output(5)).toContain("Калькулятор")
             const draft = output(6)
               .split("\n")
               .filter((line) => /^\d+: /.test(line))
@@ -123,11 +117,6 @@ test.each(["pdf", "docx", "md"] as const)(
           join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
         )
       }
-      const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
-      await writeFile(
-        join(fixture.bundle, "resource-manifest.json"),
-        JSON.stringify({ ...manifest, endpoint: knowledge.endpoint }),
-      )
       const connection = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
       await connection.stage({
         generation: 1,
@@ -177,7 +166,11 @@ test.each(["pdf", "docx", "md"] as const)(
               !request.tools?.some((tool) => ["task", "bash", "loginom_dock_prepare"].includes(tool.function.name)),
           ),
       ).toBe(true)
-      expect(knowledge.calls.map((call: { name: string }) => call.name)).toEqual(["find", "read"])
+      expect(
+        result.events
+          .filter((event) => event.type === "tool_use" && event.part.tool.startsWith("loginom_"))
+          .map((event) => event.part.tool),
+      ).toEqual(["loginom_find", "loginom_read"])
       const expected = join(fixture.directory, `Исходный сценарий.lgp_report.${format}`)
       expect(result.events.some((event) => event.type === "text" && event.part.text.includes(expected))).toBe(true)
       const bytes = await readFile(expected)
@@ -234,7 +227,6 @@ test.each(["pdf", "docx", "md"] as const)(
               inputSha256: original,
               actions,
               requests,
-              knowledge: knowledge.calls,
               result,
             },
             null,
@@ -244,7 +236,6 @@ test.each(["pdf", "docx", "md"] as const)(
       }
     } finally {
       provider.stop(true)
-      for (const callback of cleanup) await callback()
     }
   },
   30_000,
