@@ -430,6 +430,7 @@ export interface ElimOutlierEditConfigurationReadback extends Omit<ElimOutlierCo
 }
 
 export interface LogRegressionConfigurationReadback {
+ weight_field?:string;
  kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
  node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'|'apply'; selection?:{criterion:'deviance'|'aic'|'aicc'|'bic'|'hqic';entry_significance?:number;removal_significance?:number}; input_fields:string[]; target_field:string;
  classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;

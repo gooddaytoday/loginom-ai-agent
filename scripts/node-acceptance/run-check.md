@@ -1053,6 +1053,12 @@ recommend-holdout.csv из fixtures/v040. Oracle сохраняет правил
 Аудит требует обучение и apply одного GUID, без повторного Train;
 оба полных typed-порта 1/2, два CSV, Save, cold без настройки и cleanup.
 
+`logreg-weights`: Enter с частотными весами Real, 32×9 полных значений.
+Только утверждённые task-weights.md и weighted.csv передаются модели;
+независимый modes/oracle.py и expected.json остаются в harness.
+Weight сохраняется в прогнозе, не используется как фактор. CSV/Save/cold/cleanup.
+
+
 `assnrules-exclude`: train.csv из fixtures/v040, support 50%, confidence 60%,
 lift 0, max_items=3, max_consequents=2, исключение поддержки >90%.
 Только task-exclude.md и train.csv передаются модели. Экспортируются два CSV: наборов и правил.
