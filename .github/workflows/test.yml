@@ -182,10 +182,11 @@ jobs:
           browser=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'const fs = require("node:fs"); const browser = require("playwright").chromium.executablePath(); fs.accessSync(browser); process.stdout.write(browser)')
           echo "LOGINOM_DOCK_TEST_BROWSER=$browser" >> "$GITHUB_ENV"
       - name: Verify platform-dependent client tests
+        timeout-minutes: 6
         working-directory: packages/loginom-runtime/client
         run: |
           set -euo pipefail
-          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2 \
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 \
             test/agent-command.test.mjs test/archive.test.mjs test/artifacts.test.mjs \
             test/artifact-download.test.mjs test/artifact-upload.test.mjs test/artifact-verification.test.mjs \
             test/browser-downloads.test.mjs test/browser-launch.test.mjs test/browser-temp.test.mjs \
@@ -201,13 +202,15 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/windows-client-tests.log"
       - name: Verify complete supervised runtime suite
         if: ${{ !cancelled() }}
+        timeout-minutes: 5
         working-directory: packages/loginom-runtime
         run: |
           set -euo pipefail
-          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-timeout=60000 --test-concurrency=2 test/*.test.mjs \
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 test/*.test.mjs \
             2>&1 | tee "$RUNNER_TEMP/windows-runtime-tests.log"
       - name: Verify platform-dependent host tests
         if: ${{ !cancelled() }}
+        timeout-minutes: 8
         working-directory: packages/loginom-host
         run: |
           set -euo pipefail

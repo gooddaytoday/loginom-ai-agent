@@ -63,3 +63,6 @@ path filters.
 Each suite has a separate failing step and a log in the `windows-runtime-*`
 artifact (14-day retention). Runtime and host suites still execute after a
 client-test failure so the run exposes all three results; no failure is ignored.
+Node suites use TAP so assertion details are written immediately, including
+when a later test retains an open handle. Each suite has its own step timeout
+within the job's 30-minute limit.
