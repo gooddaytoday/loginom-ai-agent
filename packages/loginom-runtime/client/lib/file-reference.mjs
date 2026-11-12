@@ -2,6 +2,7 @@
 import { constants } from 'node:fs';
 import { lstat, open, realpath } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const fail = code => { throw Error(code); };
 const milliseconds = ns => Number(ns/1000000000n)*1000+Number(ns%1000000000n)/1000000;
@@ -20,12 +21,27 @@ export function referenceUploadBudget(size) {
   return Math.min(7200000,120000+Math.ceil(size/(5*1024*1024))*1000);
 }
 
+// File times come from a coarse clock: one tick is up to 15.625 ms on NTFS and
+// a jiffy on Linux. A same-size rewrite within the tick of the last write keeps
+// size, mtime, ctime and file ID, so such a "racy" snapshot cannot detect it.
+// Take the snapshot only once the last write is older than one tick: every
+// later write then gets a newer mtime. No file bytes are read.
+const timestampTickMs = 20;
+const racyAttempts = 5;
+
 export async function inspectReferenceFile(path) {
   try {
-    const canonical=await realpath(path),s=await lstat(canonical,{bigint:true});
-    if(!s.isFile()||s.isSymbolicLink())fail('LOGINOM_FILE_NOT_REGULAR');
-    if(s.size<0n||s.size>BigInt(Number.MAX_SAFE_INTEGER))fail('LOGINOM_FILE_TOO_LARGE');
-    return identity(canonical,s);
+    for(let attempt=0;;attempt++) {
+      const started=Date.now();
+      const canonical=await realpath(path),s=await lstat(canonical,{bigint:true});
+      if(!s.isFile()||s.isSymbolicLink())fail('LOGINOM_FILE_NOT_REGULAR');
+      if(s.size<0n||s.size>BigInt(Number.MAX_SAFE_INTEGER))fail('LOGINOM_FILE_TOO_LARGE');
+      const snapshot=identity(canonical,s),age=started-snapshot.mtime;
+      // A future mtime (clock skew, network share) cannot be settled by waiting.
+      if(age>=timestampTickMs||age<0)return snapshot;
+      if(attempt>=racyAttempts)fail('LOGINOM_FILE_CHANGED'); // Still being written.
+      await delay(timestampTickMs-age+1);
+    }
   } catch(error) { mapError(error); }
 }
 
