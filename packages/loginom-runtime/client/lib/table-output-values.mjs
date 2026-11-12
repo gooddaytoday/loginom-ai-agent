@@ -32,6 +32,9 @@ export function decodeTableOutput(output,{formatProof,readSettings,expectedColum
         const mask=type==='integer'?'0':'0.################E+00';
         const precision=proofs.length===1&&proofs[0].mask===mask&&proofs[0].verified_format?.mask===mask&&proofs[0].verified_format.index===j&&proofs[0].verified_format.key===schema[j].name&&proofs[0].verified_format.type===type;
         if(precision&&type==='integer'&&/^-?(?:0|[1-9][0-9]*)$/.test(cell.text))return {type,is_null:false,value:BigInt(cell.text).toString(),representation:'decimal_integer',precision:'exact_integer',display_text:cell.text};
+        // v040-nan-exact: the verified Real format renders native NaN as "NaN"
+        // (LAB-1314 cold execution-events); NULL stays is_null. Infinities unobserved.
+        if(precision&&type==='real'&&cell.text==='NaN')return {type,is_null:false,value:null,non_finite:'NaN',representation:'binary64_non_finite',precision:'exact_non_finite',display_text:cell.text};
         if(precision&&type==='real'&&/^-?[0-9](?:[.,][0-9]{1,16})?E[+-][0-9]{2,3}$/i.test(cell.text)) {
           const canonical=cell.text.replace(',','.').replace('e','E'),value=Number(canonical);
           if(Number.isFinite(value)&&(value!==0||/^-?0(?:[.]0+)?E/i.test(canonical)))return {type,is_null:false,value,decimal:canonical,representation:'binary64',precision:'17_significant_digits',display_text:cell.text};

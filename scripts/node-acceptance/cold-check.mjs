@@ -209,13 +209,6 @@ page = context.pages()[0]
    const settings=await observeCoarseFrozenSavedSettings({load,channel:channelFor(nodes[0].ref,'coarse-frozen-saved')});
    await record({phase:'coarse_frozen_saved_settings',node:nodes[0].ref,...settings});
   }
-  if(expected.coarse_external){
-   const nodes=graph.nodes.filter(n=>n.type==='preprocessing.coarse_classes');
-   if(nodes.length!==1)throw Error('COARSE_EXTERNAL_ONE_SAVED_NODE');
-   const {observeCoarseExternalSavedSettings}=await import('./coarse-classes-external.mjs');
-   const settings=await observeCoarseExternalSavedSettings({load,channel:channelFor(nodes[0].ref,'coarse-external-saved')});
-   await record({phase:'coarse_external_saved_settings',node:nodes[0].ref,...settings});
-  }
   let staticSources;
   if(expected.static_sources){
    const {readGraph}=await load('client/lib/node-target-browser.mjs');

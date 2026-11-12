@@ -36,3 +36,7 @@ test('ordinary Collapse/Replacement reads and other types keep their previous re
  assert.equal(Object.hasOwn(other,'typedVariants'),false);
 });
 
+
+for(const route of ['apply','read'])test('Text Import always uses the shared typed Variant reader: '+route,async()=>{
+ for(const exact of [false,true])assert.equal((await dispatched('imports.text',exact,route)).typedVariants,true);
+});

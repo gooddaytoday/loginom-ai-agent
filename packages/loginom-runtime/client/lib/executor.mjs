@@ -3679,6 +3679,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             await verifyDeferredTextImportSources(request,history,resolve);
           }
           if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
+          if(request.target.type==='imports.text'&&request.parameters.source?.kind==='verified_sources')
+            for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
         }catch(error){
           if(pending||running)throw error;
           error.nodePhaseRefusal??={phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};

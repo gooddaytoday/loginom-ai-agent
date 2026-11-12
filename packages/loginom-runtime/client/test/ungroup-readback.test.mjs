@@ -45,3 +45,28 @@ test('computed readback requires independently owned secondary output and native
   const f=make();change(f);assert.throws(()=>ungroupConfigurationReadback(f));
  }
 });
+
+test('seasonal readback binds order fields, seasonality, excluded bands and the quality/index output',()=>{
+ const make=()=>{
+  const f=fixture(),c=f.phases[1].value.configuration,ports=f.phases[0].value.ports;c.method='seasonal';
+  const period=port=>({name:'Period',label:'Period',type:'datetime',record_id:'Period'+port,field_id:'9',index:9});
+  for(const field of c.input_fields.flat())if(field.type==='real')field.type='integer';
+  for(const [port,fs] of c.input_fields.entries()){fs.push(period(port));const m=ports[port].native_mapping;m.source_fields=fs;m.target_fields=fs.map((s,i)=>({...s,index:i,record_id:'t'+s.record_id,data_kind:'Дискретный',excluded:false,source:s}));}
+  c.ungroup.order_fields=[['Period'],['Period']];c.seasonality={period:'year',multiplier:1,index_count:12,rare_density:0.25,absent_periods:1,novelty_periods:1,max_history_periods:0};
+  const int=n=>({name:n,label:n,type:'integer',record_id:n}),sources=[...c.input_fields[0],int('Total_Rounded'),c.input_fields[1][1],int('OutputValue'),int('ConfidenceBandUpper'),int('ConfidenceBandLower'),int('OutputTrend'),
+   {name:'OutputSI',label:'OutputSI',type:'real',record_id:'si'},int('OutputVT'),{name:'OutputVTDesc',label:'OutputVTDesc',type:'string',record_id:'desc'}];
+  const m=f.phases[3].value.native_mapping;m.source_fields=sources;m.target_fields=sources.map((s,i)=>({...s,index:i,record_id:'t'+s.record_id,data_kind:'Дискретный',excluded:s.name.startsWith('ConfidenceBand'),source:s}));
+  const second=[c.input_fields[1][1],c.input_fields[1][0],...['UngroupQuality',...Array.from({length:12},(_,i)=>'SeasonalIndex'+(i+1))].map(name=>({name,type:'real'}))];
+  f.phases[3].value.ports=[{port:0},{port:1,native_mapping:{verified:true,inventory_complete:true,node_context:{...c.node_context,output_port:{port:1}},target_fields:second.map(field=>({...field,excluded:false}))},closed:{cleanup_complete:true}}];
+  return f;
+ };
+ const f=make(),r=ungroupConfigurationReadback(f);
+ assert.equal(r.mode,'seasonal');assert.deepEqual([r.ungroup.total_order_field,r.ungroup.support_order_field],['Period','Period']);assert.equal(r.seasonality.index_count,12);
+ assert.deepEqual(r.output_mapping.fields.filter(x=>x.excluded).map(x=>x.name),['ConfidenceBandUpper','ConfidenceBandLower']);
+ const result=validate({operation_id:'op',status:'SUCCEEDED',effect_possible:true,phases:[],node:f.node,execution:{status:'not_requested',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
+  package_saved:false,cleanup_complete:true,warnings:[],configuration:{status:'applied',readback:r}});
+ assert.equal(result.valid,true,JSON.stringify(result));
+ for(const change of [f=>delete f.phases[1].value.configuration.seasonality,f=>f.phases[1].value.configuration.ungroup.order_fields=[['Period'],[]],f=>f.phases[3].value.ports[1].native_mapping.target_fields.pop(),f=>f.phases[3].value.native_mapping.target_fields.pop()]){
+  const g=make();change(g);assert.throws(()=>ungroupConfigurationReadback(g));
+ }
+});

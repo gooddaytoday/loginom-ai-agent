@@ -6,8 +6,8 @@ import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {validateUiAction} from '../lib/workspace-ui.mjs';
 const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
-test('ungroup registers two native inputs/outputs and shares/computed with bounded model schemas',()=>{
- const type=NODE_TYPES['transform.ungroup_data'];assert.equal(type.tabular_inputs,2);assert.equal(type.tabular_outputs,2);assert.deepEqual(type.modes,['shares','computed']);
+test('ungroup registers two native inputs/outputs and shares/computed/seasonal with bounded model schemas',()=>{
+ const type=NODE_TYPES['transform.ungroup_data'];assert.equal(type.tabular_inputs,2);assert.equal(type.tabular_outputs,2);assert.deepEqual(type.modes,['shares','computed','seasonal']);
  const tool=nodeApiTools.find(t=>t.name==='dock_node_apply'),compact=userNodeTool(tool),card=describeNodeTypes(['transform.ungroup_data'],{},new Map(),support.nodeApplyHandlers)[0];
  assert.ok(Buffer.byteLength(JSON.stringify({name:compact.name,description:compact.description,inputSchema:compact.inputSchema}))<=20000);
  assert.ok(Buffer.byteLength(JSON.stringify(card))<=12000);
@@ -15,7 +15,7 @@ test('ungroup registers two native inputs/outputs and shares/computed with bound
  assert.ok(skill.length<=6000);assert.doesNotMatch(skill.toString(),/\$(?:\d+|ARGUMENTS)/);
  assert.ok(card.parameter_schema.properties.ungroup);
 });
-test('ungroup public dispatch rejects seasonality, port 1 and unknown fields before runtime',async()=>{
+test('ungroup public dispatch accepts explicit seasonal and rejects partial seasonality, shares port 1 and unknown fields before runtime',async()=>{
  const r={operation_id:'ungroup',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]},
   target:{kind:'new',type:'transform.ungroup_data',position:{x:320,y:320}},inputs:[0,1].map(input=>({input,output:0,source:{document_id:'doc',workflow_id:'wf',node_id:'source'+input}})),mode:'shares',
   parameters:{ungroup:{keys:[{total:'Group',support:'Group'}],value_field:'Total',item_field:'Item',share_field:'Share',rounding:{format:'none'},balance:'none'}},
@@ -23,8 +23,15 @@ test('ungroup public dispatch rejects seasonality, port 1 and unknown fields bef
  let count=0;const runtime={tools:nodeApiTools,startNodeApply:args=>{validateNodeApplyRequest(args,support.nodeApplyHandlers);count++;return {};}};
  await dispatchNodeApi(runtime,'dock_node_apply',r);assert.equal(count,1);
  await dispatchNodeApi(runtime,'dock_node_apply',{...r,mode:'computed',read:{...r.read,ports:[0,1]}});assert.equal(count,2);
- for(const change of [{mode:'seasonal'},{read:{...r.read,ports:[1]}},{parameters:{...r.parameters,variables:{}}}])await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,...change}));
+ for(const change of [{mode:'seasonal'},{read:{...r.read,ports:[1]}},{parameters:{...r.parameters,variables:{}}},{parameters:{...r.parameters,seasonality:{}}}])await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...r,...change}));
  assert.equal(count,2);
+ const seasonality={total_order_field:'Period',support_order_field:'Period',period:'year',multiplier:1,index_count:12,rare_density:0.25,absent_periods:1,novelty_periods:1,max_history_periods:0};
+ const bands=['ConfidenceBandUpper','ConfidenceBandLower'].map(name=>({source:{kind:'configured_field',name},excluded:true}));
+ const seasonal={...r,mode:'seasonal',parameters:{...r.parameters,seasonality},read:{...r.read,ports:[0,1]},mappings:[{direction:'output',port:0,changes:bands}]};
+ await dispatchNodeApi(runtime,'dock_node_apply',seasonal);assert.equal(count,3);
+ for(const change of [{parameters:{...seasonal.parameters,seasonality:{...seasonality,index_count:4}}},{mappings:[{direction:'output',port:0,changes:[{source:{kind:'configured_field',name:'OutputSI'},excluded:true}]}]}])
+  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...seasonal,...change}));
+ assert.equal(count,3);
 });
 test('ungroup may advance only its observed owned wizard through conditional output/done',()=>{
  const action={verb:'wizard_step',ref:'ui-next',expected_stage:['output_mapping','done']};

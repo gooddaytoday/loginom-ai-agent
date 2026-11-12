@@ -49,6 +49,10 @@ for(const path of ['packages/opencode/src/tool.ts','packages/protocol/src/index.
 });
 
 for(const [path,scenario] of [
+ ['packages/product/skills/loginom-automation/references/nodes/transform.collapse_columns.md','variant-reader-collapse'],
+ ['scripts/node-acceptance/assnrules-holdout.mjs','assnrules-holdout'],
+ ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-recommendations.md','assnrules-holdout'],
+ ['packages/product/skills/loginom-automation/references/nodes/datamining.assn_rules.md','assnrules-holdout'],
  ['docs/node-development/nodes/datamining-assnrules/acceptance/v040/task-consequents.md','assnrules-consequents'],
  ['docs/node-development/nodes/datamining-assnrules/fixtures/v040/train.csv','assnrules-consequents'],
  ['docs/node-development/nodes/transform-crosstable/acceptance/modes/README.md','crosstable-datetime'],
@@ -88,16 +92,24 @@ test(`duplicates typed acceptance paths require all three cases: ${path}`,t=>{
  for(const name of ['duplicates-typed','duplicates-empty','duplicates-singleton'])assert.ok(text.includes(name));
 });
 
+for(const path of ['packages/loginom-runtime/client/lib/binning-procedure.mjs',
+ 'docs/node-development/nodes/preprocessing-binning/acceptance/modes/semantics.txt'])
+test(`Binning current and default next acceptance remain required: ${path}`,t=>{
+ const r=repo(t);r.commit(path);const text=r.list();
+ assert.ok(ids(text).includes('live-ui'));
+ for(const name of ['binning-ties-current','binning-frequency-ties','binning-sd','binning-count','binning-apply'])assert.ok(text.includes(name));
+});
+
 test('REST C1 requires four single-method cases and excludes the retired eight-row example',t=>{
  const r=repo(t);r.commit('packages/loginom-runtime/client/lib/rest-request.mjs');const text=r.list();
  for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
  assert.ok(!text.includes('rest-methods-body'));
 });
-test('tree changes require J2 scenarios but not tree-empty-containers until J3',t=>{
+test('tree changes require J2 scenarios and includes tree-empty-containers from J3',t=>{
  const r=repo(t);r.commit('packages/loginom-runtime/client/lib/tree-parameters.mjs');const text=r.list();
  assert.ok(ids(text).includes('live-ui'));
  for(const name of ['table-tree-json','json-tree-json','tree-null-leaves','tree-nested-records'])assert.ok(text.includes(name));
- assert.ok(!text.includes('tree-empty-containers'));
+ assert.ok(text.includes('tree-empty-containers'));
 });
 test('empty/unrelated diff, explicit head, subdirectory and uncommitted files',t=>{
  const r=repo(t);assert.deepEqual(ids(r.list()),[]);

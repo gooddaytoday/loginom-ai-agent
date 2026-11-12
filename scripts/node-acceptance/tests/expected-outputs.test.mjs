@@ -209,3 +209,54 @@ test('W1 cold variable/control links match exact typed namespaces and reject an 
  assert.equal(matchVariableInventoryLinks(graph,inventory).length,1);graph.variable_links[0].kind='variables';assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
  graph.variable_links[0].kind='control';graph.nodes.push({ref:{node_id:'other'},type:'transform.calculator'});assert.throws(()=>matchVariableInventoryLinks(graph,inventory));
 });
+
+// v040-nan-exact: expected {non_finite} matches only the exact marked typed cell.
+test('expected non-finite Real matches the exact typed marker, never NULL or a number',()=>{
+ const want=v=>({...report({non_finite:v}),columns:[columns[0],{...columns[1],tolerance:{abs:1e-12,rel:1e-12}}]});
+ const marked=(v)=>{const a=actual('nan',0),cell=a.data.sample[0][1];for(const k of Object.keys(cell))delete cell[k];Object.assign(cell,{type:'real',is_null:false,value:null,non_finite:v,representation:'binary64_non_finite',precision:'exact_non_finite'});return a;};
+ for(const v of ['NaN','Infinity','-Infinity'])assert.equal(matchExpectedOutputs([marked(v)],[want(v)]).length,1);
+ assert.throws(()=>matchExpectedOutputs([marked('Infinity')],[want('NaN')]));
+ const nul=actual('null',0);Object.assign(nul.data.sample[0][1],{is_null:true,value:null,precision:'exact_null'});
+ assert.throws(()=>matchExpectedOutputs([nul],[want('NaN')]));
+ assert.throws(()=>matchExpectedOutputs([marked('NaN')],[report(null)]));
+ assert.throws(()=>matchExpectedOutputs([marked('NaN')],[report(1)]));
+ assert.throws(()=>parseExpectedOutputs({package_path:'/t.lgp',nodes:[],outputs:[report({non_finite:'nan'})]}));
+});
+
+test('v040-c8-filetime: comparison present accepts any non-NULL DateTime and never compares the value',()=>{
+ const columns=[{name:'File',type:'string',label_any:true},{name:'FileTime',type:'datetime',label_any:true,comparison:'present'}];
+ const output={output_node_type:'imports.text',output_port:0,ordered:false,column_order:'exact',columns,rows:[{File:'a.csv',FileTime:true},{File:'b.csv',FileTime:true}]};
+ const expected={package_path:'/own/p.lgp',nodes:[{type:'imports.text'}],outputs:[output]};
+ const {outputs}=parseExpectedOutputs(expected);
+ const schema=[{name:'File',label:'File',type:'string'},{name:'FileTime',label:'Время файла',type:'datetime'}];
+ const time=value=>({type:'datetime',is_null:false,value,precision:'millisecond',representation:'local_datetime',timezone:'unspecified'});
+ const read=cells=>[{node:{node_id:'t'},type:'imports.text',output_port:0,data:{schema,row_count:2,sample_complete:true,precision:{numbers_verified:true},
+  sample:cells.map((cell,i)=>[{type:'string',is_null:false,value:['a.csv','b.csv'][i]},cell])}}];
+ // Any present value passes: the time is not promised to equal a local mtime.
+ assert.equal(matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),time('1999-01-01T00:00:00.000')]),outputs).length,1);
+ assert.equal(matchExpectedOutputs(read([{...time('2026-11-09T10:11:00.000'),timezone:'Europe/Moscow'},
+  {type:'datetime',is_null:false,value:'2026-11-09T10:11:00.000',precision:'minute'}]),outputs).length,1);
+ assert.equal(matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),{type:'datetime',is_null:false,value:'00000000c079e640',
+  precision:'exact_native',native:{tag:7,bytes_le:'00000000c079e640'}}]),outputs).length,1);
+ for(const bad of [{type:'datetime',is_null:true,value:null},{...time(''),value:''},{...time('x'),value:'not a date'},
+  {...time('x'),value:null},{type:'string',is_null:false,value:'2026-11-09T10:11:00.000'},undefined])
+  assert.throws(()=>matchExpectedOutputs(read([time('2026-11-09T10:11:00.000'),bad]),outputs),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ // The form is datetime-only, and its rows carry only the presence token.
+ const variant=change=>{const e=structuredClone(expected);change(e.outputs[0]);return e;};
+ for(const change of [o=>{o.columns[1].type='string';},o=>{o.columns[1].types=['datetime','string'];},
+  o=>{o.rows[0].FileTime=null;},o=>{o.rows[0].FileTime='2026-11-09T10:11:00.000';},o=>{o.rows[0].FileTime=false;}])
+  assert.throws(()=>parseExpectedOutputs(variant(change)),/EXPECTED_COMPARISON_INVALID/);
+});
+
+test('v040-c8-filetime: C8 path expectations add FileTime present after FileName and the task asks for the time',()=>{
+ const kit=new URL('../../../docs/node-development/nodes/text-import/acceptance/',import.meta.url);
+ const task=readFileSync(new URL('task-file-info.md',kit),'utf8');
+ assert.match(task,/путь и время/);assert.match(task,/relative-path\.csv/);
+ for(const [name,prefix] of [['absolute-path','/own/dir/'],['relative-path','']]){
+  const text=readFileSync(new URL('extended/expected-'+name+'.json',kit),'utf8').replaceAll('{{SOURCE_DIR}}','/own/dir').replace('{{PACKAGE_PATH}}','/own/dir/run.lgp');
+  const [output]=parseExpectedOutputs(JSON.parse(text)).outputs;
+  assert.deepEqual(output.columns.map(c=>c.name),['SaleID','Month','Amount','Note','FileName','FileTime']);
+  assert.deepEqual(output.columns.at(-1),{name:'FileTime',type:'datetime',label_any:true,comparison:'present'});
+  assert.ok(output.rows.length===5&&output.rows.every(r=>r.FileTime===true&&r.FileName.startsWith(prefix+'sales_2026-0')));
+ }
+});

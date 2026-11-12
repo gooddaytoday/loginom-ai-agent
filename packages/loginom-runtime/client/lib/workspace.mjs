@@ -271,7 +271,7 @@ async function prepareWorkspace(page, options) {
       return result('NOT_READY','FOREIGN_PAGE');
     }
     if (page.url()==='about:blank') {
-      if (options.recoverOnly) return result('NOT_READY','DOCUMENT_LOST');
+      if (options.recoverOnly || options.bindOpenOnly) return result('NOT_READY','DOCUMENT_LOST');
       await page.goto(options.url,{waitUntil:'domcontentloaded',timeout:remaining()});
     }
     const build=await wait('ui_build',()=>page.evaluate(()=>globalThis.bg?.app?.Version??null));
@@ -301,6 +301,7 @@ async function prepareWorkspace(page, options) {
     // A confirmed pre-open refusal may continue without replacing its original receipt.
     if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly))
       return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
+    if (options.bindOpenOnly && old.exists) return result('NOT_READY','OPERATION_CONFLICT',{authenticated:true});
     if (old.exists && old.phase!=='reserved') {
       if (old.tab_tid) await tid(old.tab_tid).click({timeout:remaining()});
       effectPossible=true;
@@ -311,6 +312,8 @@ async function prepareWorkspace(page, options) {
       if(before.error)return result('NOT_READY',before.error,{authenticated:true});
       if (before.blocked) return result('NOT_READY',before.unsaved?'UNSAVED_CHANGES':'UI_BLOCKED',{authenticated:true});
       if(options.intent==='existing_workflow' && (before.document_id!==options.workflowRef.document_id || !before.requested_tab_present)) return result('NOT_READY','WORKFLOW_LOST',{authenticated:true});
+      // Bind-only adopts the exact package already active; it never opens one.
+      if(options.bindOpenOnly && !(before.ready && before.package_path===options.packagePath)) return result('NOT_READY','PACKAGE_NOT_ACTIVE',{authenticated:true});
       const reserved=await inspect('reserve');
       if (reserved.error) return result('NOT_READY',reserved.error,{authenticated:true});
       if (options.intent==='open_package' && before.home_ready) {
@@ -357,7 +360,7 @@ async function prepareWorkspace(page, options) {
   }
 }
 
-export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, timeoutMs = 120000, recoverOnly = false, identityOnly = false, storageBinding = null }) {
+export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, timeoutMs = 120000, recoverOnly = false, identityOnly = false, storageBinding = null, bindOpenOnly = false }) {
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash
       || [...url.searchParams.keys()].some(key => /token|password|secret|auth|api.?key/i.test(key))) {
@@ -370,6 +373,8 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   if (intent === 'open_package' && (typeof packagePath !== 'string' || !/^\/[^\\\x00-\x1f]+\.lgp$/i.test(packagePath)
       || packagePath.split('/').some(part => part === '..' || part === '.') || packagePath.includes('//'))) throw new Error('An exact absolute package path is required');
   if (intent !== 'open_package' && packagePath !== null) throw new Error('A new draft cannot specify a stored package');
+  if (bindOpenOnly !== false && (bindOpenOnly !== true || intent !== 'open_package' || allowTestLogin || recoverOnly || identityOnly))
+    throw new Error('Bind-only preparation requires an exact open_package binding without login or recovery');
   if (intent === 'existing_workflow') {
     if (!workflowRef || Object.keys(workflowRef).some(k=>!['document_id','tab_tid','prefix','navigation_path','workflow_id'].includes(k))
         || typeof workflowRef.workflow_id !== 'string' || !workflowRef.workflow_id || workflowRef.workflow_id.length>160
@@ -381,7 +386,7 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
   } else if (workflowRef !== null) throw new Error('Workflow reference requires existing_workflow intent');
   if (!compatibility?.loginom_build) throw new Error('An exact Loginom build pin is required');
   const options = { url: url.href, origin: url.origin, pathname: url.pathname,
-    sessionId, operationId, intent, packagePath, workflowRef, timeoutMs, recoverOnly, identityOnly, storageBinding,
+    sessionId, operationId, intent, packagePath, workflowRef, timeoutMs, recoverOnly, identityOnly, storageBinding, bindOpenOnly,
     expectedBuild: compatibility?.loginom_build ?? null, profileId: compatibility?.profile_id,
     platform: ({ darwin: 'macos', linux: 'linux', win32: 'windows' })[platform] ?? platform,
     allowTestLogin: allowTestLogin === true, testLoginUser: allowTestLogin ? testLoginUser : null };

@@ -8,10 +8,6 @@ const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof v
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const digest = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 const domainNode=({dom_epoch,...value})=>value;
-// LAB-1324: Coarse Classes has one additional input; native removes Input_Add
-// once Input_Data-2 exists. Only this exact transition is restored.
-const singleAddConsumed=(current,original)=>original.type==='preprocessing.coarse_classes'&&same(original.other_ports,['Input_Add'])&&same(current.other_ports,[])
-  ?{...current,other_ports:original.other_ports}:current;
 const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
 export function normalizeGraphRefusal(effect,receipt){
  if(effect.kind==='connect'&&receipt?.status==='FAILED'&&receipt.action_key==='link.create'
@@ -83,7 +79,7 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
     const field=kind==='rename'?'label':kind==='move'?'position':'inputs';
     const correct=kind==='rename'?current.label===p.label:kind==='move'?positionMatches(current,p.position):same(current.inputs,[...original.inputs,p.input]);
-    return correct && same(domainNode({...(kind==='add_input'?singleAddConsumed(current,original):current),[field]:original[field]}),domainNode(original)) && same(keep(before,[p.ref.node_id]),keep(after,[p.ref.node_id]))?{}:null;
+    return correct && same(domainNode({...current,[field]:original[field]}),domainNode(original)) && same(keep(before,[p.ref.node_id]),keep(after,[p.ref.node_id]))?{}:null;
   }
   if(kind==='connect'||kind==='remove_link'){
     const key=edgeKey(p.edge),present=(p.edge.kind?after.variable_links??[]:after.links).some(e=>edgeKey(e)===key);
@@ -372,7 +368,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
         if (!NODE_TYPES[target.type].additional_tabular_inputs || edge.input !== Math.max(-1, ...target.inputs) + 1) throw new Error('Additional input must be the next observed tabular input');
         graph = await change('add_input', { ref: target.ref, input: edge.input }, (before, after) => {
           const current = node(after, state.targetId), original = node(before, state.targetId);
-          return same(current.inputs, [...original.inputs, edge.input]) && same(domainNode({ ...singleAddConsumed(current, original), inputs: original.inputs }), domainNode(original))
+          return same(current.inputs, [...original.inputs, edge.input]) && same(domainNode({ ...current, inputs: original.inputs }), domainNode(original))
             && unchangedExcept(before, after, [state.targetId]);
         });
       }

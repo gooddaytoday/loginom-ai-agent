@@ -140,7 +140,8 @@ export async function configureBinning(channel,parameters,{request,inputMapping,
   if(wanted.method==='frequency'&&s.node_binning.settings.ties!==(wanted.ties??'next')){
    const label=wanted.ties==='current'?'Сохранять в текущем':'Добавлять в следующий';
    const owner=s.node_binning.frame.controls['cbbMatchingObservationsMode;ValueControl'];
-   await act('cbbMatchingObservationsMode;ValueControl',{verb:'click'});
+   await channel.perform({condition:'open owned binning tie policy picker',initialObservation:s,ready:binningReady,identity:()=>field,
+    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===owner+';trg_picker'&&e.allowed_actions.includes('click'),'owned tie policy picker trigger required').ref})});
    s=await observeBinning(channel,'native tie policy option',s=>s.ui.elements.some(e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click')));
    await channel.perform({condition:'choose requested tie policy',initialObservation:s,ready:binningReady,identity:()=>field,resolve:s=>({verb:'click',ref:one(s,e=>e.tid?.startsWith(owner+';boundlist;')&&e.label===label&&e.allowed_actions.includes('click'),'requested tie option required').ref})});
    s=await observeBinning(channel,'requested tie policy readback');

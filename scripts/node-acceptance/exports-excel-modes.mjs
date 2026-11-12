@@ -7,8 +7,9 @@ const [root,configPath,output]=process.argv.slice(2);
 process.umask(0o077);await mkdir(output,{recursive:true,mode:0o700});
 const config=JSON.parse(await readFile(configPath,'utf8')),load=name=>import(pathToFileURL(root+'/runtime/'+name).href);
 const {verifyResources}=await load('src/resources.mjs'),resources=await verifyResources(root);
-const {loginBrowser}=await load('src/connection-check.mjs');
+const {loginBrowser,loginomAddress}=await load('src/connection-check.mjs');
 const {makeWorkspacePrepareCode}=await load('client/lib/workspace.mjs');
+const {makeWorkspaceUiCode}=await load('client/lib/workspace-ui.mjs');
 const {makePackageCleanupCode}=await load('client/lib/package-cleanup.mjs');
 const {createActionRuntime}=await load('client/lib/executor.mjs');
 const {createArtifactStore}=await load('client/lib/artifacts.mjs');
@@ -18,9 +19,33 @@ const {context}=await loginBrowser({browserPath:resources.browserPath,profile:ou
 const page=context.pages()[0],sessionId=randomUUID(),record=createExecutionJournal({directory:output,metadata:{sessionId},knownSecrets:[config.login.password]});
 const execute=code=>new Function('page',`return (${code})(page)`)(page);
 try{
- const identity=await execute(makeWorkspacePrepareCode({loginomUrl:config.login.url,compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'excel-seed-workspace',intent:'new_draft'}));
+ const identity=await execute(makeWorkspacePrepareCode({loginomUrl:loginomAddress(config.login.url),compatibility:{loginom_build:'7.4.2',platform:'linux',browser:'chromium'},sessionId,operationId:'excel-seed-workspace',intent:'new_draft'}));
  if(identity.status!=='READY')throw Error('EXCEL_SEED_WORKSPACE');
- const directory=config.login.package_directory;
+ const mask=config.text_mask_directory;
+ if(mask&&(!/^[A-Za-z0-9_-]{1,100}$/.test(mask.name)||typeof mask.create!=='boolean'))throw Error('TEXT_MASK_DIRECTORY_INVALID');
+ const directory=config.login.package_directory+(mask?'/'+mask.name:'');
+ if(mask?.create){
+  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
+  await at('MF;cntMain;tlbMainToolbar;btnFilestorage').click();
+  const grid=page.locator('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]:visible');
+  await grid.waitFor({state:'visible'});
+  if(await grid.count()!==1)throw Error('TEXT_MASK_STORAGE_AMBIGUOUS');
+  const prefix=(await grid.getAttribute('data-tid')).split(';FileStorageForm;')[0];
+  const breadcrumb=value=>at(prefix+';cnrNaviMode;b.s_Сервер>Файлы'+value);
+  await breadcrumb('').click();
+  let trail='';
+  for(const part of config.login.package_directory.slice(1).split('/')){
+   await at(prefix+';FileStorageForm;colName_'+part.replace(/\s/g,'_').replace(/,/g,'')).dblclick();
+   trail+='>'+part;await breadcrumb(trail).waitFor({state:'visible'});
+  }
+  if(await at(prefix+';FileStorageForm;colName_'+mask.name).count())throw Error('TEXT_MASK_DIRECTORY_EXISTS');
+  await at(prefix+';FileStorageForm;btnCreateDirectory').click();
+  await record({phase:'text_mask_directory_dialog',observation:await execute(makeWorkspaceUiCode({mode:'observe',expected_origin:new URL(config.login.url).origin,expected_build:'7.4.2'}))});
+  const field=at('msgbox;cnt;cnt;txt').locator('input');
+  if(await field.count()!==1)throw Error('TEXT_MASK_DIRECTORY_DIALOG_UNOBSERVED');
+  await field.fill(mask.name);await at('msgbox;tlb;ok').click();
+  await at(prefix+';FileStorageForm;colName_'+mask.name).waitFor({state:'visible'});
+ }
  const binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:identity.document_id,account:identity.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
  const actions=JSON.parse(await readFile(root+'/runtime/executor/catalog/actions.json','utf8')).actions;
  const selectors=JSON.parse(await readFile(root+'/runtime/executor/catalog/selectors.json','utf8')).selectors;
@@ -29,7 +54,7 @@ try{
  const delivered=[];
  for(const [index,book]of config.books.entries()){
   if(book.destination.slice(0,book.destination.lastIndexOf('/'))!==directory)throw Error('EXCEL_SEED_DIRECTORY');
-  const bytes=await readFile(book.fixture),artifact=await artifactStore.admit({sourcePath:book.fixture,name:book.destination.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory,overwrite:'replace'}});
+  const bytes=await readFile(book.fixture),artifact=await artifactStore.admit({sourcePath:book.fixture,name:book.destination.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory,overwrite:config.overwrite??'replace'}});
   const result=await runtime.deliverArtifact({operation_id:'excel-seed-'+index,artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
   if(result.outcome?.status!=='SUCCEEDED'||result.outcome.destination!==book.destination||result.outcome.upload_completion_verified!==true||result.outcome.cleanup_complete!==true)throw Error('EXCEL_SEED_UPLOAD:'+JSON.stringify(result));
   delivered.push(result.outcome);

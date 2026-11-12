@@ -153,6 +153,21 @@ test('JSON output admits nested object arrays while tree-to-table retains its on
  }
 });
 
+test('JSON preflight admits empty record containers only with an object-array witness at the same schema path',async()=>{
+ assert.throws(()=>validateTreeJsonScope('{"items":[]}'),{message:'Tree stage 1 requires one nonempty repeated object branch'});
+ const text=await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/fixtures/nested-records/empty.json',import.meta.url),'utf8');
+ assert.equal(validateTreeJsonScope(text).verified,true);
+ assert.equal((await jsonPreflight([text])).verified,true);
+ const value=JSON.parse(text);value.items.reverse();
+ assert.equal(validateTreeJsonScope(JSON.stringify(value)).verified,true);
+ assert.equal(validateTreeJsonScope('{"items":[{"parts":[],"details":{}},{"parts":[{"qty":0}],"details":{"code":""}}]}').verified,true);
+ for(const input of [
+  {items:[{parts:[]},{parts:[]}]},
+  {items:[{parts:[],other:[{qty:1}]}]},
+  {items:[{parts:[]},{parts:[0]}]},
+ ])assert.throws(()=>validateTreeJsonScope(JSON.stringify(input)));
+});
+
 test('nested JSON keeps sibling/scalar arrays, mixed types, dates and limits outside scope',async()=>{
  for(const value of [
   {items:[{parts:[{sku:'a'}],other:[{name:'b'}]}]},

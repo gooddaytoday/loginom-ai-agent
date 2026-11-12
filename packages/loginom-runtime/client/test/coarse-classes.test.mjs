@@ -27,7 +27,7 @@ test('coarse classes registers train and saved-model apply with three exact outp
 test('coarse classes rejects edits in apply, invalid analytic settings and non-discrete predictors',()=>{
  assert.doesNotThrow(()=>validateCoarseClassesParameters(parameters,'internal'));
  assert.doesNotThrow(()=>validateCoarseClassesParameters({},'apply',{target:{kind:'existing'},inputs:[],mappings:[],finish:'execute',read:{ports:[0,1,2]}}));
- for(const patch of [{max_classes:0},{min_class_percent:51},{uniformity_percent:-1},{target_field:'Segment'},{partition:'external',frozen:true},{partition:'unknown'},{event_value:''}])assert.throws(()=>validateCoarseClassesParameters({coarse_classes:{...parameters.coarse_classes,...patch}},'internal'));
+ for(const patch of [{max_classes:0},{min_class_percent:51},{uniformity_percent:-1},{target_field:'Segment'},{partition:'external'},{event_value:''}])assert.throws(()=>validateCoarseClassesParameters({coarse_classes:{...parameters.coarse_classes,...patch}},'internal'));
  assert.throws(()=>validateCoarseClassesParameters(parameters,'apply'));
  assert.deepEqual(resolveCoarseClassesFields(parameters,fields).input_field,'Segment');
  assert.throws(()=>resolveCoarseClassesFields(parameters,fields.map(f=>({...f,data_kind:'Непрерывный'}))));

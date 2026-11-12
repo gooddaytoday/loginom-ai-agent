@@ -1079,7 +1079,7 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
-for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
+for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','extent','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
  const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
  page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async ms=>{clock.advance(ms);};
  Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
@@ -1100,19 +1100,29 @@ for(const stage of ['controls','data_views'])for(const fault of ['transient','pe
     failures++;if(fault==='expired')clock.advance(16000);
     return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':stage}};
    }
-   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
+   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;if(fault==='extent')table.scrollHeight=2401;}
   }
   return evaluate(fn,arg);
  };
  const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
- const retry=['transient','persistent','directory','owner','position'].includes(fault);
- assert.equal(result.status,fault==='transient'?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ const retry=['transient','persistent','directory','owner','position','extent'].includes(fault);
+ assert.equal(result.status,['transient','extent'].includes(fault)?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
  assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,fault==='before'?0:1);
  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
  assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);
  assert.equal(failures,fault==='persistent'?2:1);
- if(['directory','owner','position'].includes(fault))assert.equal(result.error.code,'UI_SCROLL_NOT_CONFIRMED');
+ if(['directory','owner','position'].includes(fault)){
+  assert.equal(result.error.code,'UI_SCROLL_NOT_CONFIRMED');
+  assert.equal(result.error.message,'File-list context or scroll owner changed after its completed scroll');
+ }
  if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+ // A refused read must name the limit kind and stage it actually hit.
+ if(['persistent','before','work','elements','traversal','other_stage'].includes(fault)){
+  assert.equal(result.error.code,'UI_SCAN_LIMIT');
+  assert.equal(result.error.message,'Workspace scan budget exceeded; use root discovery and a narrower observation');
+  const kind=['work','elements','traversal'].includes(fault)?fault:'time',scanStage=fault==='other_stage'?'collect':stage;
+  assert.deepEqual(result.trace.filter(e=>e.event==='ui_scan_limit').map(e=>[e.limit_kind,e.scan_stage]),Array(failures).fill([kind,scanStage]));
+ }
 });
 
 // LAB-1164 grouping-median :1673: a 1092-element Files region scrolled 4000->5000
@@ -3769,6 +3779,29 @@ test('import column choice closes editor and settles both type and kind without 
   }
 });
 
+test('Variant checkbox reappearing after a column editor preserves legacy format guards',async()=>{
+ for(const mode of ['reappears','unchanged','changed_variant','changed_format']){
+  const page=new Page(),c=importChoiceFixture(page,'data_kind');
+  const tid='MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtVariantAsGeneralType;ValueControl';
+  const owner=page.add('div',tid,'',undefined,c.form);
+  page.add('div',tid+';DisplayEl','',undefined,owner).attrs.class='x-form-checkbox';
+  if(['reappears','changed_format'].includes(mode))owner.style.display='none';
+  const snapshot=await page.observe(),option=snapshot.ui.elements.find(e=>e.wizard_combo?.kind==='option');
+  assert.equal(snapshot.wizard.settings.fields.variant_as_general_type?.status,
+   ['reappears','changed_format'].includes(mode)?undefined:'observed');
+  const click=page.mouse.click;
+  page.mouse.click=async(...args)=>{
+   await click(...args);c.owner.remove();c.list.remove();c.hidden.remove();c.cells[c.row].ownText=c.label;
+   owner.style.display='';
+   if(mode==='changed_variant')owner.attrs.class='x-form-cb-checked';
+   if(mode==='changed_format')c.form.querySelector('[data-tid="MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtValueNull;ValueControl"]').querySelector('input').value='changed';
+  };
+  const result=await page.act({verb:'select_wizard_option',ref:option.ref},snapshot);
+  assert.equal(result.status,['reappears','unchanged'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,mode);
+ }
+});
+
 test('closed import type and kind cells are delivered as actionable observed controls',async()=>{
   const page=new Page(),c=importFormatField(page);importColumnFixture(page,c.form,2);
   const snapshot=await page.observe(),column=snapshot.wizard.import_columns.fields[0];
@@ -3843,7 +3876,7 @@ test('import source reads exact controls and Ext checkbox equally in full roots 
   const snapshot=await page.observe(),source=snapshot.wizard.import_source;
   assert.equal(snapshot.wizard.stage,'text_import_file');assert.ok(source);
   assert.deepEqual(Object.fromEntries(Object.entries(source.fields).map(([k,v])=>[k,v.value])),{
-    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true});
+    source_path:'/test/source.csv',connection:'Локальное',encoding:'UTF-8 (65001)',rows_to_skip:'0',file_info:undefined,max_threads:undefined,first_line_as_title:true,parallel_processing:undefined});
   assert.equal(source.fields.connection.read_only,true);assert.equal(c.native.checked,false);
   for(const options of [{discover_roots:true},{root_ref:snapshot.wizard.root_ref}]) {
     const read=await page.execute({mode:'observe',...options});assert.deepEqual(read.output.wizard.import_source,source);
@@ -3851,6 +3884,43 @@ test('import source reads exact controls and Ext checkbox equally in full roots 
   assert.equal(source.settings_applied,false);assert.equal(source.file_bytes_verified,false);assert.equal(source.schema_complete,false);
   assert.ok(!snapshot.ui.elements.some(e=>e.wizard_field?.scope==='import_source' || e.wizard_combo?.field?.scope==='import_source'));
   c.header.attrs.class='';assert.equal((await page.observe()).wizard.import_source.fields.first_line_as_title.value,false);
+});
+
+test('file list source observes the native filename combo and parallel checkbox',async()=>{
+  const page=new Page(),c=importSourceFixture(page);
+  const info=page.add('div',c.base+'cbbFileInfoColumnsType;ValueControl','',undefined,c.form);
+  info.append(new Element('input')).value='Имя файла';
+  const parallel=page.add('div',c.base+'chkParallelProcessing;ValueControl','',undefined,c.form);
+  const display=page.add('span',c.base+'chkParallelProcessing;ValueControl;DisplayEl','',undefined,parallel);display.attrs.class='x-form-checkbox';
+  c.inputs.source_path.value='/test/feb.csv｜/test/jan.csv';
+  const snapshot=await page.observe(),fields=snapshot.wizard.import_source.fields;
+  assert.equal(fields.file_info.value,'Имя файла');assert.equal(fields.parallel_processing.value,false);
+  assert.equal(fields.source_path.value,'/test/feb.csv｜/test/jan.csv');
+  assert.equal(fields.parallel_processing.display_ref,snapshot.ui.elements.find(e=>e.tid===display.attrs['data-tid']).ref);
+});
+
+test('text import threads use owned native combo options in full and narrow observations',async()=>{
+ const page=new Page(),c=importSourceFixture(page),tid=c.base+'cbbMaxThreadCount;ValueControl';
+ const owner=page.add('div',tid,'',undefined,c.form),input=owner.append(new Element('input'));input.value='Автоопределение';
+ page.add('div',tid+';trg_picker','',{x:500,y:200,width:20,height:20},owner);
+ const list=page.add('div',tid+';boundlist','',{x:700,y:400,width:180,height:90});
+ page.add('div',tid+';boundlist;2','2',{x:705,y:405,width:170,height:25},list);
+ const full=await page.observe();
+ assert.equal(full.wizard.import_source.fields.max_threads?.value,'Автоопределение');
+ const narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+ assert.deepEqual(narrow.output.wizard.import_source,full.wizard.import_source);
+ const option=full.ui.elements.find(e=>e.wizard_combo?.field.name==='max_threads'&&e.wizard_combo.kind==='option');
+ assert.ok(option);
+ const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);input.value='2';list.remove();};
+ const result=await page.act({verb:'select_wizard_option',ref:option.ref},full);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+ assert.equal((await page.observe()).wizard.import_source.fields.max_threads.value,'2');
+ input.disabled=true;
+ const disabled=await page.observe();
+ assert.equal(disabled.wizard.import_source.fields.max_threads.value,'2');
+ assert.equal(disabled.wizard.import_source.fields.max_threads.enabled,false);
+ assert.ok(!disabled.ui.elements.some(e=>e.wizard_combo?.field.name==='max_threads'));
 });
 
 test('import source fails closed for duplicate hidden missing controls and redacts URL values',async()=>{

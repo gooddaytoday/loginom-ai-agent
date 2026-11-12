@@ -1,6 +1,11 @@
 const need=(v,m)=>{if(!v)throw Error('Association rules: '+m);};
 export function validateAssnRulesParameters(p,mode,request){
- need(mode==='fp_growth','only fp_growth training is supported');
+ need(['fp_growth','apply'].includes(mode),'only fp_growth training and saved-model apply are supported');
+ if(mode==='apply'){
+  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).length===0,'apply requires parameters:{} to preserve every saved setting');
+  need(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0&&request.finish==='execute','apply requires an existing trained model, unchanged connections, no mappings and finish execute');
+  need(request.read.ports.every(port=>port===0||port===1||port===2),'apply reads itemsets 0, saved rules 1 and recommendations 2');return;
+ }
  const required=['transaction_field','item_field','min_support_pct','min_confidence_pct','max_items'];
  const keys=[...required,'max_consequents','min_lift'];
  need(p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>keys.includes(k)),'unsupported parameter');
@@ -14,7 +19,7 @@ export function validateAssnRulesParameters(p,mode,request){
  need(p.min_lift===undefined||typeof p.min_lift==='number'&&Number.isFinite(p.min_lift)&&p.min_lift>=0,'min_lift must be a finite nonnegative ratio');
  need(request.inputs.length<=1&&request.inputs.every(i=>i.input===0)&&(request.target.kind==='existing'||request.inputs.length===1),'one main input is required; auxiliary input is unsupported');
  need(request.mappings.length===0,'mapping overrides are unsupported');
- need(request.read.ports.every(p=>p===0||p===1),'recommendation port 2 is not supported yet; read itemsets 0 and rules 1');
+ need(request.read.ports.every(p=>p===0||p===1||p===2),'unsupported output port; read itemsets 0, rules 1 or recommendations 2');
 }
 export function resolveAssnRulesRoles(p,fields){
  for(const k of ['transaction_field','item_field'])if(p[k]!==undefined)need(fields.some(f=>f.name===p[k]&&f.type==='string'&&f.data_kind==='Дискретный'),'roles must name discrete string fields');

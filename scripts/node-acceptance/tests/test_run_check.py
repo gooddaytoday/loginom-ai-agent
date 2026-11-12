@@ -22,6 +22,107 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_excel_destinations_reach_seed_and_oracle_books(self):
+        for name in ['excel-export-numeric', 'excel-export-replace']:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                folder, workspace = root / 'run', root / 'workspace'
+                folder.mkdir(); workspace.mkdir()
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+                phases = []
+                def phase(name, *args, **kwargs):
+                    phases.append(name)
+                    if name == 'model': raise InterruptedError
+                with patch.object(instance, 'phase', side_effect=phase):
+                    with self.assertRaises(InterruptedError):
+                        instance.model(name, folder, root / 'profile', workspace, '/own/run.lgp',
+                                       {'package_directory': '/own/'}, root / 'build')
+                expected = runner.read(folder / 'expected.json')
+                destinations = ['/own/' + root.name + '-' + folder.parent.name + '-' + b['filename']
+                                for b in expected['excel_books']]
+                self.assertEqual([b['export_destination'] for b in expected['excel_books']], destinations)
+                self.assertEqual(expected['outputs'], expected['excel_books'])
+                for destination in destinations:
+                    self.assertIn(destination, (folder / 'task.md').read_text())
+                if name == 'excel-export-replace':
+                    seeds = runner.read(folder / 'seed-config.json')['books']
+                    self.assertEqual([b['destination'] for b in seeds], destinations)
+                    self.assertEqual(phases, ['excel-seeds', 'model'])
+                else:
+                    self.assertEqual(phases, ['model'])
+
+    def test_text_parallel_uses_frozen_tables_and_original_input_names(self):
+        case = runner.scenario('text-parallel')
+        self.assertTrue(case['text_parallel'])
+        self.assertTrue(case['text_list_sources'])
+        self.assertEqual(case['input_files'], ['sales_2026-01.csv', 'sales_2026-02.csv'])
+        self.assertEqual(case['lgd_initial'], 'expected-parallel.json')
+        self.assertEqual(case['expected_name'], 'expected-parallel.json')
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-parallel.md').read_bytes())
+        self.assertEqual(runner.expected_for(case, '/own/parallel.lgp', cold=True), runner.expected_for(case, '/own/parallel.lgp'))
+
+    def test_text_parallel_requires_native_toggle_and_same_node(self):
+        replies = [(n, dict(status='SUCCEEDED', node=dict(node_id='import'), configuration=dict(readback=dict(
+            kind='text_import', source=dict(source_path='/own/jan.csv｜/own/feb.csv', file_info='Имя файла',
+                                           parallel_processing=enabled, max_threads='2'))),
+            output=dict(ports=[dict(port=0, schema=[], sample=[])]))) for n, enabled in enumerate([False, True])]
+        runner.check_text_parallel(replies)
+        for path, value, message in [('parallel_processing', False, 'TWO_THREADS'), ('max_threads', '4', 'TWO_THREADS'),
+                                     ('file_info', 'Нет', 'FILENAME'), ('source_path', '/own/other.csv', 'SOURCE_CHANGED')]:
+            changed = copy.deepcopy(replies)
+            changed[-1][1]['configuration']['readback']['source'][path] = value
+            with self.assertRaisesRegex(AssertionError, message):
+                runner.check_text_parallel(changed)
+        changed = copy.deepcopy(replies)
+        changed[-1][1]['node']['node_id'] = 'replacement'
+        with self.assertRaisesRegex(AssertionError, 'RECREATED'):
+            runner.check_text_parallel(changed)
+        with self.assertRaisesRegex(AssertionError, 'STAGES_MISSING'):
+            runner.check_text_parallel(replies[1:])
+
+    def test_text_auto_label_keeps_frozen_oracles_and_exact_input_names(self):
+        case = runner.scenario('text-auto-label')
+        self.assertTrue(case['text_auto_label'])
+        self.assertTrue(case['text_list_sources'])
+        self.assertEqual(case['input_files'], ['typed.csv', 'typed-update.csv'])
+        self.assertEqual(case['lgd_initial'], 'expected-auto-label.json')
+        self.assertEqual(case['expected_name'], 'expected-custom-label.json')
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-auto-label.md').read_bytes())
+        self.assertEqual(runner.expected_for(case, '/own/label.lgp', cold=True)['outputs'][0]['output_node_label'], 'Ежедневные продажи')
+
+    def test_text_auto_label_requires_all_native_mode_source_transitions_on_one_guid(self):
+        stages = [('typed.csv', 'automatic', 'typed.csv'), ('typed-update.csv', 'automatic', 'typed-update.csv'),
+                  ('typed-update.csv', 'custom', 'Ежедневные продажи'), ('typed.csv', 'custom', 'Ежедневные продажи'),
+                  ('typed-update.csv', 'custom', 'Ежедневные продажи')]
+        replies = [(n, dict(status='SUCCEEDED', node=dict(node_id='import'), configuration=dict(readback=dict(
+            kind='text_import', source=dict(source_path='/own/' + path), node_title=dict(mode=mode, label=label)))))
+                   for n, (path, mode, label) in enumerate(stages)]
+        runner.check_text_auto_label(replies)
+        for index in range(len(replies)):
+            with self.assertRaisesRegex(AssertionError, 'STAGES_MISSING'):
+                runner.check_text_auto_label(replies[:index] + replies[index + 1:])
+        changed = copy.deepcopy(replies)
+        changed[2][1]['node']['node_id'] = 'replacement'
+        with self.assertRaisesRegex(AssertionError, 'IMPORT_CHANGED'):
+            runner.check_text_auto_label(changed)
+
+    def test_text_variant_keeps_frozen_subtypes_and_final_cold(self):
+        case = runner.scenario('text-variant')
+        self.assertTrue(case['text_variant'])
+        self.assertEqual(case['input_files'], ['variant.csv'])
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['lgd_initial'], 'expected-variant.json')
+        before = runner.read(case['source'] / case['lgd_initial'])['outputs'][0]
+        self.assertEqual(before['columns'][1]['type'], 'variant')
+        self.assertEqual([r['Value']['cell_type'] if r['Value'] is not None else None for r in before['rows']],
+                         ['integer', 'string', 'real', None])
+        after = runner.expected_for(case, '/own/variant.lgp')
+        self.assertEqual(after['outputs'][0]['columns'][1]['type'], 'string')
+        self.assertEqual(runner.expected_for(case, '/own/variant.lgp', cold=True), after)
+
     def test_text_update_has_two_named_stages_and_final_only_cold(self):
         case = runner.scenario('text-auto-update')
         self.assertEqual(case.get('export_count'), 2)
@@ -213,6 +314,67 @@ class RunCheckTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.csv_result({k: v for k, v in output.items() if k != 'header'}, stream.getvalue())
 
+    def test_csv_non_finite_real_matches_loginom_spelling_not_null_or_empty(self):
+        # v040-nan-exact: LAB-1314 actual-2.csv writes native NaN as "Nan".
+        output = dict(columns=[dict(name='Q', type='real', tolerance=dict(abs=1e-12, rel=1e-12))], rows=[dict(Q={'non_finite': 'NaN'})])
+        for text in ['Nan', 'NaN', 'nan']:
+            self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
+        for text in ['""', '?', '0', 'Inf']:
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(dict(output, rows=[dict(Q=None)]), 'Q\nNan\n', null_marker='?')
+
+    def test_csv_non_finite_infinity_spellings_are_unobserved_and_fail_closed(self):
+        # Only NaN's CSV spelling was observed (LAB-1314); like the exact Table
+        # reader, unobserved infinity spellings are not accepted.
+        for goal, texts in [('Infinity', ['Inf', 'inf', 'Infinity', '+Inf', '+Infinity']), ('-Infinity', ['-Inf', '-inf', '-Infinity'])]:
+            output = dict(columns=[dict(name='Q', type='real')], rows=[dict(Q={'non_finite': goal})])
+            for text in texts:
+                with self.subTest(goal=goal, text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                    self.csv_result(output, 'Q\n' + text + '\n', null_marker='?')
+
+    def test_types300_csv_non_finite_target_compares_marker_instead_of_raising(self):
+        output = dict(columns=[dict(name='Q', type='real')], rows=[dict(Q={'non_finite': 'NaN'})])
+        self.csv_result(output, 'Q\nNan\n', null_marker='?', scenario_name='types300')
+        for text in ['0', '1E+00', '?']:
+            with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'Q\n' + text + '\n', null_marker='?', scenario_name='types300')
+
+    def test_csv_datetime_accepts_hour_without_leading_zero_and_compares_value(self):
+        # LAB-1413 text-auto-label: Loginom export time_format "h:mm:ss" writes 2026-11-11 1:02:03.
+        output = dict(columns=[dict(name='EventAt', type='datetime')], rows=[dict(EventAt='2026-11-11T01:02:03')])
+        for text in ['2026-11-11 1:02:03', '2026-11-11T1:02:03', '2026-11-11 01:02:03']:
+            with self.subTest(text=text):
+                self.csv_result(output, 'EventAt\n' + text + '\n')
+        for text in ['2026-11-11 13:02:03', '2026-11-11 1:02:04', '2026-11-12 1:02:03', '2026-11-11 1:2:03',
+                     '2026-11-11 :02:03', '2026-11-11 1', 'x2026-11-11 1:02:03', '1:02:03', 'garbage']:
+            with self.subTest(text=text), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'EventAt\n' + text + '\n')
+
+    def test_csv_present_datetime_requires_a_date_in_every_row_never_its_value(self):
+        # v040-c8-filetime: FileTime is typed datetime and not NULL; its value is not promised.
+        output = dict(column_order='exact', columns=[dict(name='File', type='string'),
+                      dict(name='FileTime', type='datetime', label_any=True, comparison='present')],
+                      rows=[dict(File='a.csv', FileTime=True), dict(File='b.csv', FileTime=True)])
+        for first, second in [('2026-11-09 10:11:00', '1999-01-01T00:00:00.000'), ('2026-11-09', '2026-11-09T10:11')]:
+            self.csv_result(output, f'File,FileTime\na.csv,{first}\nb.csv,{second}\n', null_marker='?')
+        for bad in ['?', '', 'not a date', '10:11']:
+            with self.subTest(bad=bad), self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, f'File,FileTime\na.csv,2026-11-09 10:11:00\nb.csv,{bad}\n', null_marker='?')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'File,FileTime\na.csv,2026-11-09\nb.csv,\n')
+        for change in [dict(type='string'), dict(types=['datetime', 'string'])]:
+            bad = copy.deepcopy(output)
+            bad['columns'][1].update(change)
+            with self.subTest(change=change), self.assertRaisesRegex(AssertionError, 'EXPECTED_COMPARISON_INVALID'):
+                self.csv_result(bad, 'File,FileTime\na.csv,2026-11-09\nb.csv,2026-11-09\n')
+        for token in [None, '2026-11-09T10:11:00.000', False]:
+            bad = copy.deepcopy(output)
+            bad['rows'][1]['FileTime'] = token
+            with self.subTest(token=token), self.assertRaisesRegex(AssertionError, 'EXPECTED_COMPARISON_INVALID'):
+                self.csv_result(bad, 'File,FileTime\na.csv,2026-11-09\nb.csv,2026-11-09\n')
+
     def test_csv_without_header_keeps_positional_columns_width_and_row_checks(self):
         output = dict(header=False, ordered=True, columns=[dict(name=n, type='integer') for n in ['A', 'B']],
                       rows=[dict(A=1, B=1), dict(A=2, B=3)])
@@ -398,6 +560,43 @@ class RunCheckTests(unittest.TestCase):
             self.assertNotIn('{{PACKAGE_PATH}}', task)
             self.assertEqual(runner.read(folder / 'expected.json')['package_path'], '/test/run-x.lgp')
 
+    def test_expected_source_dir_is_the_delivered_source_directory_or_an_explicit_refusal(self):
+        # C8 expected-absolute-path.json names {{SOURCE_DIR}}/sales_*.csv; never compare that literal.
+        node = runner.REPO / 'docs/node-development/nodes/text-import'
+        spec = dict(runner.scenario('text-multi-file-list'), prompt=node / 'acceptance/task-file-info.md',
+                    expected_name='expected-absolute-path.json')
+        class Stop(Exception): pass
+        def model(spec):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                folder, profile, workspace = root / 'run', root / 'profile', root / 'workspace'
+                for path in [folder, profile, workspace]: path.mkdir()
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+                phases = []
+                def phase(name, *args, **kwargs):
+                    phases.append(name)
+                    if name == 'model': raise Stop
+                with patch.object(runner, 'scenario', return_value=spec), patch.object(instance, 'phase', side_effect=phase):
+                    try: instance.model('c8-file-info', folder, profile, workspace, '/own/dir/run.lgp', {'package_directory': '/own/dir/'}, root / 'build')
+                    except Stop: pass
+                return phases, runner.read(folder / 'expected.json'), (folder / 'task.md').read_text()
+        phases, expected, task = model(spec)
+        self.assertEqual(phases, ['text-list-inputs', 'model'])
+        self.assertNotIn('{{SOURCE_DIR}}', json.dumps(expected, ensure_ascii=False))
+        names = {row['FileName'] for row in expected['outputs'][0]['rows']}
+        self.assertEqual(names, {'/own/dir/sales_2026-01.csv', '/own/dir/sales_2026-02.csv'})
+        self.assertTrue(all(name in task for name in names))
+        without = {k: v for k, v in spec.items() if k != 'text_list_sources'}
+        with self.assertRaisesRegex(AssertionError, 'EXPECTED_SOURCE_DIR_MISSING'):
+            model(without)
+        self.assertEqual(model(dict(without, expected_name='expected-relative-path.json'))[1]['outputs'][0]['rows'][0]['FileName'],
+                         'sales_2026-01.csv')
+        for directory in [None, '', '/']:
+            with self.subTest(directory=directory), self.assertRaisesRegex(AssertionError, 'EXPECTED_SOURCE_DIR_MISSING'):
+                runner.bind_source_dir({'rows': [{'FileName': '{{SOURCE_DIR}}/a.csv'}]}, directory)
+        self.assertEqual(runner.bind_source_dir({'rows': [{'n': 1, 'FileName': 'a.csv'}]}, None), {'rows': [{'n': 1, 'FileName': 'a.csv'}]})
+
     def test_variables_user_has_typed_snapshot_oracle_and_no_table_exports(self):
         case = runner.scenario('variables-user')
         expected = runner.expected_for(case, '/own/variables-user.lgp')
@@ -419,6 +618,24 @@ class RunCheckTests(unittest.TestCase):
             self.assertTrue(case['prompt'].is_file())
             self.assertEqual(sorted(p.name for p in case['data'].iterdir()), case['input_files'])
             self.assertNotIn('expected', case['prompt'].read_text())
+
+    def test_assnrules_recommend_keeps_oracle_private_and_matches_both_native_ports(self):
+        case = runner.scenario('assnrules-recommend')
+        self.assertEqual(case['data'], runner.REPO / 'docs/node-development/nodes/datamining-assnrules/fixtures/v040')
+        self.assertEqual(case['input_files'], ['recommend-train.csv'])
+        self.assertEqual(case['export_count'], 2)
+        self.assertEqual(case['prompt'].name, 'task-recommend.md')
+        expected = runner.expected_for(case, '/test/recommend.lgp')
+        self.assertEqual([o['output_port'] for o in expected['outputs']], [1, 2])
+        self.assertEqual([len(o['rows']) for o in expected['outputs']], [2, 1])
+        rules, recommendations = expected['outputs']
+        rule = next(r for r in rules['rows'] if r['Item_0_A'] == 'A' and r['Item_0_C'] == 'B')
+        self.assertEqual(recommendations['rows'], [dict(rule, Transaction='T4')])
+        self.assertEqual([c['name'] for c in recommendations['columns']],
+            ['Transaction', 'RuleID', 'Support', 'Confidence', 'Lift', 'Item_0_A', 'Item_0_C'])
+        self.assertEqual(runner.expected_for(case, '/test/recommend.lgp', cold=True), expected)
+        for text in ['expected', 'oracle', 'T4', 'recommend-holdout.csv', '.75']:
+            self.assertNotIn(text, case['prompt'].read_text())
 
     def test_assnrules_consequents_has_exact_input_boundary_and_final_cold(self):
         case = runner.scenario('assnrules-consequents')
@@ -789,6 +1006,28 @@ class RunCheckTests(unittest.TestCase):
             path.write_text(observed.replace('False,2,?,?,', 'False,2,?,NULL,'))
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
                 runner.check_csv(path, expected, **options)
+
+    def test_new_export_without_marker_uses_correlated_readback(self):
+        # LAB-1257 model.stdout.jsonl:52 new export-intervals sent only destination;
+        # its wait receipt (:57) read back settings.null_marker ''.
+        expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='value')])
+        def events(readback=None, readback_destination='/test/all.csv'):
+            batch = self.export_events(readback=readback)
+            del batch[0][1]['part']['state']['input']['parameters']['null_marker']
+            if readback is not None:
+                outcome = json.loads(batch[1][1]['part']['state']['output'])
+                outcome['configuration']['readback']['destination'] = readback_destination
+                batch[1][1]['part']['state']['output'] = json.dumps(outcome)
+            return batch
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'actual.csv'
+            path.write_text('s\n""\nvalue\n')
+            options = dict(null_marker=None, destination='/test/all.csv')
+            runner.check_csv(path, expected, export_events=events(readback=''), **options)
+            for batch in [events(), events(readback='', readback_destination='/other/all.csv')]:
+                with self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING'):
+                    runner.check_csv(path, expected, export_events=batch, **options)
+        self.assertEqual(runner.export_null_marker(self.export_events('?', readback=''), '/test/all.csv'), '?')
 
     def test_export_null_marker_patch_uses_final_receipt(self):
         expected = dict(columns=[dict(name='s', type='string')], rows=[dict(s=None), dict(s='')])
@@ -1949,6 +2188,9 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
 
     def test_outlier_edit_scenarios_expose_only_the_selected_fixture(self):
         for name, task, expected_name, fixture in [
+            ('outlier-replacement-limit', 'task-replacement-limit.md', 'expected-replacement-limit.json', 'replacement-discriminator.csv'),
+            ('outlier-delete', 'task-delete.md', 'expected-delete.json', 'policies.csv'),
+            ('outlier-constant', 'task-constant.md', 'expected-constant.json', 'policies.csv'),
             ('outlier-replacement-mean', 'task-replacement-discriminator.md', 'expected-replacement-mean.json', 'replacement-discriminator.csv'),
             ('outlier-replacement-median', 'task-replacement-median.md', 'expected-replacement-median.json', 'replacement-discriminator.csv'),
             ('outlier-replacement-most-probable', 'task-replacement-most-probable.md', 'expected-replacement-most-probable.json', 'replacement-discriminator.csv'),
@@ -1963,6 +2205,10 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
             self.assertEqual(case['export_count'], 3)
             expected = runner.expected_for(case, '/test.lgp')
             self.assertEqual([o['output_port'] for o in expected['outputs']], [0, 1, 2])
+            if name == 'outlier-delete': self.assertEqual(len(expected['outputs'][0]['rows']), 7)
+            if name == 'outlier-replacement-limit':
+                row = next(r for r in expected['outputs'][0]['rows'] if r['RowID'] == 8)
+                self.assertAlmostEqual(row['X'], 4.463921244845127, delta=1e-10)
             if name == 'outlier-replacement-mean':
                 row = next(r for r in expected['outputs'][0]['rows'] if r['RowID'] == 8)
                 self.assertAlmostEqual(row['X'], 19 / 7)
@@ -2481,5 +2727,43 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 mutate(receipt)
                 self.assertFalse(runner.save_confirmed(case, receipt, package))
             self.assertFalse(runner.save_confirmed(case, save, '/other.lgp'))
+
+    def test_coarse_frozen_trainings_without_training_readback_fail_with_code(self):
+        def reply(execution, training=True):
+            readback = dict(kind='coarse_classes', frozen_partition=dict(locked=True))
+            if training: readback['training'] = dict(source=dict(file='/test/train.csv'))
+            return (0, dict(status='SUCCEEDED', node=dict(node_id='node'), configuration=dict(readback=readback),
+                            execution=dict(execution_id=execution, status='completed'),
+                            output=dict(ports=[dict(port=0, schema=[], sample=[])])))
+        runner.check_coarse_frozen_trainings([reply('first'), reply('second')])
+        with self.assertRaisesRegex(AssertionError, 'COARSE_FROZEN_SAME_IMPORT'):
+            runner.check_coarse_frozen_trainings([reply('first'), reply('second', training=False)])
+        with self.assertRaisesRegex(AssertionError, 'COARSE_FROZEN_SAME_IMPORT'):
+            runner.check_coarse_frozen_trainings([reply('first', training=False), reply('second', training=False)])
+
+    def test_binning_ties_current_binds_the_oracle_that_reproduces_its_expected(self):
+        self.assertEqual(runner.scenario('binning-ties-current')['oracle'].name, 'oracle-edges.py')
+        self.assertEqual(runner.scenario('binning-ties-current')['expected_name'], 'modes/expected-current.json')
+        for name in ['binning-auto', 'binning-sd']:
+            self.assertEqual(runner.scenario(name)['oracle'].name, 'oracle.py')
+
+    def test_export_patch_readback_requires_the_same_nonempty_operation_id(self):
+        def events(request_id='export', readback_id='export', status='SUCCEEDED'):
+            batch = self.export_events(kind='existing', readback='NULL')
+            request = batch[0][1]['part']['state']['input']
+            request['parameters'] = dict(destination='/test/all.csv')
+            if request_id is None: del request['operation_id']
+            outcome = json.loads(batch[1][1]['part']['state']['output'])
+            outcome['status'] = status
+            if readback_id is None: del outcome['operation_id']
+            else: outcome['operation_id'] = readback_id
+            batch[1][1]['part']['state']['output'] = json.dumps(outcome)
+            return batch
+        self.assertEqual(runner.export_null_marker(events(), '/test/all.csv'), 'NULL')
+        for label, batch in [('both without operation_id', events(None, None)),
+                             ('foreign operation_id', events(readback_id='unrelated')),
+                             ('unsuccessful readback', events(status='FAILED'))]:
+            with self.subTest(label), self.assertRaisesRegex(AssertionError, 'CSV_NULL_MARKER_MISSING: .*same operation_id'):
+                runner.export_null_marker(batch, '/test/all.csv')
 
 if __name__ == '__main__': unittest.main()

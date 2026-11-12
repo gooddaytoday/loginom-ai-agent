@@ -6,7 +6,7 @@ export function coarseClassesConfigurationReadback({node,phases,operation_id}){
  const c=configured.value.configuration,training=structuredClone(finished.value.training??{status:'not_requested'}),applying=c?.mode==='apply';
  need(c?.verified&&['document_id','workflow_id','node_id'].every(k=>c.node_context?.[k]===node[k]),'configuration owner changed');
  need(applying?saved.value.settings_applied===false&&saved.value.draft_discarded===true&&finished.value.settings_applied===false&&training.status==='not_requested':configured.value.validation?.status==='accepted_by_loginom_next'&&saved.value.settings_applied===true&&finished.value.settings_applied===true,'internal commits; apply must discard its draft without training');
- need(applying||finished.value.mode!=='execute'||training.status==='trained'&&training.execution_id!==finished.value.execution_id&&training.source?.length===(c.partition==='external'?2:1),'separate current-input training required');
+ need(applying||finished.value.mode!=='execute'||training.status==='trained'&&training.execution_id!==finished.value.execution_id&&training.source?.length===1,'separate current-input training required');
  const executed=finished.value.mode==='execute',read=executed?phase('read'):null,model=executed?coarseClassesMaterializedModel(read.value.ports):c;
  need(!executed||model?.state==='materialized'&&model.input_field===c.input_field&&model.classes.length>0,'fresh materialized classes required');
  if(training.status==='trained')training.model={state:model.state,classes:model.classes,total_iv:model.total_iv};
@@ -14,6 +14,5 @@ export function coarseClassesConfigurationReadback({node,phases,operation_id}){
  return {kind:'coarse_classes',scope:executed?'observed_after_verified_execute':'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),receipt_ids:[input,configured,saved,mapped,finished,...(read?[read]:[])].map(p=>p.receipt_id),mode:c.mode,
   ...Object.fromEntries(['input_field','target_field','event_value','partition','min_class_percent','max_classes','uniformity_percent','roles'].map(k=>[k,structuredClone(c[k])])),
   ...(c.frozen?{frozen:true,frozen_partition:structuredClone(c.frozen_partition)}:{}),
-  ...(c.partition==='external'?{external_partition:structuredClone(c.external_partition)}:{}),
   state:model.state,total_iv:model.total_iv,classes:structuredClone(model.classes),training:structuredClone(training),output_mappings:mapped.value.ports.map(p=>({port:p.port,fields:p.schema.map((f,index)=>({...f,index,source_name:f.name}))})),package_persistence_verified:false};
 }

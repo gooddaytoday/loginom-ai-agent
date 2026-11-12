@@ -22,11 +22,12 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
     requireValue(typeof f.value!=='string'||f.value.length<=2048,'oversized '+name);
     return [name,f.value];
   }));
-  const source=fields(c.source,['source_path','connection','encoding','rows_to_skip','first_line_as_title']);
-  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','date_format','date_separator'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
+  const source=fields(c.source,['source_path','connection','encoding','rows_to_skip','first_line_as_title',
+    ...['file_info','parallel_processing','max_threads'].filter(k=>c.source?.fields?.[k]?.status==='observed')]);
+  const format=fields(c.format,['delimiter','text_qualifier','null_marker','decimal_separator',...['multiple_delimiters','variant_as_general_type','date_format','date_separator'].filter(k=>Object.hasOwn(c.format?.fields??{},k))]);
   requireValue(typeof source.first_line_as_title==='boolean'
-    &&Object.entries(source).every(([k,v])=>k==='first_line_as_title'||typeof v==='string')
-    &&Object.entries(format).every(([k,v])=>typeof v===(k==='multiple_delimiters'?'boolean':'string')),'invalid observed field types');
+    &&Object.entries(source).every(([k,v])=>typeof v===(['first_line_as_title','parallel_processing'].includes(k)?'boolean':'string'))
+    &&Object.entries(format).every(([k,v])=>typeof v===(['multiple_delimiters','variant_as_general_type'].includes(k)?'boolean':'string')),'invalid observed field types');
   requireValue(Array.isArray(c.columns)&&c.columns.length>0&&c.columns.length<=1000
     &&c.columns.every((f,i)=>f.status==='observed'&&f.index===i&&typeof f.used==='boolean'
       &&['name','label','type','data_kind'].every(k=>typeof f[k]==='string'&&f[k].length<=120))
@@ -43,10 +44,16 @@ export function textImportConfigurationReadback({node,phases,operation_id}) {
     return {...pick(f,['index','name','label','type','data_kind']),source_name:f.source.name};
   });
   // Auto-detect «Все» materializes output fields only at execution; the mapping stage reports none.
-  requireValue(output.length===(m.deferred_output===true?0:c.columns.filter(f=>f.used).length),'output inventory differs');
+  const service=source.file_info==='Имя файла'?1:0;
+  if(service)requireValue(!c.columns.some(f=>f.used&&f.name==='FileName')
+    &&output.filter(f=>f.source_name==='FileName'&&f.type==='string').length===1,'missing FileName source');
+  requireValue(output.length===(m.deferred_output===true?0:c.columns.filter(f=>f.used).length+service),'output inventory differs');
+  const title=finished.value.node_title?fields(finished.value.node_title,['label_mode','label']):null;
+  if(title)requireValue(['Автоматическая метка','Пользовательская метка'].includes(title.label_mode)&&title.label.length>0,'invalid node title');
   return {kind:'text_import',scope:'observed_before_verified_finish',node:structuredClone(node),
     receipt_ids:[configured.receipt_id,mapped.receipt_id,finished.receipt_id],
     values_are:'observed_ui_values',source,format,
+    ...(title?{node_title:{mode:title.label_mode==='Автоматическая метка'?'automatic':'custom',label:title.label}}:{}),
     columns:c.columns.map(f=>pick(f,['index','name','label','type','data_kind','used'])),
     output_mapping:{port:0,autosync:n.autosync,fields:output},
     package_persistence_verified:false};

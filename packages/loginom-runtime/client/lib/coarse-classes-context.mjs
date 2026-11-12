@@ -29,25 +29,6 @@ export function readCoarseClassesBrowser(prefix){
   if(classes.some((r,i)=>r.number!==i||![r.lower,r.upper].every(v=>v===null||Number.isFinite(v))))return fail('coarse_classes_model_bounds');
   return {verified:true,model:{input_field:c.Name,locked:c.IsLocked,edited:c.IsEdited,classes},settings_applied:false};
  }
- // LAB-1324: the external partition page precedes field roles when input 1
- // exists. Its link kinds are read from the owned grid store: 0 unused,
- // 1 feature identifier, 2 class number, 3 category (discovery LAB-1055).
- const links=exact(prefix+';WizrdMCF;CoarseClassesWizard;grdExternalBinningLinks');
- if(links.length===1&&links[0].checkVisibility({checkVisibilityCSS:true})){
-  const owner=exact(prefix+';WizrdMCF'),w=owner.length===1&&globalThis.Ext?.getCmp?.(owner[0].id),g=globalThis.Ext?.getCmp?.(links[0].id),store=g?.getStore?.(),rs=store?.getData?.().items;
-  if(!w||w.el?.dom!==owner[0]||g?.el?.dom!==links[0]||!owner[0].contains(links[0]))return fail('coarse_classes_external_owner');
-  const queues=Object.getOwnPropertySymbols(w).filter(s=>s.description==='LockQueue');
-  if(queues.length!==1||w[queues[0]]?.IsEmpty!==true)return fail('coarse_classes_external_pending');
-  if(store?.$className!=='Ext.data.Store'||store.isBufferedStore||store.isLoading?.()||!Array.isArray(rs)||!rs.length||rs.length>1000||store.getCount?.()!==rs.length)return fail('coarse_classes_external_inventory');
-  const out=[];
-  for(const [index,r] of rs.entries()){
-   const d=r.data,name=d.Name??d.DisplayName,kind=d.ClassParamsColumnKind;
-   if(typeof name!=='string'||!name||!Number.isInteger(kind))return {...fail('coarse_classes_external_link'),record_keys:Object.keys(d??{}).filter(k=>!k.startsWith('$')).slice(0,40),kind_type:typeof kind};
-   out.push({index,name,kind});
-  }
-  if(new Set(out.map(l=>l.name)).size!==out.length)return fail('coarse_classes_external_identity');
-  return {verified:true,external:{links:out},settings_applied:false};
- }
  const roots=exact(base),root=roots[0];
  if(roots.length!==1||!root.checkVisibility({checkVisibilityCSS:true}))return fail('coarse_classes_root');
  const cmp=t=>{const es=exact(t),c=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id);return c?.el?.dom===es[0]&&root.contains(es[0])?c:null;};
@@ -63,8 +44,8 @@ export function readCoarseClassesBrowser(prefix){
  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},kinds={0:'Неопределенное',1:'Непрерывный',2:'Дискретный'},fields=[];
  for(const [index,r] of rs.entries()){
   const d=r.data;
-  if(d.Index!==index||!d.Name||typeof d.DisplayName!=='string'||!types[d.DataType]||!kinds[d.DataKind]||![0,1,2,3,4].includes(d.ColumnPurpose))return fail('coarse_classes_field');
-  fields.push({index,record_id:String(r.internalId),name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],role:{0:'unused',1:'input',2:'input',3:'input',4:'target'}[d.ColumnPurpose],frozen:d.ColumnPurpose===3,external:d.ColumnPurpose===2});
+  if(d.Index!==index||!d.Name||typeof d.DisplayName!=='string'||!types[d.DataType]||!kinds[d.DataKind]||![0,1,3,4].includes(d.ColumnPurpose))return fail('coarse_classes_field');
+  fields.push({index,record_id:String(r.internalId),name:d.Name,label:d.DisplayName,type:types[d.DataType],data_kind:kinds[d.DataKind],role:{0:'unused',1:'input',3:'input',4:'target'}[d.ColumnPurpose],frozen:d.ColumnPurpose===3});
  }
  if(new Set(fields.map(f=>f.name)).size!==fields.length||new Set(fields.map(f=>f.record_id)).size!==fields.length)return fail('coarse_classes_identity');
  const selected=selection.length?fields[rs.indexOf(selection[0])]:null,settings={},controlBase=base+';CoarseClassesSettingsFrame;';
@@ -78,7 +59,7 @@ export function readCoarseClassesBrowser(prefix){
  settings.event_control=event?.path??null;
  settings.event_value=event?(event.path.endsWith(';cbx')?event.control.getRawValue?.():event.control.getValue?.()):null;
  if(selected?.role==='target'&&typeof settings.event_value!=='string')return fail('coarse_classes_event_pending');
- if(selected&&settings.role!==(selected.frozen?3:selected.external?2:{unused:0,input:1,target:4}[selected.role]))return fail('coarse_classes_selection_binding');
- if(selected?.role==='input'&&!selected.frozen&&!selected.external&&(!['min_class_percent','max_classes','uniformity_percent'].every(k=>Number.isFinite(settings[k]))||typeof settings.fine_classes!=='boolean'))return fail('coarse_classes_settings_pending');
+ if(selected&&settings.role!==(selected.frozen?3:{unused:0,input:1,target:4}[selected.role]))return fail('coarse_classes_selection_binding');
+ if(selected?.role==='input'&&!selected.frozen&&(!['min_class_percent','max_classes','uniformity_percent'].every(k=>Number.isFinite(settings[k]))||typeof settings.fine_classes!=='boolean'))return fail('coarse_classes_settings_pending');
  return {verified:true,inventory_complete:true,binding_ready:true,fields,selected,settings,settings_applied:false};
 }
