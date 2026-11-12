@@ -16,11 +16,7 @@ const NAME_END = `(?![A-Za-z0-9_~-]|\\.${NAME_CHAR})`
 const pluginName = "@loginom-ai-agent/plugin"
 const forkOnlyName = `@loginom-ai-agent/${FORK_ONLY[0]}`
 const pluginInstallName = new RegExp(`${pluginName}${NAME_END}`, "g")
-const pluginInstallFiles = new Set([
-  "packages/opencode/src/product/installation.ts",
-  "packages/opencode/test/product/plugin-dependency.test.ts",
-  "packages/product/test/names.test.ts",
-])
+const pluginInstallFiles = new Set(["packages/product/test/names.test.ts"])
 const forkScopeOutsideForkOnly = new RegExp(
   `@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})${NAME_END})${NAME_CHAR}+`,
 )
