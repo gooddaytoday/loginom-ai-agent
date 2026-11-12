@@ -764,6 +764,11 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=src / 'acceptance' / ('task-' + case + '.md'),
                     data=src / 'fixtures/modes', input_files=['requests.csv'], base=None,
                     expected_name='expected.json', oracle=src / 'acceptance/modes/oracle.py')
+    if name == 'replace-external':
+        node = REPO / 'docs/node-development/nodes/replacement'
+        return dict(source=node / 'acceptance/extended', prompt=node / 'acceptance/task-external.md',
+                    data=node / 'fixtures/extended', input_files=['input.csv', 'rules-unique.csv'], base=None,
+                    expected_name='expected-external.json')
     if name == 'replace-exact':
         src = REPO / 'docs/node-development/nodes/replacement/acceptance/nearest'
         return dict(source=src, prompt=src / 'task-exact.md', data=src / 'data', base=None, expected_name='expected-exact.json')
