@@ -29,7 +29,7 @@ test('the public dock_node_apply path refuses external classes before any graph 
  for(const inputs of [[{source:source('main'),output:0,input:0},{source:source('classes'),output:0,input:1}],[{source:source('main'),output:0,input:0}]])
   await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,inputs}),refusal);
  await assert.rejects(dispatchNodeApi(runtime,'dock_node_apply',{...envelope,parameters:{coarse_classes:{...external,partition:'automatic'}},
-  inputs:[{source:source('main'),output:0,input:0},{source:source('classes'),output:0,input:1}]}),/one input 0 required/);
+  inputs:[{source:source('main'),output:0,input:0},{source:source('classes'),output:0,input:1}]}),/Target tabular input does not exist/);
  assert.deepEqual(gestures,[]);
  // Automatic discrete training on input 0 stays admitted.
  await dispatchNodeApi(runtime,'dock_node_apply',{...envelope,parameters:{coarse_classes:{...external,partition:'automatic'}},inputs:[{source:source('main'),output:0,input:0}]});

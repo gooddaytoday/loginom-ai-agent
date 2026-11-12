@@ -1,4 +1,5 @@
 import {variableBindingsSchema} from './variable-binding-parameters.mjs';
+import {validateCoarseClassesParameters} from './coarse-classes-parameters.mjs';
 import {variablesReplaceParametersSchema} from './variables-replace-schema.mjs';
 import {variablesColumnUnionParametersSchema} from './variables-coluniondatavar-parameters.mjs';
 import {variablesCalculatorParametersSchema} from './variables-calculator-schema.mjs';
@@ -294,6 +295,8 @@ export const deliveryApiTools=Object.freeze([
 ]);
 export const isNodeApiTool=name=>[...nodeApiTools,...deliveryApiTools].some(tool=>tool.name===name);
 export function validateNodeApplyEnvelope(args) {
+ // LAB-1324: refuse the unsupported external partition before graph/input checks.
+ if(args.target?.type==='preprocessing.coarse_classes'&&args.mode==='internal'&&args.parameters?.coarse_classes?.partition==='external')validateCoarseClassesParameters(args.parameters,'internal');
  if(args.target?.type==='research.quality'){
   if(args.mode!=='profile')throw Error('Quality requires profile mode');
   validateActionParameters({type:'object',properties:{},additionalProperties:false},args.parameters,'parameters.parameters');
