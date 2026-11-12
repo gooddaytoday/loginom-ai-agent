@@ -763,7 +763,7 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete']:
+    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers']:
         src = REPO / 'docs/node-development/nodes/integration-restrequest'
         case = name.removeprefix('rest-')
         return dict(source=src / 'acceptance/modes' / case,

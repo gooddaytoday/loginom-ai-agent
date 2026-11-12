@@ -21,7 +21,7 @@ export function restRequestReadback({node,phases,operation_id}){
  need(configured?.status==='verified'&&c?.verified&&['document_id','workflow_id','node_id'].every(k=>c.node_context?.[k]===node[k]),'configuration readback owner differs');
  need(saved?.status==='verified'&&saved.value?.settings_applied===true&&saved.value.mode==='done'&&['document_id','workflow_id','node_id'].every(k=>saved.value.node_context?.[k]===node[k]),'node settings were not committed to this node');
  return {kind:'rest_request',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',method:c.method??'GET',
-  ...(c.body_field!==undefined?{body_field:c.body_field}:{}),connection:c.connection??null,query_parameters:c.query_parameters,receipt_ids:[configured,saved].map(p=>{need(p.receipt_id===operation_id+':'+p.phase,'readback phase differs');return p.receipt_id;}),package_persistence_verified:false};
+  ...(c.body_field!==undefined?{body_field:c.body_field}:{}),...(c.headers!==undefined?{headers:c.headers}:{}),connection:c.connection??null,query_parameters:c.query_parameters,receipt_ids:[configured,saved].map(p=>{need(p.receipt_id===operation_id+':'+p.phase,'readback phase differs');return p.receipt_id;}),package_persistence_verified:false};
 }
 
 export function restQueryEncoderRequest(request,deadline,now=Date.now()){
