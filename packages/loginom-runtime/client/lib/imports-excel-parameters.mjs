@@ -37,6 +37,8 @@ export function validateExcelParameters(p,mode,r){
   need(p?.source?.kind==='storage','bound file requires parameters.source from dock_storage_source');
   p={...p,excel:{...p.excel,source_path:'/binding-validation.xlsx'}};
  }
+ need(r.target?.kind!=='existing'||r.bindings?.length||!p?.excel||Object.keys(p.excel).length>0,
+  'execute the SAME node unchanged with parameters exactly {excel:{}} (no source); its saved file or bound variable is used');
  need(mode==='xlsx'&&p&&Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='excel,source','source and excel settings are required, mode xlsx');
  validateImportSource(p.source);
  const e=p.excel;

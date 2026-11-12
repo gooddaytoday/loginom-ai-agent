@@ -38,6 +38,9 @@ test('SAME Excel node re-executes unchanged with excel:{} and no reconfiguration
  for(const patch of [{bindings:[binding]},{parameters:{excel:{header_rows:1}}},{parameters:{excel:{},source:p.source}},{mode:'delimited'},{finish:'done'},{target:{kind:'new',type:'imports.excel'}}])
   assert.equal(isUnchangedExcelImportExecution({...r,...patch}),false);
  assert.doesNotThrow(()=>validateExcelParameters(r.parameters,r.mode,r));
+ // LAB-1446 run A: source beside the empty patch got a misleading path refusal.
+ const extra={...r,parameters:{excel:{},source:p.source}};
+ assert.throws(()=>validateExcelParameters(extra.parameters,extra.mode,extra),/exactly \{excel:\{\}\} \(no source\)/);
 });
 
 function wizard({initial=null,observed,literalHidden=false}={}){

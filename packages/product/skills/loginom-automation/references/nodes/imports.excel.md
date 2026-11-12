@@ -59,7 +59,7 @@ source/настройки и другое `extend_range`: выполни тот 
 
 `binding_schema`: `/excel/source_path`; `variable_inputs`: `variables.user` 4 → Excel 0.
 Сначала выполни `variables.to_table` от выхода 4. Свежий `dock_storage_source`
-перед КАЖДЫМ Execute; его storage — в `parameters.source`, без `excel.source_path`.
-Меняй только значение переменной, затем ТОТ ЖЕ узел: `parameters:{excel:{}}`,
+перед КАЖДЫМ Execute. Новый узел: storage — в `parameters.source`, без `excel.source_path`.
+Меняй только переменную, затем ТОТ ЖЕ узел: ровно `parameters:{excel:{}}` (без source),
 `bindings:[]`, пустые inputs/mappings, и после Save/reopen. Проверь `configuration.bindings`.
 <!-- /mode -->
