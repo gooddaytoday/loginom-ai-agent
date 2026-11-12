@@ -139,16 +139,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Every build stages this key into its resources; without it the app cannot use the knowledge service.
-      - name: Require the built-in knowledge key
-        env:
-          LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
-        run: |
-          if [ -z "$LOGINOM_MCP_API_KEY" ]; then
-            echo "::error::Repository secret LOGINOM_MCP_API_KEY is required: release builds embed the knowledge service key"
-            exit 1
-          fi
-
       - name: Require built-in S3 read key and virtual-host configuration
         env:
           S3_READ_ACCESS: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
@@ -249,7 +239,6 @@ jobs:
       LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
-      LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
       LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
       LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
     steps:
@@ -341,7 +330,6 @@ jobs:
       LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
-      LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
       LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
       LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -423,7 +411,6 @@ jobs:
       LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ${{ needs.verify.outputs.feeds == 'true' && vars.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD || '' }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
-      LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
       LOGINOM_UPDATES_S3_READ_ACCESS_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_ACCESS_KEY }}
       LOGINOM_UPDATES_S3_READ_SECRET_KEY: ${{ secrets.LOGINOM_UPDATES_S3_READ_SECRET_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"

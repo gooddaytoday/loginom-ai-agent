@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fork } from 'node:child_process';
+import { execFileSync, fork } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
+import { readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { knowledgeServer } from '../client/test/support/knowledge-server.mjs';
+import { HELP_URI } from '../client/lib/knowledge-client.mjs';
+import { helpFixture } from '../client/test/support/help-fixture.mjs';
 
 function entry(t) {
   const child = fork(fileURLToPath(new URL('../src/knowledge-entry.mjs', import.meta.url)), [], {
@@ -47,186 +50,92 @@ function entry(t) {
   };
 }
 
-test('start acknowledges locally while Help initialization is blocked, and close cancels startup', async t => {
-  const entered = Promise.withResolvers();
-  const release = Promise.withResolvers();
-  t.after(() => release.resolve());
-  const server = await knowledgeServer(t, { initialize: () => {
-    entered.resolve(); return release.promise;
-  } });
+test('private entry serves shipped Help through the read-only catalog', async t => {
   const runtime = entry(t);
-  assert.deepEqual(await runtime.request('start', {
-    protocol: 1, generation: 17, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET',
-  }), { protocol: 1, generation: 17, started: true });
-  await entered.promise;
-  const listing = runtime.request('list');
-  listing.catch(() => {});
-  assert.deepEqual(await runtime.request('close'), { closed: true });
-  await assert.rejects(listing, /LOGINOM_KNOWLEDGE_CLOSED/);
-  assert.deepEqual(await runtime.exited, [0, null]);
-});
-
-test('private entry returns real Help schemas and calls only the read-only catalog', async t => {
-  const server = await knowledgeServer(t);
-  const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 8, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  assert.deepEqual(await runtime.request('start', { protocol: 1, generation: 8, helpRoot: await helpFixture(t) }),
+    { protocol: 1, generation: 8, started: true });
   const catalog = await runtime.request('list');
   assert.deepEqual(catalog.tools.map(tool => tool.name).sort(), ['find', 'glob', 'grep', 'list', 'read', 'search', 'tree']);
-  assert.deepEqual(catalog.tools.find(tool => tool.name === 'read').inputSchema,
-    server.tools.find(tool => tool.name === 'read').inputSchema);
   assert.match(catalog.catalogSha256, /^[a-f0-9]{64}$/);
-  const input = { run: 'chat-A-run-1', id: 'read-1', name: 'read', arguments: { uri: 'Help/nodes.md' } };
+  const input = { run: 'chat-A-run-1', id: 'read-1', name: 'read', arguments: { uris: `${HELP_URI}/data/processors/integration/rest-request.html` } };
   const result = await runtime.request('call', input);
-  assert.deepEqual(JSON.parse(result.content[0].text), { name: 'read', arguments: input.arguments });
+  assert.match(result.content[0].text, /# REST-запрос/);
   for (const name of ['write', 'dock_prepare', 'browser_navigate'])
     await assert.rejects(runtime.request('call', { ...input, name }), /LOGINOM_KNOWLEDGE_TOOL_DENIED/);
-  assert.equal(server.calls.length, 1);
-  assert.deepEqual(await runtime.request('close'), { closed: true });
-  assert.deepEqual(await runtime.exited, [0, null]);
-});
-
-test('concurrent Help calls are cancelled by request or run without disturbing another owner', async t => {
-  const entered = Promise.withResolvers();
-  const gates = new Map(['A1', 'A2', 'B1'].map(id => [id, Promise.withResolvers()]));
-  t.after(() => { for (const gate of gates.values()) gate.resolve({ content: [] }); });
-  const server = await knowledgeServer(t, { call: params => {
-    if (server.calls.length === 3) entered.resolve();
-    return gates.get(params.arguments.uri).promise;
-  } });
-  const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 9, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  await runtime.request('list');
-  const input = id => ({ run: id.startsWith('A') ? 'run-A' : 'run-B', id, name: 'read', arguments: { uri: id } });
-  const first = runtime.request('call', input('A1'));
-  const second = runtime.request('call', input('A2'));
-  const other = runtime.request('call', input('B1'));
-  [first, second, other].forEach(promise => promise.catch(() => {}));
-  await entered.promise;
-  await assert.rejects(runtime.request('call', input('A1')), /LOGINOM_KNOWLEDGE_REQUEST_BUSY/);
-  assert.deepEqual(await runtime.request('interrupt', { run: 'run-A', id: 'A1' }), { interrupted: true });
-  await assert.rejects(first, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  gates.get('A2').resolve({ content: [{ type: 'text', text: 'A2 survived' }] });
-  assert.equal((await second).content[0].text, 'A2 survived');
-  assert.deepEqual(await runtime.request('interrupt', { run: 'run-B' }), { interrupted: true });
-  await assert.rejects(other, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  assert.equal(server.calls.length, 3);
   assert.deepEqual(await runtime.request('close'), { closed: true });
   assert.deepEqual(await runtime.exited, [0, null]);
 });
 
 test('malformed call and interrupt requests fail locally with a stable private error', async t => {
-  const server = await knowledgeServer(t);
   const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 2, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  await runtime.request('start', { protocol: 1, generation: 2, helpRoot: await helpFixture(t) });
   await runtime.request('list');
   for (const input of [undefined, null, {}, { run: '', id: 'id', name: 'read' }]) {
     await assert.rejects(runtime.request('call', input), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
     await assert.rejects(runtime.request('interrupt', input), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
   }
-  assert.equal(server.calls.length, 0);
+  for (const input of [{ all: 'true' }, { all: true, run: 'A' }])
+    await assert.rejects(runtime.request('interrupt', input), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
+  assert.deepEqual(await runtime.request('interrupt', { all: true }), { interrupted: true });
 });
 
-test('startup rejects password-bearing payloads and malformed endpoints before network access', async t => {
-  const server = await knowledgeServer(t);
+test('startup accepts only an absolute Help directory and no credentials', async t => {
   const runtime = entry(t);
-  const valid = { protocol: 1, generation: 3, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' };
+  const valid = { protocol: 1, generation: 3, helpRoot: await helpFixture(t) };
   for (const input of [
-    { ...valid, password: 'PRIVATE-NONSECRET-PASSWORD' }, { ...valid, connection: { password: 'PRIVATE-NONSECRET-PASSWORD' } },
-    { ...valid, protocol: 2 }, { ...valid, generation: 0 },
-    { ...valid, endpoint: 'file:///tmp/private' }, { ...valid, endpoint: 'invalid' },
-    { ...valid, endpoint: 'http://user:secret@127.0.0.1/mcp' },
+    { ...valid, password: 'PRIVATE-NONSECRET-PASSWORD' }, { ...valid, apiKey: 'UNIT-NONSECRET' },
+    { ...valid, endpoint: 'https://mcp.loginom.ai/mcp' }, { ...valid, protocol: 2 }, { ...valid, generation: 0 },
+    { ...valid, helpRoot: 'relative/help' }, { protocol: 1, generation: 3 },
   ]) await assert.rejects(runtime.request('start', input), /LOGINOM_START_INVALID/);
-  assert.equal(server.requests.length, 0);
   await runtime.request('start', valid);
   await runtime.request('list');
   await assert.rejects(runtime.request('start', valid), /LOGINOM_ALREADY_STARTED/);
 });
 
-test('close drains a blocked catalog read with the local cancellation code', async t => {
-  const entered = Promise.withResolvers();
-  const release = Promise.withResolvers();
-  t.after(() => release.resolve({ tools: server.tools }));
-  const server = await knowledgeServer(t, { list: () => { entered.resolve(); return release.promise; } });
+test('missing or changed Help fails the catalog with a private code and startup evidence', async t => {
   const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 4, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  await entered.promise;
-  const listing = runtime.request('list');
-  listing.catch(() => {});
+  await runtime.request('start', { protocol: 1, generation: 4, helpRoot: await helpFixture(t, { tamper: 'data/README.md' }) });
+  await assert.rejects(runtime.request('list'), /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
+  await assert.rejects(runtime.request('call', { run: 'A', id: '1', name: 'read', arguments: { uris: 'README.md' } }),
+    /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
   assert.deepEqual(await runtime.request('close'), { closed: true });
-  await assert.rejects(listing, /LOGINOM_KNOWLEDGE_CLOSED/);
   assert.deepEqual(await runtime.exited, [0, null]);
 });
 
-for (const mode of ['close', 'owner-disconnect']) test(`${mode} cancels active Help and exits without a signal`, async t => {
-  const entered = Promise.withResolvers();
-  const release = Promise.withResolvers();
-  t.after(() => release.resolve({ content: [] }));
-  const server = await knowledgeServer(t, { call: () => { entered.resolve(); return release.promise; } });
-  const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 5, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  const call = runtime.request('call', { run: 'run', id: 'active', name: 'read', arguments: { uri: 'slow-help' } });
-  call.catch(() => {});
-  await entered.promise;
-  if (mode === 'close') {
-    assert.deepEqual(await runtime.request('close'), { closed: true });
-    await assert.rejects(call, /LOGINOM_KNOWLEDGE_CLOSED/);
-  }
-  if (mode === 'owner-disconnect') {
-    runtime.child.disconnect();
-    await assert.rejects(call, /ENTRY_DISCONNECTED/);
-  }
-  assert.deepEqual(await runtime.exited, [0, null]);
-  assert.equal(server.calls.length, 1);
-});
+// The manifest is a FIFO, so Help startup waits until the test writes it.
+async function heldHelp(t) {
+  const helpRoot = await helpFixture(t);
+  const manifest = join(helpRoot, 'help-manifest.json');
+  const text = await readFile(manifest, 'utf8');
+  await rm(manifest);
+  execFileSync('mkfifo', [manifest]);
+  return { helpRoot, release: () => writeFile(manifest, text) };
+}
 
-test('private errors conceal remote secrets and missing-key startup does not use the network', async t => {
-  const server = await knowledgeServer(t, { call: () => { throw Error('PRIVATE-NONSECRET-CREDENTIAL'); } });
-  const empty = entry(t);
-  await empty.request('start', { protocol: 1, generation: 6, endpoint: server.endpoint, apiKey: '' });
-  await assert.rejects(empty.request('list'), { message: 'LOGINOM_CONFIG_REQUIRED' });
-  assert.equal(server.requests.length, 0);
+test('interrupting a call waiting for startup leaves other runs and initialization intact', async t => {
+  const held = await heldHelp(t);
   const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 7, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  await assert.rejects(runtime.request('call', { run: 'run', id: 'read', name: 'read', arguments: { uri: 'help' } }),
-    { message: 'LOGINOM_KNOWLEDGE_FAILED' });
+  await runtime.request('start', { protocol: 1, generation: 22, helpRoot: held.helpRoot });
+  const first = runtime.request('call', { run: 'A', id: 'queued', name: 'read', arguments: { uris: 'README.md' } });
+  const other = runtime.request('call', { run: 'B', id: 'queued', name: 'read', arguments: { uris: 'processors/integration/rest-request.md' } });
+  [first, other].forEach(call => call.catch(() => {}));
+  await assert.rejects(runtime.request('call', { run: 'B', id: 'queued', name: 'read', arguments: { uris: 'README.md' } }),
+    /LOGINOM_KNOWLEDGE_REQUEST_BUSY/);
+  assert.deepEqual(await runtime.request('interrupt', { run: 'A' }), { interrupted: true });
+  await assert.rejects(first, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
+  await held.release();
+  assert.match((await other).content[0].text, /# REST-запрос/);
 });
 
 test('private owner shutdown can interrupt every run without closing the knowledge client', async t => {
-  const entered = Promise.withResolvers();
-  const release = Promise.withResolvers();
-  t.after(() => release.resolve({ content: [] }));
-  const server = await knowledgeServer(t, { call: params => {
-    if (params.arguments.uri === 'after') return Promise.resolve({ content: [{ type: 'text', text: 'still ready' }] });
-    if (server.calls.length === 2) entered.resolve();
-    return release.promise;
-  } });
+  const held = await heldHelp(t);
   const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 21, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  const calls = ['A', 'B'].map(run => runtime.request('call', { run, id: 'pending', name: 'read', arguments: { uri: run } }));
+  await runtime.request('start', { protocol: 1, generation: 21, helpRoot: held.helpRoot });
+  const calls = ['A', 'B'].map(run => runtime.request('call', { run, id: 'pending', name: 'read', arguments: { uris: 'README.md' } }));
   calls.forEach(call => call.catch(() => {}));
-  await entered.promise;
   assert.deepEqual(await runtime.request('interrupt', { all: true }), { interrupted: true });
   for (const call of calls) await assert.rejects(call, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  assert.equal((await runtime.request('call', { run: 'next', id: 'after', name: 'read', arguments: { uri: 'after' } })).content[0].text,
-    'still ready');
-  for (const input of [{ all: 'true' }, { all: true, run: 'A' }])
-    await assert.rejects(runtime.request('interrupt', input), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
-});
-
-test('interrupting a call waiting for startup leaves other runs and initialization intact', async t => {
-  const entered = Promise.withResolvers();
-  const release = Promise.withResolvers();
-  t.after(() => release.resolve());
-  const server = await knowledgeServer(t, { initialize: () => { entered.resolve(); return release.promise; } });
-  const runtime = entry(t);
-  await runtime.request('start', { protocol: 1, generation: 22, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  await entered.promise;
-  const first = runtime.request('call', { run: 'A', id: 'queued', name: 'read', arguments: { uri: 'cancelled' } });
-  const other = runtime.request('call', { run: 'B', id: 'queued', name: 'read', arguments: { uri: 'survives' } });
-  [first, other].forEach(call => call.catch(() => {}));
-  assert.deepEqual(await runtime.request('interrupt', { run: 'A' }), { interrupted: true });
-  await assert.rejects(first, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  release.resolve();
-  assert.equal(JSON.parse((await other).content[0].text).arguments.uri, 'survives');
-  assert.equal(server.calls.length, 1);
+  await held.release();
+  assert.match((await runtime.request('call', { run: 'next', id: 'after', name: 'read', arguments: { uris: 'README.md' } })).content[0].text,
+    /# Loginom — руководство пользователя/);
 });

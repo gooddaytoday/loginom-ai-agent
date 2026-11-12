@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
 import { ManagedRuntime } from "effect"
-import { access, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { TestLLMServer } from "../lib/llm-server"
 import { testProviderConfig } from "../lib/test-provider"
-import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { stageHeldKnowledge } from "../../../loginom-host/test/fixtures/knowledge"
 import { connectionStore } from "@loginom-ai-agent/loginom-host/connection/connection-store"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
@@ -58,14 +58,9 @@ test.each(
   async (mode) => {
     await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
     const provider = ManagedRuntime.make(TestLLMServer.layer)
-    const cleanup: (() => void | Promise<void>)[] = []
     try {
       const marker = join(fixture.directory, "browser-started")
       if (mode !== "unconfigured") {
-        const server =
-          mode === "browser-unavailable"
-            ? await knowledgeServer({ after: (callback) => cleanup.push(callback) })
-            : undefined
         if (!fixture.binary) {
           await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
           await symlink(
@@ -86,13 +81,7 @@ test.each(
       `,
           )
         }
-        if (server || fixture.binary) {
-          const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
-          await writeFile(
-            join(fixture.bundle, "resource-manifest.json"),
-            JSON.stringify({ ...manifest, endpoint: server?.endpoint ?? "http://127.0.0.1:1/mcp" }),
-          )
-        }
+        if (mode === "help-unavailable") await rm(join(fixture.bundle, "help"), { recursive: true, force: true })
         const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
         await store.stage({
           generation: 1,
@@ -157,7 +146,6 @@ test.each(
       }
     } finally {
       await provider.dispose()
-      for (const callback of cleanup) await callback()
     }
   },
   30_000,
@@ -166,13 +154,6 @@ test.each(
 test("a real Help refusal does not turn an ordinary standalone answer into a connection failure", async () => {
   await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
   const provider = ManagedRuntime.make(TestLLMServer.layer)
-  const cleanup: (() => void | Promise<void>)[] = []
-  const server = await knowledgeServer(
-    { after: (callback) => cleanup.push(callback) },
-    {
-      call: async () => ({ isError: true, content: [{ type: "text", text: "LOGINOM_CONNECTION_NOT_READY" }] }),
-    },
-  )
   try {
     if (!fixture.binary) {
       await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
@@ -181,11 +162,6 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
         join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
       )
     }
-    const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
-    await writeFile(
-      join(fixture.bundle, "resource-manifest.json"),
-      JSON.stringify({ ...manifest, endpoint: server.endpoint }),
-    )
     const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
     await store.stage({
       generation: 1,
@@ -199,7 +175,7 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
     const llm = await provider.runPromise(TestLLMServer)
     await provider.runPromise(
       llm.toolMatch((hit) => JSON.stringify(hit.body.tools ?? []).includes('"name":"loginom_read"'), "loginom_read", {
-        uri: "help://component",
+        uris: "help://component",
       }),
     )
     await provider.runPromise(
@@ -214,60 +190,53 @@ test("a real Help refusal does not turn an ordinary standalone answer into a con
     )
     expect(result.exit).toBe(0)
     expect(result.events.filter((event) => event.type === "error")).toEqual([])
+    // Shipped Help refuses a page it does not have; the refusal stays on the Help tool.
     expect(
       result.events.find((event) => event.type === "tool_use" && event.part.tool === "loginom_read")?.part.state,
-    ).toMatchObject({ status: "error", error: "LOGINOM_CONNECTION_NOT_READY" })
+    ).toMatchObject({
+      status: "error",
+      input: { uris: "help://component" },
+      error: expect.stringContaining("File not found."),
+    })
     expect(result.events.find((event) => event.type === "text")?.part.text).toBe("Ответ: 4.")
-    expect(server.calls).toEqual([{ name: "read", arguments: { uri: "help://component" } }])
     expect(await readdir(fixture.profile)).not.toContain(".writer")
     expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
   } finally {
     await provider.dispose()
-    for (const callback of cleanup) await callback()
   }
 }, 30_000)
 
-test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
+// Native coverage runs the compiled knowledge entry, whose catalog cannot be held,
+// so only the source path observes the pending catalog and cancels during it.
+test.each(
+  process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN
+    ? ["ready", "unavailable", "ordinary-unavailable"]
+    : ["ready", "cancel", "unavailable", "ordinary-unavailable"],
+)(
   "standalone Help preflight stays independent of the browser: %s",
   async (mode) => {
     await using fixture = await standaloneFixture(process.env.LOGINOM_AI_AGENT_TEST_CLI_BIN)
     const provider = ManagedRuntime.make(TestLLMServer.layer)
-    const cleanup: (() => void | Promise<void>)[] = []
-    const entered = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
     const state: { result?: ReturnType<typeof invoke> } = {}
-    const server = await knowledgeServer(
-      { after: (callback) => cleanup.push(callback) },
-      {
-        list: async () => {
-          entered.resolve()
-          await release.promise
-          return { tools: server.tools }
-        },
-      },
-    )
+    const entry = join(fixture.bundle, "runtime/src/knowledge-entry.mjs")
+    const catalog =
+      fixture.binary || mode.includes("unavailable")
+        ? undefined
+        : await stageHeldKnowledge(entry, join(fixture.directory, "catalog-gate"))
     try {
       const marker = join(fixture.directory, "forbidden-browser")
       // The native path retains the compiled knowledge and browser resources.
       // The source-only marker rejects accidental browser dispatch early.
       if (!fixture.binary) {
         await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
-        await symlink(
-          resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
-          join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
-        )
+        if (!catalog) await symlink(resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"), entry)
         await writeFile(
           join(fixture.bundle, "runtime/src/managed-entry.mjs"),
           `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser forbidden');`,
         )
       }
-      const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
-      await writeFile(
-        join(fixture.bundle, "resource-manifest.json"),
-        JSON.stringify({ ...manifest, endpoint: server.endpoint }),
-      )
-      // The stored legacy key would be accepted; only the built-in key decides Help availability.
-      if (mode.includes("unavailable")) await writeFile(join(fixture.bundle, "knowledge-key"), "REJECTED-NONSECRET")
+      // The stored connection stays valid; only the shipped Help decides availability.
+      if (mode.includes("unavailable")) await rm(join(fixture.bundle, "help"), { recursive: true, force: true })
       const store = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
       await store.stage({
         generation: 1,
@@ -291,7 +260,7 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
           : ["--command=loginom-automation", "--", "Построй сценарий."],
         mode === "cancel"
           ? (interrupt) => {
-              void entered.promise.then(interrupt)
+              void catalog?.entered().then(interrupt)
             }
           : undefined,
         fixture.binary ? { PATH: "/nonexistent" } : undefined,
@@ -304,15 +273,17 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
         expect(await state.result).toMatchObject({ exit: 1, errors: "LOGINOM_CONNECTION_NOT_READY\n" })
         expect(await provider.runPromise(llm.calls)).toBe(0)
       } else {
-        await Promise.race([
-          entered.promise,
-          state.result.then((result) => {
-            throw Error("CLI exited before Help catalog: " + JSON.stringify(result))
-          }),
-        ])
-        expect(await provider.runPromise(llm.calls)).toBe(0)
+        if (catalog) {
+          await Promise.race([
+            catalog.entered(),
+            state.result.then((result) => {
+              throw Error("CLI exited before Help catalog: " + JSON.stringify(result))
+            }),
+          ])
+          expect(await provider.runPromise(llm.calls)).toBe(0)
+        }
         if (mode === "ready") {
-          release.resolve()
+          await catalog?.release()
           expect(await state.result).toMatchObject({ exit: 0 })
           expect(await provider.runPromise(llm.calls)).toBeGreaterThan(0)
         }
@@ -325,10 +296,9 @@ test.each(["ready", "cancel", "unavailable", "ordinary-unavailable"])(
       expect(await readdir(fixture.profile)).not.toContain(".writer")
       expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
     } finally {
-      release.resolve()
+      await catalog?.release()
       await state.result?.catch(() => {})
       await provider.dispose()
-      for (const callback of cleanup) await callback()
     }
   },
   30_000,
@@ -353,12 +323,10 @@ test("strict recovery still blocks an ordinary request before the model and pres
   }
 }, 30_000)
 
-test.each(["valid-help", "invalid-key"])(
+test.each(["valid-help", "missing-help"])(
   "standalone management separates Help from browser validation: %s",
   async (mode) => {
     await using fixture = await standaloneFixture()
-    const cleanup: (() => void | Promise<void>)[] = []
-    const server = await knowledgeServer({ after: (callback) => cleanup.push(callback) })
     const marker = join(fixture.directory, "browser-validation")
     await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
     await symlink(
@@ -377,11 +345,6 @@ test.each(["valid-help", "invalid-key"])(
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
     });`,
-    )
-    const manifest = JSON.parse(await readFile(join(fixture.bundle, "resource-manifest.json"), "utf8"))
-    await writeFile(
-      join(fixture.bundle, "resource-manifest.json"),
-      JSON.stringify({ ...manifest, endpoint: server.endpoint }),
     )
     async function command(args: string[], input?: object) {
       const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "loginom", ...args, "--format=json"], {
@@ -416,47 +379,43 @@ test.each(["valid-help", "invalid-key"])(
         await child.exited
       }
     }
-    if (mode === "invalid-key") await writeFile(join(fixture.bundle, "knowledge-key"), "WRONG-NONSECRET")
-    try {
-      // An older setup script still sends a key that the server would accept; it is ignored.
-      const setup = await command(["setup", "--stdin-json"], {
-        apiKey: "UNIT-NONSECRET",
-        url: "http://127.0.0.1:1/app/",
-        username: "user",
-        password: "PRIVATE-NONSECRET",
-      })
-      if (mode === "invalid-key") {
-        expect(setup).toMatchObject({ exit: 1, result: { ok: false, code: "LOGINOM_KNOWLEDGE_AUTH_FAILED" } })
-        await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
-        expect((await command(["status"])).result).toMatchObject({ state: "unconfigured", generation: 0 })
-        return
-      }
-      expect(setup).toMatchObject({
-        exit: 0,
-        errors: "",
-        result: {
-          generation: 1,
-          browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" },
-        },
-      })
-      expect((await command(["status"])).result.browser).toEqual({ state: "unknown" })
-      expect(await command(["check"])).toMatchObject({
-        exit: 0,
-        errors: "",
-        result: {
-          ok: true,
-          help: { state: "ready" },
-          browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" },
-        },
-      })
-      const browser = JSON.parse(await readFile(marker, "utf8"))
-      expect(browser.validation).toBe(true)
-      if (process.platform === "linux")
-        await expect(access(`/proc/${browser.pid}`)).rejects.toMatchObject({ code: "ENOENT" })
-      expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
-    } finally {
-      for (const callback of cleanup) await callback()
+    if (mode === "missing-help") await rm(join(fixture.bundle, "help"), { recursive: true, force: true })
+    // An older setup script still sends a key; it is ignored.
+    const setup = await command(["setup", "--stdin-json"], {
+      apiKey: "UNIT-NONSECRET",
+      url: "http://127.0.0.1:1/app/",
+      username: "user",
+      password: "PRIVATE-NONSECRET",
+    })
+    if (mode === "missing-help") {
+      expect(setup).toMatchObject({ exit: 1, result: { ok: false, code: "LOGINOM_KNOWLEDGE_UNAVAILABLE" } })
+      await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
+      expect((await command(["status"])).result).toMatchObject({ state: "unconfigured", generation: 0 })
+      return
     }
+    expect(setup).toMatchObject({
+      exit: 0,
+      errors: "",
+      result: {
+        generation: 1,
+        browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" },
+      },
+    })
+    expect((await command(["status"])).result.browser).toEqual({ state: "unknown" })
+    expect(await command(["check"])).toMatchObject({
+      exit: 0,
+      errors: "",
+      result: {
+        ok: true,
+        help: { state: "ready" },
+        browser: { state: "failed", failure: "LOGINOM_LOGIN_UNAVAILABLE" },
+      },
+    })
+    const browser = JSON.parse(await readFile(marker, "utf8"))
+    expect(browser.validation).toBe(true)
+    if (process.platform === "linux")
+      await expect(access(`/proc/${browser.pid}`)).rejects.toMatchObject({ code: "ENOENT" })
+    expect(await readdir(join(fixture.profile, "loginom"))).not.toContain("runtime")
   },
   30_000,
 )

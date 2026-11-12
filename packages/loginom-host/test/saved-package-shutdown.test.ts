@@ -28,7 +28,7 @@ async function configuredRuntime(directory: string, source: string) {
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await stageKnowledgeFixture(resources)
   await symlink(fixture.node, join(resources, "bin/node"))
-  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
+  await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
   await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), source)
   await mkdir(root, { recursive: true, mode: 0o700 })
   if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
@@ -122,7 +122,7 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     await mkdir(join(resources, "runtime/src"), { recursive: true })
     await stageKnowledgeFixture(resources)
     await symlink(fixture.node, join(resources, "bin/node"))
-    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "https://example.test/mcp" }))
+    await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
     // Real compiled Host and real Node IPC; the external browser runtime is a
     // controlled boundary. This proves routing, not package closure in Loginom.
     await Bun.write(
@@ -284,7 +284,6 @@ test.each([
     stateDir: directory,
     generation: 1,
     chat: "chat",
-    endpoint: "https://example.test/mcp",
     connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" },
     ...policy,
   })
@@ -310,7 +309,7 @@ test.each(["success", "refused", "private-error", "bad-ack", "bad-exit", "timeou
       process.send({id:m.id,...value},()=>process.disconnect());
     });`)
     const runtime = await supervise({ node: fixture.node, entry, resources: directory, stateDir: directory,
-      generation: 1, chat: "chat", endpoint: "https://example.test/mcp",
+      generation: 1, chat: "chat",
       connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" } })
     if (mode === "success") await runtime.close()
     if (mode !== "success") await expect(runtime.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")

@@ -5,7 +5,8 @@ import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { EventEmitter } from "node:events"
 import { superviseKnowledge } from "../src/supervisor"
-import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
+import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
+import { stageHeldKnowledge } from "./fixtures/knowledge"
 import { createLoginomHost } from "../src/host"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
@@ -17,18 +18,19 @@ test("knowledge supervision sends only its own private payload and filters provi
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "knowledge supervision Проба "))
   const entry = join(directory, "private knowledge.mjs")
+  const helpRoot = join(directory, "Справка help")
   try {
     await writeFile(
       entry,
       `process.on('message', message => {
       if (message.operation === 'start') {
-        const valid = Object.keys(message.input).sort().join(',') === 'apiKey,endpoint,generation,protocol'
-          && message.input.apiKey === 'PRIVATE-NONSECRET-KEY'
+        const valid = Object.keys(message.input).sort().join(',') === 'generation,helpRoot,protocol'
+          && message.input.helpRoot === ${JSON.stringify(helpRoot)}
           && !process.argv.join(' ').includes('PRIVATE-NONSECRET')
           && !Object.values(process.env).some(value => value.includes('PRIVATE-NONSECRET'))
           && !process.env.OPENAI_API_KEY && !process.env.PATH;
         process.send({id:message.id,result:{protocol:1,generation:valid?message.input.generation:-1,
-          started:message.input.endpoint !== 'https://example.test/no-start'}});
+          started:!message.input.helpRoot.endsWith('no-start')}});
       }
       if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
       if (message.operation === 'malformed-diagnostic') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE',
@@ -43,9 +45,8 @@ test("knowledge supervision sends only its own private payload and filters provi
       entry,
       stateDir: join(directory, "private state"),
       generation: 17,
-      endpoint: "https://example.test/mcp",
-      apiKey: "PRIVATE-NONSECRET-KEY",
-      connection: { password: "PRIVATE-NONSECRET-PASSWORD" },
+      helpRoot,
+      connection: { apiKey: "PRIVATE-NONSECRET-KEY", password: "PRIVATE-NONSECRET-PASSWORD" },
       resources: directory,
       environment: { OPENAI_API_KEY: "PRIVATE-NONSECRET-PROVIDER", PATH: "/foreign/global" },
     }
@@ -64,11 +65,13 @@ test("knowledge supervision sends only its own private payload and filters provi
     expect(receipt).not.toContain("PRIVATE-NONSECRET-DIAGNOSTIC")
     await runtime.close()
     await expect(runtime.request("list")).rejects.toThrow("LOGINOM_RUNTIME_DISCONNECTED")
-    await expect(superviseKnowledge({ ...input, apiKey: "wrong-key" })).rejects.toThrow("LOGINOM_HANDSHAKE_INVALID")
-    await expect(superviseKnowledge({ ...input, endpoint: "https://example.test/no-start" })).rejects.toThrow(
+    await expect(superviseKnowledge({ ...input, helpRoot: join(directory, "other help") })).rejects.toThrow(
       "LOGINOM_HANDSHAKE_INVALID",
     )
-    for (const field of ["node", "entry", "stateDir"])
+    await expect(superviseKnowledge({ ...input, helpRoot: join(directory, "no-start") })).rejects.toThrow(
+      "LOGINOM_HANDSHAKE_INVALID",
+    )
+    for (const field of ["node", "entry", "stateDir", "helpRoot"])
       await expect(superviseKnowledge({ ...input, [field]: "relative" })).rejects.toThrow(
         "LOGINOM_ABSOLUTE_PATH_REQUIRED",
       )
@@ -77,57 +80,28 @@ test("knowledge supervision sends only its own private payload and filters provi
   }
 })
 
-test("restored Host starts only knowledge and local settled does not wait for the remote catalog", async () => {
+test("restored Host starts only knowledge and local settled does not wait for the Help catalog", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "host-knowledge-startup-"))
-  const cleanup: (() => void | Promise<void>)[] = []
-  const entered = Promise.withResolvers<void>()
-  const release = Promise.withResolvers<void>()
-  const held = new Map(
-    ["A", "B"].map((run) => [run, Promise.withResolvers<{ content: { type: "text"; text: string }[] }>()]),
-  )
-  const both = Promise.withResolvers<void>()
-  const count = { held: 0 }
-  const server = await knowledgeServer(
-    { after: (callback) => cleanup.push(callback) },
-    {
-      list: async () => {
-        entered.resolve()
-        await release.promise
-        return { tools: server.tools }
-      },
-      call: async (params) => {
-        const gate = typeof params.arguments?.uri === "string" ? held.get(params.arguments.uri) : undefined
-        if (gate) {
-          if (++count.held === 2) both.resolve()
-          return gate.promise
-        }
-        return { content: [{ type: "text" as const, text: JSON.stringify(params) }] }
-      },
-    },
-  )
   const resources = join(directory, "resources")
   const root = join(directory, "profile")
   const marker = join(directory, "forbidden-browser")
   await mkdir(join(resources, "bin"), { recursive: true })
-  await mkdir(join(resources, "runtime/src"), { recursive: true })
   await symlink(node, join(resources, "bin/node"))
-  await symlink(
-    fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
+  const catalog = await stageHeldKnowledge(
     join(resources, "runtime/src/knowledge-entry.mjs"),
+    join(directory, "catalog-gate"),
   )
   await writeFile(
     join(resources, "runtime/src/managed-entry.mjs"),
     `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser startup is forbidden');`,
   )
-  await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-  await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
   await store.stage({
     generation: 1,
     revision: 1,
-    // A connection saved by an older build keeps its own key; Help uses the built-in one.
+    // A connection saved by an older build keeps its own key; shipped Help never uses it.
     apiKey: "LEGACY-NONSECRET",
     password: "PRIVATE-NONSECRET-PASSWORD",
     username: "user",
@@ -156,7 +130,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
     await host.settled()
     expect(await host.api.status()).toMatchObject({ state: "starting", generation: 1 })
     await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
-    await entered.promise
+    await catalog.entered()
     expect(await client.request("acquire", { run: "before-ready", session: "local-chat" })).toEqual({ generation: 1 })
     expect(await client.request("tools", { run: "before-ready" })).toMatchObject({
       tools: [expect.objectContaining({ name: "dock_diagnostics" })],
@@ -178,15 +152,14 @@ test("restored Host starts only knowledge and local settled does not wait for th
       }),
     ).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
     await client.request("release", { run: "before-ready" })
-    release.resolve()
+    await catalog.release()
     await host.catalog(1)
     expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
-    const catalog = await client.request("tools", { run: "one" })
-    expect(catalog).toMatchObject({
+    expect(await client.request("tools", { run: "one" })).toMatchObject({
       tools: expect.arrayContaining([
         expect.objectContaining({
           name: "read",
-          inputSchema: server.tools.find((tool) => tool.name === "read")?.inputSchema,
+          inputSchema: { type: "object", properties: { uri: { type: "string" } }, required: ["uri"] },
         }),
         expect.objectContaining({ name: "dock_diagnostics" }),
       ]),
@@ -204,97 +177,60 @@ test("restored Host starts only knowledge and local settled does not wait for th
     expect(
       await client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "original" }),
     ).toMatchObject({ structuredContent: { state: "ready", generation: 1 } })
-    await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
-    expect(host.journal.pending()).toEqual([])
-    expect(await readdir(join(root, "recovery"))).toEqual([])
-    expect(await client.request("acquire", { run: "other", session: "other-chat" })).toEqual({ generation: 1 })
-    const first = client.request("call", { run: "one", name: "read", args: { uri: "A" }, userMessage: "original" })
-    const other = client.request("call", {
-      run: "other",
-      name: "read",
-      args: { uri: "B" },
-      userMessage: "other-original",
-    })
-    ;[first, other].forEach((call) => call.catch(() => {}))
-    await both.promise
+    // Help calls finish synchronously; interruption still reaches the knowledge child without failing.
     expect(await client.request("interrupt", { run: "one", all: true })).toBe(true)
-    await expect(first).rejects.toThrow("LOGINOM_KNOWLEDGE_INTERRUPTED")
-    held.get("B")?.resolve({ content: [{ type: "text", text: "other chat survived" }] })
-    expect(await other).toEqual({ content: [{ type: "text", text: "other chat survived" }] })
+    expect(await catalog.lists()).toBe(1)
+    await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(host.journal.pending()).toEqual([])
     expect(await readdir(join(root, "recovery"))).toEqual([])
-    await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
-    await client.request("release", { run: "other" })
     await client.request("release", { run: "one" })
   } finally {
-    release.resolve()
-    for (const gate of held.values()) gate.resolve({ content: [] })
+    await catalog.release()
     client.close()
     await port.close()
     await host.close()
-    for (const callback of cleanup) await callback()
     await rm(directory, { recursive: true, force: true })
   }
 })
 
-test("supervised real knowledge entry acknowledges before the server catalog is ready", async () => {
+test("supervised real knowledge entry acknowledges start and serves shipped Help", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "knowledge actual-"))
-  const cleanup: (() => void | Promise<void>)[] = []
-  const entered = Promise.withResolvers<void>()
-  const release = Promise.withResolvers<void>()
-  const server = await knowledgeServer(
-    { after: (callback) => cleanup.push(callback) },
-    {
-      initialize: async () => {
-        entered.resolve()
-        await release.promise
-      },
-    },
-  )
   try {
     const runtime = await superviseKnowledge({
       node,
       entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
       stateDir: directory,
       generation: 20,
-      endpoint: server.endpoint,
-      apiKey: "UNIT-NONSECRET",
+      helpRoot: await writeHelp(join(directory, "help")),
       environment: {},
     })
     try {
       expect(runtime.ready).toEqual({ protocol: 1, generation: 20, started: true })
-      await entered.promise
-      release.resolve()
       expect(await runtime.request("list")).toMatchObject({
         tools: expect.arrayContaining([
-          expect.objectContaining({
-            name: "read",
-            inputSchema: {
-              type: "object",
-              properties: { uri: { type: "string" } },
-              required: ["uri"],
-              additionalProperties: false,
-            },
-          }),
+          expect.objectContaining({ name: "read", inputSchema: expect.objectContaining({ required: ["uris"] }) }),
         ]),
+        catalogSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
       })
       expect(
-        await runtime.request("call", { run: "run", id: "request", name: "read", arguments: { uri: "Help/node.md" } }),
-      ).toEqual({
-        content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uri: "Help/node.md" } }) }],
-      })
+        await runtime.request("call", {
+          run: "run",
+          id: "request",
+          name: "read",
+          arguments: { uris: "data/processors/integration/rest-request.md" },
+        }),
+      ).toMatchObject({ content: [{ type: "text", text: expect.stringContaining("# REST-запрос") }] })
+      await expect(
+        runtime.request("call", { run: "run", id: "write", name: "write", arguments: { uri: "README.md" } }),
+      ).rejects.toThrow("LOGINOM_KNOWLEDGE_TOOL_DENIED")
     } finally {
-      release.resolve()
       await runtime.close()
     }
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
-    expect(server.calls).toHaveLength(1)
-    expect(server.requests.every((request) => request.authorization === "Bearer UNIT-NONSECRET")).toBe(true)
+    expect(await readdir(directory)).not.toContain("startup-failures.jsonl")
   } finally {
-    release.resolve()
-    for (const callback of cleanup) await callback()
     await rm(directory, { recursive: true, force: true })
   }
 })

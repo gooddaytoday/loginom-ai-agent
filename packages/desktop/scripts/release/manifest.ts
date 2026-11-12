@@ -55,7 +55,8 @@ export const Manifest = Schema.Struct({
   connection: Schema.Struct({
     schemaVersion: Schema.Literal(1),
     generationProtocol: Schema.Literal(1),
-    knowledgeEndpoint: text,
+    // Released manifests before 0.4.0 name the retired knowledge service; new ones omit it.
+    knowledgeEndpoint: Schema.optional(text),
   }),
   updater: Schema.Struct({ feed: nullable, channel: text, previousVersion: nullable }),
   signing: Schema.Struct({

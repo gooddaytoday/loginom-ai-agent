@@ -165,10 +165,11 @@ export async function createBridge(config, session, { browserTransport: managedB
     metadata: session.metadata, redactor });
   const startup = catalogStartup(startupOptions);
   try {
-    const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() }), { startup }).then(client => { remote = client; }), browser.connect(browserTransport)]);
+    // The product ships Loginom Help and the action catalog; only diagnostic Dock setups name a knowledge endpoint.
+    const connections = await Promise.allSettled([...(config.endpoint ? [connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() }), { startup }).then(client => { remote = client; })] : []), browser.connect(browserTransport)]);
     const failed = connections.find(result => result.status === 'rejected');
     if (failed) throw failed.reason;
-    const [remoteTools, browserTools] = await Promise.all([readCatalog(remote, { startup }), readCatalog(browser)]);
+    const [remoteTools, browserTools] = await Promise.all([remote ? readCatalog(remote, { startup }) : [], readCatalog(browser)]);
     if (!browserTools.some(tool => tool.name === 'browser_run_code_unsafe')) {
       throw new Error('The pinned browser runtime lacks the verified clipboard execution tool');
     }
@@ -660,7 +661,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           return { content: [{ type: 'text', text: 'Copy and paste completed; the target DOM confirmed the result.' }] };
         });
       } catch (error) {
-        const message = String(error.message).replaceAll(config.apiKey, '[redacted]');
+        const message = config.apiKey ? String(error.message).replaceAll(config.apiKey, '[redacted]') : String(error.message);
         if(localPackageUpload)return boundedUserToolReply({isError:true,content:[{type:'text',text:JSON.stringify({
           code:'LOCAL_PACKAGE_OPEN_UNCONFIRMED',message,prepared:false,local_package_upload:localPackageUpload,
           workspace:session.metadata.workspacePreparation?.state??null,

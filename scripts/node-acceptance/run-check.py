@@ -21,8 +21,6 @@ import sys
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-# Stand builds embed the knowledge service key like release builds do.
-KNOWLEDGE_KEY = Path.home() / '.config/loginom-ai-agent/mcp-api-key'
 DATA = REPO / 'docs/testing/loginom-ai-agent'
 SCENARIOS = {
     'C1': dict(model_timeout=2700),
@@ -38,13 +36,6 @@ D87 = {
     'X1': dict(attachment='path', generator=['--format', 'xlsx', '--rows', '500000'], heavy=True,
                pending='ожидает LAB-413: XLSX-переключение'),
 }
-
-
-def stand_knowledge_key():
-    # Passed only through the build environment; never argv, reports or case files.
-    key = os.environ.get('LOGINOM_MCP_API_KEY') or (KNOWLEDGE_KEY.read_text().strip() if KNOWLEDGE_KEY.is_file() else '')
-    if not key: raise RuntimeError(f'LOGINOM_MCP_API_KEY or {KNOWLEDGE_KEY} is required to build the CLI')
-    return key
 
 
 def pair_login(config, source):
@@ -1762,7 +1753,7 @@ class Runner:
                 restore_source_modes(source)
                 assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
                 bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
-                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1', LOGINOM_MCP_API_KEY=stand_knowledge_key())
+                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
                 # Keep Bun's shared warm cache; serialize installations across
                 # SHAs on this host, releasing the lock before compilation.
                 with (cache.parent / 'bun-install.lock').open('a') as install_lock:
@@ -1779,7 +1770,7 @@ class Runner:
                 self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
             meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == self.report['head'] and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
-        assert (build / 'resources/loginom/knowledge-key').is_file(), 'Build has no built-in knowledge key'
+        assert (build / 'resources/loginom/help/help-manifest.json').is_file(), 'Build has no shipped Loginom Help'
         self.report.update(build=str(build), metadata=meta)
         self.save()
         return build
