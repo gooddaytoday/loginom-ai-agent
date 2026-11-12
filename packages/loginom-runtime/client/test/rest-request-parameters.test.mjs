@@ -68,10 +68,25 @@ test('REST refuses credentials, unsupported settings and invalid bindings before
  for(const url of ['file:///tmp/request','https://user:secret@example.org/','https://example.org/?token=secret','https://example.org/#fragment','not a URL']){
   const p=parameters();p.connection.base_url=url;assert.throws(()=>validateRestRequestParameters(p,'request',request),/base_url/);
  }
- for(const patch of [{method:'POST'},{authentication:'Basic'},{verify_certificate:false},{headers:[]},{body:'data'}])
+ for(const patch of [{method:'POST'},{authentication:'Basic'},{verify_certificate:false},{body:'data'}])
   assert.throws(()=>validateRestRequestParameters({...parameters(),...patch},'request',request),/stage 1/);
  const duplicate=parameters();duplicate.query_parameters.push({name:'Key',field:'Other'});
  assert.throws(()=>validateRestRequestParameters(duplicate,'request',request),/unique/);
  assert.throws(()=>validateRestRequestParameters(parameters(),'request',{...request,inputs:[{input:2}]}),/input 0/);
  assert.throws(()=>validateRestRequestParameters({},'request',request),/requires/);
+});
+test('C2 literal headers replace explicitly, preserve on omission and validate before mutation',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ for(const headers of [[],[{name:'X-Lab-Cycle',value:'first'}],[{name:'X-Empty',value:''}]]){
+  const p={...parameters(),headers};
+  assert.equal(validate(p).valid,true);
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+ }
+ for(const headers of [null,{},Array(33).fill({name:'X-Test',value:'a'}),
+  [{name:'Bad Name',value:'x'}],[{name:'X-Test',value:'a\r\nb'}],
+  [{name:'X-Test',value:{variable:'Cycle'}}],[{name:'Authorization',value:'secret'}],
+  [{name:'X-Test',value:'a'},{name:'x-test',value:'b'}],
+  [{name:'X-Test',value:'a',extra:true}]]){
+  assert.throws(()=>validateRestRequestParameters({...parameters(),headers},'request',request),/header/i);
+ }
 });

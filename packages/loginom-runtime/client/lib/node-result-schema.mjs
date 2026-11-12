@@ -264,6 +264,7 @@ const javascriptDeclaredConfigurationReadback=object({...javascriptExecutedConfi
 const javascriptDeclaredDoneReadback=object({...javascriptConfigurationReadback.properties,
  schema_mode:values('declared'),columns:javascriptDeclaredConfigurationReadback.properties.columns});
 const restConfigurationReadback=object({kind:values('rest_request'),scope:values('observed_before_verified_finish'),node:ref,values_are:values('observed_ui_values'),method:values('GET','POST','PUT','PATCH','DELETE'),body_field:str,
+ headers:array(object({name:str,value:str})),
  connection:nullable(object({name:str,base_url:str,method:values('GET','POST','PUT','PATCH','DELETE'),url_mode:values('query'),authentication:values('none'),verify_server_certificate:{const:true},query_parameters:array(str),reference_node_id:str,request_content_type:values('application/json','text/plain'),response_content_type:values('application/json','text/html')},['name','base_url','method','url_mode','authentication','verify_server_certificate','query_parameters','reference_node_id'])),
  query_parameters:array(object({name:str,field:str})),receipt_ids:{...array(str),minItems:2,maxItems:2},package_persistence_verified:{const:false}},['kind','scope','node','values_are','method','connection','query_parameters','receipt_ids','package_persistence_verified']);
 const clusteringConfigurationReadback=object({kind:values('clustering'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),node:ref,
