@@ -10,6 +10,12 @@ function fixture(){
  source:{verified:true,node_context:context,values},format:{prepared_node_context:context,wizard:{stage:'text_import_format',settings:{fields:structuredClone(fields)}}},schema:{definition_complete:true,schema_id:'schema',fields:[structuredClone(column)]}};
 }
 test('same configured draft may continue without reopening or reconfiguring',()=>assert.equal(verifyConfiguredImportContinuation(fixture()),true));
+test('configured continuation requires the same observed thread count',()=>{
+ const f=fixture();f.configured.source.fields.max_threads={status:'observed',value:'2'};
+ f.source.values.max_threads='2';assert.equal(verifyConfiguredImportContinuation(f),true);
+ f.source.values.max_threads='4';assert.equal(verifyConfiguredImportContinuation(f),false);
+ delete f.source.values.max_threads;assert.equal(verifyConfiguredImportContinuation(f),false);
+});
 test('changed source, format, fields, schema or ownership reject continuation',()=>{
  const changes=[f=>f.source.values.source_path='/test/other.csv',f=>f.source.values.encoding='Windows-1251',f=>f.source.values.first_line_as_title=false,
  f=>f.source.node_context.node_id='foreign',f=>f.format.prepared_node_context.workflow_id='foreign',f=>f.format.wizard.stage='done',
@@ -22,6 +28,22 @@ test('source reader refuses graph or a changed wizard around the cached read',as
  let reads=0;const page={evaluate:async()=>{reads++;return {verified:true}}};
  assert.equal((await readRetainedImportSource(page,{},async()=>({verified:true,surface:'graph'}))).verified,false);assert.equal(reads,0);
  let n=0;assert.equal((await readRetainedImportSource(page,{},async()=>({verified:true,surface:'wizard',tid:'W',node_id:String(n++)}))).verified,false);assert.equal(reads,1);
+});
+test('retained source reads disabled thread count from its owned DOM control',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const {readRetainedImportSourceBrowser}=await import('../lib/node-import-continuation.mjs');
+ const page=new Page(),rootTid='MF;TF-1;WizrdMCF',root=page.add('div',rootTid),prefix=rootTid+';ImportTextFilePreviewWizard;';
+ for(const [tid,value] of [['edtFileName;ValueControl','/test/file.csv'],['edtConnection','Локальное'],
+  ['edtCodePage;ValueControl','UTF-8 (65001)'],['edtRowsToSkip;ValueControl','0'],['cbbMaxThreadCount;ValueControl','2']]){
+  const owner=page.add('div',prefix+tid,'',undefined,root),input=page.add('input',null,'',undefined,owner);input.value=value;
+  if(tid.startsWith('cbbMax'))input.disabled=true;
+ }
+ const checkbox=page.add('div',prefix+'edtFirstLineAsTitle;ValueControl','',undefined,root);
+ page.add('div',prefix+'edtFirstLineAsTitle;ValueControl;DisplayEl','',undefined,checkbox).attrs.class='x-form-checkbox';
+ const old=globalThis.document;
+ try{globalThis.document=page.document;const read=readRetainedImportSourceBrowser({rootTid});
+  assert.equal(read.verified,true,read.reason);assert.equal(read.values.max_threads,'2');
+ }finally{globalThis.document=old;}
 });
 
 test('mapped continuation checks retained unused fields, source mapping and completion settings',async()=>{
