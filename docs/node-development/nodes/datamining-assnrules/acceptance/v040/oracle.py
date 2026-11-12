@@ -183,7 +183,11 @@ def exclude_artifacts():
     assert [len(t['rows']) for t in tables] == [3, 2]
     artifact = dict(package_path='{{PACKAGE_PATH}}', nodes=[dict(type=t) for t in
         ['imports.text', 'datamining.assn_rules', 'exports.text']], outputs=tables)
-    return {name: artifact for name in ['expected-exclude.json', 'expected-exclude-cold.json']}
+    # Owner decision 12.11: native 7.4.2 Save/Open preserves settings/rules,
+    # but restores the excluded singleton without Teach. Main stays strict 3/2.
+    cold = dict(artifact, outputs=[tables[1]],
+                assnrules_exclusion=dict(exclude_support_above_pct=90))
+    return {'expected-exclude.json': artifact, 'expected-exclude-cold.json': cold}
 
 
 if __name__ == '__main__' and sys.argv[1:] in (['--write-consequents'], ['--check-consequents'], ['--write-exclude'], ['--check-exclude']):

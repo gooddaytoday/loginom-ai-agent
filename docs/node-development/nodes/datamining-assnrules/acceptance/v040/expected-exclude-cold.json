@@ -14,74 +14,6 @@
   "outputs": [
     {
       "output_node_type": "datamining.assn_rules",
-      "output_port": 0,
-      "ordered": false,
-      "column_order": "exact",
-      "columns": [
-        {
-          "name": "ItemsetID",
-          "type": "integer",
-          "label_any": true
-        },
-        {
-          "name": "Width",
-          "type": "integer",
-          "label_any": true
-        },
-        {
-          "name": "Support",
-          "type": "real",
-          "label_any": true,
-          "tolerance": {
-            "abs": 1e-10,
-            "rel": 1e-10
-          }
-        },
-        {
-          "name": "Item_0",
-          "type": "string",
-          "label_any": true
-        },
-        {
-          "name": "Item_1",
-          "type": "string",
-          "label_any": true
-        },
-        {
-          "name": "Item_2",
-          "type": "string",
-          "label_any": true
-        }
-      ],
-      "rows": [
-        {
-          "ItemsetID": 1,
-          "Width": 1,
-          "Support": 0.75,
-          "Item_0": "B",
-          "Item_1": null,
-          "Item_2": null
-        },
-        {
-          "ItemsetID": 2,
-          "Width": 1,
-          "Support": 0.75,
-          "Item_0": "C",
-          "Item_1": null,
-          "Item_2": null
-        },
-        {
-          "ItemsetID": 3,
-          "Width": 2,
-          "Support": 0.75,
-          "Item_0": "B",
-          "Item_1": "C",
-          "Item_2": null
-        }
-      ]
-    },
-    {
-      "output_node_type": "datamining.assn_rules",
       "output_port": 1,
       "ordered": false,
       "column_order": "exact",
@@ -162,5 +94,8 @@
         }
       ]
     }
-  ]
+  ],
+  "assnrules_exclusion": {
+    "exclude_support_above_pct": 90
+  }
 }
