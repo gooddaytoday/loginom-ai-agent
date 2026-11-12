@@ -70,8 +70,7 @@ Check `configuration.readback.node_title`.
 `variables.to_table`/`columns` (source 4 → variables 0), `parameters:{}`,
 `read:{ports:[0]}`. Never reopen UserVars values: Cancel deactivates. No Calculator/
 JS/literal copy. Fresh `dock_storage_source` before EACH Execute/bound reread.
-First bound Import: verified `parameters.source` + `bindings`.
-Rerun after CsvPath change (also after Save/reopen): change only CsvPath; SAME
-Import, `parameters:{settings:{}}` WITHOUT `source`, `bindings:[]`, empty
+Bind with verified `parameters.source`. Rerun (new CsvPath, Save/reopen): SAME
+Import, `parameters:{settings:{}}` WITHOUT `source`, `bindings:[]`, no
 inputs/mappings. Check `configuration.bindings`.
 <!-- /mode -->
