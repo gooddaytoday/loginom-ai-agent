@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readdir,stat,rm,truncate} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,win32} from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-policy.mjs';
 import {Page,runtime,actions,selectors,build} from './support/executor-fixture.mjs';
@@ -328,17 +329,35 @@ test('no-progress timer cancels and drains a stalled transfer even without statu
  const registry=createServerDownloadRegistry({directory:join(f.root,'silent'),inspect:async()=>({...source(),bytes:2*1024**3}),
   download:async({path,signal})=>{await writeFile(path,'a');started=true;
    await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();}});
- registry.start(f.request);while(!started)await new Promise(resolve=>setImmediate(resolve));
+ registry.start(f.request);while(!started&&registry.status('download').state==='running')await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(started,true,JSON.stringify(registry.status('download')));
  t.mock.timers.tick(120000);await registry.cleanup();
  const result=registry.status('download');
  assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_NO_PROGRESS');
  assert.equal(result.cancel_requested,true);assert.equal(result.cleanup_complete,true);
  assert.deepEqual(await readdir(join(f.root,'silent')),[]);
 });
+// Same guarantee on both platforms: no other user can read the cache root.
+// Windows: a protected DACL (no inherited ACEs) allowing only the current user,
+// SYSTEM. All foreign explicit and inherited ACEs must be removed.
+// POSIX: no group/other mode bits.
+async function assertPrivateCache(directory) {
+ if(process.platform!=='win32'){assert.equal((await stat(directory)).mode&0o777,0o700);return;}
+ const system32=win32.join(process.env.SystemRoot,'System32');
+ const user=spawnSync(win32.join(system32,'whoami.exe'),['/user','/fo','csv','/nh'],{encoding:'utf8',windowsHide:true}).stdout.match(/"(S-1-[0-9-]+)"/i)[1];
+ const script='$a=Get-Acl -LiteralPath $env:LOGINOM_ACL_PATH;ConvertTo-Json -Compress @{protected=$a.AreAccessRulesProtected;'
+  +'rules=@($a.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])|%{@{sid=$_.IdentityReference.Value;inherited=$_.IsInherited;type=[string]$_.AccessControlType}})}';
+ const result=spawnSync(win32.join(system32,'WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-Command',script],
+  {encoding:'utf8',windowsHide:true,env:{...process.env,LOGINOM_ACL_PATH:directory}});
+ const acl=JSON.parse(result.stdout),text=JSON.stringify(acl);
+ assert.equal(acl.protected,true,text);
+ assert.ok(acl.rules.length>0,text);
+ for(const rule of acl.rules)assert.ok(rule.type==='Allow'&&rule.inherited===false&&['S-1-5-18',user].includes(rule.sid),text);
+}
 test('download writes a private cache, binds its receipt to native identity and never uploads',async t=>{
  const f=await fixture(t);f.registry.start(f.request);
  const result=await settled(f.registry);assert.equal(result.status,'SUCCEEDED');
- const path=result.output.path;assert.equal((await stat(join(f.root,'cache'))).mode&0o777,0o700);
+ const path=result.output.path;await assertPrivateCache(join(f.root,'cache'));
  assert.equal((await stat(path)).size,3);
  const receipt={basis:'backend_exact_scan',profile_id:'p',records:1,bytes:3,sha256:'a'.repeat(64),
   identity:{canonical_path:path,size:3,file_id:`${(await stat(path)).dev}:${(await stat(path)).ino}`,
@@ -434,7 +453,8 @@ test('cancel drains the actual transfer before deleting partials; IDs cannot rep
  let transfers=0,release;
  const f=await fixture(t,async({path,signal})=>{transfers++;await writeFile(path,'a');
   await new Promise(resolve=>{release=resolve;signal.addEventListener('abort',resolve,{once:true});});signal.throwIfAborted();});
- f.registry.start(f.request);while(!release)await new Promise(resolve=>setTimeout(resolve,1));
+ f.registry.start(f.request);while(!release&&f.registry.status('download').state==='running')await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(typeof release,'function',JSON.stringify(f.registry.status('download')));
  f.registry.start(f.request);assert.equal(transfers,1);
  assert.throws(()=>f.registry.start({...f.request,server_source_ref:'other'}),/different/);
  f.registry.cancel('download');const result=await settled(f.registry);
@@ -483,7 +503,8 @@ test('aborting a long status wait releases the caller without cancelling the ret
   await writeFile(path,'a');active=true;
   await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();
  });
- f.registry.start(f.request);while(!active)await new Promise(resolve=>setTimeout(resolve,1));
+ f.registry.start(f.request);while(!active&&f.registry.status('download').state==='running')await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(active,true,JSON.stringify(f.registry.status('download')));
  const controller=new AbortController();
  const waiting=f.registry.wait('download',{timeoutMs:60000,signal:controller.signal});
  controller.abort(Error('owner interrupted'));

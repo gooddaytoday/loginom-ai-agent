@@ -4,6 +4,7 @@ import {guardLoginomConnection} from './connection-recovery.mjs';
 import {randomUUID} from 'node:crypto';
 import {mkdir,mkdtemp,lstat,chmod,rm} from 'node:fs/promises';
 import {join,basename} from 'node:path';
+import {protectWindowsDirectory} from './platform.mjs';
 const purposes = ['packages', 'inputs', 'exports'];
 
 export function storagePath(value) {
@@ -204,7 +205,11 @@ export function createServerDownloadRegistry({directory,inspect,download,recover
           if(!/\.(csv|tsv|txt|xls|xlsx)$/i.test(job.source.destination))throw Error('LOGINOM_DOWNLOAD_FORMAT_UNSUPPORTED');
           await mkdir(directory,{recursive:true,mode:0o700});
           const root=await lstat(directory);
-          if(root.isSymbolicLink()||!root.isDirectory()||(root.mode&0o077)!==0)throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');
+          // Windows reports POSIX-like 0o777 for every directory: privacy is
+          // its ACL. Replace inherited access with the current user and SYSTEM
+          // only after refusing links (icacls would act on a link target).
+          if(root.isSymbolicLink()||!root.isDirectory()||process.platform!=='win32'&&(root.mode&0o077)!==0)throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');
+          try{protectWindowsDirectory(directory);}catch{throw Error('LOGINOM_DOWNLOAD_CACHE_NOT_PRIVATE');}
           job.directory=await mkdtemp(join(directory,'source-'));await chmod(job.directory,0o700);
           job.path=join(job.directory,basename(job.source.destination));job.phase='downloading';
           await download({source:structuredClone(job.source),path:job.path,operation_id:request.operation_id,

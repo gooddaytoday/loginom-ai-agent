@@ -159,6 +159,145 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  windows-runtime:
+    name: windows-runtime (${{ matrix.suite }})
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [client, runtime, host]
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: packages/loginom-runtime/client/.node-version
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        if: matrix.suite == 'host'
+        with:
+          bun-version: "1.3.14"
+      - name: Install locked host dependencies
+        if: matrix.suite == 'host'
+        run: bun install --frozen-lockfile --linker hoisted --ignore-scripts --filter '@loginom-ai-agent/loginom-host'
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+      - name: Resolve pinned test browser
+        working-directory: packages/loginom-runtime/client
+        run: |
+          set -euo pipefail
+          browser=$("$LOGINOM_AI_AGENT_TEST_NODE" -e 'const fs = require("node:fs"); const browser = require("playwright").chromium.executablePath(); fs.accessSync(browser); process.stdout.write(browser)')
+          echo "LOGINOM_DOCK_TEST_BROWSER=$browser" >> "$GITHUB_ENV"
+      - name: Verify platform-dependent client tests
+        if: matrix.suite == 'client'
+        timeout-minutes: 6
+        working-directory: packages/loginom-runtime/client
+        run: |
+          set -euo pipefail
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 \
+            test/agent-command.test.mjs test/archive.test.mjs test/artifacts.test.mjs \
+            test/artifact-download.test.mjs test/artifact-upload.test.mjs test/artifact-verification.test.mjs \
+            test/browser-downloads.test.mjs test/browser-launch.test.mjs test/browser-temp.test.mjs \
+            test/bridge.test.mjs test/connection-check-windows.test.mjs test/landing.test.mjs \
+            test/clipboard.test.mjs test/clipboard-shutdown.test.mjs test/config.test.mjs \
+            test/execution-journal.test.mjs test/file-reference.test.mjs test/history.test.mjs \
+            test/hook-runtime.test.mjs test/hooks.test.mjs test/host-artifacts.test.mjs test/host-inputs.test.mjs \
+            test/install.test.mjs test/install-profile.test.mjs test/local-diagnostics.test.mjs \
+            test/managed-shutdown.test.mjs test/managed-signal-order.test.mjs \
+            test/platform-windows.test.mjs test/runtime-pin.test.mjs test/skill.test.mjs \
+            test/storage-download.test.mjs test/storage-source.test.mjs \
+            test/text-export.test.mjs test/text-export-cp1251.test.mjs test/text-import-encoding.test.mjs \
+            2>&1 | tee "$RUNNER_TEMP/windows-client-tests.log"
+      - name: Verify complete supervised runtime suite
+        if: matrix.suite == 'runtime'
+        timeout-minutes: 5
+        working-directory: packages/loginom-runtime
+        run: |
+          set -euo pipefail
+          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 test/*.test.mjs \
+            2>&1 | tee "$RUNNER_TEMP/windows-runtime-tests.log"
+      - name: Verify platform-dependent host tests
+        if: matrix.suite == 'host'
+        timeout-minutes: 8
+        working-directory: packages/loginom-host
+        run: |
+          set -euo pipefail
+          {
+          host_failed=0
+          # A Bun crash in one file must not hide the remaining Windows cases.
+          for test_file in \
+            test/process.test.ts test/environment.test.ts test/windows-powershell.test.ts \
+            test/cli-install-windows.test.ts test/cli-install.test.ts test/cli-credentials.test.ts \
+            test/keychain-platform.test.ts test/keychain-envelope.test.ts \
+            test/system-proxy.test.ts test/system-proxy-behavior.test.ts test/system-proxy-io.test.ts \
+            test/file-reference.test.ts test/file-reference-ipc.test.ts test/inputs.test.ts \
+            test/node-host.test.ts test/runtime-startup.test.ts test/transport.test.ts \
+            test/host.test.ts test/parallel-calls.test.ts test/saved-package-shutdown.test.ts \
+            test/cli-owner-crash.test.ts test/cli-manifest.test.ts test/cli-source-snapshot.test.ts \
+            test/bundled-ripgrep.test.ts test/stage-resources.test.ts; do
+            timeout 120 bun test "$test_file" || host_failed=1
+          done
+          exit "$host_failed"
+          } 2>&1 | tee "$RUNNER_TEMP/windows-host-tests.log"
+      - name: Upload Windows runtime evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-${{ matrix.suite }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-*-tests.log
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-cli-ipc:
+    name: windows-cli-ipc
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install locked CLI dependencies
+        uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile --linker hoisted --ignore-scripts --network-concurrency=1
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+      - name: Build native CLI with the production Node Host
+        run: bun packages/loginom-host/script/build-cli.ts "$(cygpath -m "$RUNNER_TEMP")/cli-ipc" --no-archive
+      - name: Verify twenty CLI Host roundtrips and acknowledged shutdowns
+        run: |
+          set -euo pipefail
+          "$LOGINOM_AI_AGENT_TEST_NODE" --input-type=module <<'NODE' 2>&1 | tee "$RUNNER_TEMP/windows-cli-ipc-tests.log"
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { existsSync } from 'node:fs';
+          import { join } from 'node:path';
+          const binary = join(process.env.RUNNER_TEMP, 'cli-ipc/bin/loginom-ai-agent-cli.exe');
+          const profile = join(process.env.RUNNER_TEMP, 'cli-ipc-profile');
+          for (let repetition = 1; repetition <= 20; repetition++) {
+            // Each real command exchanges start, connection.status and terminal
+            // close replies through launchNodeHost, then awaits the Host exit.
+            const result = spawnSync(binary, ['loginom', 'status', '--format', 'json'], {
+              env: { ...process.env, LOGINOM_AI_AGENT_CLI_PROFILE: profile, LOGINOM_AI_AGENT_CHANNEL: 'dev' },
+              encoding: 'utf8', timeout: 30000,
+            });
+            console.log(JSON.stringify({ repetition, status: result.status, signal: result.signal,
+              error: result.error?.message, stdout: result.stdout, stderr: result.stderr }));
+            assert.ifError(result.error);
+            assert.equal(result.status, 0);
+            assert.equal(result.signal, null);
+            assert.equal(result.stderr, '');
+            assert.equal(JSON.parse(result.stdout).state, 'unconfigured');
+            assert.equal(existsSync(join(profile, '.writer')), false);
+          }
+          console.log('CLI IPC: 20/20 commands, 60/60 replies (start/status/close), 20/20 clean exits; lost replies: 0');
+          NODE
+      - name: Upload CLI IPC evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-cli-ipc-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-cli-ipc-tests.log
+          if-no-files-found: warn
+          retention-days: 14
+
   unit:
     name: unit
     runs-on: ubuntu-24.04

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { pathToFileURL } from "node:url"
 import { buildNodeHost } from "../script/build-node-host"
 import { buildKeychain } from "../script/build-keychain"
 import { launchNodeHost } from "../src/node-client"
@@ -11,11 +12,15 @@ import { supervise } from "../src/supervisor"
 import { createLoginomHost } from "../src/host"
 import { stageKnowledgeFixture } from "./fixtures/knowledge"
 
-const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
+const fixture = { directory: "", entry: "", supervisor: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
   if (!fixture.node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   fixture.directory = await mkdtemp(join(tmpdir(), "loginom-saved-package-policy-"))
   fixture.entry = await buildNodeHost(fixture.directory)
+  const built = await Bun.build({ entrypoints: [join(import.meta.dir, "../src/supervisor.ts")], target: "node" })
+  if (!built.success) throw new AggregateError(built.logs, "Supervisor test bundle failed")
+  fixture.supervisor = join(fixture.directory, "supervisor.mjs")
+  await Bun.write(fixture.supervisor, built.outputs[0])
 })
 afterAll(async () => {
   await rm(fixture.directory, { recursive: true, force: true })
@@ -27,7 +32,7 @@ async function configuredRuntime(directory: string, source: string) {
   await mkdir(join(resources, "bin"), { recursive: true })
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await stageKnowledgeFixture(resources)
-  await symlink(fixture.node, join(resources, "bin/node"))
+  await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
   await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
   await Bun.write(join(resources, "runtime/src/managed-entry.mjs"), source)
   await mkdir(root, { recursive: true, mode: 0o700 })
@@ -121,7 +126,7 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     await mkdir(join(resources, "bin"), { recursive: true })
     await mkdir(join(resources, "runtime/src"), { recursive: true })
     await stageKnowledgeFixture(resources)
-    await symlink(fixture.node, join(resources, "bin/node"))
+    await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
     await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({}))
     // Real compiled Host and real Node IPC; the external browser runtime is a
     // controlled boundary. This proves routing, not package closure in Loginom.
@@ -308,16 +313,26 @@ test.each(["success", "refused", "private-error", "bad-ack", "bad-exit", "timeou
         mode==='private-error'?{error:'private-secret-must-not-escape'}:{result:{closed:mode!=='bad-ack',extra:'private-secret-must-not-escape'}};
       process.send({id:m.id,...value},()=>process.disconnect());
     });`)
-    const runtime = await supervise({ node: fixture.node, entry, resources: directory, stateDir: directory,
-      generation: 1, chat: "chat",
-      connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" } })
-    if (mode === "success") await runtime.close()
-    if (mode !== "success") await expect(runtime.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    // The shipped Host supervises Node from Node/Electron. Bun's Windows fork
+    // can deliver disconnect before the last message; exercise the real owner.
+    const child = Bun.spawn([fixture.node, "--input-type=module", "--eval", `
+      import assert from 'node:assert/strict';
+      import { supervise } from ${JSON.stringify(pathToFileURL(fixture.supervisor).href)};
+      const runtime = await supervise(${JSON.stringify({ node: fixture.node, entry, resources: directory, stateDir: directory,
+        generation: 1, chat: "chat",
+        connection: { url: "http://example.test/app", username: "user", password: "", apiKey: "fixture" } })});
+      const closing = runtime.close();
+      assert.equal(runtime.close(), closing);
+      if (${JSON.stringify(mode)} === 'success') await closing;
+      else await assert.rejects(closing, /LOGINOM_RUNTIME_CLEANUP_FAILED/);
+    `], { stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" })
     const files = (await readdir(directory)).filter((name) => name.startsWith("runtime-close-"))
     expect(files).toHaveLength(1)
     const text = await readFile(join(directory, files[0]), "utf8")
     expect(text).not.toContain("private-secret")
-    expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600)
+    if (process.platform !== "win32") expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600)
     const result = JSON.parse(text)
     expect(result.request_error).toBe(mode === "timeout" ? "LOGINOM_RUNTIME_TIMEOUT"
       : mode === "refused" ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : mode === "private-error" ? "LOGINOM_RUNTIME_FAILED" : null)

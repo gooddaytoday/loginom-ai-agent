@@ -371,7 +371,7 @@ for(const when of ['before','during','after'])for(const change of ['size','mtime
    const snapshot={...await inspectReferenceFile(source),sha256:null};
    const store=await createArtifactStore({directory:join(root,'artifacts')});
    const artifact=await store.admitReference({grant:'e'.repeat(64),chat:'chat',userMessage:'original',generation:1,name:'data.csv',snapshot},{directory:'/test',overwrite:'reject'});
-   const f=fixture();Object.assign(f.artifact,artifact);f.page.uploadPath=source;f.native();
+   const f=fixture();Object.assign(f.artifact,artifact);f.page.uploadPath=snapshot.canonical_path;f.native();
    const mutate=async()=>{
     if(change==='size')await writeFile(source,'changed size');
     if(change==='mtime')await utimes(source,new Date(),new Date(snapshot.mtime+1000));

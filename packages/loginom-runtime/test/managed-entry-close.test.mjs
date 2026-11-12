@@ -3,7 +3,6 @@ import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { createInterface } from "node:readline"
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
@@ -133,30 +132,38 @@ test("managed entry closes while a background V8 allocation waits for foreground
 })
 
 for (const entry of ["managed-entry", "knowledge-entry"]) test(`${entry}: flushed close ACK exits even when a later IPC frame is incomplete`, async (t) => {
-  // Real Node JSON IPC on a duplex pipe. Node's disconnect event waits for a
-  // buffered partial frame, which is not an admitted runtime request.
+  // Use the native IPC pipe so libuv adds Windows IPC framing. An ordinary
+  // stdio pipe carries raw bytes only on POSIX. Keep the trailing partial JSON
+  // frame in the real Node decoder; it is not an admitted runtime request.
   const child = spawn(process.execPath, [fileURLToPath(new URL(`../src/${entry}.mjs`, import.meta.url))], {
-    stdio: ["ignore", "pipe", "pipe", "pipe"],
-    env: { ...process.env, NODE_CHANNEL_FD: "3", NODE_CHANNEL_SERIALIZATION_MODE: "json" },
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
   })
-  const lines = createInterface({ input: child.stdio[3] })
   t.after(async () => {
-    lines.close()
     if (child.exitCode !== null || child.signalCode !== null) return
     const exited = once(child, "exit")
     child.kill("SIGKILL")
     await exited
   })
-  const reply = once(lines, "line", { signal: AbortSignal.timeout(5000) })
+  const reply = once(child, "message", { signal: AbortSignal.timeout(5000) })
   const exited = once(child, "exit", { signal: AbortSignal.timeout(1500) })
-  child.stdio[3].write(JSON.stringify({ id: "close", operation: "close" }) + '\n{"id":')
-  assert.deepEqual(JSON.parse((await reply)[0]), { id: "close", result: { closed: true } })
+  // Pinned Node's private handle is necessary to send an incomplete frame;
+  // child.send() always appends a complete JSON message and newline.
+  const channel = child[Object.getOwnPropertySymbols(child).find(key => key.description === "kChannelHandle")]
+  const { WriteWrap } = process.binding("stream_wrap")
+  const write = new WriteWrap()
+  write.oncomplete = () => {}
+  assert.equal(channel.writeUtf8String(write, JSON.stringify({ id: "close", operation: "close" }) + '\n{"id":'), 0)
+  assert.deepEqual((await reply)[0], { id: "close", result: { closed: true } })
   assert.deepEqual(await exited, [0, null])
 })
 
 for (const scenario of ["unstarted", "invalid-start", "signal"]) {
   test(`actual managed entry acknowledges confirmed resource close after ${scenario}`, async (t) => {
-    const child = spawn(process.execPath, [fileURLToPath(new URL("../src/managed-entry.mjs", import.meta.url))],
+    const entry = new URL("../src/managed-entry.mjs", import.meta.url)
+    const args = process.platform === "win32" && scenario === "signal"
+      ? ["--input-type=module", "-e", `process.on('message', m => { if (m?.fixture_signal === 'SIGTERM') process.emit('SIGTERM'); }); await import(${JSON.stringify(entry.href)});`]
+      : [fileURLToPath(entry)]
+    const child = spawn(process.execPath, args,
       { stdio: ["ignore", "pipe", "pipe", "ipc"] })
     t.after(async () => {
       if (child.exitCode !== null || child.signalCode !== null) return
@@ -178,7 +185,8 @@ for (const scenario of ["unstarted", "invalid-start", "signal"]) {
       child.send({ id: "probe", operation: "list" })
       assert.deepEqual(await ready, { id: "probe", error: "LOGINOM_NOT_READY" })
       const exited = once(child, "exit", { signal: AbortSignal.timeout(5000) })
-      child.kill("SIGTERM")
+      if (process.platform === "win32") child.send({ fixture_signal: "SIGTERM" })
+      else child.kill("SIGTERM")
       assert.deepEqual(await exited, [0, null])
       return
     }
