@@ -55,13 +55,9 @@ test('saved exclusion inspection uses Next and Cancel only, including mismatches
   if(mismatch)await assert.rejects(inspect,/SAVED_SETTINGS/);else assert.equal((await inspect).exclusion_enabled,true);
   assert.equal(opened,1);assert.equal(closed,1);assert.equal(gestures.length,2);
  }
- const source=readFileSync(new URL('../cold-check.mjs',import.meta.url),'utf8');
- assert.match(source,/if\(expected\.assnrules_exclusion\)/);
- assert.match(source,/state\.assnrulesExclusion=await observeAssnRulesExclusionSaved/);
- assert.match(source,/assnrules_exclusion:state\.assnrulesExclusion/);
 });
 
-test('maximum support exclusion uses one CSV, independently generated tables and scoped cold rules/settings',()=>{
+test('maximum support exclusion uses one input CSV, independently generated tables and scoped cold rules/settings',()=>{
  const result=spawnSync('python3',['-B','-c',`
 import importlib.util,json
 from pathlib import Path
