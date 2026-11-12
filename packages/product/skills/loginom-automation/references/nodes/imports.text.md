@@ -27,7 +27,7 @@ Set types/names.
 ## File list
 
 Same-schema files: one `imports.text`; each needs delivery or fresh
-storage ref (folder: `dock_storage_list`). `source.kind:"verified_sources"`, `sources` ordered by
+storage ref (`dock_storage_list`). `source.kind:"verified_sources"`, `sources` ordered by
 `settings.source.source_paths`. `settings.source.file_info`:
 `name`/`relative_path`/`absolute_path` adds string FileName; suffix `_time` adds
 datetime FileTime (`none` disables). Outside CSV `columns`.
@@ -35,8 +35,8 @@ Relative: only beside saved package. SAME Import; no Calculator/JS.
 Check readback; Save. FileTime: non-NULL, not local mtime.
 
 Mask: `source_mask` in an owned directory, `*` only in filename; never `source_path(s)`.
-Export/Save outside the mask directory. Per folder: 1 file, plain path; 2+ (max 16):
-mask + `verified_sources` of ALL; resend both on SAME node.
+Export/Save outside the mask directory. 1 file: plain path; 2+ (max 16): mask.
+Execute: resend `source_mask` + `verified_sources` of ALL on SAME node.
 
 Sequential/parallel: SAME Import; no Calculator/JS.
 `dock_node_apply`,
