@@ -516,6 +516,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   // Source and format are caller decisions. No automatic type detection result
   // is treated as confirmation of the requested schema.
   const sourceBaseline=patch?(await read('text_import_file','existing source initialized',isTextImportSourceReady)).wizard.import_source:null;
+  if(patch&&Object.hasOwn(parameters.source,'max_threads')&&parameters.source.parallel_processing!==true)requireValue(sourceBaseline.fields.max_threads?.enabled!==false,'max_threads requires parallel_processing:true');
   if(patch&&boundSource)requireValue(sourceBaseline.fields.source_path.variable_mode===true,'BINDING_SOURCE_UNVERIFIED');
   // A discarded first configuration leaves a graph node with no source. There
   // is no retained schema to inspect until complete source settings are applied.
@@ -558,7 +559,6 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     if(encoding||['file_info','max_threads'].includes(name)) {
       const picker=one(s.ui.elements.filter(e=>e.wizard_combo?.kind==='picker'&&e.wizard_combo.field.scope==='import_source'
         &&e.wizard_combo.field.name===name&&e.wizard_combo.field.root_ref===s.wizard.root_ref&&e.wizard_combo.field.owner_ref===f.owner_ref),'Source picker unavailable');
-      if(name==='max_threads')requireValue(picker.enabled!==false,'max_threads requires parallel_processing:true');
       await act(s,{verb:'click',ref:picker.ref});
       s=await read('text_import_file','code page option visible',state=>state.ui.elements.filter(e=>e.wizard_combo?.kind==='option'
         &&e.wizard_combo.field.scope==='import_source'&&e.wizard_combo.field.name===name&&e.wizard_combo.label===desired).length===1);

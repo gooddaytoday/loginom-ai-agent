@@ -13,8 +13,8 @@ retry `CP1251`. Preview proves no rare types. Reuse ref after download/sampling;
 closed empty node: full sample settings from local profile.
 
 Import output renames/types: edit SAME Import's `settings.columns`, no Reform.
-"Do not reconfigure CSV loading": keep `settings.source`/`settings.format`,
-other fields/order; edit requested fields only. Deliver this session's attachment with
+"Do not reconfigure CSV loading": keep `settings.source`/`settings.format`/`mappings`,
+fields/order; edit requested fields only. Deliver this session's attachment with
 `overwrite=reject`; compare server bytes before path reuse. Never bypass
 `UPLOAD_PATH_CONFLICT` via path/policy changes or saved-node activation.
 
@@ -38,10 +38,11 @@ Mask: `source_mask` in an owned directory, `*` only in filename; never `source_p
 Export/Save outside the mask directory. Execute: fresh `dock_storage_source` for ALL
 matches (max 16); resend `source_mask` with `verified_sources` on SAME node.
 
-Sequential/parallel: SAME Import, `dock_node_apply`,
+Sequential/parallel: SAME Import; no Calculator/JS.
+`dock_node_apply`,
 `settings.source.parallel_processing:false/true`, `max_threads:"auto"|2|4|8|16|32`.
 Enable parallel before threads. Lists/masks default sequential: resend parallel
-with paths. Omitted settings persist.
+with paths. Omissions persist.
 Check `configuration.readback.source`, full row multisets/duplicates/NULL;
 No order/speed guarantee.
 

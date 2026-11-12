@@ -35,7 +35,7 @@ test('incompatible thread settings refuse before any UI effect in full settings 
  }
 });
 
-test('existing list switches sequential to two threads using native picker and preserves source/schema',async()=>{
+test('existing list switches sequential to two threads using native picker and preserves source/schema',async t=>{
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'scenario',label:'Scenario'}]};
  const fields={source_path:'/test/jan.csv｜/test/feb.csv',connection:'Server',encoding:'UTF-8 (65001)',
   rows_to_skip:'0',first_line_as_title:true,file_info:'Имя файла',parallel_processing:false,max_threads:'Автоопределение'};
@@ -56,6 +56,8 @@ test('existing list switches sequential to two threads using native picker and p
    else if(a.verb==='set_checked')fields[a.ref]=a.checked;
    else if(a.verb==='click'&&a.ref==='picker')open=true;
    else if(a.verb==='select_wizard_option'&&a.ref==='option'){fields.max_threads=desired;open=false;}
+   else if(a.verb==='fill')fields[a.ref]=a.text;
+   else if(a.verb==='press')assert.equal(a.key,'Tab');
    else assert.fail(JSON.stringify(a));
   }};
  channel.perform=async options=>channel.act(options.resolve(options.initialObservation));
@@ -69,8 +71,11 @@ test('existing list switches sequential to two threads using native picker and p
   assert.equal(result.columns[0].name,'SaleID');
  }
  assert.equal(gestures.filter(a=>a.verb==='select_wizard_option').length,2);
- stage='text_import_file';
- await assert.rejects(configureTextImportPatch(channel,{source:{max_threads:2}},owner,fields.source_path),/max_threads requires parallel_processing:true/);
+ for(const source of [{max_threads:2},{rows_to_skip:1,max_threads:2}])await t.test(JSON.stringify(source),async()=>{
+  stage='text_import_file';gestures.length=0;
+  await assert.rejects(configureTextImportPatch(channel,{source},owner,fields.source_path),/max_threads requires parallel_processing:true/);
+  assert.deepEqual(gestures,[]);
+ });
 });
 
 test('thread count comes from the observed UI receipt, including disabled saved controls',()=>{
