@@ -1,6 +1,6 @@
 import { Product } from "@loginom-ai-agent/product"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { InstallationLocal, InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Layer, type Context } from "effect"
 import type { Interface, UpgradeFailedError } from "@/installation"
 
@@ -35,6 +35,8 @@ export function installationNode<Id>(binding: Binding<Id>) {
   })
 }
 
-export function pluginDependency(release = { local: InstallationLocal, version: InstallationVersion }) {
-  return { name: "@loginom-ai-agent/plugin", version: release.local ? undefined : release.version }
+// Customer plugins import @opencode-ai/plugin. The product version differs from the core one,
+// so the request pins the plugin API this build ships (packages/plugin/package.json).
+export function pluginDependency() {
+  return { name: "@opencode-ai/plugin", version: "1.19.5" }
 }

@@ -119,6 +119,10 @@ def scenario(name, case_root=None, *, cases=None):
                     export_count=2 if variant == 'empty' else 4,
                     expected_name='expected.json' if variant == 'mixed' else 'expected-mixed-none.json' if variant == 'none' else 'expected-' + variant + ('-final.json' if variant != 'empty' else '.json'),
                     filter_initial=None if variant == 'empty' else 'expected-' + ('mixed' if variant == 'none' else variant) + '-initial.json')
+    if name == 'row-filter-value-list':
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task-value-list.md', data=node / 'fixtures/v040',
+                    input_files=['rows.csv'], oracle=node / 'acceptance/oracle-v040.py', expected_name='expected-v040.json', base=None)
     if name in ['enrich-data-left', 'enrich-data-composite']:
         src = REPO / 'docs/node-development/nodes/transform-enrichdata/acceptance'
         composite = name == 'enrich-data-composite'
@@ -208,6 +212,11 @@ def scenario(name, case_root=None, *, cases=None):
         kind = name.removeprefix('clustering-scale-')
         return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=src / 'data', base=None,
                     input_files=['scaling.csv'], export_count=2, expected_name='expected-' + kind + '.json')
+    if name == 'factor-apply':
+        src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance'
+        return dict(source=src / 'modes', prompt=src / 'modes/task-apply.md', data=src / 'data', base=None,
+                    input_files=['matrix.csv', 'update.csv'], export_count=2, factor_mode='apply',
+                    oracle=src / 'modes/oracle.py')
     if name == 'factor-rotation':
         src = REPO / 'docs/node-development/nodes/research-factoranalysis/acceptance/modes'
         return dict(source=src, prompt=src / 'task-rotation.md', data=src / 'fixtures', base=None,
@@ -601,6 +610,12 @@ def scenario(name, case_root=None, *, cases=None):
         source = acceptance / 'selection'
         return dict(source=source, prompt=acceptance / ('task-' + variant + '.md'),
                     data=acceptance / 'selection/data', base=None, expected_name='expected.json')
+    if name == 'assnrules-exclude':
+        node = REPO / 'docs/node-development/nodes/datamining-assnrules'
+        src = node / 'acceptance/v040'
+        return dict(source=src, prompt=src / 'task-exclude.md', data=node / 'fixtures/v040', base=None,
+                    input_files=['train.csv'], export_count=2, expected_name='expected-exclude.json',
+                    cold_expected_name='expected-exclude-cold.json')
     if name == 'assnrules-holdout':
         node = REPO / 'docs/node-development/nodes/datamining-assnrules'
         src = node / 'acceptance/v040'
@@ -2536,7 +2551,22 @@ class Runner:
             assert complete, 'FACTOR_BOTH_TYPED_OUTPUTS_MISSING'
             if spec.get('factor_mode'):
                 final = configurations[complete[-1][0]['execution']['execution_id']]
-                if spec['factor_mode'] == 'variance':
+                if spec['factor_mode'] == 'apply':
+                    assert final['mode'] == 'apply' and final['training']['status'] == 'not_requested', 'FACTOR_APPLY_RETRAINED'
+                    assert final['features'] == ['X', 'Y', 'Z'] and final['criterion'] == 'fixed' and final['factors'] == 2 and final['rotation'] == 'none' and final['output_factors'] is False, 'FACTOR_APPLY_SETTINGS_CHANGED'
+                    initial = next((group for group in complete[:-1] if
+                        configurations[group[0]['execution']['execution_id']].get('mode') == 'pca_fixed' and
+                        configurations[group[0]['execution']['execution_id']].get('factors') == final['factors'] and
+                        configurations[group[0]['execution']['execution_id']].get('features') == final['features'] and
+                        configurations[group[0]['execution']['execution_id']].get('rotation') == final['rotation'] and
+                        configurations[group[0]['execution']['execution_id']].get('training', {}).get('status') == 'trained' and
+                        group[0]['node'] == complete[-1][0]['node']), None)
+                    assert initial, 'FACTOR_INITIAL_TRAINED_SAME_NODE_MISSING'
+                    write(folder / 'factor-initial.json', initial)
+                    write(folder / 'factor-initial-expected.json', dict(read(src.parent / 'expected.json'), package_path=package))
+                    self.phase('factor-initial-signs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                        'factor-signs', folder / 'factor-initial-expected.json', folder / 'factor-initial.json', folder / 'factor-initial-aligned.json'], folder, timeout=60)
+                elif spec['factor_mode'] == 'variance':
                     assert final['mode'] == 'pca_variance' and final['variance_percent'] == 90, 'FACTOR_FINAL_VARIANCE_MISSING'
                     initial = next((group for group in complete[:-1] if
                         configurations[group[0]['execution']['execution_id']].get('mode') == 'pca_eigenvalue' and

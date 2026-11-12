@@ -20,3 +20,25 @@ print(json.dumps([{k:str(v) if hasattr(v,'__fspath__') else v for k,v in m.scena
   assert.equal(expected.variable_inventory.outputs[0].node.type,'variables.calculator');
  }
 });
+
+test('row-filter-value-list uses the approved literal-list kit and both ports',()=>{
+ const code=`import importlib.util,json
+s=importlib.util.spec_from_file_location('run_check','scripts/node-acceptance/run-check.py')
+m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+r=importlib.util.spec_from_file_location('required_checks','scripts/node-acceptance/required-checks.py')
+q=importlib.util.module_from_spec(r);r.loader.exec_module(q)
+print(json.dumps(dict(spec={k:str(v) if hasattr(v,'__fspath__') else v for k,v in m.scenario('row-filter-value-list').items()},
+ cases=sorted({c for globs,_,cases in q.RULES if any(g.endswith('row-filter/acceptance/**') for g in globs) for c in cases}))))`;
+ const {spec,cases}=JSON.parse(execFileSync('python3',['-c',code],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'}));
+ assert.match(spec.prompt,/row-filter\/acceptance\/task-value-list\.md$/);
+ assert.match(spec.data,/row-filter\/fixtures\/v040$/);
+ assert.deepEqual(spec.input_files,['rows.csv']);
+ assert.match(spec.oracle,/row-filter\/acceptance\/oracle-v040\.py$/);
+ assert.equal(spec.base,null);
+ const expected=JSON.parse(readFileSync(spec.source+'/'+spec.expected_name,'utf8'));
+ assert.deepEqual(expected.outputs.map(o=>[o.output_port,o.rows.map(r=>r.RowID)]),[[0,[1,2,3]],[1,[4,5,6]]]);
+ // Owner decision v040-filter-value-list-order: saved Filter autosync reorders fields after reopen.
+ assert.deepEqual(expected.outputs.map(o=>o.column_order),['any','any']);
+ assert.ok(cases.includes('row-filter-value-list'));
+ execFileSync('python3',[spec.oracle,'--check'],{encoding:'utf8'});
+});

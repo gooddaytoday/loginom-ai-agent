@@ -29,7 +29,7 @@
             "manual",
             "external"
           ],
-          "description": "Automatic, manually edited native classes, or native external input 1; no variables."
+          "description": "Automatic or manually edited native classes; external (input 1) is not supported in Loginom 7.4.2 (COARSE_EXTERNAL_UNSUPPORTED); no variables."
         },
         "min_class_percent": {
           "type": "number",

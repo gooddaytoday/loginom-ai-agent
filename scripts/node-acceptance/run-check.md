@@ -216,6 +216,11 @@ and NULL retained as distinct values through CSV, Save and cold reexecution.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
 
+`factor-apply`: утверждённый `task-apply.md`, matrix.csv → update.csv на том же
+обученном PCA-узле без Teach. Проверяет Real scores и прежние нагрузки двух
+портов через независимый sign-aware matcher; CSV, Save, cold и cleanup штатные.
+Oracle и expected модели не передаются.
+
 `excel-import-named`: утверждённый C3, `SalesRange` строго B:C (2 строки),
 затем продолжение до последней заполненной строки на том же узле (3 строки).
 Два CSV проверяются отдельно; внутренние typed-checkpoints подтверждают оба
@@ -1057,3 +1062,13 @@ recommend-holdout.csv из fixtures/v040. Oracle сохраняет правил
 проверяет H1→B (.75/.75/1); переобучение holdout даёт ноль правил.
 Аудит требует обучение и apply одного GUID, без повторного Train;
 оба полных typed-порта 1/2, два CSV, Save, cold без настройки и cleanup.
+
+`assnrules-exclude`: train.csv из fixtures/v040, support 50%, confidence 60%,
+lift 0, max_items=3, max_consequents=2, исключение поддержки >90%.
+Только task-exclude.md и train.csv передаются модели. Экспортируются два CSV: наборов и правил.
+Основной прогон строго проверяет наборы и правила (3/2); cold — сохранённые
+флаг исключения/порог 90 и правила B→C/C→B. После Save/Open Loginom 7.4.2
+без Teach возвращает исключённый одиночный набор; число наборов в этом cold
+не сверяется (решение владельца 12.11). Остальные сценарии сохраняют строгий cold.
+Save/cleanup обязательны; expected-exclude*.json генерируются oracle.py --write-exclude.
+Вспомогательный вход и отбор выбранных элементов не входят в сценарий.
