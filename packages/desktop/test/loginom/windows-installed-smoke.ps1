@@ -114,7 +114,12 @@ try {
         Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $exe } | Select-Object -ExpandProperty FullName)
     Check 'shortcut' ($links.Count -gt 0) ($links -join '; ')
     $report.shortcuts = $links
-    $mainProcess = Start-Process -FilePath $exe -PassThru
+    # Loopback-only Node inspector provides app.quit() even in SSH session 0 without visible windows.
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    $inspectorPort = $listener.LocalEndpoint.Port
+    $listener.Stop()
+    $mainProcess = Start-Process -FilePath $exe -ArgumentList "--inspect=127.0.0.1:$inspectorPort" -PassThru
     $logs = Join-Path $profile 'desktop\logs'
     $report.logs = $logs
     $ready = Wait-For {
@@ -130,30 +135,32 @@ try {
     $live = @(Processes)
     $report.processes = @($live | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath)
     Check 'processes-alive' (@($live | Where-Object ProcessId -eq $mainProcess.Id).Count -eq 1 -and $live.Count -gt 1) ($report.processes | ConvertTo-Json -Compress)
-    # WM_CLOSE exercises normal Electron shutdown, including sidecar cleanup. No force-kill can pass it.
-    Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class SmokeWindows {
-    public delegate bool Callback(IntPtr window, IntPtr state);
-    [DllImport("user32.dll")] public static extern bool EnumWindows(Callback callback, IntPtr state);
-    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
-    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr w, IntPtr l);
-    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
-    public static int Close(uint pid) {
-        int count = 0;
-        EnumWindows((window, state) => {
-            uint owner; GetWindowThreadProcessId(window, out owner);
-            if (owner == pid && IsWindowVisible(window) && PostMessage(window, 0x0010, IntPtr.Zero, IntPtr.Zero)) count++;
-            return true;
-        }, IntPtr.Zero);
-        return count;
+    # Invoke Electron's public quit API; it awaits the production before-quit/sidecar cleanup path.
+    # No renderer/Loginom JavaScript is changed. The debugger is disconnected before waiting for exit.
+    $targets = @(Invoke-RestMethod -Uri "http://127.0.0.1:$inspectorPort/json/list" -TimeoutSec 10)
+    if ($targets.Count -ne 1) { throw 'Expected one main-process inspector target' }
+    $socket = [Net.WebSockets.ClientWebSocket]::new()
+    $cancel = [Threading.CancellationTokenSource]::new(10000)
+    try {
+        $socket.ConnectAsync([uri]$targets[0].webSocketDebuggerUrl, $cancel.Token).GetAwaiter().GetResult()
+        $request = @{ id=1; method='Runtime.evaluate'; params=@{
+            expression="require('electron').app.quit()"; includeCommandLineAPI=$true
+        }} | ConvertTo-Json -Depth 4 -Compress
+        $bytes = [Text.Encoding]::UTF8.GetBytes($request)
+        $socket.SendAsync([ArraySegment[byte]]::new($bytes), [Net.WebSockets.WebSocketMessageType]::Text, $true, $cancel.Token).GetAwaiter().GetResult()
+        $buffer = [byte[]]::new(65536)
+        $reply = $socket.ReceiveAsync([ArraySegment[byte]]::new($buffer), $cancel.Token).GetAwaiter().GetResult()
+        $response = [Text.Encoding]::UTF8.GetString($buffer, 0, $reply.Count) | ConvertFrom-Json
+        if ($response.id -ne 1 -or $response.error -or $response.result.exceptionDetails) {
+            throw ('Electron app.quit failed: ' + ($response | ConvertTo-Json -Depth 6 -Compress))
+        }
+    } finally {
+        $socket.Abort()
+        $socket.Dispose()
+        $cancel.Dispose()
     }
-}
-'@
-    $windows = [SmokeWindows]::Close($mainProcess.Id)
     $closed = Wait-For { (Processes).Count -eq 0 }
-    Check 'graceful-close' ($windows -gt 0 -and $closed) "WM_CLOSE windows=$windows; no installed-path processes=$closed"
+    Check 'graceful-close' $closed "Electron app.quit(); no installed-path processes=$closed"
     if (-not $closed) { throw 'Desktop did not close; forced cleanup is a failure' }
 } catch {
     Check 'execution' $false $_.Exception.Message
