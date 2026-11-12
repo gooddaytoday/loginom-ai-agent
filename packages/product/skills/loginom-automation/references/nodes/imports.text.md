@@ -26,8 +26,9 @@ Set types/names.
 
 ## File list
 
-Same-schema files: one `imports.text`; each needs delivery or fresh
-`dock_storage_source`. `source.kind:"verified_sources"`, `sources` ordered by
+Same-schema files: one `imports.text`; each needs delivery or a storage ref.
+Server folder, names unknown: `dock_storage_list` (`pattern:"*.csv"`); its refs
+equal fresh `dock_storage_source`. `source.kind:"verified_sources"`, `sources` ordered by
 `settings.source.source_paths`. `settings.source.file_info`:
 `name`/`relative_path`/`absolute_path` adds string FileName; suffix `_time` adds
 datetime FileTime (`none` disables). Outside CSV `columns`.
@@ -35,8 +36,9 @@ Relative: only beside saved package. SAME Import; no Calculator/JS.
 Check readback; Save. FileTime: non-NULL, not local mtime.
 
 Mask: `source_mask` in an owned directory, `*` only in filename; never `source_path(s)`.
-Export/Save outside the mask directory. Execute: fresh `dock_storage_source` for ALL
-matches (max 16); resend `source_mask` with `verified_sources` on SAME node.
+Export/Save outside the mask directory. 1 file: plain `source_path`. 2+ (max 16): one
+Import per folder, `source_mask` `<folder>/*.csv` + `verified_sources` of ALL listed
+matches; resend both on SAME node to Execute.
 
 Sequential/parallel: SAME Import; no Calculator/JS.
 `dock_node_apply`,

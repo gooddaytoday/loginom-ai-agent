@@ -490,3 +490,46 @@ test('aborting a long status wait releases the caller without cancelling the ret
  await assert.rejects(waiting,/owner interrupted/);assert.equal(f.registry.busy,true);
  await f.registry.cleanup();assert.equal(f.registry.unsettled,false);
 });
+
+test('folder listing returns every native Files row with its own storage reference without file names',async t=>{
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot();
+ const nav='ui-navigation',table='ui-table',dir='/worker/Silent Talk/transactions';
+ const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
+ const names=['transactions_2026-10.csv','README.txt','transactions_2026-09.csv','transactions_2026-11.csv'];
+ const rows=()=>[...names.map((name,i)=>({...element('ui-row-'+i,page.prefix+';FileStorageForm;colName_'+name),label:name,
+  storage_entry:{kind:'file',path:dir+'/'+name,bytes:100+i,mtime:'2026-11-0'+(i+1)+'T00:00:00.000Z',bytes_source:'native_file_store',directory_entries:5}})),
+  {...element('ui-row-folder',page.prefix+';FileStorageForm;colName_archive'),label:'archive',storage_entry:{kind:'folder',directory_entries:5}}];
+ const evaluate=page.evaluate.bind(page);let gestures=0;
+ page.evaluate=async(fn,arg)=>{
+  if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  const state=structuredClone(base);state.active_tab_ref='files';page.clock+=500;
+  if(arg.discoverRoots){state.observation_kind='roots';state.ui.elements=[element(nav,page.prefix+';NavigationBar;NavigationPanel'),
+   element(table,page.prefix+';FileStorageForm;pnlFileStorage;tbl')];return state;}
+  state.file_storage={status:'observed',directory:dir};
+  state.observation_root={ref:arg.rootRef,identity:{anchor_tid:arg.rootRef===table?page.prefix+';FileStorageForm;pnlFileStorage;tbl':page.prefix+';NavigationBar;NavigationPanel',path:[]}};
+  state.ui.elements=arg.rootRef===table?rows():[];
+  return state;
+ };
+ page.click=async()=>{gestures++;};
+ const records=[];const r=runtime(page,{onRecord:async x=>{records.push(x);return x;},cacheDirectory:join(f.root,'listing'),getStorageBinding:()=>({session_id:'s',document_id:'d',origin:base.origin,
+  loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ const tool=r.tools.find(tool=>tool.name==='dock_storage_list');
+ assert.ok(tool);assert.equal(tool.annotations.readOnlyHint,true);
+ // The observed refusal (LAB-1468): a folder given to the single-file locator.
+ await assert.rejects(r.serverDownload({operation_id:'folder-as-file',path:dir+'/'},'dock_storage_source'),/dock_storage_list/);
+ await assert.rejects(r.serverDownload({operation_id:'foreign',path:'/foreign/transactions'},'dock_storage_list'));
+ await assert.rejects(r.serverDownload({operation_id:'bad-pattern',path:dir,pattern:'*.csv|*.txt'},'dock_storage_list'),/\* only/);
+ const result=await r.serverDownload({operation_id:'list',path:dir+'/',pattern:'*.csv'},'dock_storage_list');
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(records.filter(x=>/storage_list/.test(x.phase))));
+ const out=result.output;
+ assert.equal(out.directory,dir);assert.equal(out.complete,true);assert.equal(out.truncated,false);
+ assert.equal(out.native_entry_count,5);assert.equal(out.files_matched,3);assert.equal(out.files_other,1);assert.equal(out.folders,1);
+ assert.deepEqual(out.entries.map(e=>[e.kind,e.name]),[['file','transactions_2026-09.csv'],['file','transactions_2026-10.csv'],['file','transactions_2026-11.csv'],['folder','archive']]);
+ const files=out.entries.filter(e=>e.kind==='file');
+ assert.ok(files.every(e=>/^storage-/.test(e.server_source_ref)&&e.path===dir+'/'+e.name&&Number.isSafeInteger(e.bytes)&&e.mtime));
+ assert.equal(new Set(files.map(e=>e.server_source_ref)).size,3);
+ assert.equal(gestures,0);
+ // Same ID and request replay the receipt; a different request is refused.
+ assert.deepEqual(await r.serverDownload({operation_id:'list',path:dir+'/',pattern:'*.csv'},'dock_storage_list'),result);
+ await assert.rejects(r.serverDownload({operation_id:'list',path:dir},'dock_storage_list'));
+});

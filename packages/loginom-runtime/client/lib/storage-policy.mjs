@@ -130,6 +130,68 @@ export function createServerSourceRegistry({getBinding}) {
   };
 }
 
+// File-name filter of dock_storage_list: `*` only, case-sensitive, exactly as
+// text-import verifies a source_mask against its verified sources.
+export function storageListPattern(value) {
+  if(value===undefined)return null;
+  if(typeof value!=='string'||!value||value.length>200||/[\/\\\x00-\x1f\x7f?\[\]{}|%]/.test(value))
+    throw Error('pattern is one file-name mask with * only, for example *.csv');
+  return new RegExp('^'+value.split('*').map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*')+'$');
+}
+
+// Reads the rows of the one open Files folder. File rows keep the row-bound
+// native size/mtime and the server_source_ref minted by observation; a list
+// is complete only when the native FileStore count or the scroll end proves it.
+const LIST_ENTRIES=200,LIST_BYTES=24000,LIST_SCROLLS=64,LIST_SCROLL_PX=400;
+export async function listStorageDirectory({destination,pattern,guard,ready,roots,read,act}) {
+  const filter=storageListPattern(pattern),seen=new Map();
+  let native=null,end=false,owner=null,lastTop=null,direction=null;
+  const isRow=(s,e)=>typeof e.tid==='string'&&e.tid.startsWith(s.workflow_ref?.prefix+';FileStorageForm;colName_')&&e.storage_entry;
+  for(let step=0;;step++){
+    guard();
+    const state=await ready(async()=>{
+      const r=await roots(),tables=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+';FileStorageForm;pnlFileStorage;tbl');
+      return tables.length===1?read({rootRef:tables[0].ref,observationId:r.observation_id,allPages:true}):null;
+    },s=>s.file_storage?.status==='observed'&&s.file_storage.directory===destination
+      &&s.ui.elements.filter(e=>isRow(s,e)).every(e=>e.storage_entry.kind==='folder'
+        ||e.storage_entry.kind==='file'&&typeof e.storage_entry.server_source_ref==='string'));
+    const rows=state.ui.elements.filter(e=>isRow(state,e));
+    for(const e of rows){
+      const entry=e.storage_entry;
+      if(Number.isSafeInteger(entry.directory_entries))native=entry.directory_entries;
+      seen.set(entry.kind+':'+e.label,entry.kind==='file'
+        ?{name:e.label,kind:'file',path:entry.path,bytes:entry.bytes,mtime:entry.mtime,server_source_ref:entry.server_source_ref}
+        :{name:e.label,kind:'folder',path:(destination==='/'?'':destination)+'/'+e.label});
+    }
+    if(native!==null&&seen.size>=native||seen.size>=LIST_ENTRIES*5)break;
+    const anchors=rows.filter(e=>e.scroll&&e.allowed_actions?.includes('scroll')&&e.interaction?.state==='point_observed');
+    const scroll=anchors[0]?.scroll;
+    if(!scroll||step>=LIST_SCROLLS)break;
+    if(owner===null){owner=scroll.ref;direction=scroll.top>0?'up':'down';}
+    if(scroll.ref!==owner||anchors.some(a=>a.scroll.ref!==owner))throw Error('Server storage listing scroll owner changed');
+    if(lastTop!==null&&(direction==='up'?scroll.top>=lastTop:scroll.top<=lastTop))throw Error('Server storage listing scroll did not advance');
+    if(direction==='up'&&scroll.top===0){direction='down';lastTop=null;}
+    if(direction==='down'&&scroll.top>=scroll.max_top){end=true;break;}
+    // Step by the observed row span minus one row, so successive reads overlap.
+    const boxes=rows.map(e=>e.bounding_box).filter(b=>b&&b.height>0);
+    const span=boxes.length?Math.max(...boxes.map(b=>b.y+b.height))-Math.min(...boxes.map(b=>b.y))-Math.max(...boxes.map(b=>b.height)):0;
+    const stride=span>0?Math.min(LIST_SCROLL_PX,span):LIST_SCROLL_PX/2;
+    const delta=direction==='up'?-Math.min(stride,scroll.top):Math.min(stride,scroll.max_top-scroll.top);
+    lastTop=scroll.top;await act(state,anchors[0],'scroll',{delta_y:delta});
+  }
+  const order=(a,b)=>a.name<b.name?-1:a.name>b.name?1:0,all=[...seen.values()];
+  const folders=all.filter(e=>e.kind==='folder').sort(order),files=all.filter(e=>e.kind==='file').sort(order);
+  const matched=filter?files.filter(e=>filter.test(e.name)):files;
+  let entries=[...matched,...folders],truncated=false;
+  if(entries.length>LIST_ENTRIES){entries=entries.slice(0,LIST_ENTRIES);truncated=true;}
+  while(entries.length&&JSON.stringify(entries).length>LIST_BYTES){entries.pop();truncated=true;}
+  return {directory:destination,...(pattern!==undefined?{pattern}:{}),entries,files_matched:matched.length,
+    files_other:files.length-matched.length,folders:folders.length,native_entry_count:native,
+    complete:native!==null?seen.size>=native:end,truncated,
+    next_step:matched.length>16?'More than 16 matching files: a text-import mask accepts at most 16 verified sources; narrow the pattern.'
+      :'1 matching file: imports.text with source kind:"storage" and its server_source_ref. 2-16 files of one structure: ONE imports.text with settings.source.source_mask "<directory>/<pattern>" and source kind:"verified_sources" listing these refs in name order.'};
+}
+
 const sourceId={type:'string',minLength:1,maxLength:128,pattern:'^[A-Za-z0-9_.:-]+$'};
 export const importSourceSchema={oneOf:[
   {type:'object',properties:{kind:{const:'storage'},server_source_ref:sourceId},required:['kind','server_source_ref'],additionalProperties:false},
@@ -284,6 +346,8 @@ function localIdentity(identity) {
 
 const downloadId={type:'string',minLength:1,maxLength:128,pattern:'^[A-Za-z0-9_.:-]+$'};
 export const serverDownloadTools=[
+  {name:'dock_storage_list',description:'List one server folder in the assigned inputs directory when file names are unknown. Navigates the native Files UI to the exact folder path; returns files with native size/mtime and a server_source_ref each (the same proof as dock_storage_source), then subfolders. Optional pattern filters file names with * only (e.g. *.csv), like source_mask. Read-only: never uploads, imports, creates or deletes. Bounded: complete:false or truncated:true means entries may be missing.',
+    properties:{operation_id:downloadId,path:{type:'string',minLength:1,maxLength:1024},pattern:{type:'string',minLength:1,maxLength:200}},required:['operation_id','path']},
   {name:'dock_storage_source',description:'Locate an existing CSV/TSV/TXT/XLSX by its exact path in the assigned inputs directory. Navigates the native Files UI and returns an opaque server_source_ref with native size/mtime. Does not upload or import. Use this before preview/download when the CLI starts on the workflow graph.',
     properties:{operation_id:downloadId,path:{type:'string',minLength:1,maxLength:1024}},required:['operation_id','path']},
   {name:'dock_storage_download_start',description:'Download an observed server_source_ref once to a private local cache through the authenticated browser. First call dock_storage_source to open its exact Files directory (also after a preview returned to the graph). Asynchronous: status/wait/cancel use the SAME operation_id. Native size/mtime and copy size are checked before authorizing local profiling. Never uploads the full file. Received native Blob or Chromium bytes renew a 120-second no-progress limit within a size-derived hard deadline; disk-copy completion is verified separately.',
@@ -292,6 +356,6 @@ export const serverDownloadTools=[
   {name:'dock_storage_download_wait',description:'Wait at most 60 seconds for the original download; a wait timeout does not cancel it.',properties:{operation_id:downloadId,timeout_ms:{type:'integer',minimum:0,maximum:60000}},required:['operation_id']},
   {name:'dock_storage_download_cancel',description:'Cancel the original download. Wait for cleanup_complete before another browser action.',properties:{operation_id:downloadId},required:['operation_id']},
   {name:'dock_storage_download_cleanup',description:'Remove this completed cache after the full calculation, or cancel and drain its transfer before removing partials.',properties:{operation_id:downloadId},required:['operation_id']},
-].map(({properties,required,...tool})=>({...tool,inputSchema:{type:'object',properties,required,additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}}));
+].map(({properties,required,...tool})=>({...tool,inputSchema:{type:'object',properties,required,additionalProperties:false},annotations:{readOnlyHint:tool.name==='dock_storage_list',destructiveHint:false,openWorldHint:false}}));
 
 export const isServerDownloadTool=name=>serverDownloadTools.some(tool=>tool.name===name);

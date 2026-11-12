@@ -47,3 +47,27 @@ test('storage binding records observed account independently of the selected dir
   assert.ok(Object.isFrozen(binding) && Object.isFrozen(binding.directories));
   assert.throws(() => createStorageBinding({ sessionId: 's', origin: 'http://loginom.local/path', build: '7.4.2', documentId: 'd', account: 'a', directories }));
 });
+
+test('folder listing scrolls virtual Files rows to the native count and reports truncation honestly',async()=>{
+ const {listStorageDirectory}=await import('../lib/storage-policy.mjs');
+ const prefix='MF;TF-1',dir='/in/Silent Talk/customers',names=Array.from({length:6},(_,i)=>'part'+i+'.csv');
+ const make=(native)=>{
+  let top=0;const acts=[];
+  const state=()=>{const first=Math.floor(top/100);return {observation_id:'obs-'+top,workflow_ref:{prefix},file_storage:{status:'observed',directory:dir},
+   ui:{elements:names.slice(first,first+2).map((name,i)=>({bounding_box:{x:0,y:i*100,width:100,height:100},tid:prefix+';FileStorageForm;colName_'+name,label:name,allowed_actions:['scroll'],
+    interaction:{state:'point_observed'},scroll:{ref:'grid',top,max_top:400},storage_entry:{kind:'file',path:dir+'/'+name,bytes:1,mtime:'t',
+     server_source_ref:'storage-'+name,...(native?{directory_entries:native}:{})}}))}};};
+  return {acts,options:{destination:dir,pattern:'*.csv',guard:()=>{},ready:async probe=>probe(),
+   roots:async()=>({observation_id:'roots',workflow_ref:{prefix},ui:{elements:[{tid:prefix+';FileStorageForm;pnlFileStorage;tbl',ref:'ui-table'}]}}),
+   read:async()=>state(),act:async(s,e,verb,extra)=>{acts.push([verb,extra.delta_y]);top+=extra.delta_y;}}};
+ };
+ let f=make(6),out=await listStorageDirectory(f.options);
+ assert.deepEqual(out.entries.map(e=>e.name),names);assert.equal(out.complete,true);assert.equal(out.files_matched,6);
+ assert.deepEqual(f.acts,[['scroll',100],['scroll',100],['scroll',100],['scroll',100]]);
+ // Without a native count, only the scroll end proves completeness.
+ f=make(null);out=await listStorageDirectory(f.options);
+ assert.equal(out.complete,true);assert.equal(out.native_entry_count,null);assert.equal(out.entries.length,6);
+ // A larger native count than the rows reachable is never reported complete.
+ f=make(9);out=await listStorageDirectory(f.options);
+ assert.equal(out.complete,false);assert.equal(out.entries.length,6);
+});
