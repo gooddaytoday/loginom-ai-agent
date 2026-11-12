@@ -339,9 +339,7 @@ test('no-progress timer cancels and drains a stalled transfer even without statu
 });
 // Same guarantee on both platforms: no other user can read the cache root.
 // Windows: a protected DACL (no inherited ACEs) allowing only the current user,
-// SYSTEM and, when an elevated creator's default DACL adds it, BUILTIN\
-// Administrators: usable only with an elevated token, i.e. root over a 0700
-// directory. Users, Authenticated Users, Everyone or another user must fail.
+// SYSTEM. All foreign explicit and inherited ACEs must be removed.
 // POSIX: no group/other mode bits.
 async function assertPrivateCache(directory) {
  if(process.platform!=='win32'){assert.equal((await stat(directory)).mode&0o777,0o700);return;}
@@ -354,7 +352,7 @@ async function assertPrivateCache(directory) {
  const acl=JSON.parse(result.stdout),text=JSON.stringify(acl);
  assert.equal(acl.protected,true,text);
  assert.ok(acl.rules.length>0,text);
- for(const rule of acl.rules)assert.ok(rule.type==='Allow'&&rule.inherited===false&&['S-1-5-18','S-1-5-32-544',user].includes(rule.sid),text);
+ for(const rule of acl.rules)assert.ok(rule.type==='Allow'&&rule.inherited===false&&['S-1-5-18',user].includes(rule.sid),text);
 }
 test('download writes a private cache, binds its receipt to native identity and never uploads',async t=>{
  const f=await fixture(t);f.registry.start(f.request);
