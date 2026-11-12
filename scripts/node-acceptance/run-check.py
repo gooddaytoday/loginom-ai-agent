@@ -1953,6 +1953,8 @@ class Runner:
             if spec.get('excel_mode'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
+        if spec.get('excel_mode'):
+            expected['excel_books'] = expected['outputs']
         if spec.get('lgd') == 'roundtrip': expected['lgd']['destination'] = lgd_destination
         if spec.get('lgd_case') == 'variable':
             expected['lgd']['initial_destination'] = lgd_initial_destination
