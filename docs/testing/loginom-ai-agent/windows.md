@@ -5,7 +5,7 @@
 ## Автоматический smoke установленного NSIS с Linux
 
 На выделенном Windows 11 x64 стенде с SSH запускается полный цикл
-`/S /currentuser` → установленный EXE → штатное закрытие через `WM_CLOSE` →
+`/S /currentuser` → установленный EXE → штатное закрытие через Electron `app.quit()` →
 `Uninstall … /S /currentuser`. На Linux нужны Python 3 и OpenSSH (`ssh`, `scp`),
 на Windows — штатный Windows PowerShell 5.1. Node/Bun/отдельный Chrome не нужны.
 Команда из корня checkout на mas:
@@ -40,7 +40,7 @@ gh run download <run-id> --name loginom-windows-unsigned-<run-id> --dir ./window
 и draft releases; `loginom-windows.yml` — отдельный Windows development
 кандидат. Эти сборки не запускают установленный Desktop на Windows 11.
 
-Скрипт печатает таблицу PASS/FAIL и возвращает 0 только при полном PASS
+Скрипт печатает таблицу PASS/FAIL/WARN и возвращает 0 при отсутствии FAIL
 (1 — отказ проверки, 2 — ошибка транспорта/получения отчёта). `report.json`
 содержит hash, подпись, ОС, регистрацию Installed Apps, путь EXE, ярлыки,
 PID/пути процессов и результаты. `logs.zip` содержит журналы изолированного
@@ -51,7 +51,14 @@ PID/пути процессов и результаты. `logs.zip` содерж
 Проверяются версия и `packaged/onboardingTest` в `app starting`, `server ready`,
 живой главный процесс и дочерние процессы, отсутствие событий сбоя в `crash.log`, minidump и
 ошибок в журналах, отсутствие процессов из каталога установки после закрытия,
-удаление файлов/регистрации/ярлыков. Зависший процесс принудительно убирается
+удаление файлов/регистрации/ярлыков. SSH-обёртка передаёт `-CloseMethod Inspector`:
+публичный Electron `app.quit()` вызывается через Node inspector на случайном
+loopback-порту, соединение разрывается до ожидания выхода. Это работает в
+SSH-сессии 0, где видимых окон может не быть; штатный `before-quit` и остановка
+sidecar выполняются кодом установленного приложения. При прямом запуске
+PowerShell по умолчанию используется `-CloseMethod Window` и `WM_CLOSE`;
+отсутствие видимого окна в этом режиме — FAIL. Оба режима требуют код выхода 0
+и запись `app quit`. Зависший процесс принудительно убирается
 только по принадлежащему установке PID и делает результат FAIL. Удаление
 проверяет `preservesUserData=true` по маркеру в обычном `%APPDATA%\<appId>` и
 сохранению журналов в `LOGINOM_AI_AGENT_TEST_ROOT`; собственный маркер затем
@@ -67,6 +74,16 @@ PID/пути процессов и результаты. `logs.zip` содерж
 неуспешный запуск. `cleanup=FAIL` требует ручной уборки именно этой установки.
 Smoke не заменяет полную матрицу ниже: он не проверяет бизнес-сценарии,
 DPAPI, обновление, содержимое UI и подпись релизного gate.
+
+`no-crash-events` разрешает в `crash.log` только полные информационные записи
+`crash reporter started` с полем `path` и закрывающей скобкой; отсутствие или
+пустой файл тоже допустимы. Любое другое содержимое даёт FAIL. Это отдельно от
+`no-minidumps` и `no-error-lines` (ERROR/FATAL, uncaught/unhandled rejection).
+`background dependency install failed` (включая npm 404 для
+`@loginom-ai-agent/plugin`) выводится отдельной строкой
+`background-dependency-install` со статусом WARN и ссылкой на журнал/строку
+в таблице и JSON; само предупреждение не меняет итог PASS и exit 0.
+ERROR/FATAL и minidump по-прежнему дают FAIL, даже если рядом есть WARN.
 
 ### Тот же скрипт в Windows CI
 
@@ -94,13 +111,13 @@ DPAPI, обновление, содержимое UI и подпись рели�
 
 При `LOGINOM_AI_AGENT_TEST_ONBOARDING=1` журналы перенесены из обычного
 `%APPDATA%\<appId>\logs\<run>` в `<TEST_ROOT>\desktop\logs\<run>`.
-`crash.log` всегда создаётся для штатной записи `crash reporter started`:
-разрешена только эта info-запись, любые другие события сбоя и minidump — FAIL.
+`crash.log` создаётся для штатной записи `crash reporter started`:
+разрешена только полная info-запись, любое другое содержимое и minidump — FAIL.
 Workflow сохраняет `report.json` и `logs.zip` артефактом
 `loginom-windows-installed-smoke-<run-id>` также при ошибке. Профиль и
 установленные файлы в артефакт не включаются.
 
-Регрессионные проверки версии, готовности, crash-событий и поиска адреса
+Регрессионные проверки версии, готовности, полных crash-записей, WARN и поиска адреса
 в бинарном файле (PowerShell 7 допускает запуск на Linux с установленным rg):
 
 ```powershell

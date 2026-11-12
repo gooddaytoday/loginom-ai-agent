@@ -7,6 +7,7 @@ param(
     [ValidateSet('prod','beta','dev')][string]$Channel = 'prod',
     [ValidatePattern('^[a-fA-F0-9]{64}$')][string]$ExpectedSha256,
     [ValidateRange(20,600)][int]$TimeoutSeconds = 120,
+    [ValidateSet('Window','Inspector')][string]$CloseMethod = 'Window',
     [switch]$AllowServer,
     [switch]$KeepProxy
 )
@@ -16,7 +17,7 @@ $ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $checks = [Collections.Generic.List[object]]::new()
 $report = [ordered]@{ schemaVersion=1; startedAt=(Get-Date).ToUniversalTime().ToString('o');
-    installer=$Installer; expectedVersion=$ExpectedVersion; channel=$Channel;
+    installer=$Installer; expectedVersion=$ExpectedVersion; channel=$Channel; closeMethod=$CloseMethod;
     scriptSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant(); checks=$checks }
 $slug = 'loginom-ai-agent' + $(if ($Channel -ne 'prod') { '-' + $Channel })
 $appId = 'com.loginom.aiagent' + $(if ($Channel -ne 'prod') { '.' + $Channel })
@@ -47,9 +48,9 @@ function Test-StartupLog([string]$Text, [string]$Version) {
         $Text -match '\[info\]\s+server ready\s*\{')
 }
 function Test-CrashLog([string]$Text) {
-    if (-not $Text.Trim()) { return $true }
-    $events = @($Text -split '\r?\n' | Where-Object { $_ -match '\[(info|warn|error|debug|fatal)\]' })
-    return ($events.Count -gt 0 -and @($events | Where-Object { $_ -notmatch '\[info\].*crash reporter started' }).Count -eq 0)
+    # Remove only complete startup records, including their path metadata and closing brace.
+    $startupRecord = '(?m)^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[info\] +\(crash\) crash reporter started \{\r?\n +path: ''[^''\r\n]+''\r?\n\}\r?(?:\n|\z)'
+    return (-not [regex]::Replace($Text, $startupRecord, '').Trim())
 }
 function Test-RetiredEndpoint([string]$Directory, [string]$Ripgrep) {
     $found = @(& $Ripgrep --text --files-with-matches --fixed-strings --hidden --no-ignore -- 'mcp.loginom.ai' $Directory)
@@ -87,6 +88,27 @@ function Remove-Installation {
     if (-not $uninstaller) { throw 'Uninstaller is missing' }
     Run-Installer $uninstaller '/S /currentuser'
     return (Wait-For { -not (Test-Path -LiteralPath $install) -and (Entries).Count -eq 0 } 90)
+}
+
+function Check-Logs([string]$Profile) {
+    $logs = Join-Path $Profile 'desktop\logs'
+    $errors = @(Get-ChildItem -LiteralPath $logs -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object Extension -eq '.log' | Select-String -Pattern '\[(error|fatal)\]|level=(ERROR|FATAL)|uncaught|unhandled rejection|FATAL ERROR')
+    $crashLogs = @(Get-ChildItem -LiteralPath $Profile -Recurse -File -Filter crash.log -ErrorAction SilentlyContinue)
+    $unexpectedCrashes = @($crashLogs | ForEach-Object {
+        if (-not (Test-CrashLog ([IO.File]::ReadAllText($_.FullName)))) { $_.FullName }
+    })
+    $dumps = @(Get-ChildItem -LiteralPath $Profile -Recurse -File -Filter '*.dmp' -ErrorAction SilentlyContinue)
+    $report.crashArtifacts = @(@($crashLogs) + @($dumps) | Select-Object FullName,Length,CreationTimeUtc)
+    Check 'no-error-lines' ((Test-Path -LiteralPath $logs) -and $errors.Count -eq 0) (($errors | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }) -join "`n")
+    Check 'no-crash-events' ($unexpectedCrashes.Count -eq 0) ('Only complete crash reporter initialization info records are allowed; unexpected content in: ' + ($unexpectedCrashes -join '; '))
+    Check 'no-minidumps' ($dumps.Count -eq 0) (($dumps | Select-Object -ExpandProperty FullName) -join '; ')
+    $warnings = @(Get-ChildItem -LiteralPath $logs -Recurse -File -Filter '*.log' -ErrorAction SilentlyContinue |
+        Select-String -SimpleMatch 'background dependency install failed')
+    if ($warnings.Count) {
+        $checks.Add([pscustomobject]@{ id='background-dependency-install'; status='WARN';
+            detail=(($warnings | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }) -join "`n") })
+    }
 }
 
 try {
@@ -148,7 +170,16 @@ try {
         Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq $exe } | Select-Object -ExpandProperty FullName)
     Check 'shortcut' ($links.Count -gt 0) ($links -join '; ')
     $report.shortcuts = $links
-    $mainProcess = Start-Process -FilePath $exe -PassThru
+    if ($CloseMethod -eq 'Inspector') {
+        # SSH session 0 may have no visible window; expose app.quit only on loopback for this run.
+        $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+        $listener.Start()
+        $inspectorPort = $listener.LocalEndpoint.Port
+        $listener.Stop()
+        $mainProcess = Start-Process -FilePath $exe -ArgumentList "--inspect=127.0.0.1:$inspectorPort" -PassThru
+    } else {
+        $mainProcess = Start-Process -FilePath $exe -PassThru
+    }
     $logs = Join-Path $profile 'desktop\logs'
     $report.logs = $logs
     $ready = Wait-For {
@@ -164,8 +195,9 @@ try {
     $live = @(Processes)
     $report.processes = @($live | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath)
     Check 'processes-alive' (@($live | Where-Object ProcessId -eq $mainProcess.Id).Count -eq 1 -and $live.Count -gt 1) ($report.processes | ConvertTo-Json -Compress)
-    # WM_CLOSE exercises normal Electron shutdown, including sidecar cleanup. No force-kill can pass it.
-    Add-Type @'
+    if ($CloseMethod -eq 'Window') {
+        # WM_CLOSE exercises normal Electron shutdown, including sidecar cleanup. No force-kill can pass it.
+        Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class SmokeWindows {
@@ -185,9 +217,37 @@ public static class SmokeWindows {
     }
 }
 '@
-    $windows = [SmokeWindows]::Close($mainProcess.Id)
+        $windows = [SmokeWindows]::Close($mainProcess.Id)
+        if ($windows -eq 0) { throw 'WM_CLOSE found no visible Desktop window' }
+        $closeDetail = "WM_CLOSE windows=$windows"
+    } else {
+        # Invoke the installed app's production before-quit/sidecar cleanup path in SSH session 0.
+        $targets = @(Invoke-RestMethod -Uri "http://127.0.0.1:$inspectorPort/json/list" -TimeoutSec 10)
+        if ($targets.Count -ne 1) { throw 'Expected one main-process inspector target' }
+        $socket = [Net.WebSockets.ClientWebSocket]::new()
+        $cancel = [Threading.CancellationTokenSource]::new(10000)
+        try {
+            $socket.ConnectAsync([uri]$targets[0].webSocketDebuggerUrl, $cancel.Token).GetAwaiter().GetResult()
+            $request = @{ id=1; method='Runtime.evaluate'; params=@{
+                expression="require('electron').app.quit()"; includeCommandLineAPI=$true
+            }} | ConvertTo-Json -Depth 4 -Compress
+            $bytes = [Text.Encoding]::UTF8.GetBytes($request)
+            $socket.SendAsync([ArraySegment[byte]]::new($bytes), [Net.WebSockets.WebSocketMessageType]::Text, $true, $cancel.Token).GetAwaiter().GetResult()
+            $buffer = [byte[]]::new(65536)
+            $reply = $socket.ReceiveAsync([ArraySegment[byte]]::new($buffer), $cancel.Token).GetAwaiter().GetResult()
+            $response = [Text.Encoding]::UTF8.GetString($buffer, 0, $reply.Count) | ConvertFrom-Json
+            if ($response.id -ne 1 -or $response.error -or $response.result.exceptionDetails) {
+                throw ('Electron app.quit failed: ' + ($response | ConvertTo-Json -Depth 6 -Compress))
+            }
+        } finally {
+            $socket.Abort()
+            $socket.Dispose()
+            $cancel.Dispose()
+        }
+        $closeDetail = 'Electron app.quit() via loopback inspector'
+    }
     $closed = Wait-For { (Processes).Count -eq 0 }
-    Check 'graceful-close' ($windows -gt 0 -and $closed) "WM_CLOSE windows=$windows; no installed-path processes=$closed"
+    Check 'graceful-close' $closed "$closeDetail; no installed-path processes=$closed"
     if (-not $closed) { throw 'Desktop did not close; forced cleanup is a failure' }
     $mainProcess.Refresh()
     $quitText = Get-Content -LiteralPath $mainLog.FullName -Raw
@@ -205,16 +265,7 @@ public static class SmokeWindows {
             Check 'cleanup' ((Processes).Count -eq 0 -and -not (Test-Path -LiteralPath $install) -and (Entries).Count -eq 0) 'No installed files, registration or owned processes'
         } catch { Check 'cleanup' $false $_.Exception.Message }
         # Collect errors even when startup throws, and include shutdown/cleanup failures.
-        $logs = Join-Path $profile 'desktop\logs'
-        $errors = @(Get-ChildItem -LiteralPath $logs -Recurse -File -ErrorAction SilentlyContinue |
-            Where-Object Extension -eq '.log' | Select-String -Pattern '\[(error|fatal)\]|level=(ERROR|FATAL)|uncaught|unhandled rejection|FATAL ERROR')
-        $crashLogs = @(Get-ChildItem -LiteralPath $profile -Recurse -File -Filter crash.log -ErrorAction SilentlyContinue)
-        $dumps = @(Get-ChildItem -LiteralPath $profile -Recurse -File -Filter '*.dmp' -ErrorAction SilentlyContinue)
-        $report.crashArtifacts = @(@($crashLogs) + @($dumps) | Select-Object FullName,Length,CreationTimeUtc)
-        Check 'no-error-lines' ((Test-Path -LiteralPath $logs) -and $errors.Count -eq 0) (($errors | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }) -join "`n")
-        $badCrashLogs = @($crashLogs | Where-Object { -not (Test-CrashLog (Get-Content -LiteralPath $_.FullName -Raw)) })
-        Check 'no-crash-events' ($badCrashLogs.Count -eq 0) 'Only the normal crash reporter initialization info event is allowed in crash.log'
-        Check 'no-minidumps' ($dumps.Count -eq 0) (($dumps | Select-Object -ExpandProperty FullName) -join '; ')
+        Check-Logs $profile
         foreach ($id in @('silent-install','installed-apps','install-path','bundled-help-manifest','no-retired-endpoint','shortcut','app-starting-version','server-ready','processes-alive','graceful-close','clean-exit-code','silent-uninstall','shortcut-removed','preserves-user-data')) {
             if (-not @($checks | Where-Object id -eq $id).Count) { Check $id $false 'Not reached; see execution/cleanup failure' }
         }

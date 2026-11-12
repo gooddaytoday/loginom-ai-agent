@@ -42,7 +42,8 @@ def main():
         installer = remote + "/installer.exe"
     command = ("& " + literal(remote + "/smoke.ps1") + " -Installer " + literal(installer)
                + " -RunRoot " + literal(remote) + " -Channel " + literal(args.channel)
-               + " -ExpectedVersion " + literal(args.version) + " -TimeoutSeconds " + str(args.timeout))
+               + " -ExpectedVersion " + literal(args.version) + " -TimeoutSeconds " + str(args.timeout)
+               + " -CloseMethod Inspector")
     if args.sha256:
         command += " -ExpectedSha256 " + literal(args.sha256)
     result = powershell(command)
