@@ -70,6 +70,31 @@ function Remove-Installation {
     return (Wait-For { -not (Test-Path -LiteralPath $install) -and (Entries).Count -eq 0 } 90)
 }
 
+function Check-Logs([string]$Profile) {
+    $logs = Join-Path $profile 'desktop\logs'
+    $errors = @(Get-ChildItem -LiteralPath $logs -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object Extension -eq '.log' | Select-String -Pattern '\[(error|fatal)\]|level=(ERROR|FATAL)|uncaught|unhandled rejection|FATAL ERROR')
+    $crashLogs = @(Get-ChildItem -LiteralPath $profile -Recurse -File -Filter crash.log -ErrorAction SilentlyContinue)
+    # Electron logs this informational record as three lines, including the Crashpad path.
+    # Remove only complete startup records; any remaining content is a crash-log failure.
+    $startupRecord = '(?m)^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[info\] +\(crash\) crash reporter started \{\r?\n +path: ''[^''\r\n]+''\r?\n\}\r?(?:\n|\z)'
+    $unexpectedCrashes = @($crashLogs | ForEach-Object {
+        $unexpected = [regex]::Replace([IO.File]::ReadAllText($_.FullName), $startupRecord, '').Trim()
+        if ($unexpected) { "$($_.FullName): $unexpected" }
+    })
+    $dumps = @(Get-ChildItem -LiteralPath $profile -Recurse -File -Filter '*.dmp' -ErrorAction SilentlyContinue)
+    $report.crashArtifacts = @(@($crashLogs) + @($dumps) | Select-Object FullName,Length,CreationTimeUtc)
+    Check 'no-error-lines' ((Test-Path -LiteralPath $logs) -and $errors.Count -eq 0) (($errors | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }) -join "`n")
+    Check 'no-crash-events' ($unexpectedCrashes.Count -eq 0) ($unexpectedCrashes -join "`n")
+    Check 'no-minidumps' ($dumps.Count -eq 0) (($dumps | Select-Object -ExpandProperty FullName) -join '; ')
+    $warnings = @(Get-ChildItem -LiteralPath $logs -Recurse -File -Filter '*.log' -ErrorAction SilentlyContinue |
+        Select-String -SimpleMatch 'background dependency install failed')
+    if ($warnings.Count) {
+        $checks.Add([pscustomobject]@{ id='background-dependency-install'; status='WARN';
+            detail=(($warnings | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }) -join "`n") })
+    }
+}
+
 try {
     if (-not [IO.Path]::IsPathRooted($RunRoot) -or $RunRoot -match '["\r\n]') { throw 'RunRoot must be an absolute safe path' }
     New-Item -ItemType Directory -Force -Path $RunRoot | Out-Null
@@ -175,15 +200,7 @@ try {
             Check 'cleanup' ((Processes).Count -eq 0 -and -not (Test-Path -LiteralPath $install) -and (Entries).Count -eq 0) 'No installed files, registration or owned processes'
         } catch { Check 'cleanup' $false $_.Exception.Message }
         # Collect errors even when startup throws, and include shutdown/cleanup failures.
-        $logs = Join-Path $profile 'desktop\logs'
-        $errors = @(Get-ChildItem -LiteralPath $logs -Recurse -File -ErrorAction SilentlyContinue |
-            Where-Object Extension -eq '.log' | Select-String -Pattern '\[(error|fatal)\]|level=(ERROR|FATAL)|uncaught|unhandled rejection|FATAL ERROR')
-        $crashLogs = @(Get-ChildItem -LiteralPath $profile -Recurse -File -Filter crash.log -ErrorAction SilentlyContinue)
-        $dumps = @(Get-ChildItem -LiteralPath $profile -Recurse -File -Filter '*.dmp' -ErrorAction SilentlyContinue)
-        $report.crashArtifacts = @(@($crashLogs) + @($dumps) | Select-Object FullName,Length,CreationTimeUtc)
-        Check 'no-error-lines' ((Test-Path -LiteralPath $logs) -and $errors.Count -eq 0) (($errors | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line)" }) -join "`n")
-        Check 'crash-log-absent' ($crashLogs.Count -eq 0) (($crashLogs | Select-Object -ExpandProperty FullName) -join '; ')
-        Check 'no-minidumps' ($dumps.Count -eq 0) (($dumps | Select-Object -ExpandProperty FullName) -join '; ')
+        Check-Logs $profile
         foreach ($id in @('silent-install','installed-apps','install-path','shortcut','app-starting-version','server-ready','processes-alive','graceful-close','silent-uninstall','shortcut-removed','preserves-user-data')) {
             if (-not @($checks | Where-Object id -eq $id).Count) { Check $id $false 'Not reached; see execution/cleanup failure' }
         }

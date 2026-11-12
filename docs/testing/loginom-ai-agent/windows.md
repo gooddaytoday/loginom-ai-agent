@@ -40,7 +40,7 @@ gh run download <run-id> --name loginom-windows-unsigned-<run-id> --dir ./window
 и draft releases; `loginom-windows.yml` — отдельный Windows development
 кандидат. Эти сборки не запускают установленный Desktop на Windows 11.
 
-Скрипт печатает таблицу PASS/FAIL и возвращает 0 только при полном PASS
+Скрипт печатает таблицу PASS/FAIL/WARN и возвращает 0 при отсутствии FAIL
 (1 — отказ проверки, 2 — ошибка транспорта/получения отчёта). `report.json`
 содержит hash, подпись, ОС, регистрацию Installed Apps, путь EXE, ярлыки,
 PID/пути процессов и результаты. `logs.zip` содержит журналы изолированного
@@ -49,7 +49,7 @@ PID/пути процессов и результаты. `logs.zip` содерж
 Отчёты и журналы не коммитить.
 
 Проверяются версия и `packaged/onboardingTest` в `app starting`, `server ready`,
-живой главный процесс и дочерние процессы, отсутствие `crash.log`, minidump и
+живой главный процесс и дочерние процессы, отсутствие записей о сбоях в `crash.log`, minidump и
 ошибок в журналах, отсутствие процессов из каталога установки после закрытия,
 удаление файлов/регистрации/ярлыков. Для закрытия используется публичный
 Electron `app.quit()` через Node inspector на случайном loopback-порту;
@@ -72,11 +72,19 @@ Electron `app.quit()` через Node inspector на случайном loopback
 Smoke не заменяет полную матрицу ниже: он не проверяет бизнес-сценарии,
 DPAPI, обновление, отображение UI и подпись релизного gate.
 
-`crash-log-absent` проверяет буквальное отсутствие файла: информационный
-`crash reporter started` в `crash.log` тоже даёт FAIL. Это отдельно от
+`no-crash-events` разрешает в `crash.log` только информационные записи
+`crash reporter started` с полем `path` и закрывающей скобкой; отсутствие файла
+тоже допустимо. Любое другое содержимое даёт FAIL. Это отдельно от
 `no-minidumps` и `no-error-lines` (ERROR/FATAL, uncaught/unhandled rejection).
-Наличие такого файла само по себе не доказывает падение; смотрите его содержимое
-и остальные строки отчёта. WARN остаются в приложенных журналах для разбора.
+`background dependency install failed` выводится отдельной строкой
+`background-dependency-install` со статусом WARN и ссылкой на журнал/строку
+в таблице и JSON; само предупреждение не меняет итог PASS и exit 0.
+ERROR/FATAL и minidump по-прежнему дают FAIL, даже если рядом есть WARN.
+Проверка парсера без установки приложения (Windows PowerShell 5.1):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File packages/desktop/test/loginom/windows-installed-smoke.test.ps1
+```
 
 ## 1. Машина и входные материалы
 
