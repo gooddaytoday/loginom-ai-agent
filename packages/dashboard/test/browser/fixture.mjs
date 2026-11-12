@@ -46,7 +46,16 @@ export async function fixture(
     if (url.origin !== origin) return route.abort()
     if (url.pathname === "/dashboard/lookup")
       return route.fulfill({
-        json: malformed === "lookup" ? { exists: "yes", key: 17 } : { exists: published, key: "a".repeat(64) },
+        json:
+          malformed === "lookup"
+            ? { exists: "yes", key: 17 }
+            : {
+                exists: published,
+                key: "a".repeat(64),
+                hash: published ? "b".repeat(64) : null,
+                appOrigin: origin,
+                mode: "normal",
+              },
       })
     if (url.pathname === "/dashboard/targets") {
       snapshots.push(route.request().postDataJSON())

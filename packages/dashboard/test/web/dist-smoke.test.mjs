@@ -16,22 +16,34 @@ const binding = {
   port: 0,
 }
 
-async function launch(t, root, artifact, projectRoot) {
-  // Choose an ephemeral port before launching the real standalone entry point.
+async function ephemeral() {
   const listener = createServer().listen(0, "127.0.0.1")
   await once(listener, "listening")
-  const port = listener.address().port
+  const chosen = listener.address().port
   await new Promise((resolve) => listener.close(resolve))
+  return chosen
+}
+
+async function launch(t, root, artifact, projectRoot) {
+  // Choose ephemeral ports before launching the real standalone entry point.
+  const apiPort = await ephemeral()
+  const appPort = await ephemeral()
+  const appOrigin = `http://127.0.0.1:${appPort}`
   const child = spawn(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, [artifact], {
     cwd: root,
     env: {
       ...process.env,
-      DASHBOARD_PORT: String(port),
+      DASHBOARD_PORT: String(apiPort),
+      DASHBOARD_APP_PORT: String(appPort),
       DASHBOARD_HOST: "127.0.0.1",
-      DASHBOARD_PUBLISH_ROOT: join(root, "published"),
+      DASHBOARD_BUILDS: join(root, "builds"),
+      DASHBOARD_APP_ORIGIN: appOrigin,
+      DASHBOARD_CLIENT_ORIGINS: `http://127.0.0.1:${apiPort}`,
       DASHBOARD_PROJECT_ROOT: projectRoot,
+      DASHBOARD_PUBLISH_ROOT: undefined,
       DASHBOARD_PUBLIC_HOSTS: undefined,
       DASHBOARD_ALLOW_CURRENT: undefined,
+      DASHBOARD_MODE: undefined,
     },
     stdio: ["ignore", "ignore", "pipe"],
   })
@@ -44,12 +56,13 @@ async function launch(t, root, artifact, projectRoot) {
     if (child.exitCode === null && child.signalCode === null) child.kill()
     await exited
   })
-  const base = `http://127.0.0.1:${port}/dashboard`
+  const base = `http://127.0.0.1:${apiPort}/dashboard`
   for (let attempt = 0; attempt < 100; attempt++) {
     assert.equal(child.exitCode, null, stderr)
     try {
       await fetch(base + "/current")
-      return base
+      await fetch(appOrigin + "/")
+      return { base, appOrigin }
     } catch (error) {
       if (attempt === 99) throw error
       await setTimeout(25)
@@ -64,9 +77,10 @@ test("the standalone Node bundle preserves snapshot HTTP and an existing publica
   const artifact = join(root, "server.mjs")
   await copyFile(new URL("../../dist/server.mjs", import.meta.url), artifact)
   const key = "a".repeat(64)
-  await mkdir(join(root, "published", key), { recursive: true })
-  await writeFile(join(root, "published", key, "index.html"), "Existing dashboard")
-  const base = await launch(t, root, artifact, root)
+  const hash = "b".repeat(64)
+  await mkdir(join(root, "builds", key, hash), { recursive: true })
+  await writeFile(join(root, "builds", key, hash, "index.html"), "Existing dashboard")
+  const { base, appOrigin } = await launch(t, root, artifact, root)
   const response = await fetch(base + "/targets", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -87,14 +101,17 @@ test("the standalone Node bundle preserves snapshot HTTP and an existing publica
   assert.equal(saved.status, 200)
   assert.deepEqual(await saved.json(), target)
   const app = await fetch(base + "/apps/" + key + "/")
-  assert.equal(app.status, 200)
-  assert.equal(await app.text(), "Existing dashboard")
+  assert.equal(app.status, 404)
+  const page = await fetch(`${appOrigin}/apps/${key}/${hash}/`)
+  assert.equal(page.status, 200)
+  assert.ok(page.headers.get("content-security-policy"))
+  assert.equal(await page.text(), "Existing dashboard")
 })
 
 test("the bundled entry point derives its checkout while launched from another directory", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "dashboard-dist-root-"))
   t.after(() => rm(root, { recursive: true, force: true }))
-  const base = await launch(t, root, resolve(import.meta.dirname, "../../dist/server.mjs"))
+  const { base } = await launch(t, root, resolve(import.meta.dirname, "../../dist/server.mjs"))
   const response = await fetch(base + "/targets", {
     method: "POST",
     headers: { "content-type": "application/json" },

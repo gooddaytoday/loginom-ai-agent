@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { request } from "node:http"
 import { networkInterfaces, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -20,7 +20,9 @@ async function stand(t, options = {}) {
   const root = await mkdtemp(join(tmpdir(), "dashboard checkout's test-"))
   const server = dashboardServer({
     projectRoot: root,
-    publishRoot: join(root, "published"),
+    buildsRoot: join(root, "builds"),
+    appOrigin: options.appOrigin ?? "http://dashboards.localhost:32769",
+    mode: options.mode ?? "normal",
     maxSnapshots: options.maxSnapshots,
     allowCurrent: options.allowCurrent,
   })
@@ -37,65 +39,91 @@ async function stand(t, options = {}) {
     assert.ok(response.ok, `${path} returned ${response.status}`)
     return response.json()
   }
-  return { base, request, projectRoot: root, publishRoot: join(root, "published") }
+  return { base, request, projectRoot: root, buildsRoot: join(root, "builds") }
 }
 
 test("published dashboard keeps its metadata private", async t => {
   const server = await stand(t)
   const app = await server.request("lookup", binding)
-  const version = join(server.publishRoot, ".versions", "example")
-  await mkdir(join(version, "assets"), { recursive: true })
-  await writeFile(join(version, "index.html"), '<script src="./assets/app.js"></script>')
-  await writeFile(join(version, "assets/app.js"), 'console.log("dashboard")')
-  await writeFile(join(version, "binding.json"), JSON.stringify(binding))
-  await writeFile(join(version, "sample.json"), JSON.stringify({ schema: [{ name: "budget", type: "number" }], rows: [[500]] }))
-  await symlink(version, join(server.publishRoot, app.key), "dir")
-  assert.equal((await server.request("lookup", binding)).exists, true)
-  const base = `${server.base}/apps/${app.key}/`
-  const page = await fetch(base)
-  assert.equal(page.status, 200)
-  assert.equal(await page.text(), '<script src="./assets/app.js"></script>')
-  const script = await fetch(base + "assets/app.js")
-  assert.equal(script.status, 200)
-  assert.equal(await script.text(), 'console.log("dashboard")')
-  for (const name of ["binding.json", "sample.json"]) {
-    await symlink(join(version, name), join(version, "assets", name + ".alias"))
-    const response = await fetch(base + name)
-    assert.equal(response.status, 404)
-    const alias = await fetch(base + "assets/" + name + ".alias")
-    assert.equal(alias.status, 404)
-  }
+  const dir = join(server.buildsRoot, app.key, "b".repeat(64))
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, "index.html"), "<p>dashboard</p>")
+  await writeFile(join(dir, "binding.json"), JSON.stringify(binding))
+  await writeFile(join(dir, "sample.json"), JSON.stringify({ schema: [{ name: "budget", type: "number" }], rows: [[500]] }))
+  const page = await fetch(`${server.base}/apps/${app.key}/`)
+  assert.equal(page.status, 404)
+  assert.equal((await page.text()).includes(binding.packagePath), false)
+  const sample = await fetch(`${server.base}/apps/${app.key}/sample.json`)
+  assert.equal(sample.status, 404)
+  assert.equal((await sample.text()).includes("budget"), false)
 })
 
 test("dashboard accepts only configured hosts", async t => {
   const root = await mkdtemp(join(tmpdir(), "dashboard-hosts-"))
-  const key = "a".repeat(64)
-  await mkdir(join(root, "published", key), { recursive: true })
-  await writeFile(join(root, "published", key, "index.html"), "Dashboard")
-  const server = startDashboard({
-    DASHBOARD_PROJECT_ROOT: root, DASHBOARD_PUBLISH_ROOT: join(root, "published"), DASHBOARD_PORT: "0",
-    DASHBOARD_PUBLIC_HOSTS: "Example.test:32768, localhost:32768",
+  const started = startDashboard({
+    DASHBOARD_PROJECT_ROOT: root,
+    DASHBOARD_BUILDS: join(root, "builds"),
+    DASHBOARD_PORT: "0",
+    DASHBOARD_APP_PORT: "0",
+    DASHBOARD_CLIENT_ORIGINS: "http://Example.test:32768, http://localhost:32768",
   })
   t.after(async () => {
-    await new Promise(resolve => server.close(resolve))
+    await Promise.all([started.api, started.apps].map(server => new Promise(resolve => server.close(resolve))))
     await rm(root, { recursive: true, force: true })
   })
-  await once(server, "listening")
-  const status = (host, path = `/dashboard/apps/${key}/`, method = "GET") => new Promise((resolve, reject) => {
-    const req = request({ hostname: "127.0.0.1", port: server.address().port, path, method, headers: { host } }, response => {
+  await Promise.all([once(started.api, "listening"), once(started.apps, "listening")])
+  const status = (host, path = "/dashboard/current", method = "GET") => new Promise((resolve, reject) => {
+    const req = request({ hostname: "127.0.0.1", port: started.api.address().port, path, method, headers: { host } }, response => {
       response.resume()
       resolve(response.statusCode)
     })
     req.on("error", reject)
     req.end()
   })
-  assert.equal(await status("eXAMPLE.TEST:32768"), 200)
-  assert.equal(await status("LOCALHOST:32768"), 200)
+  assert.equal(await status("eXAMPLE.TEST:32768"), 404)
+  assert.equal(await status("LOCALHOST:32768"), 404)
   assert.equal(await status("evil.test:32768"), 403)
   assert.equal(await status("example.test:32769"), 403)
   assert.equal(await status("example.test"), 403)
-  assert.equal(await status(`127.0.0.1:${server.address().port}`), 403)
+  assert.equal(await status(`127.0.0.1:${started.api.address().port}`), 403)
   assert.equal(await status("evil.test:32768", "/dashboard/targets", "POST"), 403)
+})
+
+test("startup returns a canonical app origin when the configured host uses uppercase", async t => {
+  const root = await mkdtemp(join(tmpdir(), "dashboard-origin-"))
+  const started = startDashboard({
+    DASHBOARD_PROJECT_ROOT: root,
+    DASHBOARD_BUILDS: join(root, "builds"),
+    DASHBOARD_PORT: "0",
+    DASHBOARD_APP_PORT: "0",
+    DASHBOARD_APP_ORIGIN: "http://DASHBOARDS.LOCALHOST:32769",
+  })
+  t.after(async () => {
+    await Promise.all([started.api, started.apps].map(server => new Promise(resolve => server.close(resolve))))
+    await rm(root, { recursive: true, force: true })
+  })
+  await Promise.all([once(started.api, "listening"), once(started.apps, "listening")])
+  const response = await fetch(`http://127.0.0.1:${started.api.address().port}/dashboard/lookup`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(binding),
+  })
+  assert.equal(response.status, 200)
+  assert.equal((await response.json()).appOrigin, "http://dashboards.localhost:32769")
+})
+
+test("startup rejects an unknown mode and an origin with a path", async t => {
+  const root = await mkdtemp(join(tmpdir(), "dashboard-startup-"))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const base = {
+    DASHBOARD_PROJECT_ROOT: root,
+    DASHBOARD_BUILDS: join(root, "builds"),
+    DASHBOARD_PORT: "0",
+    DASHBOARD_APP_PORT: "0",
+  }
+  assert.throws(() => startDashboard({ ...base, DASHBOARD_MODE: "fast" }))
+  assert.throws(() => startDashboard({ ...base, DASHBOARD_APP_ORIGIN: "http://dashboards.localhost:32769/path" }))
+  assert.throws(() => startDashboard({ ...base, DASHBOARD_CLIENT_ORIGINS: "http://127.0.0.1:32768/studio" }))
 })
 
 test("a package path separates applications even when node GUIDs match", async t => {
@@ -106,6 +134,33 @@ test("a package path separates applications even when node GUIDs match", async t
   assert.notEqual(a.key, b.key)
   assert.deepEqual(await request("lookup", binding), a)
   assert.equal(a.exists, false)
+})
+
+test("lookup reports the current build hash, app origin and mode", async t => {
+  const server = await stand(t)
+  const missing = await server.request("lookup", binding)
+  assert.deepEqual(
+    { exists: missing.exists, hash: missing.hash, appOrigin: missing.appOrigin, mode: missing.mode },
+    { exists: false, hash: null, appOrigin: "http://dashboards.localhost:32769", mode: "normal" },
+  )
+  assert.equal(missing.exists, missing.hash !== null)
+  const hash = "b".repeat(64)
+  await mkdir(join(server.buildsRoot, missing.key), { recursive: true })
+  await writeFile(join(server.buildsRoot, missing.key, "current"), hash + "\n")
+  const published = await server.request("lookup", binding)
+  assert.equal(published.exists, true)
+  assert.equal(published.hash, hash)
+  assert.equal(published.exists, published.hash !== null)
+  await writeFile(join(server.buildsRoot, missing.key, "current"), "not-a-build\n")
+  const garbage = await server.request("lookup", binding)
+  assert.equal(garbage.hash, null)
+  assert.equal(garbage.exists, false)
+  const strict = await stand(t, { mode: "strict", appOrigin: "https://dashboards.example:8443" })
+  const strictLookup = await strict.request("lookup", binding)
+  assert.equal(strictLookup.mode, "strict")
+  assert.equal(strictLookup.appOrigin, "https://dashboards.example:8443")
+  assert.equal(strictLookup.hash, null)
+  assert.equal(strictLookup.exists, false)
 })
 
 test("the first snapshot stays available by ID after opening another node", async t => {
@@ -135,9 +190,9 @@ test("the first snapshot stays available by ID after opening another node", asyn
   assert.equal((await fetch(server.base + "/current")).status, 404)
 
   // A fresh session has no live result; the example is scoped to the published binding.
-  await mkdir(join(server.publishRoot, a.key), { recursive: true })
-  await writeFile(join(server.publishRoot, a.key, "binding.json"), JSON.stringify(binding))
-  await writeFile(join(server.publishRoot, a.key, "sample.json"), JSON.stringify({ schema: data.schema, rows: data.rows }))
+  await mkdir(join(server.buildsRoot, a.key), { recursive: true })
+  await writeFile(join(server.buildsRoot, a.key, "binding.json"), JSON.stringify(binding))
+  await writeFile(join(server.buildsRoot, a.key, "sample.json"), JSON.stringify({ schema: data.schema, rows: data.rows }))
   const fresh = await request("targets", { ...data, schema: [], rows: [], sample: null })
   assert.deepEqual(fresh.schema, data.schema)
   assert.deepEqual(fresh.rows, data.rows)
@@ -152,10 +207,10 @@ test("the first snapshot stays available by ID after opening another node", asyn
   assert.equal(absent.tableSource, "unavailable")
   assert.deepEqual(absent.schema, [])
   assert.deepEqual(absent.rows, [])
-  await writeFile(join(server.publishRoot, a.key, "sample.json"), JSON.stringify({ schema: data.schema, rows: [[999]] }))
+  await writeFile(join(server.buildsRoot, a.key, "sample.json"), JSON.stringify({ schema: data.schema, rows: [[999]] }))
   await assert.rejects(request("targets", { ...data, sample: 42 }), /returned 400/)
   await assert.rejects(request("targets", { ...data, sample: {} }), /returned 400/)
-  await writeFile(join(server.publishRoot, a.key, "binding.json"), JSON.stringify(other))
+  await writeFile(join(server.buildsRoot, a.key, "binding.json"), JSON.stringify(other))
   await assert.rejects(request("targets", { ...data, sample: null }), /returned 400/)
   assert.deepEqual(await request("targets/" + fresh.id), fresh)
   assert.deepEqual(await request("targets/" + a.id), a)
@@ -165,18 +220,24 @@ test("the snapshot service listens on loopback unless the stand opts in", async 
   const root = await mkdtemp(join(tmpdir(), "dashboard-listen-"))
   const base = {
     DASHBOARD_PROJECT_ROOT: root,
-    DASHBOARD_PUBLISH_ROOT: join(root, "published"),
+    DASHBOARD_BUILDS: join(root, "builds"),
     DASHBOARD_PORT: "0",
+    DASHBOARD_APP_PORT: "0",
   }
   const loopback = startDashboard(base)
   const open = startDashboard({ ...base, DASHBOARD_HOST: "0.0.0.0" })
   t.after(async () => {
-    await Promise.all([loopback, open].map(server => new Promise(resolve => server.close(resolve))))
+    await Promise.all([loopback.api, loopback.apps, open.api, open.apps].map(server => new Promise(resolve => server.close(resolve))))
     await rm(root, { recursive: true, force: true })
   })
-  await Promise.all([once(loopback, "listening"), once(open, "listening")])
-  assert.equal(loopback.address().address, "127.0.0.1")
-  assert.equal(open.address().address, "0.0.0.0")
+  await Promise.all([
+    once(loopback.api, "listening"), once(loopback.apps, "listening"),
+    once(open.api, "listening"), once(open.apps, "listening"),
+  ])
+  assert.equal(loopback.api.address().address, "127.0.0.1")
+  assert.equal(loopback.apps.address().address, "127.0.0.1")
+  assert.equal(open.api.address().address, "0.0.0.0")
+  assert.equal(open.apps.address().address, "0.0.0.0")
 })
 
 test("only the newest snapshots stay available", async t => {
@@ -203,18 +264,18 @@ test("current is explicit local debugging through startDashboard", async t => {
     { name: "only the literal 1 enables debugging", host: "127.0.0.1", client: "127.0.0.1", peer: "127.0.0.1", flag: "true", status: 404 },
   ]) await t.test(connection.name, async t => {
     const root = await mkdtemp(join(tmpdir(), "dashboard-current-"))
-    const server = startDashboard({
-      DASHBOARD_PROJECT_ROOT: root, DASHBOARD_PUBLISH_ROOT: join(root, "published"),
-      DASHBOARD_PORT: "0", DASHBOARD_HOST: connection.host, DASHBOARD_ALLOW_CURRENT: connection.flag,
+    const started = startDashboard({
+      DASHBOARD_PROJECT_ROOT: root, DASHBOARD_BUILDS: join(root, "builds"),
+      DASHBOARD_PORT: "0", DASHBOARD_APP_PORT: "0", DASHBOARD_HOST: connection.host, DASHBOARD_ALLOW_CURRENT: connection.flag,
     })
     t.after(async () => {
-      await new Promise(resolve => server.close(resolve))
+      await Promise.all([started.api, started.apps].map(server => new Promise(resolve => server.close(resolve))))
       await rm(root, { recursive: true, force: true })
     })
-    await once(server, "listening")
+    await Promise.all([once(started.api, "listening"), once(started.apps, "listening")])
     const peers = []
-    server.on("request", request => peers.push(request.socket.remoteAddress))
-    const base = `http://${connection.client}:${server.address().port}/dashboard`
+    started.api.on("request", request => peers.push(request.socket.remoteAddress))
+    const base = `http://${connection.client}:${started.api.address().port}/dashboard`
     const created = await fetch(base + "/targets", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ binding, nodeName: "Synthetic debug target", sample: null, parameters: [] }),
@@ -232,20 +293,20 @@ test("debug current rejects a non-loopback TCP peer despite forwarded headers", 
   const address = Object.values(networkInterfaces()).flat().find(ip => ip.family === "IPv4" && !ip.internal)?.address
   if (!address) return t.skip("No non-loopback IPv4 interface; verify this case on the dev stand")
   const root = await mkdtemp(join(tmpdir(), "dashboard-current-network-"))
-  const server = startDashboard({
-    DASHBOARD_PROJECT_ROOT: root, DASHBOARD_PUBLISH_ROOT: join(root, "published"),
-    DASHBOARD_PORT: "0", DASHBOARD_HOST: "0.0.0.0", DASHBOARD_ALLOW_CURRENT: "1",
+  const started = startDashboard({
+    DASHBOARD_PROJECT_ROOT: root, DASHBOARD_BUILDS: join(root, "builds"),
+    DASHBOARD_PORT: "0", DASHBOARD_APP_PORT: "0", DASHBOARD_HOST: "0.0.0.0", DASHBOARD_ALLOW_CURRENT: "1",
   })
   t.after(async () => {
-    await new Promise(resolve => server.close(resolve))
+    await Promise.all([started.api, started.apps].map(server => new Promise(resolve => server.close(resolve))))
     await rm(root, { recursive: true, force: true })
   })
-  await once(server, "listening")
+  await Promise.all([once(started.api, "listening"), once(started.apps, "listening")])
   const peers = []
-  server.on("request", request => peers.push(request.socket.remoteAddress))
-  const base = `http://${address}:${server.address().port}/dashboard`
+  started.api.on("request", request => peers.push(request.socket.remoteAddress))
+  const base = `http://${address}:${started.api.address().port}/dashboard`
   const headers = {
-    host: `127.0.0.1:${server.address().port}`, "content-type": "application/json",
+    host: `127.0.0.1:${started.api.address().port}`, "content-type": "application/json",
     "x-forwarded-for": "127.0.0.1", "x-real-ip": "::1", forwarded: 'for="[::1]"',
   }
   const send = (path, data) => new Promise((resolve, reject) => {
@@ -338,50 +399,15 @@ test("known fields are validated while unknown nested metadata survives the snap
   ]) await assert.rejects(server.request("targets", { ...data, ...invalid }), /returned 400/)
 })
 
-test("published files have M0 MIME and cache headers and cannot escape publication", async t => {
-  const server = await stand(t)
-  const app = await server.request("lookup", binding)
-  const dir = join(server.publishRoot, app.key)
-  await mkdir(dir, { recursive: true })
-  const assets = [
-    ["index.html", "text/html; charset=utf-8"], ["app.js", "text/javascript"], ["app.css", "text/css"],
-    ["data.json", "application/json"], ["icon.svg", "image/svg+xml"], ["icon.png", "image/png"],
-    ["photo.jpg", "image/jpeg"], ["font.woff2", "font/woff2"], ["unknown.bin", "application/octet-stream"],
-  ]
-  for (const [name, mime] of assets) {
-    await writeFile(join(dir, name), "fixture " + name)
-    const response = await fetch(`${server.base}/apps/${app.key}/${name}`)
-    assert.equal(response.status, 200)
-    assert.equal(response.headers.get("content-type"), mime)
-    assert.equal(response.headers.get("x-content-type-options"), "nosniff")
-    assert.equal(response.headers.get("cache-control"), name === "index.html" ? "no-store" : "no-cache")
-    assert.equal(await response.text(), "fixture " + name)
-  }
-  const outside = join(server.publishRoot, "..", "outside")
-  await mkdir(outside)
-  await writeFile(join(outside, "secret.txt"), "OUTSIDE SECRET")
-  await symlink(join(outside, "secret.txt"), join(dir, "escape.txt"))
-  const escaped = "b".repeat(64)
-  await symlink(outside, join(server.publishRoot, escaped), "dir")
-  for (const [path, status] of [
-    [`${app.key}/missing.js`, 404], [`${app.key}/escape.txt`, 404], [`${escaped}/secret.txt`, 404],
-    [`${app.key}/%2e%2e%2foutside%2fsecret.txt`, 400], [`${app.key}/%2e%2e%5coutside%5csecret.txt`, 400],
-  ]) {
-    const response = await fetch(`${server.base}/apps/${path}`)
-    assert.equal(response.status, status, path)
-    assert.ok(!(await response.text()).includes("OUTSIDE SECRET"), path)
-  }
-})
-
 test("source startup derives the checkout independently of the working directory", async t => {
   const root = await mkdtemp(join(tmpdir(), "dashboard-source-root-"))
-  const server = startDashboard({ DASHBOARD_PUBLISH_ROOT: root, DASHBOARD_PORT: "0" })
+  const started = startDashboard({ DASHBOARD_BUILDS: root, DASHBOARD_PORT: "0", DASHBOARD_APP_PORT: "0" })
   t.after(async () => {
-    await new Promise(resolve => server.close(resolve))
+    await Promise.all([started.api, started.apps].map(server => new Promise(resolve => server.close(resolve))))
     await rm(root, { recursive: true, force: true })
   })
-  await once(server, "listening")
-  const response = await fetch(`http://127.0.0.1:${server.address().port}/dashboard/targets`, {
+  await Promise.all([once(started.api, "listening"), once(started.apps, "listening")])
+  const response = await fetch(`http://127.0.0.1:${started.api.address().port}/dashboard/targets`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ binding, nodeName: "Source checkout", sample: null, parameters: [] }),
   })
@@ -445,7 +471,7 @@ test("invalid target fields keep M0 binding and table error precedence", async t
 test("published example errors keep M0 parser messages and precedence", async t => {
   const server = await stand(t)
   const { key } = await server.request("lookup", binding)
-  const dir = join(server.publishRoot, key)
+  const dir = join(server.buildsRoot, key)
   await mkdir(dir, { recursive: true })
   const sample = { schema: [{ name: "n", type: 3 }], rows: [[1]] }
   const syntax = "Expected property name or '}' in JSON at position 1 (line 1 column 2)"

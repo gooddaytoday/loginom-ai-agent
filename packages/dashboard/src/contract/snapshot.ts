@@ -26,7 +26,20 @@ export const SnapshotRequest = Schema.Struct({
   parameters: Schema.Array(Parameter),
 })
 
-export const LookupResponse = Schema.Struct({ key: Schema.String, exists: Schema.Boolean })
+const Hash = Schema.String.check(Schema.makeFilter((value) => /^[a-f0-9]{64}$/.test(value)))
+const HttpOrigin = Schema.String.check(
+  Schema.makeFilter((value) => {
+    const url = URL.parse(value)
+    return url?.origin === value && (url.protocol === "http:" || url.protocol === "https:")
+  }),
+)
+export const LookupResponse = Schema.Struct({
+  key: Schema.String,
+  exists: Schema.Boolean,
+  hash: Schema.Union([Schema.Null, Hash]),
+  appOrigin: HttpOrigin,
+  mode: Schema.Literals(["normal", "strict"]),
+})
 export const ErrorResponse = Schema.Struct({ error: Schema.String })
 export const Snapshot = Schema.Struct({
   id: Schema.String,

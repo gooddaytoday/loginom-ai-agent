@@ -1,11 +1,14 @@
 import { createHash, randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
-import { readFile, realpath } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
-import { basename, extname, join, resolve, sep } from "node:path"
+import { homedir } from "node:os"
+import { basename, join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { Option, Schema } from "effect"
 import { Binding, Snapshot, SnapshotRequest, TableSample } from "../contract/snapshot.ts"
+import { appHost, type Mode } from "./apps.ts"
+
+export { appHeaders, appHost } from "./apps.ts"
 
 function json(response: ServerResponse, status: number, data: unknown) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" })
@@ -51,7 +54,7 @@ function appKey(input: unknown) {
     .digest("hex")
 }
 
-async function snapshot(input: unknown, projectRoot: string, publishRoot: string): Promise<typeof Snapshot.Type> {
+async function snapshot(input: unknown, projectRoot: string, buildsRoot: string): Promise<typeof Snapshot.Type> {
   const raw = input as Record<string, unknown>
   const key = appKey(raw.binding)
   // Accept the previous client's payload while bootstrap and Node are rolled out.
@@ -59,7 +62,7 @@ async function snapshot(input: unknown, projectRoot: string, publishRoot: string
   let tableSource: typeof Snapshot.Type.tableSource = sample === null ? "unavailable" : "live"
   if (sample === null) {
     try {
-      const dir = join(publishRoot, key)
+      const dir = join(buildsRoot, key)
       const binding: unknown = JSON.parse(await readFile(join(dir, "binding.json"), "utf8"))
       if (appKey(binding) !== key) throw Error("Published example binding differs")
       sample = JSON.parse(await readFile(join(dir, "sample.json"), "utf8"))
@@ -97,48 +100,11 @@ async function snapshot(input: unknown, projectRoot: string, publishRoot: string
   }
 }
 
-const mime: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".woff2": "font/woff2",
-}
-
-async function serveApp(response: ServerResponse, publishRoot: string, key: string, asset: string) {
-  const requested = asset || "index.html"
-  if (requested.split("/").some((part) => !part || part === "." || part === ".." || part.includes("\\"))) {
-    return json(response, 400, { error: "Invalid asset path" })
-  }
-  try {
-    const root = await realpath(publishRoot)
-    const dir = await realpath(join(root, key))
-    if (!dir.startsWith(root + sep)) return json(response, 404, { error: "Not found" })
-    const file = await realpath(join(dir, requested))
-    if (!file.startsWith(dir + sep)) return json(response, 404, { error: "Not found" })
-    if (["binding.json", "sample.json"].some((name) => requested === name || file === join(dir, name))) {
-      return json(response, 404, { error: "Not found" })
-    }
-    const data = await readFile(file)
-    response.writeHead(200, {
-      "content-type": mime[extname(file)] ?? "application/octet-stream",
-      "cache-control": file.endsWith("index.html") ? "no-store" : "no-cache",
-      "x-content-type-options": "nosniff",
-    })
-    response.end(data)
-  } catch (error) {
-    if (error instanceof Error && "code" in error && ["ENOENT", "ENOTDIR", "EISDIR"].includes(String(error.code)))
-      return json(response, 404, { error: "Not found" })
-    throw error
-  }
-}
-
 type Options = {
   projectRoot: string
-  publishRoot: string
+  buildsRoot: string
+  appOrigin: string
+  mode: Mode
   maxSnapshots?: number
   allowCurrent?: boolean
   allowedHosts?: string[]
@@ -146,7 +112,9 @@ type Options = {
 
 export function dashboardServer({
   projectRoot,
-  publishRoot,
+  buildsRoot,
+  appOrigin,
+  mode,
   maxSnapshots = 100,
   allowCurrent = false,
   allowedHosts,
@@ -163,10 +131,11 @@ export function dashboardServer({
       const path = request.url!.split("?")[0]
       if (request.method === "POST" && path === "/dashboard/lookup") {
         const key = appKey(await body(request))
-        return json(response, 200, { key, exists: existsSync(join(publishRoot, key, "binding.json")) })
+        const hash = await currentBuild(buildsRoot, key)
+        return json(response, 200, { key, exists: hash !== null, hash, appOrigin, mode })
       }
       if (request.method === "POST" && path === "/dashboard/targets") {
-        const target = await snapshot(await body(request), projectRoot, publishRoot)
+        const target = await snapshot(await body(request), projectRoot, buildsRoot)
         snapshots.set(target.id, target)
         current = target
         if (snapshots.size > maxSnapshots) snapshots.delete(snapshots.keys().next().value!)
@@ -179,8 +148,6 @@ export function dashboardServer({
             ? allowCurrent && /^(?:127\.|::ffff:127\.|::1$)/.test(request.socket.remoteAddress ?? "") && current
             : id && snapshots.get(id)
         if (target) return json(response, 200, target)
-        const app = path?.match(/^\/dashboard\/apps\/([a-f0-9]{64})\/(.*)$/)
-        if (app) return await serveApp(response, publishRoot, app[1]!, decodeURIComponent(app[2]!))
       }
       json(response, 404, { error: "Not found" })
     } catch (error) {
@@ -192,18 +159,50 @@ export function dashboardServer({
   })
 }
 
+async function currentBuild(root: string, key: string) {
+  try {
+    const hash = (await readFile(join(root, key, "current"), "utf8")).trim()
+    return /^[a-f0-9]{64}$/.test(hash) ? hash : null
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
+    throw error
+  }
+}
+
 // Loopback by default. The stand sets DASHBOARD_HOST=0.0.0.0 because Apache runs in another container.
 export function startDashboard(env: NodeJS.ProcessEnv = process.env) {
-  const server = dashboardServer({
+  const requested = env.DASHBOARD_MODE ?? "normal"
+  if (requested !== "normal" && requested !== "strict") throw Error("DASHBOARD_MODE must be normal or strict")
+  const mode = requested === "strict" ? "strict" : "normal"
+  const appOrigin = requireOrigin(env.DASHBOARD_APP_ORIGIN ?? "http://dashboards.localhost:32769")
+  const clientOrigins = (env.DASHBOARD_CLIENT_ORIGINS ?? "http://127.0.0.1:32768,http://localhost:32768")
+    .split(",")
+    .map((origin) => requireOrigin(origin.trim()))
+  const buildsRoot = env.DASHBOARD_BUILDS ?? join(homedir(), "loginom-dashboard", "builds")
+  const host = env.DASHBOARD_HOST ?? "127.0.0.1"
+  const api = dashboardServer({
     projectRoot:
       env.DASHBOARD_PROJECT_ROOT ??
       resolve(import.meta.dirname, basename(import.meta.dirname) === "dist" ? "../../.." : "../../../.."),
-    publishRoot: env.DASHBOARD_PUBLISH_ROOT ?? "/workdir/dashboard-app/apps",
+    buildsRoot,
+    appOrigin,
+    mode,
     allowCurrent: env.DASHBOARD_ALLOW_CURRENT === "1",
-    allowedHosts: env.DASHBOARD_PUBLIC_HOSTS?.split(",").map((host) => host.trim()),
+    allowedHosts:
+      env.DASHBOARD_CLIENT_ORIGINS === undefined ? undefined : clientOrigins.map((origin) => new URL(origin).host),
   })
-  server.listen(Number(env.DASHBOARD_PORT ?? 8100), env.DASHBOARD_HOST ?? "127.0.0.1")
-  return server
+  const apps = appHost({ buildsRoot, appOrigin, clientOrigins, mode })
+  api.listen(Number(env.DASHBOARD_PORT ?? 8100), host)
+  apps.listen(Number(env.DASHBOARD_APP_PORT ?? 8101), host)
+  return { api, apps }
+}
+
+function requireOrigin(value: string) {
+  const url = URL.parse(value)
+  // URL.origin lowercases the host, so a configured origin may differ only by case.
+  if (!url || url.origin.toLowerCase() !== value.toLowerCase() || (url.protocol !== "http:" && url.protocol !== "https:"))
+    throw Error("Dashboard origin must be an http(s) origin")
+  return url.origin
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) startDashboard()
