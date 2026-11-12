@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { stemmer as stemRussian } from '@orama/stemmers/russian';
 import { stemmer as stemEnglish } from '@orama/stemmers/english';
 
@@ -77,12 +78,12 @@ export function validateKnowledgeInterrupt(input) {
 }
 
 function answer(help, name, args) {
-  if (name === 'find' || name === 'search') return search(help, args);
-  if (name === 'read') return read(help, args);
-  if (name === 'list') return list(help, args);
-  if (name === 'tree') return tree(help, args);
-  if (name === 'glob') return glob(help, args);
-  return grep(help, args);
+  const reply = name === 'find' || name === 'search' ? search(help, args) : name === 'read' ? read(help, args)
+    : name === 'list' ? list(help, args) : name === 'tree' ? tree(help, args) : name === 'glob' ? glob(help, args) : grep(help, args);
+  // Echoed input can be arbitrarily long; no reply may exceed the agent output limit.
+  for (const item of reply.content)
+    if (Buffer.byteLength(item.text) > REPLY_BYTES) item.text = Buffer.from(item.text).subarray(0, REPLY_BYTES - 100).toString().replace(/\uFFFD$/, '') + '\n[truncated]';
+  return reply;
 }
 
 async function loadHelp(root) {
@@ -165,7 +166,7 @@ function search(help, args) {
   if (typeof args.query !== 'string' || !args.query.trim()) return failure('find: query is required.');
   const scope = args.target_uri ? resolve(help, args.target_uri) : { dir: '' };
   if (scope.error) return failure(scope.error);
-  if (scope.missing) return failure(`Not found: ${uriOf(scope.missing)}.`);
+  if (scope.missing) return failure(`Not found: ${quote(uriOf(scope.missing))}.`);
   const prefix = scope.file ?? (scope.dir ? scope.dir + '/' : '');
   const limit = Number.isSafeInteger(args.limit) ? Math.min(10, Math.max(1, args.limit)) : 5;
   const words = [...new Set(tokens(args.query))];
@@ -194,7 +195,7 @@ function search(help, args) {
     hits.push({ score, item: shown });
     if (hits.length === limit) break;
   }
-  if (!hits.length) return text(`Nothing found in Loginom Help for «${args.query}». Try other words, a function name, or browse with tree.`);
+  if (!hits.length) return text(`Nothing found in Loginom Help for «${quote(args.query)}». Try other words, a function name, or browse with tree.`);
   const blocks = hits.map(({ score, item }, i) => {
     const page = help.pages.get(item.path);
     const body = args.read_content === true ? item.text.slice(0, 6000) : excerpt(item.text, words);
@@ -224,9 +225,9 @@ function read(help, args) {
       blocks.push(`=== ${uriOf(path)} ===\n${help.pages.get(path).text}`);
       continue;
     }
-    if (target.error) blocks.push(`=== ${item} ===\n${target.error}`);
-    else if (target.dir !== undefined) blocks.push(`=== ${item} ===\nThis is a directory without README.md; use list.`);
-    else blocks.push(`=== ${item} ===\nFile not found.${suggest(help, target.missing)}`);
+    if (target.error) blocks.push(`=== ${quote(item)} ===\n${target.error}`);
+    else if (target.dir !== undefined) blocks.push(`=== ${quote(item)} ===\nThis is a directory without README.md; use list.`);
+    else blocks.push(`=== ${quote(item)} ===\nFile not found.${suggest(help, target.missing)}`);
   }
   return { ...text(fit(blocks, '')), ...(found ? {} : { isError: true }) };
 }
@@ -241,7 +242,7 @@ function suggest(help, path) {
 
 function list(help, args) {
   const target = resolve(help, args.uri ?? HELP_URI);
-  if (target.dir === undefined) return failure(target.error ?? `Not a directory: ${args.uri}`);
+  if (target.dir === undefined) return failure(target.error ?? `Not a directory: ${quote(String(args.uri))}`);
   const entries = args.recursive === true
     ? [...help.pages.keys()].filter(path => path.startsWith(target.dir ? target.dir + '/' : '')).sort()
     : [...help.dirs.get(target.dir)].sort().map(name => target.dir ? `${target.dir}/${name}` : name);
@@ -250,7 +251,7 @@ function list(help, args) {
 
 function tree(help, args) {
   const target = resolve(help, args.uri ?? HELP_URI);
-  if (target.dir === undefined) return failure(target.error ?? `Not a directory: ${args.uri}`);
+  if (target.dir === undefined) return failure(target.error ?? `Not a directory: ${quote(String(args.uri))}`);
   const depth = Number.isSafeInteger(args.level_limit) && args.level_limit > 0 ? args.level_limit : 3;
   const limit = Number.isSafeInteger(args.node_limit) && args.node_limit > 0 ? args.node_limit : 1000;
   const lines = [uriOf(target.dir)];
@@ -269,14 +270,16 @@ function tree(help, args) {
 function glob(help, args) {
   if (typeof args.pattern !== 'string' || !args.pattern) return failure('glob: pattern is required.');
   const target = resolve(help, args.uri ?? HELP_URI);
-  if (target.dir === undefined) return failure(target.error ?? `Not a directory: ${args.uri}`);
+  if (target.dir === undefined) return failure(target.error ?? `Not a directory: ${quote(String(args.uri))}`);
   const base = target.dir ? target.dir + '/' : '';
-  const source = args.pattern.replace(/\.html\b/g, '.md').split(/(\*\*\/|\*\*|\*|\?)/).map(part =>
+  const source = args.pattern.replace(/\.html\b/g, '.md').replace(/\*{3,}/g, '**').split(/(\*\*\/|\*\*|\*|\?)/).map(part =>
     part === '**/' ? '(?:.*/)?' : part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : escape(part)).join('');
-  const pattern = new RegExp(`^${source}$`);
   const limit = Number.isSafeInteger(args.node_limit) && args.node_limit > 0 ? args.node_limit : 100;
-  const matches = [...help.pages.keys()].filter(path => path.startsWith(base) && pattern.test(path.slice(base.length))).sort();
-  if (!matches.length) return text(`No pages match ${args.pattern} under ${uriOf(target.dir)}.`);
+  const found = bounded('const pattern = new RegExp(source); paths.filter(path => pattern.test(path))',
+    { source: `^${source}$`, paths: [...help.pages.keys()].filter(path => path.startsWith(base)).map(path => path.slice(base.length)) });
+  if (found.error) return failure(`glob: ${found.error}`);
+  const matches = [...found].map(path => base + path).sort();
+  if (!matches.length) return text(`No pages match ${quote(args.pattern)} under ${uriOf(target.dir)}.`);
   return text(fit(matches.slice(0, limit).map(path => `${uriOf(path)} — ${help.pages.get(path).title}`),
     matches.length > limit ? `\n[${matches.length - limit} more]` : '', '\n'));
 }
@@ -284,25 +287,34 @@ function glob(help, args) {
 function grep(help, args) {
   const patterns = Array.isArray(args.pattern) ? args.pattern : [args.pattern];
   if (!patterns.length || patterns.length > 5 || patterns.some(item => typeof item !== 'string' || !item)) return failure('grep: pattern must be a string or up to 5 strings.');
-  const expressions = [];
-  for (const item of patterns) {
-    try { expressions.push(new RegExp(item, args.case_insensitive === true ? 'iu' : 'u')); }
-    catch (error) { return failure(`grep: invalid regular expression ${item}: ${error.message}`); }
-  }
   const target = resolve(help, args.uri ?? HELP_URI);
   if (target.error) return failure(target.error);
-  if (target.missing) return failure(`Not found: ${uriOf(target.missing)}.`);
+  if (target.missing) return failure(`Not found: ${quote(uriOf(target.missing))}.`);
   const paths = target.file ? [target.file] : [...help.pages.keys()].filter(path => path.startsWith(target.dir ? target.dir + '/' : '')).sort();
   const limit = Number.isSafeInteger(args.node_limit) && args.node_limit > 0 ? Math.min(args.node_limit, 200) : 20;
-  const lines = [];
-  let total = 0;
-  for (const path of paths)
-    help.pages.get(path).text.split('\n').forEach((line, i) => {
-      if (!expressions.some(expression => expression.test(line))) return;
-      if (++total <= limit) lines.push(`${uriOf(path)}:${i + 1}: ${line.length > 300 ? line.slice(0, 300) + ' …' : line}`);
-    });
-  if (!total) return text(`No matches for ${patterns.join(' | ')}.`);
-  return text(fit(lines, total > limit ? `\n[${total - limit} more matches; narrow uri or pattern]` : '', '\n'));
+  const found = bounded(`const expressions = patterns.map(item => new RegExp(item, flags));
+    const lines = [];
+    let total = 0;
+    for (const [uri, text] of files)
+      text.split('\\n').forEach((line, i) => {
+        if (!expressions.some(expression => expression.test(line))) return;
+        if (++total <= limit) lines.push(uri + ':' + (i + 1) + ': ' + (line.length > 300 ? line.slice(0, 300) + ' …' : line));
+      });
+    ({ lines, total })`, { patterns, flags: args.case_insensitive === true ? 'iu' : 'u', limit,
+    files: paths.map(path => [uriOf(path), help.pages.get(path).text]) });
+  if (found.error) return failure(`grep: ${found.error}`);
+  if (!found.total) return text(`No matches for ${quote(patterns.join(' | '))}.`);
+  return text(fit([...found.lines], found.total > limit ? `\n[${found.total - limit} more matches; narrow uri or pattern]` : '', '\n'));
+}
+
+// Model-supplied patterns run with a time limit, so one catastrophic expression cannot stall Help for every chat.
+function bounded(code, context) {
+  try { return runInNewContext(code, context, { timeout: 3000 }); }
+  catch (error) {
+    return { error: error?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT'
+      ? 'the pattern takes too long on Loginom Help; simplify it'
+      : `invalid pattern: ${quote(String(error?.message ?? error))}` };
+  }
 }
 
 function resolve(help, value) {
@@ -315,7 +327,8 @@ function resolve(help, value) {
     path = path.slice(HELP_URI.length);
   }
   path = path.replace(/[?#].*$/, '').replace(/^\/+|\/+$/g, '').replace(/(^|\/)index\.html$/, '$1README.md').replace(/\.html$/, '.md');
-  if (path && path !== 'data' && !path.startsWith('data/')) path = `data/${path}`;
+  // The Help root itself opens the data tree, whose README.md is the main page.
+  path = !path || path === 'data' || path.startsWith('data/') ? path || 'data' : `data/${path}`;
   if (path.split('/').includes('..')) return { error: 'Parent directory references are not allowed.' };
   if (help.pages.has(path)) return { file: path };
   if (help.dirs.has(path)) return { dir: path };
@@ -342,4 +355,5 @@ function fit(blocks, footer, separator = '\n\n') {
 const uriOf = path => path ? `${HELP_URI}/${path}` : HELP_URI;
 const text = value => ({ content: [{ type: 'text', text: value }] });
 const failure = value => ({ ...text(value), isError: true });
+const quote = value => value.length > 200 ? `${value.slice(0, 200)}…` : value;
 const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

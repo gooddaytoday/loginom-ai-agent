@@ -33,8 +33,10 @@ def functions(pages):
 def problems(pages, aliases):
     covered = {(item['path'], item['fn']) for item in aliases if item.get('fn')}
     missing = sorted(functions(pages) - covered)
-    # A name without its own heading (JS API members, aggregation items) serves as a page-level synonym.
-    dangling = [item for item in aliases if item['path'] not in pages or not item.get('aliases')]
+    # Outside the Calculator pages a name without its own heading (JS API members, aggregation items)
+    # serves as a page-level synonym; a Calculator function must keep its heading.
+    dangling = [item for item in aliases if item['path'] not in pages or not item.get('aliases')
+                or (item.get('fn') and item['path'].startswith(FUNCTION_PAGES) and (item['path'], item['fn']) not in functions(pages))]
     return missing, dangling
 
 
