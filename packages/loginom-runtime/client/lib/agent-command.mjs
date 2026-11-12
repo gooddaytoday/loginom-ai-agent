@@ -1,6 +1,7 @@
 import { delimiter, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import crossSpawn from 'cross-spawn';
+import escape from 'cross-spawn/lib/util/escape.js';
 import which from 'which';
 
 function environmentValue(env, name) {
@@ -34,8 +35,15 @@ export function createAgentLauncher(command, { env = process.env, cwd = process.
     executable: executable || null,
     run(args, options = {}) {
       if (resolutionError) return { executable: null, error: resolutionError, status: null, signal: null, stdout: null, stderr: null };
-      // cross-spawn handles CMD shims and argument escaping; EXE and POSIX
-      // executables retain direct execution. Do not enable options.shell.
+      // cross-spawn only double-escapes shims under node_modules/.bin. Global
+      // npm shims also forward %*, so their arguments undergo two CMD parses.
+      if (process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(executable)) {
+        const command = [escape.command(executable), ...args.map(arg => escape.argument(arg, true))].join(' ');
+        const result = spawnSync(process.env.ComSpec || process.env.comspec || 'cmd.exe',
+          ['/d', '/v:off', '/s', '/c', `"${command}"`],
+          { ...options, env, cwd, shell: false, windowsVerbatimArguments: true });
+        return { ...result, executable };
+      }
       const spawn = process.platform === 'win32' && /\.(?:exe|com)$/i.test(executable) ? spawnSync : crossSpawn.sync;
       const result = spawn(executable, args, { ...options, env, cwd, shell: false });
       return { ...result, executable };
