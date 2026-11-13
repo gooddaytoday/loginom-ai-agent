@@ -27,7 +27,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
-D76_SCENARIOS = ('types300', 'date-time-formats')
+D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -1425,7 +1425,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
 
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned: both for types300; midnight_date
-        # also for date-time-formats (LAB-1101: port read keeps the exact value).
+        # also for date-time-formats (LAB-1101) and date-time-parts/week
+        # (owner decision d76-date-time-parts; port/cold retain exact values).
         # LAB-1153: CrossTable permits only omission of exactly zero time.
         if scenario_name not in D76_SCENARIOS + ('crosstable-datetime',): return None
         if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
