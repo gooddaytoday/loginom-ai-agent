@@ -300,6 +300,15 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
 })
 
 const definitions = Effect.fnUntraced(function* (profile: TaskScope.Profile) {
+  if (profile === "loginom-dashboard") {
+    const { DashboardDraftTool, DashboardPublishTool } = yield* Effect.promise(() => import("@/tool/dashboard"))
+    const draft = yield* DashboardDraftTool
+    const publish = yield* DashboardPublishTool
+    return [
+      { ...(yield* Tool.init(draft)), origin: "builtin" as const },
+      { ...(yield* Tool.init(publish)), origin: "builtin" as const },
+    ]
+  }
   if (profile !== "package-docs") return []
   const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))
   const docs = yield* PackageDocsTool

@@ -5,7 +5,6 @@ import http from "node:http"
 import net from "node:net"
 import tls from "node:tls"
 import { readFileSync } from "node:fs"
-// @ts-expect-error Node's TypeScript loader requires an explicit extension.
 import { startProxyRelay, shouldUseProxyRelay } from "./proxy-relay.ts"
 
 const cleanup: Array<() => void | Promise<void>> = []

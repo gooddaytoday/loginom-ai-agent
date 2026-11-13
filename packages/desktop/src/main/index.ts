@@ -1,5 +1,5 @@
 import { credentials } from "./loginom/credentials"
-import { desktopLoginom, verifyDesktopResources } from "./loginom/desktop-service"
+import { desktopLoginom, loginomResources, verifyDesktopResources } from "./loginom/desktop-service"
 import { registerLoginomIpc } from "./loginom/ipc"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync } from "node:fs"
@@ -10,6 +10,7 @@ import { isAbsolute, join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
 import { app, BrowserWindow, dialog, safeStorage, session } from "electron"
+import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { Product, productName } from "@loginom-ai-agent/product"
 
 import { Cause, Deferred, Effect, Fiber } from "effect"
@@ -18,7 +19,9 @@ import contextMenu from "electron-context-menu"
 import type { ServerReadyData } from "../preload/types"
 import { checkAppExists, resolveAppPath } from "./apps"
 import { CHANNEL } from "./constants"
-import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
+import { getDashboardTarget, checkDashboardTarget } from "./dashboard-target"
+import { createDeepLinkQueue, protocolUrls } from "./deep-links"
+import { registerIpcHandlers, notifyDeepLinks, sendMenuCommand } from "./ipc"
 import { forwardInitializationFailure } from "./initialization"
 import {
   configureDiagnosticsExport,
@@ -90,7 +93,14 @@ const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
 let logger: ReturnType<typeof initLogging>
 let server: SidecarListener | null = null
 
-const pendingDeepLinks: string[] = []
+const deepLinks = createDeepLinkQueue(process.platform === "linux" ? process.argv : [])
+
+function restoreWithDeepLinks() {
+  const windows = restoreMainWindows()
+  const win = windows.at(-1)
+  if (win) deepLinks.restore(win.webContents)
+  return windows
+}
 
 function useEnvProxy() {
   try {
@@ -103,9 +113,9 @@ function useEnvProxy() {
 
 function emitDeepLinks(urls: string[]) {
   if (urls.length === 0) return
-  pendingDeepLinks.push(...urls)
-  const win = getLastFocusedWindow()
-  if (win) sendDeepLinks(win, urls)
+  const win = getLastFocusedWindow() ?? BrowserWindow.getAllWindows().at(-1)
+  deepLinks.add(win?.webContents, urls)
+  if (win) notifyDeepLinks(win)
 }
 
 async function killSidecar() {
@@ -206,7 +216,9 @@ const main = Effect.gen(function* () {
   let stopping: Promise<void> | undefined
   let systemProxy: SystemProxyDetection | undefined
   let proxyRelay: Awaited<ReturnType<typeof startProxyRelay>> | undefined
+  const dashboardLifecycle = new AbortController()
   const stopSidecars = () => {
+    dashboardLifecycle.abort()
     systemProxy?.stop()
     stopping ??= (async () => {
       try {
@@ -274,7 +286,7 @@ const main = Effect.gen(function* () {
     }
   })
   app.on("second-instance", (_event: Event, argv: string[]) => {
-    const urls = argv.filter((arg: string) => arg.startsWith("loginom-ai-agent://"))
+    const urls = protocolUrls(argv)
     if (urls.length) {
       logger.log("deep link received via second-instance", { urls })
       emitDeepLinks(urls)
@@ -416,7 +428,18 @@ const main = Effect.gen(function* () {
       },
       (e) => Effect.runPromise(e),
     ),
-    consumeInitialDeepLinks: () => pendingDeepLinks.splice(0),
+    getDashboardTarget: (id) =>
+      getDashboardTarget(id, {
+        status: () => loginom.api.status(),
+        settled: () => loginom.settled(),
+        catalog: generation => loginom.catalog(generation),
+        readPublication: (input, signal) => loginom.readDashboard(input, signal),
+        signal: dashboardLifecycle.signal,
+        dashboards: () => dashboardDataRoot(process.env),
+        template: join(loginomResources(), "dashboard", "template"),
+      }),
+    checkDashboardTarget: (id) => checkDashboardTarget(id, dashboardDataRoot(process.env)),
+    consumeDeepLinks: deepLinks.take,
     getDefaultServerUrl: () => getDefaultServerUrl(),
     setDefaultServerUrl: (url) => setDefaultServerUrl(url),
     isFirstLaunchOnboardingPending,
@@ -597,10 +620,10 @@ const main = Effect.gen(function* () {
   })
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length > 0) return
-    restoreMainWindows()
+    restoreWithDeepLinks()
   })
 
-  const windows = restoreMainWindows()
+  const windows = restoreWithDeepLinks()
   if (windows.length) createMenu(menuDeps)
 })
 

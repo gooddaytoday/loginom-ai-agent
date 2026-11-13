@@ -9,6 +9,8 @@ import { SessionID, MessageID, PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { SessionRevert } from "./revert"
 import { TaskScope } from "./task-scope"
+import { DashboardSession } from "@/product/dashboard-session"
+import { toolPolicy } from "@/product/tool-policy"
 import { Session } from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
@@ -462,7 +464,7 @@ const layer = Layer.effect(
           const markReady = ready ? ready.open.pipe(Effect.asVoid) : Effect.void
           const { msg, part, cwd } = yield* Effect.gen(function* () {
             const ctx = yield* InstanceState.context
-            const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+            const session = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
             if (session.revert) {
               yield* revert.cleanup(session)
             }
@@ -680,7 +682,7 @@ const layer = Layer.effect(
         format: input.format,
       }
 
-      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const current = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
       if (
         current.agent !== info.agent ||
         current.model?.providerID !== info.model.providerID ||
@@ -712,6 +714,8 @@ const layer = Layer.effect(
       )(function* (part) {
         if (part.type === "file") {
           if (part.source?.type === "resource") {
+            if (!toolPolicy.allowsMcp(DashboardSession.profile(current)))
+              return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
             const { clientName, uri } = part.source
             yield* Effect.logInfo("mcp resource", { clientName, uri, mime: part.mime })
             const pieces: Draft<SessionV1.Part>[] = [
@@ -1102,7 +1106,7 @@ const layer = Layer.effect(
       input: PromptInput,
       grant?: TaskScope.Activation,
     ) {
-      const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const session = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
       yield* revert.cleanup(session)
       const message = yield* createUserMessage(input, grant)
       yield* sessions.touch(input.sessionID)
@@ -1137,7 +1141,8 @@ const layer = Layer.effect(
         let structured: unknown
         let step = 0
         while (true) {
-          const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
+          const session = yield* sessions.getForExecution(sessionID).pipe(Effect.orDie)
+          const base = DashboardSession.profile(session)
           yield* status.set(sessionID, { type: "busy" })
           yield* Effect.logInfo("loop", { "session.id": sessionID, step })
 
@@ -1148,6 +1153,8 @@ const layer = Layer.effect(
           const { user: lastUser, assistant: lastAssistant, finished: lastFinished, tasks } = MessageV2.latest(msgs)
 
           if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
+          if (base === "loginom-dashboard" && lastUser.format?.type === "json_schema")
+            return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
 
           const lastAssistantMsg = msgs.findLast(
             (msg) => msg.info.role === "assistant" && msg.info.id === lastAssistant?.id,
@@ -1202,7 +1209,7 @@ const layer = Layer.effect(
               sessionID,
               session,
               msgs,
-              profile: TaskScope.derive({ sessionID, messages: history, revert: session.revert })?.profile ?? "default",
+              profile: TaskScope.derive({ sessionID, messages: history, revert: session.revert, base })?.profile ?? base,
             })
             continue
           }
@@ -1327,7 +1334,7 @@ const layer = Layer.effect(
               sys.skills(agent),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
-              sys.mcp(agent, session.permission),
+              toolPolicy.allowsMcp(base) ? sys.mcp(agent, session.permission) : Effect.succeed(""),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
             const system = [
@@ -1437,6 +1444,10 @@ const layer = Layer.effect(
     })
 
     const command = Effect.fn("SessionPrompt.command")(function* (input: CommandInput) {
+      const session = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
+      const directory = yield* InstanceState.directory
+      if (DashboardSession.profile(session) === "loginom-dashboard" && !DashboardSession.isDashboardWork(directory))
+        return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
       yield* Effect.logInfo("command", {
         "session.id": input.sessionID,
         command: input.command,

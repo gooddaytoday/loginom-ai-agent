@@ -1,4 +1,9 @@
 import { expect } from "bun:test"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { join, resolve } from "node:path"
+import { prepareDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
+import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
+import { DashboardSession } from "@/product/dashboard-session"
 import { asSchema } from "ai"
 import { pathToFileURL } from "node:url"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
@@ -26,7 +31,7 @@ import { Plugin } from "@/plugin"
 import { MCP } from "@/mcp"
 import { Truncate } from "@/tool/truncate"
 import { isRecord } from "@/util/record"
-import { TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
+import { provideInstance, TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { TestConfig } from "../fixture/config"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
@@ -569,6 +574,8 @@ codeMode.instance("code mode keeps the verified Host Help catalog available in d
   Effect.gen(function* () {
     const { tools } = yield* resolveProfile("package-docs", {
       generation: 9,
+      async dashboardRead() { throw Error("Unexpected dashboard read") },
+      async dashboardPublish() { throw Error("Unexpected dashboard publish") },
       async scope(_mode, scope) {
         return scope
       },
@@ -666,6 +673,8 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
       const scopes: unknown[] = []
       const loginom: Awaited<ReturnType<typeof LoginomHost.acquire>> = {
         generation: 9,
+        async dashboardRead() { throw Error("Unexpected dashboard read") },
+        async dashboardPublish() { throw Error("Unexpected dashboard publish") },
         async scope(mode, scope) {
           scopes.push({ mode, scope })
           return scope
@@ -699,6 +708,8 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
         async release() {},
       }
       const { tools, user, history } = yield* resolveProfile(profile, loginom)
+      expect(tools.dashboard_draft).toBeUndefined()
+      expect(tools.dashboard_publish).toBeUndefined()
       expect(scopes).toEqual([{ mode: "bind", scope: { taskMessageID: user, profile } }])
       expect(tools.loginom_find).toBeDefined()
       expect(tools.loginom_dock_diagnostics).toBeDefined()
@@ -721,6 +732,8 @@ for (const image of [false, true])
     Effect.gen(function* () {
       const loginom: Awaited<ReturnType<typeof LoginomHost.acquire>> = {
         generation: 9,
+        async dashboardRead() { throw Error("Unexpected dashboard read") },
+        async dashboardPublish() { throw Error("Unexpected dashboard publish") },
         async scope(mode, scope) {
           return scope
         },
@@ -765,6 +778,8 @@ function preparedLoginom(
 ): NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>> {
   return {
     generation: 9,
+    async dashboardRead() { throw Error("Unexpected dashboard read") },
+    async dashboardPublish() { throw Error("Unexpected dashboard publish") },
     async scope(_mode, scope) {
       return scope
     },
@@ -794,6 +809,7 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
   image?: boolean,
   permission: PermissionV1.Ruleset = [{ permission: "*", pattern: "*", action: "allow" }],
   attachment?: Pick<SessionV1.FilePart, "url" | "mime" | "filename" | "source">,
+  options: { api?: string; emptyHistory?: boolean } = {},
 ) {
   const sessions = yield* Session.Service
   const agents = yield* Agent.Service
@@ -861,11 +877,11 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
     loginom,
     agent,
     session,
-    history,
-    messages: history,
+    history: options.emptyHistory ? [] : history,
+    messages: options.emptyHistory ? [] : history,
     model: {
       providerID: ProviderV2.ID.make("test"),
-      api: { id: "test-model" },
+      api: { id: options.api ?? "test-model" },
       ...(image === undefined ? {} : { capabilities: { input: { image } } }),
     } as Provider.Model,
     processor: {
@@ -923,5 +939,74 @@ it.instance("Dock calls exclude local reference attachments from repeated byte a
       )
     expect(calls).toHaveLength(2)
     expect(calls.every((call) => Array.isArray(call[4]) && call[4].length === 0)).toBe(true)
+  }),
+)
+
+
+codeMode.instance("a dashboard directory selects its real builtin whitelist before any activation", () =>
+  Effect.gen(function* () {
+    yield* Effect.promise(() => mkdir(DashboardSession.dashboardRoot(), { recursive: true }))
+    const folder = yield* Effect.acquireRelease(
+      Effect.promise(() => mkdtemp(join(DashboardSession.dashboardRoot(), "resolver-"))),
+      (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+    )
+    const work = join(folder, "work")
+    yield* Effect.promise(() => mkdir(work))
+    for (const options of [{ api: "test-model" }, { api: "gpt-5" }, { emptyHistory: true }]) {
+      const result = yield* resolveProfile("default", undefined, undefined, undefined, undefined, options).pipe(
+        provideInstance(work),
+      )
+      expect(result.session.directory).toBe(work)
+      const ids = Object.keys(result.tools)
+      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish"].includes(id))).toBe(
+        true,
+      )
+      for (const id of ["read", "glob", "grep", "skill", "dashboard_draft"]) expect(ids).toContain(id)
+      expect(result.tools.apply_patch || (result.tools.edit && result.tools.write)).toBeDefined()
+      const file = join(work, "src", crypto.randomUUID() + ".ts")
+      const writer = result.tools.apply_patch ?? result.tools.write
+      if (!writer.execute) throw Error("Dashboard writer unavailable")
+      yield* Effect.promise(() => writer.execute!(
+        result.tools.apply_patch
+          ? { patchText: "*** Begin Patch\n*** Add File: " + file + "\n+export {}\n*** End Patch" }
+          : { filePath: file, content: "export {}\n" },
+        { toolCallId: "dashboard-writer", abortSignal: new AbortController().signal, messages: [] },
+      ))
+      expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("export {}\n")
+      if (options.emptyHistory) {
+        yield* Effect.promise(() => rm(work, { recursive: true }))
+        const execute = result.tools.read.execute!
+        const exit = yield* Effect.promise(() =>
+          execute(
+            { filePath: "missing.txt" },
+            { toolCallId: "after-loss", abortSignal: new AbortController().signal, messages: [] },
+          ),
+        ).pipe(Effect.exit)
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      }
+    }
+  }),
+)
+
+
+codeMode.instance("a folder prepared by Desktop resolves dashboard tools without bash", () =>
+  Effect.gen(function* () {
+    expect(dashboardDataRoot(process.env)).toBe(DashboardSession.dashboardRoot())
+    const id = crypto.randomUUID()
+    const prepared = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
+      id, origin: "http://localhost:32768", dashboards: dashboardDataRoot(process.env),
+      template: resolve(import.meta.dir, "../../../dashboard/template"),
+      fetch: Object.assign(async () => Response.json({
+        id, created: new Date().toISOString(), published: false, nodeName: "Dashboard skeleton",
+        binding: { packagePath: "/user/skeleton-" + id + ".lgp", workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7", nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930" },
+        parameters: [], sample: { schema: [{ name: "count", type: 1 }], rows: [[1], [2]] },
+      }), { preconnect: () => undefined }),
+    }))
+    yield* Effect.addFinalizer(() => Effect.promise(() => rm(join(prepared.directory, ".."), { recursive: true, force: true })))
+    const result = yield* resolveProfile("default").pipe(provideInstance(prepared.directory))
+    expect(result.tools.dashboard_draft).toBeDefined()
+    expect(result.tools.bash).toBeUndefined()
+    expect(result.tools.dashboard_publish?.execute).toBeDefined()
   }),
 )

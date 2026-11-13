@@ -4,6 +4,7 @@ import { Context, Effect, Layer } from "effect"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { SyncPaths } from "../../src/server/routes/instance/httpapi/groups/sync"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
+import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
 import { Session } from "@/session/session"
 import { resetDatabase } from "../fixture/db"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
@@ -70,6 +71,48 @@ describe("sync HttpApi", () => {
         expect(yield* replayed.json).toEqual({ sessionID: session.id })
       }),
     { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance("replay cannot clear an existing dashboard restriction", () =>
+    Effect.gen(function* () {
+      const tmp = yield* TestInstance
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({ title: "sync dashboard" })
+      const history = yield* requestInDirectory(SyncPaths.history, tmp.directory, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      })
+      const rows = (yield* history.json) as Array<{ id: string; aggregate_id: string; seq: number; type: string }>
+      const latest = rows.filter((row) => row.aggregate_id === session.id).at(-1)!
+      for (const [index, metadata] of [
+        { [DASHBOARD_SESSION_MARKER]: true },
+        undefined,
+        {},
+        { [DASHBOARD_SESSION_MARKER]: false, annotation: "latest" },
+      ].entries()) {
+        const replayed = yield* requestInDirectory(SyncPaths.replay, tmp.directory, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            directory: tmp.directory,
+            events: [
+              {
+                id: `${latest.id}-${index}`,
+                aggregateID: session.id,
+                seq: latest.seq + index + 1,
+                type: "session.updated.1",
+                data: { sessionID: session.id, info: { ...session, metadata } },
+              },
+            ],
+          }),
+        })
+        expect(replayed.status).toBe(200)
+        const restored = yield* sessions.get(session.id)
+        expect(restored.metadata?.[DASHBOARD_SESSION_MARKER]).toBe(true)
+        if (index === 3) expect(restored.metadata?.annotation).toBe("latest")
+      }
+    }),
   )
 
   it.instance(

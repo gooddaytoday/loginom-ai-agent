@@ -24,6 +24,23 @@ export const LOGINOM_ENGLISH = {
 
   "prompt.attachment.missingPath":
     "This attachment has no disk path. Save it and attach it using the file picker, or provide its path.",
+  "dashboard.notice.newer-publication": "A newer version {{latest}} is published. Local sources are preserved; replacing it will require confirmation.",
+  "dashboard.notice.publication-check-unavailable": "The publication could not be checked in Studio. The saved local draft is open.",
+  "dashboard.notice.latest-build-failed": "Version {{latest}} failed to build. Current version: {{current}}. {{error}}",
+  "dashboard.version.none": "none",
+  "dashboard.conflict": "A newer version {{latest}} is published. Replace it with the local draft? This approval applies only to the prepared publication.",
+  "dashboard.target.accessDenied": "You do not have permission to read the publication in Loginom.",
+  "dashboard.target.publicationInvalid": "The published sources have an unsupported or invalid format. A template cannot replace them.",
+  "dashboard.target.connectionFailed": "The Loginom connection is unavailable or has changed. Check the connection and open the dashboard from Studio again.",
+  "dashboard.target.bindingConflict": "This local draft belongs to another stand or node. Its sources were preserved.",
+  "dashboard.target.failed": "The dashboard could not be opened. Check the Loginom connection and try a new snapshot from Studio.",
+  "dashboard.target.snapshotGone":
+    "The snapshot was already used, has expired or belongs to another stand. Press the button in Studio again.",
+  "dashboard.target.notConfigured": "Connect a Loginom stand in settings first.",
+  "dashboard.target.localOnly": "Open a local Desktop chat to work on this dashboard.",
+  "prompt.context.dashboardDraft": "Dashboard draft for node “{{name}}”",
+  "prompt.context.dashboardRevise": "Dashboard edit “{{name}}”",
+  "settings.permissions.tool.dashboard_publish.description": "Publish the dashboard to the stand. Check the node and package below",
   "loginom.saveClose": "Save and close",
   "loginom.saving": "Saving settings…",
   "loginom.applying": "Applying settings…",

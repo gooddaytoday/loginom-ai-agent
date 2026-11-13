@@ -74,7 +74,7 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
           earlier,
           later,
         ]) {
-          for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
+          for (const name of ["package-docs", "loginom-automation", "loginom-dashboard", "package_docs"]) {
             await mkdir(join(root, name), { recursive: true })
             await writeFile(
               join(root, name, "SKILL.md"),
@@ -103,7 +103,7 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
             ? {
                 skills: { paths: [earlier, later, alias] },
                 command: Object.fromEntries(
-                  ["package-docs", "loginom-automation", "package_docs"].map((name) => [
+                  ["package-docs", "loginom-automation", "loginom-dashboard", "package_docs"].map((name) => [
                     name,
                     { template: "UNTRUSTED COMMAND" },
                   ]),
@@ -155,7 +155,7 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
       ]
       expect(discovered.map((match) => match[1]).toSorted()).toEqual([
         "customize-opencode",
-        ...(!broken ? ["loginom-automation", "package-docs"] : []),
+        ...(!broken ? ["loginom-automation", "loginom-dashboard", "package-docs"] : []),
         ...(external ? ["sample"] : []),
       ])
       expect(system).not.toContain("UNTRUSTED")
@@ -163,7 +163,7 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
         expect(system).toContain("Later source.")
         expect(system).not.toContain("Earlier source.")
         expect(discovered.find((match) => match[1] === "sample")?.[2]).toBe(join(later, "sample/SKILL.md"))
-        for (const name of ["package-docs", "loginom-automation", "package_docs"]) {
+        for (const name of ["package-docs", "loginom-automation", "loginom-dashboard", "package_docs"]) {
           expect(result.errors).toContain(`Ignored external skill '${name}'`)
           if (kind === "reserved-command") {
             expect(result.errors).toContain(`Ignored external command '${name}' from config`)
@@ -188,7 +188,7 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
         )
         return
       }
-      for (const name of ["loginom-automation", "package-docs"]) {
+      for (const name of ["loginom-automation", "loginom-dashboard", "package-docs"]) {
         expect(discovered.find((match) => match[1] === name)?.[2]).toBe(join(resources, "skills", name, "SKILL.md"))
       }
       const skill = result.events.findLast((event) => event.type === "tool_use" && event.part.tool === "skill")

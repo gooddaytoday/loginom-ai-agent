@@ -1,5 +1,6 @@
 import { toolContributor } from "@/product/tool-contributor"
 import { toolPolicy } from "@/product/tool-policy"
+import { DashboardSession } from "@/product/dashboard-session"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { Agent } from "@/agent/agent"
@@ -62,6 +63,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     source: { scope: TaskScope.Info; messageID: MessageID; callID: string },
   ) => Effect.Effect<void>
 }) {
+  const sessions = yield* Session.Service
+  const session = yield* sessions.getForExecution(input.session.id).pipe(Effect.orDie)
   const tools: Record<string, AITool> = {}
   const run = yield* EffectBridge.make()
   const plugin = yield* Plugin.Service
@@ -75,8 +78,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     messages: input.history,
     revert: input.session.revert,
   })
-  const task = TaskScope.derive({ sessionID: input.session.id, messages: history })
-  const profile = task?.profile ?? "default"
+  const base = DashboardSession.profile(session)
+  const task = TaskScope.derive({ sessionID: input.session.id, messages: history, base })
+  const profile = task?.profile ?? base
   if (input.loginom && task) {
     const loginom = input.loginom
     yield* Effect.promise((signal) =>
@@ -114,7 +118,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ...req,
           sessionID: input.session.id,
           tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-          ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+          ruleset: Permission.merge(input.agent.permission, input.session.permission ?? [], DashboardSession.dashboardRules(profile)),
         })
         .pipe(
           Effect.tapError((error) => {
@@ -152,6 +156,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, options) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             if (!toolPolicy.permits(profile, id, origin)) return yield* Effect.die(toolPolicy.denied())
             const ctx = context(args, options)
             const activate = input.activate
@@ -211,6 +216,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, opts) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             const parsed = parseListMcpResourcesArgs(args)
             const ctx = context(toRecord(args), opts)
             const clients = yield* mcp.clients()
@@ -294,6 +300,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, opts) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             const parsed = parseListMcpResourcesArgs(args)
             const ctx = context(toRecord(args), opts)
             const clients = yield* mcp.clients()
@@ -381,6 +388,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, opts) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             const parsed = parseReadMcpResourceArgs(args)
             const ctx = context(toRecord(args), opts)
             const clients = yield* mcp.clients()
@@ -455,6 +463,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     item.execute = (args, opts) =>
       run.promise(
         Effect.gen(function* () {
+          yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
           const ctx = context(args, opts)
           yield* plugin.trigger(
             "tool.execute.before",
