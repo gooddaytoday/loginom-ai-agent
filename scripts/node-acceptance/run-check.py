@@ -669,9 +669,10 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['weighted.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
-    if name == 'logreg-ridge':
-        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/ridge'
-        return dict(source=src, prompt=src / 'task-ridge.md', data=src / 'data', base=None,
+    if name in ['logreg-ridge', 'logreg-lasso']:
+        variant = name.removeprefix('logreg-')
+        src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes' / variant
+        return dict(source=src, prompt=src / ('task-' + variant + '.md'), data=src / 'data', base=None,
                     input_files=['train.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 

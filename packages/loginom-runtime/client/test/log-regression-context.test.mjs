@@ -143,7 +143,7 @@ test('selection criterion picker is actionable through the serialized workspace 
 
 test('Ridge setup picker and lambda input are actionable through serialized workspace observation',async()=>{
  const {Page}=await import('./support/workspace-ui-fixture.mjs');
- for(const [name,part,verb] of [['pedRidgeSetupMethod','trg_picker','click'],['pedLambdaRidge','input','fill']]){
+ for(const [name,part,verb] of [['pedRidgeSetupMethod','trg_picker','click'],['pedLambdaRidge','input','fill'],['pedLassoSetupMethod','trg_picker','click'],['pedLambdaLasso','input','fill']]){
   const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
   page.add('div',base+';LogRegressionWizard-1;pedEpsilon','',undefined,form);
   const owner=page.add('div',base+';LogRegressionWizard-1;'+name+';ValueControl','',undefined,form);
@@ -174,4 +174,20 @@ test('logistic role reader retains a Real frequency weight outside predictor nor
  const f=fixture();f.records[3].data.DataType=3;f.records[3].data.UsageType=7;
  const r=f.read();assert.equal(r.verified,true);assert.equal(r.fields[3].usage_type,7);assert.equal(r.fields[3].type,'real');
  f.records[3].data.DataType=4;assert.equal(f.read().verified,false);
+});
+
+
+test('LASSO native details observe its method identity and initialized editable L1',()=>{
+ const base='MF;TF;WizrdMCF;',elements=[],components={};
+ const add=(tid,value,disabled=false)=>{const e={id:'lasso'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);components[e.id]={el:{dom:e},getValue:()=>value,isDisabled:()=>disabled};return components[e.id];};
+ add(base+'LogRegressionWizard-1');
+ const method=add(base+'LogRegressionWizard;pedRegressionMethod;ValueControl',5);
+ Object.assign(method,{valueField:'id',displayField:'label',getStore:()=>({getData:()=>({items:[{data:{id:5,label:'LASSO (L1-регуляризация)'}}]})})});
+ for(const [name,value] of Object.entries({pedEpsilon:1e-10,pedIntercept:true,pedThreshold:0.8,pedRegSelQuality:0,pedAddSignificance:0.05,pedRemoveSignificance:0.1,pedLassoSetupMethod:0}))add(base+'LogRegressionWizard-1;'+name+';ValueControl',value,name.startsWith('pedRegSel')||name.endsWith('Significance'));
+ const lambda=add(base+'LogRegressionWizard-1;pedLambdaLasso;ValueControl',1);
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')(' + JSON.stringify('MF;TF') + ')',context)));
+ assert.equal(read().verified,true);assert.equal(read().values.pedLambdaLasso,1);assert.equal(read().disabled.pedLambdaLasso,false);
+ for(const value of [null,NaN,Infinity,-1,0]){lambda.getValue=()=>value;assert.equal(read().verified,false);}
+ lambda.getValue=()=>1;delete lambda.isDisabled;assert.equal(read().verified,false);
 });
