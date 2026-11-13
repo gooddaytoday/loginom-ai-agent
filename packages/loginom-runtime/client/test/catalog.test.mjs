@@ -94,3 +94,17 @@ test('startup diagnostic retains the original transport cause and removes creden
   const text = JSON.stringify(diagnostic);
   for (const secret of ['private-query','private-key','unknown-token','u:p','?unknown=']) assert.ok(!text.includes(secret), text);
 });
+
+test('startup diagnostic preserves sanitized login phase and original cause through IPC normalization', () => {
+  const error=Error('LOGINOM_LOGIN_UNAVAILABLE',{cause:{login:{phase:'goto',duration_ms:60123,elapsed_ms:60124,
+    original_name:'TimeoutError',original_code:'ETIMEDOUT',
+    original_message:'Navigation timeout https://u:password@example.test/app/?secret=hidden',url:'https://example.test/app/?secret=hidden'}}});
+  const diagnostic=startupDiagnostic(startupDiagnostic(error,['password']));
+  assert.equal(diagnostic.cause.name,'TimeoutError');
+  assert.equal(diagnostic.cause.code,'ETIMEDOUT');
+  assert.equal(diagnostic.cause.phase,'goto');
+  assert.equal(diagnostic.cause.duration_ms,60123);
+  assert.match(diagnostic.cause.message,/Navigation timeout/);
+  assert.ok(!JSON.stringify(diagnostic).includes('hidden'));
+  assert.ok(!JSON.stringify(diagnostic).includes('password'));
+});

@@ -4,23 +4,35 @@ import {EXCEL_EXPORT_FIELDS,validateExcelExportDestination,validateExcelSheetNam
 import {withBrowserReceipt} from './executor.mjs';
 import {createHash} from 'node:crypto';
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+// A binding needs exactly one connected non-NULL string variable of that name
+// whose observed value is itself an admissible destination or sheet name.
+export function requireExcelBindingSources(bindings,variableMapping,storageDirectories){
+ for(const key of ['destination','sheet_name']){
+  const wanted=bindings?.[key]?.variable;if(wanted===undefined)continue;
+  const fields=variableMapping?.fields?.filter(f=>f.name===wanted&&f.source&&f.type===5&&!f.is_null)??[];
+  need(fields.length===1&&variableMapping.fields.filter(f=>f.name===wanted).length===1,'Excel binding requires one connected non-NULL string variable: '+key);
+  if(key==='destination')validateExcelExportDestination(fields[0].value,storageDirectories);
+  else validateExcelSheetName(fields[0].value);
+ }
+}
 export async function configureExcelExport(channel,p,ctx,options){
  const binding={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node};
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Excel export configuration deadline elapsed');};
  const native=async()=>{guard();const r=await options.execute(makeExcelExportContextCode(binding,options.variableMapping));guard();need(r.verified&&r.stage==='excel_export','Excel export context unavailable: '+r.reason);await options.onRecord({phase:'excel_export_native_read',operation_id:options.operation.id,configuration:r});return r;};
  const readUi=()=>channel.observe({condition:'bound Excel export',ready:s=>s.wizard?.stage==='excel_export'});
  const one=xs=>{need(xs.length===1,'Unique Excel export control required');return xs[0];};
+ const refuse=async error=>{
+  guard();const closed=await options.close(channel);guard();
+  need(closed.cleanup_complete===true&&closed.draft_discarded===true&&closed.settings_applied===false,'Unsupported Excel export draft was not discarded');
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'text_export_unsupported_retained'};throw error;
+ };
  let current=await native();const initial=current;
+ // Every requested binding is checked before the first gesture of this page.
+ if(p.bindings)try{requireExcelBindingSources(p.bindings,options.variableMapping,options.storageDirectories);}catch(error){await refuse(error);}
  const request=options.operation.nodeApply.request,mode=request.mode??'xlsx';
  for(const key of ['destination','sheet_name']){
   const wanted=p.bindings?.[key]?.variable;
   if(wanted===undefined&&p[key]===undefined)continue;
-  if(wanted!==undefined){
-   const fields=options.variableMapping?.fields?.filter(f=>f.name===wanted&&f.source&&f.type===5&&!f.is_null)??[];
-   need(fields.length===1,'Excel binding requires one connected non-NULL string variable: '+key);
-   if(key==='destination')validateExcelExportDestination(fields[0].value,options.storageDirectories);
-   else validateExcelSheetName(fields[0].value);
-  }
   if(wanted!==undefined&&(current.values[key].variable!==true||current.values[key].variable_name!==wanted)||wanted===undefined&&current.values[key].variable){
    const result=await runExcelExportNext({binding,before:current,variableMapping:options.variableMapping,change_binding:{key,variable:wanted??null},origin:options.targetOrigin,operation_id:options.operation.id+':excel-bind-'+key,deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
    need(result.status==='SUCCEEDED'&&result.cleanup_complete,'Excel binding unconfirmed: '+key);current=await native();
@@ -54,11 +66,7 @@ export async function configureExcelExport(channel,p,ctx,options){
  const configured={excel_export:current};
  if(ctx.finish==='close')return {verified:true,cleanup_complete:true,effect_possible:true,configuration:{initial,configured,destination:current.values.destination.value}};
  try{validateNativeExcelExport(current.values,options.storageDirectories,mode);}
- catch(error){
-  guard();const closed=await options.close(channel);guard();
-  need(closed.cleanup_complete===true&&closed.draft_discarded===true&&closed.settings_applied===false,'Unsupported Excel export draft was not discarded');
-  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'text_export_unsupported_retained'};throw error;
- }
+ catch(error){await refuse(error);}
  const destination=validateExcelExportDestination(current.values.destination.value,options.storageDirectories);
  const result=await runExcelExportNext({binding,before:current,variableMapping:options.variableMapping,destination,overwrite:p.overwrite??'reject',origin:options.targetOrigin,operation_id:options.operation.id+':excel-next',deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
  need(result.status==='SUCCEEDED'&&result.cleanup_complete,'Excel export Next uncertain');

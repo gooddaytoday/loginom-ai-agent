@@ -114,6 +114,13 @@ test('Excel bindings require distinct string settings and a connected variables 
  }
  for(const variable_inputs of [[],[{kind:'control',input:0}],[{kind:'variables',input:1}]])assert.throws(()=>validateExcelExportParameters(p,'xlsx',{...r,variable_inputs}));
  assert.doesNotThrow(()=>validateExcelExportParameters({},'xlsx',{...r,target:{kind:'existing'},variable_inputs:[]}));
+ // Close never maps the variables input, so a bound Close is refused before the UI.
+ for(const target of [{kind:'new'},{kind:'existing'}]){
+  const req={...r,target,inputs:target.kind==='new'?[{}]:[],variable_inputs:target.kind==='new'?r.variable_inputs:[]};
+  assert.throws(()=>validateExcelExportParameters(p,'xlsx',{...req,finish:'close'}),/finish=close/,target.kind);
+  for(const finish of ['done','execute'])assert.doesNotThrow(()=>validateExcelExportParameters(p,'xlsx',{...req,finish}),target.kind+' '+finish);
+ }
+ assert.doesNotThrow(()=>validateExcelExportParameters({},'xlsx',{...r,target:{kind:'existing'},inputs:[],variable_inputs:[],finish:'close'}));
 });
 
 test('Excel variable read uses mapped names and labels without dereferencing native references',async()=>{
