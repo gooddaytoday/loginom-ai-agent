@@ -39,9 +39,10 @@ or move unrelated standard operations into it.
 Для неподключённого источника: inputs:[] и parameters.input_state:"unconnected".
 Runtime проверит отсутствие входящих связей и пустой native input mapping;
 пустая подключённая таблица — другой случай. Этот же input_state нужен при
-повторном выполнении/изменении источника. Setup executes twice: materialize,
-inspect mapping, reactivate. Existing-node execute/cold runs once. Make FS effects
-idempotent; preserve partial failures, never retry unknown effects.
+повторном выполнении/изменении источника. Each dock_node_apply with finish:execute
+runs the script twice, including existing nodes: materialize, map, reactivate.
+Only cold/downstream execution runs once. Preserve partial failures;
+never retry unknown effects.
 В обычной табличной ветке input_state опускай.
 
 ## FS
@@ -59,7 +60,8 @@ openSync returns a FileHandle; closeSync in finally. readSync/writeSync support 
 fstatSync/ftruncateSync use the handle. statSync/lstatSync, existsSync, readdirSync,
 mkdirSync({recursive:true}), copyFileSync, renameSync, truncateSync, unlinkSync,
 rmSync/rmdirSync operate only inside assigned paths. w replaces; a appends; wx
-creates exclusively; fs.constants provides numeric flags.
+creates exclusively. a and wx are not idempotent across executions;
+fs.constants provides numeric flags.
 Errors may leave partial files: COPYFILE_FICLONE_FORCE left an empty destination.
 Report the observed effect; never retry or silently fall back. console.error or
 a green status alone does not prove success; return real diagnostics.

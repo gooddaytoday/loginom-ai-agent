@@ -64,8 +64,16 @@ test('unconnected executed readback requires the fresh final execution',()=>{
 
 test('unconnected source reactivates output mapping with a fresh second Execute',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
-  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-once'],{encoding:'utf8',timeout:10000});
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-execute'],{encoding:'utf8',timeout:10000});
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+});
+
+test('reapplying Execute to an existing FS source performs two more append effects',()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-reapply'],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const {ledger}=JSON.parse(result.stdout.trim());
+ assert.deepEqual(ledger,['run','run','run','run']);
 });
 
 for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{

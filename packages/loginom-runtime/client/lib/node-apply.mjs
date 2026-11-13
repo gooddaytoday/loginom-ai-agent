@@ -463,9 +463,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
       if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
       if(request.finish==='execute')requireValue(id(value.execution_id)
-        &&(!materialize||value.execution_id!==state.execution.execution_id
-),
-        'A fresh execution identity is required');
+        &&(!materialize||value.execution_id!==state.execution.execution_id), 'A fresh execution identity is required');
       else if(request.target.type==='programming.javascript'&&request.finish==='done'){
         // Loginom does not expose whether Done ran internal work. The owned
         // gesture, graph settlement and independent source readback establish

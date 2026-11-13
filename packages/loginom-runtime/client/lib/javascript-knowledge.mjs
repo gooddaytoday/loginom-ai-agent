@@ -110,7 +110,7 @@ const current=Object.freeze({...dataOnly,version:'1.4.0',
     scope:'Loginom7.4.2/Linux native operator probes LAB-1549; candidate pending autonomous acceptance.',
     paths:'Only the assigned user-storage subtree. Unsaved relative paths use the personal folder; saved paths use the LGP directory; a moved package needs its sidecar separately.',
     bytes:'readFileSync without encoding returns ArrayBuffer; use Uint8Array, not Node Buffer.',
-    effects:'Source setup executes for materialization and again after mapping deactivates it. Existing-node execute/cold runs once. FS effects must be idempotent; unknown or partial outcomes never authorize retries.',
+    effects:'Each dock_node_apply with finish:execute runs the script twice, including existing nodes: materialize, map, reactivate. Only cold/downstream execution runs once. a and wx are not idempotent; never retry unknown or partial effects.',
   }),
 });
 
