@@ -270,7 +270,7 @@ page = context.pages()[0]
    state.variableInventory={outputs,links};
   }
   // A bound LGD destination needs the saved variable source's fresh value.
-  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>b.node.type==='imports.text')?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
+  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>['imports.text','imports.excel'].includes(b.node.type))?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
   // The existing inventory audit executes/reads it without changing settings.
   if(expected.lgd?.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));

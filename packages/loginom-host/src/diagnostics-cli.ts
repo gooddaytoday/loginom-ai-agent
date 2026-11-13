@@ -25,6 +25,7 @@ export type DiagnosticsCliOptions = {
 type Row = Record<string, unknown>
 
 const SESSION_ID = /^[A-Za-z0-9_-]{1,200}$/
+const BUSY_TIMEOUT_MS = 5000
 
 export async function diagnosticsCommand(args: string[], paths: DiagnosticsProfile, options: DiagnosticsCliOptions = {}) {
   const stdout = options.stdout ?? ((text: string) => process.stdout.write(text))
@@ -114,7 +115,13 @@ export async function diagnosticsCommand(args: string[], paths: DiagnosticsProfi
         ...(chatReason ? { chatReason } : {}),
       },
     })
-    writeFileSync(target, zip, { mode: 0o600, flag: "wx" })
+    try {
+      writeFileSync(target, zip, { mode: 0o600, flag: "wx" })
+    } catch (error) {
+      // The file may appear after the check above; it is still never overwritten.
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw Error("DIAGNOSTICS_OUTPUT_EXISTS")
+      throw error
+    }
     const files = manifest.files as Array<{ status: string; reason?: string }>
     const reasons = new Map<string, number>()
     for (const file of files.filter((item) => item.status !== "included"))
@@ -167,6 +174,9 @@ async function openSessions(file: string) {
   if (!lstatSync(file, { throwIfNoEntry: false })?.isFile()) return
   const { Database } = await import("bun:sqlite")
   const db = new Database(file, { readonly: true })
+  // The running CLI holds write locks briefly (checkpoint, commit): wait for them,
+  // within a bound, so a hung writer still cannot hang diagnostics.
+  db.run(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`)
   const json = (value: unknown) => {
     if (typeof value !== "string") return {}
     try {
@@ -183,7 +193,9 @@ async function openSessions(file: string) {
         .get() as Row | null
       return typeof row?.id === "string" ? row.id : undefined
     },
-    export(sessionID: string) {
+    // One read transaction: messages and parts come from the same snapshot even
+    // while the running CLI appends to the session.
+    export: db.transaction((sessionID: string) => {
       const session = db.query("SELECT * FROM session WHERE id = ?").get(sessionID) as Row | null
       if (!session) return
       const parts = new Map<string, Row[]>()
@@ -213,7 +225,7 @@ async function openSessions(file: string) {
         },
         messages,
       }
-    },
+    }),
     close() {
       db.close()
     },

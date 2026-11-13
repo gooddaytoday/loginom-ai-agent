@@ -31,6 +31,8 @@ test("groups summarize included files, sizes and skipped files", () => {
       { name: "runtime/a.jsonl", group: "runtime", status: "included", size: 5 },
       { name: "runtime/b.jsonl", group: "runtime", status: "omitted", reason: "archive-budget" },
       { name: "crashpad/a.dmp", group: "dumps", status: "omitted", reason: "unreadable-or-not-redactable" },
+      // Always archived, whatever groups are chosen: listed, but not counted under Logs.
+      { name: "manifest.json", group: "logs", status: "included", size: 7 },
     ]),
   ).toEqual([
     { group: "chat", included: 1, omitted: 0, bytes: 10 },

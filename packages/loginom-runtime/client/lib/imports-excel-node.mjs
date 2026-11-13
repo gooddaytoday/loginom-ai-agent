@@ -1,7 +1,8 @@
 import {createHash} from 'node:crypto';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {verifyFullImportCount,verifyImportSchema,verifyTextImportSource} from './text-import-node.mjs';
-import {excelParametersSchema,validateExcelParameters} from './imports-excel-parameters.mjs';
+import {excelParametersSchema,validateExcelParameters,validExcelPath,isUnchangedExcelImportExecution} from './imports-excel-parameters.mjs';
+import {importBindingSchema,prepareImportBinding,readImportBindings,resolveImportBindingValue} from './import-bindings.mjs';
 import {makeExcelConfigureCode} from './imports-excel-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
@@ -40,7 +41,9 @@ export function excelReadback({node,phases,operation_id}){
   return {index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,excluded:f.excluded,source_name:source.name};
  });
  need(linked.size===m.source_fields.length,'output source coverage differs');
- return {kind:'excel_import',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',source:c.source,auto_detect:c.auto_detect,columns:c.columns,
+ // The bound W1 caption is reported only by configuration.bindings.
+ const {binding_field,...source}=c.source;
+ return {kind:'excel_import',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',source,auto_detect:c.auto_detect,columns:c.columns,
   receipt_ids:[configured,saved,mapped,finished].map(p=>p.receipt_id),output_mapping:{port:0,autosync:m.autosync,fields},package_persistence_verified:false};
 }
 
@@ -62,14 +65,27 @@ export function excelSchemaSnapshot(configuration,mapping){
   blank_rows:configuration.source.blank_rows,columns:configuration.columns,
   mapping:{autosync:mapping.autosync,source_fields:mapping.source_fields.map(field),target_fields:mapping.target_fields.map(f=>({...field(f),source:field(f.source??{})}))}};
 }
+export const excelBindingSchema=structuredClone(importBindingSchema);
+excelBindingSchema.items.properties.parameter={const:'/excel/source_path'};
+// W1 filename field in the shape of the Import binding inventory; Cancel only.
+export async function readExcelBindingField(channel){
+ await openPreparedWizard(channel);let r;
+ try{r=await channel.readExcelImportSource();}
+ finally{const closed=await closePreparedWizard(channel);if(closed.verified!==true||closed.cleanup_complete!==true)throw Error('BINDING_SOURCE_UNVERIFIED: /excel/source_path');}
+ return {wizard:{import_source:{fields:{source_path:r.configuration?.source?.binding_field??{status:'observed',variable_mode:false}}}},prepared_node_context:r.node_context};
+}
+export const excelBindingHooks={readField:readExcelBindingField,parameter:'/excel/source_path',validate:path=>{if(!validExcelPath(path))throw Error('BINDING_VALUE_INVALID');}};
 export function createExcelImportNodeSupport(config){
- const implementation={type:'imports.excel',mode:'xlsx',revision:'excel-import-v1',parameterSchema:excelParametersSchema,validate:validateExcelParameters,readback:excelReadback,
+ const implementation={type:'imports.excel',mode:'xlsx',revision:'excel-import-v1',parameterSchema:excelParametersSchema,bindingSchema:excelBindingSchema,validate:validateExcelParameters,readback:excelReadback,
   configurationObservation:{condition:'owned Excel source wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},
   configureInputs:async()=>verified({not_applicable:true}),
  };
- return {nodeApplyHandlers:createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
+ const nodeApplyHandlers=createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers;
+ // SAME bound node re-executes its saved file pointer through the read path.
+ nodeApplyHandlers.get('imports.excel').unchangedExecution=isUnchangedExcelImportExecution;
+ return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,receiptOptions}=options;
-  const request=operation.nodeApply?.request??operation.parameters,switching=request?.parameters?.source_switch;
+  const request=operation.nodeApply?.request??operation.parameters,switching=request?.parameters?.source_switch,bound=!!operation.parameters?.bindings?.length;
   let channel,sourceReceipt,saveReceipt,beforeConfiguration,beforeMapping,schemaBefore,schemaAfter,committedConfiguration;
   const mapping=async()=> (await channel.observe({condition:'owned Excel output mapping',readMappings:true,
    ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true})).node_mapping;
@@ -100,13 +116,25 @@ export function createExcelImportNodeSupport(config){
    throw error;
   };
   const drivers=createTabularTransformNodeSupport(config,{...implementation,
+   ...(bound?{
+    async beforeOpen(c){channel=c;
+     const mapped=await channel.readVariablePortMapping({direction:'input',kind:'variables',port:0});
+     need(mapped.verified===true&&mapped.independent_readback===true&&mapped.cleanup_complete===true,'LOGINOM_BINDING_SOURCE_UNVERIFIED: variables input 0');
+     operation.importBinding.mapping=mapped.mapping;
+    },
+   }:{}),
    ...(switching?{
     async beforeOpen(c){channel=c;await channel.openOutputPort(0);beforeMapping=await mapping();await closePreparedWizard(channel);},
     async afterOpen(c){channel=c;beforeConfiguration=(await configure({}, {inspect:true})).configuration;
      schemaBefore=excelSchemaSnapshot(beforeConfiguration,beforeMapping);await closePreparedWizard(channel);await openPreparedWizard(channel);},
    }:{}),
    async configure(c,p){channel=c;try{
-    const result=await configure(p.excel,switching?{preserve:true}:{});
+    let binding;
+    if(bound){const b=operation.importBinding,f=b.mapping.fields.filter(f=>f.name===b.name);
+     need(f.length===1&&b.mapping.fields.filter(x=>x.label===f[0].label).length===1
+      &&resolveImportBindingValue(b.proof,b.name,b.mapping,undefined,excelBindingHooks.validate).value===b.value,'LOGINOM_BINDING_SOURCE_UNVERIFIED: mapped filename variable changed');
+     binding={label:f[0].label,value:b.value};}
+    const result=await configure(bound?{...p.excel,source_path:binding.value}:p.excel,switching?{preserve:true}:bound?{binding}:{});
     if(switching)verifyImportSchema(schemaBefore,excelSchemaSnapshot(result.configuration,beforeMapping));
     return result;
    }catch(error){return refuse(error,'configure');}},
@@ -121,13 +149,21 @@ export function createExcelImportNodeSupport(config){
    },
   }).nodeApplyDriverFactory(options);
   return {...drivers,
+   ...(bound?{async beforeTarget(ctx){
+    operation.importBinding=await prepareImportBinding(options,ctx,config,{expectedPath:sourceReceipt.source.destination,...excelBindingHooks});
+    return verified();
+   }}:{}),
    async verifySource(p){
-    sourceReceipt=verifyTextImportSource({source:p.source,settings:{source:{source_path:p.excel.source_path}}},p.source.kind==='storage'?[]:options.verifiedUploads(),p.source.kind==='storage'?undefined:options.uploadHistory?.(),
-     p.source.kind==='storage'?await options.resolveStorageSource?.(p.source.server_source_ref):undefined);
+    const storage=p.source.kind==='storage'?await options.resolveStorageSource?.(p.source.server_source_ref):undefined;
+    sourceReceipt=verifyTextImportSource({source:p.source,settings:{source:{source_path:bound?storage?.destination:p.excel.source_path}}},p.source.kind==='storage'?[]:options.verifiedUploads(),p.source.kind==='storage'?undefined:options.uploadHistory?.(),storage);
     if(switching){need(typeof options.verifySourceSwitchSave==='function','Full source switch requires a verified package save');saveReceipt=options.verifySourceSwitchSave(switching.save_operation_id);}
     return sourceReceipt;
    },
    async finishGraph(mode,ctx){
+    if(bound){
+     operation.importBinding.graph=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+     operation.importBindingInventory=await readImportBindings(channel,operation.importBinding);
+    }
     if(switching){
      await openPreparedWizard(channel);
      const committed=committedConfiguration=(await configure({}, {inspect:true})).configuration;
@@ -139,7 +175,7 @@ export function createExcelImportNodeSupport(config){
      await closePreparedWizard(channel);
     }
     const result=await drivers.finishGraph(mode,ctx);
-    return {...result,...(switching?{reopen_performed:true,schema_before:schemaBefore,schema_after:schemaAfter}:{})};
+    return {...result,...(switching?{reopen_performed:true,schema_before:schemaBefore,schema_after:schemaAfter}:bound?{reopen_performed:true}:{})};
    },
    async readOutput(read,ctx){
     const result=await drivers.readOutput(read,ctx);
