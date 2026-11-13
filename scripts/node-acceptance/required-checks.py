@@ -109,6 +109,8 @@ RULES = (
       'docs/node-development/nodes/integration-restrequest/acceptance/task-headers.md'),
      ('live-ui',), ('rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers')),
     (('docs/node-development/nodes/integration-restrequest/acceptance/plain/**',), ('live-ui',), ('rest-get-plain',)),
+    ((C + 'rest-request*.mjs', 'docs/node-development/nodes/integration-restrequest/acceptance/modes/variables/**',
+      'docs/node-development/nodes/integration-restrequest/acceptance/task-variables.md'), ('live-ui',), ('rest-variables',)),
     (('docs/node-development/nodes/preprocessing-*/acceptance/v040/**', C + 'sampling-*.mjs', C + 'data-partition-*.mjs', 'scripts/node-acceptance/sampling-modes.mjs'), ('live-ui',), ('sampling-uniform', 'partition-uniform', 'partition-test-priority')),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random', 'sampling-stratified', 'sampling-biased', 'partition-stratified', 'partition-biased')),

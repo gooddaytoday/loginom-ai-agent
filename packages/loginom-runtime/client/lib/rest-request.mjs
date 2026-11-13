@@ -170,10 +170,16 @@ export async function restRequestCapability(page,t,readContext){
       const cells=key=>[...table.querySelectorAll('[data-tid^='+JSON.stringify(headers+';'+key+';StringPropEdit')+'][data-tid$=";PropContainer;ValueContainer;ValueControl"]')];
       const names=cells('colName'),values=cells('colHeaderValue'),deletes=[...table.querySelectorAll('[data-tid^='+JSON.stringify(headers+';colDelete_')+']')];
       if(names.length>32||names.length!==values.length||names.length!==deletes.length)throw Error('REST literal header inventory is unavailable');
-      const field=e=>{const input=e.querySelector('input'),field=Ext.getCmp(e.id);
-       if(!input||input.disabled||input.readOnly||field?.el?.dom!==e||field.inputEl?.dom!==input||!e.getBoundingClientRect().width||typeof field.getValue()!=='string')throw Error('REST header literal field unavailable');
+      const field=(e,visible=true)=>{const input=e.querySelector('input'),field=Ext.getCmp(e.id);
+       if(!input||field?.el?.dom!==e||field.inputEl?.dom!==input||visible&&(input.disabled||input.readOnly||!e.getBoundingClientRect().width)||typeof field.getValue()!=='string')throw Error('REST header literal field unavailable');
        return {tid:e.getAttribute('data-tid'),value:field.getValue()};};
-      return names.map((e,i)=>({name:field(e),value:field(values[i]),delete_tid:deletes[i].getAttribute('data-tid')}));
+      return names.map((e,i)=>{
+       const literal=field(values[i],false),base=literal.tid.slice(0,-';PropContainer;ValueContainer;ValueControl'.length);
+       const vs=[...exact(base+';PropContainer;VariableContainer;VariableControl')].filter(e=>e.getBoundingClientRect().width>0);
+       if(vs.length>1)throw Error('REST header variable control is ambiguous');
+       const value=vs.length?{tid:vs[0].getAttribute('data-tid'),variable_mode:true}:literal;
+       return {name:field(e),value,base,delete_tid:deletes[i].getAttribute('data-tid')};
+      });
      },{root,headers});
     };
     let rows=await readHeaders();
@@ -191,15 +197,52 @@ export async function restRequestCapability(page,t,readContext){
      }
     }
     rows=await readHeaders();
+    const readVariable=async row=>{
+     await guard();return find(row.base+';PropContainer;VariableContainer;VariableControl').evaluate((e,{root})=>{
+      const c=Ext.getCmp(e.id),store=c?.getStore?.(),records=store?.getData?.()?.items,owner=document.querySelectorAll('[data-tid='+JSON.stringify(root)+']');
+      if(owner.length!==1||!owner[0].contains(e)||c?.el?.dom!==e||store?.isLoading?.()||!Array.isArray(records)||records.length>128)throw Error('REST header variable inventory unavailable');
+      const variables=records.map(r=>{
+       const v=r.get?.(r.getFields?.()[2]?.getName?.());
+       if(!v||typeof v.DisplayName!=='string'||!Number.isSafeInteger(v.Index)||typeof v.IsNull!=='boolean')throw Error('REST header variable identity unavailable');
+       const option=c.getPicker?.()?.getNode?.(r),tid=option?.getAttribute('data-tid');
+       return {name:v.DisplayName,index:v.Index,type:v.DataType,is_null:v.IsNull,value:v.Value,selected:r.data.field1===c.getValue(),...(tid?{option_tid:tid}:{})};
+      });
+      return variables;
+     },{root});
+    };
     for(let index=0;index<t.headers.length;index++){
-     const row=rows[index],h=t.headers[index];
+     let row=(await readHeaders())[index];const h=t.headers[index];
+     if(typeof h.value==='object'){
+      const fields=t.header_variables?.fields?.filter(f=>f.name===h.value.variable);
+      need(t.header_variables?.kind==='variables'&&t.header_variables.port===0&&fields?.length===1,'header variable mapping is unavailable');
+      const f=fields[0];
+      need(f.type===5&&f.source?.type===5&&Number.isSafeInteger(f.id)&&Number.isSafeInteger(f.source.id),'header variable must have a connected string source');
+      if(!row.value.variable_mode){await click(row.base+';SwitchButton');row=await wait('header variable mode',async()=>{const r=(await readHeaders())[index];return r?.value.variable_mode?r:null;});}
+      const select=vs=>{const matches=vs.filter(v=>v.name===f.name&&v.index===f.index);need(matches.length===1,'header variable name/index differs');const v=matches[0];
+       need(v.type===5&&!v.is_null&&typeof v.value==='string'&&v.value.length<=2048&&!/[\x00-\x1f\x7f]/.test(v.value),'header variable requires a bounded non-NULL string without control characters');return v;};
+      let v=select(await readVariable(row));
+      if(!v.selected){
+       await click(row.value.tid+';trg_picker');
+       v=await wait('header variable option',async()=>{const v=select(await readVariable(row));return v.option_tid?v:null;});
+       need(v.option_tid.startsWith(row.value.tid+';boundlist;'),'header variable choice belongs to another picker');await click(v.option_tid);
+       await find(row.value.tid).locator('input').press('Tab',{timeout:remaining()});
+      }
+      await wait('header variable committed',async()=>select(await readVariable(row)).selected);
+      continue;
+     }
+     if(row.value.variable_mode){await click(row.base+';SwitchButton');row=await wait('header literal mode',async()=>{const r=(await readHeaders())[index];return r&&!r.value.variable_mode?r:null;});}
      if(row.value.value===h.value)continue;
      await quiet();await guard();await point(row.value.tid);effect=true;
      await find(row.value.tid).locator('input').fill(h.value,{timeout:remaining()});await find(row.value.tid).locator('input').press('Tab',{timeout:remaining()});
      await wait('header value committed',async()=>(await readHeaders())[index]?.value.value===h.value);
     }
-    const observed=(await readHeaders()).map(r=>({name:r.name.value,value:r.value.value}));
-    need(observed.length===t.headers.length&&observed.every((h,i)=>h.name===t.headers[i].name&&h.value===t.headers[i].value),'custom header readback differs');
+    const observed=[];
+    for(const row of await readHeaders()){
+     const selected=row.value.variable_mode?(await readVariable(row)).filter(v=>v.selected):[];
+     need(!row.value.variable_mode||selected.length===1,'header variable selection is ambiguous');
+     observed.push({name:row.name.value,value:row.value.variable_mode?{variable:selected[0].name}:row.value.value});
+    }
+    need(observed.length===t.headers.length&&observed.every((h,i)=>h.name===t.headers[i].name&&JSON.stringify(h.value)===JSON.stringify(t.headers[i].value)),'custom header readback differs');
     configuration.headers=observed;
    }
    if(caption==='Дополнительные параметры'&&t.new_node===true){
