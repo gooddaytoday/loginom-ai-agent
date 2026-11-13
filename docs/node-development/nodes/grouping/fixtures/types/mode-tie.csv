@@ -1,0 +1,11 @@
+RowID;Region;Amount;Text
+1;T1;5;beta
+2;T1;3;alpha
+3;T1;5;beta
+4;T1;3;alpha
+5;T2;7;x
+6;T2;7;x
+7;T2;1;y
+8;T3;9;zeta
+9;T3;\N;eta
+10;T3;2;\N

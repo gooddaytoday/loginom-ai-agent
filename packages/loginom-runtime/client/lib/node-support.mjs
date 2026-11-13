@@ -19,7 +19,7 @@ import {createBinningNodeSupport} from './binning-node.mjs';
 import {createSamplingNodeSupport} from './sampling-node.mjs';
 import {createDataPartitionNodeSupport} from './data-partition-node.mjs';
 import {createLogRegressionNodeSupport} from './log-regression-node.mjs';
-import {createExcelImportNodeSupport} from './imports-excel-node.mjs';
+import {createExcelImportNodeSupport,excelBindingHooks} from './imports-excel-node.mjs';
 import {createRestRequestNodeSupport} from './rest-request-node.mjs';
 import {createLinRegressionNodeSupport} from './linregression-node.mjs';
 import {createAutoCorrelationNodeSupport} from './auto-correlation-node.mjs';
@@ -94,7 +94,7 @@ export function createCandidateNodeSupport(config) {
  const nodeApplyHandlers=new Map([...condition.nodeApplyHandlers,...variablesReplace.nodeApplyHandlers,...variablesColumnUnion.nodeApplyHandlers,...variablesCalculator.nodeApplyHandlers,...dataToVar.nodeApplyHandlers,...variablesToTable.nodeApplyHandlers,...userVariables.nodeApplyHandlers,...quality.nodeApplyHandlers,...colUnion.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
-  const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters,nodeApplyHandlers.get(type));
+  const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||nodeApplyHandlers.get(type)?.unchangedExecution?.(options.operation.parameters)===true||isUnchangedTransformExecution(options.operation.parameters,nodeApplyHandlers.get(type));
   const drivers=(()=>{
   if(type==='variables.column_union'&&!readOnly)return variablesColumnUnion.nodeApplyDriverFactory(options);
   if(type==='variables.calculator'&&!readOnly)return variablesCalculator.nodeApplyDriverFactory(options);
@@ -153,9 +153,9 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,...(type==='imports.text'&&readOnly&&options.operation.parameters.finish==='execute'?{async beforeTarget(ctx){
+  return {...drivers,...(['imports.text','imports.excel'].includes(type)&&readOnly&&options.operation.parameters.finish==='execute'?{async beforeTarget(ctx){
    const value=await drivers.beforeTarget?.(ctx);
-   const prepared=await prepareImportBinding(options,ctx,config,{saved:true});
+   const prepared=await prepareImportBinding(options,ctx,config,{saved:true,...(type==='imports.excel'?excelBindingHooks:{})});
    if(prepared){
     const channel=importBindingChannel(options,ctx,config,options.operation.parameters.target.ref);
     options.operation.importBindingInventory=await readImportBindings(channel,prepared);

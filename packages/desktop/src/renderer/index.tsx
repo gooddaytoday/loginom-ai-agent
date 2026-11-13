@@ -256,6 +256,8 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
 
     exportDebugLogs: () => window.api.exportDebugLogs(),
 
+    diagnostics: window.api.diagnostics,
+
     setForceFocus: (enabled) => window.api.setForceFocus(enabled),
 
     recordFatalRendererError: (error) => window.api.recordFatalRendererError(error),

@@ -29,7 +29,7 @@ export function importBindingChannel(options,ctx,config,node){
   preparedNodeContext:{document_id:operation.parameters.document_id,workflow_ref:operation.parameters.workflow_ref,node},
   wrapMutation:(code,p)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(p.id,p.action_key,p.signature),operation_id:p.id})});
 }
-export function resolveImportBindingValue(proof,name,mapping,expectedPath){
+export function resolveImportBindingValue(proof,name,mapping,expectedPath,validate=path=>validateTextImportPatch({source:{source_path:path}})){
  need(proof?.verified===true&&proof.cleanup_complete===true&&proof.independent_readback===true,'BINDING_SOURCE_UNVERIFIED');
  const field=mapping?.fields?.find(f=>f.name===name),sourceName=field?.source?.name??name;
  const variables=proof.variables?.filter(v=>v.name===sourceName);
@@ -37,7 +37,7 @@ export function resolveImportBindingValue(proof,name,mapping,expectedPath){
  const v=variables[0];need(v.type==='string'&&v.cell?.type==='string','BINDING_TYPE_MISMATCH');
  need(v.cell.is_null===false,'BINDING_NULL_UNSUPPORTED');
  need(typeof v.cell.value==='string'&&v.cell.value.length>0,'BINDING_VALUE_INVALID');
- try{validateTextImportPatch({source:{source_path:v.cell.value}});}catch{need(false,'BINDING_VALUE_INVALID');}
+ try{validate(v.cell.value);}catch{need(false,'BINDING_VALUE_INVALID');}
  if(expectedPath!==undefined)need(v.cell.value===expectedPath,'BINDING_SOURCE_UNVERIFIED');
  if(field)need(field.type===5&&field.source?.type===5&&field.source.id===v.id,'BINDING_SOURCE_UNVERIFIED');
  return {value:v.cell.value,variable:v,name};
@@ -54,7 +54,7 @@ export async function prepareImportBinding(options,ctx,config,settings){
   throw error;
  }
 }
-async function readImportBindingSource(options,ctx,config,{saved=false,expectedPath}={}){
+async function readImportBindingSource(options,ctx,config,{saved=false,expectedPath,readField=readImportBindingField,validate,parameter:path=parameter}={}){
  const r=options.operation.parameters;
  const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline,ctx.signal);
  need(graph.complete===true&&graph.document_id===r.document_id&&graph.workflow_ref.workflow_id===r.workflow_ref.workflow_id,'BINDING_SOURCE_UNVERIFIED');
@@ -86,7 +86,7 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
   const scoped=proof.variables?.some(v=>v.type==='string'&&v.cell?.type==='string'&&v.cell.is_null===false&&typeof v.cell.value==='string'&&options.isBoundFileInput(v.cell.value));
   if(!scoped)return null;
   const target=importBindingChannel(options,ctx,config,r.target.ref);
-  const s=await readImportBindingField(target);
+  const s=await readField(target);
   const f=s.wizard.import_source.fields.source_path;
   if(f.variable_mode!==true)return null;
   const mapped=await target.readVariablePortMapping({direction:'input',kind:'variables',port:0});
@@ -100,7 +100,7 @@ async function readImportBindingSource(options,ctx,config,{saved=false,expectedP
   if(values?.length===1&&typeof values[0].cell?.value==='string'&&values[0].cell.value.length>0
     &&!options.isBoundFileInput(values[0].cell.value))return null;
  }
- const result={...resolveImportBindingValue(proof,name,mapping,expectedPath),proof,source,link,graph,mapping};
+ const result={...resolveImportBindingValue(proof,name,mapping,expectedPath,validate),proof,source,link,graph,mapping,readField,parameter:path};
  // The host resolves only an observed/admitted file in its own selected input
  // directory. It never turns an arbitrary string into a storage reference.
  need(typeof options.resolveBoundFileSource==='function','BINDING_SOURCE_UNVERIFIED');
@@ -123,7 +123,7 @@ export function importBindingInventory(field,prepared,node){
  // NULL/old cached text. The independently read source, not that cache,
  // authorizes the current file. Execute receipts prove the actual output.
  need(typeof field.row_id==='string','BINDING_SOURCE_UNVERIFIED');
- return [{parameter,mode:'variable',row_id:field.row_id,variable:{kind:'variables',input:0,id:f.id,name:f.name,type:'string',is_null:false},
+ return [{parameter:prepared.parameter??parameter,mode:'variable',row_id:field.row_id,variable:{kind:'variables',input:0,id:f.id,name:f.name,type:'string',is_null:false},
   source:{ref:source.ref,type:source.type,output:link.output,variable_id:variable.id},input_port_guid:mapping.port_guid,connected:true,verified:true}];
 }
 export async function configureImportBinding(channel,prepared){
@@ -152,7 +152,7 @@ export async function readImportBindingField(channel){
  finally{const closed=await closePreparedWizard(channel);need(closed.verified===true&&closed.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');}
 }
 export async function readImportBindings(channel,prepared){
- const s=await readImportBindingField(channel);
+ const s=await (prepared.readField??readImportBindingField)(channel);
  const mapping=await channel.readVariablePortMapping({direction:'input',kind:'variables',port:0});
  need(mapping.verified===true&&mapping.independent_readback===true&&mapping.cleanup_complete===true,'BINDING_SOURCE_UNVERIFIED');
  return importBindingInventory(s.wizard.import_source.fields.source_path,{...prepared,mapping:mapping.mapping},s.prepared_node_context);

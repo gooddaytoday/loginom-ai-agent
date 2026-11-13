@@ -291,6 +291,22 @@ test("judgeTask: supervisor drains the judge's child before returning a verdict"
   }
 }, 20_000)
 
+// A Bun process is multi-threaded: its leader already reads Z while sibling
+// threads are still inside exit_group, and until the last of them exits the
+// kernel keeps orphans parented to that thread group. Only a group with no
+// thread left besides the zombie leader has handed its children to the subreaper.
+async function threadGroupExited(pid: number, starttime: string) {
+  const read = (file: string) => readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT" || error.code === "ESRCH") return ""
+    throw error
+  })
+  const stat = await read(`/proc/${pid}/stat`)
+  if (!stat || stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19] !== starttime) return true
+  const status = await read(`/proc/${pid}/status`)
+  if (!status) return true
+  return ["Z", "X"].includes(status.match(/^State:\s+(\S)/m)?.[1] ?? "") && Number(status.match(/^Threads:\s+(\d+)/m)?.[1]) <= 1
+}
+
 async function ordinaryExecFixture(lifetime = 1_200, late = false) {
   const fixture = await gateFixture()
   const file = (name: string) => path.join(fixture.root, name)
@@ -422,7 +438,7 @@ test("ordinary exec: late descendant adoption prevents early proof", async () =>
     await Bun.write(fixture.file("spawn-late"), "1")
     await fixture.wait(() => Bun.file(fixture.file("late-image")).exists())
     const child = await Bun.file(fixture.file("late-image")).json() as Pick<ProcessIdentity, "pid" | "starttime">
-    await fixture.wait(async () => !await fixture.active(fixture.pid))
+    await fixture.wait(() => threadGroupExited(fixture.pid, fixture.before.starttime))
     expect(await fixture.active(child.pid)).toBe(true)
     expect(Number((await Bun.file(`/proc/${child.pid}/stat`).text()).split(") ")[1]!.split(" ")[1])).toBe(fixture.launcher.pid)
     await Bun.sleep(150)
@@ -564,7 +580,7 @@ test("ordinary exec: known browser helper stays fatal after adoption and natural
     const parent = scope()!.processes!.find(entry => entry.pid === native)!
     expect(path.basename(parent.executable)).toBe("chrome")
     await Bun.write(file("parent-end"), "1")
-    await wait(async () => !await active("native.pid"))
+    await wait(() => threadGroupExited(native, parent.starttime))
     expect(Number((await Bun.file(`/proc/${pid}/stat`).text()).split(") ")[1]!.split(" ")[1])).toBe(scope()!.launcher.pid)
     await Bun.write(file("helper-exec"), "1")
     await wait(() => Bun.file(file("helper-image")).exists())

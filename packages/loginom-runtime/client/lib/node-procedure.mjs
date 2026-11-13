@@ -54,6 +54,7 @@ import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode,makeTreeWizardContextCode} from './node-output-context.mjs';
 import {captureExecutionBaseline,identifyNewExecution,selectFailedExecutionChild} from './node-execution-evidence.mjs';
 import {makeNodeVariableOutputCode,makeBuiltinVariablesPreviewCode,makeNodePortOutputCode} from './node-port-output.mjs';
+import {makeExcelSourceReadCode} from './imports-excel-procedure.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
 import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
@@ -378,6 +379,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async mapVariablePort(mapping){return crossTableOwnedStep('variable_mapping',{mapping},makeVariablePortMappingCode);},
     async readVariablePortMapping(mapping){return crossTableOwnedStep('variable_mapping_read',{mapping,read_only:true},makeVariablePortMappingCode);},
     async readBuiltinVariablesPreview({port_guid}) {return crossTableOwnedStep('user_runtime_read',{port:4,port_guid},makeBuiltinVariablesPreviewCode);},
+    async readExcelImportSource() {return crossTableOwnedStep('excel_source_read',{},makeExcelSourceReadCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
     async configureCondition(settings){return crossTableOwnedStep('condition',settings,makeConditionConfigureCode);},
