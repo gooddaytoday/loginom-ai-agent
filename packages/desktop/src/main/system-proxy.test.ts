@@ -140,6 +140,19 @@ test("stop() settles detection while chromium hangs", async () => {
   expect(Date.now() - started).toBeLessThan(500)
 })
 
+test("Windows detection allows a cold read beyond the former total cap", async () => {
+  const detection = startSystemProxyDetection({
+    platform: "win32",
+    read: () => new Promise((resolve) => setTimeout(() => resolve({
+      windows: { autoDetect: false, autoConfigUrl: "", proxy: "", bypass: "" },
+    }), 10_100)),
+  })
+  detection.useChromium(async () => "DIRECT")
+  const result = await detection.result
+  expect(result.state).toBe("direct")
+  expect(result.notices).toEqual([])
+}, 15_000)
+
 test("detection settles by the total cap even if a stage never resolves", async () => {
   const started = Date.now()
   const detection = startSystemProxyDetection({

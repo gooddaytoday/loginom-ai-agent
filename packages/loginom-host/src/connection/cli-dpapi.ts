@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { win32 } from "node:path"
-import { windowsPowerShellArguments } from "../windows-powershell"
+import { WINDOWS_POWERSHELL_TIMEOUT_MS, windowsPowerShellArguments } from "../windows-powershell"
 
 // Windows PowerShell is an OS component. Never resolve it through user PATH or
 // place credentials in argv, environment variables, scripts or temporary files.
@@ -24,7 +24,7 @@ try {
     const child = execFile(
       win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
       windowsPowerShellArguments(script),
-      { env: { SystemRoot: root }, windowsHide: true, timeout: 15000, maxBuffer: 2 * 1024 * 1024, encoding: "utf8" },
+      { env: { SystemRoot: root }, windowsHide: true, timeout: WINDOWS_POWERSHELL_TIMEOUT_MS, maxBuffer: 2 * 1024 * 1024, encoding: "utf8" },
       (error, stdout) => {
         // Discard child errors/stderr: platform diagnostics may contain input.
         if (error || !stdout || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(stdout)) {
