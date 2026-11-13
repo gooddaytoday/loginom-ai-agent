@@ -104,6 +104,14 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
+`fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
+`cases.boolean.stages` from LAB-1558. Native Boolean min/max/mode and integer
+unique/null counts, tie → False and all-NULL mode → False are checked as full
+typed rows with exact field order and `ordered:false`. The independent oracle
+stays private. CSV, Save, cold execution without configuration and cleanup use
+stock checks; only the business task and CSV reach the model.
+
 `group-real` uses grouping `acceptance/types/task-real.md` and only
 `fixtures/types/types.csv`. `expected-real.json` contains the unchanged
 `cases.real.stages` from the LAB-1558 proposal; its independent `oracle.py
@@ -112,6 +120,13 @@ all-NULL and the mode tie are checked as complete typed rows with exact field
 order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
 the existing node, cold execution without configuration and cleanup use stock
 checks. Only the business task and CSV reach the model.
+
+`row-filter-top-n` uses the approved row-filter `acceptance/typed/task-top-n.md`
+and only `fixtures/typed/rows.csv`. The private stdlib oracle checks TopN 3→5,
+both full ordered outputs and four CSVs. The source alone changes on the same
+Filter GUID; readback requires integer `row_number <= TopN`, not a literal.
+Stock Save, cold binding/field readback without configuration, both typed
+outputs and cleanup apply. Oracle/expected never reach the model.
 
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
