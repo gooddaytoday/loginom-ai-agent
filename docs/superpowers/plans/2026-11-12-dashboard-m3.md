@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** задачи 1–11 выполнены и независимо проверены по поведению; задачи 12–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** задачи 1–12 выполнены и независимо проверены по поведению; задачи 13–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -19,7 +19,7 @@
 - В `packages/opencode` Bun-тесты запускать через существующий `bun run test [файлы]`: скрипт пакета задаёт `--timeout 30000`. Эта команда заменяет сырой `bun test` в эскизах ниже; бюджет и ожидаемое поведение тестов не меняются.
 - После полного прогона можно повторить только изменённые тестовые файлы, если исправлены исключительно их фикстуры, production-код не менялся и причины всех сбоев подтверждены. Успешные проверки неизменённых файлов сохраняют силу; совокупную проверку не называть новым зелёным полным запуском. Полный зелёный CI перед приёмкой задачи 18 остаётся обязательным.
 - Новых npm-зависимостей нет. Добавляются только workspace-зависимости `@loginom-ai-agent/dashboard` в `packages/opencode`, `packages/desktop`, `packages/app`; `bun install` обновляет `bun.lock`.
-- Числа дизайна: тело снимка до 655 360 байт (640 КиБ); образец до 100 строк и до 524 288 символов JSON (512 КиБ); снимок живёт 15 минут, в памяти не больше 100; `src/` — не больше 200 файлов и 1 048 576 байт; сборка — 90 секунд; вывод модели — первые 8 192 байта UTF-8; `ready` в самопроверке — 15 секунд; опрос хеша — 2 секунды; значения образца в коде — от 6 символов; имя папки — до 40 символов плюс `-<8 символов ключа>`.
+- Числа дизайна: тело снимка до 655 360 байт (640 КиБ); образец до 100 строк и до 524 288 байт JSON в UTF-8 (512 КиБ); снимок живёт 15 минут, в памяти не больше 100; `src/` — не больше 200 файлов и 1 048 576 байт; сборка — 90 секунд; вывод модели — первые 8 192 байта UTF-8; `ready` в самопроверке — 15 секунд; опрос хеша — 2 секунды; значения образца в коде — от 6 символов; имя папки — до 40 символов плюс `-<8 символов ключа>`.
 - Тексты для пользователя — дословно из дизайна: «Сначала подключите стенд в настройках»; «Снимок уже использован, устарел или создан на другом стенде. Нажмите кнопку в Studio ещё раз»; «Узел завершился с ошибкой: <текст>. Исправьте сценарий и нажмите ещё раз»; «Черновик dashboard для узла «X»»; «Правка dashboard «X»»; «Черновик — доступен только с этого компьютера. Данные: пример из N строк от <время>»; «Пересчёт доступен после публикации»; «Черновик остановлен. Попросите агента показать его снова»; «Публикация на этот стенд появится в следующей версии»; «Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard»; «Нажмите в Studio «Изменить в чате», чтобы получить свежие данные». В приложении тексты получают новые ключи в `en.ts` и `ru.ts`; существующие английские строки не правятся.
 - Не ослаблять без владельца: проверку пути в профиле, неизменяемость профиля сессии, окно публикации без «Разрешать всегда», список запретов резолвера и предварительной проверки `tsc`, принудительный CSP страницы черновика, loopback сервера черновика, одноразовое чтение снимка.
 - Стиль — [AGENTS.md](../../../AGENTS.md): без `any`, без алиасов и `import *`, без `else`, `const`, `try/catch` только где без него нельзя (`try/finally` для уборки допустим). Комментарии в коде — на английском, только о неочевидных ограничениях; документы — на русском.
@@ -1319,20 +1319,20 @@ export async function finishPublish(input: { work: string; control: ControlBindi
 export const dashboardRules: (profile: TaskScope.Profile) => PermissionV1.Rule[] // [{permission: "dashboard_publish", pattern: "*", action: "ask"}] in the dashboard profile
 ```
 
-- [ ] **Step 1: Тесты пакета.** `publish.test.mjs` (нужен `template/node_modules`): папка из `prepareDashboard` со строками `["Москва-Север", 123456]` и `["Юг", 7]`; настоящий `dashboardServer` с временным `buildsRoot` как стенд (`origin` = `http://127.0.0.1:<порт>`), `builds` = тот же `buildsRoot`. Проверки:
+- [x] **Step 1: Тесты пакета.** `publish.test.mjs` (нужен `template/node_modules`): папка из `prepareDashboard` со строками `["Москва-Север", 123456]` и `["Юг", 7]`; настоящий `dashboardServer` с временным `buildsRoot` как стенд (`origin` = `http://127.0.0.1:<порт>`), `builds` = тот же `buildsRoot`. Проверки:
   - без `sample.json` → `{ok: false, text: NO_SAMPLE}`;
   - `src/main.tsx` с литералом `"Москва-Север"` → `ok: false`, текст называет значение и объясняет запрет; `123456` в коде → тоже; то же значение, записанное в `src/logo.png` (модель может записать туда текст), → тоже; `"Юг"` (короче 6) → не мешает;
   - ошибка типов → `ok: false`, «Сборка не удалась» и вывод `tsc`;
   - успешный `finishPublish`: `builds/<ключ>/<хеш>/` равен `control/draft/<хеш>/`, `current` = хеш и перевод строки, `lookup` стенда отдаёт этот хеш, ответ `{status: "published", text: «Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard»}`, `sample.json` удалён, `snapshot.json` и `control/binding.json` на месте; повтор той же сборки → снова `published`, каталог хеша один;
   - `origin` `http://192.0.2.1:32768` → `{status: "failed", text: «Публикация на этот стенд появится в следующей версии»}`, `builds` не тронут; каталог `builds` отсутствует → тот же ответ;
   - стенд, чей `lookup` отдаёт другой хеш (подменённый `fetch`) → `failed`, `sample.json` на месте.
-- [ ] **Step 2: Тесты бэкенда.**
+- [x] **Step 2: Тесты бэкенда.**
   - `dashboard.test.ts` — на уровне `SessionTools.resolve`, как в `profile-tools.test.ts`, чтобы проверить и правило в `tools.ts`. Конфигурация пользователя — `permission: {"*": "allow"}` (`TestConfig`). Каталог ресурсов — временный: `resource-manifest.json` с `{"node": "bin/node", "browser": "browsers/chrome"}`, ссылки `bin/node` → `$LOGINOM_AI_AGENT_TEST_NODE`, `dashboard/template` → `P/template`, `runtime/client/node_modules/playwright-core` → `playwright-core` рантайма, файлы `dashboard/draft.js`, `dashboard/selfcheck.mjs`, `browsers/chrome` (инструмент проверяет только наличие). Папка — из `prepareDashboard` с подменённым `fetch` в `dashboardDataRoot(process.env)`. Тест вызывает `execute` инструмента `dashboard_publish` из результата `resolve`, ждёт ожидающий запрос в `Permission` (`pollWithTimeout`) и проверяет его: `permission: "dashboard_publish"`, `patterns` — `[nodeName, packagePath]` из `control/binding.json`, `always: []`. Затем отвечает `reject`: инструмент завершается ошибкой отказа, `sample.json` на месте — последний шаг не выполнялся.
   - `dashboard-session.test.ts`: `dashboardRules("default")` пуст; `Permission.evaluate("dashboard_publish", "x", Permission.merge(Permission.fromConfig({ "*": "allow" }), dashboardRules("loginom-dashboard"))).action === "ask"`.
   - `permission-auto-respond.test.ts`: при включённом автоответе для сессии и для папки `autoRespondsPermission` и `sessionAutoAccept` для запроса `{sessionID, permission: "dashboard_publish"}` возвращают `false`; для `edit` поведение прежнее.
   - Задача CI `unit` (`.github/workflows/test.yml`) до `bun turbo test` ставит набор шаблона той же командой, что `dashboard-browser` (`npm ci --ignore-scripts` в `packages/dashboard/template` закреплённым Node), — иначе тест подтверждения публикации в CI пропускался бы.
-- [ ] **Step 3: Тесты падают.** → FAIL.
-- [ ] **Step 4: Реализация пакета.**
+- [x] **Step 3: Тесты падают.** → FAIL.
+- [x] **Step 4: Реализация пакета.**
   - embeddedValues сохраняет заданную семантику: непустые относительно null ячейки превращаются в строки, уникальные значения длиной от 6 кодовых точек Unicode ищутся Buffer.includes во всех файлах src, включая бинарные расширения. В сообщении показать не больше пяти значений и объяснить публичность сборки. Ограничение 8 192 байта UTF-8 применяется ко всему output инструмента, включая статус и вводный текст; последнюю кодовую точку не обрывать.
   - preparePublish получает единый согласованный snapshot/control/sample. Каталог operation принадлежит вызывающему на всё время prepare → ask → finish; prepare не создаёт скрытого постоянного состояния. Work разрешить через realpath до вычисления sibling control.
   - В buildDashboard добавить один специфичный необязательный publication-параметр с sample и operation. После штатной повторной проверки собственной captured src проверить именно её байты, до запуска scanner/tsc/Vite. Живой work после копирования для этой проверки не читать. Сохранить существующие лимиты, Node FS boundary и диагностику; не вводить универсальный observer/callback framework.
@@ -1343,7 +1343,7 @@ export const dashboardRules: (profile: TaskScope.Profile) => PermissionV1.Rule[]
   - После lookup с ожидаемым hash через существующее snapshot-исключение удалить sample только при совпадении исходного snapshotId, включая случай нового снимка с теми же строками. Для этого добавить узкую операцию удаления в folder.ts, не разносить проверку ID и unlink.
   - Отказ подготовки/пользователя не меняет current; failed lookup сохраняет sample. Исключения освобождаются в finally. Очистка private operation выполняется владельцем после завершения использующих её Promise; orphan collector, M4 publisher/store и долговечная очередь исключены.
 
-- [ ] **Step 5: Бэкенд.** `dashboard-session.ts`:
+- [x] **Step 5: Бэкенд.** `dashboard-session.ts`:
 
 ```ts
 export const dashboardRules = (profile: TaskScope.Profile): PermissionV1.Rule[] =>
@@ -1358,7 +1358,7 @@ export const dashboardRules = (profile: TaskScope.Profile): PermissionV1.Rule[] 
 
   После успешного prepare вызвать ctx.ask с permission dashboard_publish, patterns [prepared.control.nodeName, prepared.control.binding.packagePath], always:[], metadata:{}. Только после разового разрешения вызвать finishPublish с удержанными control/build. Ответ инструмента сохраняет title «Публикация dashboard» и status-prefixed output из результата. Освобождение operation не должно обгонять файловую работу; подтверждённый результат не подменять ошибкой вспомогательной уборки, включая локальное удаление sample после совпавшего lookup; такую ошибку сообщать отдельно при необходимости действий.
 
-- [ ] **Step 6a: Без автоответа.** В `permission-auto-respond.ts` тип параметра `permission` у `autoRespondsPermission` и `sessionAutoAccept` — `{ sessionID: string; permission?: string }`; первой строкой обеих функций:
+- [x] **Step 6a: Без автоответа.** В `permission-auto-respond.ts` тип параметра `permission` у `autoRespondsPermission` и `sessionAutoAccept` — `{ sessionID: string; permission?: string }`; первой строкой обеих функций:
 
 ```ts
 // Publication is always confirmed by the user, whatever auto-accept says for the session or folder.
@@ -1366,9 +1366,9 @@ if (permission.permission === "dashboard_publish") return false
 ```
 
   `permission.tsx` уже передаёт туда полный `PermissionRequest`; других изменений не нужно.
-- [ ] **Step 6: Окно разрешений.** `session-permission-dock.tsx`: кнопку `ui.permission.allowAlways` обернуть в `<Show when={props.request.always.length > 0}>`. i18n: `settings.permissions.tool.dashboard_publish.description` — ru «Опубликовать dashboard на стенд. Проверьте узел и пакет ниже», en «Publish the dashboard to the stand. Check the node and package below». Проверка: e2e `session-request-docks.spec.ts` дополнить запросом с `always: []` → две кнопки, если e2e приложения запускается в этой среде; иначе — ручная проверка в приёмке задачи 18 и запись в отчёт задачи.
-- [ ] **Step 7: Прогон.** `bun typecheck` в `packages/opencode`, `packages/app`, `packages/dashboard`; тесты шагов 1–2 (в `packages/app` — `bun test src/context/permission-auto-respond.test.ts`) → PASS.
-- [ ] **Step 8: Коммит.** `git commit -m "feat(dashboard): publish drafts to the local stand with confirmation"`.
+- [x] **Step 6: Окно разрешений.** `session-permission-dock.tsx`: кнопку `ui.permission.allowAlways` обернуть в `<Show when={props.request.always.length > 0}>`. i18n: `settings.permissions.tool.dashboard_publish.description` — ru «Опубликовать dashboard на стенд. Проверьте узел и пакет ниже», en «Publish the dashboard to the stand. Check the node and package below». Проверка: e2e `session-request-docks.spec.ts` дополнить запросом с `always: []` → две кнопки, если e2e приложения запускается в этой среде; иначе — ручная проверка в приёмке задачи 18 и запись в отчёт задачи.
+- [x] **Step 7: Прогон.** `bun typecheck` в `packages/opencode`, `packages/app`, `packages/dashboard`; тесты шагов 1–2 (в `packages/app` — `bun test src/context/permission-auto-respond.test.ts`) → PASS.
+- [x] **Step 8: Коммит.** `git commit -m "feat(dashboard): publish drafts to the local stand with confirmation"`.
 
 ### Task 13: `run --dashboard` в CLI
 
