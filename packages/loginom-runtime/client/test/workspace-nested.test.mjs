@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {makeWorkspacePrepareCode} from '../lib/workspace.mjs';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
+import {Page} from './support/workspace-ui-fixture.mjs';
 
 // LAB-1543 DOM: entering keeps TF-1 and changes breadcrumbs; service GUIDs
 // repeat. Leaving can retain the selected owner's breadcrumb.
@@ -115,6 +116,18 @@ test('NW1 validates scoped enter and leave arguments before browser work',()=>{
   const f=fixture(),workflowRef={...f.ref,document_id:'doc'};
   for(const graphNavigation of [{direction:'enter',node_ref:{document_id:'other',workflow_id:'outer',node_id:'x'}},{direction:'leave',node_ref:{}},{direction:'enter'}])
     assert.throws(()=>makeWorkspacePrepareCode({...base,intent:'existing_workflow',workflowRef,graphNavigation}),/Graph navigation/);
+});
+
+for(const role of ['input','output'])test('NW1 public workspace observation exposes the native '+role+' boundary role',async()=>{
+  const page=new Page(),tid='MF;TF-1;Graph;Boundary',body=page.add('g',tid);
+  page.add('text',tid+';Label;Label','Boundary');
+  page.add('g',tid+';'+(role==='input'?'Output':'Input')+'_Data-0');
+  const f=page.graphModels.get(body.parentElement),node=f.byTid.get(tid),diagram=f.model.FDiagram;
+  node.FGuid='da493381-d79a-3458-8192-b3fa1602118b';node.FIconCls='bg-vendor-icon-nullvendor';
+  diagram.FIsSubmodel=true;diagram[role==='input'?'GenericInputNode':'GenericOutputNode']=node;
+  assert.equal((await page.observe()).nodes.find(n=>n.node_id===node.FGuid).boundary_role,role);
+  diagram.FIsSubmodel=false;
+  assert.equal((await page.observe()).nodes.find(n=>n.node_id===node.FGuid).boundary_role,undefined);
 });
 
 test('NW1 same operation never repeats a completed navigation; foreign/stale refs do not click',async()=>{
