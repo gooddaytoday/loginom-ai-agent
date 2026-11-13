@@ -82,6 +82,10 @@ test("secrets planted in the real profile stores never reach any archived byte",
     "stand https://app.loginom.ai/app/",
     "connect ECONNREFUSED 192.168.5.6:3128",
     "upload /fixture-person/input.csv",
+    "bucket https://corp-data.s3.amazonaws.com/x",
+    "tenant https://corp-tenant.azure.com/x",
+    "model https://bedrock-runtime.us-east-1.amazonaws.com/model",
+    "model https://fixture-res.openai.azure.com/openai",
   ]
   const target = attemptDir(p.runtime, "ses_target", "a1")
   put(
@@ -97,6 +101,8 @@ test("secrets planted in the real profile stores never reach any archived byte",
     messages: [{ info: { id: "m1", role: "user" }, parts: [{ type: "text", text: [...echo, ...hosts].join(" ") }] }],
   }
 
+  // Without a codec the stored connection cannot prime redaction; say so.
+  expect((await profileSecrets({ loginom: p.loginom })).status).toBe("unavailable")
   const known = await profileSecrets({ loginom: p.loginom, data: p.data, codec: credentials("linux"), extra: ["fixture-sidecar-value"] })
   expect(known.status).toBe("ok")
   const { zip, manifest } = await buildDiagnosticsArchive({
@@ -116,9 +122,11 @@ test("secrets planted in the real profile stores never reach any archived byte",
       expect(bytes.includes(Buffer.from(variant))).toBe(false)
       expect(Buffer.from(zip).includes(Buffer.from(variant))).toBe(false)
     }
-  for (const internal of ["10.1.2.3", "loginom.corp.local", "192.168.5.6", "fixture-person", "other-session-marker"])
+  for (const internal of ["10.1.2.3", "loginom.corp.local", "192.168.5.6", "fixture-person", "other-session-marker", "corp-data.s3", "corp-tenant"])
     expect(all).not.toContain(internal)
   expect(all).toContain("https://app.loginom.ai/app/")
+  expect(all).toContain("https://bedrock-runtime.us-east-1.amazonaws.com/model")
+  expect(all).toContain("https://fixture-res.openai.azure.com/openai")
   expect(all).toContain("http://host-")
   expect(all).toContain("/[user]/input.csv")
   expect(manifest.selection).toBe("session")

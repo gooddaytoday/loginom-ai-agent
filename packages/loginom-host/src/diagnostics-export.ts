@@ -41,10 +41,11 @@ export const PUBLIC_HOSTS = Object.freeze([
   "dashscope.aliyuncs.com",
   "minimax.io",
   "minimaxi.com",
-  "github.com",
   "githubcopilot.com",
-  "azure.com",
-  "amazonaws.com",
+  // Model endpoints only: other cloud hosts under these domains may be internal.
+  "openai.azure.com",
+  "services.ai.azure.com",
+  "cognitiveservices.azure.com",
   "models.dev",
   "opencode.ai",
 ])
@@ -199,6 +200,9 @@ function privateIPv4(host: string) {
 function publicHost(host: string, allowed: readonly string[]) {
   const name = host.toLowerCase().replace(/^\[|\]$/g, "")
   if (name === "::1" || /^127(?:\.\d{1,3}){3}$/.test(name)) return true
+  // Copilot sign-in and Bedrock model endpoints, not every GitHub or AWS host.
+  if (["github.com", "api.github.com"].includes(name) || /^bedrock(?:-runtime)?(?:-fips)?\.[a-z0-9-]+\.amazonaws\.com$/.test(name))
+    return true
   return allowed.some((item) => name === item || name.endsWith("." + item))
 }
 
@@ -420,11 +424,12 @@ export async function profileSecrets(input: {
   const secrets: string[] = [...(input.extra ?? [])]
   const users: string[] = []
   let status: "ok" | "unavailable" = "ok"
-  if (input.loginom && input.codec) {
+  if (input.loginom) {
     const directory = join(input.loginom, "connection")
     // Never create profile directories: read only an existing store.
     if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false })?.isFile()) {
       try {
+        if (!input.codec) throw Error("codec-unavailable")
         const active = await connectionStore(directory, input.codec).read()
         if (active) {
           secrets.push(active.apiKey, active.password)
