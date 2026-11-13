@@ -32,7 +32,10 @@ export function auditFilterBindings(events,initial,final){
  assert.ok(before&&after,'FILTER_BINDING_SOURCE_INVENTORY');
  assert.deepEqual(before.map(v=>[v.id,v.index,v.name,v.type]),after.map(v=>[v.id,v.index,v.name,v.type]),'FILTER_BINDING_VARIABLE_IDENTITY');
  if(top){
-  for(const [variables,want] of [[before,'3'],[after,'5']])assert.deepEqual(variables.find(v=>v.name===name)?.cell,{type:'integer',is_null:false,value:want,precision:'exact_integer'});
+  for(const [variables,want] of [[before,'3'],[after,'5']]){
+   const cell=variables.find(v=>v.name===name)?.cell;
+   assert.equal(cell?.type,'integer');assert.equal(cell.is_null,false);assert.equal(cell.precision,'exact_integer');assert.equal(cell.value,want);
+  }
  }
  if(!top){const sentinel=v=>v.find(x=>x.name==='Sentinel');assert.ok(sentinel(before),'FILTER_BINDING_SENTINEL');assert.deepEqual(sentinel(before),sentinel(after));}
  return {status:'PASS',node:first.result.node,binding:b,initial_execution_id:first.result.execution.execution_id,final_execution_id:second.result.execution.execution_id};
