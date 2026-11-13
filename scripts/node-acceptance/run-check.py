@@ -2062,7 +2062,7 @@ class Runner:
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
         if spec.get('excel_mode') == 'variables':
             prompt = prompt.replace('{{EXCEL_INITIAL_DESTINATION}}', destinations[0]).replace('{{EXCEL_FINAL_DESTINATION}}', destinations[1])
-            expected['variable_inventory'] = dict(outputs=[dict(node=dict(type='variables.calculator'), port=0, ordered=True,
+            expected['variable_inventory'] = dict(outputs=[dict(node=dict(type='variables.calculator'), port=0, ordered=False,
                 variables=[dict(name='ExcelPath', label_any=True, type='string', value=destinations[1]),
                            dict(name='SheetName', label_any=True, type='string', value='Февраль')])],
                 links=[dict(source=dict(type='variables.calculator'), output=0, target=dict(type='exports.excel'), input=0, kind='variables')])
@@ -2549,6 +2549,15 @@ class Runner:
                 self.phase('oracle-' + book['phase'], [sys.executable, '-B', src / 'oracle.py', '--verify', book['phase'], actual], folder, timeout=60)
                 manifest.append(dict(file=str(actual), phase=book['phase']))
             assert stages[0][0] < stages[1][0] and stages[0][1]['node'] == stages[1][1]['node'], 'EXCEL_VARIABLE_SAME_NODE'
+            calculators = [(n, o, o.get('configuration', {}).get('readback', {})) for n, o in replies
+                           if o.get('status') == 'SUCCEEDED' and o.get('execution', {}).get('status') == 'completed'
+                           and o.get('configuration', {}).get('readback', {}).get('kind') == 'variables_calculator']
+            first = [c for c in calculators if c[0] < stages[0][0]]
+            second = [c for c in calculators if stages[0][0] < c[0] < stages[1][0]]
+            assert first and second and first[-1][1]['node'] == second[-1][1]['node'], 'EXCEL_VARIABLE_SAME_CALCULATOR'
+            unchanged = lambda r: [{k: v for k, v in e.items() if k != 'formula'} for e in r['expressions']]
+            assert unchanged(first[-1][2]) == unchanged(second[-1][2]), 'EXCEL_VARIABLE_SOURCE_ONLY_VALUES'
+
             requests = [event.get('part', {}).get('state', {}).get('input', {}) for _, event in events
                         if event.get('type') == 'tool_use' and event.get('part', {}).get('tool') == 'loginom_dock_node_apply']
             assert any(r.get('operation_id') == stages[1][1].get('operation_id') and r.get('target', {}).get('kind') == 'existing'

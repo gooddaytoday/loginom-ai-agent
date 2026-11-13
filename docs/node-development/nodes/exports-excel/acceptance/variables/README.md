@@ -27,6 +27,17 @@ run-check (`{{EXCEL_*_DESTINATION}}`, по образцу `{{LGD_INITIAL_DESTINA
 Имена файлов в этих путях должны быть `excel-var-a.xlsx` и `excel-var-b.xlsx`:
 oracle сверяет `path.name` с `filename` (иначе FAIL `FILENAME`).
 
+### Уточнение LAB-1552
+
+Свежая native-проба 13.11.2026 описана в `../../discovery.md`: оба переключателя,
+picker и сохранение variable-mode после cold подтверждены. `Input_Var-2` —
+обычный `kind:variables,input:0`, а не control из исходного предложения;
+oracle/expected исправляют только этот вид порта. Значения книг не изменялись.
+`excel-export-variables` зарегистрирован в штатном run-check. Уникальные
+серверные пути задаёт harness; скачанные байты проверяются под canonical
+именами из expected, без преобразования книги. Cold проверяет финальное
+состояние того же sink и обе реальные привязки, не переписывая настройки.
+
 ### Файлы
 
 - [task.md](task.md) — задание на языке пользователя; модели передаются только
