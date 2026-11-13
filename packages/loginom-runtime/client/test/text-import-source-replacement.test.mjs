@@ -207,6 +207,20 @@ test('bound existing patches reject a literal conflict or an unobserved variable
   assert.deepEqual(f.parameters,before);
   assert.equal(f.refreshes,0);
  });
+ test('unconfigured patch defaults omitted column usage while retaining explicit exclusions',async()=>{
+  const f=fixture({unconfigured:true});delete f.parameters.source.source_path;
+  delete f.parameters.columns[0].used;f.parameters.columns[1].used=false;
+  const before=structuredClone(f.parameters),observe=f.channel.observe;
+  f.channel.observe=options=>observe({...options,ready:s=>{
+   s.wizard.import_columns.fields[1].used=false;
+   return options.ready(s);
+  }});
+  const result=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv');
+  assert.equal(result.verified,true);
+  assert.equal(result.source.fields.source_path.value,'/test/new.csv');
+  assert.deepEqual(result.columns.map(c=>c.used),[true,false]);
+  assert.deepEqual(f.parameters,before);
+ });
  test('unconfigured patch with incomplete settings refuses before any settings gesture and leaves request intact',async()=>{
   for(const change of [p=>delete p.source,p=>delete p.format,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
    const f=fixture({unconfigured:true});change(f.parameters);const before=structuredClone(f.parameters);

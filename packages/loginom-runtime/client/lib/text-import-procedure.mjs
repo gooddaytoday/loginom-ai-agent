@@ -529,6 +529,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     if(!['source_path','source_paths','source_mask'].some(k=>Object.hasOwn(requested.source,k))
       &&typeof patch.verifiedSourcePath==='string'&&!/[｜*]/.test(patch.verifiedSourcePath))
       requested.source.source_path=patch.verifiedSourcePath;
+    // Existing patches permit omitted usage. A first configuration has no
+    // saved exclusions to preserve; explicitly disabled fields stay disabled.
+    if(Array.isArray(requested.columns))requested.columns=requested.columns.map(c=>({used:true,...c}));
     validateInitialExistingImportSettings(requested,patch.verifiedSourcePath);
     return configureImport(channel,requested,owner,true);
   }
