@@ -6,7 +6,7 @@
 уборка — готовая сборка runtime `origin/v040@497dd093f2` на mas2 (CLI не
 собирался, модель не запускалась); жесты — мышью по наблюдённым `data-tid`,
 чтение — DOM/Ext без вызова внутренних обработчиков Loginom. Нагрузка mas2 на
-стартах 6–15 (один старт при 30, см. «Ограничения»). Это исследование и
+стартах 6–15 (на конце запуска 11 — 22; один старт при 30, см. «Ограничения»). Это исследование и
 предложение контракта, не PASS.
 
 ## Проба выполнения (наблюдено)
@@ -110,12 +110,35 @@
   пустая ячейка (NULL) в Amount и AmountScaled; дата `02/29/2024, 12:00 AM`; порядок
   полей = порядок столбцов кадра, новый столбец — в конце.
 
+## Объявленная схема и запись pandas (наблюдено, запуск 11)
+
+Источник — Python, кадр с nullable-типами как у `to_data_frame(InputTable, True)`
+(Int64, float64 с NaN, object с None, boolean с NA, datetime64 с NaT) →
+`prepare_compatible_table` + `fill_table`. Приёмник читает: типы Integer, Float,
+String, Boolean, DateTime; **None, NA, NaT и NaN пришли как NULL** (`IsNull` True),
+`''` — пустая строка.
+
+Объявленные поля приёмника: `btnAddMappingColumn` на странице 2 открывает
+`{P};WizrdMCF;EditColumnDefForm` «Добавить столбец»: `edtName` «Имя», `edtDisplayName`
+«Метка», `cbxDataType` «Тип данных» (по умолчанию **«Строковый»**), `cbxDataKind`
+«Вид данных» («Дискретный»), `cbxUsageType` «Назначение по умолчанию» («Не задано»),
+`btnApply` «Добавить», `btnCancel` «Отмена». Шесть полей Id…Date добавлены в порядке
+добавления (`grdTargetColumns`: Name, DisplayName, DataType=5, OriginType=1).
+Клик по полю ввода `cbxDataType` список типов не открыл — все поля остались
+строковыми; выбор типа (через `trg_picker`, как у JavaScript) не наблюдён.
+
+Код `calculation.py` (флаг «из кода» выкл., `type(OutputTable)` =
+`OutputTableClass`) выполнился: `Set` по имени в **строковые** поля записал
+`'1'`, `'10.5'`, `'31.5'`, `'True'`, `'2024-02-29 00:00:00'` **без ошибки** —
+значение молча приводится к типу поля; NULL остаётся NULL, `''` — `''`. Поэтому
+обработчик обязан задавать и читать обратно тип каждого объявленного поля.
+
 ## Не проверено (`not_checked`)
 
 Входные переменные и `Input_Add`; вкладки нескольких выходов на странице 2;
 изменение схемы A/B→B/C без configure; окружения/PY_ENV/venv/контейнеры; модули
 и файлы; отмена, тайм-аут запуска, параллельность; сохранение и cold-open пакета;
-время выполнения; поведение при пустом входе и после первой строки (`AddColumn`).
+выбор типа в `cbxDataType` и `Set` в объявленные нестроковые поля; время выполнения; поведение при пустом входе и после первой строки (`AddColumn`).
 
 ## Предложение этапа 1
 
@@ -131,7 +154,7 @@ Runtime type `programming.python`, режим `external_process` (наблюде
 | Сценарий | Вход модели | Схема | Ожидание |
 |---|---|---|---|
 | `python-stdlib` | `values.csv`, `calculation.py` | declared: Id, Amount, AmountScaled, Text, Flag, Date | 4 строки по порядку; AmountScaled = Amount×3; NULL Amount → NULL; `''` ≠ NULL |
-| `python-pandas` | `values.csv`, `pandas_calculation.py` | code: кадр Id, Amount, Text, Flag, Date + AmountScaled | 2 строки (Flag=true) по порядку; типы nullable-пути выше |
+| `python-pandas` | `values.csv`, `pandas_calculation.py` | code: кадр Id, Amount, Text, Flag, Date + AmountScaled | 3 строки (Flag=true: Id 1, 3, 4) по порядку; NULL Amount, Text, Date сохраняются; типы nullable-пути выше |
 
 Критерии (предложение, утверждает оркестратор): выход узла `output_port 0`,
 `ordered: true`, `column_order: exact`, вещественные — допуск `abs 0 / rel 0`

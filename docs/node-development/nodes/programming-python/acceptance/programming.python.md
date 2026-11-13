@@ -10,11 +10,13 @@
 - `schema_mode: declared` — поля выхода задаются в мастере (`columns`: name, label,
   type ∈ integer/real/string/boolean/datetime), код только `OutputTable.Append()` и
   `Set(name, value)`.
+  `Set` в поле другого типа не падает, а приводит значение (в строковое поле —
+  `'1'`, `'True'`): тип каждого поля задаётся явно и сверяется по readback.
 - `schema_mode: code` — включено «Разрешить формировать выходные столбцы из кода»;
   код создаёт поля (`AddColumn`, `prepare_compatible_table`) до первой строки.
 - pandas 2.2.3 и numpy 2.2.4 установлены. Для типов с пропусками используйте
   `to_data_frame(InputTable, True)`: без него целое и логическое с пропуском
-  становятся вещественными.
+  становятся вещественными. `fill_table` пишет None/NA/NaT/NaN как пропуск.
 - Существующий узел с `{}` сохраняет код и схему; замена кода — с
   `expected_source_sha256` из readback. Предпросмотр выполняет весь код.
 

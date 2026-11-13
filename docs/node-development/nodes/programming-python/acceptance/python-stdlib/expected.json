@@ -84,7 +84,7 @@
           "Amount": -5.5,
           "AmountScaled": -16.5,
           "Text": null,
-          "Flag": false,
+          "Flag": true,
           "Date": null
         }
       ]

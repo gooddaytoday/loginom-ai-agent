@@ -70,6 +70,14 @@
           "Flag": true,
           "Date": "2024-03-02 00:00:00",
           "AmountScaled": null
+        },
+        {
+          "Id": 4,
+          "Amount": -5.5,
+          "Text": null,
+          "Flag": true,
+          "Date": null,
+          "AmountScaled": -16.5
         }
       ]
     }
