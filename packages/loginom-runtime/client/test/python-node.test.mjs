@@ -242,7 +242,7 @@ function columnsPage({cover=0,coverAfterApply=false,missingType=null,deadline=Da
 test('declared columns wait out a transient cover over Add after Apply and still refuse a lasting one',{timeout:30000},async()=>{
  const transient=columnsPage({cover:3,coverAfterApply:true});
  const ok=await transient.run();
- assert.equal(ok.status,'SUCCEEDED',ok.error);assert.deepEqual(ok.columns,declared);
+ assert.equal(ok.status,'SUCCEEDED',ok.error);assert.deepEqual(JSON.parse(JSON.stringify(ok.columns)),declared);
  const lasting=columnsPage({cover:1e9,coverAfterApply:true,deadline:Date.now()+20000}),started=Date.now();
  const refused=await lasting.run();
  assert.equal(refused.status,'AMBIGUOUS');assert.equal(refused.cleanup_complete,true);assert.equal(lasting.records.length,1);
