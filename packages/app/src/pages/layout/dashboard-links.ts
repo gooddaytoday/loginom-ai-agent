@@ -31,7 +31,6 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
     const path = location.pathname
     const draftID = search.draftId || search.dashboardDraft
     const current = !cold && (path === "/new-session" || /\/session(?:\/[^/]+)?\/?$/.test(path))
-    const existing = link.action === "edit" && current
     const draft = path === "/new-session" && tabs.store.find((tab) => tab.type === "draft" && tab.draftID === draftID)
     const key =
       current && params.serverKey ? requireServerKey(params.serverKey) : current && draft ? draft.server : server.key
@@ -40,17 +39,13 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
       return
     }
 
-    // Capture the recipient before fetching. A newer click for this draft wins even if replies arrive out of order.
-    const route = dashboardRoute(key, existing ? path : "/", existing ? draftID : undefined)
+    // A newer click wins even if snapshot replies arrive out of order.
+    const route = dashboardRoute(key, "/")
     requests.set(route, link)
     try {
       const snapshot = await platform.getDashboardTarget(link.id)
       if (requests.get(route) !== link) return
-      const item = { type: "dashboard", ...link, nodeName: snapshot.nodeName } as const
-      if (existing) {
-        deliverDashboard(route, item)
-        return
-      }
+      const item = { type: "dashboard", ...link, nodeName: snapshot.nodeName, fresh: snapshot.fresh } as const
       layout.projects.open(snapshot.directory)
       if (settings.general.newLayoutDesigns()) {
         await tabs.ready.promise
@@ -63,9 +58,16 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
       const draftID = crypto.randomUUID()
       deliverDashboard(dashboardRoute(key, path, draftID), item)
       navigate(`${path}?dashboardDraft=${draftID}`)
-    } catch {
+    } catch (error) {
       if (requests.get(route) === link)
-        showToast({ title: language.t("dashboard.target.unavailable"), variant: "error" })
+        showToast({
+          title: language.t(
+            error instanceof Error && error.message.includes("DASHBOARD_NOT_CONFIGURED")
+              ? "dashboard.target.notConfigured"
+              : "dashboard.target.snapshotGone",
+          ),
+          variant: "error",
+        })
     } finally {
       if (requests.get(route) === link) requests.delete(route)
     }

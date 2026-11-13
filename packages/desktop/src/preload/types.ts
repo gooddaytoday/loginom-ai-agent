@@ -57,7 +57,10 @@ export type ElectronAPI = {
   wslServers: WslServersAPI
   updater: UpdaterAPI
   consumeDeepLinks: () => Promise<PendingDeepLinks>
-  getDashboardTarget: (id: string) => Promise<{ nodeName: string; directory: string }>
+  getDashboardTarget: (
+    id: string,
+  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean }>
+  checkDashboardTarget: (id: string) => Promise<boolean>
   getDefaultServerUrl: () => Promise<string | null>
   setDefaultServerUrl: (url: string | null) => Promise<void>
   isFirstLaunchOnboardingPending: () => Promise<boolean>

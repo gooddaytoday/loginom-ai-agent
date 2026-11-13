@@ -8,7 +8,6 @@ import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
 import type { FatalRendererError, PendingDeepLinks, ServerReadyData, TitlebarTheme } from "../preload/types"
-import { getDashboardTarget } from "./dashboard-target"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations, describePickedFiles } from "./attachment-picker"
@@ -40,6 +39,10 @@ type Deps = {
   killSidecar: () => Promise<void> | void
   relaunch: () => void
   awaitInitialization: () => Promise<ServerReadyData>
+  getDashboardTarget: (
+    id: string,
+  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean }>
+  checkDashboardTarget: (id: string) => Promise<boolean>
   consumeDeepLinks: (sender: WebContents) => PendingDeepLinks
   getDefaultServerUrl: () => Promise<string | null> | string | null
   setDefaultServerUrl: (url: string | null) => Promise<void> | void
@@ -78,7 +81,8 @@ export function registerIpcHandlers(deps: Deps) {
     publishSystemProxyStatus({ ...currentSystemProxyStatus(), enabled: enabled === true })
   })
   ipcMain.handle("consume-deep-links", (event) => deps.consumeDeepLinks(event.sender))
-  ipcMain.handle("get-dashboard-target", (_event, id: string) => getDashboardTarget(id))
+  ipcMain.handle("get-dashboard-target", (_event, id: string) => deps.getDashboardTarget(id))
+  ipcMain.handle("check-dashboard-target", (_event, id: string) => deps.checkDashboardTarget(id))
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())
   ipcMain.handle("set-default-server-url", (_event: IpcMainInvokeEvent, url: string | null) =>
     deps.setDefaultServerUrl(url),

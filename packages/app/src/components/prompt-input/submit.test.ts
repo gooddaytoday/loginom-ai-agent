@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { createStore } from "solid-js/store"
 import { createPromptState } from "@/context/prompt-state"
 import type { Prompt, PromptStore } from "@/context/prompt"
+import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
 import type { ModelSelection } from "@/context/local"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
@@ -34,7 +35,8 @@ const sentPrompts: string[] = []
 const promptInputs: unknown[] = []
 const sentCommands: unknown[] = []
 const toasts: unknown[] = []
-let lookupDashboard: (id: string) => Promise<{ nodeName: string; directory: string }>
+let lookupDashboard: (id: string) => Promise<boolean>
+const snapshotReads: string[] = []
 let onPrompt: (() => void) | undefined
 const commands: Array<{ name: string }> = []
 let serverSessionSyncs = 0
@@ -270,7 +272,11 @@ beforeAll(async () => {
   mock.module("@/context/platform", () => ({
     usePlatform: () => ({
       fetch: fetch,
-      getDashboardTarget: (id: string) => lookupDashboard(id),
+      getDashboardTarget: async (id: string) => {
+        snapshotReads.push(id)
+        return { nodeName: "A", directory: "/repo/main", action: "edit", fresh: false }
+      },
+      checkDashboardTarget: (id: string) => lookupDashboard(id),
     }),
   }))
 
@@ -309,7 +315,8 @@ beforeEach(() => {
   createSessionGate = undefined
   serverSessionSyncs = 0
   onPrompt = undefined
-  lookupDashboard = async () => ({ nodeName: "A", directory: "/repo/main" })
+  lookupDashboard = async () => true
+  snapshotReads.length = 0
   toasts.length = 0
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
 })
@@ -819,7 +826,7 @@ test("a queued slash command includes its pinned dashboard in the accepted messa
       expect.objectContaining({
         type: "text",
         synthetic: true,
-        text: expect.stringContaining("/dashboard/targets/target-a"),
+        text: dashboardPrompt("edit", false),
       }),
     ],
   })
@@ -837,7 +844,7 @@ test("a rejected dashboard prompt restores the user's words and target for retry
   expect(promptInputs[0]).toMatchObject({
     legacyParts: [
       expect.objectContaining({ text: "Edit chart" }),
-      expect.objectContaining({ synthetic: true, text: expect.stringContaining("/dashboard/targets/target-a") }),
+      expect.objectContaining({ synthetic: true, text: dashboardPrompt("edit", false) }),
     ],
   })
   expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
@@ -879,20 +886,20 @@ test("an expired dashboard keeps the draft and tells the user to reopen it in Lo
   expect(promptInputs).toHaveLength(0)
   expect(state.current()[0]).toMatchObject({ content: "Edit chart" })
   expect(state.context.items()[0]).toMatchObject({ id: "target-a" })
-  expect(toasts).toContainEqual(expect.objectContaining({ title: "dashboard.target.unavailable", variant: "error" }))
+  expect(toasts).toContainEqual(expect.objectContaining({ title: "dashboard.target.snapshotGone", variant: "error" }))
 })
 
 test("queueing a validated dashboard keeps a newer selection and text in the editor", async () => {
   params = { id: "session-1" }
   const state = dashboardDraft("Edit first")
-  const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
+  const gate = Promise.withResolvers<boolean>()
   lookupDashboard = () => gate.promise
   const queued: import("./submit").FollowupDraft[] = []
   const submit = dashboardSubmit(state, { shouldQueue: () => true, onQueue: (draft) => queued.push(draft) })
   const pending = submit.handleSubmit(new Event("submit"))
   state.context.add({ type: "dashboard", id: "target-b", nodeName: "B", action: "edit" })
   state.set([{ type: "text", content: "Edit second", start: 0, end: 11 }])
-  gate.resolve({ nodeName: "A", directory: "/repo/main" })
+  gate.resolve(true)
   await pending
 
   expect(queued[0]?.context[0]).toMatchObject({ id: "target-a" })
@@ -906,9 +913,9 @@ test("an expired queued dashboard rejects delivery without sending its command",
   await expect(
     sendQueuedReview(async (id) => {
       ids.push(id)
-      throw new Error("dashboard.target.unavailable")
+      throw new Error("dashboard.target.snapshotGone")
     }),
-  ).rejects.toThrow("dashboard.target.unavailable")
+  ).rejects.toThrow("dashboard.target.snapshotGone")
   expect(ids).toEqual(["target-a"])
   expect(sentCommands).toHaveLength(0)
 })
@@ -916,7 +923,7 @@ test("an expired queued dashboard rejects delivery without sending its command",
 test("repeat Enter during a dashboard lookup submits the captured draft once", async () => {
   params = { id: "session-1" }
   const state = dashboardDraft("Edit A")
-  const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
+  const gate = Promise.withResolvers<boolean>()
   const ids: string[] = []
   lookupDashboard = (id) => {
     ids.push(id)
@@ -924,7 +931,7 @@ test("repeat Enter during a dashboard lookup submits the captured draft once", a
   }
   const submit = dashboardSubmit(state)
   const sends = [submit.handleSubmit(new Event("submit")), submit.handleSubmit(new Event("submit"))]
-  gate.resolve({ nodeName: "A", directory: "/repo/main" })
+  gate.resolve(true)
   await Promise.all(sends)
   expect(ids).toEqual(["target-a"])
   expect(promptInputs).toHaveLength(1)
@@ -982,7 +989,7 @@ test("a dashboard that expires during session creation stays in the draft", asyn
   let available = true
   lookupDashboard = async () => {
     if (!available) throw new Error("404")
-    return { nodeName: "A", directory: "/repo/main" }
+    return true
   }
   const state = dashboardDraft("Edit A")
   const sending = dashboardSubmit(state, { info: () => undefined }).handleSubmit(new Event("submit"))
@@ -998,9 +1005,9 @@ test("a dashboard that expires during session creation stays in the draft", asyn
 test("the promoted chat cannot submit the same draft during its final dashboard lookup", async () => {
   const first = dashboardDraft("Edit A")
   const chat = createPromptState()
-  const gate = Promise.withResolvers<{ nodeName: string; directory: string }>()
+  const gate = Promise.withResolvers<boolean>()
   let reads = 0
-  lookupDashboard = async () => (++reads === 1 ? { nodeName: "A", directory: "/repo/main" } : gate.promise)
+  lookupDashboard = async () => (++reads === 1 ? true : gate.promise)
   const original = dashboardSubmit(first, {
     info: () => undefined,
     prompt: { ...first, capture: (scope) => (scope ? chat.capture() : first.capture()) },
@@ -1010,7 +1017,20 @@ test("the promoted chat cannot submit the same draft during its final dashboard 
   expect(chat.current()[0]).toMatchObject({ content: "Edit A" })
   params = { id: "session-1" }
   const repeated = dashboardSubmit(chat).handleSubmit(new Event("submit"))
-  gate.resolve({ nodeName: "A", directory: "/repo/main" })
+  gate.resolve(true)
   await Promise.all([sending, repeated])
+  expect(promptInputs).toHaveLength(1)
+})
+
+test("sending a dashboard checks its local folder without fetching the consumed snapshot", async () => {
+  params = { id: "session-1" }
+  const ids: string[] = []
+  lookupDashboard = async (id) => {
+    ids.push(id)
+    return true
+  }
+  await dashboardSubmit(dashboardDraft("Edit chart")).handleSubmit(new Event("submit"))
+  expect(ids).toEqual(["target-a"])
+  expect(snapshotReads).toEqual([])
   expect(promptInputs).toHaveLength(1)
 })

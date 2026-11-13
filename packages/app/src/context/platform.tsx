@@ -80,7 +80,10 @@ type PlatformBase = {
   updater?: UpdaterPlatform
 
   /** Resolve a local Loginom dashboard snapshot selected in the browser. */
-  getDashboardTarget?(id: string): Promise<{ nodeName: string; directory: string }>
+  getDashboardTarget?(
+    id: string,
+  ): Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean }>
+  checkDashboardTarget?(id: string): Promise<boolean>
 
   /** Fetch override */
   fetch?: typeof fetch

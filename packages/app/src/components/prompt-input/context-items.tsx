@@ -103,7 +103,7 @@ export function PromptDashboardContext(props: {
   remove: (key: string) => void
   focus: () => void
   t: (
-    key: "prompt.context.dashboardCreate" | "prompt.context.dashboardEdit" | "prompt.attachment.remove",
+    key: "prompt.context.dashboardDraft" | "prompt.context.dashboardRevise" | "prompt.attachment.remove",
     params?: { name: string },
   ) => string
 }) {
@@ -120,7 +120,7 @@ export function PromptDashboardContext(props: {
       {(item) => (
         <div class="flex items-center gap-2 px-3 pt-2 text-12-medium text-text-strong">
           <span>
-            {props.t(item().action === "create" ? "prompt.context.dashboardCreate" : "prompt.context.dashboardEdit", {
+            {props.t(item().action === "create" ? "prompt.context.dashboardDraft" : "prompt.context.dashboardRevise", {
               name: item().nodeName,
             })}
           </span>

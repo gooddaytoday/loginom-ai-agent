@@ -1,4 +1,4 @@
-// Run with Node 24 and LOGINOM_AI_AGENT_TEST_EXECUTABLE; uses an isolated Desktop profile.
+// Run with Node 24 against a built Desktop; uses an isolated profile.
 import { createRequire } from "node:module"
 import { mkdtemp } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -9,14 +9,18 @@ import { fixture, pageMessages } from "../../../app/e2e/performance/timeline/ses
 
 const require = createRequire(new URL("../../../app/package.json", import.meta.url))
 const { _electron, expect } = require("@playwright/test") as typeof import("@playwright/test")
-const executablePath = process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE
-if (!executablePath) throw new Error("LOGINOM_AI_AGENT_TEST_EXECUTABLE is required")
+const directory = resolve(import.meta.dirname, "../..")
+const executablePath =
+  process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ?? resolve(directory, "node_modules/electron/dist/electron")
 const evidence = await mkdtemp(join(tmpdir(), "dashboard-chat-"))
+const dashboard = join(evidence, "dashboards", "campaign-fixture", "work")
 const first = "9465655a-84c2-4fd3-bcfe-a2c4024168e2"
 const second = "9465655a-84c2-4fd3-bcfe-a2c4024168e3"
+const notConfigured = "9465655a-84c2-4fd3-bcfe-a2c4024168e5"
 const application = await _electron.launch({
   executablePath,
-  args: [],
+  args: process.env.LOGINOM_AI_AGENT_TEST_EXECUTABLE ? [] : [directory],
+  cwd: directory,
   env: {
     ...process.env,
     LOGINOM_AI_AGENT_TEST_ONBOARDING: "1",
@@ -31,6 +35,12 @@ try {
   page.setDefaultTimeout(30_000)
   const init = await page.evaluate(() => window.api.awaitInitialization())
   process.env.PLAYWRIGHT_SERVER_PORT = new URL(init.url).port
+  const requestedDirectories: string[] = []
+  page.on("request", (request) => {
+    const url = new URL(request.url())
+    const directory = url.searchParams.get("directory")
+    if (url.origin === new URL(init.url).origin && directory) requestedDirectories.push(directory)
+  })
   await mockOpenCodeServer(page, {
     provider: fixture.provider,
     directory: fixture.directory,
@@ -41,16 +51,24 @@ try {
   })
   // Snapshot and Loginom readiness are fixtures; routing, drafts and IPC are real.
   await application.evaluate(
-    ({ ipcMain }, { first, second, directory }) => {
+    ({ ipcMain }, { first, second, notConfigured, directory }) => {
       ipcMain.removeHandler("get-dashboard-target")
       ipcMain.handle("get-dashboard-target", (_event, id: string) => {
+        if (id === notConfigured) throw new Error("DASHBOARD_NOT_CONFIGURED")
         if (id !== first && id !== second) throw new Error("Snapshot unavailable")
-        return { directory, nodeName: id === first ? "Existing dashboard" : "New dashboard" }
+        return {
+          directory,
+          nodeName: id === first ? "Existing dashboard" : "New dashboard",
+          action: id === first ? "edit" : "create",
+          fresh: true,
+        }
       })
+      ipcMain.removeHandler("check-dashboard-target")
+      ipcMain.handle("check-dashboard-target", (_event, id: string) => id === first || id === second)
       ipcMain.removeHandler("loginom-read")
       ipcMain.handle("loginom-read", () => ({ generation: 1, state: "ready" }))
     },
-    { first, second, directory: fixture.directory },
+    { first, second, notConfigured, directory: dashboard },
   )
   await page.evaluate(async (directory) => {
     await window.api.finishFirstLaunchOnboarding(false)
@@ -88,37 +106,51 @@ try {
     application.evaluate(({ app }, url) => {
       app.emit("second-instance", {}, ["loginom-ai-agent", url], "")
     }, `loginom-ai-agent://dashboard?id=${id}&action=${action}`)
+  const drafts = page.locator('[data-slot="titlebar-tabs"] a[href^="/new-session?draftId="]')
   await open(first, "edit")
-  await expect(page.getByText("Editing dashboard “Existing dashboard”", { exact: true })).toBeVisible()
+  await expect(drafts).toHaveCount(1)
+  await expect(page.getByText("Dashboard edit “Existing dashboard”", { exact: true })).toBeVisible()
+  await expect(editor).toHaveText("")
+  // Project display names come from fixtures; the backend request carries the selected folder.
+  await expect.poll(() => requestedDirectories).toContain(dashboard)
   await open(second, "create")
-  await expect(page.locator('[data-slot="titlebar-tabs"] a[href^="/new-session?draftId="]')).toHaveCount(1)
-  await expect(page.getByText("Creating a dashboard for node “New dashboard”", { exact: true })).toBeVisible()
+  await expect(drafts).toHaveCount(2)
+  await expect(page.getByText("Dashboard draft for node “New dashboard”", { exact: true })).toBeVisible()
   await expect(editor).toHaveText("")
   await original.click()
   await expect(editor).toHaveText("Keep this draft for the existing dashboard")
-  await expect(page.getByText("Editing dashboard “Existing dashboard”", { exact: true })).toBeVisible()
+  await expect(page.getByText("Dashboard edit “Existing dashboard”", { exact: true })).toHaveCount(0)
   // With draft text the composer shows Send; Stop is exposed when it is empty.
   await editor.fill("")
   await expect(page.getByRole("button", { name: /^(Stop|Остановить)$/ })).toBeVisible()
   await editor.fill("Keep this draft for the existing dashboard")
   await page.screenshot({ path: join(evidence, "original-preserved.png") })
-  const created = page.locator('[data-slot="titlebar-tabs"] a[href^="/new-session?draftId="]')
+  const created = drafts.nth(1)
   const href = await created.getAttribute("href")
   await created.click()
   await editor.fill("Keep the new dashboard draft too")
   await open(second, "edit")
-  await expect(page.getByText("Editing dashboard “New dashboard”", { exact: true })).toBeVisible()
+  await expect(drafts).toHaveCount(3)
+  await expect(page.getByText("Dashboard edit “New dashboard”", { exact: true })).toBeVisible()
+  await expect(editor).toHaveText("")
   await open(first, "create")
-  await expect(page.locator('[data-slot="titlebar-tabs"] a[href^="/new-session?draftId="]')).toHaveCount(2)
-  await expect(page.getByText("Creating a dashboard for node “Existing dashboard”", { exact: true })).toBeVisible()
+  await expect(drafts).toHaveCount(4)
+  await expect(page.getByText("Dashboard draft for node “Existing dashboard”", { exact: true })).toBeVisible()
   await page.locator(`[data-slot="titlebar-tabs"] a[href="${href}"]`).click()
   await expect(editor).toHaveText("Keep the new dashboard draft too")
-  await expect(page.getByText("Editing dashboard “New dashboard”", { exact: true })).toBeVisible()
+  await expect(page.getByText("Dashboard draft for node “New dashboard”", { exact: true })).toBeVisible()
   await open("9465655a-84c2-4fd3-bcfe-a2c4024168e4", "create")
   await expect(
-    page.getByText("Could not load the selected node. Open the dashboard in Loginom again.", { exact: true }),
+    page.getByText(
+      "The snapshot was already used, has expired or belongs to another stand. Press the button in Studio again.",
+      { exact: true },
+    ),
   ).toBeVisible()
-  await expect(page.locator('[data-slot="titlebar-tabs"] a[href^="/new-session?draftId="]')).toHaveCount(2)
+  await expect(drafts).toHaveCount(4)
+  await expect(editor).toHaveText("Keep the new dashboard draft too")
+  await open(notConfigured, "create")
+  await expect(page.getByText("Connect a Loginom stand in settings first.", { exact: true })).toBeVisible()
+  await expect(drafts).toHaveCount(4)
   await expect(editor).toHaveText("Keep the new dashboard draft too")
   console.log(
     JSON.stringify({
@@ -126,8 +158,11 @@ try {
       evidence,
       busyChatPreserved: true,
       separateCreateDraft: true,
+      separateEditDraft: true,
+      dashboardFolder: true,
       repeatedCreate: true,
       snapshotFailurePreserved: true,
+      notConfiguredPreserved: true,
     }),
   )
 } catch (error) {

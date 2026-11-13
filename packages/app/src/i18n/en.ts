@@ -5,10 +5,12 @@ import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 export const LOGINOM_ENGLISH = {
   "prompt.attachment.missingPath":
     "This attachment has no disk path. Save it and attach it using the file picker, or provide its path.",
-  "dashboard.target.unavailable": "Could not load the selected node. Open the dashboard in Loginom again.",
+  "dashboard.target.snapshotGone":
+    "The snapshot was already used, has expired or belongs to another stand. Press the button in Studio again.",
+  "dashboard.target.notConfigured": "Connect a Loginom stand in settings first.",
   "dashboard.target.localOnly": "Open a local Desktop chat to work on this dashboard.",
-  "prompt.context.dashboardCreate": "Creating a dashboard for node “{{name}}”",
-  "prompt.context.dashboardEdit": "Editing dashboard “{{name}}”",
+  "prompt.context.dashboardDraft": "Dashboard draft for node “{{name}}”",
+  "prompt.context.dashboardRevise": "Dashboard edit “{{name}}”",
   "loginom.saveClose": "Save and close",
   "loginom.saving": "Saving settings…",
   "loginom.applying": "Applying settings…",

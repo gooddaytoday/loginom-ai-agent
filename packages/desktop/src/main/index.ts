@@ -1,4 +1,4 @@
-import { desktopLoginom } from "./loginom/desktop-service"
+import { desktopLoginom, loginomResources } from "./loginom/desktop-service"
 import { registerLoginomIpc } from "./loginom/ipc"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync } from "node:fs"
@@ -9,6 +9,7 @@ import { isAbsolute, join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
 import { app, BrowserWindow, dialog, session } from "electron"
+import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { Product, productName } from "@loginom-ai-agent/product"
 
 import { Cause, Deferred, Effect, Fiber } from "effect"
@@ -17,6 +18,7 @@ import contextMenu from "electron-context-menu"
 import type { ServerReadyData } from "../preload/types"
 import { checkAppExists, resolveAppPath } from "./apps"
 import { CHANNEL } from "./constants"
+import { getDashboardTarget, checkDashboardTarget } from "./dashboard-target"
 import { createDeepLinkQueue, protocolUrls } from "./deep-links"
 import { registerIpcHandlers, notifyDeepLinks, sendMenuCommand } from "./ipc"
 import { forwardInitializationFailure } from "./initialization"
@@ -336,6 +338,13 @@ const main = Effect.gen(function* () {
       },
       (e) => Effect.runPromise(e),
     ),
+    getDashboardTarget: (id) =>
+      getDashboardTarget(id, {
+        status: () => loginom.api.status(),
+        dashboards: () => dashboardDataRoot(process.env),
+        template: join(loginomResources(), "dashboard", "template"),
+      }),
+    checkDashboardTarget: (id) => checkDashboardTarget(id, dashboardDataRoot(process.env)),
     consumeDeepLinks: deepLinks.take,
     getDefaultServerUrl: () => getDefaultServerUrl(),
     setDefaultServerUrl: (url) => setDefaultServerUrl(url),

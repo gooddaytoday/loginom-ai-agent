@@ -1,3 +1,4 @@
+import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { LOGINOM_PACKAGE_MIME } from "@/constants/file-picker"
 import { type AgentPartInput, type FilePartInput, type Part, type TextPartInput } from "@opencode-ai/sdk/v2/client"
@@ -198,14 +199,7 @@ export function buildDashboardPart(item: Extract<ContextItem, { type: "dashboard
     id: Identifier.ascending("part"),
     type: "text" as const,
     synthetic: true,
-    text: [
-      item.action === "create"
-        ? "Создай dashboard Loginom по просьбе пользователя."
-        : "Измени dashboard Loginom по просьбе пользователя.",
-      `Прочитай снимок запросом GET http://127.0.0.1:32768/dashboard/targets/${item.id} и используй только этот ID до окончания запроса.`,
-      "Возьми путь исходников и команды из этого снимка. Штатными инструментами отредактируй файлы, проверь, собери и опубликуй приложение.",
-      "Не обращайся к /dashboard/current и не входи в живую сессию Loginom.",
-    ].join(" "),
+    text: dashboardPrompt(item.action, item.fresh === true),
   }
 }
 

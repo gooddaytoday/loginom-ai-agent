@@ -261,8 +261,8 @@ export function useDashboardTargetCheck() {
   const platform = usePlatform()
   const language = useLanguage()
   return async (id: string) => {
-    const snapshot = await platform.getDashboardTarget?.(id).catch(() => undefined)
-    if (!snapshot) throw new Error(language.t("dashboard.target.unavailable"))
+    const ready = await platform.checkDashboardTarget?.(id).catch(() => false)
+    if (!ready) throw new Error(language.t("dashboard.target.snapshotGone"))
   }
 }
 

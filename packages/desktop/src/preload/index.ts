@@ -73,6 +73,7 @@ const api: ElectronAPI = {
   },
   consumeDeepLinks: () => ipcRenderer.invoke("consume-deep-links"),
   getDashboardTarget: (id) => ipcRenderer.invoke("get-dashboard-target", id),
+  checkDashboardTarget: (id) => ipcRenderer.invoke("check-dashboard-target", id),
   getDefaultServerUrl: () => ipcRenderer.invoke("get-default-server-url"),
   setDefaultServerUrl: (url) => ipcRenderer.invoke("set-default-server-url", url),
   isFirstLaunchOnboardingPending: () => ipcRenderer.invoke("is-first-launch-onboarding-pending"),

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Prompt } from "@/context/prompt"
+import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
 import { buildRequestParts } from "./build-request-parts"
 
 describe("buildRequestParts", () => {
@@ -481,7 +482,7 @@ test("large native references retain escaped paths and receipts without inline b
   expect(result.optimisticParts[0]).toMatchObject({ url: part.url, source: part.source })
 })
 
-test("a dashboard request keeps the user's words and passes only the selected snapshot to the agent", () => {
+test("a dashboard request keeps the user's words and adds the local folder instruction", () => {
   const { requestParts } = buildRequestParts({
     prompt: [],
     text: "Change the title",
@@ -495,7 +496,7 @@ test("a dashboard request keeps the user's words and passes only the selected sn
         key: "dashboard",
         id: "5f85dea9-7be3-4709-9525-e11736087e19",
         nodeName: "Node",
-        action: "edit",
+        action: "create",
       },
     ],
   })
@@ -504,9 +505,23 @@ test("a dashboard request keeps the user's words and passes only the selected sn
     expect.objectContaining({
       type: "text",
       synthetic: true,
-      text: expect.stringContaining(
-        "GET http://127.0.0.1:32768/dashboard/targets/5f85dea9-7be3-4709-9525-e11736087e19",
-      ),
+      text: dashboardPrompt("create", false),
     }),
   ])
+})
+
+test("a fresh edit tells the agent that local sources are only a template", () => {
+  const { requestParts } = buildRequestParts({
+    prompt: [],
+    text: "Edit chart",
+    images: [],
+    sessionDirectory: "/repo",
+    sessionID: "s",
+    messageID: "m",
+    context: [{ type: "dashboard", key: "dashboard", id: "target-a", nodeName: "Node", action: "edit", fresh: true }],
+  })
+  expect(requestParts[1]).toMatchObject({ type: "text", synthetic: true, text: dashboardPrompt("edit", true) })
+  const note = requestParts[1]
+  expect(note?.type === "text" ? note.text : "").toContain("заготовка шаблона")
+  expect(JSON.stringify(requestParts)).not.toMatch(/127\.0\.0\.1:32768|\/dashboard\//)
 })

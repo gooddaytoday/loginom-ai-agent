@@ -77,6 +77,7 @@ export type PromptInputV2Comment = {
 }
 
 export type DashboardContextItem = {
+  fresh?: boolean
   type: "dashboard"
   id: string
   action: "create" | "edit"

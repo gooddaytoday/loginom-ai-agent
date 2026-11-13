@@ -177,6 +177,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     platform: "desktop",
     loginom: window.api.loginom,
     getDashboardTarget: window.api.getDashboardTarget,
+    checkDashboardTarget: window.api.checkDashboardTarget,
     os,
     version: pkg.version,
     windowID: windowState.id,
