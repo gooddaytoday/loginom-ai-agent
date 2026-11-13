@@ -1,15 +1,19 @@
 import { expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { copyFile, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 test("bakes the source commit and ignores only the config loader's temporary file when measuring dirtiness", async () => {
   const root = await mkdtemp(join(tmpdir(), "loginom-build-source-"))
+  const desktop = join(root, "packages/desktop")
   const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim()
   try {
-    await copyFile(join(import.meta.dir, "electron.vite.config.ts"), join(root, "electron.vite.config.ts"))
-    await symlink(join(import.meta.dir, "node_modules"), join(root, "node_modules"), "dir")
+    await mkdir(desktop, { recursive: true })
+    await mkdir(join(root, "packages/loginom-host/script"), { recursive: true })
+    await copyFile(join(import.meta.dir, "electron.vite.config.ts"), join(desktop, "electron.vite.config.ts"))
+    await copyFile(join(import.meta.dir, "../loginom-host/script/cloud-build.ts"), join(root, "packages/loginom-host/script/cloud-build.ts"))
+    await symlink(join(import.meta.dir, "node_modules"), join(desktop, "node_modules"), "dir")
     await writeFile(join(root, ".gitignore"), "node_modules\n")
     await writeFile(join(root, "package.json"), '{"type":"module"}\n')
     git("init", "-q")
@@ -26,7 +30,7 @@ test("bakes the source commit and ignores only the config loader's temporary fil
         console.log(JSON.stringify(loaded.config.main.define));
       `,
         ],
-        { cwd: root, stdout: "pipe", stderr: "pipe" },
+        { cwd: desktop, stdout: "pipe", stderr: "pipe" },
       )
       if (result.exitCode) throw Error(result.stderr.toString())
       return JSON.parse(result.stdout.toString())

@@ -16,6 +16,7 @@ const credentialProfile = process.env.LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE
 if (credentialProfile) {
   const connection = await Bun.file(join(credentialProfile, "loginom/connection/connection.json")).json()
   const secrets = await cliCredentials("win32").decode(connection.secrets)
+  config.endpoint = connection.endpoint
   config.api_key = secrets.apiKey
   config.loginom_url = connection.url
   config.workflow_profile = { passwordless_login: secrets.password === "", loginom_user: connection.username }
@@ -23,6 +24,7 @@ if (credentialProfile) {
 const mcpConfig = process.env.LOGINOM_AI_AGENT_TEST_MCP_CONFIG
 if (mcpConfig) {
   const active = await Bun.file(mcpConfig).json()
+  config.endpoint = active.endpoint
   config.api_key = active.api_key
   config.loginom_url = active.loginom_url
   config.workflow_profile = { passwordless_login: true, loginom_user: active.user }
@@ -62,6 +64,7 @@ async function launch(chat: string, csv: string, cleanupPackage: string): Promis
       directory: join(directory, "desktop", chat),
       csv,
       connection: {
+        endpoint: config.endpoint,
         apiKey: config.api_key,
         password: "",
         url: config.loginom_url,
@@ -79,6 +82,7 @@ async function launch(chat: string, csv: string, cleanupPackage: string): Promis
       directory: join(directory, "cli", chat),
       csv,
       connection: {
+        endpoint: config.endpoint,
         apiKey: config.api_key,
         password: "",
         url: config.loginom_url,

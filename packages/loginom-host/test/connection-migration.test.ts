@@ -9,6 +9,8 @@ import { credentials, type CredentialCodec } from "../src/connection/credentials
 import { cliCredentials } from "../src/connection/cli-credentials"
 
 const original = {
+  mode: "custom" as const,
+  endpoint: "http://example.test/mcp",
   generation: 1,
   revision: 1,
   url: "http://logi-test-plan.bg.local/app/",
@@ -23,10 +25,10 @@ async function fixture(codec: CredentialCodec) {
   const prepared: string[] = []
   const services: Awaited<ReturnType<typeof connectionService>>[] = []
   const runtime: ConnectionRuntime = {
-    async check() {},
+    async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
     async prepare(record) {
       prepared.push(record.url)
-      return { async close() {} }
+      return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
     },
   }
   return {
@@ -59,7 +61,7 @@ for (const [name, codec] of [
       const f = await fixture(codec)
       try {
         const first = await f.start()
-        const validation = await first.api.check({
+        const validation = await first.api.check({ mode: "custom", endpoint: original.endpoint,
           revision: 0, url, username: original.username,
           apiKey: { operation: "replace", value: original.apiKey }, password: { operation: "empty" },
         })
@@ -79,7 +81,7 @@ for (const [name, codec] of [
           import { credentials } from ${JSON.stringify(new URL("../src/connection/credentials.ts", import.meta.url).href)};
           import { cliCredentials } from ${JSON.stringify(new URL("../src/connection/cli-credentials.ts", import.meta.url).href)};
           const store = connectionStore(process.argv[1], ${name === "CLI" ? "cliCredentials" : "credentials"}("linux"));
-          const service = await connectionService(store, {async check(){}, async prepare(){return {async close(){}}}});
+          const service = await connectionService(store, {async check(){return {help:{state:"ready" as const},browser:{state:"unknown" as const}}}, async prepare(){return {observeHelp(listener){listener({state:"ready"})},async close(){}}}});
           await service.settled();
           console.log(JSON.stringify(await service.api.status()));
           await service.close();
@@ -100,7 +102,7 @@ for (const [name, codec] of [
       await f.store.stage(original)
       await f.store.activate(1)
       const first = await f.start()
-      const validation = await first.api.check({
+      const validation = await first.api.check({ mode: "custom", endpoint: original.endpoint,
         revision: 1, url: original.url, username: original.username,
         apiKey: { operation: "preserve" }, password: { operation: "preserve" },
       })
@@ -113,8 +115,8 @@ for (const [name, codec] of [
       f.runtime.prepare = prepare
       const restarted = await f.start()
       expect(await restarted.api.status()).toMatchObject({ url: original.url, generation: 2, state: "ready" })
-      // The new generation does not carry the saved key forward; Help uses the built-in key.
-      expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: "", password: original.password })
+      // Switching Loginom settings preserves custom Dock credentials.
+      expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: original.apiKey, password: original.password })
       expect(await f.store.latestGeneration()).toBe(2)
       expect(await f.store.pending()).toBeUndefined()
     } finally { await f.close() }

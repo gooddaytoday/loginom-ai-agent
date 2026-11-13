@@ -5,12 +5,20 @@ import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
 
-export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void>; ready?: Promise<void> }
+export type RuntimeHandle = {
+  close(): Promise<void>
+  reset?(): Promise<void>
+  observeHelp(listener: (status: { state: Loginom.HelpState; failure?: string }) => void): void
+}
 export type ConnectionRuntime = {
-  check(candidate: ActiveConnection, signal?: AbortSignal): Promise<void | Loginom.BrowserStatus>
+  check(
+    candidate: ActiveConnection,
+    signal?: AbortSignal,
+    verifyBrowser?: boolean,
+  ): Promise<{ help: { state: Loginom.HelpState }; browser: Loginom.BrowserStatus }>
   prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
 }
-const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
+const decodeCandidate = Schema.decodeUnknownOption(Loginom.Check)
 
 export async function connectionService(
   store: ReturnType<typeof connectionStore>,
@@ -26,7 +34,8 @@ export async function connectionService(
     browser: Loginom.BrowserStatus
     pendingBrowser?: Loginom.BrowserStatus
     phase: Loginom.View["state"]
-    readiness: "starting" | "ready" | "recoverable-error"
+    readiness: Loginom.HelpState
+    helpFailure?: string
     applying?: Promise<void>
     failure?: string
     writing?: boolean
@@ -39,12 +48,16 @@ export async function connectionService(
     {
       candidate: ActiveConnection
       browser: Loginom.BrowserStatus
+      help: { state: Loginom.HelpState }
       expiresAt: number
       timer: ReturnType<typeof setTimeout>
     }
   >()
   const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
-  const checks = new Map<AbortController, Promise<void | Loginom.BrowserStatus>>()
+  const checks = new Map<
+    AbortController,
+    Promise<{ help: { state: Loginom.HelpState }; browser: Loginom.BrowserStatus }>
+  >()
   state.active = await store.read().catch(() => {
     state.phase = "recoverable-error"
     return undefined
@@ -77,6 +90,7 @@ export async function connectionService(
           observeReadiness(handle)
         },
         () => {
+          state.readiness = "recoverable-error"
           state.phase = "recoverable-error"
         },
       )
@@ -87,22 +101,12 @@ export async function connectionService(
   }
 
   function observeReadiness(handle: RuntimeHandle) {
-    state.readiness = handle.ready ? "starting" : "ready"
-    state.phase = state.pending ? "pending" : state.readiness
-    if (!handle.ready) return
-    void handle.ready.then(
-      () => {
-        if (state.closing || state.handle !== handle) return
-        state.readiness = "ready"
-        state.phase = state.pending ? "pending" : "ready"
-      },
-      () => {
-        if (state.closing || state.handle !== handle) return
-        state.readiness = "recoverable-error"
-        state.failure = "LOGINOM_RUNTIME_START_FAILED"
-        state.phase = state.pending ? "pending" : "recoverable-error"
-      },
-    )
+    handle.observeHelp((status) => {
+      if (state.closing || state.handle !== handle) return
+      state.readiness = status.state
+      state.helpFailure = status.failure
+      state.phase = state.pending ? "pending" : status.state
+    })
   }
 
   function clearValidations() {
@@ -117,7 +121,14 @@ export async function connectionService(
   }
   function view(): Loginom.View {
     const current = state.active
+    const failure = state.failure ?? (state.pending ? undefined : state.helpFailure)
     return {
+      mode: current?.mode ?? "cloud",
+      endpoint: current?.endpoint,
+      hasApiKey: !!current?.apiKey,
+      server: current?.mode === "custom" ? "custom" : "primary",
+      help: { state: state.active ? state.readiness : "connection-required" },
+      cloud: { connected: false },
       revision: state.revision,
       generation: current?.generation ?? 0,
       url: settingsAddress(current?.url ?? Product.connection.url),
@@ -128,7 +139,7 @@ export async function connectionService(
       state:
         recovery?.pending().length || state.failure === "LOGINOM_STORE_READ_FAILED" ? "recoverable-error" : state.phase,
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
-      ...(state.failure ? { failure: state.failure } : {}),
+      ...(failure ? { failure } : {}),
     }
   }
   function progress() {
@@ -149,7 +160,6 @@ export async function connectionService(
         return
       }
       // Local activation may commit before the background catalog request settles.
-      void prepared.ready?.catch(() => undefined)
       if (state.pending !== candidate) {
         await prepared.close().catch(() => undefined)
         return
@@ -159,6 +169,8 @@ export async function connectionService(
         .then((previous) => {
           if (!previous) return store.stage(candidate)
           if (
+            previous.mode !== candidate.mode ||
+            previous.endpoint !== candidate.endpoint ||
             previous.revision !== candidate.revision ||
             previous.url !== candidate.url ||
             previous.urlSource !== candidate.urlSource ||
@@ -177,7 +189,9 @@ export async function connectionService(
             state.failure = "LOGINOM_STORE_WRITE_FAILED"
             const persisted = await store.read().catch(() => undefined)
             return (
-              persisted?.generation === candidate.generation &&
+              persisted?.mode === candidate.mode &&
+              persisted.endpoint === candidate.endpoint &&
+              persisted.generation === candidate.generation &&
               persisted.revision === candidate.revision &&
               persisted.url === candidate.url &&
               persisted.username === candidate.username &&
@@ -209,7 +223,7 @@ export async function connectionService(
       progress()
     })
   }
-  const api: Loginom.API = {
+  const api: Pick<Loginom.API, "read" | "status" | "check" | "save" | "cancelPending" | "acknowledgeRecovery"> = {
     async acknowledgeRecovery(input) {
       if (state.closing) throw Error("LOGINOM_HOST_CLOSED")
       if (input.revision !== state.revision) throw Error("LOGINOM_REVISION_CONFLICT")
@@ -260,7 +274,32 @@ export async function connectionService(
           : candidate.password.operation === "empty"
             ? ""
             : candidate.password.value
+      const current = state.pending ?? state.active
+      const mode = candidate.mode ?? current?.mode ?? "cloud"
+      const endpoint = candidate.mode === "custom" ? (candidate.endpoint ?? current?.endpoint) : current?.endpoint
+      const apiKey =
+        candidate.mode !== "custom" || !candidate.apiKey || candidate.apiKey.operation === "preserve"
+          ? (current?.apiKey ?? "")
+          : candidate.apiKey.operation === "empty"
+            ? ""
+            : candidate.apiKey.value
+      if (mode === "custom") {
+        if (!endpoint || !URL.canParse(endpoint)) throw Error("LOGINOM_ENDPOINT_INVALID")
+        const address = new URL(endpoint)
+        if (!["http:", "https:"].includes(address.protocol) || address.username || address.password)
+          throw Error("LOGINOM_ENDPOINT_INVALID")
+        if (
+          (!current?.endpoint ||
+            !URL.canParse(current.endpoint) ||
+            address.origin !== new URL(current.endpoint).origin) &&
+          (candidate.apiKey?.operation !== "replace" || !candidate.apiKey.value.trim())
+        )
+          throw Error("LOGINOM_API_KEY_REQUIRED")
+        if (!apiKey.trim()) throw Error("LOGINOM_API_KEY_REQUIRED")
+      }
       const record = {
+        mode,
+        endpoint,
         generation: state.generation + 1,
         revision: state.revision + 1,
         url: settingsAddress(candidate.url),
@@ -268,14 +307,13 @@ export async function connectionService(
         // preserves saved URLs independently of this marker.
         urlSource: "explicit" as const,
         username: candidate.username,
-        // The knowledge service uses the built-in key; a key sent by older clients is ignored.
-        apiKey: "",
+        apiKey,
         password,
       }
       const controller = new AbortController()
-      const checking = Promise.resolve().then(() => runtime.check(record, controller.signal))
+      const checking = Promise.resolve().then(() => runtime.check(record, controller.signal, candidate.verifyBrowser))
       checks.set(controller, checking)
-      const browser = (await checking
+      const result = await checking
         .catch((error: unknown) => {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
             state.checkCleanupFailed = true
@@ -294,7 +332,8 @@ export async function connectionService(
               : "LOGINOM_CONNECTION_CHECK_FAILED"
           throw new Error(code)
         })
-        .finally(() => checks.delete(controller))) ?? { state: "unknown" as const }
+        .finally(() => checks.delete(controller))
+      const browser = result.browser
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (candidate.revision !== state.revision || state.applying || state.writing)
         throw new Error("LOGINOM_REVISION_CONFLICT")
@@ -311,8 +350,8 @@ export async function connectionService(
       })
       const timer = setTimeout(() => validations.delete(validationId), 5 * 60_000)
       timer.unref()
-      validations.set(validationId, { candidate: record, browser, expiresAt, timer })
-      return { validationId, expiresAt, browser: { ...browser } }
+      validations.set(validationId, { candidate: record, browser, help: result.help, expiresAt, timer })
+      return { validationId, expiresAt, help: result.help, browser: { ...browser } }
     },
     async save(input) {
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")

@@ -10,6 +10,12 @@ import {
 
 function setup(initial: Partial<Loginom.View> = {}) {
   let view: Loginom.View = {
+    mode: "custom",
+    endpoint: "http://loginom.test/mcp",
+    hasApiKey: true,
+    server: "custom",
+    help: { state: "ready" },
+    cloud: { connected: false },
     revision: 1,
     generation: 1,
     url: "http://loginom.test/app/",
@@ -19,15 +25,18 @@ function setup(initial: Partial<Loginom.View> = {}) {
     state: "ready",
     ...initial,
   }
-  const checks: Loginom.Candidate[] = []
+  const checks: Loginom.Check[] = []
   const saves: Array<{ revision: number; validationId: string }> = []
   const closed: Loginom.View[] = []
   const api: Loginom.API = {
+    cloudStart: async () => ({ ...view }),
+    cloudCancel: async () => ({ ...view }),
+    cloudDisconnect: async () => ({ ...view }),
     read: async () => ({ ...view }),
     status: async () => ({ ...view }),
     check: async (candidate) => {
       checks.push(candidate)
-      return { validationId: "checked", expiresAt: Date.now() + 10000 }
+      return { help: { state: "ready" }, validationId: "checked", expiresAt: Date.now() + 10000 }
     },
     save: async (input) => {
       saves.push(input)
@@ -58,6 +67,380 @@ function setup(initial: Partial<Loginom.View> = {}) {
 }
 
 describe("Loginom settings", () => {
+  test("editing another custom origin clears draft credentials and restoring the saved origin preserves its key", async () => {
+    const f = setup()
+    try {
+      await f.form.load()
+      expect(f.form.canPreserveApiKey()).toBe(true)
+      f.form.edit({ apiKey: "draft-key", apiKeyMode: "replace" })
+      f.form.edit({ endpoint: "http://LOGINOM.test:80/other" })
+      expect(f.form.state.apiKey).toBe("draft-key")
+      f.form.edit({ endpoint: "http://typo.test/mcp" })
+      expect(f.form.state.apiKey).toBe("")
+      expect(f.form.state.apiKeyMode).toBe("empty")
+      expect(f.form.canPreserveApiKey()).toBe(false)
+      await f.form.submit(false)
+      expect(f.checks[0].apiKey).toEqual({ operation: "empty" })
+      f.form.edit({ endpoint: "http://LOGINOM.test:80/other" })
+      expect(f.form.state.apiKey).toBe("")
+      expect(f.form.state.apiKeyMode).toBe("preserve")
+      expect(f.form.canPreserveApiKey()).toBe(true)
+      await f.form.submit(false)
+      expect(f.checks[1].apiKey).toEqual({ operation: "preserve" })
+    } finally {
+      f.dispose()
+    }
+  })
+  test("Connect opens the full pending login URL exactly once", async () => {
+    const f = setup({ mode: "cloud" })
+    const opened: string[] = []
+    const pending = { userCode: "TEST", verificationUrl: "https://loginom.ai/device?user_code=TEST", expiresAt: Date.now() + 60_000 }
+    f.api.cloudStart = async () => ({ ...(await f.api.read()), cloud: { connected: false, pending } })
+    try {
+      await f.form.load()
+      await f.form.connect((url) => { opened.push(url) })
+      await f.form.connect((url) => { opened.push(url) })
+      expect(opened).toEqual([pending.verificationUrl])
+      expect(f.form.state.view?.cloud.pending).toEqual(pending)
+    } finally { f.dispose() }
+  })
+  test("an unavailable opener preserves manual login and status polling", async () => {
+    for (const asynchronous of [false, true]) {
+      const f = setup({ mode: "cloud" })
+      const pending = { userCode: "TEST", verificationUrl: "https://loginom.ai/device?user_code=TEST", expiresAt: 42 }
+      f.api.cloudStart = async () => ({ ...(await f.api.read()), cloud: { connected: false, pending } })
+      try {
+        await f.form.load()
+        await f.form.connect(() => {
+          if (asynchronous) return Promise.reject(Error("opener unavailable"))
+          throw Error("opener unavailable")
+        })
+        expect(f.form.state.view?.cloud.pending).toEqual(pending)
+        expect(f.form.state.cloudBusy).toBe(false)
+        f.update({ cloud: { connected: true } })
+        await f.form.refresh()
+        expect(f.form.state.view?.cloud.connected).toBe(true)
+        expect(f.form.state.failed).toBe(false)
+      } finally { f.dispose() }
+    }
+  })
+  test("cancelled or disposed cloud starts never open their late login URL", async () => {
+    for (const dispose of [false, true]) {
+      const f = setup({ mode: "cloud" })
+      const start = Promise.withResolvers<Loginom.View>()
+      const opened: string[] = []
+      f.api.cloudStart = () => start.promise
+      await f.form.load()
+      const previous = await f.api.read()
+      const connecting = f.form.connect((url) => { opened.push(url) })
+      if (dispose) f.dispose()
+      else await f.form.cancelLogin()
+      start.resolve({ ...previous, cloud: { connected: false,
+        pending: { userCode: "OLD", verificationUrl: "https://loginom.ai/device?user_code=OLD", expiresAt: 42 } } })
+      await connecting
+      expect(opened).toEqual([])
+      expect(f.form.state.view?.cloud.pending).toBeUndefined()
+      if (!dispose) f.dispose()
+    }
+  })
+  test("cloud settings save before sign-in without browser verification", async () => {
+    const f = setup({ state: "connection-required", mode: "cloud", help: { state: "connection-required" } })
+    try {
+      await f.form.load()
+      f.form.edit({ username: "other" })
+      await f.form.submit(true)
+      expect(f.checks[0]).toMatchObject({ mode: "cloud", verifyBrowser: false })
+      expect(f.saves).toHaveLength(1)
+      expect(f.closed[0].state).toBe("connection-required")
+      expect(f.form.state.failed).toBe(false)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("deferred cloud activation stops when a connection is required", async () => {
+    const f = setup({ state: "pending", revision: 2 })
+    try {
+      const saved = await f.api.read()
+      f.update({ state: "connection-required", help: { state: "connection-required" } })
+      const results: string[] = []
+      const status = f.api.status
+      let calls = 0
+      f.api.status = () => (++calls > 1 ? Promise.reject(Error("unexpected polling")) : status())
+      await watchLoginomApplication(
+        f.api,
+        saved,
+        (result) => results.push(result),
+        async () => {
+          if (results.length > 0) throw Error("unexpected polling")
+        },
+      )
+      expect(results).toEqual(["connection-required"])
+    } finally {
+      f.dispose()
+    }
+  })
+  test("cloud sign-in is durable without applying the draft or its revision", async () => {
+    const f = setup({ mode: "cloud" })
+    f.api.cloudStart = async () => ({
+      ...(await f.api.read()),
+      revision: 2,
+      cloud: { connected: true, email: "account@test.invalid" },
+    })
+    try {
+      await f.form.load()
+      f.form.edit({ username: "draft", password: "private", passwordMode: "replace" })
+      await f.form.connect(() => {})
+      expect(f.form.state.view?.cloud.email).toBe("account@test.invalid")
+      expect(f.form.state.username).toBe("draft")
+      expect(f.form.state.password).toBe("private")
+      expect(f.form.state.baseline?.revision).toBe(1)
+      expect(f.saves).toHaveLength(0)
+      f.form.discard()
+      expect(f.form.state.view?.cloud.connected).toBe(true)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("pending sign-in is cancelled only after accepted dirty close and stale status cannot restore it", async () => {
+    const f = setup({
+      cloud: {
+        connected: false,
+        pending: { userCode: "TEST", verificationUrl: "https://loginom.ai/device", expiresAt: 42 },
+      },
+    })
+    let cancelled = 0
+    f.api.cloudCancel = async () => {
+      cancelled++
+      return { ...(await f.api.read()), cloud: { connected: false } }
+    }
+    try {
+      await f.form.load()
+      const stale = Promise.withResolvers<Loginom.View>()
+      const previous = await f.api.read()
+      f.api.status = () => stale.promise
+      const refresh = f.form.refresh()
+      f.form.edit({ username: "draft" })
+      expect(f.form.requestClose()).toBe(false)
+      expect(cancelled).toBe(0)
+      f.form.discard()
+      expect(f.form.requestClose()).toBe(true)
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(cancelled).toBe(1)
+      stale.resolve(previous)
+      await refresh
+      expect(f.form.state.view?.cloud.pending).toBeUndefined()
+    } finally {
+      f.dispose()
+    }
+  })
+  test("closing during cloud start cancels it and disposal ignores late completion", async () => {
+    const f = setup()
+    const start = Promise.withResolvers<Loginom.View>()
+    let cancellations = 0
+    f.api.cloudStart = () => start.promise
+    f.api.cloudCancel = async () => {
+      cancellations++
+      return f.api.read()
+    }
+    await f.form.load()
+    const previous = await f.api.read()
+    const connecting = f.form.connect(() => {})
+    expect(f.form.busy()).toBe(false)
+    expect(f.form.requestClose()).toBe(true)
+    f.dispose()
+    start.resolve({ ...previous, cloud: { connected: true } })
+    await connecting
+    expect(cancellations).toBe(1)
+    expect(f.form.state.view?.cloud.connected).toBe(false)
+  })
+  test("logout is durable through discard and stale status", async () => {
+    const f = setup({ cloud: { connected: true, email: "account@test.invalid" } })
+    f.api.cloudDisconnect = async () => ({
+      ...(await f.api.read()),
+      cloud: { connected: false, failure: "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" },
+    })
+    try {
+      await f.form.load()
+      const stale = Promise.withResolvers<Loginom.View>()
+      const previous = await f.api.read()
+      f.api.status = () => stale.promise
+      const refresh = f.form.refresh()
+      await f.form.disconnect()
+      stale.resolve(previous)
+      await refresh
+      f.form.discard()
+      expect(f.form.state.view?.cloud.connected).toBe(false)
+      expect(f.form.state.view?.cloud.failure).toBe("LOGINOM_CLOUD_REVOKE_UNCONFIRMED")
+      expect(f.saves).toHaveLength(0)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("mode changes preserve custom draft credentials and explicit checks always verify the browser", async () => {
+    const f = setup()
+    let starts = 0
+    f.api.cloudStart = async () => {
+      starts++
+      return f.api.read()
+    }
+    try {
+      await f.form.load()
+      f.form.edit({ mode: "cloud" })
+      expect(f.form.dirty()).toBe(true)
+      f.form.edit({ mode: "custom" })
+      expect(f.form.dirty()).toBe(false)
+      f.form.edit({ endpoint: "https://custom.test/mcp", apiKey: "private-key", apiKeyMode: "replace" })
+      f.form.edit({ mode: "cloud" })
+      await f.form.submit(false)
+      expect(f.checks[0]).toMatchObject({
+        mode: "cloud",
+        verifyBrowser: true,
+        endpoint: "https://custom.test/mcp",
+        apiKey: { operation: "replace", value: "private-key" },
+      })
+      f.form.edit({ mode: "custom" })
+      expect(f.form.state.apiKey).toBe("private-key")
+      expect(f.form.dirty()).toBe(true)
+      expect(starts).toBe(0)
+      f.dispose()
+      expect(f.form.state.apiKey).toBe("")
+    } finally {
+      f.dispose()
+    }
+  })
+  test("browser verification does not claim Help is ready", async () => {
+    const f = setup({ help: { state: "connection-required" } })
+    f.api.check = async () => ({
+      validationId: "checked",
+      expiresAt: 42,
+      browser: { state: "verified" },
+      help: { state: "connection-required" },
+    })
+    try {
+      await f.form.load()
+      await f.form.submit(false)
+      expect(f.form.state.checkedHelp?.state).toBe("connection-required")
+      expect(f.form.state.checkedBrowser?.state).toBe("verified")
+      f.form.edit({ username: "draft" })
+      expect(f.form.state.checkedHelp).toBeUndefined()
+    } finally {
+      f.dispose()
+    }
+  })
+  test("accepted close and cleanup cancel a pending login once", async () => {
+    const f = setup({
+      cloud: {
+        connected: false,
+        pending: { userCode: "TEST", verificationUrl: "https://loginom.ai/device", expiresAt: 42 },
+      },
+    })
+    const cancel = Promise.withResolvers<Loginom.View>()
+    let calls = 0
+    f.api.cloudCancel = () => {
+      calls++
+      return cancel.promise
+    }
+    await f.form.load()
+    const previous = await f.api.read()
+    expect(f.form.requestClose()).toBe(true)
+    f.dispose()
+    expect(calls).toBe(1)
+    cancel.resolve({ ...previous, cloud: { connected: false } })
+    await Promise.resolve()
+    expect(f.form.state.password).toBe("")
+  })
+  test("cloud status retires a previous Help result while preserving browser verification", async () => {
+    const f = setup({ mode: "cloud", help: { state: "connection-required" } })
+    f.api.check = async () => ({
+      help: { state: "connection-required" },
+      browser: { state: "verified" },
+      validationId: "checked",
+      expiresAt: 42,
+    })
+    try {
+      await f.form.load()
+      await f.form.submit(false)
+      f.update({ cloud: { connected: true }, help: { state: "ready" } })
+      await f.form.refresh()
+      expect((f.form.state.checkedHelp ?? f.form.state.view?.help)?.state).toBe("ready")
+      expect(f.form.state.checkedBrowser?.state).toBe("verified")
+    } finally {
+      f.dispose()
+    }
+  })
+  test("a stale status failure cannot replace successful disconnect feedback", async () => {
+    const f = setup({ cloud: { connected: true } })
+    const status = Promise.withResolvers<Loginom.View>()
+    f.api.status = () => status.promise
+    f.api.cloudDisconnect = async () => ({ ...(await f.api.read()), cloud: { connected: false } })
+    try {
+      await f.form.load()
+      const refresh = f.form.refresh()
+      await f.form.disconnect()
+      status.reject(Error("LOGINOM_STATUS_UNAVAILABLE"))
+      await refresh
+      expect(f.form.state.failed).toBe(false)
+      expect(f.form.state.view?.cloud.connected).toBe(false)
+    } finally {
+      f.dispose()
+    }
+  })
+  test("refresh during disconnect cannot restore stale state, errors or lose the revoke warning", async () => {
+    for (const result of ["connected", "error", "missing-revocation"]) {
+      const f = setup({ cloud: { connected: true } })
+      const original = structuredClone(await f.api.read())
+      const disconnect = Promise.withResolvers<Loginom.View>()
+      const status = Promise.withResolvers<Loginom.View>()
+      void status.promise.catch(() => {})
+      let reads = 0
+      f.api.cloudDisconnect = () => disconnect.promise
+      f.api.status = () => {
+        reads++
+        return status.promise
+      }
+      try {
+        await f.form.load()
+        const disconnecting = f.form.disconnect()
+        const refreshing = f.form.refresh()
+        disconnect.resolve({ ...original, cloud: { connected: false, failure: "LOGINOM_CLOUD_REVOKE_UNCONFIRMED" } })
+        await disconnecting
+        if (result === "error") status.reject(Error("LOGINOM_STATUS_UNAVAILABLE"))
+        if (result !== "error") status.resolve({ ...original, cloud: { connected: result === "connected" } })
+        await refreshing
+        expect(f.form.state.view?.cloud.connected).toBe(false)
+        expect(f.form.state.view?.cloud.failure).toBe("LOGINOM_CLOUD_REVOKE_UNCONFIRMED")
+        expect(f.form.state.failed).toBe(false)
+        expect(reads).toBe(0)
+      } finally {
+        f.dispose()
+      }
+    }
+  })
+  test("explicit browser checks before cloud sign-in never claim Help success", async () => {
+    for (const browser of [
+      { state: "verified" as const },
+      { state: "failed" as const, failure: "LOGINOM_LOGIN_REJECTED" as const },
+    ]) {
+      const f = setup({ mode: "cloud", state: "connection-required", help: { state: "connection-required" } })
+      f.api.check = async (candidate) => {
+        f.checks.push(candidate)
+        return { help: { state: "connection-required" }, browser, validationId: "checked", expiresAt: 42 }
+      }
+      try {
+        await f.form.load()
+        await f.form.submit(false)
+        expect(f.checks[0].verifyBrowser).toBe(true)
+        expect(f.form.state.message).toBe("loginom.ai.required")
+        expect(f.form.state.checkedHelp?.state).toBe("connection-required")
+        expect(f.form.state.checkedBrowser).toEqual(browser)
+        expect(f.form.state.failed).toBe(false)
+        expect(f.saves).toHaveLength(0)
+      } finally {
+        f.dispose()
+      }
+    }
+  })
   test("browser status messages distinguish unchecked sign-in and keep account warnings compatible with saving", () => {
     expect(loginomBrowserMessage()).toBe("loginom.browserUnknown")
     expect(loginomBrowserMessage({ state: "unknown" })).toBe("loginom.browserUnknown")
@@ -78,7 +461,12 @@ describe("Loginom settings", () => {
   test("a browser warning keeps Help successful and still permits saving", async () => {
     const f = setup({ browser: { state: "unknown" } })
     const browser: Loginom.BrowserStatus = { state: "failed", failure: "LOGINOM_ACCOUNT_MISMATCH" }
-    f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+    f.api.check = async () => ({
+      help: { state: "ready" },
+      validationId: "checked",
+      expiresAt: Date.now() + 10000,
+      browser,
+    })
     try {
       await f.form.load()
       f.form.edit({ password: "replacement", passwordMode: "replace" })
@@ -102,7 +490,12 @@ describe("Loginom settings", () => {
       { state: "failed" as const, failure: "LOGINOM_LOGIN_REJECTED" as const },
     ]) {
       const f = setup()
-      f.api.check = async () => ({ validationId: "checked", expiresAt: Date.now() + 10000, browser })
+      f.api.check = async () => ({
+        help: { state: "ready" },
+        validationId: "checked",
+        expiresAt: Date.now() + 10000,
+        browser,
+      })
       try {
         await f.form.load()
         await f.form.submit(false)
@@ -137,6 +530,7 @@ describe("Loginom settings", () => {
   test("initial form uses the product connection defaults", () => {
     const f = setup()
     try {
+      expect(f.form.state.mode).toBe("cloud")
       expect(f.form.state.url).toBe(Product.connection.url)
       expect(f.form.state.username).toBe(Product.connection.username)
     } finally {
@@ -212,6 +606,10 @@ describe("Loginom settings", () => {
       })
       await f.form.submit(false)
       expect(f.checks[0]).toEqual({
+        mode: "custom",
+        endpoint: "http://loginom.test/mcp",
+        apiKey: { operation: "preserve" },
+        verifyBrowser: true,
         revision: 1,
         url: "http://other.test/",
         username: "other",
@@ -233,8 +631,8 @@ describe("Loginom settings", () => {
       await f.form.load()
       await f.form.submit(false)
       expect(f.form.state.message).toBe("loginom.checkedSaved")
-      // The built-in knowledge key replaced the user key; the form never sends one.
-      expect(f.checks[0]).not.toHaveProperty("apiKey")
+      expect(f.form.state.apiKey).toBe("")
+      expect(f.checks[0].apiKey).toEqual({ operation: "preserve" })
       expect(f.checks[0].password).toEqual({ operation: "preserve" })
       await f.form.submit(true)
       expect(f.saves).toHaveLength(0)
@@ -258,7 +656,7 @@ describe("Loginom settings", () => {
       f.dispose()
     }
   })
-  test("a rejected built-in key keeps the form and draft; no persistence takes place", async () => {
+  test("a rejected Dock key keeps the form and draft; no persistence takes place", async () => {
     const f = setup()
     try {
       await f.form.load()
@@ -267,7 +665,7 @@ describe("Loginom settings", () => {
       }
       f.form.edit({ username: "draft" })
       await f.form.submit(true)
-      expect(f.form.state.message).toBe("loginom.invalidKey")
+      expect(f.form.state.message).toBe("loginom.ai.invalidKey")
       expect(f.form.state.username).toBe("draft")
       expect(f.saves).toHaveLength(0)
       expect(f.closed).toHaveLength(0)
@@ -295,7 +693,7 @@ describe("Loginom settings", () => {
     const f = setup()
     try {
       await f.form.load()
-      const checking = Promise.withResolvers<{ validationId: string; expiresAt: number }>()
+      const checking = Promise.withResolvers<Awaited<ReturnType<Loginom.API["check"]>>>()
       let calls = 0
       f.api.check = () => {
         calls++
@@ -306,7 +704,7 @@ describe("Loginom settings", () => {
       expect(f.form.requestClose()).toBe(false)
       await f.form.submit(true)
       expect(calls).toBe(1)
-      checking.resolve({ validationId: "checked", expiresAt: Date.now() + 10000 })
+      checking.resolve({ help: { state: "ready" }, validationId: "checked", expiresAt: Date.now() + 10000 })
       await save
       expect(f.closed).toHaveLength(1)
     } finally {
@@ -344,6 +742,23 @@ describe("Loginom settings", () => {
       f.dispose()
     }
   })
+  test("a clean form adopts deferred cloud settings when activation requires sign-in", async () => {
+    const f = setup({ state: "pending", revision: 2 })
+    try {
+      await f.form.load()
+      f.update({ state: "connection-required", mode: "cloud", generation: 2,
+        server: "primary", username: "next", folder: "/next", help: { state: "connection-required" } })
+      await f.form.refresh()
+      expect(f.form.state.mode).toBe("cloud")
+      expect(f.form.state.username).toBe("next")
+      expect(f.form.state.baseline?.generation).toBe(2)
+      expect(f.form.dirty()).toBe(false)
+      f.form.edit({ url: "http://new.test/app/" })
+      await f.form.submit(false)
+      expect(f.checks[0]).toMatchObject({ revision: 2, mode: "cloud", username: "next" })
+    } finally { f.dispose() }
+  })
+
   test("status refresh preserves a dirty draft and its original revision", async () => {
     const f = setup()
     try {

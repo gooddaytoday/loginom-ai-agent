@@ -1,0 +1,531 @@
+# Проектирование и проверка подключения к Loginom AI
+
+Ветка `dock-cloud-auth`, база `loginom` (`dd2f949d11`). Ход реализации — в checkpoints ниже.
+Канонические решения: [спецификация](../superpowers/specs/2026-11-05-dock-cloud-auth-design.md).
+Этот файл содержит план работы и свидетельства проверки, не вторую спецификацию.
+
+## План обсуждения
+
+- [x] Изучить Agent, канонический Dock и сайт; независимо проверить план исследования.
+- [x] Согласовать пользовательские решения и визуальный макет.
+- [x] Записать спецификацию.
+- [x] Получить первоначальное Spec Review; оно пропустило перечисленные ниже проблемы
+      и не является доказательством готовности прежней редакции.
+- [x] Завершить повторное независимое ревью технически исправленной спецификации.
+      Host/runtime, Dock и auth: Approved. Дополнительно устранена гонка GET
+      выдачи новой пары после отзыва установки; повторная auth-проверка одобрила правку.
+- [x] Зафиксировать проверенную документацию коммитом в `dock-cloud-auth`.
+- [x] Подготовить [план Agent/Dock с TDD](../superpowers/plans/2026-11-06-dock-cloud-auth.md);
+      отдельный план реализации сайта в этом репозитории не создавать.
+
+## План исправления замечаний 2026-11-05
+
+- [x] Разделить проверку на Host/runtime/consumers, Dock/backup/ACL, Better Auth.
+- [x] Проверить фактические пути вызова, а не только текст прежнего дизайна.
+- [x] Уточнить неизвестную topology у пользователя; подтверждено, что reserve
+      ещё не существует и будет отдельным инстансом.
+- [x] Независимо проверить подход правки: real issues исправить минимальными
+      механизмами, не расширять logout на все браузерные сессии и не добавлять
+      глобальную модель ACL/репликацию.
+- [x] Исправить спецификацию; явно отделить будущие гарантии от проверенных фактов.
+- [x] Перепроверить изменённые разделы тремя исследователями и проверить документ.
+      Проверены структура разделов, покрытие всех замечаний и пробельные ошибки.
+
+## Результаты проверки замечаний
+
+| Замечание | Вывод и решение в спецификации |
+| --- | --- |
+| P1-1 | Подтверждено: ready/catalog одноразовые, acquire/tools блокируют повтор. §§3/7/11: connection-required, save до входа, mutable readiness прежнего поколения, retry до gates, тест обновления0.3.9 и восстановления. |
+| P1-2 | Подтверждено: product Help обслуживает один child; browser user-v1 remote нужен только startup. §7: удалить его в managed-пути, оставить Host→Help request/reply; reverse IPC и browser transport replacement убраны. |
+| P1-3 | Подтверждено: web session позволяет новый вход. §6 ограничивает отзыв уже выданными credentials; all-web logout не вводится. Открытая регистрация не обеспечивает блокировку человека. |
+| P1-4 | Подтверждено по code paths: общие agent/resources доступны USER, default search может включать skills. §9 ограничивает все managed Help URI официальной KB, запрещает context mode; серверные ACL KB сохраняются. Общие OpenViking права не перепроектируются. |
+| P1-5 | Backup действительно включает auth registry. Неизвестность topology разрешена ответом пользователя: будущий отдельный reserve. §9: независимые volume/registries, отдельная публикация KB, запрет primary full restore поверх reserve. |
+| P2-6 | Подтверждено: config/installation binding, quota, errors, provisioning concurrency. §5 задаёт binding/exact disabledPaths/server revoke/явный лимит; §8 — singleflight/cooldown. Вечный запрет refresh до новой local revision отклонён как deadlock. |
+| P2-7 | Подтверждено: runtime endpoint override и новые Host HTTP запросы не защищены существующим networking автоматически. §5: fixed release URLs, один build-only staging tuple, proxy/system-CA контракт и native проверка. |
+| P2-8 | Подтверждено: build callers, evals, node acceptance и fixtures пропущены. §§10/12 перечисляют их, задают explicit custom setup через stdin и безопасную legacy migration. UI-01 находится в docs/testing/loginom-ai-agent/README.md, не корневом README.md. |
+| P2-9 | Подтверждено: management timeout180с и model diagnostics=whole status. §§3/5: короткие start/status/cancel, expiry и guard; отдельные management/model проекции. |
+| P3 | §§3–9: отмена незавершённого входа при закрытии формы, смена аккаунта на сайте, удаление revoked credentials с диска, отдельная cloud запись, Linux plaintext факт, общий deadline, реальный масштаб ADMIN. |
+
+## Необязательные предложения
+
+- Приняты Host-owned Help recovery без reverse IPC, redirect:error, закрепление
+  reserve только после успешного ответа, сокращение ненужных client response ID.
+- Постоянный seed не принят: повторный regenerate с ним не меняет ключ. Recovery
+  выдачи/ротации должен учитывать потерянный ответ; детальный выбор хранения и
+  повторяемого provisioning относится к отдельному плану сайта.
+- Перенос полного primary volume в reserve не используется для обновления KB.
+- Глобальные права всех USER OpenViking не меняются: предотвращение попадания
+  чужих общих записей в Agent обеспечивается scoped Help и read ACL официальной KB.
+
+## Основания и пределы проверки
+
+Host: connection-service.ts, host.ts, host-port.ts; managed-entry.mjs/bridge.mjs;
+knowledge-client.mjs; transport.ts; Desktop/CLI startup; перечисленные consumers.
+Dock: api_keys/legacy.py и new.py, storage/acl.py и viking_fs/_access.py,
+mcp_endpoint.py, backup-server.sh/restore-server.py, Assets catalog/import.
+Better Auth: официальные docs и исходники v1.7.17, включая router.disabledPaths,
+verifyApiKey, updateApiKey, signOut/revokeSession и deviceAuthorization.
+
+Не выполнялись runtime-тесты, build, Better Auth/Electron интеграция, изменения
+или запросы с credentials к production, исследование бинарника0.3.9.
+Сайт и reserve ещё не реализованы. Неизвестны текущие production ACL,
+allow_private_networks и внешняя доступность admin API; это условия развёртывания,
+не уже доказанные свойства. Макет остаётся иллюстрацией во временной папке.
+
+## План уточнений 2026-11-06
+
+- [x] Сверить proxy с канонической system proxy v2, диагностику с текущим View,
+      условие revokeSession с официальным исходником Better Auth v1.7.17.
+- [x] Независимо проверить минимальный план правок до изменения спецификации.
+      Approved; условие revokeSession сверено также независимым reviewer.
+- [x] Уточнить §3–6 и проверки §11: proxy-вариант А, совместимая диагностика,
+      raw token той же device-сессии, ротация пары при отзыве пользователя;
+      отдельно определить browser check при сохранении до облачного входа.
+- [x] Сохранить точки интеграции connection-required для будущего плана.
+- [x] Проверить изменённые формулировки независимо, выполнить документальные
+      проверки и зафиксировать только документацию.
+      Diff получил Approved; `git diff --check` пройден. Проверка без runtime.
+
+Для будущего плана: `connection-required` требует изменить обработку успешного
+сохранения и завершения polling в
+`packages/app/src/components/settings-loginom-state.ts`, убрать безусловное
+`help: ready` из `packages/opencode/src/cli/loginom-management.ts` и распознавать
+новый профиль в `evals/src/profile.ts`. Это точки интеграции нового состояния,
+а не дефекты существующего кода до начала реализации функции.
+В `packages/app/src/components/settings-loginom.tsx` отдельно проверить подписи
+после browser check и toast сохранения: browser verified не означает Help ready.
+Onboarding сохраняет критерий наличия настроек; CLI automation preflight вправе
+требовать фактический Help ready перед работой.
+
+Уточнения подтверждены чтением исходников. Proxy-вариант А не переносит системный
+resolver в Host/Help и не меняет system proxy v2. Передача explicit env в Help
+не признана доказательством её применения транспортом; эта проверка остаётся
+в реализации. Diagnostics сохраняет прежний View в обоих форматах ответа.
+Для revokeSession явно требуется raw token той же authenticated device-сессии.
+Отзыв пользователя явно ротирует обе Dock credentials. Сохранение до входа
+не запускает browser check автоматически; явный Check проверяет его отдельно.
+
+## Подготовка плана реализации 2026-11-06
+
+- [x] Сверить точные интерфейсы, тестовые helpers и команды Agent/Dock.
+- [x] Записать план `docs/superpowers/plans/2026-11-06-dock-cloud-auth.md`:
+      последовательные TDD-срезы, файлы, интерфейсы, проверки и зависимости выпуска.
+- [x] Самостоятельно проверить покрытие спецификации, имена и отсутствие заглушек.
+- [x] Получить независимое ревью готового плана и исправить замечания.
+      Итог: общее ревью, Host, Dock/runtime — Approved. Документальные проверки пройдены; план зафиксирован вместе с журналом.
+
+План подготовки до исполнения получил независимое Approved. Работа ограничена
+документацией; реализация сайта остаётся отдельной задачей в его репозитории.
+
+План содержит 15 задач; все implementation checkboxes пока не выполнены.
+Исправлены замечания ревью: реальный порядок save/settled, observable Help snapshot,
+write/clear races, installation-bound access_revoked, HTTP/deadline ограничения,
+CLI save без browser до входа, зависимость Node integration от build tuple и
+реальный двухпроцессный Dock fixture с MCP lifecycle. Публичный HttpApi не нужен.
+Проверены пути, структура Markdown, отсутствие незаполненных шагов и покрытие
+§§1–12 спецификации; `git diff --check` пройден. Runtime/тесты/сборки не запускались.
+Следующий шаг — выбор способа выполнения плана; site/reserve/native gates остаются
+отдельными условиями выпуска. Производственный rollout не выполнялся.
+
+## Проверка замечаний к плану 2026-11-06
+
+- [x] Подтвердить замечания по общим типам, зависимостям тестов, TUI,
+      release/proxy и Dock по исходникам.
+- [x] Исправить план: согласованные изменения всех consumers, ранние custom
+      fixtures без legacy fallback, выполнимый порядок сетевых проверок,
+      обычный чат TUI; упростить локальную Dock-проверку до одного инстанса.
+- [x] Согласовать со спецификацией запрет повторного входа при уже подключённой установке.
+- [x] Проверить документацию самостоятельно и независимо; результат сохраняется docs-коммитом.
+
+План правки до исполнения получил независимое Approved. Одноразовая проба
+Better Auth остаётся предложением вне текущего объёма; продуктовый код не меняется.
+
+Повторное общее ревью, Host/CLI и Dock — Approved. API и Desktop channels собраны
+в Task6 атомарно; custom setup/fixtures перенесены в3; live cloud проверки —13.
+TUI cancellation явно охватывает startup/cleanup и передаёт управление обычному
+чату после успеха. Проверены структура, ссылки, типы commits и git diff --check.
+Runtime/сборки/production не запускались. Следующий шаг — выполнение Task1.
+
+## Checkpoint исполнения — 2026-11-06
+
+- SHA: `fd489f49a1`, ветка `dock-cloud-auth`; исходный worktree чистый.
+- Прочитан файл цели; выполнение Task1 ещё не начато, implementation checkboxes не изменены.
+- Обе разрешённые копии Node совпадают с закреплённым SHA-256 Node 24.19.0.
+- Блокер: в текущей сессии Codex не зарегистрированы OpenViking search/read tools.
+- `ov-memory-doctor` без proxy env: timeout; с `NODE_USE_ENV_PROXY=1`: exit 0,
+  credentials приняты, status 200, MCP tools/list 24, все подсистемы ready исправны.
+- Это подтверждает доступность сервера, но не доступ к памяти из Agent runtime.
+- Согласно пользовательским AGENTS-инструкциям работа остановлена при недоступности памяти.
+- Следующий шаг: восстановить MCP-инструменты в сессии либо получить разрешение
+  владельца продолжить без памяти; затем дочитать spec/plan и выполнить Task1.
+
+## Checkpoint Task 1 — 2026-11-06
+
+- SHA базы: `fd489f49a1`; результат фиксируется коммитом `refactor(loginom): start managed browser without Dock`.
+- OpenViking восстановлен: настоящие actor search и exact read успешны; блокер снят.
+- Независимое ревью полного плана/spec и источников Task1–2: Approved.
+- Pre-flight: 1→2 browser/Help разделены; 3→6 mode/check/view согласованы со всеми consumers;
+  4→5→7 cloud-store/auth/recovery; 6→8→10/11 API; 9→13 proxy/tuple; 12→13 harness; 2→14 scope.
+- Исполнение inline (executing-plans), ledger — этот журнал; временные материалы только в storage/tmp.
+- RED→GREEN: remote startup запрещён; browser IPC/env/argv без Dock key; local prepare и диагностика без remote probe.
+- Runtime: pinned Node, bundled/bridge/classic/user-profile — 20 PASS; Host prepare/knowledge/process — 16 PASS.
+- `bun typecheck` Host и `git diff --check`: PASS. Зависимости установлены по frozen lock, pins не менялись.
+- Ограничения: проверки source/fixtures, установленный GUI и native Windows/macOS этим не подтверждены.
+- Следующий шаг: Task2, ограничить семь Help-чтений официальной KB.
+
+## Checkpoint Task 2 — 2026-11-06
+
+- SHA Task1: `2bf6c1e354`; результат Task2 — коммит `fix(loginom): scope Help reads to official knowledge base`.
+- Все семь Help-чтений проверяются до отправки: root/descendants, search list-only,
+  полный read-array, относительный glob; чужие/неоднозначные URI не нормализуются в разрешённые.
+- Опубликованные схемы сужены до combineCatalogs; portable read array сохранён.
+- Реальные MCP fixtures: mixed read даёт 0 remote calls; find получает KB root.
+- RED→GREEN: каждый scope-сценарий, сетевой mixed read, published schemas и передача safe error через Host.
+- Runtime client: 27 PASS; entry: 11 PASS; Host knowledge: 3 PASS;
+  дополнительно Host knowledge+prepare: 13 PASS и `bun typecheck` PASS; `git diff --check` PASS.
+- Независимая проверка scope и regex/runtime: замечаний нет; ошибочные fixture read.offset/limit удалены.
+- Поправка плана: allowlist scope-error перенесён из5 в2, поскольку ошибка пересекает IPC уже сейчас.
+- Ограничения: настоящий Python Dock/ACL проверяется Task14; production не затронут.
+- Следующий шаг: Task3, explicit custom configuration и безопасная legacy migration.
+
+## Checkpoint Task 3 — 2026-11-06
+
+- SHA базы: `0a6f69ae4c`; результат — `feat(loginom): add explicit custom Dock configuration`.
+- Executor с Task3: subagent-driven-development; scratch/report workspace `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl`.
+- Legacy без mode → cloud без старого key; исторические файлы неизменны, Loginom credentials/URL сохранены.
+- Explicit custom endpoint/key, сохранение при переключениях, Check и обязательные View/Validation fields готовы; runtime fallback удалён.
+- TDD edge-ветки исправлены до commit: возврат к проверенному срезу, затем по одному RED→GREEN; mapping в scratch report.
+- Host mandatory:60 PASS; final validation:20 PASS; Desktop:31 PASS; Schema:2 PASS; App:19 PASS.
+- CLI cumulative:25 PASS/1 native skip; stale KB-read fixture исправлен, preflight+parser rerun:14 PASS.
+- Adjacent: Desktop7 PASS, migration18 PASS; все5 `bun typecheck` и `git diff --check` PASS.
+- PTY custom setup/password:code0, cancel:130; secrets скрыты, guards сняты, своих живых children нет.
+- Native shutdown/oracle/oauth NOT_RUN: нужен fresh isolated Desktop artifact и private inputs; source syntax PASS.
+- PTY --prompt старый provider зовёт недоступный loginom_probe; свой loop завершён, исправление fixture — Task11.
+- Cloud без credentials намеренно не запускает Help; save-before-login и cloud API — Task6. Production/site/native ОС не проверены.
+- Независимое ревью `f2cfcfe12b`: Spec compliant, Quality Approved; обязательных замечаний нет.
+- Minor (deferred): неверный custom endpoint/key на Node IPC даёт общий безопасный код; корректный отказ сохранён.
+- Следующий шаг: Task4, отдельное хранение cloud credentials.
+
+## Checkpoint Task 4 — 2026-11-06
+
+- SHA базы: `f2cfcfe12b`; результат — `feat(loginom): persist cloud credentials outside generations`.
+- Отдельный stateless cloud.json: полный kind/schema, private permissions/owner/NOFOLLOW, temp0600, fsync/rename/directory fsync и durable clear.
+- До rename выполняется decoded read-back; invalid kind/неполная пара/corrupt payload не заменяют прежнюю запись.
+- После directory fsync failure новая запись остаётся фактической; rollback не обещан.
+- Codec обобщён на JSON object; v1 envelope, Keychain AAD/crypto/limits сохранены; connection-store пишет только apiKey/password.
+- Legacy Linux/safeStorage/CLI metadata envelopes читаются; secret pair проверяется store; четыре native script callers сузили unknown.
+- TDD: roundtrip, CLI/Keychain/cloud payload, schema, permissions, read-back, fsync write/clear, fixed corrupt errors — RED→GREEN.
+- Дополнительно повторены RED→GREEN safeStorage generic decode и оба connection encode payload, затем Desktop 13 PASS.
+- Host mandatory 20 PASS/2 native SKIP; с adjacent migration/keychain-platform 39 PASS/2 SKIP; Desktop13 PASS.
+- Host/Desktop `bun typecheck` и `git diff --check` PASS; schema/Protocol/HttpApi не менялись.
+- Поправка порядка: memory/status regression требует controller; перенесён в Task5 явно, store durable semantics проверены здесь.
+- Ограничения: native safeStorage/DPAPI/Keychain, installed GUI, сайт и production не проверены; используются fixtures на Linux.
+- Независимое ревью `411fe5f68e`: Spec compliant, Quality Approved; замечаний нет.
+- Следующий шаг: Task5 с обязательным memory/status reconciliation regression.
+
+## Checkpoint Task 5 — 2026-11-06
+
+- SHA базы: `411fe5f68e`; результат — `feat(loginom): implement cloud device authorization client`.
+- Native fetch + schema: device/code → token → full durable pair; публичный status без device/bootstrap/Dock/installation secrets.
+- Fixed Product.cloud tuple; семь точных безопасных cloud-кодов в private IPC allowlist.
+- TDD: interval/slow_down/429/expiry, bounded native requests, cancel/close, URL/redirect/protocol trust и already-connected guard.
+- GET pair/DELETE current используют только installation key; bootstrap revoke привязан к raw token той же device-сессии.
+- Epoch и последовательные writes защищают от старых ответов; отменённый начатый login-write очищается после завершения.
+- Post-rename fsync failure: memory/revision сверяются с actual disk; invalid read-back не активируется; rollback не обещан.
+- Ошибки durable clear не скрываются; remote revoke ограничен5с и возвращает unconfirmed; completed credentials close сохраняет.
+- Host: cloud-auth/cloud-store/transport — 60 PASS / 252 assertions (`--timeout 30000` для filesystem runner); `bun typecheck` и diff-check PASS.
+- Product: genuine RED→GREEN, полный `bun test` — 34 PASS / 96 assertions; `bun typecheck` PASS (root handoff).
+- Evidence и requirement→TDD mapping: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-5-report.md`.
+- Ограничения: localhost synthetic fixtures; Better Auth/site, installed GUI, production/reserve и native ОС не проверялись.
+- Общий shutdown deadline применяется композицией6/7: auth close начинается в beginClose до operation drain; API close() сохранён.
+- Ревью `06a66330bb`: три P1 закрыты тестами45–48 — epoch отзыва, общий cancel/close cleanup, disabled-old read-back.
+- Следующий шаг: scoped re-review исправлений от `06a66330bb`, затем Task6; recovery/cooldown/failover остаются Task7.
+
+## Ревью Task5 и уточнение порядка Task6 — 2026-11-06
+
+- Task5 SHA `b22cbc6557`: scoped re-review Spec compliant / Quality Approved; все три P1 закрыты.
+- Host60 PASS/252 assertions, typecheck и diff-check PASS; реальные fsync/revoke/cancel regressions сохранены.
+- Независимая read-only проверка Task6 выявила sequencing: текущая diagnostics передаёт весь management View.
+- Прежний шаг Task8 projection и тот же тест перенесены в Task6 до появления email/pending; Node routes остаются Task8.
+- Это выполнение прежнего spec§5: явный безопасный набор полей, одно значение для text и structuredContent.
+- Контракты/критерии не менялись; подтверждение и карта кода — task-6-context.md в task scratch.
+- Следующий шаг: Task6 — save-before-login, mutable Help readiness и атомарная Host/Desktop API интеграция.
+
+## Checkpoint Task 6 — 2026-11-06
+
+- База SHA: `b22cbc6557`; результат — `feat(loginom): recover Help readiness within a generation`.
+- Save-before-login выдаёт validation token без Help; browser check остаётся отдельным, verifyBrowser:false пропускает только его.
+- CloudAuth/CloudStore подключены к Host; login/logout заменяют Help прежнего поколения, не меняют settings record/revision/browser/leases.
+- KnowledgeSession владеет попыткой/child/catalog: singleflight, revision/attempt fence, cleanup retirement и повтор до readiness gates.
+- RuntimeHandle публикует текущий Help snapshot; pending, browser warning и store/cleanup failures независимы, старые/closing handles игнорируются.
+- Private stateDir сохраняет evidence в profile; admitted barrier сохраняет local start ACK, не ждёт remote catalog; shutdown начинает auth close до drain.
+- Три cloud API атомарно проведены через schema/Host/Desktop IPC/preload/App stubs; Node cloud routes остаются Task8.
+- Diagnostics явно проецирует прежние несекретные поля +mode/server/help, без cloud/email/userCode/verificationUrl.
+- TDD подтверждает legacy/no-creds/connected/custom, retry tools/call/connection.ready, concurrent/stale/cancel/close и logout tools во время retirement.
+- Host mandatory: 68 PASS/474 assertions; неизменённые migration18/recovery2 PASS переиспользованы; CLI9 PASS/206, Desktop30 PASS/80, App19 PASS/81, Schema2 PASS/13.
+- Все5 package typechecks и diff-check PASS; публичные Protocol/HttpApi не менялись, генерация SDK не требуется.
+- Измерены fixture I/O: outer30с для restart/двух cleanup tests; heavyCLI240с после177.8с/105fsync; product deadlines/assertions сохранены.
+- Сохранён local ACK контракт; CLI fixture упорядочивает start ACK до close ACK/disconnect, не ослабляя writer/cleanup проверки.
+- Evidence/точные команды/первичные failures: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-6-report.md`;61 clean close receipts отдельно.
+- Ограничения: synthetic localhost/Linux; сайт/production/reserve/native/installed GUI не проверялись. Исходный journal timeout не классифицирован; final PASS.
+- Следующий шаг: независимое ревью Task6; затем Task7 recovery/cooldown/failover. Слияния/выпуска не выполнялись.
+
+## Checkpoint Task 6, fix round1 — 2026-11-06
+
+- Fix base SHA: `d2abf2a4ae`; независимое ревью выявило два Important terminal-admission дефекта; исправлены в том же Task6 commit через amend.
+- Notify-only callback/Host resolver заменены одной session-owned admission Promise: success/no-creds resolve, terminal pre-ACK outcome reject после cleanup.
+- Failed prepare удаляет свою generation из Host и ждёт session disposal; проверенный кандидат с неверным ACK не активируется и не закрывает рабочее поколение/browser.
+- Current failed retirement завершает initial admission ошибкой; старые invalidations не завершают новую попытку, cleanup uncertainty остаётся sticky.
+- Initial prepare rejection переводит существующее Help readiness в recoverable-error; applying/settled завершаются, последующий check не блокируется.
+- Validation продолжает ждать ensure/catalog; admission rejection обработан без замены исходной Promise и без unhandled rejection.
+- Два постоянных real-Node regression: success-check→failed-saveACK RED→GREEN; logout-beforeACK/closed:false/exit0→terminal settled RED→GREEN.
+- Cloud-readiness:16 PASS/73 assertions; mandatory Host6:70 PASS/487; Host typecheck PASS; CLI startup/writer focused:1 PASS/14 assertions.
+- Schema/App/Desktop/остальные CLI checks переиспользованы: public contracts/call sites/happy-path fixtures не менялись; heavy CLI не повторялся.
+- Два старых pre-ACK Host tests требуют unavailable generation после disposal, сохраняя прежние status/cleanup assertions; own fixture teardown идёт через finally.
+- Публичные schema/IPC/API, remote catalog recovery и product deadlines не менялись; дополнительных status flags/caches/dependencies нет.
+- Exact RED/GREEN/covering outputs и self-review: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-6-report.md`.
+- Ограничения прежние: synthetic localhost/Linux, без installed GUI/native/site; независимое одобрение ещё не заявлено.
+- Следующий шаг: scoped re-review `d2abf2a4ae..amended HEAD` у исходного reviewer; затем Task7 по утверждённому goal.
+
+## Ревью Task6 — 2026-11-06
+
+- SHA `3cbcc83f17`: scoped re-review Spec compliant / Quality Approved; оба Important исправлены, новых обязательных замечаний нет.
+- Local admission сохраняет terminal outcome; failed apply оставляет рабочее поколение, failed retirement завершает ожидание с сохранением cleanup failure.
+- Host70/487, cloud16/73, CLI startup/writer1/14 и Host typecheck PASS; прочие неизменённые проверки подтверждены отчётом.
+- Native/site/reserve/installed GUI и полный bundled management dispatch — gates13/15; Node cloud router — Task8, в Task6 не заявлялись.
+- Следующий шаг: автономно Task7 по принятому плану; push/merge/release не выполнялись.
+
+## Checkpoint Task7 — 2026-11-06
+
+- База SHA `3cbcc83f170`; результат — `feat(loginom): recover cloud Help with bounded failover`.
+- Help использует исходный120с deadline до lease и сквозь startup/refresh/retirement/retry; remote read≤60с, managed initialize≤15с.
+- Настоящий fetch отменяется по сигналу своего SDK-запроса; private IPC передаёт только проверенную классификацию HTTP/сети/timeout.
+- На вызов один refresh и один primary→reserve; успешный reserve сохраняется в Host между поколениями, новый Host начинает с primary.
+- Cloud refresh singleflight удерживается до durable write/changed; cooldown30с/Retry-After demand-only, новая пара и actual-diskB снимают паузу.
+- Поздние401 старого child используют его завершённый refresh outcome; новый child/demand не наследует результат, у каждого waiter свой budget.
+- Logout сразу отключает память, отменяет refresh, очищает файл после начатых writes; ошибка удаления не скрывается, remote DELETE bounded.
+- Local admission/cleanup outcome, epoch/attempt/revision guards, browser leases и отдельная browser timeout policy сохранены.
+- Принятое уточнение старого revoke/write теста: GET1 и оба waiter ждут fsync, затем допустимый следующий revoke удаляет запись/reopenfalse; logout/write с новой парой сохранён.
+- В read-only review подтверждена недостижимость параллельного revoke GET при strict singleflight; новый hook/раннее освобождение flight не вводились.
+- Host117 PASS/703 assertions; Runtime65 PASS; scoped CLI startup/writer1 PASS/14; Host typecheck и diff-check PASS.
+- Сохранены реальные RED позднего401, actual-diskB cooldown и задержанного cleanup; исправлены первые неверные границы, не ожидания тестов.
+- Публичные Schema/Protocol/HttpApi и зависимости не менялись; SDK patch/generation и Task8+ отсутствуют.
+- Evidence/точные команды/ограничения: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-7-report.md`.
+- Ограничения: synthetic localhost/Linux; site/production reserve/native stores/installed GUI и полный120с worst-case остаются gates13/15.
+- Следующий шаг: независимое ревью Task7; после принятия Task8. Push/merge/release не выполнялись.
+
+## Checkpoint Task7, fix round1 — 2026-11-06
+
+- Fix base SHA `399b9e3fd9`; независимое ревью нашло два Important/P2, исправления входят через amend в тот же Task7 commit.
+- Concurrent catalog после общего reserve startup больше не использует stale primary: route caller обновляется после await, действующий reserve сохраняется.
+- Recovery видит target общей попытки; failed reserve не получает дополнительный failover, explicit reserve intent не понижается до primary.
+- SDK GET/SSE, как и POST, получает redirect:error в текущей fetch boundary; same-origin302 не вызывает target и не передаёт ему Bearer.
+- Оба замечания закреплены постоянными настоящими HTTP/MCP RED→GREEN; concurrent failed reserve отдельно проверен без нового retry.
+- Общий deadline, local admission/retirement/cleanup, refresh singleflight/cooldown и browser leases не изменены.
+- Host119 PASS/715 assertions; Runtime66 PASS; scoped CLI startup/writer1 PASS/14; Host typecheck и diff-check PASS.
+- Новых dependencies/framework/SDK patches/public contracts нет; heavy CLI и Task8+ не запускались.
+- Exact commands, RED/GREEN и covering logs: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-7-report.md`.
+- Ограничения прежние: synthetic localhost/Linux; native/site/production/installed GUI/full120с acceptance не заявлены.
+- Следующий шаг: scoped re-review `399b9e3fd9..amended HEAD`; независимое одобрение не заявляется. Push/merge/release не выполнялись.
+
+## Ревью Task7 — 2026-11-06
+
+- SHA `3f1e1f80a7`: scoped re-review Spec compliant / Quality Approved; оба Important/P2 закрыты, новых замечаний нет.
+- Concurrent catalog сохраняет успешный reserve; actual route и лимиты попыток согласованы. Fetch-граница запрещает redirect также для credential-bearing GET/SSE.
+- Host119/715, Runtime66, CLI startup/writer1/14, Host typecheck/diff-check/secret hook PASS.
+- Native/site/production/installed GUI и полный native120с worst-case остаются gates13/15; в Task7 не заявлены проверенными.
+- Следующий шаг: Task8 private Node management routes; push/merge/release не выполнялись.
+
+## Checkpoint Task8 — 2026-11-06
+
+- SHA базы: `3f1e1f80a7`; Task8 — коммит с этим checkpoint, итоговый SHA в отчёте.
+- Private Node API принимает exact `connection.cloud-start/cloud-cancel/cloud-disconnect` только с `{}` и возвращает существующий redacted View.
+- Существующий handler/decoders перенесён в internal `node-management.ts`; production и real Host localhost fixture используют один код без bootstrap injection.
+- `connection.ready` наблюдает живой shutdown; Host.beginClose/stop-before-drain, local admission, поколения и Task7 recovery/deadline не менялись.
+- Реальные bundled cancel/disconnect и real Host pending/status/cancel подтверждены; status/cancel/disconnected-disconnect не делают HTTP.
+- Model diagnostics сохраняют прежние безопасные поля и равенство text/structuredContent; cloud/code/link/email и новые tools не добавлены.
+- RED→GREEN: неизвестные routes, start и exact empty input. Ошибка добавленного raw View decoder устранена в тесте, продукт не менялся ради проверки.
+- Schema2 PASS/13 assertions; Host48 PASS/381 assertions; все5 package typechecks и git diff --check PASS.
+- Новых общих полей/Protocol/HttpApi/dependencies/generated правок нет; parent Task7 review note сохранён.
+- Evidence/точные команды/самопроверка: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-8-report.md`.
+- Ограничения: localhost/Linux; full bundled cloud device flow с baked tuple — Task13, site/native/installed/production не проверялись.
+- Следующий шаг: независимое ревью Task8; Task9 — после принятия. Push/PR/merge/release не выполнялись.
+
+## Ревью Task8 — 2026-11-06
+
+- SHA `f3249af43f`: независимое ревью Spec compliant / Quality Approved; обязательных замечаний нет.
+- Реальный Node routing использует общий handler, exact empty input и живое состояние shutdown; модель получает только безопасную проекцию.
+- Host48/381, Schema2/13 и все5 package typechecks PASS; full compiled cloud flow остаётся Task13, native/site — Task15.
+- Следующий шаг: Task9 explicit proxy/CA; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task9 — 2026-11-06
+
+- База SHA `f3249af43f24`; Task9 — коммит с этим checkpoint, итоговый SHA в отчёте.
+- Реальные native Node CloudAuth device/code и Help initialize/list используют explicit HTTP(S)/ALL proxy без opt-in flag; direct target0.
+- Native env snapshot сохраняет per-scheme lowercase/uppercase precedence/NO_PROXY, добавляет ALL fallback без изменения process.env/OS resolver.
+- По реальному malformed RED и независимому technical review init находится в default CloudAuth request и remote Help promise, не в strict Node bootstrap.
+- Local Host admission и Help start ACK сохранены; init failure даёт безопасный unavailable, refresh/DELETE не идут direct, close ACK+exit подтверждены.
+- Desktop повторяет тот же native init сразу после preferAppEnv; warning больше не содержит raw native error/proxy URL; sidecar контракт сохранён.
+- Реальные regression: NO_PROXY direct, dead/unsupported proxy target0, отсутствие explicit env при OS/PAC fixture, redirect second-origin0, child credentials filter.
+- Local test CA доказала TLS CONNECT для обоих клиентов; существующие system-CA настройки и Chromium --no-proxy-server сохранены.
+- Host100 PASS/476 assertions; Runtime18 PASS; local Host1/3 и CLI startup writer1/8 PASS; Host/Desktop typecheck и diff-check PASS.
+- Desktop environment-proxy и pinned Node no-proxy-contract PASS; source guard проверяет shell-init порядок и Chromium flags.
+- Общие Schema/Protocol/HttpApi, dependencies/pins/handshake/generated код не менялись; parent Task8 review note сохранён.
+- Evidence/команды/RED→GREEN/self-review: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-9-report.md`.
+- Ограничения: собранный Desktop first-shell-request и полный baked NodeHost cloud — gate13; installed system CA/native/site/reserve — gate15.
+- Следующий шаг: независимое ревью Task9; Task10 только после принятия. Push/PR/merge/release не выполнялись.
+
+## Ревью Task9 — 2026-11-06
+
+- SHA `2f0f279fa4`: независимое ревью Spec compliant / Quality Approved; обязательных замечаний нет.
+- Настоящие site/Help clients применяют explicit HTTP(S)/ALL/NO_PROXY; ошибки proxy не обходятся direct, local ACK/cleanup сохраняются.
+- Host100/476, Runtime18, local Host1/3, CLI writer1/8, Host/Desktop typecheck и proxy/NO_PROXY checks PASS.
+- Full compiled first-shell/dev tuple остаются Task13, native OS CA/site/reserve — Task15. Следующий шаг: Task10 Desktop UI; push/merge/release не выполнялись.
+
+## Checkpoint Task10 — 2026-11-06
+
+- База SHA `2f0f279fa4`; Task10 — текущий commit, ветка `dock-cloud-auth`.
+- Shared Desktop settings: cloud/custom cards, immediate cloud login/logout, isolated draft/revision guard, cancel after accepted close, no secret echo.
+- Save-before-login сохраняет `connection-required`; explicit Check проверяет browser отдельно от Help; recovery/pending activation сохранены.
+- TDD по одному поведению: App32 PASS/147 assertions; Desktop47 PASS/138 assertions; App/Desktop typecheck и diff-check PASS.
+- Current dev main/preload/renderer + unpacked Electron42.3.3 candidate: isolated IPC-stub settings-ux PASS (cards/keyboard/cancel/account/key/4close/save/pending).
+- ASAR bytes main/preload/renderer равны current out; knowledge-key отсутствует. Node24.19.0, Chromium1246, Electron42.3.3 hashes проверены; pins/dependencies не менялись.
+- Evidence, exact commands, ограничения: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-10-report.md`; GUI `$HOME/storage/tmp/loginom-settings-ux-SPtnY0`.
+- Это Linux dev IPC/UI-проверка с заглушками, не installed/live cloud acceptance. Пользовательское приложение/профили не менялись.
+- Ревью P2 исправлены: status не начинается во время cloudBusy; Check с Help connection-required не заявляет Help success; оба RED→GREEN и current GUI PASS.
+- Full baked tuple/settings-live — Task13; native Windows/macOS/site/reserve — Task15. Следующий шаг: повторное независимое ревью двух исправлений Task10.
+- Push/PR/merge/release не выполнялись; Task11 не начата.
+
+## Ревью Task10 — 2026-11-06
+
+- SHA `c238d0ad7d`: scoped re-review Spec compliant / Quality Approved; оба Important/P2 закрыты, новых замечаний нет.
+- Status не стартует во время cloud management; явная проверка при Help connection-required не заявляет доступность AI/Help.
+- App32/147, Desktop47/138, typechecks, current isolated candidate/settings-ux/inventory5117/asar-byte checks PASS; без встроенного ключа.
+- Live cloud/settings-live — Task13, native/site/reserve — Task15. Следующий шаг: Task11 CLI; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task11 — 2026-11-06
+
+- База SHA `c238d0ad7d`; Task11 — коммит с этим checkpoint, итоговый SHA в отчёте.
+- CLI connect/disconnect, выбранный cloud/custom setup, раздельные Help/browser; вход не применяет другой режим.
+- Setup cloud без credentials сохраняет Loginom до входа без browser; код/ссылка только stderr, итог stdout — один JSON.
+- Connect делает короткие start/status/cancel до expiresAt; clock181с и opener resolve/reject/never проверены без OS browser.
+- Один invocation handler/Host/guard для connect/TUI; handoff идемпотентен, SIGINT130 только после ACK+exit; bad cleanup держит guard.
+- TUI предлагает вход и при сохранённом cloud; отказ сохраняет ordinary chat. Поздний вход требует выхода из TUI.
+- Headless/automation gate проверяет верхний connection-required; исходный unconfigured ordinary path сохранён.
+- Исправлен прежний Host tools/prepare boundary: отказ Help сохраняет local descriptors; actual prepare остаётся not-ready.
+- Abort/release/close/deadline/неподтверждённый cleanup не превращаются в local success; retry/budgets/finally сохранены.
+- Fix1/P2: после Help fallback сохранённый runtime не запускает второй lease/catalog/list; успешный новый run сохраняет listing.
+- CLI69 PASS/1 SKIP/656 и PTY3 переиспользованы; fix1: Host48/341, CLI lazy1/8, Host typecheck и diff-check PASS; knowledge4 прежние PASS.
+- Isolated source PTY unconfigured/saved-cloud refusal+ordinary model/history и cancel-setup PASS; guard=false/alive=[].
+- Skip compiled constructor-recovery и настоящий compiled cloud transport/PTY/baked tuple — Task13, не installed/live acceptance.
+- Отчёт/точные команды/RED-GREEN: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-11-report.md`.
+- Новых dependencies/pins/common contracts/endpoint override нет; site/установка/пользовательские профили не изменялись.
+- Следующий шаг: независимое ревью Task11 родителем, затем Task12. Push/PR/merge/release не выполнялись.
+
+## Ревью Task11 — 2026-11-06
+
+- SHA `8b3756a4e2`: scoped re-review Spec compliant / Quality Approved; Important/P2 закрыт, новых замечаний нет.
+- Local fallback не запускает повторные lease/catalog/list; успешный existing-runtime path сохранён, отмена и cleanup остаются ошибками.
+- Свежие Host48/341, CLI lazy1/8 и Host typecheck PASS; прежние CLI69/1 compiled-only SKIP, knowledge4, Opencode typecheck и PTY3 переиспользованы по неизменённым путям.
+- Compiled cloud/PTY/constructor recovery — Task13, native/site/reserve — Task15. Следующий шаг: Task12 harness stdin; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task12 — 2026-11-06
+
+- База `8b3756a4e2`; Task12 — коммит с этим checkpoint, итоговый SHA в scratch-отчёте.
+- Evals setup передаёт custom mode, `/mcp` из dock.baseUrl и ключ только через stdin.
+- Fresh detection мигрирует старое/cloud/connection-required; совпадающий custom ready сохраняет generation.
+- Slot user/url guards до setup сохранены; verify требует custom endpoint/key и готовый Help; browser отдельно.
+- Node acceptance читает stand key только при setup; legacy/new key vars исключены из build/model env.
+- Missing key отказывает до setup/model, prepare-only не требует ключа harness; default/custom endpoints проверены.
+- RED→GREEN subprocess и unit canaries: stdin, env, argv, evidence и отсутствие knowledge-key в build fixture.
+- Source freeze5/5; evals profile108 PASS/2 proc-denial SKIP, bun typecheck PASS, node unittest10 PASS, diff-check PASS.
+- Typecheck потребовал ignored symlink на существующие зависимости с идентичными package.json/bun.lock; pins не менялись.
+- До отключения legacy требуется отдельный USER key + реальный setup/KB read; production/key provisioning не выполнялись.
+- Task13 завершает удаление встроенного ключа из настоящих пакетов; live evals и installed artifacts здесь не проверялись.
+- Отчёт: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-12-report.md`.
+- Следующий шаг: независимое ревью Task12 родителем, затем Task13. Push/PR/merge/release не выполнялись.
+
+## Ревью Task12 — 2026-11-06
+
+- SHA `d65979d3a7`: независимое ревью Spec compliant / Quality Approved; обязательных замечаний нет.
+- Harness использует custom stdin; stand key отсутствует в build/model env, missing-key/prepare-only и slot guards сохранены.
+- Evals108/2 существующих opt-in SKIP, node10, typecheck/freeze/diff/secret PASS. Реальная упаковка — Task13, USER provisioning/stand acceptance отдельно.
+- Следующий шаг: Task13 key removal, baked dev tuple и compiled integration; push/PR/merge/release не выполнялись.
+
+## Checkpoint Task13 — 2026-11-06
+
+- База `d65979d3a7`; Task13 — коммит с этим checkpoint, итоговый SHA в scratch-отчёте.
+- Shared staging и оба build callers больше не читают/пакуют общий Dock key; исторические отчёты сохранены.
+- Один build-only JSON tuple разрешён только explicit local dev; Node/Electron получают literal, runtime env/manifest его не меняют.
+- Release guard отвергает любую defined override во всех четырёх jobs, включая dev/empty; exact24 combinations PASS.
+- TDD: staging/key, tuple/callers, compiled release collector0; pinned Node24.19.0/Chromium1246/Electron42.3.3 не менялись.
+- Штатные current CLI и Desktop dev build/package PASS; inventories6141/5117, payload canaries/profile/key absent, ASAR byte equality PASS.
+- Реальный settings-live preload→IPC→Host: save-before-login/start/cancel/ready той же generation/disconnect, first-shell proxy/direct0 PASS.
+- Current compiled Node1/17, management1/28, constructor recovery1/13 и PTY connect/decline/Ctrl+C3/3 PASS; все отложенные local gates8–11 закрыты.
+- Реальный terminal Ctrl+C выявил ранний SIGINT Host: POSIX own session без unref; ACK+exit/guard сохранены, owner-loss IPC regression PASS.
+- Source Host86/557 + изменённый Node27/162, CLI54/574, Desktop65/256 PASS; source compiled opt-in skips покрыты отдельными current gates.
+- Desktop2 native SKIP остаются; Host/Desktop/Opencode typechecks, proxy runner, diff-check PASS; бюджеты не ослаблены.
+- Desktop не зависит от node-client; после launcher fix пересобран CLI. Build metadata содержит BASE/dirty source, не финальный SHA.
+- Initial mixed Desktop и harness failures сохранены с причинами/неопределённостью; повторные isolated checks PASS.
+- Evidence/команды/RED→GREEN/freeze: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-13-report.md`.
+- Это own Linux dev fixtures, не installed/native Windows/macOS/production site/reserve/authentic0.3.9 приёмка; эти gates — Task15.
+- Профили пользователя, production и pins/dependencies не менялись; push/PR/merge/release не выполнялись.
+- Следующий шаг: независимое ревью Task13 родителем, затем Task14 local Dock/USER ACL.
+
+Независимое ревью Task13 (`39d1fce83f`): Spec compliant / Quality Approved; обязательных замечаний нет. Minor: в standalone-cli stage-примере отсутствует запуск fixture; перенесён в документацию Task15, продуктовый результат не блокирует. Следующий этап — Task14: настоящий локальный Dock/ACL/managed Help.
+
+## Checkpoint Task14 — 2026-11-06
+
+- База `39d1fce83f`; Task14 — коммит с этим checkpoint, итоговый SHA в scratch-отчёте.
+- Настоящие RagFS/vector x86_avx2 и отдельный loopback Dock с собственными workspace/auth registry; только внешние модели fake.
+- ADMIN публикует KB, USER читает и получает отказ write/delete/ACL/admin; effective grants остаются read-only после republication.
+- Реальный managed client: семь чтений, точный trusted content, отсутствие hostile вне KB и mixed-read refusal; ротация/old401/new/legacy bootstrap PASS.
+- Mandatory existing ACL test выявил потерю request ID при disabled telemetry: write(wait:true) завершался до creator MANAGE. Минимальный bind fix сохраняет ID без включения metrics/global wait; неизменённый тест RED→GREEN.
+- Обязательная команда — 6 PASS; финальные native/network — повторные 2 PASS; tracker/processor — 15 PASS, request-wait — 4 PASS после исправления устаревшего unit stub.
+- Промежуточные mandatory5/1 и affected19/2 failures сохранены и объяснены; исходные ACL ожидания и forbid-global-wait не ослаблены.
+- Private official uv0.10.9/Python3.13.1/Rust1.91.1: native build PASS; pinned Node24.19.0 версия/SHA проверены, locks/build inputs неизменны.
+- Ruff/Node syntax/diff-check PASS. Только собственные private temp/processes; retired secrets удалены, initial own-fixture diagnostic repr заменён явным sanitized summary.
+- Runbook: свой bootstrap/State/source revision/ACL audit на каждом Dock, широкие ADMIN права, backup identities/rollback revoke; primary restore не копируется на reserve ради KB.
+- Evidence/команды/пределы: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-14-report.md`.
+- Production, сайт, реальный reserve, installed/native платформы и authentic0.3.9 не проверялись; это внешние gates15. Task15 не выполнялся.
+- Следующий шаг: независимое ревью Task14 родителем. Push/PR/merge/release не выполнялись.
+
+Независимое ревью Task14 (`0b9e5d5948`): Spec compliant / Quality Approved; обязательных замечаний нет. Четыре прежних Pydantic warnings отмечены Minor без изменения scope. Задачи1–14 завершены; следующий этап — Task15 source/local отчёт и общее ревью ветки от `dd2f949d11`.
+
+## Checkpoint Task15 — 2026-11-06
+
+- Принятый source SHA `0b9e5d5948ea8968b3fa165146340e82c53497a0`; задачи1–14 Spec compliant / Quality Approved.
+- Task15 docs commit содержит этот checkpoint; отчёт: `docs/testing/loginom-ai-agent/cloud-auth.md`, команды/SHA/результаты сохранены в git.
+- Source package/typecheck/build evidence переиспользовано по неизменным срезам; Task14 Python не меняет build inputs клиентов13 (git diff exit0).
+- Local integration PASS: реальные assembled Desktop/CLI→Host→Help с own HTTPS site/двумя MCP fixtures13 и native Dock/ACL14.
+- Source migration не равна authentic0.3.9; HTTP fixture не равен Better Auth. BASE/dirty metadata артефактов сохранены, final SHA не приписан сборкам.
+- Linux filesystem0700/0600 и local CA/proxy PASS; native Windows/macOS/system trust/full120s worst-case — NOT_RUN с условиями продолжения.
+- Внешний staging gate NOT_RUN: site/два независимых registry/accounts не предоставлены; доступность public production не проверялась.
+- Настоящий0.3.9 NOT_RUN: нет безопасных isolated inputs; binary/key/owner profiles не трогались, legacy key не отключён.
+- Исправлен existing standalone fixture example: own start/bounded readiness/own-PID cleanup; smoke PASS, без нового runner/поведения продукта.
+- Source gate PENDING независимого ревью Task15 и всего diff от `dd2f949d11`; до их исхода checkbox1 открыт, cloud выпуск не готов.
+- Task15 — только документация; TDD/runtime suites не повторялись без изменения поведения, SDK/locks/dependencies/pins неизменны.
+- Ранний own-fixture diagnostic leak14 описан честно; sanitized summaries/retired-secret cleanup не выданы за отсутствие экспозиции.
+- Следующий шаг: parent reviews, закрыть обязательные findings, docs-only update source gate; затем отдельные staging/native/legacy проверки владельца.
+- Push/PR/merge/release/production/website/legacy-disable не выполнялись. Scratch: `$HOME/storage/tmp/dock-cloud-auth-70d9-16751mfl/task-15-report.md`.
+
+
+## Финальный checkpoint cloud-auth — 2026-11-06
+
+- Итоговый runtime source SHA `a688c02c83453d1fbc8e03dc95dcb217aa496bc4`; source/local gates PASS, задачи1–14 приняты.
+- Initial15 `7ae457baf4`: scoped Spec compliant / Quality Approved; общее ревью `dd2f949d11..7ae` нашло два Important/P2, Critical0.
+- F1: Desktop Connect автоматически открывает точный pending URL один раз; manual fallback/polling/cancel/dispose сохранены, App35/161 PASS.
+- F2: исходный HostPort read имеет общий refresh/reserve allowance для catalog+read; независимые calls независимы, recovery25/109 PASS.
+- Fix `7ae..a688`: Spec compliant / Quality Approved, ADDRESSED2/OPEN0/new Critical/Important0; обязательные замечания общего ревью закрыты.
+- Host combined127 PASS/2 corrected FAIL переиспользован по срезам; не заявлен новый129 PASS. Host/Desktop/Opencode types и unchanged App types PASS.
+- Desktop полный src/main/loginom47/138 PASS41.27s; прежний5s timeout и focused1/8 сохранены, причина не установлена, deadlines не ослаблены.
+- Fresh dev CLI/Desktop/package, compiledNode1/22 и GUI Connect-only automatic2/manual0/direct0 PASS; product bytes равны freeze/a688.
+- Новые артефакты BASE7ae/dirtytrue; CLI0.0.0-dev-202611062033, Desktop0.3.9dev; чистый finalSHA не приписан metadata.
+- Inventory5117/6141 и canary scans6136CLI/5222Desktop PASS; свои процессы/fixture завершены, GUI successful profile удалён.
+- Exact affectedpytest19/2 + separate request-wait4/processor15/native2 перенесены в durable report; Dock14/CI24/staging/release evidence неизменны.
+- Native Windows/macOS/system trust/full120s и внешний site/два независимых Dock/accounts — NOT_RUN; public availability не проверялась.
+- До Windows native gate исправить legacy manual driver/input cloud и POSIX platform setup; helper здесь не менялся. Authentic0.3.9 NOT_RUN без safe inputs.
+- Durable команды/provenance/limits: `docs/testing/loginom-ai-agent/cloud-auth.md`; final closure docs-only, runtime suites/builds не повторялись.
+- Legacy key/production/website/owner profiles/apps не тронуты; early14 synthetic private-log incident описан и sanitized, не скрыт.
+- Следующие действия владельца: staging site/reserve/accounts, native CA/proxy/storage, безопасный0.3.9 стенд; legacy-disable отдельно. Cloud выпуск не готов.
+- Push/PR/merge/release не выполнялись; новый docs commit сохраняет runtimeSHA a688 и историю7ae/sourcefix без amend/rebase.

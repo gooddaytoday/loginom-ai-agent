@@ -43,6 +43,8 @@ export async function launchNodeHost(
       return fork(input.entry, [], {
         execPath: input.node,
         execArgv: ["--use-system-ca"],
+        // The CLI owns terminal cancellation and must receive the close ACK before releasing its profile.
+        detached: process.platform !== "win32",
         env: environment,
         stdio: ["ignore", "ignore", "ignore", "ipc"],
       })

@@ -4,12 +4,12 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { launchNodeHost, NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
-import { standaloneCancellation } from "./standalone-cancellation"
+import { handoffStandaloneCancellation, standaloneCancellation } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
 import { InstallationBrowserRecovery } from "@opencode-ai/core/installation/version"
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run") {
-  const signal = mode === "run" ? standaloneCancellation() : undefined
+  const signal = standaloneCancellation()
   const boundary = args.indexOf("--") < 0 ? args.length : args.indexOf("--")
   const flags = args.slice(0, boundary)
   const automation =
@@ -74,13 +74,18 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     return undefined
   })
   if (!host) return
-  const cleanup: { dispose?: () => Promise<void>; detach?: () => void } = {}
+  const cleanup: { dispose?: () => Promise<void>; detach?: () => void; cancelled?: boolean } = {}
   try {
     if (signal?.aborted) throw Error("CLI_CANCELLED")
     const status = Schema.decodeUnknownOption(Loginom.View)(await host.request("connection.status", {}))
     if (Option.isNone(status)) throw new Error("LOGINOM_REPLY_INVALID")
     if (status.value.recoveries?.length) {
       failure("LOGINOM_RECOVERY_REQUIRED", 4)
+      return
+    }
+    if (mode === "run" && (headless || automation) && status.value.state === "connection-required") {
+      failure("LOGINOM_CONNECTION_REQUIRED", 1)
+      process.stderr.write("Выполните loginom connect перед запуском.\n")
       return
     }
     if (mode === "run" && automation && !status.value.generation) {
@@ -113,14 +118,49 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       })
       // readline pauses stdin when the startup prompt closes; the TUI reuses this stream.
       process.stdin.resume()
-      if (isCancel(setup)) {
-        failure("CLI_CANCELLED", 130)
-        return
-      }
+      if (isCancel(setup)) throw Error("CLI_CANCELLED")
       if (setup) {
         const { loginomManagement } = await import("./loginom-management")
         await loginomManagement(host, "setup", { stdinJSON: false, acknowledge: false })
         process.stdin.resume()
+      }
+    }
+    if (mode === "tui" && process.stdin.isTTY) {
+      if (signal?.aborted) throw Error("CLI_CANCELLED")
+      const refreshed = Schema.decodeUnknownOption(Loginom.View)(await host.request("connection.status", {}))
+      if (Option.isNone(refreshed)) throw Error("LOGINOM_REPLY_INVALID")
+      if (
+        refreshed.value.mode === "cloud" &&
+        !refreshed.value.cloud.connected &&
+        refreshed.value.help.state === "connection-required"
+      ) {
+        const { confirm, isCancel } = await import("@clack/prompts")
+        const connect = await confirm({
+          message: "Подключиться к Loginom AI сейчас? Можно продолжить обычный чат без подключения.",
+          initialValue: false,
+          output: process.stderr,
+        })
+        process.stdin.resume()
+        if (isCancel(connect) || signal?.aborted) throw Error("CLI_CANCELLED")
+        if (connect) {
+          const { loginomManagement } = await import("./loginom-management")
+          try {
+            await loginomManagement(host, "connect", { stdinJSON: false, acknowledge: false })
+          } catch (error) {
+            if (
+              !(error instanceof Error) ||
+              !["LOGINOM_CLOUD_ACCESS_DENIED", "LOGINOM_CLOUD_EXPIRED", "LOGINOM_CLOUD_UNAVAILABLE"].includes(error.message)
+            )
+              throw error
+            process.stderr.write(
+              `Не удалось подключиться к Loginom AI: ${error.message}. Можно продолжить обычный чат без подключения.\n`,
+            )
+          } finally {
+            process.stdin.resume()
+          }
+        } else {
+          process.stderr.write("Для входа позже выйдите из TUI, выполните loginom connect и откройте TUI снова.\n")
+        }
       }
     }
     // An ordinary request reaches the model before its Loginom task profile is known.
@@ -156,6 +196,8 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       await parser.command(RunCommand).parseAsync(filtered)
     } else {
       const { TuiThreadCommand, setTuiLoginomHost, setTuiStartupWarning } = await import("./cmd/tui")
+      if (signal?.aborted) throw Error("CLI_CANCELLED")
+      handoffStandaloneCancellation()
       setTuiLoginomHost(host.port)
       setTuiStartupWarning(systemProxyNoticeLine(systemProxy))
       cleanup.detach = () => {
@@ -170,7 +212,7 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
   } catch (error) {
     if (error instanceof Error && error.message === "LOGINOM_TUI_CLEANUP_FAILED") throw error
     if (error instanceof Error && error.message === "CLI_CANCELLED") {
-      failure("CLI_CANCELLED", 130)
+      cleanup.cancelled = true
       return
     }
     failure(
@@ -186,7 +228,8 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
       cleanup.detach?.()
       LoginomHost.disconnect()
       await host.close()
-      if (signal?.aborted && process.exitCode !== 130 && process.exitCode !== 4) failure("CLI_CANCELLED", 130)
+      if ((cleanup.cancelled || signal?.aborted) && process.exitCode !== 130 && process.exitCode !== 4)
+        failure("CLI_CANCELLED", 130)
     }
   }
 }

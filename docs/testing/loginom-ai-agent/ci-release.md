@@ -96,3 +96,19 @@ Native CI и offline smoke не заменяют установленную GUI-
 - Docker matrix пока использует prod install root. Теги с semver pre-release суффиксом выбирают beta и не проходят этот gate. Для 0.1.5 используется тег `v0.1.5` и отдельный флаг GitHub pre-release.
 - Полный attribution/source/relinking audit, доверенные подписи и публичный update feed — отдельные работы.
 - Ранние dry runs ветки `ci-release` имели необязательные Windows/macOS jobs на macos-15 и не доказывают состояние объединённой сборки. Этот контракт заменяет тот режим; результаты последующих runs фиксируются отдельно.
+
+
+## Cloud build boundary
+
+Общий Dock key больше не нужен в secrets и не упаковывается в resources.
+`LOGINOM_AI_AGENT_CLOUD_BUILD` — только локальный dev JSON tuple. Helper
+проверяет явный dev channel и три HTTPS адреса, Node/Electron встраивают literal.
+Перед любой работой в verify/Linux/Windows/macOS release.yml выполняет bash
+проверку присутствия переменной: unset допускается; empty или tuple отклоняется
+для любого канала, в том числе dev. Значение не печатается. Эта граница CI
+дополняет проверку helper, поскольку локальный dev и release job имеют разные права.
+Проверка exact guard и раннего отказа build callers: из packages/loginom-host
+`bun test test/cloud-build.test.ts` с закреплённым `LOGINOM_AI_AGENT_TEST_NODE`.
+Полная локальная staging/inventory и compiled cloud проверка описаны в
+[standalone runbook](standalone-cli.md#локальный-cloud-staging-этапы-1315).
+Они не подтверждают выпуск на настоящем сайте/reserve или native Windows/macOS.

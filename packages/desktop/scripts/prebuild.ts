@@ -5,6 +5,11 @@ import { resolve } from "node:path"
 import { copyIcons } from "./copy-icons"
 import { resolveChannel } from "./utils"
 
+import { cloudBuild } from "../../loginom-host/script/cloud-build"
+
+// Reject invalid build inputs before producing backend or staged artifacts.
+cloudBuild(process.env)
+
 const channel = resolveChannel()
 const packageDirectory = resolve(import.meta.dir, "..")
 const agentDirectory = resolve(packageDirectory, "../opencode")

@@ -60,7 +60,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
     )
     const root = join(directory, "profile")
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
       generation: 1,
       revision: 1,
       url: "http://example.test",

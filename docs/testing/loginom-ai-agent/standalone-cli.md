@@ -4,6 +4,34 @@
 > и показывается тостом TUI. Исторические проверки ниже относятся к прежним версиям.
 > [Текущее решение](../../superpowers/specs/2026-09-23-system-proxy-v2.md).
 
+## Cloud/custom CLI: исходники, 2026-11-06
+
+`loginom setup --stdin-json` принимает `mode`, `endpoint`, `apiKey`, `url`,
+`username`, `password`. Для своего сервера задайте `mode:"custom"`, MCP endpoint
+и отдельный ключ через stdin. Облачные настройки Loginom можно сохранить до
+входа; setup в этом состоянии не запускает проверку браузера.
+`loginom check` отдельно показывает фактическое состояние Help и браузера.
+
+`loginom connect` начинает вход в Loginom AI, показывает код/ссылку в stderr
+и опрашивает короткие status-запросы до указанного сервером срока. Ошибка
+автоматического открытия браузера не мешает открыть ссылку вручную. Итоговый
+stdout содержит один JSON; Ctrl+C возвращает130 после подтверждённого закрытия
+Host. Повторный Ctrl+C не обходит cleanup. При его ошибке writer остаётся.
+Для смены аккаунта сначала выполните `loginom disconnect`; недоступность
+удалённого отзыва отмечается `LOGINOM_CLOUD_REVOKE_UNCONFIRMED`, локальный выход
+при этом выполнен. Настройки другого режима сохраняются.
+
+TUI предлагает вход также при уже сохранённых облачных настройках. Отказ
+позволяет продолжить обычный чат. Чтобы войти позже, выйдите из TUI, выполните
+`loginom connect` и запустите TUI снова: открытый TUI удерживает профиль.
+Headless/automation до модели останавливается при верхнем `state` равном
+`connection-required`; первоначальный `unconfigured` сохраняет прежний путь
+обычного чата. Готовность Help нужна для действий Loginom.
+
+Эта запись описывает текущие исходники и изолированные unit/native/PTY fixtures.
+Compiled cloud device-flow с baked site tuple проверяется в Task13; это
+не installed/live приёмка. Исторические результаты ниже не переименованы.
+
 ## macOS candidate, 2026-09-19
 
 Общий Desktop/CLI pipeline и установка описаны в [macOS runbook](macos.md).
@@ -327,11 +355,17 @@ MessagePort close в проверенном сценарии, несмотря �
 Это ручной development путь; подписи/hashes manifest и installed auto-discovery пока не проверяются.
 
 Автоматизация setup: `loginom setup --stdin-json --format json` принимает объект
-с необязательными строковыми `url`, `username`, `password` через отдельный
-stdin команды. Пропущенный пароль сохраняется; `password: ""` задаёт пустой пароль.
-Ключ сервиса знаний встроен в сборку (`resources/loginom/knowledge-key`); поле
-`apiKey` от старых скриптов принимается и игнорируется. Секреты не передаются
-аргументами; настройки провайдера модели остаются отдельными.
+с необязательными `mode`, `url`, `username`, `password` через отдельный stdin.
+`mode: "cloud"` сохраняет настройки до входа; `loginom connect` показывает код/ссылку
+и ожидает входа короткими запросами, Ctrl+C отменяет ожидание. `loginom disconnect`
+удаляет локальные cloud credentials; неподтверждённый revoke сайта выдаёт предупреждение.
+Для смены аккаунта сначала нужен disconnect. Вход сохраняет credentials немедленно,
+не меняя черновой режим. Переключение режима сохраняет credentials другого режима.
+`mode: "custom"` принимает `endpoint` и `apiKey`; ключ идёт только через stdin.
+Custom KB ограничен `viking://resources/loginom-dock`. Общего встроенного ключа нет.
+Legacy `apiKey` без явного custom mode игнорируется. Пропущенный пароль сохраняется;
+`password: ""` задаёт пустой пароль. Browser verification остаётся отдельным статусом.
+Настройки провайдера модели и профили Desktop/CLI независимы.
 
 По умолчанию неопределённая операция Loginom не блокирует следующий `run` и не
 даёт код 4: журнал мягкий, записи прошлого процесса стираются при старте host.
@@ -648,3 +682,69 @@ guard/processes0, public uninstall выполнен. Отдельный холо
 в прежнем sessionID сбросил docs-профиль в default, сохранив исторический grant.
 Provider синтетический; полная живая TUI/lifecycle матрица этим не закрывается.
 [Отчёт локальной приёмки](reports/2026-10-07-package-docs-local-installed.md).
+
+
+### Локальный cloud staging: этапы 13–15
+
+Release endpoints закреплены в Product: `https://loginom.ai`,
+`https://mcp.loginom.ai/mcp`, `https://mcp-reserve.loginom.ai/mcp`.
+Только локальная сборка с явно заданным `LOGINOM_AI_AGENT_CHANNEL=dev` может получить
+`LOGINOM_AI_AGENT_CLOUD_BUILD`: один JSON с ровно `site`, `primary`, `reserve`,
+все три — непустые HTTPS URL без credentials. CLI Node Host и Desktop main
+встраивают literal; runtime env, manifest.endpoint и handshake его не меняют.
+Release CI запрещает любую определённую переменную, в том числе пустую и канал dev.
+
+Использовать отдельный каталог под `$HOME/storage/tmp/`, закреплённые
+Node/npm и Chromium из Product и свою тестовую CA. Пример в отдельном shell из корня репозитория
+(файл `fixture.json` создаёт собственный `packages/loginom-host/test/support/cloud-fixture.ts`):
+
+```sh
+set -eu
+export TMPDIR=$HOME/storage/tmp TMP=$HOME/storage/tmp TEMP=$HOME/storage/tmp
+run=$(mktemp -d $HOME/storage/tmp/loginom-cloud-dev-XXXXXX)
+bun packages/loginom-host/test/support/cloud-fixture.ts "$run/fixture.json" >"$run/fixture.log" 2>&1 &
+fixture_pid=$!
+trap 'kill "$fixture_pid" 2>/dev/null || :; wait "$fixture_pid" 2>/dev/null || :' EXIT
+# Дождаться завершённой записи descriptor, максимум 10 секунд.
+for attempt in $(seq 1 100); do
+  rg -q '^Local cloud fixture ready$' "$run/fixture.log" && break
+  kill -0 "$fixture_pid" 2>/dev/null || exit 1
+  sleep 0.1
+done
+rg -q '^Local cloud fixture ready$' "$run/fixture.log" || exit 1
+export LOGINOM_AI_AGENT_CHANNEL=dev
+# fixture.json содержит только локальные endpoints, proxy, cert и control, без ключей.
+export LOGINOM_AI_AGENT_CLOUD_BUILD="$(bun -e 'const f=await Bun.file(process.argv[1]).json(); process.stdout.write(JSON.stringify(f.endpoints))' "$run/fixture.json")"
+export LOGINOM_AI_AGENT_CLI_PROFILE="$run/cli-profile"
+export LOGINOM_AI_AGENT_TEST_ROOT="$run/desktop-profile"
+export LOGINOM_AI_AGENT_TEST_ONBOARDING=1
+# NODE_SOURCE/BROWSER_SOURCE заранее указывают на проверенные inputs.
+bun packages/loginom-host/script/build-cli.ts "$run/cli" --no-archive
+(cd packages/desktop && bun run build)
+# В этом же shell выполнить проверки ниже; при выходе trap завершит только fixture_pid.
+```
+
+Не запускать dev tuple в рабочем Desktop root. Для GUI использовать
+`settings-live.mjs` с JSON stdin (`executable`, `connection`, `cloud` из fixture.json):
+он сохраняет настройки до входа, подключается через настоящий preload/IPC/Host,
+проверяет ready в той же generation, cancel/disconnect и первый site/Help запрос
+через login-shell proxy на POSIX и явное proxy environment на Windows.
+Для Windows `packages/loginom-host/script/windows-settings-live.ts` принимает
+`LOGINOM_AI_AGENT_TEST_DESKTOP_EXECUTABLE`, `LOGINOM_AI_AGENT_TEST_RESOURCES`,
+`LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE` и `LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE`.
+Fixture должен соответствовать compiled dev endpoints проверяемой сборки.
+Драйвер читает из профиля только URL и username, передаёт `{executable,connection,cloud}`.
+Только внешний OS opener перехватывается в своём процессе.
+Для CLI текущий artifact передаётся через `LOGINOM_AI_AGENT_TEST_CLI_BIN` в Bun tests,
+через `LOGINOM_AI_AGENT_TEST_CLI_EXE` в PTY; общий fixture file —
+`LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE`. PTY `--compiled-cloud --cloud-without-login`
+использует реальный bundled Host; `--cloud-connect --prompt` проверяет вход/чат,
+`--cloud-cancel` — Ctrl+C, `--prompt` без этих флагов — отказ от входа и обычный чат.
+
+Site и Help используют только явные proxy env и системные CA; `NO_PROXY`
+сохраняется, отказ proxy не разрешает прямой fallback. Chromium работает с
+`--no-proxy-server`; системный proxy v2 для модели не меняется.
+Этап14 проверяет отдельный локальный Dock/USER ACL. Этап15 разделяет source,
+локальные compiled fixtures и внешнюю/native приёмку. Локальные fixtures не
+подтверждают сайт, production reserve, Windows/macOS, установленный выпуск или
+совместимость настоящего 0.3.9; нужны отдельные стенды/артефакты и разрешение владельца.

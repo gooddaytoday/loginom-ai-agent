@@ -1,6 +1,12 @@
 # Manual Linux PTY acceptance. Runtime fixture uses no Chromium or external provider.
 import os, json, pathlib, tempfile, subprocess, pty, select, time, fcntl, termios, struct, signal, shutil, sys, threading, sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.request import urlopen
+compiled_cloud = "--compiled-cloud" in sys.argv
+cloud_connect = "--cloud-connect" in sys.argv
+cloud_cancel = "--cloud-cancel" in sys.argv
+assert not (cloud_connect or cloud_cancel) or compiled_cloud
+assert not cloud_cancel or "--prompt" not in sys.argv
 prompt_mode = "--prompt" in sys.argv
 cancel_startup = "--cancel-startup" in sys.argv
 cancel_stdin = "--cancel-stdin" in sys.argv or cancel_startup
@@ -15,6 +21,8 @@ assert not resume_mode or (prompt_mode and not attachment_mode), "--resume requi
 assert not attachment_mode or prompt_mode, "--attachment requires --prompt"
 proxy_notice = "--proxy-notice" in sys.argv
 unconfigured = "--unconfigured" in sys.argv
+cloud_without_login = "--cloud-without-login" in sys.argv
+ordinary_chat = unconfigured or cloud_without_login
 cancel_setup = "--cancel-setup" in sys.argv
 password_setup = "--password" in sys.argv
 onboarding = "--setup" in sys.argv or cancel_setup
@@ -25,41 +33,63 @@ assert not (unconfigured and onboarding), 'Choose --unconfigured or --setup'
 root=pathlib.Path(tempfile.mkdtemp(prefix='loginom-cli-tui-'))
 repo=pathlib.Path(__file__).resolve().parents[5]
 bundle=root/'bundle'; profile=root/'profile'
+binary=os.environ.get('LOGINOM_AI_AGENT_TEST_CLI_EXE')
+cloud=None
+if compiled_cloud:
+ assert binary and pathlib.Path(binary).is_file()
+ assert '--cloud-without-login' in sys.argv
+ cloud=json.loads(pathlib.Path(os.environ['LOGINOM_AI_AGENT_TEST_CLOUD_FIXTURE']).read_text())
+ assert cloud['control'].startswith('http://127.0.0.1:')
+ bundle=pathlib.Path(binary).parent.parent/'resources/loginom'
 workspace=root/'workspace'; workspace.mkdir()
 csv=b'amount\n10\n20\n25\n'
 if attachment_mode: (workspace/'sales.csv').write_bytes(csv)
-(bundle/'bin').mkdir(parents=True); (bundle/'runtime/src').mkdir(parents=True)
-(bundle/'bin/node').symlink_to(repo/'packages/desktop/resources/loginom/bin/node')
-(bundle/'resource-manifest.json').write_text(json.dumps({'endpoint':'https://example.test'}))
-# The built-in knowledge key; the fixture runtime starts only with it.
-(bundle/'knowledge-key').write_text('fixture-key')
-(bundle/'runtime/src/managed-entry.mjs').write_text('''import { appendFileSync, existsSync } from 'node:fs';
-appendFileSync(new URL('../../fixture-pids.jsonl', import.meta.url),JSON.stringify([process.pid,process.ppid])+'\\n');
-process.on('message', m => {
- if(m.operation==='start')appendFileSync(new URL('../../fixture-starts.jsonl', import.meta.url),JSON.stringify({chat:m.input.chat,headless:m.input.headless})+'\\n');
- if(m.operation==='start'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../starting',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{protocol:1,generation:m.input.connection.apiKey==='fixture-key' && m.input.connection.password==='' ? m.input.generation : -1,chat:m.input.chat,checked:true,ready:true}}),delayed?2000:0);}
- if(m.operation==='list')process.send({id:m.id,result:{tools:[{name:'probe',description:'Probe the private TUI host',inputSchema:{type:'object',properties:{}}}]}});
- if(m.operation==='call'){appendFileSync(new URL('../../fixture-calls.jsonl',import.meta.url),JSON.stringify(m.input)+'\\n');process.send({id:m.id,result:{recoveryPending:false,result:{content:[{type:'text',text:'TUI private host completed'}]}}});}
- if(m.operation==='admit')process.send({id:m.id,result:{admitted:true}});
- if(m.operation==='interrupt')process.send({id:m.id,result:{interrupted:true}});
- if(m.operation==='close'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../closing',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{closed:true}},()=>process.disconnect()),delayed?500:0);}
-});'''.replace("m.input.connection.password===''", "m.input.connection.password==='fixture-password'" if password_setup else "m.input.connection.password===''"))
+if not compiled_cloud:
+ (bundle/'bin').mkdir(parents=True); (bundle/'runtime/src').mkdir(parents=True)
+ (bundle/'bin/node').symlink_to(os.environ.get('LOGINOM_AI_AGENT_TEST_NODE', repo/'packages/desktop/resources/loginom/bin/node'))
+ (bundle/'resource-manifest.json').write_text(json.dumps({'endpoint':'https://example.test'}))
+ (bundle/'runtime/src/knowledge-entry.mjs').write_text("""process.on('message', m => {
+  if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.apiKey==='fixture-key'?m.input.generation:-1,started:true}});
+  if(m.operation==='list')process.send({id:m.id,result:{tools:[]}});
+  if(m.operation==='interrupt')process.send({id:m.id,result:{interrupted:true}});
+  if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+ });""")
+ (bundle/'runtime/src/managed-entry.mjs').write_text('''import { appendFileSync, existsSync } from 'node:fs';
+ appendFileSync(new URL('../../fixture-pids.jsonl', import.meta.url),JSON.stringify([process.pid,process.ppid])+'\\n');
+ process.on('message', m => {
+  if(m.operation==='start')appendFileSync(new URL('../../fixture-starts.jsonl', import.meta.url),JSON.stringify({chat:m.input.chat,headless:m.input.headless})+'\\n');
+  if(m.operation==='start'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../starting',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{protocol:1,generation:!('apiKey' in m.input.connection) && m.input.connection.password==='' ? m.input.generation : -1,chat:m.input.chat,checked:true,ready:true}}),delayed?2000:0);}
+  if(m.operation==='list')process.send({id:m.id,result:{tools:[{name:'probe',description:'Probe the private TUI host',inputSchema:{type:'object',properties:{}}}]}});
+  if(m.operation==='call'){appendFileSync(new URL('../../fixture-calls.jsonl',import.meta.url),JSON.stringify(m.input)+'\\n');process.send({id:m.id,result:{recoveryPending:false,result:{content:[{type:'text',text:'TUI private host completed'}]}}});}
+  if(m.operation==='admit')process.send({id:m.id,result:{admitted:true}});
+  if(m.operation==='interrupt')process.send({id:m.id,result:{interrupted:true}});
+  if(m.operation==='close'){const delayed=existsSync(new URL('../../delay-start',import.meta.url));if(delayed)appendFileSync(new URL('../../closing',import.meta.url),'1');setTimeout(()=>process.send({id:m.id,result:{closed:true}},()=>process.disconnect()),delayed?500:0);}
+ });'''.replace("m.input.connection.password===''", "m.input.connection.password==='fixture-password'" if password_setup else "m.input.connection.password===''"))
 bun=shutil.which('bun')
 assert bun, 'Bun is required'
 binary=os.environ.get('LOGINOM_AI_AGENT_TEST_CLI_EXE')
 if binary: assert pathlib.Path(binary).is_absolute() and pathlib.Path(binary).is_file()
 command=[binary] if binary else [bun,'run','src/standalone.ts']
-subprocess.run([bun,'script/build-node-host.ts',str(bundle/'host')],cwd=repo/'packages/loginom-host',check=True,capture_output=True)
+if not compiled_cloud: subprocess.run([bun,'script/build-node-host.ts',str(bundle/'host')],cwd=repo/'packages/loginom-host',check=True,capture_output=True)
 env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile),LOGINOM_AI_AGENT_CLI_BUNDLE=str(bundle),LOGINOM_AI_AGENT_PURE='1',BUN_RUNTIME_TRANSPILER_CACHE_PATH='0',TERM='xterm-256color')
+if compiled_cloud:
+ for key in list(env):
+  if key.lower() in ['http_proxy','https_proxy','all_proxy','no_proxy']: env.pop(key)
+ (root/'private-bin').mkdir()
+ opener=root/'private-bin/xdg-open'
+ opener.write_text('#!/bin/sh\nprintf opened >> "'+str(root/'opened')+'"\n');opener.chmod(0o700)
+ env.update(HOME=str(root/'home'),XDG_CONFIG_HOME=str(root/'config'),XDG_DATA_HOME=str(root/'data'),XDG_CACHE_HOME=str(root/'cache'),XDG_CURRENT_DESKTOP='generic',DESKTOP_SESSION='generic',DISPLAY='',WAYLAND_DISPLAY='',PATH=str(root/'private-bin')+':/usr/bin:/bin',BROWSER=str(opener),HTTPS_PROXY=cloud['proxy'],HTTP_PROXY=cloud['proxy'],NO_PROXY='',NODE_EXTRA_CA_CERTS=cloud['cert'],LOGINOM_AI_AGENT_SYSTEM_PROXY='off')
+ env.pop('LOGINOM_AI_AGENT_CLI_BUNDLE',None)
+
 if not unconfigured and not onboarding:
- setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input='{}',text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
+ setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input=json.dumps({'mode':'cloud'} if cloud_without_login else {'mode':'custom','endpoint':'https://example.test/mcp','apiKey':'fixture-key'}),text=True,capture_output=True,cwd=workspace if compiled_cloud else repo/'packages/opencode',env=env,timeout=15)
  assert setup.returncode==0,setup.stderr
 elif prompt_mode:
- status=subprocess.run(command+['loginom','status','--format','json'],text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
+ status=subprocess.run(command+['loginom','status','--format','json'],text=True,capture_output=True,cwd=workspace if compiled_cloud else repo/'packages/opencode',env=env,timeout=15)
  assert status.returncode==0,status.stderr
 if cancel_stdin:
  if cancel_startup: (bundle/'delay-start').write_text('1')
- child=subprocess.Popen(command+['run','--headless','--format','json','--','pending input'],cwd=repo/'packages/opencode',env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ child=subprocess.Popen(command+['run','--headless','--format','json','--','pending input'],cwd=workspace if compiled_cloud else repo/'packages/opencode',env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
  try:
   deadline=time.monotonic()+30
   ready=(bundle/'starting') if cancel_startup else (profile/'data/loginom-ai-agent.db')
@@ -95,22 +125,23 @@ class Provider(BaseHTTPRequestHandler):
   state["tool_result"] |= tool_result
   delta = {"content": "TUI fixture title" if title else "standalone tui completed"}
   finish = "stop"
-  if not title and not tool_result and not unconfigured:
+  if not title and not tool_result and not ordinary_chat:
    delta = {"tool_calls": [{"index": 0, "id": phase["call"], "type": "function", "function": {"name": "loginom_probe", "arguments": "{}"}}]}
    finish = "tool-calls"
   chunks = [{"id": "tui-test", "object": "chat.completion.chunk", "choices": [{"index": 0, "delta": value, "finish_reason": reason}]} for value, reason in [(delta, None), ({}, finish)]]
   data = ("".join("data: " + json.dumps(chunk) + "\n\n" for chunk in chunks) + "data: [DONE]\n\n").encode()
   self.send_response(200); self.send_header("Content-Type", "text/event-stream"); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
-  if (tool_result or unconfigured) and not title: state["finished"] = True
+  if (tool_result or ordinary_chat) and not title: state["finished"] = True
 server = None
 if prompt_mode:
  server = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
  threading.Thread(target=server.serve_forever, daemon=True).start()
+ if compiled_cloud: env['NO_PROXY']='localhost,127.0.0.1,::1'
  config = {"model":"test/test-model", "formatter":False,"lsp":False,"permission":{"loginom_*":"ask"},"provider":{"test":{"name":"Test","id":"test","env":[],"npm":"@ai-sdk/openai-compatible","models":{"test-model":{"id":"test-model","name":"Test Model","attachment":False,"reasoning":False,"temperature":False,"tool_call":True,"release_date":"2025-01-01","limit":{"context":100000,"output":10000},"cost":{"input":0,"output":0},"options":{}}},"options":{"apiKey":"test-key","baseURL":f"http://127.0.0.1:{server.server_port}/v1"}}}}
  (profile/'config/loginom-ai-agent.json').write_text(json.dumps(config))
 session_id = None
 if resume_mode:
- seed = subprocess.run(command+['run','--headless','--model','test/test-model','--dangerously-skip-permissions','--','Call loginom_probe and report the result'],cwd=repo/'packages/opencode',env=env,text=True,capture_output=True,timeout=60)
+ seed = subprocess.run(command+['run','--headless','--model','test/test-model','--dangerously-skip-permissions','--','Call loginom_probe and report the result'],cwd=workspace if compiled_cloud else repo/'packages/opencode',env=env,text=True,capture_output=True,timeout=60)
  assert seed.returncode==0, seed.stderr
  with sqlite3.connect('file:' + str(profile/'data/loginom-ai-agent.db') + '?mode=ro', uri=True) as db:
   sessions=list(db.execute('select id from session'))
@@ -127,10 +158,11 @@ if proxy_notice:
  env['XDG_CURRENT_DESKTOP']='GNOME'
  for key in ['HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy','NODE_USE_ENV_PROXY']:
   env.pop(key, None)
+native_hosts=set(); cloud_approved=False; cloud_interrupted=False; guard_during_login=False
 master,slave=pty.openpty(); fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',35,120,0,0))
-child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if unconfigured else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/opencode',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
-os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
-setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('URL Loginom',b'\x03' if cancel_setup else b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
+child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if ordinary_chat else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=workspace if compiled_cloud else repo/'packages/opencode',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True,preexec_fn=(lambda: fcntl.ioctl(0,termios.TIOCSCTTY,0)) if compiled_cloud else None)
+os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; connect_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
+setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('Сервер Loginom AI',b'\x1b[B\r'),('MCP endpoint',b'https://example.test/mcp\r'),('Ключ сервера',b'fixture-key\r'),('URL Loginom',b'\x03' if cancel_setup else b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
 if password_setup: setup_steps.append(('Новый пароль',b'fixture-password\r'))
 while child.poll() is None and time.monotonic()-start<(90 if attachment_mode else 30):
  if select.select([master],[],[],0.1)[0]:
@@ -141,8 +173,22 @@ while child.poll() is None and time.monotonic()-start<(90 if attachment_mode els
    os.write(master,setup_steps[setup_step][1]);setup_step+=1
   if unconfigured and not setup_skipped and 'Настроить Loginom сейчас?'.encode() in output:
    os.write(master,b'\r');setup_skipped=True
+  if ordinary_chat and not connect_skipped and 'Подключиться к Loginom AI сейчас?'.encode() in output:
+   os.write(master,b'\x1b[D\r' if cloud_connect or cloud_cancel else b'\r');connect_skipped=True
   if b'\x1b[6n' in chunk: os.write(master,b'\x1b[1;1R')
   if b'\x1b[c' in chunk: os.write(master,b'\x1b[?1;2c')
+ if compiled_cloud:
+  child_list=pathlib.Path('/proc',str(child.pid),'task',str(child.pid),'children')
+  for pid in child_list.read_text().split() if child_list.exists() else []:
+   try: commandline=pathlib.Path('/proc',pid,'cmdline').read_bytes()
+   except FileNotFoundError: continue
+   if b'node-host.mjs' in commandline: native_hosts.add(int(pid))
+  if b'TASK13-CODE' in output and not (cloud_approved or cloud_interrupted):
+   guard_during_login=(profile/'.writer').exists()
+   assert guard_during_login and len(native_hosts)==1
+   if cloud_cancel: os.write(master,b'\x03');cloud_interrupted=True
+   if cloud_connect:
+    urlopen(cloud['control']+'/approve').close();cloud_approved=True
  if attachment_mode and (not onboarding or setup_step==len(setup_steps)):
   if attachment_step==0 and b'Ask anything' in output:
    os.write(master,b'@sales.csv');attachment_step=1;attachment_at=time.monotonic()
@@ -166,7 +212,7 @@ except subprocess.TimeoutExpired:
  os.killpg(child.pid,signal.SIGKILL);child.wait()
 os.close(master)
 (root/'terminal.txt').write_bytes(output)
-pids=set(pid for line in ((bundle/'fixture-pids.jsonl').read_text().splitlines() if (bundle/'fixture-pids.jsonl').exists() else []) for pid in json.loads(line))
+pids=native_hosts if compiled_cloud else set(pid for line in ((bundle/'fixture-pids.jsonl').read_text().splitlines() if (bundle/'fixture-pids.jsonl').exists() else []) for pid in json.loads(line))
 alive=[]
 for pid in pids:
  try: os.kill(pid,0);alive.append(pid)
@@ -177,15 +223,21 @@ result.update(state)
 result['unconfigured'] = unconfigured
 result['setup_skipped'] = setup_skipped
 result['setup_completed'] = onboarding and setup_step==len(setup_steps)
-result['secret_visible'] = b'fixture-key' in output or b'fixture-password' in output
-if onboarding and not cancel_setup: assert result['setup_completed'] and not result['secret_visible'], 'Setup must complete without displaying the key'
-if unconfigured: assert setup_skipped and not (bundle/'fixture-pids.jsonl').exists(), 'Unconfigured TUI must offer setup without launching a runtime'
+result['secret_visible'] = b'fixture-key' in output or b'fixture-password' in output or b'CANARY' in output
+if onboarding and not cancel_setup:
+ saved=json.loads((profile/'loginom/connection/connection.json').read_text())
+ result['custom_saved']=saved.get('mode')=='custom' and saved.get('endpoint')=='https://example.test/mcp'
+ assert result['setup_completed'] and result['custom_saved'] and not result['secret_visible'], 'Custom setup must persist without displaying the key'
+if ordinary_chat:
+ assert connect_skipped and (setup_skipped or cloud_without_login) and not (bundle/'fixture-pids.jsonl').exists(), 'TUI must offer cloud sign-in and allow ordinary chat without launching a runtime'
+ result['connect_declined']=connect_skipped and not (cloud_connect or cloud_cancel)
+ result['saved_cloud']=cloud_without_login
 result['tool_called'] = (bundle/'fixture-calls.jsonl').exists()
 result['history_verified'] = False
 if prompt_mode:
  with sqlite3.connect('file:' + str(profile/'data/loginom-ai-agent.db') + '?mode=ro', uri=True) as db:
   parts = [json.loads(row[0]) for row in db.execute('select data from part')]
- result['history_verified'] = (unconfigured or any(p.get('tool') == 'loginom_probe' and p.get('state', {}).get('status') == 'completed' and p.get('state', {}).get('output') == 'TUI private host completed' for p in parts)) and any(p.get('type') == 'text' and p.get('text') == 'standalone tui completed' for p in parts)
+ result['history_verified'] = (ordinary_chat or any(p.get('tool') == 'loginom_probe' and p.get('state', {}).get('status') == 'completed' and p.get('state', {}).get('output') == 'TUI private host completed' for p in parts)) and any(p.get('type') == 'text' and p.get('text') == 'standalone tui completed' for p in parts)
 if resume_mode:
  with sqlite3.connect('file:' + str(profile/'data/loginom-ai-agent.db') + '?mode=ro', uri=True) as db:
   sessions=list(db.execute('select id from session'))
@@ -203,9 +255,15 @@ if attachment_mode:
 if proxy_notice:
  assert b'SYSTEM_PROXY_NOT_APPLIED' in output, 'Proxy warning must stay inside the TUI screen'
  result['proxy_notice']=True
+if compiled_cloud:
+ result.update(elapsed_seconds=round(time.monotonic()-start,2),ready_seconds=None if ready_at is None else round(ready_at-start,2),exit_keys_sent=sent,compiled_cloud=True,cloud_approved=cloud_approved,cloud_interrupted=cloud_interrupted,guard_during_login=guard_during_login,host_count=len(native_hosts))
+ assert len(native_hosts)==1 and not result['secret_visible']
+ if cloud_connect: assert cloud_approved and (root/'opened').exists()
 print(json.dumps(result))
+if cloud_cancel:
+ sys.exit(0 if child.returncode==130 and not forced and not result['guard'] and not alive and cloud_interrupted else 1)
 if invalid_session:
  sys.exit(0 if child.returncode==2 and not forced and not result['guard'] and not alive and b'CLI_ARGUMENT_INVALID' in output else 1)
 if cancel_setup:
  sys.exit(0 if child.returncode==130 and not forced and not result['guard'] and not alive and not result['secret_visible'] and not result['tool_called'] else 1)
-sys.exit(0 if child.returncode==0 and not forced and not result['guard'] and not alive and ((state['finished'] and not state['tool_advertised'] and not result['tool_called'] and result['history_verified'] if unconfigured else all(state.values()) and result['tool_called'] and result['history_verified']) if prompt_mode else result['provider_dialog']) else 1)
+sys.exit(0 if child.returncode==0 and not forced and not result['guard'] and not alive and ((state['finished'] and not state['tool_advertised'] and not result['tool_called'] and result['history_verified'] if ordinary_chat else all(state.values()) and result['tool_called'] and result['history_verified']) if prompt_mode else result['provider_dialog']) else 1)

@@ -33,7 +33,7 @@ async function configuredRuntime(directory: string, source: string) {
   await mkdir(root, { recursive: true, mode: 0o700 })
   if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test/app",
@@ -150,7 +150,7 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
     await mkdir(root, { recursive: true, mode: 0o700 })
     if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
     const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
       generation: 1,
       revision: 1,
       url: "http://example.test/app",

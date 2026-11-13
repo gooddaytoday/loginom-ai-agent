@@ -13,6 +13,9 @@ const updaterHandler = (_: unknown, state: UpdaterState) => {
 
 const api: ElectronAPI = {
   loginom: {
+    cloudStart: () => ipcRenderer.invoke("loginom-cloud-start"),
+    cloudCancel: () => ipcRenderer.invoke("loginom-cloud-cancel"),
+    cloudDisconnect: () => ipcRenderer.invoke("loginom-cloud-disconnect"),
     read: () => ipcRenderer.invoke("loginom-read"),
     status: () => ipcRenderer.invoke("loginom-status"),
     check: (candidate) => ipcRenderer.invoke("loginom-check", candidate),

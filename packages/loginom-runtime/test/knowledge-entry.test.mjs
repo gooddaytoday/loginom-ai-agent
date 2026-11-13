@@ -37,6 +37,7 @@ function entry(t) {
     child, exited,
     request(operation, input, timeout = 2000) {
       if (!child.connected) return Promise.reject(Error('ENTRY_DISCONNECTED'));
+      if (['start', 'call'].includes(operation) && input) input = { deadline: Date.now() + 120000, ...input };
       const id = randomUUID();
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => { requests.delete(id); reject(Error('ENTRY_TIMEOUT')); }, timeout);
@@ -72,14 +73,19 @@ test('private entry returns real Help schemas and calls only the read-only catal
   await runtime.request('start', { protocol: 1, generation: 8, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   const catalog = await runtime.request('list');
   assert.deepEqual(catalog.tools.map(tool => tool.name).sort(), ['find', 'glob', 'grep', 'list', 'read', 'search', 'tree']);
-  assert.deepEqual(catalog.tools.find(tool => tool.name === 'read').inputSchema,
-    server.tools.find(tool => tool.name === 'read').inputSchema);
+  const schema = catalog.tools.find(tool => tool.name === 'read').inputSchema;
+  assert.equal(schema.properties.uris.type, 'array');
+  assert.equal(schema.properties.uris.minItems, 1);
+  assert.equal(typeof schema.properties.uris.items.pattern, 'string');
   assert.match(catalog.catalogSha256, /^[a-f0-9]{64}$/);
-  const input = { run: 'chat-A-run-1', id: 'read-1', name: 'read', arguments: { uri: 'Help/nodes.md' } };
+  const input = { run: 'chat-A-run-1', id: 'read-1', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/Help/nodes.md'] } };
   const result = await runtime.request('call', input);
   assert.deepEqual(JSON.parse(result.content[0].text), { name: 'read', arguments: input.arguments });
   for (const name of ['write', 'dock_prepare', 'browser_navigate'])
     await assert.rejects(runtime.request('call', { ...input, name }), /LOGINOM_KNOWLEDGE_TOOL_DENIED/);
+  await assert.rejects(runtime.request('call', { ...input, id: 'mixed', arguments: {
+    uris: ['viking://resources/loginom-dock/Help/nodes.md', 'viking://agent/skills/private.md'],
+  } }), /LOGINOM_KNOWLEDGE_SCOPE_DENIED/);
   assert.equal(server.calls.length, 1);
   assert.deepEqual(await runtime.request('close'), { closed: true });
   assert.deepEqual(await runtime.exited, [0, null]);
@@ -91,12 +97,12 @@ test('concurrent Help calls are cancelled by request or run without disturbing a
   t.after(() => { for (const gate of gates.values()) gate.resolve({ content: [] }); });
   const server = await knowledgeServer(t, { call: params => {
     if (server.calls.length === 3) entered.resolve();
-    return gates.get(params.arguments.uri).promise;
+    return gates.get(params.arguments.uris[0].split('/').at(-1)).promise;
   } });
   const runtime = entry(t);
   await runtime.request('start', { protocol: 1, generation: 9, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   await runtime.request('list');
-  const input = id => ({ run: id.startsWith('A') ? 'run-A' : 'run-B', id, name: 'read', arguments: { uri: id } });
+  const input = id => ({ run: id.startsWith('A') ? 'run-A' : 'run-B', id, name: 'read', arguments: { uris: [`viking://resources/loginom-dock/${id}`] } });
   const first = runtime.request('call', input('A1'));
   const second = runtime.request('call', input('A2'));
   const other = runtime.request('call', input('B1'));
@@ -164,7 +170,7 @@ for (const mode of ['close', 'owner-disconnect']) test(`${mode} cancels active H
   const server = await knowledgeServer(t, { call: () => { entered.resolve(); return release.promise; } });
   const runtime = entry(t);
   await runtime.request('start', { protocol: 1, generation: 5, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  const call = runtime.request('call', { run: 'run', id: 'active', name: 'read', arguments: { uri: 'slow-help' } });
+  const call = runtime.request('call', { run: 'run', id: 'active', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/slow-help'] } });
   call.catch(() => {});
   await entered.promise;
   if (mode === 'close') {
@@ -187,7 +193,7 @@ test('private errors conceal remote secrets and missing-key startup does not use
   assert.equal(server.requests.length, 0);
   const runtime = entry(t);
   await runtime.request('start', { protocol: 1, generation: 7, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  await assert.rejects(runtime.request('call', { run: 'run', id: 'read', name: 'read', arguments: { uri: 'help' } }),
+  await assert.rejects(runtime.request('call', { run: 'run', id: 'read', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/help'] } }),
     { message: 'LOGINOM_KNOWLEDGE_FAILED' });
 });
 
@@ -196,18 +202,18 @@ test('private owner shutdown can interrupt every run without closing the knowled
   const release = Promise.withResolvers();
   t.after(() => release.resolve({ content: [] }));
   const server = await knowledgeServer(t, { call: params => {
-    if (params.arguments.uri === 'after') return Promise.resolve({ content: [{ type: 'text', text: 'still ready' }] });
+    if (params.arguments.uris[0].split('/').at(-1) === 'after') return Promise.resolve({ content: [{ type: 'text', text: 'still ready' }] });
     if (server.calls.length === 2) entered.resolve();
     return release.promise;
   } });
   const runtime = entry(t);
   await runtime.request('start', { protocol: 1, generation: 21, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
-  const calls = ['A', 'B'].map(run => runtime.request('call', { run, id: 'pending', name: 'read', arguments: { uri: run } }));
+  const calls = ['A', 'B'].map(run => runtime.request('call', { run, id: 'pending', name: 'read', arguments: { uris: [`viking://resources/loginom-dock/${run}`] } }));
   calls.forEach(call => call.catch(() => {}));
   await entered.promise;
   assert.deepEqual(await runtime.request('interrupt', { all: true }), { interrupted: true });
   for (const call of calls) await assert.rejects(call, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  assert.equal((await runtime.request('call', { run: 'next', id: 'after', name: 'read', arguments: { uri: 'after' } })).content[0].text,
+  assert.equal((await runtime.request('call', { run: 'next', id: 'after', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/after'] } })).content[0].text,
     'still ready');
   for (const input of [{ all: 'true' }, { all: true, run: 'A' }])
     await assert.rejects(runtime.request('interrupt', input), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
@@ -221,12 +227,37 @@ test('interrupting a call waiting for startup leaves other runs and initializati
   const runtime = entry(t);
   await runtime.request('start', { protocol: 1, generation: 22, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
   await entered.promise;
-  const first = runtime.request('call', { run: 'A', id: 'queued', name: 'read', arguments: { uri: 'cancelled' } });
-  const other = runtime.request('call', { run: 'B', id: 'queued', name: 'read', arguments: { uri: 'survives' } });
+  const first = runtime.request('call', { run: 'A', id: 'queued', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/cancelled'] } });
+  const other = runtime.request('call', { run: 'B', id: 'queued', name: 'read', arguments: { uris: ['viking://resources/loginom-dock/survives'] } });
   [first, other].forEach(call => call.catch(() => {}));
   assert.deepEqual(await runtime.request('interrupt', { run: 'A' }), { interrupted: true });
   await assert.rejects(first, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
   release.resolve();
-  assert.equal(JSON.parse((await other).content[0].text).arguments.uri, 'survives');
+  assert.equal(JSON.parse((await other).content[0].text).arguments.uris[0], 'viking://resources/loginom-dock/survives');
   assert.equal(server.calls.length, 1);
+});
+
+test('private absolute deadline aborts the child initialize HTTP socket', async t => {
+  const disconnected = Promise.withResolvers();
+  const server = await knowledgeServer(t, { request(body, _request, response) {
+    if (body?.method !== 'initialize') return false;
+    response.on('close', () => disconnected.resolve()); return true;
+  } });
+  const runtime = entry(t);
+  const started = Date.now();
+  await runtime.request('start', { protocol: 1, generation: 1, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET', deadline: started + 600 });
+  await assert.rejects(runtime.request('list'), /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
+  assert.ok(Date.now() - started < 1200);
+  await Promise.race([disconnected.promise, new Promise((_, reject) => setTimeout(() => reject(Error('HTTP_NOT_ABORTED')), 500))]);
+});
+
+test('private calls require a finite absolute deadline before remote dispatch', async t => {
+  const server = await knowledgeServer(t);
+  const runtime = entry(t);
+  await runtime.request('start', { protocol: 1, generation: 1, endpoint: server.endpoint, apiKey: 'UNIT-NONSECRET' });
+  await runtime.request('list');
+  for (const deadline of [undefined, NaN, Infinity, '600'])
+    await assert.rejects(runtime.request('call', { run: 'run', id: 'read', name: 'read', deadline,
+      arguments: { uris: ['viking://resources/loginom-dock/help'] } }), /LOGINOM_KNOWLEDGE_REQUEST_INVALID/);
+  assert.equal(server.calls.length, 0);
 });

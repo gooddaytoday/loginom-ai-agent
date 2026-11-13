@@ -8,6 +8,7 @@ import { connectionStore } from "./connection-store"
 import { credentials } from "./credentials"
 
 const active = {
+  mode: "custom" as const, endpoint: "http://example.test/mcp",
   generation: 1,
   revision: 1,
   url: "http://example.test/app/",
@@ -16,9 +17,9 @@ const active = {
   password: "private-password",
 }
 const runtime = {
-  async check() {},
+  async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
   async prepare() {
-    return { async close() {} }
+    return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
   },
 }
 

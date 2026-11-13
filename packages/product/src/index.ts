@@ -16,6 +16,11 @@ export const Product = Object.freeze({
   support: "https://github.com/gooddaytoday/loginom-ai-agent/issues",
   artifactName: "loginom-ai-agent-${os}-${arch}.${ext}",
   knowledgeEndpoint: "https://mcp.loginom.ai/mcp",
+  cloud: Object.freeze({
+    site: "https://loginom.ai",
+    primary: "https://mcp.loginom.ai/mcp",
+    reserve: "https://mcp-reserve.loginom.ai/mcp",
+  }),
   connection: Object.freeze({ url: "https://app.loginom.ai", username: "user" }),
   stores: Object.freeze({ settings: "loginom-ai-agent.settings", updater: "loginom-ai-agent.updater" }),
   config: Object.freeze({

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { watch } from "node:fs"
 import { createLoginomHost } from "../src/host"
+import { cliCredentials } from "../src/connection/cli-credentials"
 import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { knowledgeServer } from "../../loginom-runtime/client/test/support/knowledge-server.mjs"
@@ -64,7 +65,6 @@ async function fixture(
     });`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-  await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET\n")
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
   return {
     host,
@@ -73,6 +73,9 @@ async function fixture(
     resources,
     marker,
     candidate: {
+      mode: "custom" as const,
+      endpoint: server.endpoint,
+      apiKey: { operation: "replace" as const, value: "UNIT-NONSECRET" },
       revision: 0,
       url: "http://unavailable.example/app/?custom=1",
       username: "user",
@@ -212,17 +215,17 @@ test.each([
       expect((await f.host.api.status()).failure).toBeUndefined()
       expect(await connectionStore(join(f.root, "connection"), credentials("linux")).read()).toMatchObject({
         url: f.candidate.url,
-        // The built-in key is read from the resources and never stored with the connection.
-        apiKey: "",
+        // Custom credentials remain private in the connection store.
+        apiKey: "UNIT-NONSECRET",
         password: f.candidate.password.value,
       })
       expect(
-        await f.host.knowledge(1).request("call", {
+        await f.host.callKnowledge(1, {
           run: "docs",
           id: "help",
           name: "read",
-          arguments: { uri: "Help/node.md" },
-        }),
+          arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] },
+        }, { deadline: Date.now() + 120000, signal: new AbortController().signal }),
       ).toMatchObject({ content: [{ type: "text", text: expect.stringContaining("Help/node.md") }] })
       expect(f.host.hasRuntime(1, "docs")).toBe(false)
       expect(f.host.journal.pending()).toEqual([])
@@ -318,24 +321,16 @@ test("unexpected runtime failures do not become a successful browser warning or 
   }
 }, 15_000)
 
-test("a rejected or missing built-in Help key cannot start browser validation or produce a save token", async () => {
+test("a rejected custom key cannot use a fallback or start browser validation", async () => {
   const f = await fixture("LOGINOM_LOGIN_UNAVAILABLE")
   try {
-    await writeFile(join(f.resources, "knowledge-key"), "WRONG-NONSECRET")
-    // A key sent by an older client would be accepted by the server, but it is never used.
-    const legacy = { ...f.candidate, apiKey: { operation: "replace" as const, value: "UNIT-NONSECRET" } }
-    await expect(f.host.api.check(legacy)).rejects.toThrow("LOGINOM_KNOWLEDGE_AUTH_FAILED")
-    await rm(join(f.resources, "knowledge-key"))
-    await expect(f.host.api.check(legacy)).rejects.toThrow("LOGINOM_CONNECTION_CHECK_FAILED")
+    const rejected = { ...f.candidate, apiKey: { operation: "replace" as const, value: "WRONG-NONSECRET" } }
+    await expect(f.host.api.check(rejected)).rejects.toThrow("LOGINOM_KNOWLEDGE_AUTH_FAILED")
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(await f.host.api.status()).toMatchObject({ state: "unconfigured", generation: 0 })
-    await expect(f.host.api.save({ revision: 0, validationId: "never-issued" })).rejects.toThrow(
-      "LOGINOM_VALIDATION_EXPIRED",
-    )
+    await expect(f.host.api.save({ revision: 0, validationId: "never-issued" })).rejects.toThrow("LOGINOM_VALIDATION_EXPIRED")
     expect(await connectionStore(join(f.root, "connection"), credentials("linux")).read()).toBeUndefined()
-  } finally {
-    await f.close()
-  }
+  } finally { await f.close() }
 }, 15_000)
 
 test("Host shutdown cancels the pending Help validation before any browser check", async () => {
@@ -439,3 +434,54 @@ test("browser reports from an old generation cannot replace the saved connection
     await f.close()
   }
 }, 15_000)
+
+test("explicit custom configuration uses its own endpoint and key without a bundled fallback", async () => {
+  const f = await fixture("")
+  try {
+    await rm(join(f.resources, "knowledge-key"), { force: true })
+    await writeFile(join(f.resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://127.0.0.1:1/mcp" }))
+    const checked = await f.host.api.check(f.candidate)
+    expect(checked.help).toEqual({ state: "ready" })
+    expect(f.server.requests.length).toBeGreaterThan(0)
+    expect(f.server.requests.every(request => request.authorization === "Bearer UNIT-NONSECRET")).toBe(true)
+  } finally { await f.close() }
+}, 15_000)
+
+test.each(["host", "node"])("Check can validate custom Help without launching a browser: %s", async (mode) => {
+  const f = await fixture("")
+  const owner = mode === "host" ? f.host : await launchNodeHost({
+    node: process.env.LOGINOM_AI_AGENT_TEST_NODE!, entry: await buildNodeHost(join(f.resources, "host")),
+    root: f.root, resources: f.resources, headless: true, environment: {},
+  })
+  try {
+    const input = { ...f.candidate, verifyBrowser: false }
+    const checked = "api" in owner ? await owner.api.check(input) : await owner.request("connection.check", input)
+    expect(checked).toMatchObject({ help: { state: "ready" }, browser: { state: "unknown" } })
+    await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
+  } finally {
+    await owner.close()
+    await f.close()
+  }
+}, 15_000)
+
+test("Node connection.ready retries the same generation after initial Help failure", async () => {
+  let available = false
+  const f = await fixture("", { request: async (_body, _request, response) => {
+    if (available) return false
+    response.writeHead(503); response.end(); return true
+  } })
+  await f.host.close()
+  const store = connectionStore(join(f.root, "connection"), cliCredentials("linux"))
+  const record = { ...f.candidate, generation: 1, revision: 1, apiKey: "UNIT-NONSECRET", password: "" }
+  await store.stage(record)
+  await store.activate(1)
+  const owner = await launchNodeHost({ node: process.env.LOGINOM_AI_AGENT_TEST_NODE!, entry: await buildNodeHost(join(f.resources, "host")), root: f.root, resources: f.resources, headless: true, environment: {} })
+  try {
+    await expect(owner.request("connection.ready", {})).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
+    expect(await owner.request("connection.status", {})).toMatchObject({ generation: 1, state: "recoverable-error" })
+    available = true
+    expect(await owner.request("connection.ready", {})).toMatchObject({ generation: 1, revision: 1, state: "ready" })
+    expect(await store.read()).toEqual(record)
+    await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
+  } finally { await owner.close(); await f.close() }
+}, 180000)

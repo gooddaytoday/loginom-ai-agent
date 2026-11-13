@@ -164,7 +164,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
   const root = join(directory, "host")
   const codec = credentials("linux")
   const store = connectionStore(join(root, "connection"), codec)
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",

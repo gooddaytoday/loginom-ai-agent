@@ -22,7 +22,7 @@ test("knowledge supervision sends only its own private payload and filters provi
       entry,
       `process.on('message', message => {
       if (message.operation === 'start') {
-        const valid = Object.keys(message.input).sort().join(',') === 'apiKey,endpoint,generation,protocol'
+        const valid = Object.keys(message.input).sort().join(',') === 'apiKey,deadline,endpoint,generation,protocol'
           && message.input.apiKey === 'PRIVATE-NONSECRET-KEY'
           && !process.argv.join(' ').includes('PRIVATE-NONSECRET')
           && !Object.values(process.env).some(value => value.includes('PRIVATE-NONSECRET'))
@@ -31,6 +31,7 @@ test("knowledge supervision sends only its own private payload and filters provi
           started:message.input.endpoint !== 'https://example.test/no-start'}});
       }
       if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
+      if (message.operation === 'failure-marker') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_FAILED', knowledgeFailure:message.input});
       if (message.operation === 'malformed-diagnostic') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE',
         startupFailure:{stage:['catalog'],error_class:'Error',code:null,cause_codes:[],aborted:false,timeout:false,
           elapsed_ms:1,body:'PRIVATE-NONSECRET-DIAGNOSTIC'}});
@@ -54,6 +55,15 @@ test("knowledge supervision sends only its own private payload and filters provi
       expect(runtime.ready).toEqual({ protocol: 1, generation: 17, started: true })
       expect(await runtime.request("list")).toEqual({ tools: [] })
       await expect(runtime.request("malformed-diagnostic")).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+      for (const kind of ["unauthorized", "unavailable", "forbidden", "rate-limited", "other"])
+        await expect(runtime.request("failure-marker", { kind, retryAfterMs: 12 })).rejects.toMatchObject({ knowledgeFailure: { kind, retryAfterMs: 12 } })
+      for (const marker of [{ kind: "unknown" }, { kind: "unavailable", retryAfterMs: -1 }, { kind: "other", retryAfterMs: Infinity },
+        { kind: "unauthorized", body: "PRIVATE-CANARY" }, { kind: "forbidden", retryAfterMs: "3" }]) {
+        const error = await runtime.request("failure-marker", marker).catch(error => error)
+        expect(error).toBeInstanceOf(Error)
+        expect(error && typeof error === "object" && "knowledgeFailure" in error).toBe(false)
+        expect(JSON.stringify(error)).not.toContain("PRIVATE-CANARY")
+      }
     } finally {
       await runtime.close()
     }
@@ -98,7 +108,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
         return { tools: server.tools }
       },
       call: async (params) => {
-        const gate = typeof params.arguments?.uri === "string" ? held.get(params.arguments.uri) : undefined
+        const gate = Array.isArray(params.arguments?.uris) ? held.get(params.arguments.uris[0].split("/").at(-1)) : undefined
         if (gate) {
           if (++count.held === 2) both.resolve()
           return gate.promise
@@ -122,13 +132,12 @@ test("restored Host starts only knowledge and local settled does not wait for th
     `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser startup is forbidden');`,
   )
   await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-  await writeFile(join(resources, "knowledge-key"), "UNIT-NONSECRET")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: server.endpoint,
     generation: 1,
     revision: 1,
-    // A connection saved by an older build keeps its own key; Help uses the built-in one.
-    apiKey: "LEGACY-NONSECRET",
+    // The profile explicitly selects the local custom Dock fixture.
+    apiKey: "UNIT-NONSECRET",
     password: "PRIVATE-NONSECRET-PASSWORD",
     username: "user",
     url: "http://unavailable.example/app/?custom=1",
@@ -173,7 +182,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
       client.request("call", {
         run: "before-ready",
         name: "read",
-        args: { uri: "Help/node.md" },
+        args: { uris: ["viking://resources/loginom-dock/Help/node.md"] },
         userMessage: "original",
       }),
     ).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
@@ -186,7 +195,7 @@ test("restored Host starts only knowledge and local settled does not wait for th
       tools: expect.arrayContaining([
         expect.objectContaining({
           name: "read",
-          inputSchema: server.tools.find((tool) => tool.name === "read")?.inputSchema,
+          inputSchema: expect.objectContaining({ properties: expect.objectContaining({ uris: expect.objectContaining({ type: "array", minItems: 1 }) }) }),
         }),
         expect.objectContaining({ name: "dock_diagnostics" }),
       ]),
@@ -195,24 +204,30 @@ test("restored Host starts only knowledge and local settled does not wait for th
       await client.request("call", {
         run: "one",
         name: "read",
-        args: { uri: "Help/node.md" },
+        args: { uris: ["viking://resources/loginom-dock/Help/node.md"] },
         userMessage: "original",
       }),
     ).toEqual({
-      content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uri: "Help/node.md" } }) }],
+      content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }) }],
     })
     expect(
       await client.request("call", { run: "one", name: "dock_diagnostics", args: {}, userMessage: "original" }),
     ).toMatchObject({ structuredContent: { state: "ready", generation: 1 } })
+    const count = server.calls.length
+    await expect(client.request("call", {
+      run: "one", name: "read", userMessage: "original",
+      args: { uris: ["viking://resources/loginom-dock/Help/node.md", "viking://agent/skills/private.md"] },
+    })).rejects.toThrow("LOGINOM_KNOWLEDGE_SCOPE_DENIED")
+    expect(server.calls).toHaveLength(count)
     await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(host.journal.pending()).toEqual([])
     expect(await readdir(join(root, "recovery"))).toEqual([])
     expect(await client.request("acquire", { run: "other", session: "other-chat" })).toEqual({ generation: 1 })
-    const first = client.request("call", { run: "one", name: "read", args: { uri: "A" }, userMessage: "original" })
+    const first = client.request("call", { run: "one", name: "read", args: { uris: ["viking://resources/loginom-dock/A"] }, userMessage: "original" })
     const other = client.request("call", {
       run: "other",
       name: "read",
-      args: { uri: "B" },
+      args: { uris: ["viking://resources/loginom-dock/B"] },
       userMessage: "other-original",
     })
     ;[first, other].forEach((call) => call.catch(() => {}))
@@ -273,17 +288,17 @@ test("supervised real knowledge entry acknowledges before the server catalog is 
             name: "read",
             inputSchema: {
               type: "object",
-              properties: { uri: { type: "string" } },
-              required: ["uri"],
+              properties: expect.objectContaining({ uris: expect.objectContaining({ type: "array", minItems: 1 }) }),
+              required: ["uris"],
               additionalProperties: false,
             },
           }),
         ]),
       })
       expect(
-        await runtime.request("call", { run: "run", id: "request", name: "read", arguments: { uri: "Help/node.md" } }),
+        await runtime.request("call", { deadline: Date.now() + 120_000, run: "run", id: "request", name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }),
       ).toEqual({
-        content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uri: "Help/node.md" } }) }],
+        content: [{ type: "text", text: JSON.stringify({ name: "read", arguments: { uris: ["viking://resources/loginom-dock/Help/node.md"] } }) }],
       })
     } finally {
       release.resolve()
@@ -298,3 +313,28 @@ test("supervised real knowledge entry acknowledges before the server catalog is 
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test("knowledge start carries the original deadline into the real child HTTP request", async () => {
+  const cleanup: (() => void | Promise<void>)[] = []
+  const server = await knowledgeServer({ after: callback => cleanup.push(callback) }, { async request(body, _request, response) {
+    if ((!body || typeof body !== "object" || !("method" in body) || body.method !== "initialize")) return false
+    return true
+  } })
+  const directory = await mkdtemp(join(tmpdir(), "knowledge-deadline-"))
+  const started = Date.now()
+  const runtime = await superviseKnowledge({ node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+    entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)), stateDir: directory,
+    generation: 1, endpoint: server.endpoint, apiKey: "UNIT-NONSECRET", environment: {}, deadline: started + 600 })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await expect(Promise.race([runtime.request("list"), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Error("CHILD_DEADLINE_IGNORED")), 1300)
+    })])).rejects.toMatchObject({ knowledgeFailure: { kind: "unavailable" } })
+    expect(Date.now() - started).toBeLessThan(1200)
+  } finally {
+    clearTimeout(timer)
+    await runtime.close()
+    for (const close of cleanup) await close()
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 30000)

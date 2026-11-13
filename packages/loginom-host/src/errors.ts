@@ -10,6 +10,8 @@ const codes = new Set([
   "LOGINOM_CONFIG_REQUIRED",
   "LOGINOM_CONNECTION_NOT_READY",
   "LOGINOM_URL_INVALID",
+  "LOGINOM_ENDPOINT_INVALID",
+  "LOGINOM_API_KEY_REQUIRED",
   "LOGINOM_USERNAME_INVALID",
   "LOGINOM_REVISION_CONFLICT",
   "LOGINOM_APPLICATION_PENDING",
@@ -19,10 +21,19 @@ const codes = new Set([
   "LOGINOM_RECOVERY_UNAVAILABLE",
   "LOGINOM_VALIDATION_EXPIRED",
   "LOGINOM_CONNECTION_CHECK_FAILED",
+  "LOGINOM_CLOUD_CONNECTION_REQUIRED",
+  "LOGINOM_CLOUD_ALREADY_CONNECTED",
+  "LOGINOM_CLOUD_UNAVAILABLE",
+  "LOGINOM_CLOUD_PROTOCOL_INVALID",
+  "LOGINOM_CLOUD_ACCESS_DENIED",
+  "LOGINOM_CLOUD_EXPIRED",
+  "LOGINOM_CLOUD_REVOKE_UNCONFIRMED",
+  "LOGINOM_CLOUD_LOGIN_CLEANUP_UNCONFIRMED",
   "LOGINOM_KNOWLEDGE_AUTH_FAILED",
   "LOGINOM_KNOWLEDGE_UNAVAILABLE",
   "LOGINOM_KNOWLEDGE_FAILED",
   "LOGINOM_KNOWLEDGE_TOOL_DENIED",
+  "LOGINOM_KNOWLEDGE_SCOPE_DENIED",
   "LOGINOM_KNOWLEDGE_INTERRUPTED",
   "LOGINOM_KNOWLEDGE_REQUEST_INVALID",
   "LOGINOM_KNOWLEDGE_REQUEST_BUSY",
@@ -115,4 +126,14 @@ export function fileError(value: unknown) {
           ? "LOGINOM_FILE_NOT_REGULAR"
           : value,
   )
+}
+
+export function knowledgeFailure(value: unknown) {
+  if (!value || typeof value !== "object" || !("knowledgeFailure" in value)) return undefined
+  const failure = value.knowledgeFailure
+  if (!failure || typeof failure !== "object" || Array.isArray(failure) || !("kind" in failure)
+    || typeof failure.kind !== "string" || !["unauthorized", "unavailable", "forbidden", "rate-limited", "other"].includes(failure.kind)
+    || Object.keys(failure).some(key => !["kind", "retryAfterMs"].includes(key))
+    || ("retryAfterMs" in failure && (typeof failure.retryAfterMs !== "number" || !Number.isFinite(failure.retryAfterMs) || failure.retryAfterMs < 0))) return undefined
+  return { kind: failure.kind, ...("retryAfterMs" in failure ? { retryAfterMs: failure.retryAfterMs as number } : {}) }
 }

@@ -17,6 +17,7 @@ test.skipIf(process.platform !== "linux")(
     await Bun.write(
       config,
       JSON.stringify({
+        endpoint: "https://dock.example.test/team/mcp",
         api_key: "private-fixture",
         loginom_url: "http://127.0.0.1:1/app/",
         workflow_profile: { passwordless_login: true, loginom_user: "user" },
@@ -30,6 +31,7 @@ test.skipIf(process.platform !== "linux")(
           LOGINOM_AI_AGENT_TEST_CONFIG: config,
           LOGINOM_AI_AGENT_TEST_CLI_EXECUTABLE: executable,
           LOGINOM_AI_AGENT_TEST_CREDENTIAL_PROFILE: "",
+          LOGINOM_ORACLE_SETUP_REPORT: join(root, "setup.json"),
           LOGINOM_ORACLE_PROBE_REPORT: join(root, "calls.json"),
         },
         stdout: "pipe",
@@ -43,11 +45,15 @@ test.skipIf(process.platform !== "linux")(
         new Response(child.stdout).text(),
         new Response(child.stderr).text(),
       ])
-      const directory = stdout.match(/^Private crash evidence: (\/tmp\/loginom-cli-owner-crash-[^\s]+)$/m)?.[1]
+      const directory = stdout.match(/^Private crash evidence: (.+)$/m)?.[1]
       if (directory) evidence.push(directory)
       expect(code).not.toBe(0)
       expect(stderr).toContain("CRASH_PREPARE_FAILED")
       expect(stderr).not.toContain("CLI_ORACLE_TOOL_NOT_ADVERTISED")
+      expect(await Bun.file(join(root, "setup.json")).json()).toEqual({
+        mode: "custom", endpoint: "https://dock.example.test/team/mcp",
+        apiKey: "private-fixture", password: "", username: "user", url: "http://127.0.0.1:1/app/",
+      })
       const calls = await Bun.file(join(root, "calls.json")).json()
       expect(calls.map((call: { name: string }) => call.name)).toEqual(["skill", "loginom_dock_prepare"])
       expect(calls[0].arguments).toEqual({ name: "loginom-automation" })

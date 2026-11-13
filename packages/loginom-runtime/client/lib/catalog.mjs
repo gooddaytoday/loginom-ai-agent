@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { createRedactor } from './redact.mjs';
 
-export function catalogStartup({ signal, deadline = Date.now() + 120000, onFailure } = {}) {
+export function catalogStartup({ signal, deadline = Date.now() + 120000, onFailure, retry = true } = {}) {
   const bounded = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(Math.max(0, deadline - Date.now()))]);
-  let retried = false;
+  let retried = !retry;
   return { signal: bounded, async read(phase, operation) {
     for (;;) {
       bounded.throwIfAborted();

@@ -5,10 +5,19 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 export async function knowledgeServer(t, options = {}) {
+  const inputs = {
+    find: { properties: { query: { type: 'string' }, target_uri: { type: 'string' }, limit: { type: 'integer' } }, required: ['query'] },
+    search: { properties: { query: { type: 'string' }, target_uri: { type: 'string' }, mode: { type: 'string', enum: ['list', 'context'], default: 'list' } }, required: ['query'] },
+    read: { properties: { uris: { type: 'array', items: { type: 'string' } } }, required: ['uris'] },
+    list: { properties: { uri: { type: 'string' }, recursive: { type: 'boolean' } }, required: ['uri'] },
+    tree: { properties: { uri: { type: 'string', default: 'viking://' }, level_limit: { type: 'integer' }, node_limit: { type: 'integer' }, include_abstract: { type: 'boolean' } } },
+    grep: { properties: { uri: { type: 'string' }, pattern: { type: 'array', items: { type: 'string' } }, case_insensitive: { type: 'boolean' }, node_limit: { type: 'integer' } }, required: ['uri', 'pattern'] },
+    glob: { properties: { uri: { type: 'string', default: 'viking://' }, pattern: { type: 'string' }, node_limit: { type: 'integer' } }, required: ['pattern'] },
+  };
   const state = { requests: [], sessions: new Map(), calls: [],
     tools: (options.names ?? ['find', 'search', 'read', 'grep', 'glob', 'list', 'tree', 'write']).map(name => ({
       name, description: `Real remote ${name} schema`, inputSchema: {
-        type: 'object', properties: { uri: { type: 'string' } }, required: ['uri'], additionalProperties: false,
+        type: 'object', ...(inputs[name] ?? { properties: { uri: { type: 'string' } }, required: ['uri'] }), additionalProperties: false,
       },
     })),
   };

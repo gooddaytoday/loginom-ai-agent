@@ -72,7 +72,7 @@ async function fixture(configured = false, admissionResult?: unknown) {
   )
   if (configured) {
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
       generation: 1,
       revision: 1,
       url: "http://example.test",

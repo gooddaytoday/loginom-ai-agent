@@ -4,6 +4,7 @@ import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { loginomManagement } from "./loginom-management"
 import { standaloneBundle } from "./standalone-bundle"
+import { standaloneCancellation } from "./standalone-cancellation"
 
 export async function standaloneCommand(args: string[], paths: ReturnType<typeof cliProfile>) {
   const parsed = parseManagementArgs(args)
@@ -61,7 +62,9 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
   if (
     !["default", "json"].includes(parsed.values.format) ||
     parsed.positionals[0] !== "loginom" ||
-    !["status", "setup", "check", "cancel-pending", "recover"].includes(parsed.positionals[1] ?? "") ||
+    !["status", "setup", "check", "connect", "disconnect", "cancel-pending", "recover"].includes(
+      parsed.positionals[1] ?? "",
+    ) ||
     (parsed.positionals.length > 2 && (parsed.positionals[1] !== "recover" || !parsed.values.acknowledge)) ||
     (parsed.values["stdin-json"] && parsed.positionals[1] !== "setup") ||
     (parsed.values.acknowledge && parsed.positionals[1] !== "recover") ||
@@ -90,18 +93,25 @@ export async function standaloneCommand(args: string[], paths: ReturnType<typeof
     return undefined
   })
   if (!host) return
-  try {
-    const result = await loginomManagement(host, parsed.positionals[1], {
-      stdinJSON: parsed.values["stdin-json"],
-      acknowledge: parsed.values.acknowledge,
-      ids: parsed.positionals.slice(2),
-    })
-    process.stdout.write(JSON.stringify(result, null, parsed.values.format === "json" ? undefined : 2) + "\n")
-  } catch (error) {
-    failure(error)
-  } finally {
-    await host.close()
+  const outcome = await loginomManagement(host, parsed.positionals[1], {
+    stdinJSON: parsed.values["stdin-json"],
+    acknowledge: parsed.values.acknowledge,
+    ids: parsed.positionals.slice(2),
+  }).then(
+    (result) => ({ result }),
+    (error: unknown) => {
+      if (error instanceof Error && error.message === "CLI_CANCELLED") return { cancelled: true }
+      failure(error)
+      return { failed: true }
+    },
+  )
+  await host.close()
+  if ("cancelled" in outcome || ("result" in outcome && standaloneCancellation()?.aborted)) {
+    failure("CLI_CANCELLED")
+    return
   }
+  if ("failed" in outcome) return
+  process.stdout.write(JSON.stringify(outcome.result, null, parsed.values.format === "json" ? undefined : 2) + "\n")
 }
 
 function parseManagementArgs(args: string[]) {

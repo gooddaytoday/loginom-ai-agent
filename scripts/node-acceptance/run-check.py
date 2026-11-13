@@ -20,7 +20,7 @@ import sys
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-# Stand builds embed the knowledge service key like release builds do.
+# Optional private stand key input for setup only.
 KNOWLEDGE_KEY = Path.home() / '.config/loginom-ai-agent/mcp-api-key'
 DATA = REPO / 'docs/testing/loginom-ai-agent'
 SCENARIOS = {
@@ -39,9 +39,9 @@ D87 = {
 
 
 def stand_knowledge_key():
-    # Passed only through the build environment; never argv, reports or case files.
-    key = os.environ.get('LOGINOM_MCP_API_KEY') or (KNOWLEDGE_KEY.read_text().strip() if KNOWLEDGE_KEY.is_file() else '')
-    if not key: raise RuntimeError(f'LOGINOM_MCP_API_KEY or {KNOWLEDGE_KEY} is required to build the CLI')
+    # Read only for setup stdin; never build/model environment, argv or evidence.
+    key = os.environ.get('LOGINOM_DOCK_API_KEY') or (KNOWLEDGE_KEY.read_text().strip() if KNOWLEDGE_KEY.is_file() else '')
+    if not key: raise RuntimeError(f'LOGINOM_DOCK_API_KEY or {KNOWLEDGE_KEY} is required for setup')
     return key
 
 
@@ -668,7 +668,7 @@ class Runner:
         self.deadline = self.report['started'] + 85 * 60
         self.last_start = 0
         self.current = None
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_')) and k not in ('LOGINOM_MCP_API_KEY', 'LOGINOM_DOCK_API_KEY')}
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
 
     def memory(self, pid):
@@ -776,7 +776,7 @@ class Runner:
                 restore_source_modes(source)
                 assert git('rev-parse', 'HEAD', cwd=source) == self.report['head'] and not git('status', '--porcelain', cwd=source), 'Dirty build source'
                 bun = Path.home() / '.cache/loginom-bootstrap/bun-linux-x64/bun'
-                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1', LOGINOM_MCP_API_KEY=stand_knowledge_key())
+                env = dict(self.env, LOGINOM_AI_AGENT_NODE_SOURCE=os.environ.get('LOGINOM_AI_AGENT_NODE_SOURCE') or str(next((Path.home() / '.cache/loginom-bootstrap/node').glob('*/bin/node'))), LOGINOM_AI_AGENT_BROWSER_SOURCE=os.environ.get('LOGINOM_AI_AGENT_BROWSER_SOURCE', str(Path.home() / '.cache/loginom-wave2-browsers')), LOGINOM_AI_AGENT_BROWSER_RECOVERY='1')
                 # Keep Bun's shared warm cache; serialize installations across
                 # SHAs on this host, releasing the lock before compilation.
                 with (cache.parent / 'bun-install.lock').open('a') as install_lock:
@@ -793,7 +793,6 @@ class Runner:
                 self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts', build, '--no-archive', *(['--baseline'] if socket.gethostname().split('.')[0] == 'mas2' else [])], cache, env=env, cwd=source / 'packages/loginom-host')
             meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == self.report['head'] and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
-        assert (build / 'resources/loginom/knowledge-key').is_file(), 'Build has no built-in knowledge key'
         self.report.update(build=str(build), metadata=meta)
         self.save()
         return build
@@ -1171,7 +1170,7 @@ class Runner:
                 try:
                     if r['scenario'] in D87 and not self.options.get('case_root'):
                         self.prepared_case = self.prepare_d87(r['scenario'], folder)
-                    self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(url=login['url'], username=login['username'], password=login['password'])))
+                    self.phase('setup', [build / 'bin/loginom-ai-agent-cli', 'loginom', 'setup', '--headless', '--stdin-json', '--format', 'json'], folder, timeout=180, env=env, stdin=json.dumps(dict(mode='custom', endpoint=os.environ.get('LOGINOM_DOCK_ENDPOINT', 'https://mcp.loginom.ai/mcp'), apiKey=stand_knowledge_key(), url=login['url'], username=login['username'], password=login['password'])))
                     assert read(folder / 'setup.stdout').get('browser', {}).get('state') == 'verified', 'SETUP_NOT_VERIFIED'
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
