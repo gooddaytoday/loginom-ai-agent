@@ -791,7 +791,7 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers']:
+    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers', 'rest-variables']:
         src = REPO / 'docs/node-development/nodes/integration-restrequest'
         case = name.removeprefix('rest-')
         return dict(source=src / 'acceptance/modes' / case,
@@ -1121,8 +1121,21 @@ for(const stage of JSON.parse(readFileSync(0,'utf8')))
     assert result.returncode == 0, 'TEXT_UPDATE_PORT_VALUES: ' + result.stderr[:2000]
 
 
+def rest_query_expected(case, package, initial=False):
+    expected = read(case['source'] / (case['rest_query_initial'] if initial else case['expected_name']))
+    fixture = read(case['source'].parent / 'fixtures/rest-variables.json')
+    values = next(v for v in fixture['cases'] if v['name'] == ('initial' if initial else 'updated'))
+    expected['package_path'] = package
+    expected['variable_inventory'] = dict(outputs=[dict(node=dict(type='variables.user'), port=4,
+        variables=[dict(v, value=values[v['name']], label_any=True) for v in fixture['variables']])],
+        links=[dict(source=dict(type='variables.user'), output=4, target=dict(type='variables.to_table'), input=0, kind='variables')])
+    return expected
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
+    if case.get('rest_query_initial'):
+        return rest_query_expected(case, package)
     if case.get('tree_only'):
         expected = read(src / 'expected.json')['cases'][case['tree_case']]
         return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
@@ -2096,6 +2109,12 @@ class Runner:
             if spec.get('excel_mode'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
+        if spec.get('rest_query_initial'):
+            assert len(destinations) == 2, 'REST_QUERY_TWO_EXPORTS_REQUIRED'
+            initial = rest_query_expected(spec, package, initial=True)
+            initial['outputs'][0]['export_destination'] = destinations[0]
+            write(folder / 'expected-initial.json', initial)
+            self.phase('fixture-oracle', [sys.executable, '-B', spec['oracle'], '--check'], folder, timeout=60)
         if spec.get('excel_mode'):
             expected['excel_books'] = expected['outputs']
         if spec.get('lgd') == 'roundtrip': expected['lgd']['destination'] = lgd_destination
@@ -2219,6 +2238,13 @@ class Runner:
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs',
                 *([src / spec['quality_initial_name']] if spec.get('quality_initial_name') else ['--single']),
                 src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
+        if case == 'rest-query-variables':
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'rest-query-events.json', evidence)
+            self.phase('rest-query-variables-oracle', [build / 'resources/loginom/bin/node',
+                REPO / 'scripts/node-acceptance/expected-outputs.mjs', 'rest-query-variables',
+                folder / 'expected-initial.json', folder / 'expected.json', folder / 'rest-query-events.json'], folder, timeout=60)
         if spec.get('import_binding'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -2741,7 +2767,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
+            csv_expected = (read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('rest_query_initial')
+                            else read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
                             else expected['outputs'][0] if spec.get('binding_initial')
                             else expected['outputs'][0] if spec.get('grouping_case')
                             else text_update_stages(spec)[index] if spec.get('text_update')

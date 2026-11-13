@@ -1,3 +1,12 @@
+`rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
+in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
+
+`rest-variables` uses the approved REST C4 `task-variables.md`, requests.csv and
+unchanged `acceptance/modes/variables/expected.json`. Cycle first → second must
+update the response on the same REST without reconfiguration. Full typed output,
+CSV, Save, cold reexecution and cleanup use stock checks. Only task and CSV reach
+the model; oracle/expected stay private.
+
 `text-file-info` uses the unchanged text-import `task-file-info.md` and original
 January/February inputs next to the saved package. Both complete typed tables
 and CSVs use frozen `expected-absolute-path.json` then `expected-relative-path.json`;
