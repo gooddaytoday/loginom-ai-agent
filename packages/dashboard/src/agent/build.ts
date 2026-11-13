@@ -47,7 +47,8 @@ export async function buildDashboard(input: { work: string; template: string; no
   const signal = AbortSignal.any([AbortSignal.timeout(input.timeoutMs ?? 90_000), ...(input.signal ? [input.signal] : [])])
   try {
     for (const name of PLATFORM_FILES) await cp(join(input.template, name), join(staging, name))
-    await symlink(join(input.template, "node_modules"), join(staging, "node_modules"), process.platform === "win32" ? "junction" : "dir")
+    const kit = await realpath(join(input.template, "node_modules"))
+    await symlink(kit, join(staging, "node_modules"), process.platform === "win32" ? "junction" : "dir")
     await cp(join(work, "src"), join(staging, "src"), { recursive: true })
     const copied = await sourceFiles(staging)
     if ("error" in copied) return { ok: false, output: copied.error }
@@ -56,10 +57,13 @@ export async function buildDashboard(input: { work: string; template: string; no
       if (output.length === OUTPUT) return
       output = Buffer.concat([output, Buffer.from(chunk).subarray(0, OUTPUT - output.length)])
     }
+    const root = await realpath(staging)
+    const permissions = ["--permission", `--allow-fs-read=${root}`, `--allow-fs-read=${kit}`, `--allow-fs-write=${root}`]
+    // Only trusted Rollup/esbuild need grants; their flag warnings must not consume compiler diagnostics.
     for (const args of [
-      ["scan.mjs"],
-      ["node_modules/typescript/bin/tsc", "--noEmit", "--pretty", "false", "-p", "tsconfig.json"],
-      ["node_modules/vite/bin/vite.js", "build", "--configLoader", "native", "--base", "./", "--outDir", "dist", "--emptyOutDir", "--logLevel", "warn"],
+      [...permissions, "--allow-addons", "--disable-warning=SecurityWarning", "scan.mjs"],
+      [...permissions, "node_modules/typescript/bin/tsc", "--noEmit", "--pretty", "false", "-p", "tsconfig.json"],
+      [...permissions, "--allow-addons", "--allow-child-process", "--disable-warning=SecurityWarning", "node_modules/vite/bin/vite.js", "build", "--configLoader", "native", "--base", "./", "--outDir", "dist", "--emptyOutDir", "--logLevel", "warn"],
     ]) {
       const code = await execute(input.node, args, staging, signal, add)
       if (code !== 0) {

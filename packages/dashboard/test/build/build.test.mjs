@@ -207,10 +207,12 @@ process.stdout.write(JSON.stringify(result));
   assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
 })
 
-test("both compiler steps consume the captured sources when the work project changes", async t => {
+test("build processes cannot write back into the source project", async t => {
   const input = await fixture(t)
   const main = join(input.work, "src/main.tsx")
   await writeFile(main, 'document.body.textContent = "before-capture"; export {}')
+  const before = await buildDashboard(input)
+  assert.equal(before.ok, true, before.output)
   const kit = join(dirname(input.work), "template-kit")
   await mkdir(kit)
   await Promise.all(PLATFORM_FILES.map(name => cp(join(input.template, name), join(kit, name))))
@@ -220,12 +222,10 @@ writeFileSync(${JSON.stringify(main)}, 'document.body.textContent = "after-captu
 export default { cacheDir: ".vite-cache", css: { postcss: { plugins: [] } } };
 `)
   const result = await buildDashboard({ ...input, template: kit })
-  assert.equal(result.ok, true, result.output)
-  assert.match(await readFile(main, "utf8"), /after-capture/)
-  const files = (await readdir(join(result.dir, "assets"))).filter(name => name.endsWith(".js"))
-  const code = (await Promise.all(files.map(name => readFile(join(result.dir, "assets", name), "utf8")))).join("\n")
-  assert.match(code, /before-capture/)
-  assert.doesNotMatch(code, /after-capture/)
+  assert.equal(result.ok, false)
+  assert.match(result.output, /Access to this API has been restricted.*--allow-fs-write/)
+  assert.match(await readFile(main, "utf8"), /before-capture/)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), before.hash + "\n")
 })
 
 test("a work directory alias builds the same captured sources", async t => {
@@ -418,4 +418,254 @@ test("local font assets inside src build successfully", async t => {
   assert.ok(css)
   assert.match(await readFile(join(assets, css), "utf8"), /@font-face/)
   assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
+})
+
+test("percent-encoded CSS paths cannot escape src after Vite decoding", async t => {
+  const input = await fixture(t)
+  await mkdir(dirname(input.out), { recursive: true })
+  await writeFile(join(dirname(input.out), "encoded-external.woff2"), Buffer.alloc(16, 2))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), '@font-face { font-family: synthetic; src: url(%2e%2e/%2e%2e/%2e%2e/encoded-external.woff2) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, "encoded CSS escape unexpectedly built")
+  assert.match(result.output, /CSS.*src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("relative directory imports cannot redirect TypeScript outside src", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "redirected-external.d.ts")
+  await writeFile(external, "export type SyntheticExternal = string")
+  await mkdir(join(input.work, "src/pkg"))
+  await writeFile(join(input.work, "src/pkg/package.json"), JSON.stringify({ types: external.replaceAll("\\", "/") }))
+  await writeFile(join(input.work, "src/main.tsx"), 'import type { SyntheticExternal } from "./pkg"; const value: SyntheticExternal = "synthetic"; console.log(value)')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, "package metadata redirect unexpectedly built")
+  assert.match(result.output, /error TS2307: Cannot find module '\.\/pkg'/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("ordinary documentation strings naming import.meta.glob remain valid source", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'export const documentation = "Документация import.meta.glob"; const address = new URL(location.href); document.body.textContent = documentation + address.href; // import.meta.glob("/**")\n/* new URL("synthetic", import.meta.url) */')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, true, result.output)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
+})
+
+test("missing CSS asset targets are refused instead of left for runtime", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), '@font-face { font-family: synthetic; src: url(./missing.woff2) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /missing\.woff2.*CSS.*src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("extensionless TS and CSS, local package metadata and encoded assets remain supported", async t => {
+  const input = await fixture(t)
+  await mkdir(join(input.work, "src/pkg"))
+  await writeFile(join(input.work, "src/pkg/package.json"), JSON.stringify({ types: "./index.ts", main: "./index.ts" }))
+  await writeFile(join(input.work, "src/pkg/index.ts"), 'export const label = "synthetic"')
+  await writeFile(join(input.work, "src/helper.ts"), 'export const suffix = " local"')
+  await writeFile(join(input.work, "src/main.tsx"), 'import { createElement } from "react"; import { label } from "./pkg"; import { suffix } from "./helper"; import "./style.css"; console.log(createElement("p", null, label + suffix))')
+  await writeFile(join(input.work, "src/style.css"), '@import "./theme";')
+  await writeFile(join(input.work, "src/theme.css"), '@font-face { font-family: synthetic; src: url("./encoded%20font.woff2") }')
+  await writeFile(join(input.work, "src/encoded font.woff2"), Buffer.alloc(16, 3))
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, true, result.output)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
+})
+
+test("local type declarations cannot authorize an external runtime package entry", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "runtime-external.ts")
+  await writeFile(external, 'export const label = "synthetic external runtime"')
+  await mkdir(join(input.work, "src/pkg"))
+  await writeFile(join(input.work, "src/pkg/package.json"), JSON.stringify({ types: "./index.d.ts", main: external.replaceAll("\\", "/") }))
+  await writeFile(join(input.work, "src/pkg/index.d.ts"), 'export declare const label: string')
+  await writeFile(join(input.work, "src/main.tsx"), 'import { label } from "./pkg"; document.body.textContent = label')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /pkg/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("nested URL arguments cannot hide the import.meta.url base", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "nested-external.txt")
+  await writeFile(external, "synthetic")
+  await writeFile(join(input.work, "src/main.tsx"), `document.body.textContent = new (URL)(String(${JSON.stringify(external.replaceAll("\\", "/"))}), (import.meta.url)).href`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /new URL.*import\.meta\.url.*запрещён/)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("CSS package metadata cannot read a manifest outside captured sources", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "external-package")
+  await mkdir(external)
+  await writeFile(join(external, "package.json"), JSON.stringify({ style: "external.css" }))
+  await writeFile(join(external, "external.css"), "body { color: rebeccapurple }")
+  await mkdir(join(input.work, "src/csspkg"))
+  await writeFile(join(input.work, "src/csspkg/package.json"), JSON.stringify({ style: external.replaceAll("\\", "/") }))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), '@import "./csspkg";')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /csspkg.*CSS.*src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("quoted image-set paths with closing parentheses cannot escape src", async t => {
+  const input = await fixture(t)
+  await mkdir(dirname(input.out), { recursive: true })
+  await writeFile(join(dirname(input.out), "external).png"), Buffer.alloc(16, 4))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), 'body { background-image: image-set("../../../external).png" 1x) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, "quoted image-set escape unexpectedly built")
+  assert.match(result.output, /CSS.*src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("an external editor cannot change the sources already captured for the build", async t => {
+  if (process.platform === "win32") return t.skip("the external-editor launcher requires a POSIX shebang")
+  const input = await fixture(t)
+  const main = join(input.work, "src/main.tsx")
+  await writeFile(main, 'document.body.textContent = "before-capture"; export {}')
+  const before = await buildDashboard(input)
+  assert.equal(before.ok, true, before.output)
+  const launcher = join(dirname(input.work), "external-editor")
+  await writeFile(launcher, `#!${node}
+import { writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+writeFileSync(${JSON.stringify(main)}, 'document.body.textContent = "after-capture"; export {}');
+const child = spawnSync(${JSON.stringify(node)}, process.argv.slice(2), { stdio: "inherit" });
+if (child.error) throw child.error;
+process.exit(child.status ?? 1);
+`, { mode: 0o755 })
+  const result = await buildDashboard({ ...input, node: launcher })
+  assert.equal(result.ok, true, result.output)
+  assert.equal(result.hash, before.hash)
+  assert.match(await readFile(main, "utf8"), /after-capture/)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), before.hash + "\n")
+})
+
+test("local image-set filenames preserve quoted parentheses and ignore type descriptors", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/local).png"), Buffer.alloc(16, 5))
+  await writeFile(join(input.work, "src/style.css"), 'body { background-image: image-set("./local).png" 1x type("image/png")) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, true, result.output)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
+})
+
+test("spaced unquoted URL arguments preserve local font and stylesheet targets", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/font.woff2"), Buffer.alloc(16, 6))
+  await writeFile(join(input.work, "src/style.css"), '@import url( ./theme );')
+  await writeFile(join(input.work, "src/theme.css"), '@font-face { font-family: synthetic; src: url( ./font.woff2 ) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, true, result.output)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
+})
+
+test("spaced unquoted URL arguments cannot leave missing assets for runtime", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), '@font-face { font-family: synthetic; src: url( ./missing.woff2 ) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /missing\.woff2.*CSS.*src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("data CSS URLs are refused before compilation", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), "body { background: url(data:font/woff2;base64,AA) }")
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("HTTP CSS URLs are refused before compilation", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), "body { background: url(http://synthetic.invalid/f) }")
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("remote CSS imports are refused before compilation", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), "@import url(\"https://synthetic.invalid/a.css\");")
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("CSS URL query strings are refused before compilation", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/font.woff2"), Buffer.alloc(16, 7))
+  await writeFile(join(input.work, "src/style.css"), "@font-face { src: url(./font.woff2?x) }")
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("absolute CSS URLs cannot read an owned external asset", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "absolute-external.woff2")
+  await writeFile(external, Buffer.alloc(16, 8))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), `@font-face { src: url("${external.replaceAll("\\", "/")}") }`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("local CSS references, comments and ordinary strings retain their meaning", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/font.woff2"), Buffer.alloc(16, 9))
+  await writeFile(join(input.work, "src/a.css"), "body { color: rebeccapurple }")
+  await writeFile(join(input.work, "src/style.css"), `@import "./a.css";
+/* @import url("https://synthetic.invalid/ignored.css"); url(data:ignored) */
+@font-face { font-family: synthetic; src: url(font.woff2), url("./font.woff2") }
+body::before { content: 'url(http://synthetic.invalid/documentation)' }
+`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, true, result.output)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
+})
+
+test("image-set references without embedded parentheses must also remain inside src", async t => {
+  const input = await fixture(t)
+  await mkdir(dirname(input.out), { recursive: true })
+  await writeFile(join(dirname(input.out), "external.png"), Buffer.alloc(16, 10))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), 'body { background-image: image-set("../../../external.png" 1x) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.deepEqual(await readdir(input.out), [])
 })
