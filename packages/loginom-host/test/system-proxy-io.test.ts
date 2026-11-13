@@ -10,6 +10,48 @@ import { pathToFileURL } from "node:url"
 import { probeProxyPort, probeProxyUrl, readSystemProxy, resolveSystemProxy, spawnCommand } from "../src/system-proxy"
 import type { CommandRunner } from "../src/system-proxy/readers"
 
+test("Windows reads WinINET without a C# compiler and preserves read failures and caller timeouts", async () => {
+  const windows = { autoDetect: false, autoConfigUrl: "", proxy: "127.0.0.1:8080", bypass: "" }
+  const result = await readSystemProxy({
+    platform: "win32",
+    environment: { SystemRoot: "C:\\Windows", PRIVATE_INPUT: "must-not-reach-powershell" },
+    runner: async (command, args, options) => {
+      expect(command).toEndWith("powershell.exe")
+      const script = Buffer.from(args.at(-1)!, "base64").toString("utf16le")
+      expect(script).toContain("WinHttpGetIEProxyConfigForCurrentUser")
+      expect(script).not.toContain("Add-Type")
+      expect(options.timeoutMs).toBe(30_000)
+      expect(options.env?.PRIVATE_INPUT).toBeUndefined()
+      return { code: 0, stdout: JSON.stringify(windows), timedOut: false }
+    },
+  })
+  expect(result).toEqual({ ok: true, snapshot: { windows } })
+  for (const [response, code] of [
+    [{ code: null, stdout: "", timedOut: true }, "timeout"],
+    [{ code: 1, stdout: "", timedOut: false }, "read-failed"],
+    [{ code: 0, stdout: "invalid JSON", timedOut: false }, "read-failed"],
+  ] as const) {
+    expect(await readSystemProxy({
+      platform: "win32", environment: { SystemRoot: "C:\\Windows" }, timeoutMs: 25,
+      runner: async (_command, _args, options) => {
+        expect(options.timeoutMs).toBe(25)
+        return response
+      },
+    })).toEqual({ ok: false, code })
+  }
+})
+
+test("Windows resolution allows a cold read beyond eight seconds", async () => {
+  const result = await resolveSystemProxy({
+    platform: "win32",
+    read: () => new Promise((resolve) => setTimeout(() => resolve({
+      windows: { autoDetect: false, autoConfigUrl: "", proxy: "127.0.0.1:8080", bypass: "" },
+    }), 8100)),
+  })
+  expect(result.state).toBe("applied")
+  expect(result.notices).toEqual([])
+}, 12_000)
+
 test("socket probe distinguishes an HTTP proxy, a non-HTTP port, refusal and timeout", async () => {
   const http = createNetServer((socket) => {
     socket.on("data", () => socket.end("HTTP/1.1 200 Connection Established\r\n\r\n"))

@@ -1,4 +1,5 @@
 import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
+import { WINDOWS_POWERSHELL_TIMEOUT_MS } from "@loginom-ai-agent/loginom-host/windows-powershell"
 import {
   directResult,
   explicitProxy,
@@ -35,6 +36,7 @@ export function startSystemProxyDetection(input: {
   read?: () => Promise<SystemProxySnapshot | undefined>
 } = {}): SystemProxyDetection {
   const environment = input.environment ?? {}
+  const windows = (input.platform ?? process.platform) === "win32"
   const deadlineMs = input.deadlineMs ?? 8000
   const abort = new AbortController()
   let chromium: ((url: string) => Promise<string>) | undefined
@@ -45,14 +47,15 @@ export function startSystemProxyDetection(input: {
   const timer = setTimeout(release, deadlineMs)
   let capTimer: ReturnType<typeof setTimeout> | undefined
   const capped = new Promise<SystemProxyResult>((resolve) => {
-    capTimer = setTimeout(() => resolve(failedResult("timeout")), input.timeoutMs ?? 10_000)
+    capTimer = setTimeout(() => resolve(failedResult("timeout")), input.timeoutMs ?? (windows ? WINDOWS_POWERSHELL_TIMEOUT_MS + 5000 : 10_000))
   })
   const skipped = input.enabled === false || disabled(environment) || Boolean(explicitProxy(environment))
   const emptySnapshot: SystemProxySnapshot = {}
   const readPromise = skipped
     ? Promise.resolve({ ok: true as const, snapshot: emptySnapshot })
-    : loadSnapshot(input, abort.signal, deadlineMs)
+    : loadSnapshot(input, abort.signal, windows ? WINDOWS_POWERSHELL_TIMEOUT_MS : deadlineMs)
   const result = Promise.race([detect(), capped]).finally(() => {
+    abort.abort()
     clearTimeout(timer)
     if (capTimer) clearTimeout(capTimer)
   })
