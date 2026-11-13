@@ -21,7 +21,7 @@ test('an intermediate expression is not an output field and cannot be mapped',()
 
 function inactiveFixture(fault){
  const node={document_id:'doc',workflow_id:'flow',node_id:'import'},tid='source',port={index:0,port_guid:'port',tid:tid+';Output_Data-0',active:false};
- const icon=fault==='calculated'?'bg-vendor-icon-calcdata':'bg-vendor-icon-importtextfile';
+ const icon=fault?.startsWith('boundary')?'bg-vendor-icon-nullvendor':fault==='calculated'?'bg-vendor-icon-calcdata':'bg-vendor-icon-importtextfile';
  const form=fault==='calculated'?'DerivedDataSourceOutputSocketWizard':'DataSetOutputSocketWizard';
  const owner={...node,verified:true,surface:'wizard',output_port:{direction:'output',port:0,native_index:0,port_guid:'port',opening_operation_id:'open',node_icon_class:icon}};
  const root='wizard',events=[];let opened=false,closed=false,selected=fault!=='deselected';
@@ -40,8 +40,9 @@ function inactiveFixture(fault){
    assert.deepEqual(a,{verb:'click',ref:'close'});events.push('close');if(fault==='close')throw Error('unknown close');closed=true;return {status:'SUCCEEDED'};}};
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow'},node};
  const source={channel,binding,port,state:{prepared_node_context:{...node,tid},ui:{elements:[{tid,signature:{native_graph:{status:'non_script',icon:fault==='foreign_type'?'bg-vendor-icon-javascript':icon,node_id:node.node_id}}}]}}};
- const request={parameters:fault==='invalid_expression'?{expressions:[{...parameters.expressions[0],name:'amount'}]}:parameters,mappings:[]};
- const options={operation:{id:'l505',parameters:request},onRecord:async e=>{events.push('journal');return fault==='ack'?{}:structuredClone(e);}};
+ const request={document_id:'doc',workflow_ref:binding.workflow_ref,parameters:fault==='invalid_expression'?{expressions:[{...parameters.expressions[0],name:'amount'}]}:parameters,mappings:[]};
+ const options={operation:{id:'l505',deadline:100000,parameters:request,nodeTargetAdapter:{observe:async()=>({complete:true,document_id:'doc',workflow_ref:binding.workflow_ref,
+  nodes:[{ref:{...node,workflow_id:fault==='boundary-foreign'?'foreign':'flow'},type:'bg-vendor-icon-nullvendor',boundary_role:fault==='boundary-output'?'output':fault==='boundary-missing'?undefined:'input',inputs:[],outputs:[0]}]})}},onRecord:async e=>{events.push('journal');return fault==='ack'?{}:structuredClone(e);}};
  return {events,source,options,run:()=>preflightInactiveCalculatorSource(options,source)};
 }
 test('inactive calculator preflight reads native fields, cancels and journals unchanged activity without execution',async()=>{
@@ -50,6 +51,15 @@ test('inactive calculator preflight reads native fields, cancels and journals un
  assert.deepEqual(proof.source_activity,{before:false,after:false,changed:false});assert.equal(proof.cancellation.draft_discarded,true);
  assert.ok(f.events.indexOf('schema')<f.events.indexOf('close'));assert.ok(f.events.indexOf('close')<f.events.indexOf('outputs'));
  assert.equal(f.events.at(-1),'journal');
+});
+test('LAB-1615 inactive native input boundary defers schema validation to the owned Calculator wizard',async()=>{
+ const f=inactiveFixture('boundary'),proof=await f.run();
+ assert.equal(proof.validation_deferred,'input_mapping');assert.equal(proof.settings_changed,false);
+ assert.deepEqual(proof.source_activity,{before:false,after:false,changed:false});
+ assert.deepEqual(f.events,['journal']);
+});
+for(const fault of ['boundary-foreign','boundary-output','boundary-missing'])test('LAB-1615 refuses an unbound nullvendor source before opening its editor: '+fault,async()=>{
+ const f=inactiveFixture(fault);await assert.rejects(f.run());assert.deepEqual(f.events,[]);
 });
 test('incomplete Calculator table mapping refuses with confirmed source cleanup before a target can be created',async()=>{
  const f=inactiveFixture();
