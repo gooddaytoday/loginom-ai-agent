@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {setTimeout} from 'node:timers/promises';
 import {makeWorkspacePrepareCode} from '../lib/workspace.mjs';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
@@ -60,9 +61,9 @@ function fixture({loseReply=false,foreignOwner=false,block=false}={}) {
     locator:selector=>({click:async options=>{if(options?.trial)return;clicks++;if(selector.includes('GenericEnterLabel')){current=inner;crumbs.push('Подмодель','Модуль','Сценарий');if(foreignOwner)owner.FGuid='foreign';}else if(selector.includes('LeaveSubmodelLabel')){current=outer;crumbs=crumbs.slice(0,5).concat('Подмодель');}else throw Error('Unexpected click');masked=true;if(loseReply){loseReply=false;throw Error('lost click reply');}}}),
     waitForTimeout:async()=>{masked=false;},mouse:{up:async()=>{}}};
   const adapter=createNodeTargetBrowserAdapter({origin:'https://app.loginom.ai',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')')(page)});
-  const navigate=(wf,direction='enter',operationId='enter')=>vm.runInNewContext('('+makeWorkspacePrepareCode({
+  const navigate=(wf,direction='enter',operationId='enter',{timeoutMs=120000,recoverOnly=false}={})=>vm.runInNewContext('('+makeWorkspacePrepareCode({
     loginomUrl:'https://app.loginom.ai/app/?testable=true',compatibility:{profile_id:'native',loginom_build:'7.4.2',platform:'linux',browser:'chromium'},
-    intent:'existing_workflow',workflowRef:{...wf,document_id:'doc'},operationId,
+    intent:'existing_workflow',workflowRef:{...wf,document_id:'doc'},operationId,timeoutMs,recoverOnly,
     graphNavigation:{direction,...(direction==='enter'?{node_ref:{document_id:'doc',workflow_id:wf.workflow_id,node_id:'supernode'}}:{})},
   })+')')(page);
   return {navigate,ref,receipt,preparation,read:wf=>adapter.observe({document_id:'doc',workflow_ref:wf},Date.now()+2000),
@@ -100,6 +101,20 @@ test('NW1 uncertain click is reconciled read-only under the same operation ID',a
   const recovered=await f.navigate(f.ref);
   assert.equal(recovered.status,'READY',JSON.stringify(recovered));assert.equal(f.clicks(),1);
   assert.ok((await f.read(recovered.workflow_ref)).nodes.some(n=>n.ref.node_id==='calc'));
+});
+
+for(const recoverOnly of [false,true])test('NW1 retry after the original deadline verifies navigation with one click (recoverOnly='+recoverOnly+')',async()=>{
+  const f=fixture({loseReply:true}),unknown=await f.navigate(f.ref,'enter','enter',{timeoutMs:300});
+  assert.equal(unknown.status,'NOT_READY');
+  assert.equal(unknown.verification_required,true);
+  assert.equal(unknown.effect_possible,true);
+  await setTimeout(Math.max(0,f.preparation.receipts.get('enter').navigationDeadline-Date.now()+1));
+  f.unmask();
+  const recovered=await f.navigate(f.ref,'enter','enter',{timeoutMs:120000,recoverOnly});
+  assert.equal(recovered.status,'READY',JSON.stringify(recovered));
+  assert.equal(f.clicks(),1);
+  assert.ok((await f.read(recovered.workflow_ref)).nodes.some(n=>n.ref.node_id==='calc'));
+  await assert.rejects(f.read(f.ref));
 });
 
 test('NW1 refuses a foreign nested owner after a gesture and blockers before one',async()=>{

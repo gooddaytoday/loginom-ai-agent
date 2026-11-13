@@ -368,7 +368,7 @@ async function prepareWorkspace(page, options) {
 // Explicit preparation is the only place that changes the graph scope. A lost
 // gesture reply retains its browser receipt; recovery observes, never clicks.
 async function navigatePreparedGraph(page, options) {
-  let deadline=Date.now()+options.timeoutMs;
+  const deadline=Date.now()+options.timeoutMs;
   const trace=[];
   let effectPossible=options.recoverOnly===true;
   const remaining=()=>{const ms=deadline-Date.now();if(ms<=0)throw Error('DEADLINE');return ms;};
@@ -410,8 +410,10 @@ async function navigatePreparedGraph(page, options) {
     }
     if(mode==='settle'){
       if(!existing?.navigationStarted)fail('Navigation receipt missing');
-      if(Date.now()>=existing.navigationDeadline)fail('DEADLINE');
-      if(workflow===source.nodeTargetWorkflowNode)return {pending:true};
+      if(workflow===source.nodeTargetWorkflowNode){
+        if(Date.now()>=deadline)fail('DEADLINE');
+        return {pending:true};
+      }
       const direction=options.graphNavigation.direction;
       if(direction==='enter'&&!ancestors.includes(source.nodeTargetWorkflowNode)
         ||direction==='leave'&&workflow!==source.navigationParentWorkflow)fail('Navigation reached a foreign workflow');
@@ -468,7 +470,7 @@ async function navigatePreparedGraph(page, options) {
   try{
     remaining();const old=await inspect('lookup');effectPossible=old.effect_possible===true;
     if(old.exists&&old.phase==='verified')return result('READY',null,{...await inspect('replay'),replayed:true});
-    if(old.exists)deadline=Math.min(deadline,old.deadline_at);
+    // A retry only observes the original gesture under this call's deadline.
     if(!old.exists){
       if(options.recoverOnly)throw Error('RECEIPT_LOST');
       const before=await inspect('reserve');trace.push({event:'graph_navigation_prepared',direction:options.graphNavigation.direction,control_tid:before.control_tid});
