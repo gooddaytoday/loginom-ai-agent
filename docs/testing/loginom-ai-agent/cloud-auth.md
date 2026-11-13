@@ -587,3 +587,25 @@ prepare-startup retry/twice/deadline cases. Они отдельно воспро
 `$HOME/storage/tmp/cloud-auth-nine-checks-U8B0eY/` и файлах
 `cloud-auth-nine-{auth,state,acceptance}-report.md` в том же временном корне.
 Чужое незакоммиченное изменение prompt сайта сохранено.
+
+## Публикация PR и CI, 2026-11-13
+
+PR [#1061](https://github.com/gooddaytoday/loginom-ai-agent/pull/1061) направлен
+в `loginom`. Перед первым push все 28 неопубликованных коммитов проверены новым
+правилом приватности. В девяти документах обезличены личные пути и адрес шлюза,
+сообщения коммитов и содержимое вне `docs` сохранены. Сканирование всей входящей
+истории — clean, pre-push typecheck — 33/33 PASS. Локальный черновик prompt
+сохранён отдельно от публикуемых изменений.
+
+Первый CI выявил три воспроизводимые ошибки fixtures. Прямая Node-команда
+`test/loginom/environment-proxy.ts` не загружала TypeScript-зависимость Host;
+теперь main собирает настоящий supervisor в временный Node bundle и использует
+его в прежних сетевых проверках. Изолированная Vite-проверка воспроизводит
+расположение пакетов и копирует настоящий `cloud-build.ts`. Unix-тест регистра
+proxy-переменных явно выбирает Linux, Windows-проверка uppercase сохранена.
+
+RED подтверждён точными CI-командами и логами. После исправления Node proxy
+проверка прошла с directTargetRequests0, связанный Host набор — 26 PASS,
+Vite fixture — 1 PASS. Независимое ревью исправлений — Approved.
+Общие PR-проверки и `release.yml mode=candidate channel=prod` должны завершиться
+на последнем SHA PR. Candidate не подтверждает live production cloud auth.

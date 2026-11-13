@@ -6,7 +6,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { once } from "node:events"
-import { superviseKnowledge } from "../../../loginom-host/src/supervisor"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { knowledgeServer } from "../../../loginom-runtime/client/test/support/knowledge-server.mjs"
 
 export async function environmentProxy(handler?: (req: IncomingMessage, res: ServerResponse) => void, targetHost = "127.0.0.1") {
@@ -145,6 +145,12 @@ if (import.meta.main) {
   const fixture = await environmentProxy()
   const { cert, proxy, tlsProxy, local, port, requests, tunnels } = fixture
   try {
+    const supervisor = join(fixture.directory, "supervisor.mjs")
+    const build = spawn("bun", ["build", fileURLToPath(new URL("../../../loginom-host/src/supervisor.ts", import.meta.url)),
+      "--target=node", "--outfile=" + supervisor], { stdio: "inherit" })
+    const [built] = await once(build, "exit")
+    if (built !== 0) throw Error("HELP_SUPERVISOR_BUILD_FAILED")
+    const { superviseKnowledge } = await import(pathToFileURL(supervisor).href) as typeof import("../../../loginom-host/src/supervisor")
     const env = {
       ...process.env,
       NODE_EXTRA_CA_CERTS: cert,
@@ -210,7 +216,7 @@ catch { console.log('NO_DIRECT_FALLBACK'); }`,
     )
     const runtime = await superviseKnowledge({
       node,
-      entry: join(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
+      entry: fileURLToPath(new URL("../../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
       stateDir: join(fixture.directory, "help"),
       generation: 1,
       endpoint: help.endpoint,
