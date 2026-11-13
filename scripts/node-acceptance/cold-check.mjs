@@ -12,7 +12,7 @@ import {observeImportBindingInventory} from './import-bindings.mjs';
 import {observeFilterBindingInventory} from './filter-bindings.mjs';
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
-import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
+import {excelColdExpected,verifyExcelColdSettings,verifyExcelColdBindings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
 import {observeSamplingSavedSettings,parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
 import {checkClusteringRound,observeClusteringSavedSettings} from './clustering-normalized.mjs'
@@ -89,7 +89,7 @@ if(excelExpected&&rawExpected.excel_books){
  if(!args["excel-books"])throw Error("COLD_EXCEL_BOOKS_REQUIRED");
  const books=JSON.parse(await readFile(resolve(args["excel-books"]),"utf8"));
  if(books.length!==rawExpected.excel_books.length)throw Error("COLD_EXCEL_BOOKS_COUNT");
- for(const book of books)execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/modes/oracle.py",import.meta.url).pathname,"--case",book.case,"--file",book.file],{stdio:"pipe"});
+ for(const book of books)if(rawExpected.excel_variables)execFileSync('python3',['-B',new URL('../../docs/node-development/nodes/exports-excel/acceptance/variables/oracle.py',import.meta.url).pathname,'--verify',book.phase,book.file],{stdio:'pipe'});else execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/modes/oracle.py",import.meta.url).pathname,"--case",book.case,"--file",book.file],{stdio:"pipe"});
 }else if(excelExpected){
  if(!args.xlsx||!args["xlsx-expected"])throw Error("COLD_XLSX_REQUIRED")
  execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/oracle.py",import.meta.url).pathname,"--xlsx",resolve(args.xlsx),"--expected",resolve(args["xlsx-expected"])],{stdio:"pipe"})
@@ -270,7 +270,7 @@ page = context.pages()[0]
    state.variableInventory={outputs,links};
   }
   // A bound LGD destination needs the saved variable source's fresh value.
-  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>b.node.type==='imports.text')?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
+  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>['imports.text','imports.excel'].includes(b.node.type))?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
   // The existing inventory audit executes/reads it without changing settings.
   if(expected.lgd?.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
@@ -278,6 +278,7 @@ page = context.pages()[0]
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
   if(expected.excel_sinks)for(const sink of expected.excel_sinks)verifyExcelColdSettings(destinations,sink);
   else if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
+  if(expected.excel_bindings)verifyExcelColdBindings(destinations,expected);
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {

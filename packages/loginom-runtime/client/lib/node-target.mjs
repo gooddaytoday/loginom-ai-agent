@@ -78,7 +78,7 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
   if(['rename','move','add_input'].includes(kind)){
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
     const field=kind==='rename'?'label':kind==='move'?'position':'inputs';
-    const correct=kind==='rename'?current.label===p.label:kind==='move'?positionMatches(current,p.position):same(current.inputs,[...original.inputs,p.input]);
+    const correct=kind==='rename'?current.label===p.label:kind==='move'?positionMatches(current,p.position,effect):same(current.inputs,[...original.inputs,p.input]);
     return correct && same(domainNode({...current,[field]:original[field]}),domainNode(original)) && same(keep(before,[p.ref.node_id]),keep(after,[p.ref.node_id]))?{}:null;
   }
   if(kind==='connect'||kind==='remove_link'){
@@ -104,7 +104,7 @@ async function settleMoveMismatch({operation,state,effect,receipt,graph,adapter,
     ||!verifyNodeTargetEffect(effect,graph,()=>true))return false;
   const current=node(graph,effect.parameters.ref.node_id),original=node(effect.before,current.ref.node_id);
   if(!Number.isFinite(current.position?.x)||!Number.isFinite(current.position?.y)
-    ||adapter.positionMatches(current,effect.parameters.position)
+    ||adapter.positionMatches(current,effect.parameters.position,{...effect,receipt})
     ||!sameDomainGraph(effect.before,{...graph,nodes:graph.nodes.map(n=>n===current?{...n,position:original.position}:n)}))return false;
   const mismatch={id:effect.id,requested_position:structuredClone(effect.parameters.position),observed_position:structuredClone(current.position),receipt:structuredClone(receipt)};
   const settled={...structuredClone(state),pending:null,last_graph:structuredClone(graph),move_mismatch:mismatch,
@@ -206,8 +206,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       await commit();
       const after = await observe();
       if(await settleMoveMismatch({operation,state,effect,receipt,graph:after,adapter,record}))throw Error(state.result.error);
-      if (receipt?.cleanup_complete !== true || !verifyNodeTargetEffect(effect,after,adapter.positionMatches) || !verify(before, after)) { throw new Error('Graph effect needs reconciliation'); }
-      state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt) });
+      if (receipt?.cleanup_complete !== true || !verifyNodeTargetEffect(effect,after,adapter.positionMatches) || !verify(before, after, effect)) { throw new Error('Graph effect needs reconciliation'); }
+      state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt),...(kind==='move'?{before:effect.before}:{}) });
       state.pending = null; state.last_graph=structuredClone(after);
       await commit();
       return after;
@@ -245,9 +245,9 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
         await commit();graph=await observe();
       }else{
-      const proof=verifyNodeTargetEffect(state.pending,graph,adapter.positionMatches);
+      const proof=verifyNodeTargetEffect({...state.pending,receipt:recovery.receipt},graph,adapter.positionMatches);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
-      state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery });
+      state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery,...(state.pending.kind==='move'?{before:state.pending.before}:{}) });
       if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;}
       state.pending = null;state.last_graph=structuredClone(graph); await commit(); graph = await observe();
       }
@@ -342,10 +342,11 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       });
     }
     target = node(graph, state.targetId);
-    if (request.target.position && !adapter.positionMatches(target, request.target.position)) {
-      graph = await change('move', { ref: target.ref, position: request.target.position }, (before, after) => {
+    const moved=state.receipts.findLast(r=>r.kind==='move'&&same(r.parameters.ref,target.ref)&&same(r.parameters.position,request.target.position));
+    if (request.target.position && !adapter.positionMatches(target, request.target.position,moved?{...moved,receipt:moved.receipt.receipt??moved.receipt}:undefined)) {
+      graph = await change('move', { ref: target.ref, position: request.target.position }, (before, after, effect) => {
         const current = node(after, state.targetId), original = node(before, state.targetId);
-        return adapter.positionMatches(current, request.target.position) && same(domainNode({ ...current, position: original.position }), domainNode(original))
+        return adapter.positionMatches(current, request.target.position, effect) && same(domainNode({ ...current, position: original.position }), domainNode(original))
           && unchangedExcept(before, after, [state.targetId]);
       });
     }
@@ -452,10 +453,10 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
       (state.refusals??=[]).push({id:effect.id,kind:effect.kind,receipt:structuredClone(refused)});
       state.pending=null;state.last_graph=structuredClone(graph);state.effect_possible=state.receipts.length>0;
     }else{
-    const proof=verifyNodeTargetEffect(effect,graph,adapter.positionMatches);
+    const proof=verifyNodeTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
     if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;state.auto_created_variable_links=proof.auto_created_variable_links;}
-    state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery});
+    state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery,...(effect.kind==='move'?{before:effect.before}:{})});
     state.pending=null;state.last_graph=structuredClone(graph);
     }
   }else if(!same(state.completed?state.final_graph:(state.last_graph??state.baseline),graph))throw new Error('Partial node target graph changed');

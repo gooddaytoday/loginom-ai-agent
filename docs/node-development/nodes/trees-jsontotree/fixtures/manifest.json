@@ -28,6 +28,11 @@
     "response.json": {
       "bytes": 211,
       "sha256": "96b3fb5ae6d138a649705df5db96ae155e68e73a1b62bb1b9b678760e741d85e"
+    },
+    "typed/documents.csv": {
+      "bytes": 497,
+      "sha256": "f5f01a045f6599dad064507e172c259781dcc2bc7d45edc749e7881c58e0ede8",
+      "role": "proposed acceptance input (LAB-1558): delimiter \";\", columns dates/mixed/arrays, all strings, one row"
     }
   }
 }

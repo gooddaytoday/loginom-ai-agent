@@ -17,7 +17,7 @@ const verified=value=>({verified:true,cleanup_complete:true,effect_possible:fals
 export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor,handler}){
  const {operation,execute,onRecord,now,receiptOptions}=options;
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
- const unchangedImport=isUnchangedTextImportExecution(request),unchangedTransform=isUnchangedTransformExecution(request,handler);
+ const unchangedImport=isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true,unchangedTransform=isUnchangedTransformExecution(request,handler);
  const unchanged=unchangedImport||unchangedTransform;
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
   node_id:request.target.ref.node_id,operation_id:operation.id,ui_epoch:Date.now()}:null;
@@ -40,7 +40,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
  const forbidden=()=>{throw Error('A read operation cannot open or configure node/port wizards');};
  return {
   verifySource:async()=>verified(unchanged
-   ?{source_kind:unchangedImport?'unchanged_existing_text_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
+   ?{source_kind:unchangedImport?'unchanged_existing_'+(request.target.type==='imports.excel'?'excel':'text')+'_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
    :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id}),
   ...(javascript?{async beforeTarget(ctx){
    enter({...ctx,node:request.target.ref});

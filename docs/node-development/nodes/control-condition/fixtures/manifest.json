@@ -1,0 +1,13 @@
+{
+  "status": "proposal_pending_approval",
+  "format": {"encoding": "utf-8", "delimiter": ",", "decimal_separator": ".", "header": true, "null_marker": "?", "text_qualifier": "\""},
+  "files": {
+    "orders.csv": {"rows": 4, "bytes": 115, "sha256": "03d08c1ee17d2fb32a759d1a03b32e29dbe93884ed1ef74dd9bb2ae84e1eb45a",
+      "columns": [{"name": "OrderID", "type": "integer"}, {"name": "Region", "type": "string"}, {"name": "Amount", "type": "real"},
+                  {"name": "Paid", "type": "boolean"}, {"name": "Note", "type": "string"}]}
+  },
+  "variables": {"source": "builtin Переменные сценария (variables.user, output 4); label equals name",
+                "Mode": {"type": "integer", "initial": 1, "final": 0}},
+  "empty_note": "Empty CSV Note field means empty string; ? means NULL. Enforce import types explicitly.",
+  "limits": "No Int64 outside JS safe range, Variant, datetime, NaN or infinity in this slice."
+}

@@ -264,7 +264,7 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
    confirmIdentity:s=>({owner:s.prepared_node_context,epoch:s.dom_epoch,setting:settings(s)[0]})});
   try{
    let lgdVariables=null;
-   if(lgd&&!includeInputFields&&(graph.variable_links??[]).some(e=>e.target===target.ref.node_id&&e.kind==='variables'&&e.input===0)){
+   if((lgd||excel)&&!includeInputFields&&(graph.variable_links??[]).some(e=>e.target===target.ref.node_id&&e.kind==='variables'&&e.input===0)){
     const {makeVariablePortMappingCode}=await load('client/lib/variable-port-mapping.mjs');
     const binding={document_id:target.ref.document_id,workflow_ref:graph.workflow_ref,node:target.ref};
     const origin=await execute('async page=>new URL(page.url()).origin');
@@ -297,12 +297,12 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
    s=await channel.observe({condition:'cold export destination rendered',ready:s=>s.wizard?.stage===stage});
    const binding={document_id:target.ref.document_id,workflow_ref:graph.workflow_ref,node:target.ref};
    const reader=lgd?(await load('client/lib/lgd-export-context.mjs')).makeLgdExportContextCode:excel?(await load('client/lib/exports-excel-context.mjs')).makeExcelExportContextCode:makeTextExportContextCode;
-   const observed=await execute(lgd?reader(binding,lgdVariables):reader(binding));
+   const observed=await execute(lgd||excel?reader(binding,lgdVariables):reader(binding));
    need(observed.verified===true&&observed.stage===stage&&observed.settings_applied===false
     &&observed.node_context?.verified===true&&observed.node_context.surface==='wizard'
     &&['document_id','workflow_id','node_id'].every(k=>observed.node_context?.[k]===target.ref[k])
     &&typeof observed.values?.destination?.value==='string','export destination unavailable');
-   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value,...(lgd?{lgd_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value])),lgd_binding:observed.values.destination.variable?observed.values.destination.variable_name:null}:{}),...(excel?{excel_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value]))}:{}),...(input_fields?{input_fields}:{})});
+   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value,...(lgd?{lgd_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value])),lgd_binding:observed.values.destination.variable?observed.values.destination.variable_name:null}:{}),...(excel?{excel_settings:Object.fromEntries(Object.entries(observed.values).map(([k,v])=>[k,v.value])),excel_bindings:Object.fromEntries(Object.entries(observed.values).filter(([,v])=>v.variable===true).map(([key,v])=>[key,{variable:v.variable_name}]))}:{}),...(input_fields?{input_fields}:{})});
   }finally{
    const current=await channel.observe({condition:'cold export inspection cancellation surface',ready:()=>true});
    if(current.wizard?.status==='observed'){

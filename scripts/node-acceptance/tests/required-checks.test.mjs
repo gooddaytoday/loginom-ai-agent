@@ -182,6 +182,42 @@ test('approval has no executable command and cannot be cleared with exit 0',t=>{
  assert.equal(r.run('verify','--base','base','--report',report).status,0);
 });
 
+test('verify accepts NOT_RUN, CI, COVERED and APPROVED and prints an outcome summary',t=>{
+ const r=repo(t);r.commit('packages/loginom-runtime/src/managed-entry.mjs');
+ r.commit('scripts/node-acceptance/run-check.md');r.commit('packages/opencode/src/example.ts');
+ const checks=rows(r.list()),report=join(r.cwd,'report.md');
+ const row=id=>checks.find(x=>x.startsWith('| `'+id+'`'));
+ const verify=lines=>{writeFileSync(report,lines.join('\n'));return r.run('verify','--base','base','--report',report);};
+ const ci='CI; https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/123';
+ const rest=checks.filter(x=>!/`(host-unit|acceptance-tests|main-chat-approval)`/.test(x)).map(x=>result(x));
+ for(const [id,outcome] of [['host-unit','NOT_RUN; причина: docs-only этап'],['host-unit',ci],['host-unit',ci+'/job/456'],
+  ['host-unit','COVERED; LAB-1533'],['main-chat-approval','APPROVED; решение LAB-1538'],['main-chat-approval','NOT_RUN; причина: этап 0'],
+  ['main-chat-approval','COVERED; LAB-1551'],['main-chat-approval',ci]]){
+  const other=['host-unit','acceptance-tests','main-chat-approval'].filter(x=>x!==id).map(x=>result(row(x),x==='main-chat-approval'?'APPROVED; решение 42':'exit 0'));
+  const out=verify([result(row(id),outcome),...other,...rest]);
+  assert.equal(out.status,0,outcome+'\n'+out.stdout);
+ }
+ for(const [id,bad] of [['host-unit','NOT_RUN'],['host-unit','NOT_RUN; причина:'],['host-unit','NOT_RUN; причина:  '],
+  ['host-unit','CI'],['host-unit','CI; https://github.com/gooddaytoday/loginom-ai-agent/pull/1086'],
+  ['host-unit','CI; https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/'],['host-unit','CI; https://example.com/actions/runs/1'],
+  ['host-unit','COVERED'],['host-unit','COVERED; 1533'],['host-unit','APPROVED; решение LAB-1538'],
+  ['main-chat-approval','APPROVED'],['main-chat-approval','APPROVED; решение'],['main-chat-approval','exit 0']]){
+  const other=['host-unit','acceptance-tests','main-chat-approval'].filter(x=>x!==id).map(x=>result(row(x),x==='main-chat-approval'?'APPROVED; решение 42':'exit 0'));
+  const out=verify([result(row(id),bad),...other,...rest]);
+  assert.equal(out.status,1,bad);assert.match(out.stdout,new RegExp('Недостающие / неполные ID: .*'+id));
+ }
+ const out=verify([result(row('host-unit'),'NOT_RUN; причина: этап 0'),result(row('acceptance-tests'),'COVERED; LAB-1533'),
+  result(row('main-chat-approval'),'APPROVED; решение LAB-1538'),...rest]);
+ assert.equal(out.status,0,out.stdout);
+ const summary=out.stdout.split('\n').filter(x=>x.startsWith('Исходы: '));
+ assert.equal(summary.length,1,out.stdout);
+ assert.match(summary[0],/exit 0: \d+/);assert.match(summary[0],/FAIL: 0(;|$)/);assert.match(summary[0],/CI: 0(;|$)/);
+ assert.match(summary[0],/NOT_RUN: 1 \(host-unit\)/);assert.match(summary[0],/COVERED: 1 \(acceptance-tests\)/);
+ assert.match(summary[0],/APPROVED: 1 \(main-chat-approval\)/);
+ const partial=verify([result(row('host-unit'),'NOT_RUN; причина: этап 0')]);
+ assert.equal(partial.status,1);assert.match(partial.stdout,/^Исходы: .*NOT_RUN: 1 \(host-unit\)/m);
+});
+
 test('live/cold/full-client reports preserve complete commands and multiple IDs',t=>{
  const r=repo(t);r.commit('packages/loginom-runtime/client/lib/text-export-node.mjs');
  const checks=rows(r.list()),report=join(r.cwd,'report.md');
