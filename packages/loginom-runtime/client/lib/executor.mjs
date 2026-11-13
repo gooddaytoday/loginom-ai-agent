@@ -2917,14 +2917,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           }
           throw Error('Server storage UI is not ready');
         };
-        const directory=expected=>ready(async()=>{
+        const directory=(expected,owner)=>ready(async()=>{
           const s=await roots();
           // The confirmed Files click can precede its tab/region mounting.
           // Reading the previous graph's NavigationPanel races its detach.
           if(!s.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;')))return null;
           const bars=s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';NavigationBar;NavigationPanel');
           if(bars.length!==1)return null;
-          try{return await detail(s,bars[0]);}catch(error){if(error.code==='UI_ROOT_STALE')return null;throw error;}
+          let fresh;
+          try{fresh=await detail(s,bars[0]);}catch(error){if(error.code==='UI_ROOT_STALE')return null;throw error;}
+          // Loginom can replace the newly mounted Files tab with the previous
+          // one after a confirmed click. Its route belongs to a different tab;
+          // stop waiting for that route and plan from the restored breadcrumbs.
+          if(owner&&fresh.file_storage?.status==='observed'
+            &&fresh.dom_epoch.document===owner.dom_epoch.document
+            &&JSON.stringify(fresh.workflow_ref)!==JSON.stringify(owner.workflow_ref))
+            throw Object.assign(Error('Files tab restored'),{storageRestored:fresh});
+          return fresh;
         },s=>s.file_storage?.status==='observed'&&(expected===undefined||s.file_storage.directory===expected));
         try{
           const initial=await roots();
@@ -2933,10 +2942,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             await act(toolbar,one(toolbar.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'),'files_button'));
           }
           let current=await directory();const destination=listing?path:path.slice(0,path.lastIndexOf('/'));
-          if(current.file_storage.directory!==destination&&!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
-            await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'),'files_root'));
-            current=await directory('/');
-          }
           const row=async name=>{
             const parent=current;let last;
             return findNativeStorageRow({name,guard,roots:async()=>{last=await roots();return last;},
@@ -2946,9 +2951,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 last=state;return state;
               },ready:(probe,predicate)=>ready(probe,predicate),act});
           };
-          for(const part of destination.slice(current.file_storage.directory==='/'?0:current.file_storage.directory.length).split('/').filter(Boolean)){
-            const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'folder');
-            await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part);
+          while(current.file_storage.directory!==destination){
+            try{
+              if(!destination.startsWith(current.file_storage.directory.replace(/\/$/,'')+'/')){
+                await act(current,one(current.ui.elements.filter(e=>e.tid===current.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'),'files_root'));
+                current=await directory('/',current);continue;
+              }
+              const part=destination.slice(current.file_storage.directory==='/'?1:current.file_storage.directory.length+1).split('/')[0];
+              const state=await row(part),folder=one(state.ui.elements.filter(e=>e.label===part&&e.storage_entry?.kind==='folder'&&e.allowed_actions.includes('double_click')),'folder');
+              await act(state,folder,'double_click');current=await directory((current.file_storage.directory==='/'?'':current.file_storage.directory)+'/'+part,current);
+            }catch(error){
+              if(!error.storageRestored)throw error;
+              current=error.storageRestored;
+            }
           }
           if(current.file_storage.directory!==destination)throw Error('Server storage directory differs');
           if(listing){

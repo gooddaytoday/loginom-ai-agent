@@ -412,6 +412,46 @@ test('source discovery waits through the old graph tab before reading the new Fi
  assert.equal(page.events.filter(e=>e==='mouse_click').length,0);
 });
 
+for(const listing of [false,true])for(const restoredTab of [true,false])test('storage navigation replans only a restored Files tab: '+listing+', restored: '+restoredTab,async t=>{
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot(),records=[];
+ let directory='/',prefix=page.prefix,restored=false;const visited=[];
+ const tid=suffix=>prefix+suffix,nav=';NavigationBar;NavigationPanel',table=';FileStorageForm;pnlFileStorage;tbl';
+ const root=';cnrNaviMode;b.s_Сервер>Файлы',row=';FileStorageForm;colName_';
+ const element=(suffix,label='',allowed=[])=>({ref:page.uiReference(tid(suffix)),tid:tid(suffix),kind:'control',scope:'workspace',label,enabled:true,visible:true,
+  identity:{anchor_tid:tid(suffix),path:[]},signature:{tag:'button',tid:tid(suffix)},bounding_box:{x:10,y:10,width:20,height:20},
+  interaction:{state:'point_observed',point:{x:20,y:20}},allowed_actions:allowed});
+ const name=()=>directory==='/'?'worker':directory==='/worker'?'target':'full.csv';
+ const evaluate=page.evaluate.bind(page),elements=page.elements.bind(page);
+ page.elements=()=>[...elements(),page.element(tid(row+name())),page.element(tid(root))];
+ page.click=async()=>{directory='/';visited.push(directory);};
+ page.afterDoubleClick=async()=>{
+  if(!restored){restored=true;directory='/worker/old';if(restoredTab)prefix='MF;TF-0';}
+  else directory=directory==='/'?'/worker':'/worker/target';
+  visited.push(directory);
+ };
+ page.evaluate=async(fn,arg)=>{
+  if(!arg||!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  const state=structuredClone(base);page.clock+=500;
+  state.workflow_ref={...base.workflow_ref,prefix};state.active_tab_ref=prefix;
+  state.file_storage={status:'observed',directory,listing_complete:false};
+  const entry=element(row+name(),name(),directory==='/worker/target'?[]:['double_click']);
+  entry.storage_entry=directory==='/worker/target'?{kind:'file',path:directory+'/full.csv',bytes:3,
+   mtime:'native-time',bytes_source:'native_file_store',directory_entries:1}:{kind:'folder',directory_entries:1};
+  state.ui.elements=[element(nav),element(table),element(root,'Файлы',['click']),entry];
+  if(arg.discoverRoots){state.observation_kind='roots';if(arg.storageName)state.ui.elements=state.ui.elements.filter(e=>e.label===arg.storageName);}
+  else state.observation_root={ref:arg.rootRef,identity:state.ui.elements.find(e=>e.ref===arg.rootRef)?.identity};
+  return state;
+ };
+ const r=runtime(page,{onRecord:async x=>{records.push(x);return x;},cacheDirectory:join(f.root,'restore'),getStorageBinding:()=>({session_id:'s',document_id:'d',
+  origin:base.origin,loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ const result=await r.serverDownload({operation_id:'restore',path:'/worker/target'+(listing?'':'/full.csv')},listing?'dock_storage_list':'dock_storage_source');
+ if(!restoredTab){assert.equal(result.status,'FAILED');assert.match(records.at(-1).error.message,/Server storage UI is not ready/);assert.deepEqual(visited,['/worker/old']);return;}
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(records.filter(x=>/storage_.*failed/.test(x.phase))));
+ assert.deepEqual(visited,['/worker/old','/','/worker','/worker/target']);
+ if(listing){assert.equal(result.output.directory,'/worker/target');assert.equal(result.output.complete,true);}
+ else assert.equal(result.output.source.path,'/worker/target/full.csv');
+});
+
 test('source discovery reacquires invalidated read pages without replaying any gesture',async t=>{
  const f=await fixture(t),page=new Page(),base=page.uiSnapshot();let reads=0;
  const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
