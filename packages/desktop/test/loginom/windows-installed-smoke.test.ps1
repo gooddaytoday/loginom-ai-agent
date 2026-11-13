@@ -6,7 +6,7 @@ $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'windows-installed-smoke.ps1'), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
 # Load the actual check functions, never the installer or registry operations.
-foreach ($name in @('Check', 'Check-Logs', 'Test-StartupLog', 'Test-CrashLog', 'Test-RetiredEndpoint')) {
+foreach ($name in @('Check', 'Check-Logs', 'Test-StartupLog', 'Test-CrashLog', 'Test-RetiredEndpoint', 'Test-InstalledUriScheme')) {
     $fn = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if (-not $fn) { throw "Missing smoke function: $name" }
     Invoke-Expression $fn.Extent.Text
@@ -18,6 +18,18 @@ function Assert-Status([string]$Id, [string]$Expected) {
         throw "$Id expected $Expected; actual: $($actual | ConvertTo-Json -Compress)"
     }
 }
+foreach ($case in @(
+    @{ command='"C:\lab\installed\loginom-ai-agent.exe" "%1"'; owned=$true },
+    @{ command='C:\lab\installed\loginom-ai-agent.exe %1'; owned=$true },
+    @{ command='"c:\LAB\INSTALLED\loginom-ai-agent-dev.exe" "%1"'; owned=$true },
+    @{ command='"C:\lab\installed-dev\loginom-ai-agent-dev.exe" "%1"'; owned=$false },
+    @{ command='"C:\lab\installed\..\prod\loginom-ai-agent.exe" "%1"'; owned=$false },
+    @{ command='"C:\foreign\app.exe" "C:\lab\installed\argument"'; owned=$false },
+    @{ command=''; owned=$false }
+)) {
+    Assert ((Test-InstalledUriScheme $case.command 'C:\lab\installed') -eq $case.owned) 'URI ownership check failed'
+}
+Write-Output 'PASS URI ownership: quoted/unquoted, case, foreign sibling, traversal, arguments and absence'
 $start = "[info] app starting { version: '0.3.9', packaged: true, onboardingTest: true }`n"
 Assert (-not (Test-StartupLog ($start + '[info] awaiting server ready') '0.3.9')) 'Awaiting readiness is not ready'
 Assert (-not (Test-StartupLog ($start + '[info] server ready {}') '0.4.0')) 'Wrong version accepted'
