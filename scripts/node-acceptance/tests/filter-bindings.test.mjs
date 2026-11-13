@@ -44,3 +44,21 @@ test('native final column order may change while values and types stay exact',()
  events[4].result.output.ports[0].sample[0][0].value='100';
  assert.throws(()=>auditFilterBindings(events,initial,expected),/FILTER_BINDING_FINAL_SAME_NODE/);
 });
+
+test('Top-N audits the saved row-number condition and source-only 3 to 5 update',()=>{
+ const topRoot=new URL('../../../docs/node-development/nodes/row-filter/acceptance/typed/',import.meta.url);
+ const first=JSON.parse(readFileSync(new URL('expected-top-initial.json',topRoot))),last=JSON.parse(readFileSync(new URL('expected-top-final.json',topRoot)));
+ const events=history();
+ for(const index of [0,3])events[index].result.configuration.readback.variables=[{name:'TopN',id:1,index:0,type:'integer',cell:{type:'integer',is_null:false,value:index===0?'3':'5',precision:'exact_integer'}}];
+ events[1].result.configuration.bindings[0].variable.name='TopN';
+ events[1].result.configuration.readback={groups:[[{field:{kind:'row_number'},type:'integer',operator:'<=',value:{kind:'variable',name:'TopN'}}]]};
+ events[2].request.parameters.variables=[{name:'TopN',type:'integer',value:5}];
+ for(const [index,want] of [[1,first],[4,last]])events[index].result.output.ports=want.outputs.map(o=>({port:o.output_port,fresh:true,
+  execution_id:events[index].result.execution.execution_id,row_count:o.rows.length,sample_complete:true,precision:{numbers_verified:true},
+  schema:o.columns.map(c=>({...c,label:c.name})),sample:o.rows.map(r=>o.columns.map(c=>({type:c.type,is_null:r[c.name]===null,
+   value:r[c.name]===null?null:String(r[c.name]),precision:r[c.name]===null?'exact_null':c.type==='real'?'exact_native':c.type==='datetime'?'millisecond':'exact_integer',
+   ...(c.type==='datetime'?{representation:'local_datetime',timezone:'unspecified'}:{})})))}));
+ assert.equal(auditFilterBindings(events,first,last).status,'PASS');
+ events[1].result.configuration.readback.groups[0][0].field={kind:'input_field',name:'RowID'};
+ assert.throws(()=>auditFilterBindings(events,first,last),/FILTER_TOP_N_CONDITION/);
+});

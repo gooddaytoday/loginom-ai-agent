@@ -50,8 +50,9 @@ export function validateFilterConditions(p){
    need(['value','lower','upper','values'].every(k=>keys.includes(k)?Object.hasOwn(c,k):!Object.hasOwn(c,k)),'Filter operator operands differ');
    const variable=keys.find(k=>isFilterVariable(c[k]));
    if(variable){
-    need((variable==='value'&&['<','<=','>','>=','=','<>'].includes(c.operator)||variable==='values'&&arity==='list')
-     &&c.field.kind==='input_field'&&['integer','string'].includes(c.type),'Unsupported filter variable operand');
+    need((variable==='value'&&['<','<=','>','>=','=','<>'].includes(c.operator)
+     &&(c.field.kind==='input_field'||c.field.kind==='row_number'&&c.type==='integer')
+     ||variable==='values'&&arity==='list'&&c.field.kind==='input_field')&&['integer','string'].includes(c.type),'Unsupported filter variable operand');
     need(object(c[variable],['kind','name'])&&c[variable].kind==='variable'&&name(c[variable].name),'Exact mapped filter variable name required');
     continue;
    }
