@@ -1,3 +1,6 @@
+import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
+import { DashboardSession } from "@/product/dashboard-session"
+import { eq } from "drizzle-orm"
 import type { Session as SDKSession, Message, Part } from "@opencode-ai/sdk/v2"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Session } from "@/session/session"
@@ -67,15 +70,36 @@ const runImport = Effect.fn("Cli.import.body")(function* (file: string, ctx: Ins
     directory: ctx.directory,
     path: path.relative(path.resolve(ctx.worktree), ctx.directory).replaceAll("\\", "/"),
   }) as Session.Info
-  const row = Session.toRow(info)
-  yield* db
-    .insert(SessionTable)
-    .values(row)
-    .onConflictDoUpdate({
-      target: SessionTable.id,
-      set: { project_id: row.project_id, directory: row.directory, path: row.path },
-    })
-    .run()
+  const row = yield* db
+    .transaction(() =>
+      Effect.gen(function* () {
+        const current = yield* db
+          .select({ metadata: SessionTable.metadata })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, info.id))
+          .get()
+          .pipe(Effect.orDie)
+        const row = Session.toRow({
+          ...info,
+          metadata: DashboardSession.metadata(
+            info.directory,
+            current ? (current.metadata ?? undefined) : info.metadata,
+            current?.metadata?.[DASHBOARD_SESSION_MARKER] === true ||
+              info.metadata?.[DASHBOARD_SESSION_MARKER] === true,
+          ),
+        })
+        yield* db
+          .insert(SessionTable)
+          .values(row)
+          .onConflictDoUpdate({
+            target: SessionTable.id,
+            set: { project_id: row.project_id, directory: row.directory, path: row.path, metadata: row.metadata },
+          })
+          .run()
+          .pipe(Effect.orDie)
+        return row
+      }),
+    )
     .pipe(Effect.orDie)
 
   for (const msg of exportData.messages) {

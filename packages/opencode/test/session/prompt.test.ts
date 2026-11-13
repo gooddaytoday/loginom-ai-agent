@@ -12,12 +12,14 @@ import { eq } from "drizzle-orm"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { afterAll, expect } from "bun:test"
 import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer, Schema } from "effect"
-import { cp, mkdir, mkdtemp, rm } from "fs/promises"
+import { cp, mkdir, mkdtemp, rm, symlink } from "fs/promises"
 import { tmpdir } from "node:os"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 import { isRecord } from "@/util/record"
+import { InstanceRef } from "@/effect/instance-ref"
 import { EffectBridge } from "@/effect/bridge"
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url"
@@ -38,7 +40,7 @@ import { Image } from "../../src/image/image"
 import { Question } from "../../src/question"
 import { Todo } from "../../src/session/todo"
 import { Session } from "@/session/session"
-import { SessionMessageTable } from "@opencode-ai/core/session/sql"
+import { SessionTable, SessionMessageTable } from "@opencode-ai/core/session/sql"
 import { LLM } from "../../src/session/llm"
 import { MessageV2 } from "../../src/session/message-v2"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -1584,6 +1586,90 @@ function dashboardInstance<A, E, R>(effect: Effect.Effect<A, E, R>) {
     return yield* effect.pipe(provideInstance(work), Effect.provideService(TestInstance, { directory: work }))
   })
 }
+
+it.instance(
+  "a persisted dashboard alias cannot become an ordinary session after metadata replacement and alias loss",
+  () =>
+    Effect.gen(function* () {
+      const { dir, llm } = yield* useServerConfig(providerCfg)
+      const sessions = yield* Session.Service
+      const prompt = yield* SessionPrompt.Service
+      const alias = path.join(dir, "dashboard-alias")
+      const requests: unknown[] = []
+      LoginomHost.connect({
+        start() {},
+        on() {},
+        postMessage(value) {
+          requests.push(value)
+          throw Error("Unexpected Host request")
+        },
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+      const chat = yield* dashboardInstance(
+        Effect.gen(function* () {
+          const work = yield* TestInstance
+          yield* Effect.promise(() => symlink(work.directory, alias, process.platform === "win32" ? "junction" : "dir"))
+          const ctx = yield* InstanceRef
+          if (!ctx) throw Error("Missing instance")
+          return yield* sessions
+            .create({ title: "Pinned", metadata: { previous: "value" } })
+            .pipe(Effect.provideService(InstanceRef, { ...ctx, directory: alias }))
+        }),
+      )
+      expect(chat.directory).toBe(alias)
+      yield* sessions.setMetadata({ sessionID: chat.id, metadata: { current: "value" } })
+      expect((yield* sessions.listGlobal({ directory: alias })).map((session) => session.id)).toContain(chat.id)
+      yield* Effect.promise(() => rm(alias))
+      const database = yield* Database.Service
+      const restored = yield* Session.use
+        .get(chat.id)
+        .pipe(
+          Effect.provide(
+            Layer.fresh(LayerNode.compile(Session.node, [[Database.node, Layer.succeed(Database.Service, database)]])),
+          ),
+        )
+      expect(restored.directory).toBe(alias)
+      expect(restored.metadata?.current).toBe("value")
+      yield* llm.text("unexpected ordinary reply")
+      const exit = yield* prompt
+        .prompt({ sessionID: chat.id, agent: "build", model: ref, parts: [{ type: "text", text: "Continue" }] })
+        .pipe(Effect.exit)
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      expect(requests).toEqual([])
+      expect(yield* llm.inputs).toEqual([])
+    }),
+)
+
+it.instance("execution adopts an older dashboard row once and preserves its current metadata", () =>
+  dashboardInstance(
+    Effect.gen(function* () {
+      const sessions = yield* Session.Service
+      const events = yield* EventV2Bridge.Service
+      const { db } = yield* Database.Service
+      const chat = yield* sessions.create({ title: "Old dashboard" })
+      // Model a row written before dashboard recognition became durable.
+      yield* db
+        .update(SessionTable)
+        .set({ metadata: { note: "latest" } })
+        .where(eq(SessionTable.id, chat.id))
+        .run()
+        .pipe(Effect.orDie)
+      const updates: unknown[] = []
+      const unsubscribe = yield* events.listen((event) => {
+        if (event.type === Session.Event.Updated.type && (event.data as { sessionID: string }).sessionID === chat.id)
+          updates.push(event.data)
+        return Effect.void
+      })
+      yield* Effect.addFinalizer(() => unsubscribe)
+      for (const _ of [1, 2]) {
+        const adopted = yield* sessions.getForExecution(chat.id)
+        expect(adopted.metadata).toEqual({ note: "latest", [DASHBOARD_SESSION_MARKER]: true })
+      }
+      expect(updates).toHaveLength(1)
+    }),
+  ),
+)
 
 withMcpInstructions.instance("the first dashboard prompt advertises only dashboard builtins to the provider", () =>
   dashboardInstance(

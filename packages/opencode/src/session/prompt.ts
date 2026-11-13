@@ -464,7 +464,7 @@ const layer = Layer.effect(
           const markReady = ready ? ready.open.pipe(Effect.asVoid) : Effect.void
           const { msg, part, cwd } = yield* Effect.gen(function* () {
             const ctx = yield* InstanceState.context
-            const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+            const session = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
             if (session.revert) {
               yield* revert.cleanup(session)
             }
@@ -682,7 +682,7 @@ const layer = Layer.effect(
         format: input.format,
       }
 
-      const current = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const current = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
       if (
         current.agent !== info.agent ||
         current.model?.providerID !== info.model.providerID ||
@@ -714,7 +714,7 @@ const layer = Layer.effect(
       )(function* (part) {
         if (part.type === "file") {
           if (part.source?.type === "resource") {
-            if (!toolPolicy.allowsMcp(DashboardSession.baseProfile(current.directory)))
+            if (!toolPolicy.allowsMcp(DashboardSession.profile(current)))
               return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
             const { clientName, uri } = part.source
             yield* Effect.logInfo("mcp resource", { clientName, uri, mime: part.mime })
@@ -1106,7 +1106,7 @@ const layer = Layer.effect(
       input: PromptInput,
       grant?: TaskScope.Activation,
     ) {
-      const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const session = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
       yield* revert.cleanup(session)
       const message = yield* createUserMessage(input, grant)
       yield* sessions.touch(input.sessionID)
@@ -1141,8 +1141,8 @@ const layer = Layer.effect(
         let structured: unknown
         let step = 0
         while (true) {
-          const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
-          const base = DashboardSession.baseProfile(session.directory)
+          const session = yield* sessions.getForExecution(sessionID).pipe(Effect.orDie)
+          const base = DashboardSession.profile(session)
           yield* status.set(sessionID, { type: "busy" })
           yield* Effect.logInfo("loop", { "session.id": sessionID, step })
 
@@ -1444,9 +1444,9 @@ const layer = Layer.effect(
     })
 
     const command = Effect.fn("SessionPrompt.command")(function* (input: CommandInput) {
-      const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const session = yield* sessions.getForExecution(input.sessionID).pipe(Effect.orDie)
       const directory = yield* InstanceState.directory
-      if (DashboardSession.isDashboardWork(session.directory) && !DashboardSession.isDashboardWork(directory))
+      if (DashboardSession.profile(session) === "loginom-dashboard" && !DashboardSession.isDashboardWork(directory))
         return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
       yield* Effect.logInfo("command", {
         "session.id": input.sessionID,

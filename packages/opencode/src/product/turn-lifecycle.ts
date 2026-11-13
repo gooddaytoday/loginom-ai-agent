@@ -24,8 +24,8 @@ export type AcquireInput = {
 
 const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
   const { sessionID, sessions, agents, permission } = input
-  const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
-  const base = DashboardSession.baseProfile(session.directory)
+  const session = yield* sessions.getForExecution(sessionID).pipe(Effect.orDie)
+  const base = DashboardSession.profile(session)
   const status: { failure?: string } = {}
   const loginom: Lease | undefined =
     base === "loginom-dashboard"

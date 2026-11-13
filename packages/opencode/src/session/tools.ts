@@ -63,6 +63,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     source: { scope: TaskScope.Info; messageID: MessageID; callID: string },
   ) => Effect.Effect<void>
 }) {
+  const sessions = yield* Session.Service
+  const session = yield* sessions.getForExecution(input.session.id).pipe(Effect.orDie)
   const tools: Record<string, AITool> = {}
   const run = yield* EffectBridge.make()
   const plugin = yield* Plugin.Service
@@ -76,7 +78,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     messages: input.history,
     revert: input.session.revert,
   })
-  const base = DashboardSession.baseProfile(input.session.directory)
+  const base = DashboardSession.profile(session)
   const task = TaskScope.derive({ sessionID: input.session.id, messages: history, base })
   const profile = task?.profile ?? base
   if (input.loginom && task) {
@@ -154,6 +156,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, options) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             if (!toolPolicy.permits(profile, id, origin)) return yield* Effect.die(toolPolicy.denied())
             const ctx = context(args, options)
             const activate = input.activate
@@ -213,6 +216,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, opts) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             const parsed = parseListMcpResourcesArgs(args)
             const ctx = context(toRecord(args), opts)
             const clients = yield* mcp.clients()
@@ -296,6 +300,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, opts) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             const parsed = parseListMcpResourcesArgs(args)
             const ctx = context(toRecord(args), opts)
             const clients = yield* mcp.clients()
@@ -383,6 +388,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, opts) {
         return run.promise(
           Effect.gen(function* () {
+            yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
             const parsed = parseReadMcpResourceArgs(args)
             const ctx = context(toRecord(args), opts)
             const clients = yield* mcp.clients()
@@ -457,6 +463,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     item.execute = (args, opts) =>
       run.promise(
         Effect.gen(function* () {
+          yield* sessions.getForExecution(session.id).pipe(Effect.orDie)
           const ctx = context(args, opts)
           yield* plugin.trigger(
             "tool.execute.before",

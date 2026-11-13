@@ -42,7 +42,7 @@ const unused = new Proxy({}, { get: () => () => Effect.die("unexpected call") })
 function fakes(directory = "/fixture/project") {
   const written: { kind: "message" | "part"; value: unknown }[] = []
   const sessions = {
-    get: () => Effect.succeed({ id: sessionID, directory }),
+    getForExecution: () => Effect.succeed({ id: sessionID, directory }),
     updateMessage: (value: unknown) => Effect.sync(() => void written.push({ kind: "message", value })),
     updatePart: (value: unknown) => Effect.sync(() => void written.push({ kind: "part", value })),
   }

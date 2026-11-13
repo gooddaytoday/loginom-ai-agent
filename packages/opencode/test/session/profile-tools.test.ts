@@ -959,6 +959,18 @@ codeMode.instance("a dashboard directory selects its real builtin whitelist befo
       expect(ids).toContain("edit")
       expect(ids).toContain("write")
       expect(ids).not.toContain("apply_patch")
+      if (options.emptyHistory) {
+        yield* Effect.promise(() => rm(work, { recursive: true }))
+        const execute = result.tools.read.execute!
+        const exit = yield* Effect.promise(() =>
+          execute(
+            { filePath: "missing.txt" },
+            { toolCallId: "after-loss", abortSignal: new AbortController().signal, messages: [] },
+          ),
+        ).pipe(Effect.exit)
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
+      }
     }
   }),
 )
