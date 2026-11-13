@@ -1,3 +1,4 @@
+import { credentials } from "./loginom/credentials"
 import { desktopLoginom } from "./loginom/desktop-service"
 import { registerLoginomIpc } from "./loginom/ipc"
 import { randomUUID } from "node:crypto"
@@ -8,7 +9,7 @@ import { homedir, tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
-import { app, BrowserWindow, dialog, session } from "electron"
+import { app, BrowserWindow, dialog, safeStorage, session } from "electron"
 import { Product, productName } from "@loginom-ai-agent/product"
 
 import { Cause, Deferred, Effect, Fiber } from "effect"
@@ -20,6 +21,7 @@ import { CHANNEL } from "./constants"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
 import { forwardInitializationFailure } from "./initialization"
 import {
+  configureDiagnosticsExport,
   exportDebugLogs,
   initCrashReporter,
   initLogging,
@@ -372,6 +374,7 @@ const main = Effect.gen(function* () {
     relaunch,
   }
   if (stopping) return
+  configureDiagnosticsExport({ codec: credentials(process.platform, safeStorage) })
   loginomStarting = desktopLoginom()
   const loginom = yield* Effect.promise(() => loginomStarting!)
   if (stopping) return
@@ -486,6 +489,7 @@ const main = Effect.gen(function* () {
     const hostname = "127.0.0.1"
     const url = `http://${hostname}:${port}`
     const password = randomUUID()
+    configureDiagnosticsExport({ value: password })
 
     if (stopping) return
     let attempt = 0
