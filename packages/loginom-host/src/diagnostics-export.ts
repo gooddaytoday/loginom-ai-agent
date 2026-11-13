@@ -529,8 +529,9 @@ export async function profileSecrets(input: {
     } catch {
       status = "unavailable"
     }
-    // Never create profile directories: read only an existing store.
-    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false })?.isFile() || history.length) {
+    // Never create profile directories: read only an existing store. Any entry
+    // counts: the store refuses a linked record, which is then reported unavailable.
+    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false }) || history.length) {
       const store = input.codec && connectionStore(directory, input.codec)
       // Every generation, not only the active one: an older chat may echo the
       // login and password of an account the profile used before.
