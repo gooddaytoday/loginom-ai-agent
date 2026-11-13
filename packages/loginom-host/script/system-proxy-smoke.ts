@@ -4,7 +4,6 @@ import { createServer } from "node:http"
 import type { Socket } from "node:net"
 import { resolve } from "node:path"
 import { pathToFileURL } from "node:url"
-import { sidecarEnvironment } from "../../desktop/src/main/proxy-env"
 import { resolveSystemProxy } from "../src/system-proxy"
 
 if (process.argv.includes("--measure-windows")) await measureWindows()
@@ -58,6 +57,7 @@ async function readProxy() {
 }
 
 async function assertWindowsProxy() {
+  const { sidecarEnvironment } = await import("../../desktop/src/main/proxy-env")
   assert.equal(process.platform, "win32")
   assert.equal(process.env.GITHUB_ACTIONS, "true", "Requires a disposable GitHub-hosted runner")
   assert.equal(process.env.RUNNER_ENVIRONMENT, "github-hosted")
