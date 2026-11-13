@@ -1,10 +1,35 @@
-import { expect, test } from "bun:test"
+import { afterAll, beforeAll, expect, test } from "bun:test"
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "../src/supervisor"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
+
+const fixture = { directory: "", supervisor: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
+beforeAll(async () => {
+  if (!fixture.node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+  fixture.directory = await mkdtemp(join(tmpdir(), "loginom-startup-supervisor-"))
+  const built = await Bun.build({ entrypoints: [join(import.meta.dir, "../src/supervisor.ts")], target: "node" })
+  if (!built.success) throw new AggregateError(built.logs, "Supervisor test bundle failed")
+  fixture.supervisor = join(fixture.directory, "supervisor.mjs")
+  await Bun.write(fixture.supervisor, built.outputs[0])
+})
+afterAll(async () => {
+  await rm(fixture.directory, { recursive: true, force: true })
+})
+
+async function runSupervisor(source: string) {
+  // The shipped Host owns runtime IPC from Node. Bun's Windows fork can lose
+  // replies before disconnect; keep filesystem/redaction assertions in Bun.
+  const child = Bun.spawn([fixture.node, "--input-type=module", "--eval", `
+    import assert from 'node:assert/strict';
+    import { supervise, superviseKnowledge } from ${JSON.stringify(pathToFileURL(fixture.supervisor).href)};
+    ${source}
+  `], { stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" })
+}
 
 for (const scenario of [
   { failure: "LOGINOM_BROWSER_START_FAILED", knowledge: false, validation: false, closed: false },
@@ -75,11 +100,15 @@ for (const knowledge of [true, false]) test(`startup diagnostic is private, reda
     const input = { node, entry, resources: directory, stateDir: directory, generation: 1, chat: "diagnostic",
       helpRoot: join(directory, "help"), environment: {},
       connection: { apiKey: "PRIVATE-KEY", password: "p", username: "user", url: "https://example.test" } }
-    if (knowledge) {
-      const runtime = await superviseKnowledge(input)
-      await expect(runtime.request("list")).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
-      await runtime.close()
-    } else await expect(supervise(input)).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
+    await runSupervisor(`
+      const input = ${JSON.stringify(input)};
+      if (${knowledge}) {
+        const runtime = await superviseKnowledge(input);
+        try {
+          await assert.rejects(runtime.request('list'), /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
+        } finally { await runtime.close(); }
+      } else await assert.rejects(supervise(input), /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
+    `)
     const hostLog = await readFile(join(directory, "startup-failures.jsonl"), "utf8")
     const [id] = await readdir(join(directory, "diagnostics"))
     const diagnostic = await readFile(join(directory, "diagnostics", id, "events.jsonl"), "utf8")
@@ -97,24 +126,24 @@ for (const phase of ["ready", "failure"]) test(`knowledge shutdown diagnostics: 
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE")
   const directory = await mkdtemp(join(tmpdir(), "knowledge-shutdown-diagnostic-"))
   const help = await mkdtemp(join(tmpdir(), "knowledge-shutdown-help-"))
-  const runtime = await superviseKnowledge({ node,
-    entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
-    stateDir: directory, generation: 1, environment: {},
-    helpRoot: await writeHelp(help, phase === "failure" ? { tamper: "data/README.md" } : {}),
-  })
   try {
-    expect(runtime.ready).toMatchObject({ started: true })
-    const catalog = runtime.request("list")
-    void catalog.catch(() => {})
-    if (phase === "ready") {
-      expect(await catalog).toHaveProperty("tools")
-      await runtime.close()
+    const input = { node,
+      entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
+      stateDir: directory, generation: 1, environment: {},
+      helpRoot: await writeHelp(help, phase === "failure" ? { tamper: "data/README.md" } : {}),
     }
-    if (phase === "failure") {
-      await expect(catalog).rejects.toThrow("LOGINOM_KNOWLEDGE_UNAVAILABLE")
-      await runtime.close()
-    }
-    expect(await runtime.exited).toEqual({ code: 0, signal: null })
+    await runSupervisor(`
+      const runtime = await superviseKnowledge(${JSON.stringify(input)});
+      try {
+        assert.equal(runtime.ready.started, true);
+        const catalog = runtime.request('list');
+        void catalog.catch(() => {});
+        if (${JSON.stringify(phase)} === 'ready') assert.ok('tools' in await catalog);
+        else await assert.rejects(catalog, /LOGINOM_KNOWLEDGE_UNAVAILABLE/);
+        await runtime.close();
+        assert.deepEqual(await runtime.exited, { code: 0, signal: null });
+      } finally { await runtime.close(); }
+    `)
     if (phase !== "failure") {
       expect(await readdir(directory)).not.toContain("startup-failures.jsonl")
       expect(await readdir(directory)).not.toContain("diagnostics")
@@ -128,7 +157,6 @@ for (const phase of ["ready", "failure"]) test(`knowledge shutdown diagnostics: 
       expect(log).toContain("LOGINOM_HELP_INTEGRITY")
     }
   } finally {
-    await runtime.close()
     await rm(directory, { recursive: true, force: true })
     await rm(help, { recursive: true, force: true })
   }

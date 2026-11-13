@@ -491,8 +491,8 @@ test('Enrich third port keeps logical 2, SVG 3 and native tree 2 distinct',async
  const r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.port,2);assert.equal(r.native_index,2);assert.equal(r.trace[0].port_tid,'MF;TF;Graph;Node;Input_Data-3');
 });
 
-test('positional union attached input keeps logical/native 1 while its SVG index is 2',async()=>{
- const f=fixture('input');f.node.FIconCls='bg-vendor-icon-coluniondata';f.task.port=1;f.port.FPortIndex=1;f.portTree.FIndex=1;
+for(const icon of ['bg-vendor-icon-coluniondata','bg-vendor-icon-replacecolumns'])test(icon+' attached input keeps logical/native 1 while its SVG index is 2',async()=>{
+ const f=fixture('input');f.node.FIconCls=icon;f.task.port=1;f.port.FPortIndex=1;f.portTree.FIndex=1;
  f.portDom.tid='MF;TF;Graph;Node;Input_Data-2';f.portDom.getAttribute=()=>f.portDom.tid;
  const prior={FGuid:'main',FCell:{},FPortIndex:0,data:{},parent:f.node};
  const dom=f.el('MF;TF;Graph;Node;Input_Data-0');dom.parent=f.portDom.parent;dom.getBoundingClientRect=()=>({x:0,y:0,width:20,height:20});

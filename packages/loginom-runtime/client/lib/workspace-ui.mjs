@@ -3060,18 +3060,19 @@ function readRenderedInputMapping(observation) {
           }
         }
       }
-      for(const [gridName,role] of [['grdDataList','field'],['grdReplaceItems','pair']]){
+      if(selected?.isModel&&selected.data?.ReplaceMode===2){const es=tids.get(base+'cbxReplaceOther;trg_picker')??[];if(es.length===1&&visible(es[0])&&!sensitive(es[0]))replacementCells.set(refOf(es[0]),{field_key:selected.data.Name,record_id:String(selected.internalId),selected_record_id:String(selected.internalId),role:'control',part:'other_picker',wizard_root_ref:wizard.root_ref});}
+      for(const [gridName,role] of [['grdDataList','field'],['grdReplaceItems','pair'],...(selected?.data?.ReplaceMode===2?[['grdInputSource','external']]:[])]){
         const grids=tids.get(base+gridName+';tbl')??[];if(grids.length!==1)continue;
         const grid=grids[0],view=globalThis.Ext?.getCmp?.(grid.id),store=view?.getStore?.(),records=store?.getData?.()?.items;
         if(view?.el?.dom!==grid||store?.$className!=='Ext.data.Store'||store.isLoading?.()||!Array.isArray(records)||records.length>1000)continue;
         for(const row of grid.querySelectorAll('table.x-grid-item')){
           const r=records.find(r=>String(r.internalId)===row.getAttribute('data-recordid')),d=r?.data;
           if(!r?.isModel||row.getAttribute('data-boundview')!==grid.id||role==='pair'&&(!selected||!(d.CollectionID===0&&Object.hasOwn(d,'DataValueType')||d.CollectionID===1&&Object.hasOwn(d,'RegularExpression'))))continue;
-          const name=role==='field'?d.Name:selected.data.Name;if(typeof name!=='string'||!name)continue;
-          for(const [column,part] of role==='field'?[['colInputData_','select'],['colReplaceSource_','mode']]:[['colReplaceValue_','from'],['colReplaceBy_','to'],['colReplaceDelete_','delete']]){
-            const tid=base+column+(role==='field'?name:d.Index),cells=[...row.querySelectorAll('[data-tid]')].filter(e=>(role==='pair'&&d.CollectionID===1?(getTid(e)??'').startsWith(base+column):getTid(e)===tid)&&!e.closest('tr.x-grid-row-summary'));
+          const name=role==='field'?d.Name:selected.data.Name;if(typeof name!=='string'||!name||role==='external'&&(![0,3,4,6].includes(d.UsageType)||typeof d.Name!=='string'))continue;
+          for(const [column,part] of role==='field'?[['colInputData_','select'],['colReplaceSource_','mode']]:role==='external'?[['colInputSourceUsage_','usage']]:[['colReplaceValue_','from'],['colReplaceBy_','to'],['colReplaceDelete_','delete']]){
+            const tid=base+column+(role==='field'?name:role==='external'?d.Name:d.Index),cells=[...row.querySelectorAll('[data-tid]')].filter(e=>(role==='pair'&&d.CollectionID===1?(getTid(e)??'').startsWith(base+column):getTid(e)===tid)&&!e.closest('tr.x-grid-row-summary'));
             if(cells.length!==1||!visible(cells[0])||sensitive(cells[0]))continue;
-            replacementCells.set(refOf(cells[0]),{field_key:name,record_id:String(r.internalId),selected_record_id:role==='pair'?String(selected.internalId):null,role,part,index:role==='pair'?d.Index:null,row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
+            replacementCells.set(refOf(cells[0]),{field_key:name,record_id:String(r.internalId),selected_record_id:role==='pair'||role==='external'?String(selected.internalId):null,...(role==='external'?{source_field:d.Name}:{}),role,part,index:role==='pair'?d.Index:null,row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
           }
         }
       }
@@ -3669,6 +3670,13 @@ function readRenderedInputMapping(observation) {
         && other.closest('.x-grid-item')===storageRow && visible(other) && !sensitive(other);}) : [];
       const storageEntry=storageRow ? {row_ref:refOf(storageRow),selected:storageRow.classList.contains('x-grid-item-selected'),
         kind:storageTypes.length===1 && textOf(storageTypes[0],true)==='Папка' ? 'folder':'unknown'} : null;
+      if(storageEntry) {
+        // Native FileStore size of the open folder (files and folders): a
+        // listing compares it with the distinct rows it actually observed.
+        const gridTid=tid.split(';colName_')[0]+';pnlFileStorage';
+        const grid=storageRow.closest('[data-tid='+JSON.stringify(gridTid)+']'),inventory=grid&&storageInventory(grid,gridTid);
+        if(inventory&&inventory.store.isLoading?.()===false&&inventory.store.getCount()===inventory.count)storageEntry.directory_entries=inventory.count;
+      }
       if(storageEntry&&storageEntry.kind!=='folder') {
         // Loginom 7.4.2 renders 1702 bytes as "1,702". Display text is not
         // byte identity: use the cached file record bound to this exact row.

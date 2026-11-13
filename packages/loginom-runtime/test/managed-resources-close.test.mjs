@@ -100,7 +100,8 @@ for (const scenario of ["success", "package-blocked", "transport-false", "proces
     if (scenario !== "diagnostic-unwritable") {
       const file = ready.diagnostic + "/resource-close.jsonl"
       const records = (await readFile(file, "utf8")).trim().split("\n").map((line) => JSON.parse(line))
-      assert.equal((await stat(file)).mode & 0o777, 0o600)
+      // Windows mode bits do not represent the native DACL.
+      if (process.platform !== "win32") assert.equal((await stat(file)).mode & 0o777, 0o600)
       assert.equal(JSON.stringify(records).includes("private injected failure"), false)
       for (const row of records) assert.deepEqual(Object.keys(row).sort(), ["recorded_at", "stage", "status", "version"])
       const last = records.at(-1)

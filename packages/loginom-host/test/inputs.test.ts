@@ -42,12 +42,12 @@ test("server copy names satisfy upload, import and package path rules while pres
     const names = [
       "Скидка 10%.csv",
       "План #2.lgp",
-      "a:b?.xlsx",
+      "sales:2026?.xlsx",
       "control\u0001.csv",
       "конец. ",
       "a".repeat(140) + ".xlsx",
     ]
-    const copies = ["Скидка 10_.csv", "План _2.lgp", "a_b_.xlsx", "control_.csv", "конец_", "a".repeat(115) + ".xlsx"]
+    const copies = ["Скидка 10_.csv", "План _2.lgp", "sales_2026_.xlsx", "control_.csv", "конец_", "a".repeat(115) + ".xlsx"]
     const files = names.map((name, index) => ({ name, data: Buffer.from([0, 255, index]).toString("base64") }))
     const admitted = await inputStore(root).admit("chat", "original", files, "/user")
     for (const [index, file] of admitted.entries()) {

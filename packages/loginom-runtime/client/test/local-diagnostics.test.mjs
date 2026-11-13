@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, writeFile, mkdir, symlink } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile, mkdir, symlink, chmod, lstat, readdir } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { recordLocalDiagnostics as record, readLocalDiagnosticReport as report, pruneLocalDiagnostics as prune } from '../lib/local-diagnostics.mjs';
@@ -57,4 +58,67 @@ test('diagnostic writer refuses symlink destinations', async t => {
   await symlink(target, join(directory, 'events.jsonl'));
   await assert.rejects(record(root, 'session', [{ event: 'tool.end' }]));
   assert.equal(await readFile(target, 'utf8'), 'untouched');
+});
+
+test('diagnostics work in paths with spaces and Cyrillic and retain private permissions', async t => {
+  const root = join(await fixture(t), 'журналы с пробелами');
+  const directory = await record(root, 'session', [{ event: 'task.end' }]);
+  assert.equal((await report(root, 'session')).events.length, 1);
+  if (process.platform === 'win32') {
+    // Check the actual ACL, rather than Windows' synthetic POSIX mode bits.
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      '$ErrorActionPreference="Stop"; $a=Get-Acl -LiteralPath $env:DOCK_DIAGNOSTIC_PATH; ' +
+      'ConvertTo-Json -Compress @{protected=$a.AreAccessRulesProtected; rules=@($a.Access | ForEach-Object { ' +
+      '@{sid=$_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value; rights=[int]$_.FileSystemRights} }); ' +
+      'sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value}'],
+    { encoding: 'utf8', env: { ...process.env, DOCK_DIAGNOSTIC_PATH: directory } });
+    assert.equal(result.status, 0, result.stderr);
+    const acl = JSON.parse(result.stdout);
+    assert.equal(acl.protected, true);
+    assert.deepEqual(acl.rules.map(rule => rule.sid).sort(), [acl.sid, 'S-1-5-18'].sort());
+    for (const rule of acl.rules) assert.equal(rule.rights, 2032127); // FullControl
+    const slashRoot = root.replaceAll('\\', '/');
+    await record(slashRoot, 'session', [{ event: 'task.end' }]);
+    assert.equal((await report(root, 'session')).events.length, 2);
+  } else {
+    assert.equal((await lstat(directory)).mode & 0o077, 0);
+    assert.equal((await lstat(join(directory, 'events.jsonl'))).mode & 0o077, 0);
+    await chmod(join(directory, 'events.jsonl'), 0o644);
+    await assert.rejects(record(root, 'session', [{ event: 'task.end' }]), /Invalid diagnostic file/);
+  }
+});
+
+test('diagnostic writer refuses linked directories before modifying the target', async t => {
+  const root = await fixture(t), target = join(root, 'unrelated');
+  await mkdir(target);
+  if (process.platform === 'win32') {
+    // Make ACL mutation observable even when TEMP already has a private DACL.
+    const grant = spawnSync('icacls.exe', [target, '/inheritance:e', '/grant', '*S-1-5-32-545:(OI)(CI)RX'], { encoding: 'utf8' });
+    assert.equal(grant.status, 0, grant.stderr);
+  }
+  const acl = path => {
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      '$ErrorActionPreference="Stop"; (Get-Acl -LiteralPath $env:DOCK_DIAGNOSTIC_PATH).Sddl'],
+    { encoding: 'utf8', env: { ...process.env, DOCK_DIAGNOSTIC_PATH: path } });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  const link = join(root, 'diagnostics');
+  await symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  const linkAcl = () => {
+    const result = spawnSync('icacls.exe', [link, '/L'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  if (process.platform === 'win32') {
+    const grant = spawnSync('icacls.exe', [link, '/L', '/inheritance:e', '/grant', '*S-1-5-32-545:(OI)(CI)RX'], { encoding: 'utf8' });
+    assert.equal(grant.status, 0, grant.stderr);
+  }
+  const before = process.platform === 'win32' ? [acl(target), linkAcl()] : null;
+  await assert.rejects(record(root, 'session', [{ event: 'task.end' }]), /Invalid diagnostic directory/);
+  assert.deepEqual(await readdir(target), []);
+  if (process.platform === 'win32') {
+    assert.equal(acl(target), before[0], 'junction target SDDL must stay unchanged');
+    assert.equal(linkAcl(), before[1], 'junction ACL must stay unchanged');
+  }
 });

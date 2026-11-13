@@ -5,6 +5,14 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { acquireClipboard } from '../lib/clipboard.mjs';
 
+function sendSignal(child, signal) {
+  // Windows kill() terminates the process without delivering POSIX handlers.
+  // Keep native signals on POSIX; exercise the same handlers over fixture IPC
+  // on Windows. EOF and forced termination still use real process boundaries.
+  if (process.platform === 'win32') child.send({ signal });
+  else child.kill(signal);
+}
+
 async function childFixture(t, scenario) {
   const child = spawn(process.execPath, ['--experimental-test-module-mocks',
     fileURLToPath(new URL('./support/managed-shutdown-child.mjs', import.meta.url)), scenario],
@@ -31,11 +39,11 @@ for (const [scenario, trigger] of [['failure','SIGTERM'], ['throw','SIGINT'], ['
       const listen = () => { if (f.stderr().includes('shutdown is unconfirmed')) { clearTimeout(timeout); f.child.stderr.off('data', listen); resolve(); } };
       f.child.stderr.on('data', listen); listen();
     });
-    if (trigger === 'EOF') f.child.stdin.end(); else f.child.kill(trigger);
+    if (trigger === 'EOF') f.child.stdin.end(); else sendSignal(f.child, trigger);
     await diagnostic;
     await blocked();
     for (const signal of ['SIGTERM', 'SIGINT']) {
-      f.child.kill(signal);
+      sendSignal(f.child, signal);
       const reply = once(f.child, 'message', { signal: AbortSignal.timeout(5000) }); f.child.send('state');
       const [state] = await reply;
       assert.equal(state.calls, 1, 'signals must not retry unknown cleanup');
@@ -51,7 +59,7 @@ for (const [scenario, trigger] of [['failure','SIGTERM'], ['throw','SIGINT'], ['
 
 test('managed SIGTERM exits successfully after confirmed transport process termination and lease release', async t => {
   const f = await childFixture(t, 'success');
-  const exited = once(f.child, 'exit', { signal: AbortSignal.timeout(5000) }); f.child.kill('SIGTERM');
+  const exited = once(f.child, 'exit', { signal: AbortSignal.timeout(5000) }); sendSignal(f.child, 'SIGTERM');
   assert.deepEqual(await exited, [0, null]);
   assert.equal(f.stderr().includes('shutdown is unconfirmed'), false);
   const next = await acquireClipboard({ port: f.port, timeoutMs: 1000 }); await next.release();

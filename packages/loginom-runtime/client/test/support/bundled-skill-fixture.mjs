@@ -1,11 +1,11 @@
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resourceInventory } from '../../../src/resource-inventory.mjs';
 
 // Real product instructions and references, in an independent resource root.
 export async function createBundledSkillFixture(t) {
-  const resources = await mkdtemp(join(tmpdir(), 'loginom-product-skill-'));
+  const resources = await realpath(await mkdtemp(join(tmpdir(), 'loginom-product-skill-')));
   t.after(() => rm(resources, { recursive: true, force: true }));
   const directory = join(resources, 'skills/loginom-automation');
   await mkdir(join(resources, 'skills'));

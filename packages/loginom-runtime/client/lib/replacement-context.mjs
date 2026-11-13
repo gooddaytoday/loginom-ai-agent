@@ -19,11 +19,23 @@ export function readReplacementBrowser(prefix){
  const grid=cmp('grdDataList'),rs=records(grid,'bg.ext.CollectionProxy',1000);if(!rs)return fail('replacement_input_inventory');
  const types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'},fields=[],names=new Set(),ids=new Set();
  for(const r of rs){const d=r?.data,id=String(r?.internalId??'');
-  if(!r?.isModel||!id||ids.has(id)||typeof d?.Name!=='string'||!d.Name||d.Name.length>128||names.has(d.Name.toLowerCase())||typeof d.DisplayName!=='string'||!types[d.DataType]||![0,1].includes(d.ReplaceMode))return fail('replacement_input_record');
-  names.add(d.Name.toLowerCase());ids.add(id);fields.push({record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],mode:d.ReplaceMode===0?'none':'manual'});
+  if(!r?.isModel||!id||ids.has(id)||typeof d?.Name!=='string'||!d.Name||d.Name.length>128||names.has(d.Name.toLowerCase())||typeof d.DisplayName!=='string'||!types[d.DataType]||![0,1,2].includes(d.ReplaceMode))return fail('replacement_input_record');
+  names.add(d.Name.toLowerCase());ids.add(id);fields.push({record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],mode:['none','manual','external'][d.ReplaceMode],...(d.ReplaceMode===2?{replace_source:d.ReplaceSource}:{})});
  }
  const selected=grid.getSelectionModel?.().getSelection?.();if(!Array.isArray(selected)||selected.length>1||selected.some(r=>!rs.includes(r)))return fail('replacement_selection');
  const field=selected.length?fields[rs.indexOf(selected[0])]:null;
+ if(field?.mode==='external'){
+  if(typeof field.replace_source!=='string'||!field.replace_source||field.replace_source.length>128)return fail('replacement_external_source');
+  const rows=records(cmp('grdInputSource'),'bg.ext.CollectionProxy',1000);if(!rows)return fail('replacement_external_inventory');
+  const external_fields=[],seen=new Set(),ids=new Set();
+  for(const r of rows){const d=r?.data,id=String(r?.internalId??'');
+   if(!r?.isModel||!id||ids.has(id)||typeof d?.Name!=='string'||!d.Name||seen.has(d.Name.toLowerCase())||typeof d.DisplayName!=='string'||!types[d.DataType]||![0,3,4,6].includes(d.UsageType))return fail('replacement_external_record');
+   seen.add(d.Name.toLowerCase());ids.add(id);external_fields.push({record_id:id,name:d.Name,label:d.DisplayName,type:types[d.DataType],usage:d.UsageType});
+  }
+  const other=cmp('cbxReplaceOther')?.getValue?.(),case_sensitive=cmp('chkCaseSensitivity')?.getValue?.();
+  if(![0,1].includes(other)||typeof case_sensitive!=='boolean')return fail('replacement_external_options');
+  return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,mode:'external',result_type:field.type,replace_source:field.replace_source,external_fields,pairs:[],other:{mode:['keep','null'][other]},case_sensitive,precision:0,editor_open:false,settings_applied:false};
+ }
  const disabledGrid=cmp('grdReplaceItems');
  if([...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>e.checkVisibility({checkVisibilityCSS:true})&&!(disabledGrid?.disabled===true&&(!field||field.mode==='none')&&e.parentElement===disabledGrid.el.dom&&e.classList.contains('x-mask'))))return fail('replacement_mask');
  if(!field)return {verified:true,inventory_complete:true,input_fields:fields,selected:null,pairs:[],settings_applied:false};

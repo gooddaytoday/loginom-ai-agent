@@ -25,15 +25,19 @@ function history(){
 test('source-only update preserves the Import GUID, variable IDs, Sentinel and field order',()=>{
  assert.equal(auditImportBindings(history(),initial,final).status,'PASS');
 });
-for(const fault of ['literal','second node','sentinel','variable identity','reconfigure','stale execution'])test('Import oracle refuses '+fault,()=>{
+for(const fault of ['literal','second node','sentinel','variable identity','reconfigure','stale execution','reconfigure without final bindings'])test('Import oracle refuses '+fault,()=>{
  const e=history();
  if(fault==='literal')delete e[1].result.configuration.bindings;
  if(fault==='second node')e[4].result.node={...e[4].result.node,node_id:'another'};
  if(fault==='sentinel')e[3].result.configuration.readback.variables[1].value='lost';
  if(fault==='variable identity')e[3].result.configuration.readback.variables[0].id=99;
  if(fault==='stale execution')e[4].result.execution.execution_id='first';
- if(fault==='reconfigure')e.splice(4,0,{phase:'node_apply_prepared',request:{target:{kind:'existing',type:'imports.text',ref:e[1].result.node},parameters:{settings:{source:{source_path:'/own/b.csv'}}},inputs:[],mappings:[]}});
- assert.throws(()=>auditImportBindings(e,initial,final));
+ if(fault.startsWith('reconfigure'))e.splice(4,0,{phase:'node_apply_prepared',request:{target:{kind:'existing',type:'imports.text',ref:e[1].result.node},parameters:{settings:{source:{source_path:'/own/b.csv'}}},inputs:[],mappings:[]}});
+ if(fault==='reconfigure without final bindings'){
+  delete e[5].result.configuration.bindings;
+  assert.throws(()=>auditImportBindings(e,initial,final),{name:'AssertionError',message:/IMPORT_BINDING_RECONFIGURED/});
+ }
+ assert.throws(()=>auditImportBindings(e,initial,final),{name:'AssertionError'});
 });
 
 async function coldReadFixture({alias=false,blocked=false,excel=false}={}){

@@ -7,7 +7,8 @@ import { join } from "node:path"
 import { once } from "node:events"
 import { pathToFileURL } from "node:url"
 
-import { probeProxyPort, probeProxyUrl, readSystemProxy, resolveSystemProxy } from "../src/system-proxy"
+import { probeProxyPort, probeProxyUrl, readSystemProxy, resolveSystemProxy, spawnCommand } from "../src/system-proxy"
+import type { CommandRunner } from "../src/system-proxy/readers"
 
 test("socket probe distinguishes an HTTP proxy, a non-HTTP port, refusal and timeout", async () => {
   const http = createNetServer((socket) => {
@@ -198,20 +199,36 @@ test("linux readers honor a fake gsettings and a temporary kioslaverc", async ()
   try {
     const bin = join(directory, "bin")
     await mkdir(bin)
+    // Native Windows cannot execute the POSIX gsettings fixture. Preserve real
+    // subprocess exit/timeout behaviour through the existing runner boundary.
+    let script = "console.log('not-settings');process.exit(1)"
+    const runner: CommandRunner | undefined = process.platform === "win32" ? (command, args, options) => {
+      expect(command).toBe("gsettings")
+      expect(args).toEqual(["list-recursively", "org.gnome.system.proxy"])
+      expect(options.env?.PATH).toBe(bin)
+      const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+      if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
+      return spawnCommand(node, ["-e", script], { ...options,
+        env: { ...options.env, SystemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT } })
+    } : undefined
     await writeFile(join(bin, "gsettings"), "#!/bin/sh\nprintf '%s\\n' 'not-settings'\nexit 1\n", { mode: 0o755 })
     const failed = await readSystemProxy({
       platform: "linux",
+      runner,
       timeoutMs: 1000,
       environment: { PATH: bin, XDG_CURRENT_DESKTOP: "GNOME" },
     })
     expect(failed).toEqual({ ok: false, code: "read-failed" })
+    script = "setInterval(() => {}, 1000)"
     await writeFile(join(bin, "gsettings"), "#!/bin/sh\n/bin/sleep 30\n", { mode: 0o755 })
     const hung = await readSystemProxy({
       platform: "linux",
+      runner,
       timeoutMs: 200,
       environment: { PATH: bin, XDG_CURRENT_DESKTOP: "GNOME" },
     })
     expect(hung).toEqual({ ok: false, code: "timeout" })
+    script = "console.log(\"org.gnome.system.proxy mode 'manual'\\norg.gnome.system.proxy.http host '127.0.0.1'\\norg.gnome.system.proxy.http port 8080\")"
     await writeFile(
       join(bin, "gsettings"),
       "#!/bin/sh\nprintf '%s\\n' \"org.gnome.system.proxy mode 'manual'\" \"org.gnome.system.proxy.http host '127.0.0.1'\" \"org.gnome.system.proxy.http port 8080\"\n",
@@ -219,6 +236,7 @@ test("linux readers honor a fake gsettings and a temporary kioslaverc", async ()
     )
     const manual = await readSystemProxy({
       platform: "linux",
+      runner,
       timeoutMs: 1000,
       environment: { PATH: bin, XDG_CURRENT_DESKTOP: "GNOME" },
     })

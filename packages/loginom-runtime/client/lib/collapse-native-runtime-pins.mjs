@@ -66,3 +66,13 @@ export const nativeRuntimePins=Object.freeze({
     "$FMethodIDOffset": 16
   }
 });
+
+// LAB-1445, Loginom 7.4.2: variable port1081 -> variables541 -> item511 -> value427.
+export const nativeVariablePins=Object.freeze({
+ port_output:'8cbca15978acc44d6fede947ab19464ed3fb9ab2d35da497006ace6ad969f03c',
+ query:'56e77848de35b0f358b8192c80b8318e8cf04d4f6dc36bf962a4099a85fedd56',
+ count:'47d87bad770c010590259b41bbf72d5350b926a243c482e514dd936b0bf6ad67',
+ item:'6a8359d22200fff6ad65f01b613df1cd5f19be9ff2873cdae4858f84fc611271',
+ value:'0ce6df6e9853a87dc5e889bb44a12db70667e4aecbb721791b0bb0beb4a6cc6e',
+ as_variant:'5ff1769d77da67f4be54cf8f51de8e17e85a55a4f0aa24db6da8f8434d958b8d',
+});

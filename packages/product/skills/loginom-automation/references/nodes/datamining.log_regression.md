@@ -5,12 +5,19 @@
 
 Используй `loginom_dock_node_apply`, `target.type:"datamining.log_regression"`,
 `mode:"enter"`, `parameters:{logistic:{input_fields:[...],target_field:"...",event:"...",threshold:...}}`.
-Цель — дискретная строка с двумя непустыми классами. Укажи точную метку события
+Цель — дискретная строка с двумя классами. Задай метку события
 и порог: событие при `p >= threshold`. Числовые факторы — в `input_fields`;
 идентификаторы, комментарии и остальные поля сохраняются без роли.
 `finish:"execute"` обучает на текущем входе и прогнозирует; `read.ports:[0]`
 возвращает класс, вероятность и исходные поля. Константа и epsilon 1e-10 фиксированы.
-Веса, валидация и выход переменных недоступны. Сначала запроси `parameter_schema`.
+Валидация и выход переменных недоступны. Запроси `parameter_schema`.
+
+## Частотные веса Real
+
+Enter: `parameters.logistic.weight_field:"Weight"` — положительные частотные
+веса Real. Исключи поле из input_fields; оно сохраняется в прогнозе, без
+нормализации. Integer — отказ до редактирования ролей, без конвертации.
+После открытия apply с прежним weight_field проверяет роль без Teach.
 
 ## Отбор факторов
 
@@ -37,10 +44,9 @@ Apply сверяет настройки и закрывает мастер бе�
 (или [0,1]), `read.require_exact_numbers:true`. Порт 1: Name, DisplayName,
 UniqueValues, затем поля с префиксом цели: _coefficients, _stdError, _wald,
 _waldPValue, _oddsRatio, _lowerBound, _upperBound (последние — 95%).
-Сохрани native NULL, точность и порядок всех десяти полей. Экспорт — новый
+Сохрани NULL, точность и порядок. Экспорт — новый
 `exports.text` от output:1, технические имена. После Save/reopen Enter-модель
 читай через apply с прежними параметрами и read.ports:[1], без Teach.
-Калькулятор и JavaScript не нужны.
 
 ## Нормализация
 

@@ -399,7 +399,10 @@ export async function restoreImportOutputLayout(channel,before,native,mappings,c
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const parameterSchema=structuredClone(textImportParametersSchema);
-  parameterSchema.properties.preview_only.description='Storage+source_path/encoding; Close/no inputs,mappings,read. Preview <=25 rows, no SHA/N; discard. Reuse after profile/scan/sample.';
+  parameterSchema.properties.preview_only.description='Native preview FIRST; storage+source_path[/encoding]; Close, reuse node.';
+  parameterSchema.properties.source_switch.description='After scan+Save: profile_id/save_operation_id; source_path only.';
+  parameterSchema.properties.source.description='Required except unchanged Execute. Unchanged existing Execute may omit source.';
+  parameterSchema.properties.settings.description='New source/format+columns/detection; existing patch.';
   const nodeApplyHandlers=new Map([['imports.text',{revision:'text-import-output-v2',modes:['delimited'],
     parameter_schema:parameterSchema,binding_schema:importBindingSchema,
     configurationReadback:textImportConfigurationReadback,
@@ -460,7 +463,13 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
         const storage=p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref)
           :p.source.kind==='verified_sources'?await Promise.all(p.source.sources.map(s=>s.kind==='storage'?resolveStorageSource?.(s.server_source_ref):undefined)):undefined;
         if(operation.parameters?.bindings?.length&&storage)p={...p,settings:{...p.settings,source:{...p.settings.source,source_path:storage.destination}}};
-        sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),storage);
+        try{sourceReceipt=verifyTextImportSource(p,p.source.kind==='storage'?[]:verifiedUploads(),p.source.kind==='storage'?undefined:uploadHistory?.(),storage);}
+        catch(error){
+          if(error.message==='Storage source exact destination differs'&&operation.parameters?.target?.kind==='existing'&&!operation.parameters.bindings?.length
+            &&!Object.hasOwn(p.settings?.source??{},'source_path'))
+            error.message+='; bound Import rerun after CsvPath change: omit parameters.source; send parameters:{settings:{}}, bindings:[], empty inputs/mappings';
+          throw error;
+        }
         if(sourceSwitch){
           if(p.source.kind==='storage'){
             requireValue(scanReceipt?.basis==='backend_exact_scan'&&scanReceipt.profile_id===sourceSwitch.profile_id,
@@ -548,7 +557,28 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
                 await read('text_import_file','server preview code page readback',s=>s.wizard.import_source.fields.encoding.value===encoding.label);
               }
             }
-            const observedSource=(await read('text_import_file','server preview exact source selected',s=>
+            await read('text_import_file','server preview exact source selected',s=>
+              isTextImportSourceReady(s)&&s.wizard.import_source.fields.source_path.value===sourceReceipt.source.destination);
+            await next('text_import_file','text_import_format');
+            // Entering this page only loads local defaults. Ask Loginom itself
+            // to recognize delimiters/date formats and recalculate definitions.
+            const suggestReady=s=>s.wizard?.stage==='text_import_format'
+              &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';ImportTextFileParamsWizard;btnSuggestFormat'
+                &&e.allowed_actions.includes('click')).length===1;
+            const parsedReady=s=>suggestReady(s)&&s.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout';
+            const suggest=await read('text_import_format','native import format detection available',parsedReady,
+              {importColumnPage:{offset:0,limit:8}});
+            await channel.perform({condition:'native import format detection',initialObservation:suggest,
+              ready:suggestReady,confirmIdentity:s=>s.dom_epoch,
+              identity:s=>({owner:s.wizard.owner_context,root_ref:s.wizard.root_ref}),
+              resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>
+                e.tid===s.wizard.root_tid+';ImportTextFileParamsWizard;btnSuggestFormat'
+                &&e.allowed_actions.includes('click')),'Native import format detection button required').ref})});
+            await read('text_import_format','native import format detected',parsedReady,{importColumnPage:{offset:0,limit:8}});
+            // Recognition can also choose the header. Read the actual source
+            // page again instead of reporting the pre-recognition defaults.
+            await previousTextImportStep(channel,{from:'text_import_format',to:'text_import_file',owner,read,ready:isTextImportSourceReady});
+            const observedSource=(await read('text_import_file','detected server preview source',s=>
               isTextImportSourceReady(s)&&s.wizard.import_source.fields.source_path.value===sourceReceipt.source.destination)).wizard.import_source;
             await next('text_import_file','text_import_format');
             const definitions=await readImportDefinitionPages(channel);

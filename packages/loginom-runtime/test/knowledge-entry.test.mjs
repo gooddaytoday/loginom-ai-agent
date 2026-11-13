@@ -1,19 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, fork } from 'node:child_process';
+import { fork } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HELP_URI } from '../client/lib/knowledge-client.mjs';
 import { helpFixture } from '../client/test/support/help-fixture.mjs';
 
-function entry(t) {
+function entry(t, held) {
   const child = fork(fileURLToPath(new URL('../src/knowledge-entry.mjs', import.meta.url)), [], {
     execPath: process.execPath,
-    execArgv: ['--import', fileURLToPath(new URL('./support/knowledge-no-browser.mjs', import.meta.url))],
-    env: {}, stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+    execArgv: ['--experimental-test-module-mocks', '--import', new URL('./support/knowledge-no-browser.mjs', import.meta.url).href],
+    env: { ...(process.platform === 'win32' ? { SystemRoot: process.env.SystemRoot } : {}),
+      ...(held ? { LOGINOM_TEST_HELD_HELP_MANIFEST: held.manifest } : {}) },
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
   });
   const requests = new Map();
   const exited = once(child, 'exit');
@@ -102,19 +103,18 @@ test('missing or changed Help fails the catalog with a private code and startup 
   assert.deepEqual(await runtime.exited, [0, null]);
 });
 
-// The manifest is a FIFO, so Help startup waits until the test writes it.
+// Hold the actual manifest read at the filesystem boundary. POSIX FIFOs are
+// not readable as pipes by native Windows Node.
 async function heldHelp(t) {
   const helpRoot = await helpFixture(t);
   const manifest = join(helpRoot, 'help-manifest.json');
-  const text = await readFile(manifest, 'utf8');
-  await rm(manifest);
-  execFileSync('mkfifo', [manifest]);
-  return { helpRoot, release: () => writeFile(manifest, text) };
+  return { helpRoot, manifest, release: child => new Promise((resolve, reject) =>
+    child.send({ fixture_release_help: true }, error => error ? reject(error) : resolve())) };
 }
 
 test('interrupting a call waiting for startup leaves other runs and initialization intact', async t => {
   const held = await heldHelp(t);
-  const runtime = entry(t);
+  const runtime = entry(t, held);
   await runtime.request('start', { protocol: 1, generation: 22, helpRoot: held.helpRoot });
   const first = runtime.request('call', { run: 'A', id: 'queued', name: 'read', arguments: { uris: 'README.md' } });
   const other = runtime.request('call', { run: 'B', id: 'queued', name: 'read', arguments: { uris: 'processors/integration/rest-request.md' } });
@@ -123,19 +123,19 @@ test('interrupting a call waiting for startup leaves other runs and initializati
     /LOGINOM_KNOWLEDGE_REQUEST_BUSY/);
   assert.deepEqual(await runtime.request('interrupt', { run: 'A' }), { interrupted: true });
   await assert.rejects(first, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  await held.release();
+  await held.release(runtime.child);
   assert.match((await other).content[0].text, /# REST-запрос/);
 });
 
 test('private owner shutdown can interrupt every run without closing the knowledge client', async t => {
   const held = await heldHelp(t);
-  const runtime = entry(t);
+  const runtime = entry(t, held);
   await runtime.request('start', { protocol: 1, generation: 21, helpRoot: held.helpRoot });
   const calls = ['A', 'B'].map(run => runtime.request('call', { run, id: 'pending', name: 'read', arguments: { uris: 'README.md' } }));
   calls.forEach(call => call.catch(() => {}));
   assert.deepEqual(await runtime.request('interrupt', { all: true }), { interrupted: true });
   for (const call of calls) await assert.rejects(call, /LOGINOM_KNOWLEDGE_INTERRUPTED/);
-  await held.release();
+  await held.release(runtime.child);
   assert.match((await runtime.request('call', { run: 'next', id: 'after', name: 'read', arguments: { uris: 'README.md' } })).content[0].text,
     /# Loginom — руководство пользователя/);
 });

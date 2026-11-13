@@ -73,6 +73,16 @@ The existing fixture uploader seeds exact original basenames with reject/equal-b
 verification. The model receives their server paths and obtains fresh storage
 references. Inline and small local admission otherwise prefix physical filenames.
 
+`text-folder-masks` uses `scenarios/text-folder-masks/task.md` (the owner's
+request without file names) and seeds its `data/` into six new folders under a
+new parent `<run> Silent Talk` (a space in the path): transactions 3 CSV plus
+README.txt, customers and beneficiaries 2 CSV, accounts, devices and
+risk_reference 1 CSV. The main run requires one Import per folder: the native
+`<folder>/*.csv` mask for 2+ CSV, the exact path for one, full typed port reads
+against the frozen `expected.json` (`oracle.py --check`), and Save. No CSV is
+exported; cold reexecutes the saved package without configuration and matches
+all six labelled outputs. Only task and folder paths reach the model.
+
 `tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
 `trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
 and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks
@@ -211,6 +221,11 @@ all twelve fields (integer/string/real/datetime and NULL) of `Wide`.
 and NULL retained as distinct values through CSV, Save and cold reexecution.
 Only the original XLSX and user task reach the model. Independent OpenPyXL
 oracles generate checked-in expected.json; stock CSV, Save, cold and cleanup apply.
+
+`factor-apply`: утверждённый `task-apply.md`, matrix.csv → update.csv на том же
+обученном PCA-узле без Teach. Проверяет Real scores и прежние нагрузки двух
+портов через независимый sign-aware matcher; CSV, Save, cold и cleanup штатные.
+Oracle и expected модели не передаются.
 
 `excel-import-named`: утверждённый C3, `SalesRange` строго B:C (2 строки),
 затем продолжение до последней заполненной строки на том же узле (3 строки).
@@ -1053,6 +1068,12 @@ recommend-holdout.csv из fixtures/v040. Oracle сохраняет правил
 проверяет H1→B (.75/.75/1); переобучение holdout даёт ноль правил.
 Аудит требует обучение и apply одного GUID, без повторного Train;
 оба полных typed-порта 1/2, два CSV, Save, cold без настройки и cleanup.
+
+`logreg-weights`: Enter с частотными весами Real, 32×9 полных значений.
+Только утверждённые task-weights.md и weighted.csv передаются модели;
+независимый modes/oracle.py и expected.json остаются в harness.
+Weight сохраняется в прогнозе, не используется как фактор. CSV/Save/cold/cleanup.
+
 
 `assnrules-exclude`: train.csv из fixtures/v040, support 50%, confidence 60%,
 lift 0, max_items=3, max_consequents=2, исключение поддержки >90%.

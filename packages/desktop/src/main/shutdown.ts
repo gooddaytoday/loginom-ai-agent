@@ -1,7 +1,10 @@
+import type { BrowserWindow } from "electron"
+
 // Electron does not await async event listeners. Keep the application alive until
 // backend shutdown and Host/Chromium cleanup finish, then admit the repeated quit.
 export function createQuitHandler(input: {
   markQuitting(): void
+  closeWindows(): Promise<void>
   stop(): Promise<void>
   quit(): void
   onError(error: unknown): void
@@ -13,6 +16,9 @@ export function createQuitHandler(input: {
     if (stopped) return
     event.preventDefault()
     stopping ??= Promise.resolve()
+      // Let synchronous before-quit listeners (including drafts.flush) finish,
+      // then close renderers before interrupting their in-flight backend calls.
+      .then(() => input.closeWindows())
       .then(() => input.stop())
       .catch(input.onError)
       .finally(() => {
@@ -20,4 +26,29 @@ export function createQuitHandler(input: {
         input.quit()
       })
   }
+}
+
+export async function closeWindows(
+  windows: Pick<BrowserWindow, "once" | "removeListener" | "close" | "destroy" | "isDestroyed">[],
+) {
+  await Promise.all(
+    windows.map(
+      (win) =>
+        new Promise<void>((resolve) => {
+          if (win.isDestroyed()) return resolve()
+          const done = () => {
+            clearTimeout(timer)
+            win.removeListener("closed", done)
+            resolve()
+          }
+          // Bound renderer teardown to 2s, below the sidecar's existing 6s stop budget.
+          const timer = setTimeout(() => {
+            if (!win.isDestroyed()) win.destroy()
+            done()
+          }, 2_000)
+          win.once("closed", done)
+          win.close()
+        }),
+    ),
+  )
 }

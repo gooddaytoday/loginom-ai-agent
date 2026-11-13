@@ -11,7 +11,7 @@
       "output_node_type": "transform.filter_data",
       "output_port": 0,
       "ordered": false,
-      "column_order": "exact",
+      "column_order": "any",
       "columns": [
         {
           "name": "RowID",
@@ -51,7 +51,7 @@
       "output_node_type": "transform.filter_data",
       "output_port": 1,
       "ordered": false,
-      "column_order": "exact",
+      "column_order": "any",
       "columns": [
         {
           "name": "RowID",

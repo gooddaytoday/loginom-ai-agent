@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readdir,stat,rm,truncate} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,win32} from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {createServerDownloadRegistry,serverDownloadBudget} from '../lib/storage-policy.mjs';
 import {Page,runtime,actions,selectors,build} from './support/executor-fixture.mjs';
@@ -328,17 +329,35 @@ test('no-progress timer cancels and drains a stalled transfer even without statu
  const registry=createServerDownloadRegistry({directory:join(f.root,'silent'),inspect:async()=>({...source(),bytes:2*1024**3}),
   download:async({path,signal})=>{await writeFile(path,'a');started=true;
    await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();}});
- registry.start(f.request);while(!started)await new Promise(resolve=>setImmediate(resolve));
+ registry.start(f.request);while(!started&&registry.status('download').state==='running')await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(started,true,JSON.stringify(registry.status('download')));
  t.mock.timers.tick(120000);await registry.cleanup();
  const result=registry.status('download');
  assert.equal(result.status,'FAILED');assert.equal(result.error.code,'LOGINOM_DOWNLOAD_NO_PROGRESS');
  assert.equal(result.cancel_requested,true);assert.equal(result.cleanup_complete,true);
  assert.deepEqual(await readdir(join(f.root,'silent')),[]);
 });
+// Same guarantee on both platforms: no other user can read the cache root.
+// Windows: a protected DACL (no inherited ACEs) allowing only the current user,
+// SYSTEM. All foreign explicit and inherited ACEs must be removed.
+// POSIX: no group/other mode bits.
+async function assertPrivateCache(directory) {
+ if(process.platform!=='win32'){assert.equal((await stat(directory)).mode&0o777,0o700);return;}
+ const system32=win32.join(process.env.SystemRoot,'System32');
+ const user=spawnSync(win32.join(system32,'whoami.exe'),['/user','/fo','csv','/nh'],{encoding:'utf8',windowsHide:true}).stdout.match(/"(S-1-[0-9-]+)"/i)[1];
+ const script='$a=Get-Acl -LiteralPath $env:LOGINOM_ACL_PATH;ConvertTo-Json -Compress @{protected=$a.AreAccessRulesProtected;'
+  +'rules=@($a.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])|%{@{sid=$_.IdentityReference.Value;inherited=$_.IsInherited;type=[string]$_.AccessControlType}})}';
+ const result=spawnSync(win32.join(system32,'WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-Command',script],
+  {encoding:'utf8',windowsHide:true,env:{...process.env,LOGINOM_ACL_PATH:directory}});
+ const acl=JSON.parse(result.stdout),text=JSON.stringify(acl);
+ assert.equal(acl.protected,true,text);
+ assert.ok(acl.rules.length>0,text);
+ for(const rule of acl.rules)assert.ok(rule.type==='Allow'&&rule.inherited===false&&['S-1-5-18',user].includes(rule.sid),text);
+}
 test('download writes a private cache, binds its receipt to native identity and never uploads',async t=>{
  const f=await fixture(t);f.registry.start(f.request);
  const result=await settled(f.registry);assert.equal(result.status,'SUCCEEDED');
- const path=result.output.path;assert.equal((await stat(join(f.root,'cache'))).mode&0o777,0o700);
+ const path=result.output.path;await assertPrivateCache(join(f.root,'cache'));
  assert.equal((await stat(path)).size,3);
  const receipt={basis:'backend_exact_scan',profile_id:'p',records:1,bytes:3,sha256:'a'.repeat(64),
   identity:{canonical_path:path,size:3,file_id:`${(await stat(path)).dev}:${(await stat(path)).ino}`,
@@ -393,6 +412,46 @@ test('source discovery waits through the old graph tab before reading the new Fi
  assert.equal(page.events.filter(e=>e==='mouse_click').length,0);
 });
 
+for(const listing of [false,true])for(const restoredTab of [true,false])test('storage navigation replans only a restored Files tab: '+listing+', restored: '+restoredTab,async t=>{
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot(),records=[];
+ let directory='/',prefix=page.prefix,restored=false;const visited=[];
+ const tid=suffix=>prefix+suffix,nav=';NavigationBar;NavigationPanel',table=';FileStorageForm;pnlFileStorage;tbl';
+ const root=';cnrNaviMode;b.s_Сервер>Файлы',row=';FileStorageForm;colName_';
+ const element=(suffix,label='',allowed=[])=>({ref:page.uiReference(tid(suffix)),tid:tid(suffix),kind:'control',scope:'workspace',label,enabled:true,visible:true,
+  identity:{anchor_tid:tid(suffix),path:[]},signature:{tag:'button',tid:tid(suffix)},bounding_box:{x:10,y:10,width:20,height:20},
+  interaction:{state:'point_observed',point:{x:20,y:20}},allowed_actions:allowed});
+ const name=()=>directory==='/'?'worker':directory==='/worker'?'target':'full.csv';
+ const evaluate=page.evaluate.bind(page),elements=page.elements.bind(page);
+ page.elements=()=>[...elements(),page.element(tid(row+name())),page.element(tid(root))];
+ page.click=async()=>{directory='/';visited.push(directory);};
+ page.afterDoubleClick=async()=>{
+  if(!restored){restored=true;directory='/worker/old';if(restoredTab)prefix='MF;TF-0';}
+  else directory=directory==='/'?'/worker':'/worker/target';
+  visited.push(directory);
+ };
+ page.evaluate=async(fn,arg)=>{
+  if(!arg||!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  const state=structuredClone(base);page.clock+=500;
+  state.workflow_ref={...base.workflow_ref,prefix};state.active_tab_ref=prefix;
+  state.file_storage={status:'observed',directory,listing_complete:false};
+  const entry=element(row+name(),name(),directory==='/worker/target'?[]:['double_click']);
+  entry.storage_entry=directory==='/worker/target'?{kind:'file',path:directory+'/full.csv',bytes:3,
+   mtime:'native-time',bytes_source:'native_file_store',directory_entries:1}:{kind:'folder',directory_entries:1};
+  state.ui.elements=[element(nav),element(table),element(root,'Файлы',['click']),entry];
+  if(arg.discoverRoots){state.observation_kind='roots';if(arg.storageName)state.ui.elements=state.ui.elements.filter(e=>e.label===arg.storageName);}
+  else state.observation_root={ref:arg.rootRef,identity:state.ui.elements.find(e=>e.ref===arg.rootRef)?.identity};
+  return state;
+ };
+ const r=runtime(page,{onRecord:async x=>{records.push(x);return x;},cacheDirectory:join(f.root,'restore'),getStorageBinding:()=>({session_id:'s',document_id:'d',
+  origin:base.origin,loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ const result=await r.serverDownload({operation_id:'restore',path:'/worker/target'+(listing?'':'/full.csv')},listing?'dock_storage_list':'dock_storage_source');
+ if(!restoredTab){assert.equal(result.status,'FAILED');assert.match(records.at(-1).error.message,/Server storage UI is not ready/);assert.deepEqual(visited,['/worker/old']);return;}
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(records.filter(x=>/storage_.*failed/.test(x.phase))));
+ assert.deepEqual(visited,['/worker/old','/','/worker','/worker/target']);
+ if(listing){assert.equal(result.output.directory,'/worker/target');assert.equal(result.output.complete,true);}
+ else assert.equal(result.output.source.path,'/worker/target/full.csv');
+});
+
 test('source discovery reacquires invalidated read pages without replaying any gesture',async t=>{
  const f=await fixture(t),page=new Page(),base=page.uiSnapshot();let reads=0;
  const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
@@ -434,7 +493,8 @@ test('cancel drains the actual transfer before deleting partials; IDs cannot rep
  let transfers=0,release;
  const f=await fixture(t,async({path,signal})=>{transfers++;await writeFile(path,'a');
   await new Promise(resolve=>{release=resolve;signal.addEventListener('abort',resolve,{once:true});});signal.throwIfAborted();});
- f.registry.start(f.request);while(!release)await new Promise(resolve=>setTimeout(resolve,1));
+ f.registry.start(f.request);while(!release&&f.registry.status('download').state==='running')await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(typeof release,'function',JSON.stringify(f.registry.status('download')));
  f.registry.start(f.request);assert.equal(transfers,1);
  assert.throws(()=>f.registry.start({...f.request,server_source_ref:'other'}),/different/);
  f.registry.cancel('download');const result=await settled(f.registry);
@@ -483,10 +543,58 @@ test('aborting a long status wait releases the caller without cancelling the ret
   await writeFile(path,'a');active=true;
   await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));signal.throwIfAborted();
  });
- f.registry.start(f.request);while(!active)await new Promise(resolve=>setTimeout(resolve,1));
+ f.registry.start(f.request);while(!active&&f.registry.status('download').state==='running')await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(active,true,JSON.stringify(f.registry.status('download')));
  const controller=new AbortController();
  const waiting=f.registry.wait('download',{timeoutMs:60000,signal:controller.signal});
  controller.abort(Error('owner interrupted'));
  await assert.rejects(waiting,/owner interrupted/);assert.equal(f.registry.busy,true);
  await f.registry.cleanup();assert.equal(f.registry.unsettled,false);
+});
+
+test('folder listing returns every native Files row with its own storage reference without file names',async t=>{
+ const f=await fixture(t),page=new Page(),base=page.uiSnapshot();
+ const nav='ui-navigation',table='ui-table',dir='/worker/Silent Talk/transactions';
+ const element=(ref,tid)=>({ref,tid,kind:'region',label:'',allowed_actions:[],identity:{anchor_tid:tid,path:[]}});
+ const names=['transactions_2026-10.csv','README.txt','transactions_2026-09.csv','transactions_2026-11.csv'];
+ const rows=()=>[...names.map((name,i)=>({...element('ui-row-'+i,page.prefix+';FileStorageForm;colName_'+name),label:name,
+  storage_entry:{kind:'file',path:dir+'/'+name,bytes:100+i,mtime:'2026-11-0'+(i+1)+'T00:00:00.000Z',bytes_source:'native_file_store',directory_entries:6}})),
+  {...element('ui-row-folder',page.prefix+';FileStorageForm;colName_archive'),label:'archive',storage_entry:{kind:'folder',directory_entries:6}},
+  // Observed parent link row (LAB-1468 stage 0 model.stdout:35): unknown kind.
+  {...element('ui-row-up',page.prefix+';FileStorageForm;colName_..'),label:'..',storage_entry:{kind:'unknown',selected:true,directory_entries:6}}];
+ const evaluate=page.evaluate.bind(page);let gestures=0;
+ page.evaluate=async(fn,arg)=>{
+  if(!fn.toString().includes("Symbol.for('loginom-dock.workspace-ui.identity.v1')"))return evaluate(fn,arg);
+  const state=structuredClone(base);state.active_tab_ref='files';page.clock+=500;
+  if(arg.discoverRoots){state.observation_kind='roots';state.ui.elements=[element(nav,page.prefix+';NavigationBar;NavigationPanel'),
+   element(table,page.prefix+';FileStorageForm;pnlFileStorage;tbl')];return state;}
+  state.file_storage={status:'observed',directory:dir};
+  state.observation_root={ref:arg.rootRef,identity:{anchor_tid:arg.rootRef===table?page.prefix+';FileStorageForm;pnlFileStorage;tbl':page.prefix+';NavigationBar;NavigationPanel',path:[]}};
+  state.ui.elements=arg.rootRef===table?rows():[];
+  return state;
+ };
+ page.click=async()=>{gestures++;};
+ const records=[];const r=runtime(page,{onRecord:async x=>{records.push(x);return x;},cacheDirectory:join(f.root,'listing'),getStorageBinding:()=>({session_id:'s',document_id:'d',origin:base.origin,
+  loginom_account:'worker',directories:{inputs:'/worker',packages:'/worker',exports:'/worker'}})});
+ const tool=r.tools.find(tool=>tool.name==='dock_storage_list');
+ assert.ok(tool);assert.equal(tool.annotations.readOnlyHint,true);
+ // The observed refusal (LAB-1468): a folder given to the single-file locator.
+ await assert.rejects(r.serverDownload({operation_id:'folder-as-file',path:dir+'/'},'dock_storage_source'),/dock_storage_list/);
+ await assert.rejects(r.serverDownload({operation_id:'mask-as-file',path:dir+'/*.csv'},'dock_storage_source'),/dock_storage_list/);
+ await assert.rejects(r.serverDownload({operation_id:'bare-folder',path:dir},'dock_storage_source'),/dock_storage_list/);
+ await assert.rejects(r.serverDownload({operation_id:'foreign',path:'/foreign/transactions'},'dock_storage_list'));
+ await assert.rejects(r.serverDownload({operation_id:'bad-pattern',path:dir,pattern:'*.csv|*.txt'},'dock_storage_list'),/\* only/);
+ const result=await r.serverDownload({operation_id:'list',path:dir+'/',pattern:'*.csv'},'dock_storage_list');
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(records.filter(x=>/storage_list/.test(x.phase))));
+ const out=result.output;
+ assert.equal(out.directory,dir);assert.equal(out.complete,true);assert.equal(out.truncated,false);
+ assert.equal(out.native_entry_count,6);assert.equal(out.files_matched,3);assert.equal(out.files_other,1);assert.equal(out.folders,1);
+ assert.deepEqual(out.entries.map(e=>[e.kind,e.name]),[['file','transactions_2026-09.csv'],['file','transactions_2026-10.csv'],['file','transactions_2026-11.csv'],['folder','archive']]);
+ const files=out.entries.filter(e=>e.kind==='file');
+ assert.ok(files.every(e=>/^storage-/.test(e.server_source_ref)&&e.path===dir+'/'+e.name&&Number.isSafeInteger(e.bytes)&&e.mtime));
+ assert.equal(new Set(files.map(e=>e.server_source_ref)).size,3);
+ assert.equal(gestures,0);
+ // Same ID and request replay the receipt; a different request is refused.
+ assert.deepEqual(await r.serverDownload({operation_id:'list',path:dir+'/',pattern:'*.csv'},'dock_storage_list'),result);
+ await assert.rejects(r.serverDownload({operation_id:'list',path:dir},'dock_storage_list'));
 });

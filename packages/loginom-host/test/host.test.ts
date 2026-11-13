@@ -149,7 +149,8 @@ test.each(["missing", "tampered"])(
       // Shipped Help failures are local: the receipt confirms cleanup and carries no remote startup failure.
       expect(JSON.parse(text)).toEqual({ version: 1, pid: expect.any(Number), started_at: expect.any(String),
         completed_at: expect.any(String), request_error: null, closed_ack: true, exit_code: 0, exit_signal: null })
-      expect((await stat(file)).mode & 0o777).toBe(0o600)
+      // Windows mode bits do not represent the native DACL.
+      if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600)
       const log = await Bun.file(join(root, "knowledge/1/startup-failures.jsonl")).text()
       const [id] = await readdir(join(root, "knowledge/1/diagnostics"))
       const diagnostic = await Bun.file(join(root, "knowledge/1/diagnostics", id!, "events.jsonl")).text()

@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto"
+import bunNotice from "../licenses/bun/source.json"
+
 // Build candidates only, not release acceptance. Values are from the verified
 // Node inventory dated 2026-09-18 and Chromium 154.0.8037.0 archive inventory
 // dated 2026-09-26; native execution of Chromium 1246 is pending.
@@ -16,4 +19,14 @@ export const nativeResourceCandidates = {
     nodeSha256: "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
     browserSha256: "ae4d66517f6879a70239c073f7be3d3b4d82bb3158938c6cb456bcd66f8f386e",
   },
+}
+
+export function verifyBunBaselineArchive(archive: Uint8Array, platform: "linux" | "win32" = "win32") {
+  const expected = platform === "linux" ? bunNotice.linuxX64BaselineSha256 : bunNotice.windowsX64BaselineSha256
+  if (createHash("sha256").update(archive).digest("hex") !== expected)
+    throw Error("LOGINOM_BUN_CHECKSUM_MISMATCH")
+}
+
+export function useBunBaseline(platform: string, arch: string, args: string[]) {
+  return (["linux", "win32"].includes(platform) && arch === "x64") || args.includes("--baseline")
 }

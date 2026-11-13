@@ -35,6 +35,7 @@ export function auditDataToVarHistory(events,initial,final){
 // LAB-1111 cycle 1: one configured node, one exact typed result. The field
 // order and per-field native functions are the task's configuration criterion.
 export const DATATOVAR_RESULT_CASES=Object.freeze({
+ 'datatovar-variant':{source:'programming.javascript',fields:[['V',['count','min','max','mode','unique_count','null_count','first','last','only']]]},
  'variables-from-table-aggregates':{source:'imports.text',fields:[
   ['N',['median','mode','standard_deviation','unique_count','null_count','first','last','only','concat']],['K',['only']]]},
  'variables-from-table-scalars':{source:'imports.text',fields:[
@@ -46,7 +47,7 @@ export function auditDataToVarResult(name,events,final){
  const spec=DATATOVAR_RESULT_CASES[name],want=parseExpectedVariableInventory(final)?.outputs;
  need(spec&&want?.length===1&&want[0].node.type==='variables.from_table','DATATOVAR_EXPECTED_INVALID');
  const requests=events.filter(e=>e.phase==='node_apply_prepared');
- need(requests.every(e=>[spec.source,'variables.from_table'].includes(e.request?.target?.type)),'DATATOVAR_UNEXPECTED_NODE');
+ need(requests.every(e=>(name==='datatovar-variant'?['variables.from_table']:[spec.source,'variables.from_table']).includes(e.request?.target?.type)),'DATATOVAR_UNEXPECTED_NODE');
  const checkpoints=events.flatMap((e,index)=>{
   const r=e.result;
   return e.phase==='node_checkpoint'&&r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.node&&r.execution?.status==='completed'

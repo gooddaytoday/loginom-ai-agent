@@ -72,6 +72,13 @@ destination. Несколько путей, в том числе одинако�
 завершённого выходного порта импорта, не строки выборки и не число групп — и
 бизнес-итог; без такой сверки пиши «N не сверено» с причиной.
 
+Серверные папки без имён файлов: не проси имена у пользователя. Непосредственно перед
+импортом каждой папки вызови `dock_storage_list({path:"точная папка", pattern:"*.csv"})`
+(ссылки свежие, как у `dock_storage_source`). Один файл —
+обычный импорт по его `server_source_ref`; 2–16 файлов одной структуры — один
+`imports.text` на папку с маской: [список файлов](references/nodes/imports.text.md#file-list).
+Поля, типы и число строк каждого импорта бери из readback и порта.
+
 При ошибке локального файла сообщи причину и путь из результата инструмента.
 Только при отклонённом запросе разрешения добавляй: «приложите файл — `--file`
 в CLI, вложение в Desktop/TUI». Для отсутствующего файла, каталога, ошибки прав
@@ -81,6 +88,9 @@ destination. Несколько путей, в том числе одинако�
 с `open_package` и точного пути из просьбы или подтверждённого Save. `existing_workflow`
 принимает только ссылку, выданную этим runtime: история чата и diagnostics её не заменяют.
 Не создавай новый draft вместо продолжения; при pending сначала следуй recovery.
+Пакет открылся «только чтение» (открыт в другой сессии): сразу сообщи причину и предложи
+сохранить копию под новым именем (`package.save_checkpoint`, `conflict_policy:"fail"`);
+не повторяй попытки записи.
 
 ## Один расчёт цепочки
 
@@ -91,6 +101,13 @@ destination. Несколько путей, в том числе одинако�
 активный выход. Уже активный выход повторно не выполняй; не жди отказа
 `requires an active source output`. В продолжении после открытия пакета
 сохранение не доказывает активность выхода.
+
+Для `variables.user/values` после изменения значений выполни
+`package.save_checkpoint`, затем отдельный `dock_node_read` от успешной
+values-операции с `read:{ports:[],variable_ports:[4]}`. Получи полный snapshot
+с новым `read_id` до `package.save_as`, повторного открытия и завершения задачи.
+`configuration.readback` подтверждает изменение настроек; сохранённые значения
+показывай по этому отдельному snapshot.
 
 Если пользователь называет поле или колонку (`RequestId`, `Key`, `EchoPath`…),
 выходное техническое имя должно быть ровно таким, как в просьбе: без приставок
@@ -168,7 +185,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Бинарная цель/отбор факторов | `datamining.log_regression` / enter, forward, backward, stepwise, apply | [читать](references/nodes/datamining.log_regression.md) |
 | Зависимость ряда от лагов | `research.auto_correlation` / time_domain | [читать](references/nodes/research.auto_correlation.md) |
 | Пирсон числовых полей | `research.corr_analysis` / pearson | [читать](references/nodes/research.corr_analysis.md) |
-| Факторный анализ | `research.factor_analysis` / pca_fixed | [читать](references/nodes/research.factor_analysis.md) |
+| Факторный анализ | `research.factor_analysis` / pca_fixed, apply | [читать](references/nodes/research.factor_analysis.md) |
 | REST GET | `integration.rest_request` / request | [читать](references/nodes/integration.rest_request.md) |
 | Линейная регрессия/прогноз | `datamining.lin_regression` / enter, apply, forward | [читать](references/nodes/datamining.lin_regression.md) |
 | Кластеры/масштабирование | `datamining.clustering` / k_means | [читать](references/nodes/datamining.clustering.md) |
@@ -188,7 +205,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
 |Доли итогов, веса, сезонная разгруппировка|`transform.ungroup_data` / shares, computed, seasonal|[читать](references/nodes/transform.ungroup_data.md)|
-| Словарь типов/regex-замена | `transform.replace_columns` / exact, regex | [читать](references/nodes/transform.replace_columns.md) |
+| Замена | `transform.replace_columns` / exact, regex, mixed, external | [читать](references/nodes/transform.replace_columns.md) |
 | Лаги строк | `transform.sliding_window` / lag | [читать](references/nodes/transform.sliding_window.md) |
 | Календарные признаки, строки дат | `transform.date_time` / calendar | [читать](references/nodes/transform.date_time.md) |
 | Свёртка столбцов | `transform.collapse_columns` / unpivot | [читать](references/nodes/transform.collapse_columns.md) |
@@ -199,6 +216,19 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Соединение по позиции | `transform.col_union_data` / positional | [читать](references/nodes/transform.col_union_data.md) |
 | Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
 
+Новый CSV/TXT: сначала нативное автоопределение Loginom через серверный preview
+по [справке импорта](references/nodes/imports.text.md), затем сверка типов и
+значений с исходным образцом. Явные типы пользователя главнее. Исправляй только
+наблюдённые противоречия, сохраняй ведущие нули, пропуски и секунды дат;
+покажи пользователю итоговые типы и формат даты.
+В одиночном файле столбец сумм с десятичными значениями и пробелами разрядов
+по умолчанию числовой; явно заданный пользователем строковый тип главнее.
+Сохраняй числовое значение суммы. Строковый тип после Import — промежуточный:
+нативный real теряет такие значения. Добавь штатный Калькулятор: убери только
+пробелы разрядов, преобразуй в real с исходным именем. Перед Export и отчётом
+прочитай выход Калькулятора: тип real, все значения и NULL сохранены. Сообщи
+итоговый числовой тип и преобразование; исходный файл и строковый Import сохранены.
+
 В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
 `node_types`. Для общей справки используй пакет, даже для одной операции Save:
 `{"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}`.
@@ -207,6 +237,11 @@ Execute вычисляющих узлов ради чтения, ответа и
 именно этот узел либо подтверждена конкретная операция, недоступная стандартной
 композиции. До выбора JS прочитай границы допуска в [файле узла](references/nodes/programming.javascript.md).
 Существующие JS-узлы не удаляй автоматически.
+Для агрегатов готового JS-источника передай его NodeRef прямо в
+`variables.from_table`, `finish:"execute"`: обработчик выполнит источник.
+«Сохранить исходник» означает оставить код и данные без изменений. Не открывай
+мастер и не вызывай `loginom_dock_node_read` с `kind:"source"` или `kind:"context"`
+только ради этого; чтение кода нужно при явном запросе посмотреть или изменить код.
 
 Путь ресурса копируй из ссылки или списка буквально: не сокращай и не набирай вручную.
 Перед созданием первого узла прочитай [порядок работы](references/workflow.md).
