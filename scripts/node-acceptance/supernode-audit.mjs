@@ -57,8 +57,9 @@ export async function checkSupernodeRun(eventsFile,expectedDirectory){
  need(topology.length>0,'MAIN_NESTED_OBSERVATION');
  need(new Set(topology.map(t=>JSON.stringify([t.input,t.calculator,t.output]))).size===1,'BOUNDARY_IDENTITY');
  const imports=all.filter(r=>r.value.kind==='text_import');
- need(ids(imports).size===1&&imports.some(r=>r.value.source?.source_path?.endsWith('/input.csv'))
-  &&imports.some(r=>r.value.source?.source_path?.endsWith('/replacement.csv')),'IMPORT_REPLACEMENT_IDENTITY');
+ const sourceName=r=>r.value.source?.source_path?.split('/').at(-1).replace(/^[a-f0-9]{64}-[0-9]+-/,'');
+ need(ids(imports).size===1&&imports.some(r=>sourceName(r)==='input.csv')
+  &&imports.some(r=>sourceName(r)==='replacement.csv'),'IMPORT_REPLACEMENT_IDENTITY');
  const initial=JSON.parse(await readFile(new URL('expected-initial.json',expectedDirectory),'utf8')).outputs[0];
  const final=JSON.parse(await readFile(new URL('expected.json',expectedDirectory),'utf8')).outputs[0];
  let previous=0;
