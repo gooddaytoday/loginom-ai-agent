@@ -179,7 +179,9 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   signal?.throwIfAborted()
   // Both attempts share the original admission deadline and the same profile.
   const record = onRetry ?? createExecutionJournal({ directory: profile, metadata: { sessionId: null } })
-  const phase = onPhase ?? record
+  // Retry observers run only after confirmed browser close; phase observers
+  // run during startup and must never be routed through that callback.
+  const phase = onPhase ?? (async () => {})
   const themeState = { reloaded: false }
   for (let attempt = 0; attempt < 2; attempt++) {
   signal?.throwIfAborted()
