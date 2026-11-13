@@ -5,7 +5,9 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": []
   },
-  "include": ["src"]
+  "include": ["src", "env.d.ts"]
 }

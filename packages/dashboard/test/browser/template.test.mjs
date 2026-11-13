@@ -1,14 +1,14 @@
 import assert from "node:assert/strict"
-import { execFileSync } from "node:child_process"
 import { once } from "node:events"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { cp, mkdtemp, readFile, rm } from "node:fs/promises"
 import { createServer } from "node:http"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { join, resolve } from "node:path"
 import test from "node:test"
 import { appHost } from "../../dist/server.mjs"
 import { chromium } from "../../../loginom-runtime/client/node_modules/playwright-core/index.mjs"
 import { fixture } from "./fixture.mjs"
+import { buildDashboard } from "../../src/agent/build.ts"
 
 const state = {
   type: "state", parameters: [{ name: "Budget", value: 17 }],
@@ -20,12 +20,12 @@ async function buildTemplate(t) {
   const root = await mkdtemp(join(tmpdir(), "dashboard-template-"))
   t.after(() => rm(root, { recursive: true, force: true }))
   const key = "a".repeat(64)
-  const hash = "b".repeat(64)
-  execFileSync("npm", ["run", "build", "--", "--outDir", join(root, key, hash), "--emptyOutDir"], {
-    cwd: resolve(import.meta.dirname, "../../template"),
-    env: { ...process.env, PATH: dirname(process.execPath) + ":" + process.env.PATH },
-  })
-  return { root, key, hash }
+  const work = join(root, "work")
+  const kit = resolve(import.meta.dirname, "../../template")
+  await cp(join(kit, "src"), join(work, "src"), { recursive: true })
+  const build = await buildDashboard({ work, out: join(root, key), template: kit, node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath })
+  assert.equal(build.ok, true, build.output)
+  return { root, key, hash: build.hash }
 }
 
 async function template(t) {

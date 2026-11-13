@@ -1,13 +1,12 @@
 import assert from "node:assert/strict"
-import { execFileSync } from "node:child_process"
-import { existsSync } from "node:fs"
-import { mkdtemp, rm, symlink } from "node:fs/promises"
+import { cp, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { join, resolve } from "node:path"
 import test from "node:test"
 import { fixture } from "./fixture.mjs"
+import { buildDashboard } from "../../src/agent/build.ts"
 
-const roi = "f42521cdeb21bbc3a3b536da85dab3936a512c5228df34864fc060dc71d886be"
+const roi = "roi"
 const channels = ["Поиск", "Соцсети", "Email", "Видео", "Партнёры"]
 const table = {
   schema: ["channel", "total_budget", "total_revenue", "roi_pct", "campaigns"].map((name, index) => ({ name, type: index ? 3 : 2 })),
@@ -56,23 +55,18 @@ async function screens(t, compiled) {
 
 for (const key of [
   roi,
-  "4760e2021e1c7bd492997a9359f10c6bc021104d00b1d71f02fde9f292569b55",
-  "c597ab9c880a2dba087f95b6b8e20c3f78efcc18fd845a73cc4f205e25153248",
+  "campaign-summary",
+  "channel-summary",
 ]) test(`SDK example typechecks/builds${key === roi ? " and passes S5" : ""}: ${key}`, async t => {
   const root = await mkdtemp(join(tmpdir(), "dashboard-example-"))
   t.after(() => rm(root, { recursive: true, force: true }))
-  const source = resolve(import.meta.dirname, "../../../../dashboard/apps", key)
-  if (!existsSync(join(source, "node_modules"))) {
-    await symlink(resolve(import.meta.dirname, "../../template/node_modules"), join(source, "node_modules"), "dir")
-    t.after(() => rm(join(source, "node_modules")))
-  }
-  const options = { cwd: source, env: { ...process.env, PATH: dirname(process.execPath) + ":" + process.env.PATH } }
-  execFileSync("npm", ["run", "typecheck"], options)
-  execFileSync("npm", ["run", "build", "--", "--outDir", join(root, key), "--emptyOutDir"], options)
-  assert.ok(existsSync(join(root, key, "index.html")))
-  await screens(t, join(root, key))
+  const work = join(root, "work")
+  await cp(resolve(import.meta.dirname, "../../examples", key, "src"), join(work, "src"), { recursive: true })
+  const build = await buildDashboard({ work, out: join(root, "builds"), template: resolve(import.meta.dirname, "../../template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath })
+  assert.equal(build.ok, true, build.output)
+  await screens(t, build.dir)
   if (key !== roi) return
-  const app = await fixture(t, { published: true, app: join(root, key), table })
+  const app = await fixture(t, { published: true, app: build.dir, table })
   const refused = []
   app.page.on("console", message => { if (/refused/i.test(message.text())) refused.push(message.text()) })
   await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
