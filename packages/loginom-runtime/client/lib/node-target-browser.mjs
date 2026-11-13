@@ -31,7 +31,7 @@ export async function readGraph(page, task) {
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
     for (let i=0;ancestor && i<32;i++,ancestor=ancestor.ParentNode) {
-      if (app.WorkFlowTreeNode && ancestor instanceof app.WorkFlowTreeNode) workflowNode=ancestor;
+      if (!workflowNode && app.WorkFlowTreeNode && ancestor instanceof app.WorkFlowTreeNode) workflowNode=ancestor;
       if (ancestor instanceof app.PackageTreeNode) {packageNode=ancestor;break;}
     }
     if (packageNode !== record.packageNode) fail('Prepared package identity changed');
@@ -65,6 +65,9 @@ export async function readGraph(page, task) {
           || !containers[0].contains(labelElements[0]) || !visible(labelElements[0])))) fail('Node label is not bound to its rendered identity');
       const label = nativeLabel.FRawValue;
       const type = nodeTypes.find(t => t.icon_class === n.FIconCls)?.type ?? n.FIconCls;
+      const boundaryRole=diagram.FIsSubmodel===true&&(diagram.GenericInputNode===n?'input':diagram.GenericOutputNode===n?'output':null);
+      if(boundaryRole&&(n.FIconCls!=='bg-vendor-icon-nullvendor'||!n.data
+        ||(n.FPorts??[]).flatMap(g=>g.FCollection??[]).some(p=>p.parent!==n||p.FCell?.parent!==n.FCell||p.FType!==(boundaryRole==='input'?1:0))))fail('Submodel boundary identity changed');
       const inputs = [], outputs = [], allPorts=[],variableInputs=[],variableOutputs=[];
       for (const ports of n.FPorts ?? []) for (const p of ports.FCollection ?? []) {
         const element = graph.view.getState(p.FCell)?.shape?.node;
@@ -179,7 +182,7 @@ export async function readGraph(page, task) {
       }
       nativeBindings.push({node_id:n.FGuid,label:tid.split(";Graph;")[1],inputs:[...inputs],outputs:[...outputs],...kinds,...variablePorts});
       for(const p of byTid.values())if(p.node===n.FGuid)p.index=(p.direction==='Input'?inputs:outputs).indexOf(p.index);
-      return {ref:{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:n.FGuid},type,label,dom_epoch:epoch(dom),
+      return {ref:{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:n.FGuid},type,label,...(boundaryRole?{boundary_role:boundaryRole}:{}),dom_epoch:epoch(dom),
         position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),...kinds,...variablePorts,
         other_ports:allPorts.filter(p=>! /^(Input|Output)_Data(?:Tree)?-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));

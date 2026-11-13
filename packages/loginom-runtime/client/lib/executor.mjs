@@ -1397,7 +1397,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
     let node=card?.Controller?.Node?.data?.node,packageNode,workflowNode;
     const seen=new Set();for(let i=0;node&&i<32&&!seen.has(node);i++,node=node.ParentNode){seen.add(node);
-      if(app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
+      if(!workflowNode&&app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
       if(app.PackageTreeNode&&node instanceof app.PackageTreeNode){packageNode=node;break;}}
     const graph=exact(binding.prefix+';ModelForm;cmpDiagram');
     if(!(card?.Controller?.FController instanceof app.ModelForm)||graph.length!==1

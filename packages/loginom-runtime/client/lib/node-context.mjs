@@ -31,9 +31,9 @@ export async function readPreparedNodeContext(page, binding) {
     const seen=new Set();
     for(let i=0;n && i<32 && !seen.has(n);i++,n=n.ParentNode) {
       seen.add(n);
-      if(app.ModelNodeTreeNode && n instanceof app.ModelNodeTreeNode
-        ||app.ModelServiceNodeTreeNode && n instanceof app.ModelServiceNodeTreeNode) nodeTree=n;
-      if(app.WorkFlowTreeNode && n instanceof app.WorkFlowTreeNode) workflowNode=n;
+      if(!workflowNode && (app.ModelNodeTreeNode && n instanceof app.ModelNodeTreeNode
+        ||app.ModelServiceNodeTreeNode && n instanceof app.ModelServiceNodeTreeNode)) nodeTree=n;
+      if(!workflowNode && app.WorkFlowTreeNode && n instanceof app.WorkFlowTreeNode) workflowNode=n;
       if(app.PackageTreeNode && n instanceof app.PackageTreeNode) {packageNode=n;break;}
     }
     if(packageNode!==r.packageNode || workflowNode!==r.nodeTargetWorkflowNode) return reject('package_or_workflow');

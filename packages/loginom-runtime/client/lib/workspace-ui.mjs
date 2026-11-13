@@ -810,7 +810,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const ownedGraph=element=>!!graphPrefix && graphContainer.contains(element) && (getTid(element)??'').startsWith(graphPrefix);
     // Native type, not an editable graph label, owns the extra script deny.
     // Build once per observation; unconfirmed controls never inherit permission.
-    const nativeGraphControls=new Map(),nativeGraphLinks=new Set(),nativeVariablePorts=new Map();
+    const nativeGraphControls=new Map(),nativeGraphLinks=new Set(),nativeVariablePorts=new Map(),nativeBoundaryRoles=new Map();
     const nativeGraphControl=element=>ownedGraph(element)&&!nativeGraphLinks.has(element)
       ?nativeGraphControls.get(element)??{status:'unconfirmed'}:null;
     if(graphQueryable&&graphPrefix){
@@ -856,6 +856,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const groups=dense(value(node,'FPorts'),16);if(!groups)continue;
           const collections=groups.map(group=>dense(value(group,'FCollection'),100));if(collections.some(list=>!list))continue;
           const ports=collections.flat();
+          const boundaryRole=value(diagram,'FIsSubmodel')===true&&(value(diagram,'GenericInputNode')===node?'input':value(diagram,'GenericOutputNode')===node?'output':null);
+          if(boundaryRole&&icon==='bg-vendor-icon-nullvendor'&&data&&ports.every(p=>value(p,'parent')===node&&value(value(p,'FCell'),'parent')===cell&&value(p,'FType')===(boundaryRole==='input'?1:0)))nativeBoundaryRoles.set(guid,boundaryRole);
           const portCells=new Map(),portGuids=new Map();
           for(const p of ports){charge();const c=value(p,'FCell'),g=value(p,'FGuid');portCells.set(c,(portCells.get(c)??0)+1);portGuids.set(g,(portGuids.get(g)??0)+1);}
           for(const port of ports){
@@ -3739,7 +3741,7 @@ function readRenderedInputMapping(observation) {
     scanStage='data_views';
     // VariablesNode has no visible Label cell and cannot be selected like a
     // component. Issue its native identity without adding graph action rights.
-    const builtinLabels=graphElements.filter(e=>nativeGraphControl(e)?.icon==='bg-vendor-icon-modelvariables'&&nativeGraphControl(e).node_id)
+    const builtinLabels=graphElements.filter(e=>{const native=nativeGraphControl(e);return native?.node_id&&(native.icon==='bg-vendor-icon-modelvariables'||nativeBoundaryRoles.has(native.node_id));})
       .map(e=>getTid(e).slice(graphPrefix.length));
     const observedNodeLabels=[...new Set([...labels,...builtinLabels])].sort();
     const nodes = observedNodeLabels.slice(0, 200).map(label => {
@@ -3752,6 +3754,7 @@ function readRenderedInputMapping(observation) {
         ports.filter(p=>p.kind===kind).sort((a,b)=>a.native_index-b.native_index).forEach((p,i)=>{p.port=i;});
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
         ...(native?.node_id?{node_id:native.node_id}:{}),
+        ...(native?.node_id&&nativeBoundaryRoles.has(native.node_id)?{boundary_role:nativeBoundaryRoles.get(native.node_id)}:{}),
         ...(native?.icon==='bg-vendor-icon-modelvariables'?{type:'variables.user',target_modes:['existing']}:{}),
         ...(variablePorts??{}),
         ports: graphElements.filter(element => (getTid(element) ?? '').startsWith(nodeTid + ';') && /;(?:Input|Output)_[^;]+$/.test(getTid(element)))
