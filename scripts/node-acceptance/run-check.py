@@ -487,7 +487,7 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/programming-python/acceptance' / name
         code = 'calculation.py' if name == 'python-stdlib' else 'pandas_calculation.py'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    expected_name='expected.json', input_files=['values.csv', code])
+                    expected_name='expected.json', input_files=['values.csv', code], oracle=src.parent / 'oracle.py')
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
