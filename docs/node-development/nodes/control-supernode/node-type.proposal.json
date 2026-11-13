@@ -1,0 +1,17 @@
+{
+  "type": "control.supernode",
+  "title": "Подмодель",
+  "palette_group": "Управление",
+  "icon_class": "bg-vendor-icon-modelgeneric",
+  "contract_revision": "1.0.0",
+  "tabular_inputs": 1,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": false,
+  "modes": ["tabular_boundary"],
+  "semantics": "Proposal pending workflow approval. Container of one inner workflow, not a table transform by itself. One mandatory table input 0 and table output 0 with explicit names/labels. Configure complete parameters.boundary for creation; omission on existing nodes preserves supported settings. Enter/leave must issue fresh workflow-bound refs; create ordinary supported nodes inside and connect local boundary nodes. Never link an outer source directly to an inner node. Execute the parent to evaluate its current inner graph, then read its external output 0. Preserve NULL, empty text, duplicates, field types and any order preserved by inner logic and mappings; no implicit sort, aggregation or training. No nested Supernodes, compose/expand, optional/multiple ports, variable/tree boundaries, conditions, loops, service links or trained-model lifecycle. These capabilities are not available until the common navigation decision and stage-1 implementation.",
+  "sources": {
+    "help_root": "viking://resources/loginom-dock/sources/loginom-help",
+    "help_path": "data/processors/control/supernode.md"
+  },
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000"
+}

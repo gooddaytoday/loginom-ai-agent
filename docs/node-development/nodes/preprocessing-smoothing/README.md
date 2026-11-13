@@ -11,7 +11,7 @@ Component ID: `component.preprocessing.Smoothing`, slug `preprocessing-smoothing
 
 Зарегистрирован `preprocessing.smoothing` / `hodrick_prescott`. Ходрик–Прескотт; Lambda или period; integer/real; сохранение исходных полей, NULL и порядка; добавление real _S.
 
-Ограничения: Вейвлеты и переменные не поддержаны. LAB-676: all-NULL даёт native NODE_EXECUTION_FAILED («Ошибка в алгоритме сглаживания»), достоверного CSV нет; диагностика вне критерия PASS.
+Ограничения: Переменные не поддержаны (вейвлеты Haar, db2, coif1, CDF9/7 — #934, #948). LAB-676: all-NULL даёт native NODE_EXECUTION_FAILED («Ошибка в алгоритме сглаживания»), достоверного CSV нет; диагностика вне критерия PASS.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [smoothing-node.mjs](../../../../packages/loginom-runtime/client/lib/smoothing-node.mjs):1–30; [smoothing-parameters.mjs](../../../../packages/loginom-runtime/client/lib/smoothing-parameters.mjs):1–35; [preprocessing.smoothing.md](../../../../packages/product/skills/loginom-automation/references/nodes/preprocessing.smoothing.md):1–25. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

@@ -1,0 +1,46 @@
+{
+  "http": [
+    {
+      "method": "GET",
+      "suffix": "/redirect/301",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/orders",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/redirect/302",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/orders",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/redirect/307",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/orders",
+      "body_hex": "",
+      "content_type": null
+    }
+  ],
+  "files": {},
+  "inventory": [],
+  "reserved_artifacts": [],
+  "required_artifacts": [],
+  "tls_failed_handshakes": 0,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}

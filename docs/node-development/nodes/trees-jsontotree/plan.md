@@ -1,5 +1,23 @@
 # JSON в дерево: подплан
 
+## Typed tree reader — LAB-1558, этап 0
+
+База `v040@864fad6efe`, 13.11.2026, только документы. Решение владельца
+`v040-open-scope`, строка «Деревья» `v040-scope-expansion`; W1 влит (#1032).
+[План общего reader](../variant-reader/tree-reader.md) — что меняется в
+`node-port-output.mjs`, `tree-parameters.mjs` и `check_tree`.
+[Комплект](acceptance/typed/README.md): даты, Variant, массивы скаляров в
+`trees.from_json`, fixtures `fixtures/typed/documents.csv`, `oracle.py --check`
+проходит.
+
+Предложенный срез: R1 даты → R2 массивы скаляров → R3 общий Variant → Variant
+узла. Даты не требуют правки общего reader: `decodePortCell` уже читает
+DateTime точно, отказ стоит в валидаторе узла. Оценка — **4 цикла (+1
+резерв)**. Вопросы native-пробы — в плане reader, раздел «Вопросы
+native-пробы». Справка `trees.from_json.md` 5773/6000 Б: на новые правила
+есть около 220 Б, поэтому в цикле придётся заменить старый список
+ограничений, а не дописывать к нему.
+
 ## Вложенные записи — LAB-1136, этап 0
 
 [Режим и наблюдения на данных](nested-records.md),

@@ -1,0 +1,24 @@
+{
+  "generator": "fixtures/generate.py from fixtures/people.sql (Python sqlite3)",
+  "uploaded_name_in_stage0": "lab1544-people.db",
+  "stage0_bytes": 8192,
+  "stage0_sha256": "165f65fb1e6e2fee551cdfca1144e754e1f518b7973ac0fc1ae36dab192943ec",
+  "stage0_sqlite_version": "3.45.1",
+  "note": ".db bytes depend on the SQLite library; content is pinned by people.sql, bytes/SHA-256 of each uploaded file go to the run report",
+  "objects": {
+    "People": {"kind": "table", "columns": [
+      {"name": "Id", "declared": "INTEGER PRIMARY KEY"},
+      {"name": "Label", "declared": "TEXT"},
+      {"name": "Amount", "declared": "REAL"},
+      {"name": "Active", "declared": "BOOLEAN"},
+      {"name": "Occurred", "declared": "DATETIME"}]},
+    "PeopleView": {"kind": "view", "definition": "SELECT Id, Label, Amount, Active, Occurred FROM People"}
+  },
+  "edge_values": {
+    "null_row": "Id=3: Label, Amount, Active, Occurred are NULL",
+    "empty_string": "Id=4: Label=''",
+    "duplicate_label": "Id=1,2: Label='А' (Cyrillic)",
+    "negative_and_zero": "Amount -5.25 (Id=4), 0 (Id=5); all reals exactly representable",
+    "seconds": "Occurred with seconds, leap day 2024-02-29"
+  }
+}

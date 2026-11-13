@@ -1,0 +1,152 @@
+{
+  "proposal": true,
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "variables.calculator",
+      "label_any": true
+    },
+    {
+      "type": "exports.excel",
+      "label_any": true
+    }
+  ],
+  "binding_values": [
+    {
+      "name": "ExcelPath",
+      "type": "string",
+      "initial": "{{EXCEL_INITIAL_DESTINATION}}",
+      "final": "{{EXCEL_FINAL_DESTINATION}}"
+    },
+    {
+      "name": "SheetName",
+      "type": "string",
+      "initial": "Январь",
+      "final": "Февраль"
+    }
+  ],
+  "binding_inventory": [
+    {
+      "node": {
+        "type": "exports.excel"
+      },
+      "parameter": "/excel_export/destination",
+      "mode": "variable",
+      "variable": {
+        "kind": "control",
+        "input": 0,
+        "name": "ExcelPath",
+        "type": "string",
+        "is_null": false
+      },
+      "source": {
+        "type": "variables.calculator",
+        "output": 0
+      }
+    },
+    {
+      "node": {
+        "type": "exports.excel"
+      },
+      "parameter": "/excel_export/sheet_name",
+      "mode": "variable",
+      "variable": {
+        "kind": "control",
+        "input": 0,
+        "name": "SheetName",
+        "type": "string",
+        "is_null": false
+      },
+      "source": {
+        "type": "variables.calculator",
+        "output": 0
+      }
+    }
+  ],
+  "excel_books": [
+    {
+      "phase": "initial",
+      "output_node_type": "exports.excel",
+      "output_port": null,
+      "ordered": true,
+      "format": "xlsx",
+      "header": "names",
+      "export_destination": "{{EXCEL_INITIAL_DESTINATION}}",
+      "filename": "excel-var-a.xlsx",
+      "sheet_name": "Январь",
+      "columns": [
+        {
+          "name": "Code",
+          "label": "Code",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "row_count": 3,
+      "rows": [
+        [
+          "А",
+          1234.56789
+        ],
+        [
+          "Б",
+          -2.5
+        ],
+        [
+          "В",
+          0.0
+        ]
+      ]
+    },
+    {
+      "phase": "final",
+      "output_node_type": "exports.excel",
+      "output_port": null,
+      "ordered": true,
+      "format": "xlsx",
+      "header": "names",
+      "export_destination": "{{EXCEL_FINAL_DESTINATION}}",
+      "filename": "excel-var-b.xlsx",
+      "sheet_name": "Февраль",
+      "columns": [
+        {
+          "name": "Code",
+          "label": "Code",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 1e-12
+          }
+        }
+      ],
+      "row_count": 3,
+      "rows": [
+        [
+          "А",
+          1234.56789
+        ],
+        [
+          "Б",
+          -2.5
+        ],
+        [
+          "В",
+          0.0
+        ]
+      ]
+    }
+  ]
+}
