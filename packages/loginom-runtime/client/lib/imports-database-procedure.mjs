@@ -19,10 +19,16 @@ export async function configureDatabaseImportBrowser(page,t,readContext){
    if(await boxes.count()===1)throw Error('Database import: '+(await boxes.innerText()).replace(/\s+/g,' ').trim().slice(0,500));
   };
   const wait=async(label,read)=>{while(Date.now()<t.deadline){await guard();await nativeError();const r=await read();if(r)return r;await page.waitForTimeout(Math.min(80,t.deadline-Date.now()));}throw Error('Database import: '+label+' did not settle');};
-  // SQL mode leaves a plain .x-mask over the hidden table-field panel
-  // (lab1555-05 execution-events.jsonl:65). Wait only for loading messages and
-  // windows; point() still refuses any control covered at its hit point.
-  const quiet=()=>wait('loading',async()=>await page.locator('.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count()===0);
+  // Run 05 (SQL mode) timed out here, but the blocker was not recorded.
+  // Hypothesis: a plain .x-mask over the hidden table-field panel. Wait for
+  // loading messages and windows only (point() still hit-tests each control)
+  // for at most 30 s, and name every visible blocker when that bound expires.
+  const quiet=async()=>{
+   const until=Math.min(t.deadline,Date.now()+30000);
+   while(Date.now()<until){await guard();await nativeError();if(await page.locator('.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count()===0)return;await page.waitForTimeout(80);}
+   const blockers=await page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').evaluateAll(es=>es.slice(0,8).map(e=>e.className.split(' ').filter(c=>/^(x-mask|x-mask-msg|bg-mask-message|x-window)$/.test(c)).join('.')+'@'+(e.closest('[data-tid]')?.getAttribute('data-tid')??'-')));
+   throw Error('Database import: loading did not settle in 30 s; visible blockers: '+JSON.stringify(blockers));
+  };
   const point=async l=>{await quiet();need(await l.count()===1,'control missing or ambiguous');return wait('control reachable',()=>l.evaluate(e=>{
    const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,h=document.elementFromPoint(x,y);
    return r.width>0&&r.height>0&&h&&(h===e||e.contains(h))&&!e.closest('.x-item-disabled,.x-btn-disabled')?{x,y}:null;
