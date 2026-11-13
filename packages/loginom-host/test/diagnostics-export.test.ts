@@ -264,3 +264,27 @@ test("P1: bare proxy authorities, public IPv4 and global IPv6 are masked", async
     expect(text).toContain(kept)
   expect(text).toMatch(/applied host-[0-9a-f]{8}:3128/)
 })
+
+test("P2.1: known values are masked in base64, base64url, double JSON and form encodings", async () => {
+  const values = ["S3cretPw!", 'a"b\\c9x', "p ss!word", "url?safe>>key~"]
+  const bytes = await archiveBytes({
+    knownSecrets: values,
+    lines: values.flatMap((value) => {
+      const json = JSON.stringify(value).slice(1, -1)
+      return [
+        `b64 ${Buffer.from(value).toString("base64")}`,
+        `b64url ${Buffer.from(value).toString("base64url")}`,
+        `json2 ${JSON.stringify(json).slice(1, -1)}`,
+        `form ${new URLSearchParams({ v: value }).toString().slice(2)}`,
+      ]
+    }),
+  })
+  expectAbsent(bytes, ["UzNjcmV0UHch", 'a\\\\\\"b\\\\\\\\c9x', "p+ss%21word"])
+  for (const value of values)
+    expectAbsent(bytes, [
+      Buffer.from(value).toString("base64").replace(/=+$/, ""),
+      Buffer.from(value).toString("base64url"),
+      JSON.stringify(JSON.stringify(value).slice(1, -1)).slice(1, -1),
+      new URLSearchParams({ v: value }).toString().slice(2),
+    ])
+})

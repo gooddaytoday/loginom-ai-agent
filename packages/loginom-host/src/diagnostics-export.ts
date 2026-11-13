@@ -168,8 +168,22 @@ export function exportHome(text: string, home = homedir()) {
     .replace(/[A-Za-z]:(?:\\+|\/)Users(?:\\+|\/)[^\\/\s"']+/gi, "~")
 }
 
+// Spellings in which a known value reaches journals: raw, URL and form
+// encoding, single and double JSON escaping, standard and URL-safe base64.
 function variants(value: string) {
-  return new Set([value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1)])
+  const json = JSON.stringify(value).slice(1, -1)
+  const base64 = Buffer.from(value).toString("base64")
+  const base64url = Buffer.from(value).toString("base64url")
+  return new Set([
+    value,
+    encodeURIComponent(value),
+    new URLSearchParams({ v: value }).toString().slice(2),
+    json,
+    JSON.stringify(json).slice(1, -1),
+    base64,
+    base64.replace(/=+$/, ""),
+    base64url,
+  ])
 }
 
 export function maskValues(text: string, values: string[], marker: string) {
