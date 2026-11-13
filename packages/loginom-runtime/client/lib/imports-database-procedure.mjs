@@ -19,10 +19,10 @@ export async function configureDatabaseImportBrowser(page,t,readContext){
    if(await boxes.count()===1)throw Error('Database import: '+(await boxes.innerText()).replace(/\s+/g,' ').trim().slice(0,500));
   };
   const wait=async(label,read)=>{while(Date.now()<t.deadline){await guard();await nativeError();const r=await read();if(r)return r;await page.waitForTimeout(Math.min(80,t.deadline-Date.now()));}throw Error('Database import: '+label+' did not settle');};
-  // Run 05 (SQL mode) timed out here, but the blocker was not recorded.
-  // Hypothesis: a plain .x-mask over the hidden table-field panel. Wait for
-  // loading messages and windows only (point() still hit-tests each control)
-  // for at most 30 s, and name every visible blocker when that bound expires.
+  // Run 05 (SQL mode) timed out here waiting for every .x-mask. Waiting for
+  // loading messages and windows only, SQL mode reached Done in lab1555-06
+  // (execution-events.jsonl:80); point() still hit-tests each control. The
+  // wait is bounded to 30 s and names every visible blocker when it expires.
   const quiet=async()=>{
    const until=Math.min(t.deadline,Date.now()+30000);
    while(Date.now()<until){await guard();await nativeError();if(await page.locator('.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count()===0)return;await page.waitForTimeout(80);}

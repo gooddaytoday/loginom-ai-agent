@@ -101,3 +101,47 @@ test('sql readback has no output mapping: its schema materializes on Execute',as
  // A table import still requires the native mapping inventory.
  assert.throws(()=>databaseImportReadback({node,phases:phases.map(p=>p.phase==='configure'?phase('configure',{configuration:{...p.value.configuration,mode:'table',table:'People'}}):p),operation_id:op}),/Database import/);
 });
+
+// Existing node with parameters:{} keeps its saved source. The Node side checks
+// that source after the configure step, before node_finish and Execute.
+async function configureExisting(saved,mode){
+ const calls=[];
+ const req={...request({target:{kind:'existing',type:'imports.database',ref:{}}}),document_id:'d',workflow_ref:{prefix:'p',workflow_id:'w'},parameters:{},mode};
+ const node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const operation={id:'op',parameters:req,deadline:Date.now()+60000,nodeApply:{request:req,node,phases:[]}};
+ const execute=async code=>{calls.push(code);
+  return {status:'SUCCEEDED',operation_id:'op:n1',action_key:'node.database.configure.internal',phase:'configure',effect_possible:true,cleanup_complete:true,
+   output:{verified:true,cleanup_complete:true,effect_possible:true,configuration:{verified:true,node_context:{...node,verified:true},database_path:'/own/people.db',pages:['DoneWizard'],...saved}},error:null,trace:[]};};
+ const support=createDatabaseImportNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+ const drivers=support.nodeApplyDriverFactory({operation,execute,onRecord:async v=>v,now:Date.now,receiptOptions:()=>({})});
+ const result=drivers.configureCalculator({document_id:'d',workflow_ref:req.workflow_ref,node,deadline:operation.deadline},{});
+ return {result,calls};
+}
+const noExecute=calls=>{assert.equal(calls.length,1);assert.ok(calls.every(c=>!/btnExecute|execute_wizard|btnDone|finish_wizard/.test(c)));};
+
+test('existing node: saved non-SELECT SQL is refused after configure, before Done and Execute',async()=>{
+ for(const sql of ['DELETE FROM People','PRAGMA table_info(People)','WITH x AS (SELECT 1) DELETE FROM People']){
+  const {result,calls}=await configureExisting({mode:'sql',sql},'sql');
+  await assert.rejects(result,/Database import: saved sql of this node is not one read-only SELECT.*nothing was executed/,sql);
+  noExecute(calls);
+ }
+});
+
+test('existing node: saved mode must match the requested mode',async()=>{
+ let r=await configureExisting({mode:'sql',sql:'SELECT Id FROM People'},'table');
+ await assert.rejects(r.result,/configured in mode sql, the request has mode table/);noExecute(r.calls);
+ r=await configureExisting({mode:'table',table:'People'},'sql');
+ await assert.rejects(r.result,/configured in mode table, the request has mode sql/);noExecute(r.calls);
+ r=await configureExisting({mode:'sql',sql:'SELECT Id FROM People ORDER BY Id'},'sql');
+ assert.equal((await r.result).configuration.sql,'SELECT Id FROM People ORDER BY Id');
+ r=await configureExisting({mode:'table',table:'People'},'table');
+ assert.equal((await r.result).configuration.table,'People');
+});
+
+test('SQL refusal names the forbidden word and the WITH rule',()=>{
+ const refusal=q=>{try{validateDatabaseImportParameters({database:{database_path:'/own/people.db',sql:q}},'sql',request());}catch(e){return e.message;}assert.fail(q);};
+ assert.match(refusal('SELECT replace(Label,\'a\',\'b\') FROM People'),/word "replace" outside quotes is refused; quote/);
+ assert.match(refusal('SELECT Begin FROM People'),/"Begin"/);
+ assert.match(refusal('WITH x AS (SELECT 1) SELECT * FROM x'),/WITH is refused, even a reading one/);
+ assert.equal(readOnlySelect('SELECT "Begin", "Release" FROM People'),true);
+});

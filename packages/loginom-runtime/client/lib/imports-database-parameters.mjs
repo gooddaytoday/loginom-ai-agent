@@ -17,6 +17,14 @@ export function readOnlySelect(sql){
  const body=bare.trim().replace(/;\s*$/,'');
  return /^select\b/i.test(body)&&!body.includes(';')&&!WRITE.test(body)&&!/[:@$?]\w*/.test(body.replace(/::/g,''))&&!/%\w+%/.test(body);
 }
+// Reason text only; readOnlySelect alone decides.
+export function sqlRefusal(sql){
+ const bare=typeof sql==='string'?sql.replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]/g,' q '):'';
+ if(/^\s*with\b/i.test(bare))return 'WITH is refused, even a reading one; write one SELECT with subqueries';
+ const word=bare.match(WRITE)?.[1];
+ if(word)return 'word '+JSON.stringify(word)+' outside quotes is refused; quote a column or table with that name ("'+word+'")';
+ return 'sql must be exactly one read-only SELECT without comments, parameters, macros or a second statement';
+}
 export function validateDatabaseImportPath(path){
  need(typeof path==='string'&&path.length<=512&&/^\/(?!\/)/.test(path)&&/\.db$/i.test(path)&&!/[|*?%\\\x00-\x1f]/.test(path)
   &&path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..'),'database_path must be one absolute storage path of a .db file');
@@ -34,7 +42,7 @@ export function validateDatabaseImportParameters(p,mode,r){
    need(d.sql===undefined&&typeof d.table==='string'&&d.table.trim()===d.table&&d.table.length>0&&d.table.length<=128&&!/[\x00-\x1f;]/.test(d.table),'mode table requires one exact table or view name and no sql');
   }else{
    need(d.table===undefined&&typeof d.sql==='string','mode sql requires sql and no table');
-   need(readOnlySelect(d.sql),'sql must be exactly one read-only SELECT without comments, parameters, macros or a second statement; nothing was changed');
+   need(readOnlySelect(d.sql),'sql must be exactly one read-only SELECT without comments, parameters, macros or a second statement ('+sqlRefusal(d.sql)+'); nothing was changed');
   }
  }
  need(r.inputs.length===0&&!(r.variable_inputs??[]).length,'import has no table input; connect nothing to it');

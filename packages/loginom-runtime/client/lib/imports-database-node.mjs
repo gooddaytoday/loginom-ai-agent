@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
-import {databaseImportParametersSchema,validateDatabaseImportParameters} from './imports-database-parameters.mjs';
+import {databaseImportParametersSchema,validateDatabaseImportParameters,readOnlySelect,sqlRefusal} from './imports-database-parameters.mjs';
 import {makeDatabaseConnectionCode} from './imports-database-connection.mjs';
 import {makeDatabaseImportConfigureCode} from './imports-database-procedure.mjs';
 import {makeRestLinkCode} from './rest-request.mjs';
@@ -99,7 +99,12 @@ export function createDatabaseImportNodeSupport(config){
     const d=p.database;
     const result=await runDatabaseStep(options,ctx,'configure',makeDatabaseImportConfigureCode,
      d?{database_path:d.database_path,mode:request.mode,...(request.mode==='sql'?{sql:d.sql}:{table:d.table})}:{database_path:null},config);
-    need(!d||result.configuration.database_path===d.database_path&&result.configuration.mode===request.mode,'configured source differs');
+    const c=result.configuration;
+    need(!d||c.database_path===d.database_path,'configured source differs');
+    // An existing node with {} keeps its saved source: it must match the requested
+    // mode, and saved SQL passes the same read-only filter before Done and Execute.
+    need(c.mode===request.mode,'the node is configured in mode '+c.mode+', the request has mode '+request.mode+'; use mode '+c.mode+' or supply database settings; nothing was executed');
+    need(c.mode!=='sql'||readOnlySelect(c.sql),'saved sql of this node is not one read-only SELECT ('+sqlRefusal(c.sql)+'); supply database.database_path and a SELECT to replace it; nothing was executed');
     return {...result,configuration:{...result.configuration,connection:connection&&{database_path:connection.database_path,reference_node_id:connection.reference_node_id}}};
    },
    // Loginom materializes SELECT output fields only on Execute (lab1555-06
