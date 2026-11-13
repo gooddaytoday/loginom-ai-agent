@@ -266,3 +266,32 @@ test("late answers and old replay cannot reactivate a task superseded by a real 
     profile: "default",
   })
 })
+
+test("a genuine task in a dashboard session starts in its immutable base profile", () => {
+  const first = user(1)
+  expect(TaskScope.derive({ sessionID, messages: [first], base: "loginom-dashboard" })).toEqual({
+    sessionID,
+    taskMessageID: first.info.id,
+    profile: "loginom-dashboard",
+  })
+})
+
+test("persisted activations and subsequent requests cannot change a dashboard base", () => {
+  const first = user(1)
+  const docs = activated(2, first, "package-docs")
+  const automation = activated(3, first, "loginom-automation")
+  const history = [first, docs, automation]
+  expect(TaskScope.derive({ sessionID, messages: history, base: "loginom-dashboard" })?.profile).toBe(
+    "loginom-dashboard",
+  )
+  const next = user(4, "Правка dashboard")
+  expect(TaskScope.derive({ sessionID, messages: [...history, next], base: "loginom-dashboard" })).toEqual({
+    sessionID,
+    taskMessageID: next.info.id,
+    profile: "loginom-dashboard",
+  })
+  expect(
+    TaskScope.activation({ name: "loginom-dashboard", profile: "loginom-dashboard", digest: "a".repeat(64) }),
+  ).toBeUndefined()
+  expect(TaskScope.derive({ sessionID, messages: [], base: "loginom-dashboard" })).toBeUndefined()
+})

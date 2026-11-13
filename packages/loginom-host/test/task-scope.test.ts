@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+import { Schema } from "effect"
+import { HostTaskScope } from "../src/task-scope"
 import { createHash } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
@@ -555,5 +557,14 @@ test("a raw browser call cannot start while the Host applies a docs transition",
     await state.runtime?.request("fixture.release_work")
     await state.applying?.catch(() => undefined)
     await f.close()
+  }
+})
+
+
+test("dashboard scopes parse but no profile transition enters or leaves them", () => {
+  expect(Schema.is(HostTaskScope.Request)({ mode: "bind", scope: { taskMessageID: "msg_dashboard", profile: "loginom-dashboard" } })).toBe(true)
+  for (const profile of ["default", "package-docs", "loginom-automation", "loginom-dashboard"] as const) {
+    expect(HostTaskScope.permits("loginom-dashboard", profile)).toBe(false)
+    expect(HostTaskScope.permits(profile, "loginom-dashboard")).toBe(false)
   }
 })

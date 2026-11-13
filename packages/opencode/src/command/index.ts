@@ -11,6 +11,7 @@ import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 import { skillSource } from "@/product/skill-source"
+import { DashboardSession } from "@/product/dashboard-session"
 import { EventV2Bridge } from "@/event-v2-bridge"
 
 type State = {
@@ -109,7 +110,8 @@ const layer = Layer.effect(
         }
       }
 
-      for (const [name, prompt] of Object.entries(yield* mcp.prompts())) {
+      const prompts = DashboardSession.isDashboardWork(ctx.directory) ? {} : yield* mcp.prompts()
+      for (const [name, prompt] of Object.entries(prompts)) {
         if (skillSource.isReserved(name)) {
           yield* skillSource.refuseCommand(events, { name, source: "MCP" })
           continue

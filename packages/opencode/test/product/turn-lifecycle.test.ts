@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { join } from "node:path"
+import { DashboardSession } from "@/product/dashboard-session"
 import { Cause, Effect, Exit } from "effect"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import type { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -36,9 +39,10 @@ function connect(options: { acquire?: "ready" | "refused" } = {}) {
 afterEach(() => LoginomHost.disconnect())
 
 const unused = new Proxy({}, { get: () => () => Effect.die("unexpected call") })
-function fakes() {
+function fakes(directory = "/fixture/project") {
   const written: { kind: "message" | "part"; value: unknown }[] = []
   const sessions = {
+    get: () => Effect.succeed({ id: sessionID, directory }),
     updateMessage: (value: unknown) => Effect.sync(() => void written.push({ kind: "message", value })),
     updatePart: (value: unknown) => Effect.sync(() => void written.push({ kind: "part", value })),
   }
@@ -238,4 +242,29 @@ describe("turnLifecycle", () => {
     )
     expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain("LOGINOM_SCOPE_DENIED")
   })
+})
+
+
+test("a dashboard run never acquires a connected Loginom Host or advertises its instructions", async () => {
+  await mkdir(DashboardSession.dashboardRoot(), { recursive: true })
+  const folder = await mkdtemp(join(DashboardSession.dashboardRoot(), "lease-"))
+  try {
+    const work = join(folder, "work")
+    await mkdir(work)
+    const requests = connect()
+    const { input } = fakes(work)
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const turn = yield* turnLifecycle.acquireRun(input)
+          expect(turn.loginom).toBeUndefined()
+          expect(turn.status.failure).toBeUndefined()
+          expect(turn.system()).toEqual([])
+        }),
+      ),
+    )
+    expect(requests).toEqual([])
+  } finally {
+    await rm(folder, { recursive: true, force: true })
+  }
 })

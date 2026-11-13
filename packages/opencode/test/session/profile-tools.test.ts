@@ -1,4 +1,7 @@
 import { expect } from "bun:test"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { join } from "node:path"
+import { DashboardSession } from "@/product/dashboard-session"
 import { asSchema } from "ai"
 import { pathToFileURL } from "node:url"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
@@ -26,7 +29,7 @@ import { Plugin } from "@/plugin"
 import { MCP } from "@/mcp"
 import { Truncate } from "@/tool/truncate"
 import { isRecord } from "@/util/record"
-import { TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
+import { provideInstance, TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { TestConfig } from "../fixture/config"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
@@ -794,6 +797,7 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
   image?: boolean,
   permission: PermissionV1.Ruleset = [{ permission: "*", pattern: "*", action: "allow" }],
   attachment?: Pick<SessionV1.FilePart, "url" | "mime" | "filename" | "source">,
+  options: { api?: string; emptyHistory?: boolean } = {},
 ) {
   const sessions = yield* Session.Service
   const agents = yield* Agent.Service
@@ -861,11 +865,11 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
     loginom,
     agent,
     session,
-    history,
-    messages: history,
+    history: options.emptyHistory ? [] : history,
+    messages: options.emptyHistory ? [] : history,
     model: {
       providerID: ProviderV2.ID.make("test"),
-      api: { id: "test-model" },
+      api: { id: options.api ?? "test-model" },
       ...(image === undefined ? {} : { capabilities: { input: { image } } }),
     } as Provider.Model,
     processor: {
@@ -923,5 +927,38 @@ it.instance("Dock calls exclude local reference attachments from repeated byte a
       )
     expect(calls).toHaveLength(2)
     expect(calls.every((call) => Array.isArray(call[4]) && call[4].length === 0)).toBe(true)
+  }),
+)
+
+
+codeMode.instance("a dashboard directory selects its real builtin whitelist before any activation", () =>
+  Effect.gen(function* () {
+    yield* Effect.promise(() => mkdir(DashboardSession.dashboardRoot(), { recursive: true }))
+    const folder = yield* Effect.acquireRelease(
+      Effect.promise(() => mkdtemp(join(DashboardSession.dashboardRoot(), "resolver-"))),
+      (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+    )
+    const work = join(folder, "work")
+    yield* Effect.promise(() => mkdir(work))
+    for (const options of [{ api: "test-model" }, { api: "gpt-5" }, { emptyHistory: true }]) {
+      const result = yield* resolveProfile("default", undefined, undefined, undefined, undefined, options).pipe(
+        provideInstance(work),
+      )
+      expect(result.session.directory).toBe(work)
+      const ids = Object.keys(result.tools)
+      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch"].includes(id))).toBe(
+        true,
+      )
+      for (const id of ["read", "glob", "grep", "skill"]) expect(ids).toContain(id)
+      if (options.api === "gpt-5") {
+        expect(ids).toContain("apply_patch")
+        expect(ids).not.toContain("edit")
+        expect(ids).not.toContain("write")
+        continue
+      }
+      expect(ids).toContain("edit")
+      expect(ids).toContain("write")
+      expect(ids).not.toContain("apply_patch")
+    }
   }),
 )

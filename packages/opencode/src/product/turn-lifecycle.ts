@@ -2,6 +2,7 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Effect } from "effect"
 import type { Agent } from "@/agent/agent"
+import { DashboardSession } from "@/product/dashboard-session"
 import { Permission } from "@/permission"
 import { BrowserRecovery } from "@/session/browser-recovery"
 import { MessageID, PartID, type SessionID } from "@/session/schema"
@@ -23,24 +24,29 @@ export type AcquireInput = {
 
 const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
   const { sessionID, sessions, agents, permission } = input
+  const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
+  const base = DashboardSession.baseProfile(session.directory)
   const status: { failure?: string } = {}
-  const loginom: Lease | undefined = yield* Effect.acquireRelease(
-    Effect.promise(() =>
-      LoginomHost.acquire(sessionID).catch((error) => {
-        status.failure = "acquire: " + hostErrorText(error)
-        return undefined
-      }),
-    ),
-    (lease) =>
-      Effect.promise(async () => {
-        await lease?.release()
-      }),
-  )
+  const loginom: Lease | undefined =
+    base === "loginom-dashboard"
+      ? undefined
+      : yield* Effect.acquireRelease(
+          Effect.promise(() =>
+            LoginomHost.acquire(sessionID).catch((error) => {
+              status.failure = "acquire: " + hostErrorText(error)
+              return undefined
+            }),
+          ),
+          (lease) =>
+            Effect.promise(async () => {
+              await lease?.release()
+            }),
+        )
   let activation: Pending | undefined
 
   const beforeTurn = Effect.fnUntraced(function* (turn: { session: Session.Info; history: History }) {
     const { session, history } = turn
-    const currentTask = TaskScope.derive({ sessionID, messages: history, revert: session.revert })
+    const currentTask = TaskScope.derive({ sessionID, messages: history, revert: session.revert, base })
     const commandMessage = TaskScope.visible({ sessionID, messages: history, revert: session.revert }).find(
       (message) => message.info.id === currentTask?.taskMessageID,
     )
@@ -104,7 +110,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     const pending = activation
     activation = undefined
     if (pending && loginom) {
-      const task = TaskScope.derive({ sessionID, messages: history, revert: session.revert })
+      const task = TaskScope.derive({ sessionID, messages: history, revert: session.revert, base })
       const visible = TaskScope.visible({ sessionID, messages: history, revert: session.revert })
       const message = history.find((message) => message.info.id === pending.messageID)
       const part = message?.parts.find(
@@ -151,7 +157,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     lastUser: SessionV1.User
   }) {
     const recovery = BrowserRecovery.active(turn.history)
-    const task = TaskScope.derive({ sessionID, messages: turn.history, revert: turn.session.revert })
+    const task = TaskScope.derive({ sessionID, messages: turn.history, revert: turn.session.revert, base })
     if (recovery && !recovery.reminded) {
       // One reminder per attempt; the lease still holds the page for this step.
       const reminder: SessionV1.User = {

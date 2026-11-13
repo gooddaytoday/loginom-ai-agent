@@ -1,5 +1,6 @@
 import { toolContributor } from "@/product/tool-contributor"
 import { toolPolicy } from "@/product/tool-policy"
+import { DashboardSession } from "@/product/dashboard-session"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { Agent } from "@/agent/agent"
@@ -75,8 +76,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     messages: input.history,
     revert: input.session.revert,
   })
-  const task = TaskScope.derive({ sessionID: input.session.id, messages: history })
-  const profile = task?.profile ?? "default"
+  const base = DashboardSession.baseProfile(input.session.directory)
+  const task = TaskScope.derive({ sessionID: input.session.id, messages: history, base })
+  const profile = task?.profile ?? base
   if (input.loginom && task) {
     const loginom = input.loginom
     yield* Effect.promise((signal) =>

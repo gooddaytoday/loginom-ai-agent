@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileReferences, inspectReferenceFile, verifyReferenceFile } from "../src/file-reference"
@@ -55,16 +55,22 @@ test("original grant binds path, owner and optional exact digest without staging
   }))
 
 for (const change of ["inode", "mtime", "size", "bytes", "symlink", "missing"] as const)
-  test(`grant refuses original ${change} changes before upload without deleting it`, () =>
+  test(change === "bytes"
+    ? "grant refuses metadata changes after a same-size rewrite without deleting it"
+    : `grant refuses original ${change} changes before upload without deleting it`, () =>
     fixture(async (root) => {
       const source = join(root, "source.csv"),
         store = fileReferences(join(root, "references"))
       await writeFile(source, "original")
       const snapshot = { ...(await inspectReferenceFile(source)), sha256: null }
       const reference = await store.reserve(owner, "source.csv", snapshot)
-      if (["inode", "symlink", "missing"].includes(change)) {
+      if (change === "inode") {
+        // Keep the original inode allocated so recreating the path cannot reuse it.
+        await rename(source, join(root, "held-original.csv"))
+        await writeFile(source, "original")
+        expect((await inspectReferenceFile(source)).file_id).not.toBe(snapshot.file_id)
+      } else if (["symlink", "missing"].includes(change)) {
         await unlink(source)
-        if (change === "inode") await writeFile(source, "original")
         if (change === "symlink") {
           const other = join(root, "other.csv")
           await writeFile(other, "original")
@@ -72,6 +78,11 @@ for (const change of ["inode", "mtime", "size", "bytes", "symlink", "missing"] a
         }
       } else if (change === "mtime") await utimes(source, new Date(), new Date(snapshot.mtime + 1000))
       else await writeFile(source, change === "size" ? "longer original" : "modified")
+      if (change === "bytes") {
+        // Same-size writes may share a filesystem timestamp tick.
+        await utimes(source, new Date(), new Date(snapshot.mtime + 1000))
+        expect((await inspectReferenceFile(source)).mtime_ns).not.toBe(snapshot.mtime_ns)
+      }
       await expect(store.commit(owner, reference)).rejects.toThrow("LOGINOM_FILE_CHANGED")
       await expect(verifyReferenceFile(snapshot)).rejects.toThrow("LOGINOM_FILE_CHANGED")
       await store.close()

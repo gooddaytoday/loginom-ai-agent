@@ -59,3 +59,33 @@ describe("toolPolicy", () => {
     expect(policy.allowsMcp("loginom-automation")).toBe(true)
   })
 })
+
+test("loginom-dashboard exposes only its built-in tools without MCP or Loginom", () => {
+  const allowed = [
+    "read",
+    "glob",
+    "grep",
+    "edit",
+    "write",
+    "apply_patch",
+    "skill",
+    "dashboard_draft",
+    "dashboard_publish",
+  ]
+  for (const id of allowed) {
+    expect(policy.permits("loginom-dashboard", id, "builtin")).toBe(true)
+    expect(policy.permits("loginom-dashboard", id, "external")).toBe(false)
+    expect(policy.permits("loginom-dashboard", id, undefined)).toBe(false)
+  }
+  for (const id of ["bash", "task", "webfetch", "websearch", "todowrite", "question", "lsp", "package_docs_run"])
+    expect(policy.permits("loginom-dashboard", id, "builtin")).toBe(false)
+  expect(policy.allowsMcp("loginom-dashboard")).toBe(false)
+  for (const name of ["find", "search", "dock_diagnostics", "dock_prepare"])
+    expect(policy.permitsLoginom("loginom-dashboard", name)).toBe(false)
+})
+
+test("dashboard built-ins stay unavailable in ordinary and other product profiles", () => {
+  for (const profile of ["default", "package-docs", "loginom-automation"] as const)
+    for (const id of ["dashboard_draft", "dashboard_publish"])
+      expect(policy.permits(profile, id, "builtin")).toBe(false)
+})
