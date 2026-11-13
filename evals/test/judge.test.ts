@@ -521,8 +521,8 @@ test("ordinary exec: selected CLI executable change remains fatal after natural 
 test("ordinary exec: known browser helper stays fatal after adoption and natural exit", async () => {
   const fixture = await gateFixture()
   const file = (name: string) => path.join(fixture.root, name)
-  const wait = async (check: () => Promise<unknown> | unknown) => {
-    const deadline = Date.now() + 5_000
+  const wait = async (check: () => Promise<unknown> | unknown, timeout = 5_000) => {
+    const deadline = Date.now() + timeout
     while (!await check()) {
       if (Date.now() >= deadline) throw Error("Known helper fixture did not settle")
       await Bun.sleep(10)
@@ -582,8 +582,28 @@ test("ordinary exec: known browser helper stays fatal after adoption and natural
     await Bun.write(file("parent-end"), "1")
     await wait(() => threadGroupExited(native, parent.starttime))
     expect(Number((await Bun.file(`/proc/${pid}/stat`).text()).split(") ")[1]!.split(" ")[1])).toBe(scope()!.launcher.pid)
+    // The Bun launcher subreaper does not reap adopted orphans, so a helper
+    // that died still reads PPid == launcher as a zombie. Its exec must start
+    // from the same live process, and a dead one fails here, not by timeout.
+    const helper = async () => {
+      const raw = await readFile(`/proc/${pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT" || error.code === "ESRCH") return ""
+        throw error
+      })
+      const fields = raw ? raw.slice(raw.lastIndexOf(")") + 2).split(" ") : []
+      return { live: fields[19] === before.starttime && !["Z", "X"].includes(fields[0]!), state: fields[0] ?? "gone" }
+    }
+    expect(await helper()).toMatchObject({ live: true })
     await Bun.write(file("helper-exec"), "1")
-    await wait(() => Bun.file(file("helper-image")).exists())
+    // Only a live helper with its original birth may keep this step open, so
+    // the wider bound covers a stalled runtime start and never a lost helper.
+    await wait(async () => {
+      if (await Bun.file(file("helper-image")).exists()) return true
+      const current = await helper()
+      if (current.live) return false
+      if (await Bun.file(file("helper-image")).exists()) return true
+      throw Error(`Known helper ${pid} ended before its exec image reported: ${current.state}`)
+    }, 15_000)
     const after = await Bun.file(file("helper-image")).json() as ProcessIdentity
     expect(after).toMatchObject({ pid: before.pid, starttime: before.starttime, uid: before.uid, group: before.group, session: before.session })
     expect([after.device, after.inode]).not.toEqual([before.device, before.inode])
