@@ -83,7 +83,11 @@ export async function readGraph(page, task) {
         const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedFactorAnalysis=type==='research.factor_analysis' && previous && previous.nodeTid!==tid && p.FSubType===1;
-        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis;
+        // A bound Excel filename renames the node to its %Variable% caption.
+        const renamedExcel=type==='imports.excel' && previous && previous.nodeTid!==tid && p.FSubType===1;
+        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis || renamedExcel;
+        // Its variables input is re-rendered under the same caption change.
+        const renamedExcelVariable=type==='imports.excel' && previous && previous.nodeTid!==tid && p.FType===0 && p.FSubType===3;
         const renamedVariablePort=previous&&previous.nodeTid!==tid&&p.FType===1&&p.FSubType===3
           &&['bg-vendor-icon-calcvariables','bg-vendor-icon-datatovariables'].includes(n.FIconCls)
           &&finishes.some(({context,trace})=>context?.verified===true&&context.surface==='graph'
@@ -105,16 +109,19 @@ export async function readGraph(page, task) {
         if((!ptid||variableRedraw) && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort)
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort || renamedExcelVariable)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort&&!renamedExcelVariable?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
               || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
             if(renamedDataPort && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
             if(renamedVariablePort&&(!/^Output_Var-\d+$/.test(candidate.slice(tid.length+1))
+              ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
+            if(renamedExcelVariable&&(!/^Input_Var-\d+$/.test(candidate.slice(tid.length+1))
               ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
             if(!variableRedraw&&[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;

@@ -1,5 +1,8 @@
 import {readPreparedNodeContext} from './node-context.mjs';
 export const makeExcelConfigureCode=t=>`async page=>(${excelConfigureCapability.toString()})(page,${JSON.stringify(t)},${readPreparedNodeContext.toString()})`;
+// Read-only W1 filename observation for an independent binding readback.
+export const makeExcelSourceReadCode=(c,o)=>`async page=>{const r=await (${makeExcelConfigureCode({document_id:c.document_id,workflow_ref:c.workflow_ref,node:c.node,
+ excel:{},inspect:true,source_only:true,origin:o.origin,build:o.build,deadline:o.deadline})})(page);return {...r,status:r.verified?'SUCCEEDED':'NOT_APPLIED',node_context:r.configuration?.node_context};}`;
 
 // One owned native Excel wizard. Mutations use trusted UI gestures; native
 // inspection is read-only and never assigns Loginom objects or prototypes.
@@ -49,10 +52,31 @@ export async function excelConfigureCapability(page,t,readContext){
   const advance=async()=>{const before=await panel();await click(find(root+';btnNext'));await wait('wizard page transition',async()=>{
    const error=find(root+';btnError');if(await error.count()===1&&await error.isVisible())throw Error((await error.getAttribute('data-qtip'))??'Loginom refused the Excel page');return await panel()!==before;
   });await quiet();};
-  await wait('Excel source page',()=>find(file+'edtFileName;ValueControl').isVisible());
+  // A variable-bound filename hides the literal path behind its VariableControl.
+  await wait('Excel source page',async()=>await find(file+'edtFileName;ValueControl').isVisible()||await find(file+'edtFileName;VariableControl').isVisible());
   if(!t.inspect){
+  if(t.binding){
+   // Select the mapped variable; its independently read value is the file.
+   const name=file+'edtFileName;',chosen=c=>c===t.binding.label||c===t.binding.label+' ( '+t.binding.value+' )';
+   const caption=()=>page.evaluate(({name})=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(name+'SwitchButton')+']'),sw=es.length===1&&Ext.getCmp(es[0].id);
+    if(typeof sw?.pressed!=='boolean')throw Error('Excel filename mode owner changed');if(!sw.pressed)return null;
+    const vs=document.querySelectorAll('[data-tid='+JSON.stringify(name+'VariableControl')+']'),c=vs.length===1&&Ext.getCmp(vs[0].id);
+    if(c?.el?.dom!==vs[0])throw Error('Excel filename variable owner changed');return c.getStore().getData().items.filter(r=>r.data.field1===c.getValue()).map(r=>r.data.field2)[0]??'';},{name});
+   let current=await caption();
+   if(current===null){await click(find(name+'SwitchButton'));current=(await wait('filename variable mode',()=>caption().then(c=>c===null?null:{c}))).c;}
+   if(!chosen(current)){
+    await click(find(name+'VariableControl;trg_picker'));
+    await wait('filename variable list',()=>find(name+'VariableControl;boundlist').isVisible());
+    const tid=await page.evaluate(({name,label})=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(name+'VariableControl')+']'),c=es.length===1&&Ext.getCmp(es[0].id),picker=c?.getPicker?.();
+     const rows=c?c.getStore().getData().items.filter(r=>r.data.field2===label||String(r.data.field2).startsWith(label+' ( ')):[],item=rows.length===1&&picker?.getNode(rows[0]);
+     return item&&picker.getRecord(item)===rows[0]&&picker.el.dom.contains(item)?item.getAttribute('data-tid'):null;},{name,label:t.binding.label});
+    need(typeof tid==='string'&&tid.startsWith(name+'VariableControl;boundlist;'),'BINDING_VARIABLE_MISSING: filename variable option ambiguous');
+    await click(find(tid));await wait('selected filename variable',()=>caption().then(chosen));
+   }
+  }else{
   const pathInput=find(file+'edtFileName;ValueControl').locator('input');
   if(await pathInput.inputValue()!==t.excel.source_path)await fill(pathInput,t.excel.source_path);
+  }
   if(!t.preserve||t.excel.sheet_name!==undefined){
   await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.named_range!==undefined?'Именованный диапазон':t.excel.sheet_name===undefined?'По номеру':'По имени');
   if(t.excel.named_range!==undefined)await choose(file+'cbbTableName;ValueContainer;cbx',t.excel.named_range,file+'cbbTableName;ValueContainer;cbx;boundlist;'+t.excel.named_range);
@@ -76,9 +100,22 @@ export async function excelConfigureCapability(page,t,readContext){
   await quiet();await guard();
   const source=await page.evaluate(({file})=>{const input=key=>{const a=document.querySelectorAll('[data-tid='+JSON.stringify(file+key)+'] input');if(a.length!==1)throw Error('Excel source field ambiguous');return a[0].value;};
    const method=input('cbbTableNamingMethod;ValueControl'),name=input('cbbTableName;ValueContainer;cbx');
+   const sw=document.querySelectorAll('[data-tid='+JSON.stringify(file+'edtFileName;SwitchButton')+']');let binding_field;
+   if(sw.length===1&&Ext.getCmp(sw[0].id)?.pressed===true){
+    const vs=document.querySelectorAll('[data-tid='+JSON.stringify(file+'edtFileName;VariableControl')+']'),c=vs.length===1&&Ext.getCmp(vs[0].id),store=c?.getStore?.();
+    if(c?.el?.dom!==vs[0]||!store||store.isLoading?.()||c.inputEl?.dom&&c.inputEl.dom.value!==c.getRawValue())throw Error('Excel filename variable unavailable');
+    const rows=store.getData().items.filter(r=>r.data.field1===c.getValue()),caption=rows[0]?.data.field2;
+    if(rows.length!==1||typeof caption!=='string'||caption.length>2304)throw Error('Excel selected filename variable unavailable');
+    const at=caption.lastIndexOf(' ( /')>=1?caption.lastIndexOf(' ( /'):caption.lastIndexOf(' ( '),value=at>=1&&caption.endsWith(' )')?caption.slice(at+3,-2):'';
+    binding_field={status:'observed',variable_mode:true,variable_caption:caption,row_id:String(rows[0].internalId),value,value_length_utf16:value.length,truncated:false};
+   }
    const region=()=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(file+'chkAllRows;ValueControl')+']');if(es.length!==1)throw Error('Excel range extension ambiguous');return {named_range:name,extend_range:es[0].classList.contains('x-form-cb-checked')};};
-   return {source_path:input('edtFileName;ValueControl'),sheet_method:method,sheet:name,...(method==='Именованный диапазон'?region():{}),header_rows:Number(input('edtTitleRowCount;ValueControl')),
+   return {source_path:binding_field?binding_field.value:input('edtFileName;ValueControl'),...(binding_field?{binding_field}:{}),sheet_method:method,sheet:name,...(method==='Именованный диапазон'?region():{}),header_rows:Number(input('edtTitleRowCount;ValueControl')),
     whole_sheet:document.querySelector('[data-tid='+JSON.stringify(file+'chkUsedRange;ValueControl')+']')?.classList.contains('x-form-cb-checked'),blank_rows:input('cbbActionBlankRow;ValueControl')};},{file});
+  if(t.binding){const f=source.binding_field;
+   need(f&&(f.variable_caption===t.binding.label||f.variable_caption===t.binding.label+' ( '+t.binding.value+' )'),'BINDING_SOURCE_UNVERIFIED: selected Excel filename variable differs');
+   source.source_path=t.binding.value;}
+  if(t.source_only)return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source}};
   const named=source.sheet_method==='Именованный диапазон';
   need((t.inspect||source.source_path===t.excel.source_path&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.named_range??t.excel.sheet_name??'1')))
    &&(t.inspect||t.preserve||source.header_rows===t.excel.header_rows)
