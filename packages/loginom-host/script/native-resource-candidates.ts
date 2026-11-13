@@ -21,7 +21,12 @@ export const nativeResourceCandidates = {
   },
 }
 
-export function verifyBunBaselineArchive(archive: Uint8Array) {
-  if (createHash("sha256").update(archive).digest("hex") !== bunNotice.windowsX64BaselineSha256)
+export function verifyBunBaselineArchive(archive: Uint8Array, platform: "linux" | "win32" = "win32") {
+  const expected = platform === "linux" ? bunNotice.linuxX64BaselineSha256 : bunNotice.windowsX64BaselineSha256
+  if (createHash("sha256").update(archive).digest("hex") !== expected)
     throw Error("LOGINOM_BUN_CHECKSUM_MISMATCH")
+}
+
+export function useBunBaseline(platform: string, arch: string, args: string[]) {
+  return (["linux", "win32"].includes(platform) && arch === "x64") || args.includes("--baseline")
 }
