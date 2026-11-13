@@ -1,126 +1,55 @@
-import { createHash, randomUUID } from "node:crypto"
+import { randomUUID } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import { homedir } from "node:os"
-import { basename, join, resolve } from "node:path"
+import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { Option, Schema } from "effect"
-import { Binding, Snapshot, SnapshotRequest, TableSample } from "../contract/snapshot.ts"
+import { bindingKey, Binding, Snapshot, SnapshotRequest } from "../contract/snapshot.ts"
 import { appHost, type Mode } from "./apps.ts"
 
 export { appHeaders, appHost } from "./apps.ts"
+export { bindingKey } from "../contract/snapshot.ts"
 
 function json(response: ServerResponse, status: number, data: unknown) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" })
   response.end(JSON.stringify(data))
 }
 
-async function body(request: IncomingMessage): Promise<unknown> {
+async function body(request: IncomingMessage, max: number): Promise<unknown> {
   if (request.headers["content-type"]?.split(";")[0] !== "application/json") throw Error("Expected application/json")
   const chunks: Buffer[] = []
   let length = 0
   for await (const chunk of request) {
     length += chunk.length
-    if (length > 1024 * 1024) throw Error("Snapshot exceeds 1 MiB")
+    if (length > max) throw Error("Request body exceeds limit")
     chunks.push(chunk)
   }
-  // Native JSON errors are part of the M0 HTTP response. Schemas validate the parsed values below.
   return JSON.parse(Buffer.concat(chunks).toString())
 }
 
-function appKey(input: unknown) {
-  const decoded = Schema.decodeUnknownOption(Binding, { onExcessProperty: "preserve" })(input)
-  if (Option.isNone(decoded)) throw Error("Invalid Loginom binding")
-  const binding = decoded.value
-  const guid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i
-  if (
-    !guid.test(binding.workflowGuid) ||
-    !guid.test(binding.nodeGuid) ||
-    !binding.packagePath.startsWith("/") ||
-    !/^https?:\/\//.test(binding.server) ||
-    new URL(binding.server).origin !== binding.server
-  )
-    throw Error("Invalid Loginom binding")
-  return createHash("sha256")
-    .update(
-      JSON.stringify([
-        binding.server,
-        binding.packagePath,
-        binding.workflowGuid.toLowerCase(),
-        binding.nodeGuid.toLowerCase(),
-        binding.port,
-      ]),
-    )
-    .digest("hex")
-}
-
-async function snapshot(input: unknown, projectRoot: string, buildsRoot: string): Promise<typeof Snapshot.Type> {
-  const raw = input as Record<string, unknown>
-  const key = appKey(raw.binding)
-  // Accept the previous client's payload while bootstrap and Node are rolled out.
-  let sample: unknown = raw.sample === undefined ? { schema: raw.schema, rows: raw.rows } : raw.sample
-  let tableSource: typeof Snapshot.Type.tableSource = sample === null ? "unavailable" : "live"
-  if (sample === null) {
-    try {
-      const dir = join(buildsRoot, key)
-      const binding: unknown = JSON.parse(await readFile(join(dir, "binding.json"), "utf8"))
-      if (appKey(binding) !== key) throw Error("Published example binding differs")
-      sample = JSON.parse(await readFile(join(dir, "sample.json"), "utf8"))
-      tableSource = "published-example"
-    } catch (error) {
-      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
-    }
-  }
-  const decoded = Schema.decodeUnknownOption(SnapshotRequest, { onExcessProperty: "preserve" })(input)
-  if (Option.isNone(decoded)) throw Error("Invalid node, table or parameters")
-  const data = decoded.value
-  const table = Schema.decodeUnknownOption(TableSample, { onExcessProperty: "preserve" })(
-    sample === null ? { schema: [], rows: [] } : sample,
-  )
-  if (Option.isNone(table)) throw Error("Invalid node, table or parameters")
-  const schema = table.value.schema
-  const rows = table.value.rows
-  const id = randomUUID()
-  const sourceDir = join(projectRoot, "dashboard/apps", key)
-  const script = join(projectRoot, "packages/dashboard/script/publish.mjs").replaceAll("'", "'\\''")
-  const publish = `node '${script}' ${id}`
-  return {
-    id,
-    key,
-    sourceDir,
-    binding: data.binding,
-    nodeName: data.nodeName,
-    schema,
-    rows,
-    tableSource,
-    parameters: data.parameters,
-    adapter:
-      "SDK v1: import { onState, close, type DashboardState } from \"./loginom\". onState(listener) calls listener with {parameters: {name, value: number|null}[], table: {schema: {name, type}[], rows, truncated: boolean, totalRows: number}|null, error: string|null, busy: boolean} and returns an unsubscribe function; a late subscriber immediately receives the last state. close() closes the dashboard; Escape calls it automatically. The app only displays data: parameters are edited in the trusted Loginom header above the iframe, so add no inputs, no «Выполнить» button and no requests — the sandbox has no network, storage, forms or popups. Show «Идёт расчёт» while busy, the error text, an empty table as a successful result, and a note when truncated. Show parameter values as text, for example «Расчёт при пороге MinBudget = 10 000». Snapshot rows are examples: never embed them in code. Use the installed React/TypeScript/Vite/Recharts template. For ROI use two decimal places and — for an undefined ratio.",
-    commands: { init: publish + " --init", typecheck: "npm run typecheck", build: "npm run build", publish },
-  }
-}
-
 type Options = {
-  projectRoot: string
   buildsRoot: string
   appOrigin: string
   mode: Mode
+  clientOrigins: string[]
+  cliButton?: boolean
   maxSnapshots?: number
-  allowCurrent?: boolean
+  ttlMs?: number
   allowedHosts?: string[]
 }
 
 export function dashboardServer({
-  projectRoot,
   buildsRoot,
   appOrigin,
   mode,
+  clientOrigins,
+  cliButton = false,
   maxSnapshots = 100,
-  allowCurrent = false,
+  ttlMs = 15 * 60 * 1000,
   allowedHosts,
 }: Options) {
-  const snapshots = new Map<string, typeof Snapshot.Type>()
-  let current: typeof Snapshot.Type | undefined
+  const snapshots = new Map<string, { snapshot: typeof Snapshot.Type; expires: number }>()
   return createServer(async (request, response) => {
     try {
       const hosts =
@@ -130,24 +59,30 @@ export function dashboardServer({
       }
       const path = request.url!.split("?")[0]
       if (request.method === "POST" && path === "/dashboard/lookup") {
-        const key = appKey(await body(request))
+        const binding = Schema.decodeUnknownOption(Binding, { onExcessProperty: "error" })(await body(request, 65_536))
+        if (Option.isNone(binding)) return json(response, 400, { error: "Invalid Loginom binding" })
+        const key = await bindingKey(binding.value)
         const hash = await currentBuild(buildsRoot, key)
-        return json(response, 200, { key, exists: hash !== null, hash, appOrigin, mode })
+        return json(response, 200, { key, exists: hash !== null, hash, appOrigin, mode, cliButton })
       }
-      if (request.method === "POST" && path === "/dashboard/targets") {
-        const target = await snapshot(await body(request), projectRoot, buildsRoot)
-        snapshots.set(target.id, target)
-        current = target
+      if (request.method === "POST" && path === "/dashboard/snapshots") {
+        const origin = request.headers.origin
+        if (origin !== undefined && !clientOrigins.includes(origin)) return json(response, 403, { error: "Forbidden origin" })
+        const input = Schema.decodeUnknownOption(SnapshotRequest, { onExcessProperty: "error" })(await body(request, 655_360))
+        if (Option.isNone(input) || Buffer.byteLength(JSON.stringify(input.value.sample)) > 524_288)
+          return json(response, 400, { error: "Invalid snapshot" })
+        const now = Date.now()
+        snapshots.forEach((item, id) => item.expires <= now && snapshots.delete(id))
+        const id = randomUUID()
+        snapshots.set(id, { snapshot: { id, created: new Date(now).toISOString(), ...input.value }, expires: now + ttlMs })
         if (snapshots.size > maxSnapshots) snapshots.delete(snapshots.keys().next().value!)
-        return json(response, 201, target)
+        return json(response, 201, { id })
       }
-      if (request.method === "GET") {
-        const id = path?.match(/^\/dashboard\/targets\/([^/]+)$/)?.[1]
-        const target =
-          path === "/dashboard/current"
-            ? allowCurrent && /^(?:127\.|::ffff:127\.|::1$)/.test(request.socket.remoteAddress ?? "") && current
-            : id && snapshots.get(id)
-        if (target) return json(response, 200, target)
+      const id = request.method === "GET" && path?.match(/^\/dashboard\/snapshots\/([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})$/)?.[1]
+      if (id) {
+        const item = snapshots.get(id)
+        snapshots.delete(id)
+        if (item && item.expires > Date.now()) return json(response, 200, item.snapshot)
       }
       json(response, 404, { error: "Not found" })
     } catch (error) {
@@ -181,13 +116,11 @@ export function startDashboard(env: NodeJS.ProcessEnv = process.env) {
   const buildsRoot = env.DASHBOARD_BUILDS ?? join(homedir(), "loginom-dashboard", "builds")
   const host = env.DASHBOARD_HOST ?? "127.0.0.1"
   const api = dashboardServer({
-    projectRoot:
-      env.DASHBOARD_PROJECT_ROOT ??
-      resolve(import.meta.dirname, basename(import.meta.dirname) === "dist" ? "../../.." : "../../../.."),
     buildsRoot,
     appOrigin,
     mode,
-    allowCurrent: env.DASHBOARD_ALLOW_CURRENT === "1",
+    clientOrigins,
+    cliButton: env.DASHBOARD_CLI_BUTTON === "1",
     allowedHosts:
       env.DASHBOARD_CLIENT_ORIGINS === undefined ? undefined : clientOrigins.map((origin) => new URL(origin).host),
   })

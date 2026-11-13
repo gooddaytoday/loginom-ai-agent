@@ -10,6 +10,8 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
+**Ход выполнения:** база принятой M2 — `c9dd858ae1`; независимое предварительное ревью всех 18 задач выполнено. Задача 1 в работе, задачи 2–18 ожидают. Подробные проверки, решения и checkpoint — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+
 ## Global Constraints
 
 - **Начало только после приёмки M2.** Проверка перед задачей 1: в ветке `dashboard-app` есть `packages/dashboard/src/web/apps.ts`, `src/sdk/loginom.ts`, `src/shell/frame.ts`, а в `docs/testing/loginom-ai-agent/dashboard-m2.md` записан итог приёмки. Иначе — стоп и вопрос владельцу. Работать в отдельном worktree на ветке `dashboard-m3` от `dashboard-app`; целевую ветку PR, слияние и выпуск задаёт владелец.
@@ -34,6 +36,7 @@
 9. **Автоответ на разрешения не касается публикации.** В приложении есть «автоматически разрешать» для сессии и папки, и он отвечает на любой запрос. Для `dashboard_publish` автоответа нет никогда (задача 12): иначе окно подтверждения из дизайна можно было бы пропустить.
 10. **Один корень папок dashboard.** Формула `<каталог данных бэкенда>/dashboards` живёт в одной функции `dashboardDataRoot(env)` пакета `product` (Node-only экспорт, как `cli-profile`). Её вызывают Desktop и CLI, а тест бэкенда сверяет её с `Global.Path.data` (задача 6).
 11. **Размер образца — в байтах UTF-8 целиком.** Служба проверяет `{schema, rows}` в байтах, а оболочка отбрасывает последние строки, пока образец не уложится в 524 288 байт: иначе образец с кириллицей, принятый оболочкой, отклонялся бы службой.
+12. **Зелёные промежуточные контракты.** Задача 1 включает минимальную адаптацию потребителей: `adapter.binding()` сразу удаляет `server` и `port`, а оболочка получает имя узла из адаптера. Иначе новый `Binding` и ответ `{id}` ломают обязательный typecheck до задачи 2. Снимки по нажатию и кнопка CLI остаются в задаче 2.
 
 ## Review Focus
 
@@ -109,7 +112,7 @@ export function snapshotResponse(value: unknown): { id: string } // id is a UUID
 
 Переменные `startDashboard`: как в M2, но без `DASHBOARD_PROJECT_ROOT` и `DASHBOARD_ALLOW_CURRENT`; новая `DASHBOARD_CLI_BUTTON` (`1` — кнопка включена, иначе выключена). `clientOrigins` берётся из `DASHBOARD_CLIENT_ORIGINS` (по умолчанию `http://127.0.0.1:32768,http://localhost:32768`).
 
-- [ ] **Step 1: Тесты службы снимков.** В `server.test.mjs` привязка — три поля (`packagePath`, `workflowGuid`, `nodeGuid`), снимок — `{binding, nodeName: "Узел", sample: {schema: [{name: "count", type: 1}], rows: [[42]]}, parameters: [{name: "MinBudget", value: 0}], published: false}`. Хелпер `stand(t, options)` создаёт `dashboardServer({buildsRoot, appOrigin, mode: "normal", clientOrigins: ["http://127.0.0.1:32768"], ...options})`. Проверки:
+- [x] **Step 1: Тесты службы снимков.** В `server.test.mjs` привязка — три поля (`packagePath`, `workflowGuid`, `nodeGuid`), снимок — `{binding, nodeName: "Узел", sample: {schema: [{name: "count", type: 1}], rows: [[42]]}, parameters: [{name: "MinBudget", value: 0}], published: false}`. Хелпер `stand(t, options)` создаёт `dashboardServer({buildsRoot, appOrigin, mode: "normal", clientOrigins: ["http://127.0.0.1:32768"], ...options})`. Проверки:
   - `POST /dashboard/snapshots` → 201 и ровно `{id}` (UUID); `GET /dashboard/snapshots/<id>` → 200 и `{id, created (ISO), ...запрос}`; повторный `GET` → 404; неизвестный UUID и строка не-UUID → 404;
   - `ttlMs: 50`: после 100 мс `GET` → 404;
   - `maxSnapshots: 2`: после трёх снимков первый → 404, второй и третий → 200;
@@ -119,8 +122,8 @@ export function snapshotResponse(value: unknown): { id: string } // id is a UUID
   - `POST /dashboard/targets`, `GET /dashboard/targets/<id>`, `GET /dashboard/current` → 404;
   - ключ известной привязки ROI (`{"packagePath":"/user/dashboard-roi/campaign.lgp","workflowGuid":"27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7","nodeGuid":"77c145b1-6ce3-458f-aa36-e6afdab2a930"}`) равен SHA-256 строки JSON `["/user/dashboard-roi/campaign.lgp","27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7","77c145b1-6ce3-458f-aa36-e6afdab2a930"]`, посчитанному в тесте через `node:crypto`.
   - Тесты M1/M2 про `sample: null`, `tableSource`, `adapter`, `sourceDir`, `commands`, `allowCurrent`, `DASHBOARD_PROJECT_ROOT` удалить: поведение уходит по дизайну.
-- [ ] **Step 2: Тесты падают.** `cd packages/dashboard && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/web/server.test.mjs` → FAIL: нет `snapshots`.
-- [ ] **Step 3: Контракт.** В `src/contract/snapshot.ts` заменить `Binding`, `SnapshotRequest`, `Snapshot`, дополнить `LookupResponse`:
+- [x] **Step 2: Тесты падают.** `cd packages/dashboard && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/web/server.test.mjs` → FAIL: нет `snapshots`.
+- [x] **Step 3: Контракт.** В `src/contract/snapshot.ts` заменить `Binding`, `SnapshotRequest`, `Snapshot`, дополнить `LookupResponse`:
 
 ```ts
 const Guid = Schema.String.check(
@@ -150,7 +153,7 @@ export const Snapshot = Schema.Struct({ id: Schema.String, created: Schema.Strin
 ```
 
 `LookupResponse` из M2 получает поле `cliButton: Schema.Boolean`. `Scalar`, `Column`, `Parameter`, `TableSample` не меняются.
-- [ ] **Step 4: Служба.** В `server.ts`:
+- [x] **Step 4: Служба.** В `server.ts`:
   - удалить `appKey`, `snapshot()`, маршруты `targets` и `current`, `projectRoot`, `allowCurrent`, чтение `binding.json`/`sample.json`, текст `adapter`;
   - `body(request, max)` получает предел: 655 360 для снимка, 64 КиБ для `lookup`;
   - разбор — `Schema.decodeUnknownOption(schema, { onExcessProperty: "error" })`;
@@ -182,10 +185,10 @@ if (id) {
 ```
 
   - в конце файла: `export { bindingKey } from "../contract/snapshot.ts"` (его импортирует `check`, задача 16).
-- [ ] **Step 5: Проверки оболочки.** `response.ts`: `lookupResponse` дополнительно требует `typeof cliButton === "boolean"` и возвращает его; `snapshotResponse` требует ровно поле `id` формата UUID и возвращает `{id}`. `shell-contract.test.mjs`: для `snapshotResponse` схема — `Schema.Struct({ id: Schema.String.check(<UUID>) })`; к перебору `lookupResponse` добавить поле `cliButton` с особыми значениями `true`, `false`, `"true"`, `1`.
-- [ ] **Step 6: Удалить `publish.mjs`.** `git rm P/script/publish.mjs P/test/publish/publish.test.mjs`; из `test:browser` убрать `test/publish/*.test.mjs`. Проверить: `rg -n "publish\.mjs" packages/dashboard` → только строки документов, которые меняет задача 17.
-- [ ] **Step 7: `dist-smoke.test.mjs`.** Запуск собранного `dist/server.mjs` через `startDashboard` с `DASHBOARD_CLI_BUTTON=1`: `POST` снимка → 201, `GET` → 200, второй `GET` → 404; `lookup` → `cliButton: true`; `import("dist/server.mjs")` экспортирует `bindingKey`.
-- [ ] **Step 8: Прогон.** `bun typecheck && bun run test` → PASS, покрытие `src/web` ≥ 90%.
+- [x] **Step 5: Проверки оболочки.** `response.ts`: `lookupResponse` дополнительно требует `typeof cliButton === "boolean"` и возвращает его; `snapshotResponse` требует ровно поле `id` формата UUID и возвращает `{id}`. `shell-contract.test.mjs`: для `snapshotResponse` схема — `Schema.Struct({ id: Schema.String.check(<UUID>) })`; к перебору `lookupResponse` добавить поле `cliButton` с особыми значениями `true`, `false`, `"true"`, `1`.
+- [x] **Step 6: Удалить `publish.mjs`.** `git rm P/script/publish.mjs P/test/publish/publish.test.mjs`; из `test:browser` убрать `test/publish/*.test.mjs`. Проверить: `rg -n "publish\.mjs" packages/dashboard` → только строки документов, которые меняет задача 17.
+- [x] **Step 7: `dist-smoke.test.mjs`.** Запуск собранного `dist/server.mjs` через `startDashboard` с `DASHBOARD_CLI_BUTTON=1`: `POST` снимка → 201, `GET` → 200, второй `GET` → 404; `lookup` → `cliButton: true`; `import("dist/server.mjs")` экспортирует `bindingKey`.
+- [x] **Step 8: Прогон.** `bun typecheck && bun run test` → PASS, покрытие `src/web` ≥ 90%.
 - [ ] **Step 9: Коммит.** `git commit -m "feat(dashboard): serve one-time snapshots by ID"`.
 
 ### Task 2: Оболочка Studio: снимок по нажатию, образец, кнопка CLI

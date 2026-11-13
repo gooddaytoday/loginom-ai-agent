@@ -114,20 +114,21 @@ function start() {
         if (overlay !== section) return
         const parameters = () => studio.parameters(form)
         const available = await parameters()
+        const nodeName = await studio.name(node)
         const capture = async (params = available) => {
           // Desktop samples retain their original values; size limits apply only to sandbox state.
           const sample = !errors.has(lookup.key) && (await studio.active(node)) ? await studio.table(node, 12, false) : null
           if (overlay !== section) return
           return snapshotResponse(await post("targets", {
             binding: target,
-            nodeName: await studio.name(node),
+            nodeName,
             sample: sample ? { schema: sample.schema, rows: sample.rows } : null,
             parameters: params.map(parameter => ({ name: parameter.name, value: parameter.value })),
           }))
         }
         const snapshot = await capture()
         if (overlay !== section || !snapshot) return
-        title.textContent = snapshot.nodeName
+        title.textContent = nodeName
         const chatUrl = (id: string) =>
           "loginom-ai-agent://dashboard?id=" +
           encodeURIComponent(id) +
@@ -143,7 +144,7 @@ function start() {
         }
         if (lookup.hash === null) {
           const chat = desktopLink(snapshot.id)
-          note.replaceChildren("Опишите dashboard для узла «" + snapshot.nodeName + "» в чате. ", chat)
+          note.replaceChildren("Опишите dashboard для узла «" + nodeName + "» в чате. ", chat)
           // A long first execution can outlive the browser's user gesture. The same link remains clickable.
           chat.click()
           return

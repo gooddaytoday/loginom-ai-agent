@@ -57,11 +57,9 @@ export function connect() {
     const workflow = await (form.FGenericNode || tree?.data.node?.ModelUnitItem)?.get_Guid()
     if (!workflow || !filename) throw Error("Не удалось определить пакет и сценарий узла.")
     return {
-      server: location.origin,
       packagePath: "/" + filename.replaceAll("\\", "/").replace(/^\/+/, ""),
       workflowGuid: guid(workflow),
       nodeGuid: guid(await node.get_Guid()),
-      port: 0,
     }
   }
 
