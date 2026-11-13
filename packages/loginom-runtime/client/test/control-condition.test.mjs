@@ -54,12 +54,12 @@ test('variable_branch accepts one variable equality branch and refuses unsupport
  assert.throws(()=>validateConditionParameters({branches:[branch]},'variable_branch',{...linked,inputs:[{source:ref('t'),output:0,input:1}]}),/input 0/);
 });
 
-test('changing only upstream variables re-executes the saved Condition through the stock read lifecycle',()=>{
+test('re-execution after an upstream variable change stays in the Condition handler to report branch activity',()=>{
  const rerun={target:existing,finish:'execute',mode:'variable_branch',inputs:[],mappings:[],parameters:{}};
- assert.equal(isUnchangedTransformExecution(rerun),true);
+ assert.equal(isUnchangedTransformExecution(rerun),false);
  validateConditionParameters({},'variable_branch',rerun);
- assert.equal(isUnchangedTransformExecution({...rerun,parameters:{branches:[branch]}}),false);
- assert.equal(isUnchangedTransformExecution({...rerun,variable_inputs:[{source:ref('v'),output:4,input:0,kind:'variables'}]}),false);
+ assert.throws(()=>validateConditionParameters({},'variable_branch',{...rerun,finish:'done'}),/exactly one user branch/);
+ assert.throws(()=>validateConditionParameters({},'variable_branch',{...rerun,variable_inputs:[{source:ref('v'),output:4,input:0,kind:'variables'}]}),/exactly one user branch/);
 });
 
 const owner={verified:true,document_id:'d',workflow_id:'w',node_id:'c',surface:'wizard',tid:'MF;TF-1;WizrdMCF'};

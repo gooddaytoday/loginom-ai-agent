@@ -73,8 +73,10 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
   need(!owner||JSON.stringify(owner)===JSON.stringify(c),'owner changed');owner??=c;return c;};
  const state=async(ready=()=>true,what='state')=>{
   const ceiling=Math.min(task.deadline,Date.now()+15000);let last;
+  // Native stores load after the page is shown: accept two equal reads in a row.
+  let previous;
   for(;;){await owned();last=await page.evaluate(readWizard,prefix);
-   if(last.verified===true&&ready(last))return last;
+   if(last.verified===true&&ready(last)){const key=JSON.stringify(last);if(key===previous)return last;previous=key;}else previous=undefined;
    need(Date.now()<ceiling,what+' did not settle: '+(last.reason??last.page));await page.waitForTimeout(Math.min(150,remaining()));}
  };
  const click=async(tid,options={})=>{await owned();await at(tid).click({timeout:Math.min(15000,remaining()),...options});effect=true;};
@@ -112,10 +114,20 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
    'requires exactly table input 0 and variables input, both passed to output; other port layouts are not supported');
   const ports=s.ports.map(({index,kind,name,label,pass_to_output})=>({index,kind,name,label,pass_to_output}));
   s=await next('branches');phase='branches';
+  s=await state(x=>x.page==='branches'&&x.branches.length>0,'branch inventory');
   need(s.branches.length===1,'supports one user branch; found '+s.branches.length);
   need(s.debug_mode===false,'debug mode is not supported');
   if(s.selected_branch!==0){await click(params+'colBranch_'+s.branches[0].name);s=await state(x=>x.selected_branch===0,'branch selection');}
-  if(task.mode==='variable_branch'){
+  if(task.mode==='variable_branch'&&!task.parameters.branches){
+   // parameters {}: keep the saved branch, read it back and execute again.
+   phase='saved_condition';
+   s=await state(x=>x.conditions.length>0,'saved condition');
+   need(s.conditions.length===1,'supports one condition row; found '+s.conditions.length);
+   // Read-only check: a table field has DataType 0 and a row-count aggregation (1).
+   const c=s.conditions[0];
+   need((c.field?c.field.variable===true:c.data_type!==0&&c.aggregation!==1)&&c.relation==='='&&c.value!==null&&!c.or&&!c.case_sensitive,
+    'saved Condition is not one variable = value branch; reconfigure it with branches');
+  }else if(task.mode==='variable_branch'){
    const want=task.parameters.branches[0];
    if(s.branches[0].name!==want.name){
     await at(params+'colBranch_'+s.branches[0].name).dblclick({timeout:Math.min(15000,remaining())});effect=true;
@@ -143,7 +155,7 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
    need(!s.conditions[0].or&&!s.conditions[0].case_sensitive,'OR and case-sensitive conditions are not supported');
   }
   const branches=s.branches.map(({index,name})=>({index,name}));
-  const conditions=task.mode==='variable_branch'?s.conditions.map(({index,field,relation,value})=>({index,variable:field.name,relation,value})):null;
+  const conditions=task.mode==='variable_branch'?s.conditions.map(({index,field,relation,value})=>({index,variable:field?.name??null,relation,value})):null;
   phase='finish_page';s=await next('done');
   return {status:'SUCCEEDED',verified:true,effect_possible:effect,cleanup_complete:true,node_context:await owned(),
    configuration:{verified:true,mode:task.mode,ports,branches,conditions,debug_mode:false,node_context:owner},
