@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "fs-effects.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Case",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Outcome",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "DestinationBytes",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Case": "clone_force",
+          "Outcome": "failed",
+          "DestinationBytes": 0
+        }
+      ]
+    }
+  ]
+}

@@ -31,6 +31,14 @@ test('unconnected source opt-in admits zero inputs without changing the existing
  assert.doesNotThrow(()=>validateJavascriptCodeRequest(request.parameters,'script',request));
 });
 
+test('filesystem source requires the opt-in even when a source patch is otherwise valid',()=>{
+ const p={...structuredClone(request),inputs:[],parameters:{schema_mode:'code',input_state:'unconnected',
+  source_text:'import * as fs from "builtIn/FS";\n'}};
+ assert.doesNotThrow(()=>validateJavascriptCodeRequest(p.parameters,'script',p));
+ const connected={...p,inputs:request.inputs,parameters:{...p.parameters}};delete connected.parameters.input_state;
+ assert.throws(()=>validateJavascriptCodeRequest(connected.parameters,'script',connected));
+});
+
 test('unconnected executed readback retains the sole completed execution and rejects replay',()=>{
  const p=phases();
  p.find(r=>r.phase==='input_mapping').value.native_mapping={verified:true,source_identity_verified:true,

@@ -216,6 +216,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           ()=>admission.admit(request.parameters.source_text===undefined?{}:
           {source_text:request.parameters.source_text,
             ...(request.target.kind==='existing'?{expected_source_sha256:request.parameters.expected_source_sha256}:{})}));
+        need(admitted.effective_source.filesystem!==true||request.parameters.input_state==='unconnected',
+          'JavaScript FS requires input_state:unconnected before mutation or execution');
         if(request.target.kind==='existing'){
           existingBaseline=await admitJavascriptExistingSchema({receipt:admitted,snapshot:sourceSnapshot,
             parameters:request.parameters,owner,record:onRecord,deadline:ctx.deadline});

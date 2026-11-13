@@ -237,6 +237,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=['normalized.csv'], export_count=2)
+    if name in ['js-fs-read', 'js-fs-write', 'js-fs-operations', 'js-fs-effects']:
+        src = REPO / 'docs/node-development/nodes/programming-javascript/acceptance/fs' / name
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    external=True, fs_case=name.removeprefix('js-fs-'))
     # Operator fixtures (including private large-file oracles) stay outside Git.
     # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
     if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
@@ -1954,6 +1958,33 @@ class Runner:
     def text_mask_directory(self, login):
         return login['package_directory'].rstrip('/') + '/' + self.out.name + '-mask'
 
+    def fs_directory(self, case, login):
+        return login['package_directory'].rstrip('/') + '/' + self.out.name + '-js-fs-' + case
+
+    def fs_files(self, spec, folder, login, build, phase, prepare=False):
+        case = spec['fs_case']
+        child = {'read': 'input', 'write': 'output', 'operations': 'operations', 'effects': 'effects'}[case]
+        parent = self.fs_directory(case, login)
+        oracle = spec['source'].parent / 'oracle.py'
+        self.phase('fs-expected', [sys.executable, '-B', oracle, '--case', case, '--check'], folder, timeout=60)
+        books = [dict(fixture=str(spec['source'].parent / 'fixtures' / name), destination=parent + '/input/' + name)
+                 for name in ['utf8.txt', 'utf16le.txt', 'cp1251.txt', 'bytes.bin']] if prepare and case == 'read' else []
+        config = dict(login=login, books=books, fs_fixture=True, overwrite='reject')
+        if prepare:
+            config['text_folders'] = dict(parent=Path(parent).name, children=[child])
+        if not prepare or books:
+            config['fs_audit'] = parent + '/' + child
+        write(folder / (phase + '.json'), config)
+        self.phase(phase, [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
+                          build / 'resources/loginom', folder / (phase + '.json'), folder / phase], folder, timeout=300)
+        proof = read(folder / phase / 'result.json')
+        assert all(proof['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'FS_AUDIT_CLEANUP_MISSING'
+        if not prepare or books:
+            self.phase(phase + '-bytes', [sys.executable, '-B', oracle, '--case', case, '--archive',
+                       folder / phase / 'files.zip', '--folder', child,
+                       '--execution', '2' if phase == 'fs-cold' else '1'], folder, timeout=60)
+        self.current['fs-bytes'] = phase + ' PASS'
+
     def source_dir(self, spec, login):
         # The one server directory whose paths the task receives for its sources.
         if spec.get('text_mask'): return self.text_mask_directory(login)
@@ -1984,6 +2015,9 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('fs_case'):
+            prompt = prompt.replace('{{FS_ROOT}}', self.fs_directory(spec['fs_case'], login))
+            self.fs_files(spec, folder, login, build, 'fs-fixtures', prepare=True)
         if spec.get('excel_mode') == 'replace': prompt = prompt.replace('existing.xlsx либо\nexisting.xls', 'existing.xlsx')
         if spec.get('lgd') == 'roundtrip':
             lgd_destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-roundtrip.lgd'
@@ -2754,6 +2788,8 @@ class Runner:
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                    if spec.get('fs_case'):
+                        self.fs_files(spec, folder, login, build, 'fs-warm')
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
@@ -2773,6 +2809,8 @@ class Runner:
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
                         r.update(cold='PASS', cleanup='both PASS')
+                        if spec.get('fs_case'):
+                            self.fs_files(spec, folder, login, build, 'fs-cold')
                     r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:
                     if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):

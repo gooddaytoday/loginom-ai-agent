@@ -91,11 +91,26 @@ const declared=Object.freeze({...previous,version:'1.2.0',
   }),
 });
 
-const current=Object.freeze({...declared,version:'1.3.0',
+const dataOnly=Object.freeze({...declared,version:'1.3.0',
   limitations:Object.freeze([...declared.limitations,
     'В parameters.source_text для AssignColumns использовать DataType.Integer, DataType.Float (вещественный), DataType.String, DataType.Boolean, DataType.DateTime из builtIn/Data. DataType.Real не существует; parameters.columns использует строковый type="real", это другой контракт.']),
   scalar_data_api:Object.freeze({...declared.scalar_data_api,
     column_types:Object.freeze({integer:'DataType.Integer',real:'DataType.Float',string:'DataType.String',boolean:'DataType.Boolean',datetime:'DataType.DateTime'}),
+  }),
+});
+
+const current=Object.freeze({...dataOnly,version:'1.4.0',
+  limitations:Object.freeze([
+    'Loginom 7.4.2: tabular Data retains input/output 0; sources require input_state:unconnected and verified absence of incoming links.',
+    'Static builtIn/Data; builtIn/FS only in the unconnected source branch. Fetch, Calc, external modules and dynamic import/require remain refused.',
+    ...dataOnly.limitations.slice(2),
+  ]),
+  filesystem:Object.freeze({
+    import:'import * as fs from "builtIn/FS";',
+    scope:'Loginom7.4.2/Linux native operator probes LAB-1549; candidate pending autonomous acceptance.',
+    paths:'Only the assigned user-storage subtree. Unsaved relative paths use the personal folder; saved paths use the LGP directory; a moved package needs its sidecar separately.',
+    bytes:'readFileSync without encoding returns ArrayBuffer; use Uint8Array, not Node Buffer.',
+    effects:'One explicit execution per node operation. Unknown outcomes and partial file effects never authorize automatic replay.',
   }),
 });
 
@@ -104,7 +119,7 @@ export const JAVASCRIPT_CARD_LIMITATIONS=current.limitations;
 
 export function describeJavascriptKnowledge(observedBuild,version=current.version) {
   if(observedBuild!==knowledge.validated_for.loginom_build)throw Error('JavaScript knowledge is not validated for observed Loginom build');
-  const selected=version===knowledge.version?knowledge:version===previous.version?previous:version===declared.version?declared:version===current.version?current:null;
+  const selected=version===knowledge.version?knowledge:version===previous.version?previous:version===declared.version?declared:version===dataOnly.version?dataOnly:version===current.version?current:null;
   if(!selected)throw Error('Unsupported JavaScript knowledge version');
   return structuredClone({...selected,knowledge_sha256:createHash('sha256').update(JSON.stringify(selected)).digest('hex')});
 }

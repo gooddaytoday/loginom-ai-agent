@@ -35,6 +35,7 @@ export function validateJavascriptParameters(parameters,mode,request) {
     need(typeof parameters.source_text==='string','source_text');
     const policy=inspectJavascriptModulePolicy(parameters.source_text);
     need(policy.status==='ADMITTED','source_text');
+    need(policy.filesystem!==true||parameters.input_state==='unconnected','input_state: FS requires unconnected');
   }
 
   const hasMode=Object.hasOwn(parameters,'schema_mode');

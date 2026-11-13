@@ -11,7 +11,7 @@ const {loginBrowser,loginomAddress}=await load('src/connection-check.mjs');
 const {makeWorkspacePrepareCode}=await load('client/lib/workspace.mjs');
 const {makeWorkspaceUiCode}=await load('client/lib/workspace-ui.mjs');
 const {makePackageCleanupCode}=await load('client/lib/package-cleanup.mjs');
-const {createActionRuntime}=await load('client/lib/executor.mjs');
+const {createActionRuntime,makeArtifactUploadCode}=await load('client/lib/executor.mjs');
 const {createArtifactStore}=await load('client/lib/artifacts.mjs');
 const {createExecutionJournal}=await load('client/lib/execution-journal.mjs');
 const {createStorageBinding}=await load('client/lib/storage-policy.mjs');
@@ -88,11 +88,59 @@ try{
   const target=book.destination.slice(0,book.destination.lastIndexOf('/'));
   if(folders?!folders.children.some(c=>target===directory+'/'+c):target!==directory)throw Error('SEED_DIRECTORY');
   const bytes=await readFile(book.fixture),artifact=await artifactStore.admit({sourcePath:book.fixture,name:book.destination.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory:target,overwrite:config.overwrite??'replace'}});
+  if(config.fs_fixture===true){
+   // Private binary fixtures use the same native upload. Their completion and
+   // bytes are proved by the independent folder ZIP below, never by this reply.
+   await storageDirectory(target);
+   const observed=await execute(makeWorkspaceUiCode({mode:'observe',expected_origin:new URL(config.login.url).origin,expected_build:'7.4.2'}));
+   if(observed.status!=='SUCCEEDED'||observed.output?.file_storage?.directory!==target)throw Error('FS_SEED_DIRECTORY_UNOBSERVED');
+   const lease=await artifactStore.stageUpload(artifact.artifact_id);
+   try{
+    const result=await execute(makeArtifactUploadCode({operation_id:'fs-seed-'+index,artifact,upload_path:lease.path,
+     snapshot:observed.output,decide_conflicts:true,expected_origin:new URL(config.login.url).origin,expected_build:'7.4.2'}));
+    await record({phase:'fs_fixture_upload_submitted',result});
+    if(result.error?.code!=='UPLOAD_SERVER_VERIFICATION_REQUIRED'||result.output?.upload_submitted!==true)throw Error('FS_SEED_UPLOAD_UNCONFIRMED');
+    delivered.push({destination:book.destination,submitted:true});
+   }finally{await lease.release();}
+   continue;
+  }
   const result=await runtime.deliverArtifact({operation_id:'excel-seed-'+index,artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
   if(result.outcome?.status!=='SUCCEEDED'||result.outcome.destination!==book.destination||result.outcome.upload_completion_verified!==true||result.outcome.cleanup_complete!==true)throw Error('SEED_UPLOAD:'+JSON.stringify(result));
   delivered.push(result.outcome);
+ }
+ if(config.fs_audit){
+  const target=config.fs_audit;
+  if(typeof target!=='string'||!target.startsWith(config.login.package_directory+'/')
+    ||!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/.test(target))throw Error('FS_AUDIT_SCOPE');
+  const {prefix,at}=await storageDirectory(target.slice(0,target.lastIndexOf('/')));
+  const name=target.split('/').at(-1),row=at(prefix+';FileStorageForm;colName_'+name);
+  await row.waitFor({state:'visible'});if(await row.count()!==1)throw Error('FS_AUDIT_ROW_AMBIGUOUS');
+  await row.click();
+  await record({phase:'fs_folder_download_prepared',directory:target,
+   observation:await execute(makeWorkspaceUiCode({mode:'observe',expected_origin:new URL(config.login.url).origin,expected_build:'7.4.2'}))});
+  const pending=page.waitForEvent('download',{timeout:60000});
+  await at(prefix+';FileStorageForm;btnDownload').click();
+  const download=await pending;await download.saveAs(output+'/files.zip');
+  if(await download.failure())throw Error('FS_AUDIT_DOWNLOAD_FAILED');
+  await download.delete();
  }
  const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
  await record({phase:'excel_seed_cleanup',cleanup});await writeFile(output+'/result.json',JSON.stringify({delivered,cleanup}));
  if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('SEED_CLEANUP');
 }finally{await context.close();}
+
+// Existing Files UI only; each destination is confined to this run's directory.
+async function storageDirectory(directory){
+ if(!directory.startsWith(config.login.package_directory)||directory.split('/').some(p=>p==='.'||p==='..'))throw Error('FS_STORAGE_SCOPE');
+ const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
+ const grids=page.locator('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]:visible');
+ if(await grids.count()===0)await at('MF;cntMain;tlbMainToolbar;btnFilestorage').click();
+ await grids.waitFor({state:'visible'});if(await grids.count()!==1)throw Error('FS_STORAGE_AMBIGUOUS');
+ const prefix=(await grids.getAttribute('data-tid')).split(';FileStorageForm;')[0];
+ await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы').click();let trail='';
+ for(const part of directory.slice(1).split('/')){
+  await at(prefix+';FileStorageForm;colName_'+part.replace(/\s/g,'_').replace(/,/g,'')).dblclick();
+  trail+='>'+part;await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы'+trail).waitFor({state:'visible'});
+ }
+ return {prefix,at};
+}

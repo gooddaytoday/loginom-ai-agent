@@ -16,6 +16,16 @@ const allowed=[
  'const text=`hello ${1 + 2}`;', 'const bigint=10n;', 'const meta=import.meta;', '#! /usr/bin/env node\nconst x=1;',
  'import Data from "builtIn/Data" with {type:"json"};'
 ];
+test('filesystem is admitted additively while external modules and Fetch remain refused',()=>{
+ for(const source of ['import * as fs from "builtIn/FS";','import {readFileSync} from "builtIn/FS";',
+  'export * from "builtIn/FS";']){
+  const admitted=inspectJavascriptModulePolicy(source);
+  assert.equal(admitted.status,'ADMITTED');assert.equal(admitted.filesystem,true);
+ }
+ assert.equal(inspectJavascriptModulePolicy('import "builtIn/Data";').filesystem,undefined);
+ for(const specifier of ['builtIn/Fetch','builtIn/Calc','fs','node:fs','builtIn/FS/','BuiltIn/FS'])
+  assert.equal(inspectJavascriptModulePolicy('import '+JSON.stringify(specifier)+';').reason,'module_specifier');
+});
 for(const [index,source] of allowed.entries())test('module policy admitted syntax '+index,()=>{
  const result=inspectJavascriptModulePolicy(source);assert.equal(result.status,'ADMITTED');assert.equal(result.source_sha256,createHash('sha256').update(source).digest('hex'));
  assert.equal(result.source_utf8_bytes,Buffer.byteLength(source));assert.equal(result.source_lf_lines,source.split('\n').length);assert.equal(result.policy,JAVASCRIPT_MODULE_POLICY);assert.deepEqual(result.parser,{name:'acorn',version:'8.15.0',ecma_version:2025,source_type:'module'});assert.ok(Object.isFrozen(result)&&Object.isFrozen(result.parser));assert.ok(!('ast' in result));
