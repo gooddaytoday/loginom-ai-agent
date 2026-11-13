@@ -253,7 +253,14 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
             await wait('export_palette_item_reachable',async()=>{try{await point(find(palette));return true;}catch{return false;}});
           }
         }finally{await handle.dispose();}
-        if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw Error('Graph changed after palette reveal');
+        const revealedGraph=await read(page,task);
+        if(!sameGraph(gestureBefore,revealedGraph))throw Error('Graph changed after palette reveal');
+        gestureBefore=revealedGraph;
+        const currentView=await canvas.evaluate(readViewport);
+        if(currentView.scale!==placementNavigation.view.scale
+          ||currentView.translate.x!==placementNavigation.view.translate.x||currentView.translate.y!==placementNavigation.view.translate.y
+          ||currentView.scroll.x!==placementNavigation.view.scroll.x||currentView.scroll.y!==placementNavigation.view.scroll.y)
+          throw Error('Export drop transform changed after palette reveal');
         const currentOrigin=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').boundingBox();
         if(JSON.stringify(currentOrigin)!==JSON.stringify(origin)||!await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);return p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&!!hit&&(hit===e||e.contains(hit));},target))throw Error('Export drop changed after palette reveal');
       }

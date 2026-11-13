@@ -12,13 +12,16 @@ function fixture(mode={}){
  const canvas={getBoundingClientRect:()=>rect(300,100,1100,720),contains:e=>e===canvas},tab={classList:{contains:()=>true}};
  const row={contains:e=>e===item,querySelectorAll:()=>mode.icon?[]:[{}]};
  const owner={isConnected:true,contains:e=>e===row||e===item,checkVisibility:()=>true,getBoundingClientRect:()=>rect(10,100,280,600),clientHeight:600,scrollHeight:2001,
-  get scrollTop(){return top;},set scrollTop(v){scrolls++;top=v;if(mode.cancelAfterScroll)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);if(mode.scrollFailure)throw Error('scroll failed');}};
+  get scrollTop(){return top;},set scrollTop(v){scrolls++;top=v;mode.afterScroll?.(graph,view);if(mode.cancelAfterScroll)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);if(mode.scrollFailure)throw Error('scroll failed');}};
  const item={textContent:'Текстовый файл',checkVisibility:()=>true,closest:()=>null,contains:e=>e===item,getBoundingClientRect:()=>rect(50,(mode.visible?200:1800)-top,100,20)};
  const exact=new Map([[ownerTid,mode.owner?[{}]:[owner]],[palette,mode.duplicate?[item,item]:[item]],[palette.replace(/;TreeText$/,''),[row]],[rootTid,[canvas]],[tabTid,[tab]]]);
  const document={querySelectorAll:selector=>exact.get(JSON.parse(selector.slice(10,-1)))??[],elementFromPoint:(x,y)=>mode.overlay?{}:x>=300?canvas:x===100&&y===item.getBoundingClientRect().y+10?item:owner};
- const before={dom_epoch:1,interaction_ready:true,nodes:[]};
+ const before={dom_epoch:1,document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:tabTid},interaction_ready:true,
+  nodes:[{ref:{document_id:'doc',workflow_id:'wf',node_id:'existing'},type:'transform.sorting',label:'Sort',dom_epoch:2,position:{x:400,y:180},locked:false,inputs:[0],outputs:[0]}],links:[],foreign_links:[]};
+ const graph=structuredClone(before);
+ const view={x:300,y:100,width:1100,height:720,viewportWidth:1508,viewportHeight:862,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0},node_bounds:{x:900,y:480,width:80,height:100}};
  const p={document,id:'doc',receipts:new Map([['r',{phase:'verified',workflowId:'wf',tab}]]),nodeTargetDomEpochs:{objects:new Map([[canvas,1]])}};
- const globals={document,innerWidth:1508,innerHeight:862,__loginomDockPreparationV1:p};
+ const globals={document,innerWidth:1508,innerHeight:862,__loginomDockPreparationV1:p,view,structuredClone};
  const evaluate=(fn,args,element)=>vm.runInNewContext('('+fn.toString()+')('+(element?'element,args':'args')+')',{...globals,args,element});
  const page={evaluate:(fn,args)=>evaluate(fn,args),waitForTimeout:async()=>{},locator:selector=>{
   const elements=exact.get(JSON.parse(selector.slice(10,-1)))??[],element=elements[0];
@@ -26,12 +29,41 @@ function fixture(mode={}){
   mouse:{move:async()=>{},down:async()=>{held=true;drags++;},up:async()=>{if(held)created=true;held=false;}},keyboard:{press:async()=>{}}};
  const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{workflow_id:'wf',prefix,tab_tid:tabTid}},types:NODE_TYPES,effect:{id:'effect',kind:'create',before,parameters:{type:'exports.text',position:{x:mode.drop?5000:600,y:380}}}};
  if(mode.cancel)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);
- const read=async()=>created||scrolls&&mode.graphChange?{...before,nodes:[{ref:{node_id:'changed'},position:{x:600,y:380}}]}:structuredClone(before);
- const viewport=()=>({x:300,y:100,width:1100,height:720,viewportWidth:1508,viewportHeight:862,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0},node_bounds:{x:900,y:480,width:80,height:100}});
+ const read=async()=>created||scrolls&&mode.graphChange?{...structuredClone(graph),nodes:[...structuredClone(graph.nodes),{ref:{node_id:'changed'},position:{x:600,y:380}}]}:structuredClone(graph);
+ const viewport=()=>structuredClone(view);
  return {run:()=>mutateGraph(page,task,read,exportPaletteScroll,viewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph),counts:()=>({scrolls,drags})};
 }
 test('new export performs one owner scroll and one drag, or no scroll for visible item',async()=>{
  for(const visible of [false,true]){const f=fixture({visible}),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.deepEqual(f.counts(),{scrolls:visible?0:1,drags:1});assert.equal(r.cleanup_complete,true);}
+});
+test('export palette scroll may redraw an existing node before exactly one drag',async()=>{
+ const f=fixture({afterScroll:graph=>{graph.nodes[0].dom_epoch++;}}),r=await f.run();
+ assert.equal(r.status,'SUCCEEDED',r.error);
+ assert.deepEqual(f.counts(),{scrolls:1,drags:1});
+ assert.equal(r.after.nodes[0].ref.node_id,'existing');
+ assert.equal(r.after.nodes[0].dom_epoch,3);
+ assert.equal(r.cleanup_complete,true);
+});
+test('export palette reveal refuses changed scale with the same canvas rectangle before drag',async()=>{
+ const f=fixture({afterScroll:(graph,view)=>{graph.nodes[0].dom_epoch++;view.scale=0.8;}}),r=await f.run();
+ assert.notEqual(r.status,'SUCCEEDED');
+ assert.deepEqual(f.counts(),{scrolls:1,drags:0});
+});
+for(const [name,change] of [
+ ['node position',graph=>{graph.nodes[0].position.x++;}],
+ ['node label',graph=>{graph.nodes[0].label='foreign';}],
+ ['root epoch',graph=>{graph.dom_epoch++;}],
+ ['document',graph=>{graph.document_id='foreign';}],
+ ['link',graph=>{graph.links.push({source:'existing',output:0,target:'foreign',input:0});}],
+ ['horizontal translation',(graph,view)=>{view.translate.x++;}],
+ ['vertical translation',(graph,view)=>{view.translate.y++;}],
+ ['horizontal scroll',(graph,view)=>{view.scroll.x++;}],
+ ['vertical scroll',(graph,view)=>{view.scroll.y++;}],
+])test('export palette reveal refuses changed '+name+' before drag',async()=>{
+ const f=fixture({afterScroll:(graph,view)=>{graph.nodes[0].dom_epoch++;change(graph,view);}}),r=await f.run();
+ assert.notEqual(r.status,'SUCCEEDED');
+ assert.match(r.error,/Graph changed after palette reveal|Export drop transform changed after palette reveal/);
+ assert.deepEqual(f.counts(),{scrolls:1,drags:0});
 });
 test('export creation cannot drag after invalid owner, overlay, graph, drop, cancellation or scroll failure',async()=>{
  for(const mode of [{owner:true},{duplicate:true},{icon:true},{overlay:true},{graphChange:true},{drop:true},{cancel:true},{cancelAfterScroll:true},{scrollFailure:true}]){
