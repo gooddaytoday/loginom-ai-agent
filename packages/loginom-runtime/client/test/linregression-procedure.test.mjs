@@ -37,6 +37,23 @@ test('ordinary training remains 100 percent; a saved row split requires explicit
  f.sizes[0].unit='rows';await assert.rejects(f.run(),/explicit sequential/);
 });
 
+test('apply explicitly refuses a saved sequential partition without changing settings or training',async()=>{
+ const node={verified:true,document_id:'doc',workflow_id:'flow',node_id:'regression'};
+ const fields=['X','Y'].map((name,index)=>({name,label:name,type:'real',data_kind:'Непрерывный',index,usage_type:index===0?3:4}));
+ let stage='input_mapping';const actions=[];
+ const state=()=>({prepared_node_context:node,wizard:{stage,root_tid:'W'},
+  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]},
+  node_linregression:{verified:true,...(stage==='input_mapping'?{fields}:stage==='normalization'?
+   {kind:'normalization',fields:fields.map(f=>({...f,norm_type:0})),source_status:'Активировано'}:
+   {kind:'partition',values:{sampling:1,validation:0,train:16,test:2},sequence:[0,1,2],sizes:[{unit:'rows',count:16},{unit:'rows',count:2}]})}});
+ const channel={async observe({ready}){const s=state();assert.equal(ready(s),true);return s;},
+  async perform({ready,resolve}){const s=state();assert.equal(ready(s),true);const action=resolve(s);actions.push(action);stage=action.expected_stage;}};
+ await assert.rejects(configureLinRegression(channel,{input_fields:['X'],target_field:'Y'},{request:{mode:'apply'}}),
+  /apply on a node with sequential partition is unsupported/);
+ assert.deepEqual(actions.map(a=>[a.verb,a.expected_stage]),[['wizard_step','normalization'],['wizard_step','learn_partition']]);
+ assert.equal(stage,'learn_partition');
+});
+
 // LAB-436 r3 journals: samples 387/375 still contain the old SVG body after
 // confirmed draft Close; steps 390/378 refuse selection after its replacement.
 // Exercise the actual apply finish driver and observation channel, replacing

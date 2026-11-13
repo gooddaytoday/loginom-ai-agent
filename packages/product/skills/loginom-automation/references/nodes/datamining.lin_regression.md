@@ -7,7 +7,7 @@
 
 <!-- mode: enter apply -->
 `enter` (пере)обучает. Прогноз новых данных — `mode:"apply"` на том же обученном Enter-узле: прежние `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`. Apply сохраняет модель и настройки без Teach.
-Последовательное обучение/тест — Enter, `linear_regression.partition:{method:"sequential",train_count:16,test_count:2}`. Размеры в строках: первые 16 обучают, следующие 2 только прогнозируются. Оба порта читаются полностью.
+Последовательное обучение/тест — Enter, `linear_regression.partition:{method:"sequential",train_count:16,test_count:2}`. Размеры в строках: первые 16 обучают, следующие 2 только прогнозируются.
 Полная статистика коэффициентов (SE, t, p, 95% границы) — `mode:"enter"`, `linear_regression:{statistics:"full"}`: порт 1 из 9 native-столбцов, включая NULL. По умолчанию `statistics:"coefficients"`: Name и Y_coefficients. Покажи коэффициенты чтением обоих портов.
 <!-- /mode -->
 

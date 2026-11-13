@@ -56,7 +56,7 @@ export async function configureLinRegressionRoles(channel,p,inputMapping,{preser
  return {verified:true,cleanup_complete:true,effect_possible:edits>0,baseline_configuration:baseline,configuration,applied_editors:edits,settings_applied:false};
 }
 
-export async function configureLinRegressionPartition(channel,wanted){
+export async function configureLinRegressionPartition(channel,wanted,{preserve=false}={}){
  const ready=s=>s.wizard?.stage==='learn_partition'&&s.node_linregression?.verified===true&&s.node_linregression.kind==='partition';
  const observe=condition=>channel.observe({condition,readLinRegression:true,ready});
  const one=(s,predicate)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,'one owned partition control required');return es[0];};
@@ -68,7 +68,7 @@ export async function configureLinRegressionPartition(channel,wanted){
  };
  need(state.node_linregression.values.validation===0,'validation is unsupported');
  if(!wanted){
-  need(state.node_linregression.sizes.every(s=>s.unit==='percent')&&state.node_linregression.values.train===100&&state.node_linregression.values.test===0,'explicit sequential partition is required for training with a holdout');
+  need(state.node_linregression.sizes.every(s=>s.unit==='percent')&&state.node_linregression.values.train===100&&state.node_linregression.values.test===0,preserve?'apply on a node with sequential partition is unsupported':'explicit sequential partition is required for training with a holdout');
   return state.node_linregression.values;
  }
  if(state.node_linregression.values.sampling!==1){
@@ -121,7 +121,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
   state=await channel.observe({condition:'regression input activated',readLinRegression:true,ready:s=>ready('normalization')(s)&&s.node_linregression.source_status!=='Не активировано'});
  }
  await next('normalization','learn_partition');
- const partition=await configureLinRegressionPartition(channel,p.linear_regression?.partition);
+ const partition=await configureLinRegressionPartition(channel,p.linear_regression?.partition,{preserve});
  await next('learn_partition','lin_regression');
  state=await observe('parameters','complete regression parameters');
  const control=(s,key,verb)=>one(s,e=>{const tid=s.wizard.root_tid+';'+(s.wizard.stage==='lin_regression_details'?'LinRegressionWizard-1':'LinRegressionWizard')+';'+key;return (e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb);},'Regression control unavailable: '+key);

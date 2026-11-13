@@ -43,6 +43,7 @@ test('Enter accepts explicit sequential train/test row counts without weakening 
  for(const extra of [{},{statistics:'full'}])assert.doesNotThrow(()=>validateLinRegressionParameters({...p,linear_regression:{partition,...extra}},'enter'));
  for(const change of [{method:'random'},{train_count:0},{train_count:1.5},{test_count:-1},{test_count:Infinity},{unused:0}])
   assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{partition:{...partition,...change}}},'enter'),/partition/);
- for(const mode of ['apply','forward','ridge','lasso','elastic'])assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{partition}},mode));
+ for(const mode of ['apply','forward','backward','stepwise','ridge','lasso','elastic'])
+  assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{partition}},mode),/linear_regression\.partition is supported only in mode enter/);
  assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{}},'enter'));
 });
