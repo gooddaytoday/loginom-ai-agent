@@ -96,7 +96,9 @@ export async function openPreparedWizard(channel) {
  // Restore only the bound node, then observe its settings before opening once.
  const settings=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
   &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid+';Setting'&&e.allowed_actions?.includes('begin_wizard'));
- const selection=!settings(s)?await selectPreparedGraphNode(channel,s,'select prepared node before reopening settings'):null;
+ // A cancelled wizard can still be redrawing the graph: a strict no-gesture
+ // stale refusal may rebind the same native body once (isPreparedBodyReplacement).
+ const selection=!settings(s)?await selectPreparedGraphNode(channel,s,'select prepared node before reopening settings',{refreshReplacedBody:true}):null;
  const now=()=>channel.now?.()??Date.now(),deadline=now()+15000;
  // A succeeded click can precede Loginom's asynchronous SVG replacement.
  // Only a proved new body of the same GUID permits one fresh selection;

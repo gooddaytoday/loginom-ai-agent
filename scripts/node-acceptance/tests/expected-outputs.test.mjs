@@ -1,4 +1,4 @@
-import {parseExpectedVariableInventory,matchVariableInventoryOutput,matchVariableInventoryLinks} from '../expected-outputs.mjs';
+import {parseExpectedVariableInventory,matchVariableInventoryOutput,matchVariableInventoryLinks,auditRestQueryVariables} from '../expected-outputs.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -259,4 +259,63 @@ test('v040-c8-filetime: C8 path expectations add FileTime present after FileName
   assert.deepEqual(output.columns.at(-1),{name:'FileTime',type:'datetime',label_any:true,comparison:'present'});
   assert.ok(output.rows.length===5&&output.rows.every(r=>r.FileTime===true&&r.FileName.startsWith(prefix+'sales_2026-0')));
  }
+});
+
+function restQueryHistory(){
+ const initial=JSON.parse(readFileSync(new URL('../../../docs/node-development/variables/acceptance/expected-initial.json',import.meta.url)));
+ const final=JSON.parse(readFileSync(new URL('../../../docs/node-development/variables/acceptance/expected.json',import.meta.url)));
+ for(const [w,limit,skip] of [[initial,3,2],[final,5,10]])w.variable_inventory={outputs:[{node:{type:'variables.user'},port:4,variables:[{name:'limit',type:'integer',value:limit},{name:'skip',type:'integer',value:skip}]}]};
+ const node=id=>({document_id:'d',workflow_id:'w',node_id:id}),events=[];
+ const add=(id,type,request,result={})=>{
+  events.push({phase:'node_apply_prepared',operation_id:id,request:{target:{kind:'existing',type,ref:node(type)},mode:'request',parameters:{},inputs:[],mappings:[],...request}});
+  events.push({phase:'node_checkpoint',result:{operation_id:id,node:node(type),status:'SUCCEEDED',cleanup_complete:true,output:{},...result}});
+ };
+ const snapshot=w=>({variable_ports:[{kind:'variables',port:4,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,read_id:'snapshot-'+w.outputs[0].rows[0].limit,execution_id:null,fresh:true,complete:true,count:2,completeness:{count:2,store_count:2,unique_ids:2,loaded:true},variables:w.variable_inventory.outputs[0].variables.map((v,id)=>({id,index:id,name:v.name,type:'integer',cell:{type:'integer',is_null:false,value:String(v.value),precision:'exact_integer'}}))}]});
+ const raw=(w,id)=>({execution:{status:'completed',execution_id:id},output:{ports:[{port:0,fresh:true,sample_complete:true,row_count:1,schema:[{name:'RequestID'},{name:'Response'}],sample:[[{value:0},{value:JSON.stringify({args:{limit:w.outputs[0].rows[0].limit,skip:w.outputs[0].rows[0].skip},url:w.outputs[0].rows[0].url})}]]}]}});
+ add('initial-vars','variables.user',{mode:'values'},{output:snapshot(initial)});
+ add('table','variables.to_table',{variable_inputs:[{source:node('variables.user'),output:4,input:0,kind:'variables'}]});
+ add('cast','transform.calculator',{inputs:[{source:node('variables.to_table'),output:0,input:0}]});
+ const readback={kind:'rest_request',method:'GET',connection:{base_url:'https://httpbin.org/anything'},query_parameters:[{name:'limit',field:'limit_text'},{name:'skip',field:'skip_text'}]};
+ add('first','integration.rest_request',{inputs:[{source:node('transform.calculator'),output:0,input:0}]},{...raw(initial,'first'),configuration:{readback}});
+ add('updated-vars','variables.user',{mode:'values',parameters:{variables:final.variable_inventory.outputs[0].variables}},{output:snapshot(final)});
+ add('second','integration.rest_request',{mode:'read_existing_output',parameters:{source_operation_id:'first'}},raw(final,'second'));
+ return {events,initial,final};
+}
+test('REST query variables audit accepts integer snapshots and unchanged same-node execution',()=>{
+ const {events,initial,final}=restQueryHistory();assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+test('REST query audit allows a new downstream Calculator after the initial REST response',()=>{
+ const {events,initial,final}=restQueryHistory();
+ events.splice(8,0,{phase:'node_apply_prepared',operation_id:'parse-initial',request:{
+  target:{kind:'new',type:'transform.calculator'},mode:'expression',
+  inputs:[{source:events[7].result.node,output:0,input:0}],
+  parameters:{expressions:[{name:'limit',formula:'return JSON.parse(Response).args.limit;'}]}
+ }});
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const edit of ['parameters','read parameters','GUID','input','variable input','mappings','connection readback'])test('REST query audit still rejects REST reconfiguration: '+edit,()=>{
+ const {events,initial,final}=restQueryHistory(),r=events[10].request;
+ if(edit==='parameters'){r.mode='request';r.parameters={connection:{base_url:'https://example.invalid'}};}
+ if(edit==='read parameters')r.parameters.connection={base_url:'https://example.invalid'};
+ if(edit==='GUID')r.target.ref.node_id='replacement';
+ if(edit==='input')r.inputs=[{source:{node_id:'different'},input:0,output:0}];
+ if(edit==='variable input')r.variable_inputs=[{source:{node_id:'different'},input:0,output:4,kind:'variables'}];
+ if(edit==='mappings')r.mappings=[{field:'limit',source:'other'}];
+ if(edit==='connection readback')events[11].result.configuration={readback:{...structuredClone(events[7].result.configuration.readback),connection:{base_url:'https://example.invalid'}}};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_(RECONFIGURED|REPLACED|CONNECTION)/);
+});
+test('REST query initial response can be an independent read after verified configuration',()=>{
+ const {events,initial,final}=restQueryHistory(),read=structuredClone(events[7]);
+ read.result.operation_id='read-first';delete read.result.configuration;
+ events[7].result.output.ports=[];events.splice(8,0,read);
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const fault of ['source type','source ID','request edit','missing cast','wrong response'])test('REST query variables audit rejects '+fault,()=>{
+ const {events,initial,final}=restQueryHistory();
+ if(fault==='source type')events[1].result.output.variable_ports[0].variables[0].type='string';
+ if(fault==='source ID')events[9].result.output.variable_ports[0].variables[0].id=42;
+ if(fault==='request edit'){events[10].request.mode='request';events[10].request.parameters={connection:{name:'different'}};}
+ if(fault==='missing cast')events.splice(4,2);
+ if(fault==='wrong response')events[11].result.output.ports[0].sample[0][1].value='{}';
+ assert.throws(()=>auditRestQueryVariables(events,initial,final));
 });

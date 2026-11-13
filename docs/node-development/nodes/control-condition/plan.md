@@ -1,6 +1,6 @@
 # Условие: подплан
 
-Статус: `discovery_required`. Редакция 2 от 2026-11-13 (LAB-1554), этап 0 по документам
+Статус: этап 1 — native-проба выполнена ([discovery](discovery.md), LAB-1557). Редакция 2 от 2026-11-13 (LAB-1554), этап 0 по документам
 без native-пробы: справка, код базы и регламент сквада. Заменяет редакцию 1 от 2026-10-05.
 Component ID: `component.control.Condition`, slug `control-condition`. Предлагаемый runtime
 type `control.condition`, mode `variable_branch` — до native-пробы это предложение.

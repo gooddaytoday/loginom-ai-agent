@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { access, copyFile, mkdir, mkdtemp, readdir, rm, stat, symlink, truncate, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
@@ -181,13 +181,6 @@ test("Host retains prewarm wait cancellation before any browser child starts", a
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await copyFile(node, join(resources, binary), constants.COPYFILE_FICLONE)
   await writeFile(join(resources, "browser"), "")
-  // Keep verification pending while the real Help child starts, even on a
-  // warm fast filesystem. At 512 MiB the wait could finish before observation
-  // and this cancellation test would accidentally launch an absent runtime.
-  await truncate(join(resources, "browser"), 4 * 1024 * 1024 * 1024)
-  const hash = createHash("sha256"),
-    block = Buffer.alloc(1024 * 1024)
-  for (let i = 0; i < 4096; i++) hash.update(block)
   await writeFile(
     join(resources, "resource-manifest.json"),
     JSON.stringify({
@@ -202,7 +195,7 @@ test("Host retains prewarm wait cancellation before any browser child starts", a
             .update(Buffer.from(await Bun.file(node).arrayBuffer()))
             .digest("hex"),
         },
-        { path: "browser", sha256: hash.digest("hex") },
+        { path: "browser", sha256: createHash("sha256").update("").digest("hex") },
       ],
     }),
   )
@@ -214,31 +207,24 @@ test("Host retains prewarm wait cancellation before any browser child starts", a
     if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
   });`,
   )
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+  // Keep the verifier barrier in a separate process so its module fixture cannot
+  // replace resource verification for any other Host test.
+  const child = Bun.spawn(
+    [process.execPath, fileURLToPath(new URL("./fixtures/prewarm-wait.ts", import.meta.url)), root, resources],
+    { stdout: "pipe", stderr: "pipe" },
+  )
+  const timer = setTimeout(() => child.kill(), 10_000)
   try {
-    const checking = host.api
-      .check({ revision: 0, url: "https://example.test", username: "fixture", password: { operation: "empty" } })
-      .catch((error) => error)
-    for (let i = 0; i < 1000; i++) {
-      if (
-        (
-          await Bun.file(join(root, "startup-phases.jsonl"))
-            .text()
-            .catch(() => "")
-        ).includes('"phase":"resources.wait"')
-      )
-        break
-      if (i === 999) throw Error("PREWARM_WAIT_NOT_OBSERVED")
-      await Bun.sleep(5)
-    }
-    host.beginClose()
-    expect((await checking).message).toBe("LOGINOM_HOST_CLOSED")
-    const evidence = await Bun.file(join(root, "validation/startup-failures.jsonl")).text()
-    expect(evidence).toContain('"phase":"resources.wait"')
-    expect(evidence).toContain("LOGINOM_HOST_CLOSED")
-    expect(await readdir(join(root, "validation"))).not.toContain("generations")
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" })
   } finally {
-    await host.close()
+    clearTimeout(timer)
+    if (child.exitCode === null) child.kill()
+    await child.exited
     await rm(directory, { recursive: true, force: true })
   }
 }, 15_000)
@@ -369,7 +355,7 @@ test.each([true, false])(
       await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
     } finally {
       await host.close().catch(() => undefined)
-      await rm(directory, { recursive: true, force: true })
+      await removeFixture(directory)
     }
   },
   15_000,
@@ -488,4 +474,19 @@ async function startupFixture(closed: boolean) {
   await store.activate(1)
   const host = await createLoginomHost({ root, resources, codec, environment: {}, headless: true })
   return { directory, host }
+}
+
+// Both children have already emitted exit (close awaits it), but Windows can
+// keep the copied node.exe image locked briefly afterwards. Only fixture
+// removal waits for that release; the cleanup assertions above are unchanged.
+async function removeFixture(directory: string) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await rm(directory, { recursive: true, force: true })
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? ""
+      if (process.platform !== "win32" || !["EBUSY", "EPERM", "ENOTEMPTY"].includes(code) || attempt >= 50) throw error
+      await Bun.sleep(100)
+    }
+  }
 }

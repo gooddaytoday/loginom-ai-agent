@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 
+test('C6 catalog keeps the original business task, partition.csv and immutable complete expected tables',()=>{
+ const value=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('linreg-partition-sequential');e=m.expected_for(c,'/worker/c6.lgp')
+approved=json.loads((c['source']/'expected.json').read_text())
+assert [o['rows'] for o in e['outputs']]==[o['rows'] for o in approved['outputs']]
+print(json.dumps(dict(task=c['prompt'].name,files=c['input_files'],outputs=e['outputs'])))`],{encoding:'utf8'}));
+ assert.equal(value.task,'task-partition-sequential.md');assert.deepEqual(value.files,['partition.csv']);
+ assert.equal(value.outputs[0].rows.length,18);assert.deepEqual(value.outputs[0].rows.slice(-2).map(r=>r.Y_rergession),[6.5,9.5]);
+ assert.deepEqual(value.outputs[1].rows.map(r=>r.Y_coefficients),[3,2,0.5,0]);
+});
+
 test('C1 catalog delivers only the approved task and selection.csv, with distinct independent F/R2 expectations',()=>{
  const result=JSON.parse(execFileSync('python3',['-c',`import importlib.util,json
 from pathlib import Path

@@ -2,20 +2,62 @@ import assert from "node:assert/strict"
 import { once } from "node:events"
 import { createServer } from "node:http"
 import type { Socket } from "node:net"
-import { sidecarEnvironment } from "../../desktop/src/main/proxy-env"
+import { resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 import { resolveSystemProxy } from "../src/system-proxy"
 
-if (process.argv.includes("--assert-windows")) await assertWindowsProxy()
+if (process.argv.includes("--measure-windows")) await measureWindows()
+else if (process.argv.includes("--assert-windows")) await assertWindowsProxy()
 else await readProxy()
 
+// Run each source/operation on its own disposable runner. The first subprocess
+// is cold; later subprocesses measure the same implementation with warm OS caches.
+async function measureWindows() {
+  assert.equal(process.platform, "win32")
+  assert.equal(process.env.GITHUB_ACTIONS, "true")
+  assert.equal(process.env.RUNNER_ENVIRONMENT, "github-hosted")
+  const source = process.argv[process.argv.indexOf("--source") + 1]
+  const operation = process.argv[process.argv.indexOf("--operation") + 1]
+  assert.ok(source && ["proxy", "dpapi"].includes(operation))
+  const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+    !/^(https?_proxy|all_proxy|no_proxy|node_use_env_proxy|loginom_ai_agent_system_proxy)$/i.test(key)))
+  const module = await import(pathToFileURL(resolve(source, operation === "proxy"
+    ? "packages/loginom-host/src/system-proxy/index.ts"
+    : "packages/loginom-host/src/connection/cli-dpapi.ts")).href)
+  let failures = 0
+  for (const sample of ["cold", "warm-1", "warm-2"]) {
+    const started = performance.now()
+    try {
+      if (operation === "proxy") {
+        const result = await module.resolveSystemProxy({ environment })
+        console.log(JSON.stringify({ operation, sample, elapsedMs: Math.round(performance.now() - started),
+          state: result.state, notices: result.notices }))
+        if (result.state !== "applied" || result.notices.length) failures++
+        continue
+      }
+      const input = Buffer.from("loginom-windows-native-timing")
+      const protectedValue = await module.cliDpapi("Protect", input)
+      console.log(JSON.stringify({ operation: "dpapi-protect", sample, elapsedMs: Math.round(performance.now() - started), state: "ok" }))
+      const unprotectStarted = performance.now()
+      assert.deepEqual(await module.cliDpapi("Unprotect", protectedValue), input)
+      console.log(JSON.stringify({ operation: "dpapi-unprotect", sample, elapsedMs: Math.round(performance.now() - unprotectStarted), state: "ok" }))
+    } catch {
+      failures++
+      console.log(JSON.stringify({ operation, sample, elapsedMs: Math.round(performance.now() - started), state: "failed" }))
+    }
+  }
+  if (process.argv.includes("--require-success")) assert.equal(failures, 0, "Native timing samples failed")
+}
+
 async function readProxy() {
-  const result = await resolveSystemProxy({ environment: process.env, deadlineMs: 8000 })
+  const result = await resolveSystemProxy({ environment: process.env })
   const target = result.summary.http ?? result.summary.https ?? ""
   console.log(`system proxy: ${result.state}${target ? ` ${target}` : ""}`)
   for (const notice of result.notices) console.log(`system proxy notice: ${notice.code}`)
 }
 
 async function assertWindowsProxy() {
+  const { sidecarEnvironment } = await import("../../desktop/src/main/proxy-env")
   assert.equal(process.platform, "win32")
   assert.equal(process.env.GITHUB_ACTIONS, "true", "Requires a disposable GitHub-hosted runner")
   assert.equal(process.env.RUNNER_ENVIRONMENT, "github-hosted")
@@ -54,8 +96,11 @@ async function assertWindowsProxy() {
     await once(local, "listening")
     const address = local.address()
     assert.ok(address && typeof address !== "string")
-    const result = await resolveSystemProxy({ environment, deadlineMs: 8000 })
+    const started = performance.now()
+    const result = await resolveSystemProxy({ environment })
+    console.log(`system proxy elapsedMs=${Math.round(performance.now() - started)}`)
     console.log(`system proxy: ${result.state} source=${result.summary.source} https=${result.summary.https}`)
+    for (const notice of result.notices) console.log(`system proxy notice: ${notice.code}`)
     assert.equal(result.state, "applied", "System proxy was not applied")
     assert.equal(result.summary.source, "windows", "Proxy must come from Windows, not environment")
     assert.equal(result.environment?.HTTP_PROXY, "http://127.0.0.1:18797")
