@@ -872,6 +872,11 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-partition-sequential`: C6, Enter на partition.csv, первые 16 строк
+обучают, следующие 2 тестовые. Только task-partition-sequential.md и CSV
+передаются модели; неизменённые expected.json и oracle остаются в оснастке.
+Полные порты 0/1, прогнозы теста 6.5/9.5, CSV, Save, cold без настройки и cleanup.
+
 `linreg-coefficients`: C7, Enter с `linear_regression.statistics:"full"`,
 утверждённые task-coefficients.md, design.csv и expected/coefficients.json.
 Порт 1 — девять native-столбцов (Name…Y_upperBound), NULL сохраняются;
@@ -889,6 +894,12 @@ Save, cold без перенастройки и Teach, cleanup.
 2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`logreg-lasso`: ручной L1, lambda_lasso=1, утверждённые task-lasso.md и train.csv
+из `datamining-logregression/acceptance/modes/lasso`. Неизменённый независимый
+oracle.py проверяет полный прогноз 32×8, типы, порядок и NULL. Повтор настройки
+и Teach — на том же узле. CSV, Save, cold без настройки/Teach и cleanup — штатные.
+Модель получает только задачу и CSV; expected и oracle остаются приватными.
 
 `logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
 повтор настройки и Teach того же узла; прогноз по независимому штрафному

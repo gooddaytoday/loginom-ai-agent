@@ -1,4 +1,5 @@
 import {makeVariablesReplaceConfigureCode} from './variables-replace-procedure.mjs';
+import {makeConditionConfigureCode} from './control-condition-procedure.mjs';
 import {makeVariablesColumnUnionContextCode} from './variables-coluniondatavar-context.mjs';
 import {makeVariablesCalculatorContextCode} from './variables-calculator-context.mjs';
 import {makeVariablesCalculatorConfigureCode} from './variables-calculator-procedure.mjs';
@@ -381,6 +382,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async readExcelImportSource() {return crossTableOwnedStep('excel_source_read',{},makeExcelSourceReadCode);},
     async readUserVariables() {return crossTableOwnedStep('user_snapshot',{},makeUserVariablesSnapshotCode);},
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
+    async configureCondition(settings){return crossTableOwnedStep('condition',settings,makeConditionConfigureCode);},
     async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},

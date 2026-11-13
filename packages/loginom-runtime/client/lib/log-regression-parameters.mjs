@@ -1,6 +1,6 @@
 const need=(value,message)=>{if(!value)throw Error('Logistic regression: '+message);};
 export function validateLogRegressionParameters(parameters,mode,r){
- need(['enter','forward','backward','stepwise','ridge','apply'].includes(mode),'use enter, forward, backward, stepwise, ridge or apply');
+ need(['enter','forward','backward','stepwise','ridge','apply','lasso'].includes(mode),'use enter, forward, backward, stepwise, ridge, lasso or apply');
  need(parameters&&Object.keys(parameters).length===1&&parameters.logistic,'use parameters.logistic');
  const p=parameters.logistic;
  need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization','regularization','weight_field'].includes(k)),'use input_fields, target_field, event and threshold');
@@ -13,10 +13,11 @@ export function validateLogRegressionParameters(parameters,mode,r){
  need(p.weight_field===undefined||['enter','apply'].includes(mode),'weight_field requires enter or saved Enter apply');
  const regularization=p.regularization;
  if(mode==='ridge')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_ridge==='number'&&Number.isFinite(regularization.lambda_ridge)&&regularization.lambda_ridge>0,'ridge requires regularization:{lambda_ridge:positive finite number}');
- else need(regularization===undefined,'regularization requires mode ridge');
+ else if(mode==='lasso')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_lasso==='number'&&Number.isFinite(regularization.lambda_lasso)&&regularization.lambda_lasso>0,'lasso requires regularization:{lambda_lasso:positive finite number}');
+ else need(regularization===undefined,'regularization requires mode ridge or lasso');
  need(p.normalization===undefined||['none','standardize'].includes(p.normalization),'normalization must be none or standardize');
  const selection=p.selection;
- if(mode==='enter'||mode==='apply'||mode==='ridge')need(selection===undefined,'Enter/apply/Ridge does not accept selection');
+ if(mode==='enter'||mode==='apply'||mode==='ridge'||mode==='lasso')need(selection===undefined,'Enter/apply/Ridge/LASSO does not accept selection');
  else if(selection!==undefined) {
   need(selection&&typeof selection==='object'&&!Array.isArray(selection)&&Object.keys(selection).every(k=>['criterion','entry_significance','removal_significance'].includes(k)),'selection requires criterion and applicable significance cutoffs');
   need(['deviance','aic','aicc','bic','hqic'].includes(selection.criterion),'unknown selection criterion');

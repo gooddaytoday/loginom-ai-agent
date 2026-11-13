@@ -3,6 +3,44 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readLinRegressionBrowser,readLinRegressionContext} from '../lib/linregression-context.mjs';
 
+function partitionFixture(change=()=>{}){
+ const base='MF;TF;WizrdMCF;LearnPartitionWizard',elements=new Map(),components={},icons=[{},{}],identity={ids:new WeakMap(),refs:new Map()};
+ const add=(tid,value,disabled=false)=>{const e={id:tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:0,y:0,width:500,height:300})};elements.set(tid,[e]);components[tid]={el:{dom:e},getValue:()=>value,isDisabled:()=>disabled,pressed:false};return e;};
+ add(base);for(const [key,value] of [['pedSamplingMethod',1],['ValidationSettings;pedLearnValidationMethod',0]])add(base+';'+key+';ValueControl',value);
+ for(const index of [0,1]){
+  const suffix=index?'-1':'',root=base+';SizeGridForm;',path=';FloatPropEdit'+suffix+';PropContainer;ValueContainer;ValueControl';
+  add(root+'colAbsoluteSize'+path,index?2:16);add(root+'colRelativeSize'+path,index?0:100,true);
+  for(const key of ['colAbsoluteSize','colRelativeSize'])add(root+key+';FloatPropEdit'+suffix+';SwitchButton');
+  const icon=icons[index];elements.set(root+'colSizeType_'+index,[{querySelectorAll:()=>[icon]},...(index?[{querySelectorAll:()=>[]}]:[])]);
+  identity.ids.set(icon,'ui-icon-'+index);identity.refs.set('ui-icon-'+index,{deref:()=>icon});
+ }
+ const grid=add(base+';SequenceMethodForm;grdSequence'),records=[0,1,2].map(PartitionType=>({isModel:true,data:{PartitionType,SequenceOrder:PartitionType,SizePath:''}}));
+ const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>records.length,isLoading:()=>false};components[grid.id].getStore=()=>store;
+ const document={querySelectorAll:q=>q.startsWith('[data-tid=')?elements.get(JSON.parse(q.slice(10,-1)))??[]:[]};identity.document=document;
+ change({components,elements,identity,records,store,base});
+ const context=vm.createContext({document,Ext:{getCmp:id=>components[id]},innerWidth:1280,innerHeight:800});context[Symbol.for('loginom-dock.workspace-ui.identity.v1')]=identity;
+ return JSON.parse(JSON.stringify(vm.runInContext('('+readLinRegressionBrowser.toString()+')',context)('MF;TF')));
+}
+test('native partition reads absolute 16/2 rather than stale 100/0 percentages and ignores the summary cell',()=>{
+ const state=partitionFixture();assert.equal(state.verified,true);assert.deepEqual(state.sizes.map(s=>[s.unit,s.count]),[['rows',16],['rows',2]]);assert.deepEqual(state.sequence,[0,1,2]);
+});
+test('partition reader refuses stale icon references, variable binding and incomplete sequence ownership',()=>{
+ for(const change of [f=>f.identity.refs.clear(),f=>f.records.pop(),f=>f.store.isLoading=()=>true,f=>f.records[1].data.PartitionType=0,
+  f=>f.components[f.base+';SizeGridForm;colAbsoluteSize;FloatPropEdit;SwitchButton'].pressed=true,
+  f=>f.components[f.base+';SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl'].isDisabled=()=>false])assert.equal(partitionFixture(change).verified,false);
+});
+
+test('serialized LearnPartition wizard exposes its native sampling picker',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+ page.add('div',base+';LearnPartitionWizard;SizeGridForm;grdDataSet','',undefined,form);
+ const owner=page.add('div',base+';LearnPartitionWizard;pedSamplingMethod;ValueControl','',undefined,form);
+ const picker=page.add('div',owner.getAttribute('data-tid')+';trg_picker','',{x:100,y:100,width:20,height:20},owner);
+ const state=await page.observe();assert.equal(state.wizard.stage,'learn_partition');
+ const control=state.ui.elements.find(e=>e.tid===picker.getAttribute('data-tid'));assert.ok(control?.allowed_actions.includes('click'));
+ assert.equal((await page.act({verb:'click',ref:control.ref},state)).status,'SUCCEEDED');
+});
+
 function fixture(count=5) {
  const base='MF;TF;WizrdMCF;TuneDataSourceInputPortWizard;',elements=[],components={};
  const element=(tid,parent)=>{const e={id:'e'+elements.length,tid,parent,checkVisibility:()=>true,contains(x){return x===this||x.parent===this;}};elements.push(e);return e;};

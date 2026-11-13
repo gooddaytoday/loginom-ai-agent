@@ -24,13 +24,18 @@ export function readLogRegressionBrowser(prefix) {
   ['details','LogRegressionWizard-1',['pedEpsilon','pedIntercept','pedThreshold','pedRegSelQuality','pedAddSignificance','pedRemoveSignificance']]
  ]){
   const base=prefix+';WizrdMCF;'+card;if(!active(base))continue;
-  const ridge=kind==='details'&&exactValue(prefix+';WizrdMCF;LogRegressionWizard;pedRegressionMethod;ValueControl')?.getValue()===4;
+  const method=exactValue(prefix+';WizrdMCF;LogRegressionWizard;pedRegressionMethod;ValueControl'),store=method?.getStore?.(),records=store?.getData?.()?.items;
+  const method_choices=Array.isArray(records)&&records.length<=1000&&!store.isLoading?.()?records.map(r=>({value:r.data?.[method.valueField],label:r.data?.[method.displayField]})).filter(c=>Number.isInteger(c.value)&&typeof c.label==='string'):[];
+  const lasso=kind==='details'&&method_choices.some(c=>c.value===method.getValue()&&/^LASSO\b/.test(c.label));
+  const ridge=kind==='details'&&method?.getValue()===4;
   if(ridge)names.push('pedRidgeSetupMethod','pedLambdaRidge');
+  if(lasso)names.push('pedLassoSetupMethod','pedLambdaLasso');
   const values={},switches={},disabled={};
-  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'logregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'logregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'logregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
+  for(const name of names){const c=exactValue(base+';'+name+';ValueControl');if(!c)return {verified:false,reason:'logregression_control'};values[name]=c.getValue();if(kind==='details'&&['pedRegSelQuality','pedAddSignificance','pedRemoveSignificance','pedRidgeSetupMethod','pedLambdaRidge','pedLassoSetupMethod','pedLambdaLasso'].includes(name)){if(typeof c.isDisabled!=='function')return {verified:false,reason:'logregression_disabled'};disabled[name]=c.isDisabled();}const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+';'+name+';SwitchButton')+']')];if(es.length>1)return {verified:false,reason:'logregression_switch'};switches[name]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;}
   if(kind==='parameters'&&(!Number.isInteger(values.pedRegressionMethod)||!['pedAutoMethod','pedDenormalize','pedUseDetailedSettings','pedShowRefCoeffs'].every(k=>typeof values[k]==='boolean')))return {verified:false,reason:'logregression_initializing'};
   if(kind==='details'&&(!(typeof values.pedEpsilon==='number'&&values.pedEpsilon>0)||typeof values.pedIntercept!=='boolean'))return {verified:false,reason:'logregression_initializing'};
   if(ridge&&(![0,1].includes(values.pedRidgeSetupMethod)||typeof values.pedLambdaRidge!=='number'||!Number.isFinite(values.pedLambdaRidge)||values.pedLambdaRidge<=0))return {verified:false,reason:'logregression_initializing'};
+  if(lasso&&(![0,1].includes(values.pedLassoSetupMethod)||typeof values.pedLambdaLasso!=='number'||!Number.isFinite(values.pedLambdaLasso)||values.pedLambdaLasso<=0))return {verified:false,reason:'logregression_initializing'};
   const classes=[];
   if(kind==='parameters'){
    const c=exactValue(base+';pedEventId;ValueControl'),store=c?.getStore?.(),records=store?.getData?.()?.items;
@@ -43,7 +48,7 @@ export function readLogRegressionBrowser(prefix) {
    }
    if(new Set(classes.map(c=>c.index)).size!==classes.length||new Set(classes.map(c=>c.label)).size!==classes.length)return {verified:false,reason:'logregression_class_identity'};
   }
-  return {verified:true,kind,values,switches,...(kind==='details'?{disabled}:{}),...(kind==='parameters'?{classes}:{})};
+  return {verified:true,kind,values,switches,...(kind==='details'?{disabled}:{}),...(kind==='parameters'?{classes,method_choices}:{})};
  }
  const partitionBase=prefix+';WizrdMCF;LearnPartitionWizard';
  if(active(partitionBase)){
