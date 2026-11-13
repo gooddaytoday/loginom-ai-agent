@@ -81,6 +81,27 @@ export const LOGINOM_ENGLISH = {
   "loginom.checking": "Checking connection…",
   "loginom.cancel": "Cancel pending changes",
   "loginom.reload": "Reload current settings",
+  "diagnostics.title": "Collect diagnostics",
+  "diagnostics.noChat": "No chat is open: recent attempts are collected",
+  "diagnostics.group.chat": "Chat",
+  "diagnostics.group.runtime": "Execution journals and session diagnostics",
+  "diagnostics.group.logs": "Application logs",
+  "diagnostics.group.dumps": "Attach crash dump",
+  "diagnostics.group.summary": "{{included}} files, {{size}}; skipped: {{omitted}}",
+  "diagnostics.dumps.warning": "A crash dump holds process memory and is attached without anonymization.",
+  "diagnostics.dataWarning":
+    "Passwords, keys, your login and internal server addresses are removed. The archive may contain chat text and fragments of your data.",
+  "diagnostics.total": "Archive: {{size}}",
+  "diagnostics.files.show": "Show files",
+  "diagnostics.files.hide": "Hide files",
+  "diagnostics.files.open": "Open",
+  "diagnostics.reason.budget": "did not fit",
+  "diagnostics.reason.unsafe": "secret found",
+  "diagnostics.reason.unreadable": "binary or unreadable",
+  "diagnostics.cancel": "Cancel",
+  "diagnostics.save": "Save as…",
+  "diagnostics.saved.title": "Diagnostics saved",
+  "diagnostics.failed.title": "Could not collect diagnostics",
 } as const
 
 export const dict = {
@@ -104,7 +125,7 @@ export const dict = {
   "command.category.permissions": "Permissions",
   "command.category.workspace": "Workspace",
   "command.category.settings": "Settings",
-  "command.logs.export": "Export logs",
+  "command.logs.export": "Collect diagnostics…",
 
   "theme.scheme.system": "System",
   "theme.scheme.light": "Light",

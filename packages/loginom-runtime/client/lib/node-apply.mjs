@@ -379,7 +379,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
   };
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request,handler);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true||isUnchangedTransformExecution(request,handler);
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
@@ -518,7 +518,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
           +'Otherwise report this actual caption.']:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied'},
       checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
-    if(request.target.type==='imports.text'&&operation.importBindingInventory)result.configuration.bindings=structuredClone(operation.importBindingInventory);
+    if(['imports.text','imports.excel'].includes(request.target.type)&&operation.importBindingInventory)result.configuration.bindings=structuredClone(operation.importBindingInventory);
     const variableMappings=state.phases.flatMap(p=>p.value?.variable_mappings??[]);
     if(variableMappings.length)result.configuration.variable_mappings=structuredClone(variableMappings);
     if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
@@ -643,7 +643,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const verified=name=>state.phases.some(p=>p.phase===name);
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
   const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
-  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request,handler);
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true||isUnchangedTransformExecution(request,handler);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
   const exportRelease=['exports.text','exports.excel','exports.lgd'].includes(request.target.type);

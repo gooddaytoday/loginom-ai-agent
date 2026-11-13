@@ -1,7 +1,8 @@
 import "@/index.css"
 import * as Sentry from "@sentry/solid"
 import { I18nProvider } from "@opencode-ai/ui/context"
-import { DialogProvider } from "@opencode-ai/ui/context/dialog"
+import { DialogProvider, useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogDiagnostics } from "@/components/dialog-diagnostics"
 import { FileComponentProvider } from "@opencode-ai/ui/context/file"
 import { File } from "@opencode-ai/session-ui/file"
 import { Font } from "@opencode-ai/ui/font"
@@ -326,6 +327,7 @@ function DesktopCommands() {
   const command = useCommand()
   const language = useLanguage()
   const platform = usePlatform()
+  const dialog = useDialog()
 
   command.register("desktop", () => {
     const commands: CommandOption[] = []
@@ -335,7 +337,8 @@ function DesktopCommands() {
         title: language.t("command.logs.export"),
         category: language.t("command.category.settings"),
         onSelect: () => {
-          void platform.exportDebugLogs?.()
+          if (platform.diagnostics) void dialog.show(() => <DialogDiagnostics />)
+          else void platform.exportDebugLogs?.()
         },
       })
     }

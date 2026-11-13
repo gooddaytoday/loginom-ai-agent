@@ -86,7 +86,11 @@ export async function readGraph(page, task) {
         const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedFactorAnalysis=type==='research.factor_analysis' && previous && previous.nodeTid!==tid && p.FSubType===1;
-        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis;
+        // A bound Excel filename renames the node to its %Variable% caption.
+        const renamedExcel=type==='imports.excel' && previous && previous.nodeTid!==tid && p.FSubType===1;
+        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis || renamedExcel;
+        // Its variables input is re-rendered under the same caption change.
+        const renamedExcelVariable=type==='imports.excel' && previous && previous.nodeTid!==tid && p.FType===0 && p.FSubType===3;
         const renamedVariablePort=previous&&previous.nodeTid!==tid&&p.FType===1&&p.FSubType===3
           &&['bg-vendor-icon-calcvariables','bg-vendor-icon-datatovariables'].includes(n.FIconCls)
           &&finishes.some(({context,trace})=>context?.verified===true&&context.surface==='graph'
@@ -108,16 +112,19 @@ export async function readGraph(page, task) {
         if((!ptid||variableRedraw) && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort)
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort || renamedExcelVariable)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort&&!renamedExcelVariable?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
               || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
             if(renamedDataPort && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
             if(renamedVariablePort&&(!/^Output_Var-\d+$/.test(candidate.slice(tid.length+1))
+              ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
+            if(renamedExcelVariable&&(!/^Input_Var-\d+$/.test(candidate.slice(tid.length+1))
               ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
             if(!variableRedraw&&[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
@@ -215,7 +222,7 @@ export async function readGraph(page, task) {
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect graph must still match immediately before the gesture.
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap) {
-  let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false;
+  let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry;
   let gestureBefore=task.effect.before;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
@@ -352,8 +359,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       // native graph comparison; drag rechecks it even if another repaint lands.
       gestureBefore=deselected;
       const source=find(tid),from=await point(source);
-      const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
-      await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
+      const geometry=()=>page.evaluate(()=>{
+        const g=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph;
+        return {scale:g.view.scale,grid_size:g.gridSize,grid_enabled:g.gridEnabled,scale_grid:g.graphHandler?.scaleGrid,
+          translate:{x:g.view.translate?.x,y:g.view.translate?.y},scroll:{x:g.container?.scrollLeft,y:g.container?.scrollTop}};
+      });
+      moveGeometry={before:await geometry()};
+      const scale=moveGeometry.before.scale,grid=moveGeometry.before.grid_size;
+      if(!Number.isFinite(scale)||scale<=0||!Number.isFinite(grid)||grid<=0)throw Error('Native move grid unavailable');
+      await drag(source,{x:from.x+(Math.round(p.position.x/grid)*grid-old.x)*scale,y:from.y+(Math.round(p.position.y/grid)*grid-old.y)*scale});
+      moveGeometry.after=await geometry();
     }else if(kind==='reveal_control'){
       const inspect=mode=>page.evaluate(({task,mode})=>{
         const b=task.request,a=bg.app,prep=globalThis.__loginomDockPreparationV1,card=a.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),m=card.Controller.FController;
@@ -525,6 +540,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;
+  if(moveGeometry)outcome.move_geometry=moveGeometry;
   if(paletteScrollUncertain||placementNavigationUncertain)outcome.cleanup_complete=false;
   return outcome;
 }
@@ -839,7 +855,25 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       // Cycles are rejected against the full tabular graph before any creation.
       if(value.target.kind==='existing')for(const input of [...value.inputs,...value.variable_inputs??[]]){const seen=new Set(),queue=[value.target.ref.node_id];while(queue.length){const id=queue.pop();if(id===input.source.node_id)throw new Error('Requested link would create a cycle');if(seen.has(id))continue;seen.add(id);queue.push(...[...graph.links,...graph.variable_links??[]].filter(e=>e.source===id).map(e=>e.target));}}
     },
-    positionMatches:(node,position)=>Math.abs(node.position.x-Math.round(position.x/8)*8)<0.1&&Math.abs(node.position.y-Math.round(position.y/8)*8)<0.1,
+    positionMatches:(node,position,effect)=>{
+      const geometry=effect?.receipt?.move_geometry,before=geometry?.before;
+      if(Math.abs(node.position.x-Math.round(position.x/8)*8)<0.1&&Math.abs(node.position.y-Math.round(position.y/8)*8)<0.1)return true;
+      if(!geometry)return false;
+      const original=effect.before.nodes.find(n=>n.ref.node_id===node.ref.node_id);
+      if(effect.kind!=='move'||effect.receipt.status!=='SUCCEEDED'||effect.receipt.cleanup_complete!==true
+        ||JSON.stringify(effect.parameters.ref)!==JSON.stringify(node.ref)||JSON.stringify(effect.parameters.position)!==JSON.stringify(position)
+        ||!original||JSON.stringify(before)!==JSON.stringify(geometry.after)||before.grid_enabled!==true||typeof before.scale_grid!=='boolean'
+        ||![before.scale,before.grid_size,before.scroll?.x,before.scroll?.y,before.translate?.x,before.translate?.y].every(Number.isFinite)
+        ||before.scale<=0||before.grid_size<=0)return false;
+      // Loginom's native handler snaps screen deltas unless scaleGrid is set.
+      // Verify that exact landing; a wider distance tolerance could hide a miss.
+      const grid=before.grid_size,step=grid*(before.scale_grid?before.scale:1);
+      return ['x','y'].every(axis=>{
+        const expected=Math.round(original.position[axis]/grid)*grid
+          +Math.round((Math.round(position[axis]/grid)*grid-original.position[axis])*before.scale/step)*step/before.scale;
+        return Math.abs(node.position[axis]-expected)<0.1;
+      });
+    },
     async mutate(effect,deadline,signal){
       signal?.throwIfAborted();let cancellation;
       const cancel=()=>{cancellation=call(`async page=>{(page[Symbol.for('loginom-dock.node-target-cancel')]??=new Set()).add(${JSON.stringify(effect.id)});return true;}`,Math.max(deadline,Date.now()+3000));cancellation.catch(()=>{});};
