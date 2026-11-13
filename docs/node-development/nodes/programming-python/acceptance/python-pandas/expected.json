@@ -1,0 +1,85 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.python"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "programming.python",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Date",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "AmountScaled",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Amount": 10.5,
+          "Text": "hello",
+          "Flag": true,
+          "Date": "2024-02-29 00:00:00",
+          "AmountScaled": 31.5
+        },
+        {
+          "Id": 3,
+          "Amount": null,
+          "Text": "я",
+          "Flag": true,
+          "Date": "2024-03-02 00:00:00",
+          "AmountScaled": null
+        },
+        {
+          "Id": 4,
+          "Amount": -5.5,
+          "Text": null,
+          "Flag": true,
+          "Date": null,
+          "AmountScaled": -16.5
+        }
+      ]
+    }
+  ]
+}
