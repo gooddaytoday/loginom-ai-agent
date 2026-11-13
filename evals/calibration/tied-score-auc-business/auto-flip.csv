@@ -1,0 +1,7 @@
+model_id;positive_cases;negative_cases;comparable_pairs;concordant_pairs;tied_pairs;auc
+M01;3;3;9;7;2;0.888889
+M02;3;3;9;7;0;0.777778
+M03;2;2;4;0;0;1.000000
+M04;2;0;0;0;0;
+M05;0;0;0;0;0;
+M06;0;2;0;0;0;
