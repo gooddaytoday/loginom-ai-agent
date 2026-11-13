@@ -3298,7 +3298,10 @@ noLLMServer.live(
                 const data = event.data as typeof SessionStatus.Event.Status.data.Type
                 if (data.sessionID === chat.id && data.status.type === "retry") retries.push(data.status.attempt)
               }
-              if (event.type === Session.Event.Error.type) errors.push(event.data)
+              if (event.type === Session.Event.Error.type) {
+                const data = event.data as typeof Session.Event.Error.data.Type
+                if (data.sessionID === chat.id) errors.push(data)
+              }
               return Effect.void
             })
             const failed = yield* prompt.prompt({
