@@ -603,12 +603,13 @@ test('invalid Duplicates input ends conclusively only with durable unchanged-dra
  }
 });
 
-test('invalid Excel variable binding ends conclusively at input mapping only with durable cleanup proof',async()=>{
- for(const failure of ['none','cleanup_complete','settings_unchanged','verification','phase','journal','foreign_type']){
+test('invalid Excel variable binding ends conclusively at input mapping only when the refusal reports the saved input',async()=>{
+ for(const failure of ['none','cleanup_complete','input_saved','claims_unchanged','verification','phase','journal','foreign_type']){
   const f=fixture({failJournal:failure==='journal'?'node_phase_refused':undefined}),p=request();
   p.target={kind:'existing',type:failure==='foreign_type'?'exports.text':'exports.excel',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
   p.read={ports:[],sample_rows:0,require_exact_numbers:false};f.handlers.set(p.target.type,{...f.handlers.get('imports.text')});
-  f.drivers.mapPorts=async()=>{const e=Error('Excel binding requires one connected non-NULL string variable: sheet_name');e.nodePhaseRefusal={phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'excel_export_binding_refused'};if(!['none','journal','foreign_type'].includes(failure))delete e.nodePhaseRefusal[failure];throw e;};
+  f.drivers.mapPorts=async()=>{const e=Error('Excel binding requires one connected non-NULL string variable: sheet_name');e.nodePhaseRefusal={phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:false,input_saved:true,verification:'excel_export_binding_refused'};
+   if(failure==='claims_unchanged')e.nodePhaseRefusal.settings_unchanged=true;else if(!['none','journal','foreign_type'].includes(failure))delete e.nodePhaseRefusal[failure];throw e;};
   const r=await f.run(p);assert.equal(r.status,failure==='none'?'FAILED':'AMBIGUOUS',failure);
   assert.equal(r.cleanup_complete,failure==='none',failure);assert.equal(r.pending_phase,failure==='none'?null:'input_mapping',failure);
   assert.ok(!f.calls.includes('open')&&!f.calls.includes('configure')&&!f.calls.includes('execute'));

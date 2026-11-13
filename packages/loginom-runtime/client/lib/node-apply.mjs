@@ -318,7 +318,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       const inputRefusal={'research.quality':'quality_input_validation_refused','research.duplicates':'duplicates_input_validation_refused','exports.excel':'excel_export_binding_refused'}[request.target.type];
       if(name==='input_mapping'&&inputRefusal&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
-        &&refusal.settings_unchanged===true&&refusal.verification===inputRefusal){
+        &&(request.target.type==='exports.excel'?refusal.settings_unchanged===false&&refusal.input_saved===true:refusal.settings_unchanged===true)
+        &&refusal.verification===inputRefusal){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }

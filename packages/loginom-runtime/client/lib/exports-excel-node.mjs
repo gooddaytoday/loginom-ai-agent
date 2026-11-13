@@ -41,7 +41,9 @@ export async function readExcelVariableMapping(channel,adapter,request,ctx,stora
   mapping=mapped.mapping;
  }
  if(bindings)try{requireExcelBindingSources(bindings,mapping,storageDirectories);}
- catch(error){error.nodePhaseRefusal={phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'excel_export_binding_refused'};throw error;}
+ catch(error){
+  // Input Done (and variables Done when bound) were already pressed: the input is saved, settings are not unchanged.
+  error.nodePhaseRefusal={phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:false,input_saved:true,verification:'excel_export_binding_refused'};throw error;}
  return mapping;
 }
 export function createExcelExportNodeSupport({targetOrigin,targetBuild,storageDirectories=null}){

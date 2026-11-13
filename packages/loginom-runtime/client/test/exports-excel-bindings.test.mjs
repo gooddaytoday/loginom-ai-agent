@@ -16,10 +16,16 @@ const invalid={
  unconnected:[variable('ExcelPath','/test-2/b.xlsx'),variable('SheetName','Февраль',{source:null})],
  missing:[variable('ExcelPath','/test-2/b.xlsx')],
 };
+// A same-named field that is itself inadmissible still makes the name ambiguous
+// for the runtime binding check (requireExcelBindingSources).
+const twins={
+ null_twin:[variable('ExcelPath','/test-2/b.xlsx'),variable('SheetName',null,{is_null:true}),variable('SheetName','Февраль')],
+ non_string_twin:[variable('ExcelPath','/test-2/b.xlsx'),variable('SheetName',7,{type:1}),variable('SheetName','Февраль')],
+};
 const mapping=fields=>({kind:'variables',direction:'input',port:0,fields});
 
 test('Excel configure refuses invalid bound variables before any setting gesture or Next',async()=>{
- for(const [name,fields] of Object.entries(invalid)){
+ for(const [name,fields] of Object.entries({...invalid,...twins})){
   let gestures=0,closed=0,reads=0;const events=[];
   const values=Object.fromEntries(Object.entries({destination:'/test-2/a.xlsx',sheet_name:'Данные',header:1,file_type:1,number_format:0,decimal_count:2,divide_thousands:false}).map(([key,value])=>[key,{value,tid:key,variable:false}]));
   const channel={observe:async()=>({wizard:{stage:'excel_export'},ui:{elements:[]}}),perform:async()=>{gestures++;throw Error('Unexpected gesture');}};
@@ -58,11 +64,12 @@ test('existing Excel export without requested bindings reads its variables input
 });
 
 test('invalid Excel bindings refuse right after the variables mapping, before the export wizard',async()=>{
- for(const kind of ['new','existing'])for(const [name,fields] of Object.entries({...invalid,no_link:null})){
+ for(const kind of ['new','existing'])for(const [name,fields] of Object.entries({...invalid,...twins,no_link:null})){
   const f=variableFixture({kind,bindings,fields:fields??good,links:fields?1:0});
   const error=await f.run().then(()=>null,e=>e);
   assert.ok(error,kind+' '+name);assert.match(error.message,/sheet_name|destination/,name);
-  assert.deepEqual(error.nodePhaseRefusal,{phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'excel_export_binding_refused'},name);
+  // Input Done and, with a link, variables Done were already pressed: the input is saved.
+  assert.deepEqual(error.nodePhaseRefusal,{phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:false,input_saved:true,verification:'excel_export_binding_refused'},name);
   assert.deepEqual(f.calls.map(c=>c[0]),fields?['graph','map']:['graph'],name);
  }
 });
