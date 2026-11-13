@@ -27,7 +27,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
-D76_SCENARIOS = ('types300', 'date-time-formats')
+D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -323,6 +323,10 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
                     expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
                     text_update=update, export_count=2 if update else 1)
+    if name == 'group-real':
+        root = REPO / 'docs/node-development/nodes/grouping'
+        return dict(source=root / 'acceptance/types', prompt=root / 'acceptance/types/task-real.md',
+                    data=root / 'fixtures/types', input_files=['types.csv'], base=None, expected_name='expected-real.json')
     if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
@@ -842,6 +846,12 @@ def scenario(name, case_root=None, *, cases=None):
         variant = name == 'collapse-variant'
         return dict(source=src, prompt=src / ('task-variant.md' if variant else 'task-mixed.md'), data=src / 'fixtures',
                     base=None, input_files=['mixed.csv'], expected_name='expected-variant.json' if variant else 'expected.json')
+    if name in ['date-time-parts', 'date-time-parts-week']:
+        src = REPO / 'docs/node-development/nodes/date-time/acceptance/parts'
+        week = name.endswith('-week')
+        return dict(source=src, prompt=src / ('task-week.md' if week else 'task.md'),
+                    data=src / 'data', base=None, input_files=['parts.csv'],
+                    expected_name='expected-week.json' if week else 'expected.json')
     if name == 'date-time-minsec':
         src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -1441,7 +1451,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
 
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned: both for types300; midnight_date
-        # also for date-time-formats (LAB-1101: port read keeps the exact value).
+        # also for date-time-formats (LAB-1101) and date-time-parts/week
+        # (owner decision d76-date-time-parts; port/cold retain exact values).
         # LAB-1153: CrossTable permits only omission of exactly zero time.
         if scenario_name not in D76_SCENARIOS + ('crosstable-datetime',): return None
         if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0

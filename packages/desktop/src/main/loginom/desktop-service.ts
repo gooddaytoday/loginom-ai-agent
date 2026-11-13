@@ -13,6 +13,7 @@ export function desktopLoginom() {
   return createLoginomHost({
     root: join(app.getPath("userData"), "loginom"),
     resources: loginomResources(),
+    resourceVersion: app.getVersion(),
     codec: credentials(process.platform, safeStorage),
     environment: process.env,
     headless:

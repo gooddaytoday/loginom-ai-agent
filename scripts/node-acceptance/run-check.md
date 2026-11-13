@@ -95,6 +95,15 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-real` uses grouping `acceptance/types/task-real.md` and only
+`fixtures/types/types.csv`. `expected-real.json` contains the unchanged
+`cases.real.stages` from the LAB-1558 proposal; its independent `oracle.py
+--check` stays outside the model workspace. Native Real median/mode/stddev,
+all-NULL and the mode tie are checked as complete typed rows with exact field
+order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
+the existing node, cold execution without configuration and cleanup use stock
+checks. Only the business task and CSV reach the model.
+
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
 `{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",
@@ -196,6 +205,12 @@ BGDATA/LZ4 файл и новый обратный импорт. Независ�
 `lgd-export-empty-variant` сохраняет схему пустого набора и Variant
 (integer/string/NULL), требует два настоящих обратных LGD-импорта, полный
 CSV/native oracle, Save, cold и cleanup. Отказ Variant-импорта не считается PASS.
+
+`date-time-parts` and `date-time-parts-week` use the approved `date-time/acceptance/parts`
+fixture and independent oracle (native-confirmed h1 weeks). The first adds day of
+year and milliseconds to the same executed quarter node; the second replaces ISO
+week with ordinary week on the same node. Full typed tables, CSV, Save, cold and
+cleanup use stock checks; only task and parts.csv reach the model.
 
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,

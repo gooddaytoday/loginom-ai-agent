@@ -379,7 +379,7 @@ async function navigatePreparedGraph(page, options) {
     const request=JSON.stringify({session:options.sessionId,ref,navigation:options.graphNavigation});
     const existing=p.receipts.get(options.operationId);
     if(existing&&existing.request!==request)fail('OPERATION_CONFLICT');
-    if(existing&&mode==='lookup')return {exists:true,phase:existing.phase,effect_possible:existing.navigationStarted===true,deadline_at:existing.navigationDeadline};
+    if(existing&&mode==='lookup')return {exists:true,phase:existing.phase,effect_possible:existing.navigationStarted===true};
     const source=existing?.navigationSource??[...p.receipts.values()].find(r=>r.phase==='verified'&&r.workflowId===ref.workflow_id);
     if(!source?.packageNode||!source.tab)fail('Prepared workflow changed');
     if(JSON.stringify(source.crumbs)!==JSON.stringify(ref.navigation_path))fail('Prepared workflow reference changed');
@@ -453,9 +453,11 @@ async function navigatePreparedGraph(page, options) {
     if(direction==='enter'&&graph.view.getState(nativeControl.FCell)?.text?.node!==controls[0])fail('Submodel entry label DOM changed');
     if(Date.now()>=deadline)fail('DEADLINE');
     if(mode==='reserve'){
-      if(existing)fail('OPERATION_CONFLICT');
+      // A reserved receipt never reached dispatch, so the same request may
+      // reserve again. dispatch stays the single gate before any gesture.
+      if(existing&&existing.phase!=='reserved')fail('OPERATION_CONFLICT');
       source.nodeTargetWorkflowNode=workflow;
-      p.receipts.set(options.operationId,{request,phase:'reserved',navigationSource:source,navigationOwner:owner,navigationOwnerGuid:owner?.FGuid,navigationOwnerData:owner?.data,navigationControl:nativeControl??controls[0],navigationGraph:graph,navigationDeadline:deadline});
+      p.receipts.set(options.operationId,{request,phase:'reserved',navigationSource:source,navigationOwner:owner,navigationOwnerGuid:owner?.FGuid,navigationOwnerData:owner?.data,navigationControl:nativeControl??controls[0],navigationGraph:graph});
     }
     if(mode==='dispatch'){
       // Hover redraws GenericEnterLabel's DOM. The unchanged native label and
@@ -471,7 +473,7 @@ async function navigatePreparedGraph(page, options) {
     remaining();const old=await inspect('lookup');effectPossible=old.effect_possible===true;
     if(old.exists&&old.phase==='verified')return result('READY',null,{...await inspect('replay'),replayed:true});
     // A retry only observes the original gesture under this call's deadline.
-    if(!old.exists){
+    if(!old.exists||old.phase==='reserved'&&!options.recoverOnly){
       if(options.recoverOnly)throw Error('RECEIPT_LOST');
       const before=await inspect('reserve');trace.push({event:'graph_navigation_prepared',direction:options.graphNavigation.direction,control_tid:before.control_tid});
       const control=page.locator('[data-tid='+JSON.stringify(before.control_tid)+']');
