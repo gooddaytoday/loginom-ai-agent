@@ -27,7 +27,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
-D76_SCENARIOS = ('types300', 'date-time-formats')
+D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -100,7 +100,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
                     input_files=['import-a.csv', 'import-b.csv'], export_count=3, import_initial='import/expected-initial.json',
-                    expected_name='import/expected.json', oracle=src / 'acceptance/oracle.py')
+                    expected_name='import/expected.json', oracle=src / 'acceptance/oracle.py',
+                    import_binding=('imports.text', '/settings/source/source_path', 'CsvPath'))
+    if name == 'excel-import-binding':
+        src = REPO / 'docs/node-development/nodes/imports-excel/acceptance'
+        return dict(source=src, prompt=src / name / 'task.md', data=src / name / 'data', base=None,
+                    input_files=['sales-a.xlsx', 'sales-b.xlsx'], export_count=3, import_initial=name + '/expected-initial.json',
+                    expected_name=name + '/expected.json', oracle=src / name / 'oracle.py',
+                    import_binding=('imports.excel', '/excel/source_path', 'ExcelPath'))
     if name == 'filter-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
@@ -316,6 +323,10 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
                     expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
                     text_update=update, export_count=2 if update else 1)
+    if name == 'group-real':
+        root = REPO / 'docs/node-development/nodes/grouping'
+        return dict(source=root / 'acceptance/types', prompt=root / 'acceptance/types/task-real.md',
+                    data=root / 'fixtures/types', input_files=['types.csv'], base=None, expected_name='expected-real.json')
     if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
@@ -363,6 +374,9 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/text-export/acceptance/cp1251'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     export_count=2, csv_header='labels', text_export_encodings=['cp1251', 'utf-8'])
+    if name == 'excel-export-variables':
+        src = REPO / 'docs/node-development/nodes/exports-excel/acceptance/variables'
+        return dict(source=src, prompt=src / 'task.md', data=src.parents[1] / 'fixtures', input_files=['modes.csv'], base=None, excel_mode='variables')
     if name in ['excel-export-xls', 'excel-export-numeric', 'excel-export-replace']:
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         mode = name.removeprefix('excel-export-')
@@ -825,6 +839,12 @@ def scenario(name, case_root=None, *, cases=None):
         variant = name == 'collapse-variant'
         return dict(source=src, prompt=src / ('task-variant.md' if variant else 'task-mixed.md'), data=src / 'fixtures',
                     base=None, input_files=['mixed.csv'], expected_name='expected-variant.json' if variant else 'expected.json')
+    if name in ['date-time-parts', 'date-time-parts-week']:
+        src = REPO / 'docs/node-development/nodes/date-time/acceptance/parts'
+        week = name.endswith('-week')
+        return dict(source=src, prompt=src / ('task-week.md' if week else 'task.md'),
+                    data=src / 'data', base=None, input_files=['parts.csv'],
+                    expected_name='expected-week.json' if week else 'expected.json')
     if name == 'date-time-minsec':
         src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -1155,6 +1175,11 @@ def expected_for(case, package, cold=False):
             'expected', '/dev/stdin', 'uniform', package], input=json.dumps(proposal).encode()))
     if case.get('excel_xls_refusal'):
         return dict(package_path=package,nodes=[dict(type='imports.text',label_any=True)],outputs=[],refusal=dict(text='XLS'))
+    if case.get('excel_mode') == 'variables':
+        approved = read(src / 'expected.json')
+        return dict(package_path=package, nodes=[dict(type='imports.text', label_any=True), *approved['nodes']],
+                    outputs=approved['excel_books'], excel_books=approved['excel_books'], excel_variables=True,
+                    excel_bindings=approved['binding_inventory'])
     if case.get('excel_mode'):
         approved = read(src / 'modes/expected.json')
         formats = ['xlsx']  # LAB-1057: XLS is a pre-mutation platform refusal, not a workbook case.
@@ -1432,7 +1457,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
 
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned: both for types300; midnight_date
-        # also for date-time-formats (LAB-1101: port read keeps the exact value).
+        # also for date-time-formats (LAB-1101) and date-time-parts/week
+        # (owner decision d76-date-time-parts; port/cold retain exact values).
         # LAB-1153: CrossTable permits only omission of exactly zero time.
         if scenario_name not in D76_SCENARIOS + ('crosstable-datetime',): return None
         if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
@@ -2065,6 +2091,12 @@ class Runner:
             routes = dict(zip(exports, destinations))
             names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
+        if spec.get('excel_mode') == 'variables':
+            prompt = prompt.replace('{{EXCEL_INITIAL_DESTINATION}}', destinations[0]).replace('{{EXCEL_FINAL_DESTINATION}}', destinations[1])
+            expected['variable_inventory'] = dict(outputs=[dict(node=dict(type='variables.calculator'), port=0, ordered=False,
+                variables=[dict(name='ExcelPath', label_any=True, type='string', value=destinations[1]),
+                           dict(name='SheetName', label_any=True, type='string', value='Февраль')])],
+                links=[dict(source=dict(type='variables.calculator'), output=0, target=dict(type='exports.excel'), input=0, kind='variables')])
         if spec.get('text_mask'):
             prompt += '\nВыгрузи и скачай первоначальную таблицу в ' + destinations[0] + '. Новая выгрузка придёт следующим сообщением.'
         if not spec.get('upload_only'):
@@ -2089,10 +2121,11 @@ class Runner:
         if spec.get('lgd_case') == 'variable':
             expected['lgd']['initial_destination'] = lgd_initial_destination
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = lgd_destination
-        if case == 'import-bindings':
+        if spec.get('import_binding'):
+            bound_type, bound_parameter, bound_variable = spec['import_binding']
             for output in expected['outputs']: output['column_order'] = 'exact'
-            expected['binding_inventory'] = [dict(node=dict(type='imports.text'), parameter='/settings/source/source_path',
-                mode='variable', variable=dict(kind='variables', input=0, name='CsvPath', type='string', is_null=False),
+            expected['binding_inventory'] = [dict(node=dict(type=bound_type), parameter=bound_parameter,
+                mode='variable', variable=dict(kind='variables', input=0, name=bound_variable, type='string', is_null=False),
                 source=dict(type='variables.user', output=4))]
         if spec.get('excel_mode') == 'replace':
             write(folder / 'seed-config.json', dict(login=login, books=[dict(fixture=str(spec['data'] / ('existing.'+b['format'])), destination=b['export_destination']) for b in expected['excel_books']]))
@@ -2212,12 +2245,12 @@ class Runner:
             self.phase('rest-query-variables-oracle', [build / 'resources/loginom/bin/node',
                 REPO / 'scripts/node-acceptance/expected-outputs.mjs', 'rest-query-variables',
                 folder / 'expected-initial.json', folder / 'expected.json', folder / 'rest-query-events.json'], folder, timeout=60)
-        if case == 'import-bindings':
+        if spec.get('import_binding'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             updates = [v['value'] for e in evidence if e.get('phase') == 'node_apply_prepared'
                        and e.get('request', {}).get('target', {}).get('type') == 'variables.user'
-                       for v in e['request'].get('parameters', {}).get('variables', []) if v.get('name') == 'CsvPath']
+                       for v in e['request'].get('parameters', {}).get('variables', []) if v.get('name') == spec['import_binding'][2]]
             assert updates, 'IMPORT_BINDING_SOURCE_UPDATE'
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = updates[-1]
             write(folder / 'expected.json', expected)
@@ -2543,6 +2576,47 @@ class Runner:
                     '--case', kind, '--file', actual], folder, timeout=60)
             self.current['csv'] = 'PASS (exact text bytes)'
             return session, expected, actual, ';'
+        if spec.get('excel_mode') == 'variables':
+            successful = [(n, o, o.get('configuration', {}).get('readback', {})) for n, o in replies
+                          if o.get('status') == 'SUCCEEDED' and o.get('execution', {}).get('status') == 'completed'
+                          and o.get('configuration', {}).get('readback', {}).get('kind') == 'excel_export']
+            wanted_bindings = dict(destination=dict(variable='ExcelPath'), sheet_name=dict(variable='SheetName'))
+            stages = []
+            manifest = []
+            for book in expected['excel_books']:
+                matches = [(n, o, r) for n, o, r in successful if r.get('destination') == book['export_destination']
+                           and r.get('settings', {}).get('sheet_name') == book['sheet_name'] and r.get('bindings') == wanted_bindings
+                           and any(f.get('destination') == book['export_destination'] and f.get('bytes', 0) > 0 for f in o.get('output', {}).get('file_artifacts', []))]
+                assert matches, 'EXCEL_VARIABLE_EXPORT_MISSING:' + book['phase']
+                stages.append(matches[0])
+                actual = folder / book['filename']
+                shutil.copyfile(downloaded_csv(profile, book['export_destination']), actual)
+                self.phase('oracle-' + book['phase'], [sys.executable, '-B', src / 'oracle.py', '--verify', book['phase'], actual], folder, timeout=60)
+                manifest.append(dict(file=str(actual), phase=book['phase']))
+            assert stages[0][0] < stages[1][0] and stages[0][1]['node'] == stages[1][1]['node'], 'EXCEL_VARIABLE_SAME_NODE'
+            calculators = [(n, o, o.get('configuration', {}).get('readback', {})) for n, o in replies
+                           if o.get('status') == 'SUCCEEDED' and o.get('execution', {}).get('status') == 'completed'
+                           and o.get('configuration', {}).get('readback', {}).get('kind') == 'variables_calculator']
+            first = [c for c in calculators if c[0] < stages[0][0]]
+            second = [c for c in calculators if stages[0][0] < c[0] < stages[1][0]]
+            assert first and second and first[-1][1]['node'] == second[-1][1]['node'], 'EXCEL_VARIABLE_SAME_CALCULATOR'
+            unchanged = lambda r: [{k: v for k, v in e.items() if k != 'formula'} for e in r['expressions']]
+            assert unchanged(first[-1][2]) == unchanged(second[-1][2]), 'EXCEL_VARIABLE_SOURCE_ONLY_VALUES'
+
+            requests = [event.get('part', {}).get('state', {}).get('input', {}) for _, event in events
+                        if event.get('type') == 'tool_use' and event.get('part', {}).get('tool') == 'loginom_dock_node_apply']
+            assert any(r.get('operation_id') == stages[1][1].get('operation_id') and r.get('target', {}).get('kind') == 'existing'
+                       and r.get('target', {}).get('ref', {}).get('node_id') == stages[1][1]['node']['node_id']
+                       and r.get('parameters') == {} and r.get('finish') == 'execute' for r in requests), 'EXCEL_VARIABLE_EMPTY_REPEAT'
+            assert all(r.get('destination_check', {}).get('existed') is False and r.get('destination_check', {}).get('overwrite') == 'reject'
+                       for _, _, r in stages), 'EXCEL_VARIABLE_REJECT_POLICY'
+
+            final_calls = [o for _, o in replies if o.get('node') == stages[1][1]['node'] and o.get('configuration', {}).get('readback', {}).get('kind') == 'excel_export']
+            assert len({o['node']['node_id'] for o in final_calls}) == 1, 'EXCEL_VARIABLE_NODE_RECREATED'
+            actual = folder / 'excel-books.json'
+            write(actual, manifest)
+            self.current['csv'] = 'PASS (Excel)'
+            return session, expected, actual, ','
         if spec.get('excel_mode'):
             manifest = []
             for book in expected['excel_books']:

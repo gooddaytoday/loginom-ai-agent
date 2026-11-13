@@ -1,0 +1,85 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "control.supernode"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "control.supernode",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Moment",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Doubled",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 9,
+          "Amount": 0.125,
+          "Note": "replaced",
+          "Flag": false,
+          "Moment": "2026-02-01 09:00:00",
+          "Doubled": 0.25
+        },
+        {
+          "RowID": 8,
+          "Amount": null,
+          "Note": "",
+          "Flag": true,
+          "Moment": null,
+          "Doubled": null
+        },
+        {
+          "RowID": 7,
+          "Amount": -4.0,
+          "Note": "last",
+          "Flag": null,
+          "Moment": "2026-02-03 11:15:00",
+          "Doubled": -8.0
+        }
+      ]
+    }
+  ]
+}

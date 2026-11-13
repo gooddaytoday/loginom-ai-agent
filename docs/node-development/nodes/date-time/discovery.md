@@ -1,3 +1,46 @@
+## Части даты: native-проба LAB-1560
+
+13.11.2026, mas3, Loginom 7.4.2 / Chromium 1246, исходники
+`origin/v040@f334cfe5e4fbf2f14d338816e46c4257f6f0f64f`.
+`https://app.loginom.ai/app/?testable=true`, worker назначенной пары;
+отдельные черновик и каталог `lab1560-native`, fixture `parts.csv` без изменений.
+Импорт подтвердил DateA:datetime; использованы только штатные жесты UI.
+
+Матрица `MF;TF-1;WizrdMCF;DateReformWizard;grdDataFormat`, read-only cached store,
+точная привязка DOM через production `readDateTimeBrowser`:
+
+| Операция | Func / ISO | StringFmt | Флаг / DOM-ячейка | Выход / DataType |
+|---|---|---|---|---|
+| quarter (регрессия) | 5 / false | `%Q` | DoNumber / `;colDoNumber_5` | DateA_Q_1 / 4 |
+| week | 7 / false | `%W` | DoNumber / `;colDoNumber_7` | DateA_WY_1 / 4 |
+| day_of_year | 8 / false | `%z` | DoNumber / `;colDoNumber_8` | DateA_DY_1 / 4 |
+| millisecond | 15 / false | `%u` | DoNumber / `;colDoNumber_15` | DateA_MSEC_1 / 4 |
+
+Типы integer и метки `DateA (Неделя)`, `DateA (День года)`,
+`DateA (Миллисекунды)` прочитаны из DOM-bound cached store
+`DerivedDataSourceOutputSocketWizard;grdTargetColumns`.
+После Execute прочитаны все 8 строк четырёх признаков в native preview
+`MF;TF-1;ModelForm;PreviewWindow;PreviewForm;DataSetForm;normalHeaderCt`:
+
+| RowID | Quarter | Week | DayOfYear | Millisecond |
+|---|---|---|---|---|
+| 1 | 1 | 1 | 1 | 0 |
+| 2 | 1 | 9 | 60 | 125 |
+| 3 | 4 | 53 | 366 | 999 |
+| 4 | 4 | 53 | 365 | 1 |
+| 5 | 1 | 1 | 1 | 0 |
+| 6 | 1 | 1 | 3 | 500 |
+| 7 | 3 | 27 | 182 | 10 |
+| 8 | NULL | NULL | NULL | NULL |
+
+**Выбрана h1**: понедельник, неделя 1 содержит 1 января. h2 (`strftime %W`)
+на строках 4–6 предсказывает 52/0/0, UI даёт 53/1/1. Все значения совпадают
+с независимым oracle; исходные expected сохранены до модельных прогонов.
+Точные `data-tid`, например `...;DateA_WY_1_3`, `...;DateA_DY_1_2`,
+`...;DateA_MSEC_1_5`. NULL отображён пустой ячейкой; строгая типизированная
+проверка NULL, CSV и cold остаются обязательной модельной приёмкой.
+Сырые DOM/matrix/schema — вне Git. Новых механизмов проверки нет.
+
 ## Минуты и секунды: этап 0 (LAB-707)
 
 Наблюдение 01.11.2026 на Loginom 7.4.2 / mas3, Chromium 1246,
@@ -224,3 +267,9 @@ Loginom 7.4.2 / Chromium 1246, `https://app.loginom.ai/app/?testable=true`, св
 `formats.csv` **не наблюдались** — их подтверждает первый живой прогон
 `date-time-formats` независимым oracle; расхождение с expected остановит карточку
 (`blocked`), expected не подгоняется.
+
+## v0.4.0: неделя, день года, миллисекунды — этап 0 (LAB-1546)
+
+Новой native-пробы нет (пара карточке не выдана). Native-ключи строк матрицы,
+две гипотезы обычной «Недели» и предложенный комплект —
+[acceptance/parts](acceptance/parts/README.md).

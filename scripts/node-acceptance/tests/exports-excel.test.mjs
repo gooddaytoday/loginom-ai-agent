@@ -74,3 +74,15 @@ assert not matches('XLS недоступен.')
 `],{cwd:new URL('../../../',import.meta.url),encoding:'utf8'});
  assert.equal(r.status,0,r.stderr);
 });
+
+test('variable Excel cold checks final sink plus both binding modes and keeps source execution inventory',async()=>{
+ const {verifyExcelColdBindings}=await import('../exports-excel-cold.mjs');
+ const books=['initial','final'].map((phase,i)=>({phase,output_node_type:'exports.excel',output_port:null,format:'xlsx',export_destination:'/test-2/'+phase+'.xlsx',sheet_name:i?'Февраль':'Январь',columns:[{name:'Code',type:'string'}],rows:[['А']]}));
+ const bindings=['destination','sheet_name'].map((key,i)=>({parameter:'/excel_export/'+key,mode:'variable',variable:{kind:'variables',input:0,name:i?'SheetName':'ExcelPath'}}));
+ const inventory={outputs:[{node:{type:'variables.calculator'},port:0,variables:[]}],links:[]};
+ const cold=excelColdExpected({excel_variables:true,excel_books:books,excel_bindings:bindings,variable_inventory:inventory});
+ assert.equal(cold.xlsx_sink,books[1]);assert.deepEqual(cold.excel_sinks,[books[1]]);assert.equal(cold.variable_inventory,inventory);
+ const destination={destination:books[1].export_destination,excel_bindings:{destination:{variable:'ExcelPath'},sheet_name:{variable:'SheetName'}}};
+ assert.equal(verifyExcelColdBindings([destination],cold),true);
+ for(const excel_bindings of [{},{destination:{variable:'ExcelPath'}},{destination:{variable:'ExcelPath'},sheet_name:{variable:'Wrong'}}])assert.throws(()=>verifyExcelColdBindings([{...destination,excel_bindings}],cold),/EXCEL_COLD_VARIABLE_BINDING/);
+});
