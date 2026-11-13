@@ -3,6 +3,25 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
+test('Grouping Real uses the unchanged proposal stage as a separate stock expected',()=>{
+ const result=spawnSync('python3',['-B','-c',`
+import importlib.util,json,subprocess,sys
+def load(name):
+ s=importlib.util.spec_from_file_location(name,'scripts/node-acceptance/'+name+'.py')
+ m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+r=load('run-check');checks=load('required-checks')
+c=r.scenario('group-real');e=r.expected_for(c,'/own/real.lgp');cold=r.expected_for(c,'/own/real.lgp',cold=True)
+proposal=json.loads((c['source']/'expected.json').read_text())
+assert e['outputs']==cold['outputs']==proposal['cases']['real']['stages']
+assert e['package_path']=='/own/real.lgp'
+assert c['input_files']==['types.csv'] and c['prompt'].name=='task-real.md'
+assert c['prompt'].is_file() and (c['data']/'types.csv').is_file()
+assert 'group-real' in checks.select([checks.C+'grouping-parameters.mjs'])[1]
+subprocess.run([sys.executable,str(c['source']/'oracle.py'),'--check'],check=True)
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});
+
 test('Grouping cache and result sort resolve approved oracle stages and required deltas',()=>{
  const result=spawnSync('python3',['-B','-c',`
 import importlib.util,subprocess,sys
