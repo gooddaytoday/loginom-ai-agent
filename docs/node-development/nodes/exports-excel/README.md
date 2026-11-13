@@ -8,7 +8,7 @@
 
 Зарегистрирован `exports.excel` / `xlsx`. Новая XLSX-книга, один именованный лист; header none/names/labels; overwrite reject; output.file_artifacts, без табличных выходов.
 
-Ограничения: Без append, XLS и числового форматирования; live names/none/empty отдельно не подтверждены.
+Ограничения: Без append и XLS (числовой стиль — #855); live names/none/empty отдельно не подтверждены.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [exports-excel-node.mjs](../../../../packages/loginom-runtime/client/lib/exports-excel-node.mjs):1–158; [exports-excel-parameters.mjs](../../../../packages/loginom-runtime/client/lib/exports-excel-parameters.mjs):1–36; [exports.excel.md](../../../../packages/product/skills/loginom-automation/references/nodes/exports.excel.md):1–14. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

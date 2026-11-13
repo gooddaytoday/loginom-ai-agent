@@ -224,3 +224,9 @@ Loginom 7.4.2 / Chromium 1246, `https://app.loginom.ai/app/?testable=true`, св
 `formats.csv` **не наблюдались** — их подтверждает первый живой прогон
 `date-time-formats` независимым oracle; расхождение с expected остановит карточку
 (`blocked`), expected не подгоняется.
+
+## v0.4.0: неделя, день года, миллисекунды — этап 0 (LAB-1546)
+
+Новой native-пробы нет (пара карточке не выдана). Native-ключи строк матрицы,
+две гипотезы обычной «Недели» и предложенный комплект —
+[acceptance/parts](acceptance/parts/README.md).

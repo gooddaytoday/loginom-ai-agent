@@ -15,7 +15,8 @@ export async function standalone(
   if (options.includes("--help") || options.includes("-h")) {
     process.stdout.write(
       `${Product.name} CLI\n\nUsage: ${Product.cliExecutable} [options] [command]\n\n` +
-        "Commands: run, providers (auth), models, loginom setup/check/status/cancel-pending/recover\n" +
+        "Commands: run, providers (auth), models, loginom setup/check/status (saved connection and pending recovery; readiness: check)/cancel-pending/recover\n" +
+        "          diagnostics export [--session <id>] [--output <path>] [--no-chat]\n" +
         "Without a command: interactive TUI\n\n" +
         "Options: --headless, --no-headless, --help, --version\n" +
         "Management: --format json; setup --stdin-json; recover --acknowledge [id...]\n" +
@@ -27,22 +28,37 @@ export async function standalone(
     process.stdout.write(`${InstallationVersion}\n`)
     return
   }
-  if (
-    ["run", "providers", "auth", "models"].includes(
-      options.filter((value) => !["--headless", "--no-headless"].includes(value))[0],
+  const command = options.filter((value) => !HEADLESS_FLAGS.includes(value))[0]
+  // Reads the profile without its guard, so it also works while a `run` hangs.
+  // Diagnostics never open a UI, so the headless flags do not apply to it.
+  if (command === "diagnostics") {
+    const channel = cliChannel()
+    const { diagnosticsCommand } = await import("@loginom-ai-agent/loginom-host/diagnostics-cli")
+    process.exitCode = await diagnosticsCommand(
+      args.filter((value) => !HEADLESS_FLAGS.includes(value)),
+      cliProfile({ channel, root: process.env.LOGINOM_AI_AGENT_CLI_PROFILE }),
+      { version: InstallationVersion, channel },
     )
-  )
+    return
+  }
+  if (["run", "providers", "auth", "models"].includes(command))
     return withStandaloneCancellation(() => executeProfile(args, execute))
   return executeProfile(args, execute)
+}
+
+const HEADLESS_FLAGS = ["--headless", "--no-headless"]
+
+function cliChannel() {
+  return productChannel(
+    process.env.LOGINOM_AI_AGENT_CHANNEL ?? (InstallationChannel === "local" ? "dev" : InstallationChannel),
+  )
 }
 
 async function executeProfile(
   args: string[],
   execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>,
 ) {
-  const channel = productChannel(
-    process.env.LOGINOM_AI_AGENT_CHANNEL ?? (InstallationChannel === "local" ? "dev" : InstallationChannel),
-  )
+  const channel = cliChannel()
   const profile = await acquireProfile(
     cliProfile({
       channel,

@@ -1,0 +1,60 @@
+{
+  "type": "imports.database",
+  "title": "Импорт — База данных",
+  "tabular_inputs": 0,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": false,
+  "modes": [
+    "table",
+    "sql"
+  ],
+  "semantics": "Read one table/view or one read-only SELECT through a module SQLite connection to a .db file in the user's storage into output table 0: field order, names, observed types, NULL. The node never writes to the database; non-SELECT SQL is refused before any gesture. Connection is created or reused by exact file path; source and query are read back from the wizard. No training. Filters, parameters, macros, ignore-errors, timeout and other DBMS are outside this slice.",
+  "parameter_schema": {
+    "type": "object",
+    "description": "New import requires connection and table or sql. Existing {} keeps saved settings.",
+    "properties": {
+      "connection": {
+        "type": "object",
+        "description": "SQLite connection of the current module, matched by exact database file path.",
+        "properties": {
+          "database_path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Absolute storage path of the .db file, e.g. /folder/people.db."
+          }
+        },
+        "required": [
+          "database_path"
+        ],
+        "additionalProperties": false
+      },
+      "mode": {
+        "type": "string",
+        "enum": [
+          "table",
+          "sql"
+        ],
+        "description": "table: whole table or view; sql: one read-only SELECT."
+      },
+      "table": {
+        "type": "string",
+        "minLength": 1,
+        "description": "mode=table: exact table or view name from the wizard list."
+      },
+      "fields": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "mode=table: fields to extract in output order; omit for all fields in source order."
+      },
+      "sql": {
+        "type": "string",
+        "minLength": 1,
+        "description": "mode=sql: one SELECT; ORDER BY fixes row order."
+      }
+    },
+    "additionalProperties": false
+  },
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000"
+}

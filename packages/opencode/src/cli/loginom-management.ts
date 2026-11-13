@@ -29,6 +29,42 @@ export function setupCandidate(json: string, current: Loginom.View): Loginom.Can
   }
 }
 
+// Every CLI command starts its own Host, so `starting` only means this process has not loaded Help yet.
+// `status` reports the saved connection instead; readiness is `loginom check`.
+export function statusView(current: Loginom.View) {
+  if (current.state !== "starting") return current
+  return { ...current, state: current.generation ? ("configured" as const) : ("unconfigured" as const) }
+}
+
+export function statusText(current: ReturnType<typeof statusView>) {
+  const count = current.recoveries?.length ?? 0
+  const clean = current.state !== "recoverable-error" && !count
+  const lines = [
+    current.generation
+      ? `Подключение настроено: ${current.url}, пользователь ${current.username}.` +
+        (clean ? " Незавершённых операций нет. Проверить соединение — `loginom check`." : "")
+      : "Подключение не настроено — `loginom setup`.",
+  ]
+  if (current.state === "pending")
+    lines.push("Сохранённое изменение подключения ещё не применено; отменить его — `loginom cancel-pending`.")
+  if (count) {
+    const word =
+      count % 10 === 1 && count % 100 !== 11
+        ? "операция"
+        : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)
+          ? "операции"
+          : "операций"
+    lines.push(
+      `Требуется восстановление: ${count} ${word} — проверьте сценарий в Loginom и выполните \`loginom recover\`.`,
+    )
+  } else if (current.state === "recoverable-error")
+    lines.push(
+      `Ошибка подключения${current.failure ? `: ${current.failure}` : ""}. ` +
+        "Проверить соединение — `loginom check`, настроить заново — `loginom setup`.",
+    )
+  return lines.join("\n")
+}
+
 export async function loginomManagement(
   host: Awaited<ReturnType<typeof launchNodeHost>>,
   command: string,
@@ -41,7 +77,7 @@ export async function loginomManagement(
   const decoded = view(await host.request("connection.status", {}))
   if (Option.isNone(decoded)) throw new Error("LOGINOM_REPLY_INVALID")
   const current = decoded.value
-  if (command === "status") return current
+  if (command === "status") return statusView(current)
   if (command === "cancel-pending") return host.request("connection.cancel-pending", { revision: current.revision })
   if (command === "recover") {
     if (!current.recoveries?.length) return current

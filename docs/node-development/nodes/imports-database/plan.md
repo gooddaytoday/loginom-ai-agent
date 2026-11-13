@@ -1,7 +1,7 @@
 # Импорт — База данных: подплан для Multica
 
-Статус: `discovery_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
-Component ID: `component.imports.DataBase`, slug `imports-database`. Runtime type и режим: `imports.database` / `table` — предложение до конца этапа 0.
+Статус: `ready_for_development` (этап 0 LAB-1544, 13.11.2026: [discovery](discovery.md), комплект `fixtures/` и `acceptance/` — предложение до утверждения). Редакция 2: по решению владельца 13.11 (`v040-open-scope`) первая СУБД этапа 1 — **SQLite** (файл `.db` в хранилище пары, сервер БД не нужен); PostgreSQL — отдельным циклом после пробы сети. Где разделы ниже говорят о PostgreSQL, для этапа 1 читать SQLite. Редакция 1 от 2026-10-05.
+Component ID: `component.imports.DataBase`, slug `imports-database`. Runtime type и режимы: `imports.database` / `table`, `sql` (этап 0 LAB-1544).
 База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактические версию/редакцию и ОС сервера записать на этапе 0; платформа исполнителя — Linux x64.
 
 Шаблон — [node-plan](../../templates/node-plan.md), образец нового узла — [ARIMAX](../datamining-arimax/plan.md). Общий порядок — [RUNBOOK](../../RUNBOOK.md) и [CLI-приёмка](../../workflow/acceptance-cli.md). [Карточка](README.md) · [реестр](../../registry.json).
