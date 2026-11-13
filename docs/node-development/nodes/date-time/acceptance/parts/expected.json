@@ -1,0 +1,118 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.date_time"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.date_time",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "DateA",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Keep",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "A_DayOfYear",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "A_Quarter",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "A_Ms",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "DateA": "2024-01-01T00:00:00.000",
+          "Keep": "пн",
+          "A_DayOfYear": 1,
+          "A_Quarter": 1,
+          "A_Ms": 0
+        },
+        {
+          "RowID": 2,
+          "DateA": "2024-02-29T13:14:15.125",
+          "Keep": "високосный",
+          "A_DayOfYear": 60,
+          "A_Quarter": 1,
+          "A_Ms": 125
+        },
+        {
+          "RowID": 3,
+          "DateA": "2024-12-31T23:59:59.999",
+          "Keep": "конец года",
+          "A_DayOfYear": 366,
+          "A_Quarter": 4,
+          "A_Ms": 999
+        },
+        {
+          "RowID": 4,
+          "DateA": "2025-12-31T12:00:00.001",
+          "Keep": "не високосный",
+          "A_DayOfYear": 365,
+          "A_Quarter": 4,
+          "A_Ms": 1
+        },
+        {
+          "RowID": 5,
+          "DateA": "2023-01-01T00:00:00.000",
+          "Keep": "вс",
+          "A_DayOfYear": 1,
+          "A_Quarter": 1,
+          "A_Ms": 0
+        },
+        {
+          "RowID": 6,
+          "DateA": "2021-01-03T08:30:00.500",
+          "Keep": "вс",
+          "A_DayOfYear": 3,
+          "A_Quarter": 1,
+          "A_Ms": 500
+        },
+        {
+          "RowID": 7,
+          "DateA": "2026-07-01T00:00:00.010",
+          "Keep": "июль",
+          "A_DayOfYear": 182,
+          "A_Quarter": 3,
+          "A_Ms": 10
+        },
+        {
+          "RowID": 8,
+          "DateA": null,
+          "Keep": null,
+          "A_DayOfYear": null,
+          "A_Quarter": null,
+          "A_Ms": null
+        }
+      ]
+    }
+  ]
+}
