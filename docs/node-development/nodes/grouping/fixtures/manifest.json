@@ -34,6 +34,152 @@
           "label_any": true
         }
       ]
+    },
+    {
+      "file": "types/types.csv",
+      "bytes": 341,
+      "sha256": "77ce4ed63dea0d1155967f2d0791fd2b1a1e7724e993ce0ed986a9bd73e2e34a",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "proposed acceptance input (LAB-1558)",
+      "rows": 14,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Price",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        }
+      ]
+    },
+    {
+      "file": "types/variant.csv",
+      "bytes": 87,
+      "sha256": "7870bd8bddd3d79bf5e4bce5740aa0dbc7e226c7e1806d9392cd3b637aa41aa8",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "proposed acceptance input (LAB-1558)",
+      "rows": 4,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "IntValue",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "RealValue",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "TextValue",
+          "type": "string",
+          "label_any": true
+        }
+      ]
+    },
+    {
+      "file": "types/mode-tie.csv",
+      "bytes": 137,
+      "sha256": "141250ff3581315a87e6a5b08a9491c01cb6bc4d2413c6bd44b1ce1c23ab053b",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "proposed acceptance input (LAB-1558)",
+      "rows": 10,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "label_any": true
+        }
+      ]
+    },
+    {
+      "file": "types/empty.csv",
+      "bytes": 29,
+      "sha256": "59185dfe8e71760275cbc54a2afbd81f6e236d43ec79df1c59a705a0412e9990",
+      "encoding": "UTF-8",
+      "delimiter": ";",
+      "null_marker": "\\N",
+      "header": true,
+      "row_order": "file order",
+      "role": "proposed acceptance input (LAB-1558)",
+      "rows": 0,
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Price",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Day",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        }
+      ]
     }
   ]
 }
