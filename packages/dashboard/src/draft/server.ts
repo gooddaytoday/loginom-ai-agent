@@ -12,7 +12,7 @@ export type DraftEntry = {
   data: Pick<typeof Snapshot.Type, "nodeName" | "created" | "sample"> & { parameters: { name: string; value: number | null }[] }
 }
 
-const page = '<!doctype html><html lang="ru"><meta charset="utf-8"><title>Черновик dashboard</title><body style="margin:0;font:14px system-ui"><script src="/draft.js"></script></body></html>'
+const page = '<!doctype html><html lang="ru"><meta charset="utf-8"><title>Черновик dashboard</title><link rel="icon" href="data:,"><body style="margin:0;font:14px system-ui"><script src="/draft.js"></script></body></html>'
 
 export async function draftServer(pageScript: string) {
   const script = await readFile(pageScript)

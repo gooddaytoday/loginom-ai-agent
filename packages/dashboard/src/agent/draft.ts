@@ -1,6 +1,7 @@
 import { realpath } from "node:fs/promises"
 import { join } from "node:path"
 import { buildDashboard } from "./build.ts"
+import { selfCheck } from "./check.ts"
 import { readDashboardSnapshot } from "./folder.ts"
 import type { DashboardResources } from "./resources.ts"
 import { draftServer } from "../draft/server.ts"
@@ -30,5 +31,6 @@ export async function draftDashboard(input: { work: string; resources: Dashboard
       sample: saved.sample,
     },
   })
-  return `Черновик: ${url}\nПроверка типов и сборка: успешно.`
+  const checked = await selfCheck({ resources: input.resources, url, signal: input.signal })
+  return `Черновик: ${url}\nПроверка типов и сборка: успешно.\nСамопроверка страницы: ${checked.ok ? "успешно" : "ошибка (" + checked.state + ")\n" + checked.errors.join("\n")}`
 }

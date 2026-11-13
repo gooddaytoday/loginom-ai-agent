@@ -38,6 +38,7 @@ test("a prepared folder builds and serves its coherent sample using one shared s
   const prepared = await fixture(t)
   const output = await draftDashboard({ work: prepared.directory, resources })
   assert.match(output, /Проверка типов и сборка: успешно/)
+  assert.match(output, /^Самопроверка страницы: успешно$/m)
   const url = output.match(/http:\/\/localhost:\d+\/[a-f0-9]{64}\//)?.[0]
   assert.ok(url, output)
   assert.equal((await fetch(url)).status, 200)
@@ -90,4 +91,16 @@ test("installation resources require the manifest, payload and template dependen
   assert.throws(() => dashboardResources(root), missing)
   await mkdir(join(expected.template, "node_modules"))
   assert.deepEqual(dashboardResources(root), expected)
+})
+
+test("draft reports at most twenty console errors from the built app", async t => {
+  const prepared = await fixture(t)
+  await writeFile(join(prepared.directory, "src/main.tsx"), `import { onState } from "./loginom"
+onState(() => { for (let index = 0; index < 25; index++) console.error("render error " + index) })`)
+  const output = await draftDashboard({ work: prepared.directory, resources })
+  assert.match(output, /Черновик: http:\/\/localhost:/)
+  assert.match(output, /Самопроверка страницы: ошибка \(ready\)/)
+  assert.equal(output.split("\n").filter(line => line.startsWith("render error ")).length, 20)
+  assert.match(output, /^render error 19$/m)
+  assert.doesNotMatch(output, /^render error 20$/m)
 })
