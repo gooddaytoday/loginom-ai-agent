@@ -30,7 +30,13 @@ python3 -I -m unittest discover -s scripts/node-acceptance/tests -p test_http_fi
 
 Используется образ `python:3.12-slim`, который уже есть на VM: ничего не
 скачивается и не собирается. `VM_LAN_IP` — LAN-адрес VM, на котором проверяющие
-с mas/mas2/mas3 откроют admin-порт.
+с mas/mas2/mas3 откроют admin-порт. `admin.env` принадлежит root с правами 0600,
+docker CLI читает его на стороне клиента — поэтому команды `docker` здесь через `sudo`.
+
+Условие: `sudo docker network inspect loginom-app-private -f '{{.Internal}}'` должно
+вернуть `false`. Если сеть internal, `-p` у контейнера только в ней порт не
+публикует: запустите контейнер в обычной bridge-сети с тем же `-p`, затем
+`sudo docker network connect loginom-app-private loginom-http-fixture`.
 
 ```sh
 sudo install -d -m 0755 /opt/loginom-http-fixture
@@ -38,7 +44,7 @@ sudo install -m 0644 scripts/node-acceptance/fixtures/http_fixture.py /opt/login
 ( umask 077; printf 'FIXTURE_ADMIN_TOKEN=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" \
   | sudo tee /opt/loginom-http-fixture/admin.env >/dev/null )
 
-docker run -d --name loginom-http-fixture --restart unless-stopped \
+sudo docker run -d --name loginom-http-fixture --restart unless-stopped \
   --network loginom-app-private \
   -p "$VM_LAN_IP:18090:18090" \
   --env-file /opt/loginom-http-fixture/admin.env \
@@ -55,16 +61,16 @@ Data-порт 18080 и TLS-порты не публикуются (`-p` толь
 убирает токен из истории shell и `ps`; в `docker inspect` он всё равно виден,
 поэтому доступ к Docker на VM приравнивается к знанию токена. Токен передаётся
 проверяющим отдельно и никогда не попадает в задачу или к модели.
-Остановка: `docker rm -f loginom-http-fixture`.
+Остановка: `sudo docker rm -f loginom-http-fixture`.
 
 ## Готовность
 
 ```sh
-docker logs loginom-http-fixture 2>&1 | grep READY
+sudo docker logs loginom-http-fixture 2>&1 | grep READY
 # READY data=18080 admin=18090 tls=18443-18462 host=loginom-http-fixture
 
 # data-порт из той же сети, что loginom-app-server (/healthz не пишется в ledger):
-docker run --rm --pull never --network loginom-app-private python:3.12-slim \
+sudo docker run --rm --pull never --network loginom-app-private python:3.12-slim \
   python3 -I -c "import urllib.request as u; print(u.urlopen('http://loginom-http-fixture:18080/healthz', timeout=5).read().decode())"
 # {"ok":true}
 ```
