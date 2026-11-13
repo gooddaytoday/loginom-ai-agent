@@ -185,7 +185,7 @@ export function maskLogins(text: string, logins: string[]) {
   const names = [...new Set(logins)].filter((item) => item.length >= 3 && !GENERIC_LOGINS.has(item.toLowerCase()))
   for (const name of names.sort((a, b) => b.length - a.length))
     for (const variant of variants(name))
-      text = text.replace(new RegExp(`(?<![\\p{L}\\p{N}_.@%-])${escapeRegExp(variant)}(?![\\p{L}\\p{N}_@%-]|\\.[\\p{L}\\p{N}])`, "giu"), "[user]")
+      if (text.toLowerCase().includes(variant.toLowerCase())) text = text.replace(new RegExp(`(?<![\\p{L}\\p{N}_.@%-])${escapeRegExp(variant)}(?![\\p{L}\\p{N}_@%-]|\\.[\\p{L}\\p{N}])`, "giu"), "[user]")
   return text
 }
 
@@ -207,19 +207,23 @@ const hostLabel = (host: string) => "host-" + sha256(host.toLowerCase()).slice(0
 // Internal server addresses: every URL host outside the public list, private
 // IPv4/IPv6 literals and intranet-only names. Scheme and port remain readable.
 export function maskHosts(text: string, allowed: readonly string[] = PUBLIC_HOSTS) {
+  text = text.replace(
+    /\b([a-z][a-z0-9+.-]*:\/\/)(\[[0-9a-f:.]+\]|[^\s/?#:"'<>\\`@[\]]+)/gi,
+    (match, scheme: string, host: string) => (publicHost(host, allowed) ? match : scheme + hostLabel(host)),
+  )
+  // Journals hold megabytes of long tokens: test whole tokens with anchored
+  // patterns instead of scanning every offset with a backtracking expression.
+  if (/\d\.\d{1,3}\.\d{1,3}\.\d|\.(?:local|lan|corp|internal|intranet|arpa)(?![\w-])/i.test(text))
+    text = text.replace(/[\w.-]+/g, (token) => {
+      const host = token.replace(/\.+$/, "")
+      if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return privateIPv4(host) ? hostLabel(host) + token.slice(host.length) : token
+      if (/^(?:[a-z0-9-]+\.)+(?:local|lan|corp|internal|intranet|home\.arpa)$/i.test(host) && !host.startsWith("-"))
+        return hostLabel(host) + token.slice(host.length)
+      return token
+    })
+  if (/f[cd][0-9a-f]{2}:/i.test(text))
+    text = text.replace(/(?<![\w-])\[?(f[cd][0-9a-f]{2}(?::[0-9a-f]{0,4}){2,7})\]?/gi, (_match, host: string) => hostLabel(host))
   return text
-    .replace(
-      /\b([a-z][a-z0-9+.-]*:\/\/)(\[[0-9a-f:.]+\]|[^\s/?#:"'<>\\`@[\]]+)/gi,
-      (match, scheme: string, host: string) => (publicHost(host, allowed) ? match : scheme + hostLabel(host)),
-    )
-    .replace(/(?<![\w.-])(\d{1,3}(?:\.\d{1,3}){3})(?![\w.-]*\w)/g, (match, host: string) =>
-      privateIPv4(host) ? hostLabel(host) : match,
-    )
-    .replace(/(?<![\w-])\[?(f[cd][0-9a-f]{2}(?::[0-9a-f]{0,4}){2,7})\]?/gi, (_match, host: string) => hostLabel(host))
-    .replace(
-      /(?<![\w.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:local|lan|corp|internal|intranet|home\.arpa))(?![\w-])/gi,
-      (_match, host: string) => hostLabel(host),
-    )
 }
 
 function readBounded(path: string, limit = DIAGNOSTICS_LIMITS.fileBytes) {
