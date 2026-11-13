@@ -107,7 +107,7 @@ RULES = (
     ((C + 'log-regression-*.mjs',), ('live-ui',), ('logreg-lasso', 'logreg-ridge', 'logreg-weights', 'logreg-normalization', 'logreg-coefficients', 'logreg-apply', 'logreg-enter', 'logreg-forward', 'logreg-backward', 'logreg-stepwise', 'logreg-selection-forward', 'logreg-selection-backward', 'logreg-selection-stepwise', 'logreg-stepwise-aic', 'logreg-stepwise-aicc', 'logreg-stepwise-bic', 'logreg-stepwise-hqic', 'logreg-stepwise-strict', 'logreg-stepwise-permissive')),
     (('scripts/node-acceptance/scenarios/linreg-elastic/**',), ('live-ui',), ('linreg-elastic',)),
     (('scripts/node-acceptance/scenarios/linreg-lasso/**',), ('live-ui',), ('linreg-lasso',)),
-    ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4', 'linreg-forward-f', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge', 'linreg-lasso', 'linreg-coefficients', 'linreg-elastic')),
+    ((C + 'linregression-*.mjs',), ('live-ui',), ('n20', 'r3', 'r4', 'linreg-forward-f', 'linreg-backward-f', 'linreg-stepwise-f', 'linreg-ridge', 'linreg-lasso', 'linreg-coefficients', 'linreg-elastic', 'linreg-partition-sequential')),
     ((C + 'rest-*.mjs',), ('live-ui',), ('n11', 'r5', 'r6')),
     ((C + 'rest-request*.mjs', C + 'rest-connection.mjs',
       'docs/node-development/nodes/integration-restrequest/acceptance/modes/*-body/**',

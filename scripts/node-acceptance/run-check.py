@@ -606,6 +606,12 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / ('acceptance/penalty/task-elastic.md' if name == 'linreg-elastic' else 'acceptance/penalty/task-lasso.md'),
                     data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
                     expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
+    if name == 'linreg-partition-sequential':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        src = node / 'acceptance/modes/partition-sequential'
+        return dict(source=src, prompt=src / 'task-partition-sequential.md',
+                    data=node / 'fixtures/modes', input_files=['partition.csv'], base=None,
+                    expected_name='expected.json', oracle=node / 'acceptance/modes/oracle.py', linreg_forward=True)
     if name == 'linreg-coefficients':
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance/modes/task-coefficients.md',

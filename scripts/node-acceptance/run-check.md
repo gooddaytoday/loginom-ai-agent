@@ -872,6 +872,11 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-partition-sequential`: C6, Enter на partition.csv, первые 16 строк
+обучают, следующие 2 тестовые. Только task-partition-sequential.md и CSV
+передаются модели; неизменённые expected.json и oracle остаются в оснастке.
+Полные порты 0/1, прогнозы теста 6.5/9.5, CSV, Save, cold без настройки и cleanup.
+
 `linreg-coefficients`: C7, Enter с `linear_regression.statistics:"full"`,
 утверждённые task-coefficients.md, design.csv и expected/coefficients.json.
 Порт 1 — девять native-столбцов (Name…Y_upperBound), NULL сохраняются;
