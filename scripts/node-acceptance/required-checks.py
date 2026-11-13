@@ -56,6 +56,8 @@ RULES = (
       'packages/product/skills/loginom-automation/references/nodes/transform.union_data.md'),
      ('live-ui',), ('union-auto-match', 's4', 'union-two-stage', 'union-auto-label')),
     ((C + 'crosstable-*.mjs',), ('live-ui',), ('s5', 'n13')),
+    ((C + 'control-condition-*.mjs', 'scripts/node-acceptance/control-condition.mjs', 'docs/node-development/nodes/control-condition/acceptance/**',
+      'packages/product/skills/loginom-automation/references/nodes/control.condition.md'), ('live-ui',), ('condition-variable',)),
     ((C + 'variables-replace-*.mjs', 'scripts/node-acceptance/variables-replace.mjs', 'docs/node-development/nodes/variables-replace/acceptance/**'), ('live-ui',), ('variables-replace-exact', 'variables-replace-match')),
     ((C + 'variables-coluniondatavar-*.mjs', 'docs/node-development/nodes/variables-coluniondatavar/acceptance/**', 'scripts/node-acceptance/variables-column-union.mjs'), ('live-ui',), ('variables-column-union', 'variables-union-inputs', 'variables-union-manual', 'variables-union-type-refusal')),
     ((C + 'variables-calculator-*.mjs', 'docs/node-development/nodes/variables-calculator/acceptance/**', 'scripts/node-acceptance/variables-calculator.mjs'),
