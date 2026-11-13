@@ -2,8 +2,6 @@ name: Loginom full client tests
 
 on:
   workflow_dispatch:
-  push:
-    branches: [client-full-ci]
 
 permissions:
   contents: read
