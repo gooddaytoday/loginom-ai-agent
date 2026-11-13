@@ -39,9 +39,19 @@ test('effective input mapping is validated before its Done, preserving retained 
  assert.throws(()=>validateDateTimeInputParameters(parameters,{fields:[{name:'Renamed',type:'datetime'}]},native));
 });
 test('unsupported ISO end/string operations and repeated assignments are refused',()=>{
- for(const operation of ['iso_week_end','custom','week','to_string','string_week'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
+ for(const operation of ['iso_week_end','custom','to_string','string_week'])assert.throws(()=>validateDateTimeParameters({fields:[{...parameters.fields[0],transformations:[{operation,name:'Out',label:'Out'}]}]},'calendar',request));
  const p=structuredClone(parameters);p.fields[0].transformations.push({...p.fields[0].transformations[0],name:'Other'});assert.throws(()=>validateDateTimeParameters(p,'calendar',request));
- assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,22);
+ assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,25);
+});
+test('ordinary week, day of year and milliseconds resolve native integer sources beside ISO week',()=>{
+ const operations=[['week','WY','Неделя'],['day_of_year','DY','День года'],['millisecond','MSEC','Миллисекунды'],['iso_week','WY','Неделя, ISO8601']];
+ const p={fields:[{field:{kind:'input_field',name:'A'},transformations:operations.map(([operation])=>({operation,name:operation,label:operation}))}]};
+ validateDateTimeParameters(p,'calendar',request);
+ const sources=operations.map(([,suffix,label],i)=>field(String(i),'A_'+suffix+'_'+(i+1),'Дата ('+label+')','integer',true)).reverse();
+ const native={verified:true,inventory_complete:true,source_identity_verified:true,source_fields:sources,target_fields:sources.map(source=>({source,name:source.name,label:source.label,excluded:false}))};
+ assert.deepEqual(resolveDateTimeOutput({input_fields:[{name:'A',label:'Дата',type:'datetime'}]},p,native).map(r=>r.name),operations.map(([operation])=>operation).reverse());
+ const wrong=structuredClone(native);wrong.source_fields.find(s=>s.name==='A_MSEC_3').type='real';
+ assert.throws(()=>resolveDateTimeOutput({input_fields:[{name:'A',label:'Дата',type:'datetime'}]},p,wrong),/ambiguous generated source/);
 });
 test('four ISO-week operations validate and resolve distinct generated sources beside calendar year',()=>{
  const operations=[['year','A_Y_1','Дата (Год)','integer'],['iso_year','A_Y_2','Дата (Год, ISO8601)','integer'],['iso_week','A_WY_7','Дата (Неделя, ISO8601)','integer'],['iso_week_start','A_YW_3','Дата (Год + Неделя, Первый день, ISO8601)','datetime'],['day_of_week','A_DW_1','Дата (День недели)','integer']];

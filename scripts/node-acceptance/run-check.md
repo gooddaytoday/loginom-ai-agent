@@ -206,6 +206,12 @@ BGDATA/LZ4 файл и новый обратный импорт. Независ�
 (integer/string/NULL), требует два настоящих обратных LGD-импорта, полный
 CSV/native oracle, Save, cold и cleanup. Отказ Variant-импорта не считается PASS.
 
+`date-time-parts` and `date-time-parts-week` use the approved `date-time/acceptance/parts`
+fixture and independent oracle (native-confirmed h1 weeks). The first adds day of
+year and milliseconds to the same executed quarter node; the second replaces ISO
+week with ordinary week on the same node. Full typed tables, CSV, Save, cold and
+cleanup use stock checks; only task and parts.csv reach the model.
+
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
 minutes and seconds from two datetime fields, 00/59, 23:59:59, NULL/empty
