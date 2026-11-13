@@ -444,6 +444,19 @@ async function navigatePreparedGraph(page, options) {
       controlTid=tid+';GenericEnterLabel;Label';
       nativeControl=owner.FEnterLabel;
       if(nativeControl?.parent!==owner||nativeControl.FCell?.parent!==owner.FCell)fail('Submodel entry label owner changed');
+      if(mode==='lookup')return {exists:false};
+      if(mode==='selection'){
+        const entry=exact(controlTid),rendered=graph.view.getState(nativeControl.FCell)?.text?.node;
+        if(entry.length===1&&entry[0]===rendered&&visible(entry[0]))return {};
+        // Live fresh Supernodes have no rendered entry until selected. Bind
+        // the native selection overlay, never an arbitrary covering element.
+        if(entry.length||nativeControl.FCell.visible!==false||rendered)fail('Graph navigation control unavailable');
+        const selection=owner.FControls,element=selection&&graph.view.getState(selection.FCell)?.shape?.node;
+        const selectionTid=tid+';NodesControls',matches=exact(selectionTid);
+        if(selection?.parent!==owner||selection.FCell?.parent!==owner.FCell||matches.length!==1
+          ||matches[0]!==element||!roots[0].contains(element)||!visible(element))fail('Submodel selection control unavailable');
+        return {control_tid:selectionTid};
+      }
     }else{
       if(!source.navigationParentWorkflow)fail('Prepared graph has no bound parent');
       controlTid=ref.prefix+';Graph;LeaveSubmodelLabel;Label';
@@ -475,6 +488,19 @@ async function navigatePreparedGraph(page, options) {
     // A retry only observes the original gesture under this call's deadline.
     if(!old.exists||old.phase==='reserved'&&!options.recoverOnly){
       if(options.recoverOnly)throw Error('RECEIPT_LOST');
+      if(options.graphNavigation.direction==='enter'){
+        const selection=await inspect('selection');
+        if(selection.control_tid){
+          const control=page.locator('[data-tid='+JSON.stringify(selection.control_tid)+']');
+          await control.click({trial:true,timeout:remaining()});remaining();
+          const fresh=await inspect('selection');
+          if(fresh.control_tid){
+            if(fresh.control_tid!==selection.control_tid)throw Error('Submodel selection changed before gesture');
+            await control.click({timeout:remaining()});remaining();
+            trace.push({event:'graph_navigation_owner_selected',control_tid:selection.control_tid});
+          }
+        }
+      }
       const before=await inspect('reserve');trace.push({event:'graph_navigation_prepared',direction:options.graphNavigation.direction,control_tid:before.control_tid});
       const control=page.locator('[data-tid='+JSON.stringify(before.control_tid)+']');
       await control.click({trial:true,timeout:remaining()});remaining();

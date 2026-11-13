@@ -429,6 +429,10 @@ export async function createBridge(config, session, { browserTransport: managedB
               if(state.status==='READY'&&preparationRequest.intent==='new_draft'&&state.created_draft===true
                 &&state.package_ref?.persisted===false&&state.package_ref.path===null)
                 ownedUnsavedDraft={document_id:state.document_id,tab_tid:state.workflow_ref?.tab_tid,account:state.loginom_account};
+              if(state.status==='READY'&&ownedUnsavedDraft?.document_id===state.document_id
+                &&ownedUnsavedDraft.tab_tid===state.workflow_ref?.tab_tid&&ownedUnsavedDraft.account===state.loginom_account
+                &&state.package_ref?.persisted===false&&state.package_ref.path===null)
+                ownedUnsavedDraft.state=structuredClone(state);
               if (userProfile && session.metadata.workspaceReady === true) userWorkflows.remember(state);
               return state;
             });
@@ -774,18 +778,33 @@ export async function createBridge(config, session, { browserTransport: managedB
           && prepared.state.phase === 'exact_workflow_ready' && prepared.state.created_draft === true
           && prepared.state.effect_possible === true && prepared.state.operation_id === preparationRequest.operation_id
           && prepared.state.session_id === session.metadata.sessionId;
+        // A refused navigation did not move the page. Retain the last issued
+        // draft identity for teardown only; workspaceReady remains false.
+        const refusedDraftNavigation = normalCleanup && !lastSavedPackage && ownedUnsavedDraft?.state
+          && preparationRequest?.intent==='existing_workflow' && preparationRequest.graph_navigation
+          && prepared.operation_id===preparationRequest.operation_id
+          && prepared.state?.operation_id===preparationRequest.operation_id
+          && prepared.state.session_id===session.metadata.sessionId
+          && prepared.state.status==='NOT_READY' && prepared.state.phase==='graph_navigation'
+          && prepared.state.authenticated===true && prepared.state.created_draft===false
+          && prepared.state.effect_possible===false && prepared.effect_possible===false
+          && prepared.state.verification_required!==true
+          && preparationRequest.workflow_ref?.document_id===ownedUnsavedDraft.state.document_id
+          && ['workflow_id','tab_tid','prefix'].every(key=>preparationRequest.workflow_ref[key]===ownedUnsavedDraft.state.workflow_ref[key])
+          && JSON.stringify(preparationRequest.workflow_ref.navigation_path)===JSON.stringify(ownedUnsavedDraft.state.workflow_ref.navigation_path);
+        const cleanupState = refusedDraftNavigation ? ownedUnsavedDraft.state : prepared?.state;
         const unsavedDraft = failedDraft || normalCleanup && !lastSavedPackage
-          && (preparationRequest?.intent === 'new_draft'&&prepared.state?.created_draft === true
-            || preparationRequest?.intent === 'existing_workflow'&&prepared.state?.status==='READY'
-              &&ownedUnsavedDraft&&ownedUnsavedDraft.document_id===prepared.state.document_id
-              &&ownedUnsavedDraft.tab_tid===prepared.state.workflow_ref?.tab_tid
-              &&ownedUnsavedDraft.account===prepared.state.loginom_account)
-          && (session.metadata.workspaceReady === true && prepared.state?.status === 'READY'
-            || prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'CANCELLED'
-              && prepared.state.target_verified === true && prepared.state.ownership_verified === true)
-          && prepared.state?.document_id && prepared.state.workflow_ref?.tab_tid
-          && prepared.state.package_ref?.persisted === false
-          && prepared.state.package_ref.path === null;
+          && (preparationRequest?.intent === 'new_draft'&&cleanupState?.created_draft === true
+            || preparationRequest?.intent === 'existing_workflow'&&cleanupState?.status==='READY'
+              &&ownedUnsavedDraft&&ownedUnsavedDraft.document_id===cleanupState.document_id
+              &&ownedUnsavedDraft.tab_tid===cleanupState.workflow_ref?.tab_tid
+              &&ownedUnsavedDraft.account===cleanupState.loginom_account)
+          && (refusedDraftNavigation || session.metadata.workspaceReady === true && cleanupState?.status === 'READY'
+            || cleanupState?.status === 'NOT_READY' && cleanupState.reason === 'CANCELLED'
+              && cleanupState.target_verified === true && cleanupState.ownership_verified === true)
+          && cleanupState?.document_id && cleanupState.workflow_ref?.tab_tid
+          && cleanupState.package_ref?.persisted === false
+          && cleanupState.package_ref.path === null;
         const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage ?? (failedOpen ? preparationRequest.package_path : null) : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
@@ -817,7 +836,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     arguments:{code:makeFailedOpenCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
                   return parsePackageCleanupResult(response, cleanupOptions);
                 }
-                let tabTid = prepared.state.workflow_ref.tab_tid;
+                let tabTid = cleanupState.workflow_ref.tab_tid;
                 // The reopened package is a new node in a new tab. Bind it like
                 // open_package to an already active package: no gesture, same
                 // document/account/path. The native tab guard stays unchanged.
@@ -841,12 +860,12 @@ export async function createBridge(config, session, { browserTransport: managedB
                   tabTid = bound.workflow_ref.tab_tid;
                 }
                 const cleanupOptions = {
-                  sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
+                  sessionId:session.metadata.sessionId, documentId:cleanupState.document_id,
                   // Managed runtimes have no replay login account; the cleanup
                   // binds to the account observed at workspace preparation.
-                  tabTid, account:prepared.state.loginom_account??config.replayLoginUser,
+                  tabTid, account:cleanupState.loginom_account??config.replayLoginUser,
                   packagePath, unsavedDraft, loginomUrl:config.loginomUrl,
-                  loginomBuild:session.metadata.targetIdentity?.loginom_build ?? prepared.state.target?.loginom_build,
+                  loginomBuild:session.metadata.targetIdentity?.loginom_build ?? cleanupState.target?.loginom_build,
                 };
                 const response = await browser.callTool({name:'browser_run_code_unsafe', arguments:{code:makePackageCleanupCode(cleanupOptions)}}, undefined, {timeout:30000});
                 return parsePackageCleanupResult(response, cleanupOptions);
