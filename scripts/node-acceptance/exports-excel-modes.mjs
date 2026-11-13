@@ -104,7 +104,7 @@ try{
    inputs:[],mode:'script',parameters:{input_state:'unconnected',schema_mode:'code',source_text:source},mappings:[],finish:'execute',
    read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:120000,execute_ms:30000,total_ms:180000}});
   if(result.status!=='SUCCEEDED'||result.output?.execution?.status!=='completed'||result.cleanup_complete!==true)throw Error('FS_ERROR_SEED_FAILED:'+JSON.stringify(result));
-  const saved=await runtime.run({operation_id:'fs-error-seed-save',action_key:'package.save_checkpoint',parameters:{path:directory+'/fixture.lgp',conflict_policy:'fail'}});
+  const saved=await runtime.run('package.save_checkpoint',{path:directory+'/fixture.lgp',conflict_policy:'fail'},{operationId:'fs-error-seed-save'});
   if(saved.status!=='SUCCEEDED'||saved.output?.package_ref?.path!==directory+'/fixture.lgp')throw Error('FS_ERROR_SEED_SAVE_UNCONFIRMED');
  }
  const delivered=[];
