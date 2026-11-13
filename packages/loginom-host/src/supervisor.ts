@@ -27,6 +27,7 @@ export type Launch = {
   // Private launcher capability for temporary browser recovery tools.
   browserRecovery?: boolean
   startupDeadline?: number
+  resourceManifestHash?: string
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }
@@ -284,6 +285,7 @@ async function superviseProcess(
     void close().catch(() => undefined)
   }
   signal?.addEventListener("abort", cancel, { once: true })
+  const started = performance.now()
   try {
     const ready = await request("start", start, timeout)
     signal?.throwIfAborted()
@@ -299,6 +301,10 @@ async function superviseProcess(
     }
     return { ready, request, close, exited }
   } catch (cause) {
+    await appendFile(join(input.stateDir, "startup-failures.jsonl"), JSON.stringify({ version: 1,
+      recorded_at: new Date().toISOString(), phase: "runtime.start", generation: input.generation, pid: child.pid,
+      elapsed_ms: Math.round(performance.now() - started), error: startupDiagnostic(cause, input.diagnosticSecrets),
+    }) + "\n", { mode: 0o600 }).catch(() => undefined)
     const cleanupConfirmed = await close().then(
       () => true,
       () => false,

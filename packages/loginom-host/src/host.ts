@@ -1,5 +1,5 @@
 import { inputStore, type InputFile } from "./inputs"
-import { readFile, rm } from "node:fs/promises"
+import { appendFile, readFile, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { Schema } from "effect"
@@ -10,6 +10,9 @@ import { connectionStore, type ActiveConnection } from "./connection/connection-
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
 import { fileReferences } from "./file-reference"
+import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
+import release from "../../product/loginom-release.json"
+import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 
 export async function createLoginomHost(options: {
   root: string
@@ -46,6 +49,48 @@ export async function createLoginomHost(options: {
   const stale = new Set<string>()
   const startupCleanup = { failed: false }
   const shutdown = { failed: false }
+  const resourceController = new AbortController()
+  const resourceStarted = performance.now()
+  // Start before the settings click. Every browser in this Host session awaits
+  // the same full hash pass; a new Host starts a new pass, never a disk cache.
+  const verifiedResources = verifyResources(resources, {
+    nodePath: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+    nodeVersion: release.nodeVersion,
+    signal: resourceController.signal,
+  }).then(
+    async (result) => {
+      await appendFile(
+        join(root, "startup-phases.jsonl"),
+        JSON.stringify({
+          version: 1,
+          recorded_at: new Date().toISOString(),
+          phase: "resources.verify",
+          status: "ready",
+          duration_ms: Math.round(performance.now() - resourceStarted),
+          files: result.manifest.files.length,
+        }) + "\n",
+        { mode: 0o600 },
+      ).catch(() => undefined)
+      return result.manifestHash
+    },
+    async (error) => {
+      await appendFile(
+        join(root, "startup-phases.jsonl"),
+        JSON.stringify({
+          version: 1,
+          recorded_at: new Date().toISOString(),
+          phase: "resources.verify",
+          status: "failed",
+          duration_ms: Math.round(performance.now() - resourceStarted),
+          error: startupDiagnostic(error),
+        }) + "\n",
+        { mode: 0o600 },
+      ).catch(() => undefined)
+      // The real runtime still performs full verification if prewarming failed.
+      // This preserves fail-closed admission and the original classified failure.
+      return undefined
+    },
+  )
   type Runtime = Awaited<ReturnType<typeof supervise>>
   function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
@@ -74,7 +119,28 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
-  async function launch(connection: ActiveConnection, chat: string, validation = false, signal?: AbortSignal, deadline?: number) {
+  async function launch(
+    connection: ActiveConnection,
+    chat: string,
+    validation = false,
+    signal?: AbortSignal,
+    deadline?: number,
+  ) {
+    const startupDeadline = deadline ?? Date.now() + (validation ? 210_000 : 120_000)
+    signal?.throwIfAborted()
+    const timeout = AbortSignal.timeout(Math.max(1, startupDeadline - Date.now()))
+    const waiting = signal ? AbortSignal.any([signal, timeout]) : timeout
+    const cancelled: { reject?: (error: unknown) => void } = {}
+    const cancel = () => cancelled.reject?.(signal?.aborted ? signal.reason : Error("LOGINOM_RUNTIME_TIMEOUT"))
+    const resourceManifestHash = await Promise.race([
+      verifiedResources,
+      new Promise<never>((_resolve, reject) => {
+        cancelled.reject = reject
+        waiting.addEventListener("abort", cancel, { once: true })
+      }),
+    ]).finally(() => waiting.removeEventListener("abort", cancel))
+    signal?.throwIfAborted()
+    if (Date.now() >= startupDeadline) throw Error("LOGINOM_RUNTIME_TIMEOUT")
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     return supervise(
       {
@@ -94,7 +160,8 @@ export async function createLoginomHost(options: {
         environment,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
-        ...(deadline !== undefined ? { startupDeadline: deadline } : {}),
+        startupDeadline,
+        resourceManifestHash,
       },
       signal,
     ).catch(startupFailure)
@@ -232,6 +299,8 @@ export async function createLoginomHost(options: {
     browserRecovery: options.browserRecovery === true,
     references,
     async close() {
+      resourceController.abort()
+      await verifiedResources
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.

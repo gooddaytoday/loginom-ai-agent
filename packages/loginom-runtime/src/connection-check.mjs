@@ -171,7 +171,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
 }
 
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
-  deadline = Date.now() + 150_000, onRetry }) {
+  deadline = Date.now() + 150_000, onRetry, onPhase }) {
   signal?.throwIfAborted()
   const { chromium } = require("playwright-core")
   const launch = browserLaunch(headless)
@@ -179,10 +179,13 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   signal?.throwIfAborted()
   // Both attempts share the original admission deadline and the same profile.
   const record = onRetry ?? createExecutionJournal({ directory: profile, metadata: { sessionId: null } })
+  const phase = onPhase ?? record
   const themeState = { reloaded: false }
   for (let attempt = 0; attempt < 2; attempt++) {
   signal?.throwIfAborted()
   if (Date.now() >= deadline) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+  const launched = performance.now()
+  await phase({ phase: "browser.launch", status: "starting", attempt: attempt + 1 })
   const context = await chromium
     .launchPersistentContext(profile, {
       executablePath: browserPath,
@@ -216,9 +219,17 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       ],
       viewport: launch.viewport,
     })
-    .catch(() => {
-      throw Error("LOGINOM_BROWSER_START_FAILED")
+    .catch(async error => {
+      const diagnostic = loginFailure(error, candidate, "browser.launch", performance.now() - launched, performance.now() - launched)
+      await phase({ phase: "browser.launch", status: "failed", attempt: attempt + 1, duration_ms: diagnostic.duration_ms })
+      throw Error("LOGINOM_BROWSER_START_FAILED", { cause: { name: diagnostic.original_name,
+        code: diagnostic.original_code, message: diagnostic.original_message } })
     })
+  await phase({ phase: "browser.launch", status: "ready", attempt: attempt + 1,
+    duration_ms: Math.round(performance.now() - launched) })
+  // launchPersistentContext resolves only after the browser's CDP handshake.
+  // This is a readiness milestone, not a second browser or a guessed CDP duration.
+  await phase({ phase: "browser.cdp", status: "ready", attempt: attempt + 1 })
   const closing = { promise: undefined }
   const close = () => closing.promise ??= context.close()
   const cancel = () => { void close().catch(() => undefined) }
@@ -239,7 +250,16 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
         }, { capture: true })
     })
     if (onContextCreated) await onContextCreated(context)
+    const loginStarted = performance.now()
+    await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
     const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline, themeState, onThemeReload: record })
+      .then(async result => {
+        await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
+        return result
+      }, async error => {
+        await phase({ phase: "login", status: "failed", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
+        throw error
+      })
     signal?.throwIfAborted()
     if (!keepOpen) {
       await close()

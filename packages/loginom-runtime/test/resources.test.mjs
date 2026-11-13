@@ -7,6 +7,7 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { verifyResources } from "../src/resources.mjs"
 const execute = promisify(execFile)
 const verifier = new URL("../src/resources.mjs", import.meta.url).href
 const node = process.platform === "win32" ? "bin/node.exe" : "bin/node"
@@ -59,3 +60,26 @@ for (const variant of [
     }
   })
 }
+
+test("host verification uses its pinned Node identity and binds the session proof to the manifest", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-resource-session-"))
+  try {
+    await copyFile(process.execPath, join(root, "node"), constants.COPYFILE_FICLONE)
+    await writeFile(join(root, "browser"), "original")
+    const files = await Promise.all(["node", "browser"].map(async path => ({ path,
+      sha256: createHash("sha256").update(await readFile(join(root, path))).digest("hex") })))
+    const manifest = { protocol: 1, nodeVersion: process.versions.node, node: "node", browser: "browser", files }
+    await writeFile(join(root, "resource-manifest.json"), JSON.stringify(manifest))
+    const identity = { nodePath: join(root, "node"), nodeVersion: process.versions.node }
+    const verified = await verifyResources(root, identity)
+    assert.match(verified.manifestHash, /^[a-f0-9]{64}$/)
+    assert.equal((await verifyResources(root, { ...identity, manifestHash: verified.manifestHash })).browserPath, join(root, "browser"))
+    await assert.rejects(verifyResources(root, { ...identity, nodeVersion: "0.0.0" }), /LOGINOM_RESOURCES_INVALID/)
+    await writeFile(join(root, "browser"), "tampered")
+    await assert.rejects(verifyResources(root, identity), /LOGINOM_RESOURCE_HASH_MISMATCH/)
+    await writeFile(join(root, "resource-manifest.json"), JSON.stringify({ ...manifest, browser: "node" }))
+    await assert.rejects(verifyResources(root, { ...identity, manifestHash: verified.manifestHash }), /LOGINOM_RESOURCE_HASH_MISMATCH/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

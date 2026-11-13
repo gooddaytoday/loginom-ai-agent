@@ -294,7 +294,7 @@ export async function connectionService(
             ].includes(error.message)
               ? error.message
               : "LOGINOM_CONNECTION_CHECK_FAILED"
-          throw new Error(code)
+          throw new Error(code, { cause: error })
         })
         .finally(() => checks.delete(controller))) ?? { state: "unknown" as const }
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
