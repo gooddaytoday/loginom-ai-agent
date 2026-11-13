@@ -84,3 +84,20 @@ test('node support exposes the connection preflight and link before inputs',()=>
  const drivers=support.nodeApplyDriverFactory({operation:{id:'op',parameters:{...request(),parameters:table,mode:'table'}},execute:async()=>{},onRecord:async v=>v,now:Date.now,receiptOptions:()=>({})});
  assert.equal(typeof drivers.beforeTarget,'function');assert.equal(typeof drivers.mapPorts,'function');
 });
+
+test('sql readback has no output mapping: its schema materializes on Execute',async()=>{
+ const node={document_id:'d',workflow_id:'w',node_id:'n'},op='op',ctx={...node,verified:true};
+ const phase=(phase,value)=>({phase,status:'verified',receipt_id:op+':'+phase,value:{verified:true,cleanup_complete:true,...value}});
+ const phases=[
+  phase('configure',{configuration:{verified:true,node_context:ctx,mode:'sql',sql:'SELECT Id FROM People',database_path:'/own/people.db',connection:null}}),
+  phase('node_finish',{settings_applied:true,mode:'done',node_context:ctx}),
+  phase('output_mapping',{deferred_schema:true,not_applicable:true,scope:'sql_schema_materialized_on_execute'}),
+  phase('finish',{settings_applied:true,mode:'execute',node_context:ctx}),
+ ];
+ const r=databaseImportReadback({node,phases,operation_id:op});
+ assert.equal(r.mode,'sql');assert.equal(r.output_mapping,null);assert.equal(r.receipt_ids.length,4);
+ const {nodeApplyResultSchema}=await import('../lib/node-result-schema.mjs');
+ const readback=JSON.stringify(nodeApplyResultSchema).includes('"database_import"');assert.ok(readback);
+ // A table import still requires the native mapping inventory.
+ assert.throws(()=>databaseImportReadback({node,phases:phases.map(p=>p.phase==='configure'?phase('configure',{configuration:{...p.value.configuration,mode:'table',table:'People'}}):p),operation_id:op}),/Database import/);
+});
