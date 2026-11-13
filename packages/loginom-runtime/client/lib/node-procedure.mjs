@@ -14,6 +14,7 @@ import {makeLinRegressionContextCode} from './linregression-context.mjs';
 import {makeAutoCorrelationContextCode} from './auto-correlation-context.mjs';
 import {makeCorrAnalysisContextCode} from './corr-analysis-context.mjs';
 import {makePythonContextCode} from './python-context.mjs';
+import {makePythonColumnsCode} from './python-columns.mjs';
 import {makeElimOutlierContextCode} from './elim-outlier-context.mjs';
 import {makeFactorAnalysisContextCode} from './factor-analysis-context.mjs';
 import {makeClusteringContextCode} from './clustering-context.mjs';
@@ -384,6 +385,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
     async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
+    async configurePythonColumns(columns) {return crossTableOwnedStep('python_columns',{columns},makePythonColumnsCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
     async revealGraphNode({target='drawing'}={}) {

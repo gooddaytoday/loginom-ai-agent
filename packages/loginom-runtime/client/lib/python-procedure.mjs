@@ -28,11 +28,16 @@ export async function configurePython(channel,p,{request}){
   state=await observe('python_columns','python generation readback');edits++;
   need(state.node_python.generation===wantedGeneration,'generation flag readback differs');
  }
- const columns=state.node_python.columns;
+ let columns=state.node_python.columns;
  if(p.columns){
-  const wanted=p.columns.map(c=>({name:c.name,type:c.type}));
-  need(same(columns.map(c=>({name:c.name,type:c.type})),wanted),
-   'declared output columns must be edited in the Python wizard first; observed '+JSON.stringify(columns.map(c=>c.name+':'+c.type))+', requested '+JSON.stringify(wanted.map(c=>c.name+':'+c.type))+'. Declared column editing is not available in this build; refuse instead of writing values into differently typed fields');
+  const wanted=p.columns.map(c=>({name:c.name,label:c.label||c.name,type:c.type}));
+  if(!same(columns,wanted)){
+   need(state.node_python.generation===false,'declared columns require generation off');
+   const written=await channel.configurePythonColumns(wanted);edits++;
+   need(same(written.columns,wanted),'declared columns step readback differs');
+   state=await observe('python_columns','python declared columns readback');columns=state.node_python.columns;
+   need(same(columns,wanted),'declared columns readback differs: '+JSON.stringify(columns.map(c=>c.name+':'+c.type)));
+  }
  }
  const schemaMode=state.node_python.generation?'code':'declared';
  await next('python_columns','python_code');

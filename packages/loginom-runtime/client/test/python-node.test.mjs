@@ -7,6 +7,7 @@ import {validatePythonParameters} from '../lib/python-parameters.mjs';
 import {configurePython} from '../lib/python-procedure.mjs';
 import {pythonConfigurationReadback} from '../lib/python-readback.mjs';
 import {readPythonOutputs} from '../lib/python-output.mjs';
+import {makePythonColumnsCode} from '../lib/python-columns.mjs';
 import {validateNodeApplyEnvelope} from '../lib/node-api.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 
@@ -77,6 +78,9 @@ function fakeWizard({generation=false,columns=[],source='import builtin_data\n',
   if(a.verb==='wizard_step')stage=a.expected_stage;
   else if(a.verb==='set_checked')generation=a.checked;
   else if(a.verb==='replace_expression')source=a.text;
+ },async configurePythonColumns(wanted){
+  assert.equal(stage,'python_columns');assert.equal(generation,false);actions.push({verb:'python_columns',columns:wanted});
+  columns=structuredClone(wanted);return {verified:true,columns:structuredClone(wanted)};
  }};
  return {channel,actions,owner};
 }
@@ -90,14 +94,26 @@ test('code mode turns on generation and writes the script verbatim',async()=>{
  assert.equal(result.configuration.columns,undefined);assert.equal(result.validation.status,'accepted_by_loginom_next');
 });
 
-test('declared mode keeps generation off and refuses unmatched columns before touching code',async()=>{
- const ok=fakeWizard({columns:declared});
- const result=await configurePython(ok.channel,{source_text:stdlib,schema_mode:'declared',columns:declared},{request:request()});
- assert.equal(ok.actions.some(a=>a.verb==='set_checked'),false);
- assert.deepEqual(result.configuration.columns,declared);assert.equal(result.configuration.source_sha256,sha(stdlib));
+test('declared mode keeps generation off and writes typed columns before the code',async()=>{
  const empty=fakeWizard();
- await assert.rejects(configurePython(empty.channel,{source_text:stdlib,schema_mode:'declared',columns:declared},{request:request()}),/Declared column editing is not available/);
- assert.equal(empty.actions.some(a=>a.verb==='replace_expression'),false);
+ const result=await configurePython(empty.channel,{source_text:stdlib,schema_mode:'declared',columns:declared},{request:request()});
+ assert.deepEqual(empty.actions.map(a=>a.verb),['wizard_step','python_columns','wizard_step','replace_expression','wizard_step']);
+ assert.deepEqual(empty.actions[1].columns,declared);
+ assert.deepEqual(result.configuration.columns,declared);assert.equal(result.configuration.schema_mode,'declared');assert.equal(result.configuration.source_sha256,sha(stdlib));
+ const same=fakeWizard({columns:declared});
+ await configurePython(same.channel,{source_text:stdlib,schema_mode:'declared',columns:declared},{request:request()});
+ assert.equal(same.actions.some(a=>['set_checked','python_columns'].includes(a.verb)),false);
+ const generated=fakeWizard({generation:true});
+ await configurePython(generated.channel,{source_text:stdlib,schema_mode:'declared',columns:declared},{request:request()});
+ assert.deepEqual(generated.actions.slice(0,3).map(a=>a.verb),['wizard_step','set_checked','python_columns']);assert.equal(generated.actions[1].checked,false);
+});
+
+test('declared column step is one owned page code with explicit native type codes',()=>{
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb',prefix:'MF;TF',navigation_path:[{tid:'x',label:'x'}]},node:{document_id:'doc',workflow_id:'wf',node_id:'py'}};
+ const code=makePythonColumnsCode(binding,{columns:declared,operation_id:'op:n1',deadline:Date.now()+1000});
+ assert.match(code,/^async page=>/);
+ for(const [type,value] of Object.entries({integer:4,real:3,string:5,boolean:1,datetime:2}))assert.ok(code.includes('"type":"'+type+'","code":'+value));
+ assert.throws(()=>makePythonColumnsCode(binding,{columns:[{name:'X',type:'variant'}]}),/supported types/);
 });
 
 test('existing code is replaced only against the readback digest',async()=>{
