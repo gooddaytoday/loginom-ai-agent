@@ -7,7 +7,9 @@ import {nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,revealNod
 export function makeDatabaseConnectionCode(task){return `async page=>(${databaseConnectionCapability.toString()})(page,${JSON.stringify(task)},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${nodePlacementOverflow.toString()},${samePlacementGraph.toString()},${JSON.stringify(NODE_TYPES)})`;}
 export async function databaseConnectionCapability(page,t,readPlacementGraph=readGraph,reveal=revealNodePlacement,readViewport=nodePlacementViewport,project=nodePlacementPoint,overflow=nodePlacementOverflow,sameGraph=samePlacementGraph,types=NODE_TYPES){
  const need=(v,m)=>{if(!v)throw Error('Database connection: '+m);};
- const remaining=()=>{const ms=t.deadline-Date.now();need(ms>0,'operation deadline exceeded');return ms;};
+ // The deadline error names the wait that consumed it.
+ let waiting=null;
+ const remaining=()=>{const ms=t.deadline-Date.now();need(ms>0,'operation deadline exceeded'+(waiting?' while waiting for '+waiting:''));return ms;};
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  const owner=await page.evaluateHandle(t=>{
   const p=globalThis.__loginomDockPreparationV1;
@@ -29,13 +31,23 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
    },{b:owner,t}),'package, module or active tab changed');
   };
   const wait=async(label,read)=>{
-   while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}
-   throw Error('Database connection: '+label+' did not settle');
+   const outer=waiting;waiting=label;
+   try{
+    while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}
+    throw Error('Database connection: '+label+' did not settle');
+   }finally{waiting=outer;}
   };
   const point=async locator=>{
    need(await locator.count()===1,'control is missing or ambiguous');
-   return locator.evaluate(e=>{if(e.closest('.x-tree-animator-wrap'))throw Error('SQLite tree row is still animating');const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);
-    if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('SQLite control is not reachable: '+e.closest('[data-tid]')?.getAttribute('data-tid'));return {x,y};});
+   // A long tree label can be wider than its clipping panel: aim at the centre
+   // of the part visible in the viewport and every clipping ancestor. A fully
+   // visible control keeps its own centre; the hit-test below is unchanged.
+   return locator.evaluate(e=>{if(e.closest('.x-tree-animator-wrap'))throw Error('SQLite tree row is still animating');const r=e.getBoundingClientRect();
+    let left=Math.max(r.left,0),top=Math.max(r.top,0),right=Math.min(r.right,innerWidth),bottom=Math.min(r.bottom,innerHeight);
+    for(let a=e.parentElement;a&&a!==document.documentElement;a=a.parentElement){const s=getComputedStyle(a);if(s.overflowX==='visible'&&s.overflowY==='visible')continue;
+     const c=a.getBoundingClientRect();if(s.overflowX!=='visible'){left=Math.max(left,c.left);right=Math.min(right,c.right);}if(s.overflowY!=='visible'){top=Math.max(top,c.top);bottom=Math.min(bottom,c.bottom);}}
+    const x=(left+right)/2,y=(top+bottom)/2,hit=right>left&&bottom>top?document.elementFromPoint(x,y):null;
+    if(r.width<=0||r.height<=0||right<=left||bottom<=top||x<0||y<0||x>=innerWidth||y>=innerHeight||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('SQLite control is not reachable: '+e.closest('[data-tid]')?.getAttribute('data-tid'));return {x,y};});
   };
   const quiet=()=>wait('loading mask',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
   const click=async(tid,double=false)=>{await quiet();const p=await wait('reachable '+tid,async()=>{try{return await point(find(tid));}catch{return null;}});await guard();effect=true;

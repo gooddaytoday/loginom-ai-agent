@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateDatabaseImportParameters,databaseImportParametersSchema,readOnlySelect} from '../lib/imports-database-parameters.mjs';
 import {databaseImportReadback,createDatabaseImportNodeSupport} from '../lib/imports-database-node.mjs';
+import {databaseConnectionCapability} from '../lib/imports-database-connection.mjs';
 import {NODE_TYPES,describeNodeTypes} from '../lib/node-contracts.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {nodeApplyInputSchema} from '../lib/node-api.mjs';
@@ -144,4 +145,38 @@ test('SQL refusal names the forbidden word and the WITH rule',()=>{
  assert.match(refusal('SELECT Begin FROM People'),/"Begin"/);
  assert.match(refusal('WITH x AS (SELECT 1) SELECT * FROM x'),/WITH is refused, even a reading one/);
  assert.equal(readOnlySelect('SELECT "Begin", "Release" FROM People'),true);
+});
+
+// LAB-1595: a saved connection labelled by its long .db path renders a TreeText
+// wider than the clipping palette panel (x=108…715.81, panel ends at x=318).
+// Its full-element centre lies over the graph SVG; only the visible part hits.
+const document_={documentElement:{}};
+const wideLabel=async({visible=true}={})=>{
+ const tid='module',svg={},panel={},wrap={},calls=[];
+ const el={getBoundingClientRect:()=>({x:108,y:226,left:108,top:226,right:715.81,bottom:244,width:607.81,height:18}),parentElement:wrap,
+  closest:s=>s==='[data-tid]'?el:null,getAttribute:()=>tid,contains:n=>n===el};
+ wrap.parentElement=panel;panel.parentElement=svg.parentElement=document_.documentElement;
+ panel.getBoundingClientRect=()=>({left:0,top:100,right:318,bottom:700});
+ const styles=new Map([[wrap,{overflowX:'visible',overflowY:'visible'}],[panel,{overflowX:'hidden',overflowY:'auto'}]]);
+ const saved={document:globalThis.document,innerWidth:globalThis.innerWidth,innerHeight:globalThis.innerHeight,getComputedStyle:globalThis.getComputedStyle};
+ Object.assign(globalThis,{document:{...document_,elementFromPoint:(x,y)=>visible&&x>=108&&x<318&&y>=226&&y<244?el:svg},innerWidth:1280,innerHeight:800,getComputedStyle:a=>styles.get(a)});
+ const locator=sel=>({count:async()=>sel.includes('x-mask')?0:1,evaluate:async fn=>fn(el),evaluateAll:async()=>[],isVisible:async()=>false,locator});
+ const page={evaluateHandle:async()=>({dispose(){}}),evaluate:async()=>true,locator,waitForTimeout:ms=>new Promise(r=>setTimeout(r,Math.min(ms,5))),
+  mouse:{click:async(x,y)=>{calls.push({x,y});throw Error('stop after first click');}}};
+ const flow={workflow_id:'flow',tab_tid:'tab',prefix:'MF;TF-1',navigation_path:[{tid,label:'Module'},{tid:'flow',label:'Flow'}]};
+ try{return {calls,result:await databaseConnectionCapability(page,{deadline:Date.now()+300,document_id:'doc',workflow_ref:flow,connection:{name:'/x.db',database_path:'/x.db'}})};}
+ finally{Object.assign(globalThis,saved);}
+};
+test('a control wider than its clipping panel is clicked inside its visible part',async()=>{
+ const {calls,result}=await wideLabel();
+ assert.equal(calls.length,1,JSON.stringify(result));
+ assert.ok(calls[0].x>=108&&calls[0].x<318&&calls[0].y===235,JSON.stringify(calls[0]));
+ assert.match(result.error,/stop after first click/);
+});
+
+test('an unreachable control times out naming the wait it was in, without a click',async()=>{
+ const {calls,result}=await wideLabel({visible:false});
+ assert.deepEqual(calls,[]);
+ assert.equal(result.verified,false);
+ assert.match(result.error,/^Database connection: operation deadline exceeded while waiting for reachable module$/);
 });
