@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** задачи 1–8 выполнены и независимо проверены по поведению; задачи 9–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** задачи 1–9 выполнены и независимо проверены по поведению; задачи 10–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -1138,7 +1138,7 @@ export async function checkDashboardTarget(id: string, dashboards: string) {
 ### Task 9: Проверка пути в сессии dashboard
 
 **Files:**
-- Modify: `O/src/product/dashboard-session.ts`, `O/src/tool/external-directory.ts`, `O/src/tool/edit.ts` (≈83), `O/src/tool/write.ts` (≈44), `O/src/tool/apply_patch.ts` (≈74, ≈143), `O/test/product/dashboard-session.test.ts`
+- Modify: `O/src/product/dashboard-session.ts`, `O/src/tool/external-directory.ts`, `O/src/tool/edit.ts` (≈83), `O/src/tool/write.ts` (≈44), `O/src/tool/apply_patch.ts` (≈74, ≈143), `O/src/tool/glob.ts`, `O/src/tool/grep.ts`, `O/test/product/dashboard-session.test.ts`
 - Create: `O/test/tool/dashboard-guard.test.ts`
 
 **Interfaces:**
@@ -1160,23 +1160,13 @@ export function dashboardPathError(directory: string, target: string, write?: bo
 - [ ] **Step 3: Тесты падают.** `cd packages/opencode && bun test test/product/dashboard-session.test.ts test/tool/dashboard-guard.test.ts` → FAIL.
 - [ ] **Step 4: Реализация.**
 
-```ts
-// O/src/product/dashboard-session.ts
-export function dashboardPathError(directory: string, target: string, write = false) {
-  if (!isDashboardWork(directory)) return
-  const work = realpathSync(directory)
-  const allowed = write ? join(work, "src") : work
-  // lstat, not exists: a dangling symlink is an existing entry and must not be treated as a new file.
-  const entry = (path: string) => lstatSync(path, { throwIfNoEntry: false })
-  if (write && entry(target)?.isSymbolicLink()) return "Сессия dashboard: запись в символьную ссылку запрещена"
-  let existing = target
-  while (!entry(existing) && dirname(existing) !== existing) existing = dirname(existing)
-  if (entry(existing)?.isSymbolicLink() && !existsSync(existing)) return "Сессия dashboard: путь ведёт в недоступную ссылку"
-  const real = join(realpathSync(existing), relative(existing, target))
-  if (real !== allowed && !real.startsWith(allowed + sep))
-    return write ? "Сессия dashboard: запись разрешена только в src/" : "Сессия dashboard: доступна только рабочая папка"
-}
-```
+  `dashboardPathError` сначала возвращает `undefined` вне dashboard. Для dashboard разрешённый корень — настоящий `work`, для записи — его `src`.
+
+  Проверка получает исходный абсолютный путь до `path.resolve` и Windows-нормализации. При обходе его компонент перед каждым `..` проверяется `lstat` отменяемого лексического префикса: если он является ссылкой, используется обычный отказ границы. После этой проверки путь нормализуется. Это закрывает подтверждённое расхождение Bun между нормализацией и файловой операцией, не требует собственного resolver ссылок и сохраняет обычный `src/../src/file` и внешний alias к work. Отмена ссылки через `..` запрещена, в том числе если конкретная ссылка ведёт внутрь разрешённой папки.
+
+  Затем `lstatSync(path, { throwIfNoEntry: false })` проверяет цель и ближайшего существующего предка (висячая ссылка считается записью, а не новым файлом). Запись в саму ссылку → «Сессия dashboard: запись в символьную ссылку запрещена»; висячий предок → «Сессия dashboard: путь ведёт в недоступную ссылку». Настоящий путь предка с оставшимся суффиксом должен совпадать с разрешённым корнем или начинаться с него и разделителя. Иначе отказ: для записи «Сессия dashboard: запись разрешена только в src/», для чтения «Сессия dashboard: доступна только рабочая папка».
+
+  Регрессия через настоящий `read`: абсолютный `src/link/../secret.txt`, где link ведёт в соседний `control/child`, отказывает без запроса разрешения и не возвращает данные control. То же для `link/child/../..`; обычный `..` и alias с обычным `..` проходят.
 
   Тест к этому: в `work/src` висячая ссылка `dangling.ts` → `../../control/new.json` (цели нет): запись в `work/src/dangling.ts` → ошибка, чтение — ошибка «недоступная ссылка».
 
@@ -1184,19 +1174,23 @@ export function dashboardPathError(directory: string, target: string, write = fa
 // O/src/tool/external-directory.ts — the body of assertExternalDirectoryEffect becomes:
 if (!target) return false
 const ins = yield* InstanceState.context
-const full = process.platform === "win32" ? FSUtil.normalizePath(target) : target
 // Before bypass: a dashboard session is confined even for internal reads.
-const denied = dashboardPathError(ins.directory, path.resolve(ins.directory, full), options?.write)
+const denied = dashboardPathError(ins.directory, path.isAbsolute(target) ? target : ins.directory + path.sep + target, options?.write)
 if (denied)
   return yield* Effect.die(new PermissionV1.DeniedError({ ruleset: [{ permission: "dashboard_path", pattern: denied, action: "deny" }] }))
-if (options?.bypass) return false
+const full = process.platform === "win32" ? FSUtil.normalizePath(target) : target
+if (isDashboardWork(ins.directory) || options?.bypass) return false
 if (containsPath(full, ins)) return false
 // ...the rest (kind, dir, glob, ctx.ask) stays as it is.
 ```
 
   Строки `const ins` и `const full` переносятся выше проверки `bypass`, а не объявляются второй раз. Отказ уходит через `Effect.die`, поэтому метка `permissionDenied` из `tools.ts` к нему не ставится: в CLI это ошибка инструмента и ненулевой код выхода `run`, как у других отказов.
 
+  После успешной проверки настоящий путь dashboard уже разрешён; повторный `containsPath` не используется, иначе внешний alias к work ошибочно вызовет `external_directory`. Обычные сессии сохраняют прежний поток проверок.
+
   `edit.ts`, `write.ts`, оба вызова в `apply_patch.ts` передают `{ write: true }` (у `apply_patch` — и для пути назначения переноса). Тип `Options`: `{ bypass?: boolean; kind?: Kind; write?: boolean }`.
+
+  В `glob.ts` и `grep.ts` существующая проверка пути переносится перед `ctx.ask`, чтобы отказ dashboard происходил без запроса разрешений. В обычных сессиях обе прежние проверки разрешений сохраняются.
 - [ ] **Step 5: Прогон.** Тесты шага 3 и `bun test test/tool` → PASS; `bun typecheck`.
 - [ ] **Step 6: Коммит.** `git commit -m "feat(opencode): confine dashboard sessions to their work folder"`.
 
@@ -1300,8 +1294,8 @@ export function dashboardResolver(root = process.cwd()) {
 ```js
 import { dashboardResolver } from "./resolver.mjs"
 
-// The template kit is read-only in installed builds; keep Vite caches in the build directory.
-export default { cacheDir: ".vite-cache", plugins: [dashboardResolver()] }
+// Keep caches local and disable discovery of PostCSS configuration outside the build.
+export default { cacheDir: ".vite-cache", css: { postcss: { plugins: [] } }, plugins: [dashboardResolver()] }
 ```
 
 - [ ] **Step 5: Проверка до `tsc`.** `template/scan.mjs`:
@@ -1794,9 +1788,18 @@ roi=$("$state/node" --input-type=module -e '
 
 Готовность: задачи 1–17 зелёные локально и в CI (`unit`, `dashboard-browser`, `dashboard-template` на всех доступных системах). Дефект, найденный в приёмке, чинится тестом и кодом в задаче, к которой он относится, затем шаг приёмки повторяется.
 
+**Границы обновления.** Обновляется локальный стенд `dashboard-master-20261109-{server,studio,web}`. Рабочий компьютер используется только как эталон развёртывания M2. Владелец разрешил исполнителю при необходимости читать на нём конфигурацию, файлы проекта и сохранённые сессии Codex, включая сессию начала M3. Реквизиты находятся в `local.env` основного checkout в переменных `WORK_HOST`, `WORK_IP`, `WORK_USER`, `WORK_PASSWORD`; значения передаются процессу подключения без вывода и сохранения в документах. Любые изменения рабочего компьютера исключены из этой задачи. Результаты эталонной приёмки — в [runbook M2](../../testing/loginom-ai-agent/dashboard-m2.md); состояние локального стенда проверяется заново.
+
 - [ ] **Step 1: Сборка.** Из чистого закоммиченного дерева: Desktop DEB и AppImage — по [Linux runbook](../../testing/loginom-ai-agent/linux.md) (`--publish never`, новый каталог версии, прежние кандидаты сохраняются); CLI — `bun packages/loginom-host/script/build-cli.ts <новый каталог>`. Проверить артефакты (`verify-artifact.ts`), записать хеши.
 - [ ] **Step 2: S6 и время запуска.** Размер `resources/loginom/dashboard` установленного пакета на диске (`du -sb`) и в сжатом виде (`tar -cf - … | gzip -6 | wc -c`); размер DEB рядом с предыдущим кандидатом. Время `loginom-ai-agent-cli --version` и запуска чата (от отправки до первого запроса к модели) — по три замера на текущей и на предыдущей сборке. Прирост больше 2 секунд на Linux — стоп и вопрос владельцу (уточнение 7).
 - [ ] **Step 3: Установка.** Перед `dpkg -i` спросить владельца: установка заменяет пакет в `/opt` для этого пользователя; работающее приложение пользователь закрывает сам. Desktop запускается в отдельном профиле (`LOGINOM_AI_AGENT_TEST_ROOT`), подключение — dev-стенд `http://127.0.0.1:32768`.
-- [ ] **Step 4: Стенд.** `(cd packages/dashboard && bun run build)`, `./packages/dashboard/deploy/dev-master.sh install --cli-button`.
+- [ ] **Step 4a: Сохранить локальные данные.** Проверить `docker context show`, `docker inspect` точной пары Server/Studio, её сеть и занятость портов `32768`/`32769`. В исходном локальном Server нет mounts, данные находятся в слое контейнера. Пока он остановлен, сохранить его через `docker commit` в приватный локальный образ и параметры запуска через `docker inspect` в файл вне Git с доступом только владельцу. Проверить копию через временный остановленный контейнер из этого образа и `docker cp` — наличие `/workdir/UserStorage`, прежнего `/workdir/dashboard-app` и совпадение хешей ROI-файлов с оригиналом. После проверки удалить только временный контейнер. Если к моменту приёмки появились mounts, сохранить их данные отдельно, поскольку `docker commit` их не включает. Результат — проверенная копия данных и конфигурации для возврата.
+- [ ] **Step 4b: Восстановить базовый Loginom.** Существующий Server сохранить и запустить. Исходную Studio всегда оставить остановленной под резервным именем, даже если порт уже фиксирован. Чтобы сохранить текущую конфигурацию в рабочем экземпляре, сделать приватный локальный образ остановленной Studio через `docker commit` и создать из него замену под штатным именем, в `dashboard-master-20261109-net`, с `-p 127.0.0.1:32768:80`. Mounts, если они есть, сохранить отдельно и не давать замене изменять единственную исходную копию. Убедиться, что оба клиента используют WebSocket-прокси этого Server. Проверить готовность Server по журналу, вход в `/app/` и `/app-debug/` через WebSocket (101), выполнение ROI. При ошибке Server сначала выяснить причину по журналу. Результат — рабочий Loginom с фиксированным адресом и неизменённая исходная Studio для возврата.
+- [ ] **Step 4c: Подготовить M3.** Использовать Desktop/CLI, оболочку, службу и завершённый установщик задачи 16 из одной ревизии. С закреплённым Node из Global Constraints выполнить `(cd packages/dashboard && bun run build)`, `bash -n packages/dashboard/deploy/dev-master.sh` и `shellcheck packages/dashboard/deploy/dev-master.sh`. Эталон M2 используется для проверки схемы портов, Apache и ограничений web; пути пользователя, UID и старые `dist` с рабочего компьютера не переносятся. Результат — согласованные артефакты M3 и установщик без статических ошибок.
+- [ ] **Step 4d: Обновить интеграцию.** Если повторная проверка обнаружила прежний web, перед установщиком сохранить его `docker inspect` приватно вне Git, остановить и оставить контейнер под резервным именем. Существующий `$HOME/loginom-dashboard` и данные его mounts сохранить отдельно перед изменением. Если web отсутствует, возврат удаляет только новый web. Выполнить `./packages/dashboard/deploy/dev-master.sh install --cli-button` непосредственно поверх локального M1; отдельная установка M2 не требуется. Переход задачи 16 сохраняет точечную остановку прежнего Node в Server и установку оболочки/CSP обоих клиентов. Проверить отдельный ограниченный web, проксирование API в `web:8100`, приложения на `127.0.0.1:32769` и read-only mount `$HOME/loginom-dashboard/builds` в `/builds`. Изменения переменных M3 и состава проверок определены в задаче 16. Результат — оба клиента используют API и оболочку M3, файлы Loginom ROI сохранены.
+- [ ] **Step 4e: Первая публикация M3.** В установленном Desktop с тестовым профилем получить свежий одноразовый снимок из Studio, создать черновик и вызвать `dashboard_publish` с разовым подтверждением для нужных узла и пакета. Публикация M3 пишет в локальный `$HOME/loginom-dashboard/builds`, web читает его без записи; прежние ID и ключи публикации M1 не переиспользуются. Затем выполнить `DASHBOARD_STUDIO_CONFIG=<приватный JSON> ./packages/dashboard/deploy/dev-master.sh check`. Результат — хеш `lookup` совпадает с `current`, опубликованный dashboard открывается в Studio. Продолжить остальные сценарии шагов 5–14.
+
+**Возврат к исходному стенду.** При необходимости возврата остановить обновлённые компоненты, восстановить Server из проверенной копии с прежними параметрами, вернуть сохранённую Studio и исходную сеть. Если каталог `$HOME/loginom-dashboard` существовал до обновления, сохранить его перед шагом 4d и вернуть вместе с прежним web. Проверить вход и ROI. `uninstall` M3 сам по себе прежнюю интеграцию M1 не восстанавливает. Резервные данные хранятся вне Git до успешной приёмки.
+
 - [ ] **Step 5–14: Приёмка** — десять шагов раздела «Приёмка» дизайна на `/app/`, в порядке runbook: ROI «Создать dashboard» → чат с меткой → просьба обычными словами → ссылка (реальные строки, поля недоступны с подписью); правка → страница обновляется сама; «Опубликовать» → окно с узлом и пакетом без «Разрешать всегда» (в том числе при включённом автоответе для папки) → `DASHBOARD_STUDIO_CONFIG=<приватный JSON> ./packages/dashboard/deploy/dev-master.sh check` проходит → кнопка Dashboard открывает ROI → `MinBudget` 0 → 10 000 → 0 даёт 500 → 453 → 500 строк узла и новые данные; «Изменить в чате» → новый чат в той же папке с меткой «Правка dashboard …», правка публикуется; Desktop, подключённый к другому стенду, и повторное открытие той же ссылки → понятные сообщения; строка образца с инструкцией записать файл в `control/` (копия fixture с изменённой строкой `dataset.csv`, не исходный пакет) — агент не выходит за `work/src/`; перезапуск Desktop → «Черновик остановлен», агент даёт новую ссылку; CLI из буфера → черновик с зелёной самопроверкой, без `--auto` публикация отклоняется. Пакет `.lgp` ROI не меняется (хеш до и после).
 - [ ] **Step 15: Итоги.** Runbook и раздел «Приёмка M3» рецепта стенда — сборка, версии Node и Chromium, результат каждого шага, ограничения; roadmap — итоги S6 и замеры запуска. Коммит: `git commit -m "docs(dashboard): record M3 acceptance"`. Слияние — по команде владельца.
