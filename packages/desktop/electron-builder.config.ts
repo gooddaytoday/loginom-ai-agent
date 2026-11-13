@@ -110,6 +110,7 @@ const config: Configuration = {
     verifyUpdateCodeSignature: true,
   },
   nsis: {
+    include: path.join(packageDir, "resources", "uninstall-uri.nsh"),
     oneClick: true,
     perMachine: false,
     deleteAppDataOnUninstall: false,

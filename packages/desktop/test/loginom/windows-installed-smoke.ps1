@@ -33,6 +33,8 @@ $installAttempted = $false
 $mainProcess = $null
 $uninstaller = $null
 $ownedDataCreated = $false
+$uriRegistered = $false
+$uriKey = 'HKCU:\Software\Classes\loginom-ai-agent\shell\open\command'
 $proxyKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
 
 function Check([string]$Id, [bool]$Pass, [string]$Detail) {
@@ -58,6 +60,16 @@ function Test-RetiredEndpoint([string]$Directory, [string]$Ripgrep) {
     $code = $LASTEXITCODE
     if ($code -gt 1) { throw "Installed-file scan failed: ripgrep exit $code" }
     return ($code -eq 0)
+}
+function Test-InstalledUriScheme([string]$Command, [string]$Directory) {
+    $target = [regex]::Match($Command.TrimStart(), '^(?:"([^"]+)"|(\S+))(?:\s|$)')
+    if (-not $target.Success) { return $false }
+    $path = if ($target.Groups[1].Success) { $target.Groups[1].Value } else { $target.Groups[2].Value }
+    if (-not [IO.Path]::IsPathRooted($path)) { return $false }
+    try {
+        return [IO.Path]::GetFullPath($path).StartsWith(
+            [IO.Path]::GetFullPath($Directory).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
+    } catch { return $false }
 }
 function Processes {
     # Query by executable path, never kill by name (other Node/Chrome installations may be in use).
@@ -203,6 +215,9 @@ try {
     $text = if ($mainLog) { Get-Content -LiteralPath $mainLog.FullName -Raw } else { '' }
     Check 'app-starting-version' (Test-StartupLog $text $ExpectedVersion) "$logs\*\main.log"
     Check 'server-ready' $ready "$logs\*\main.log"
+    $report.uriBeforeUninstall = (Get-ItemProperty -LiteralPath $uriKey -ErrorAction SilentlyContinue).'(default)'
+    $uriRegistered = Test-InstalledUriScheme $report.uriBeforeUninstall $install
+    Check 'uri-scheme-registered' $uriRegistered ([string]$report.uriBeforeUninstall)
     Start-Sleep -Seconds 5
     $live = @(Processes)
     $report.processes = @($live | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath)
@@ -272,13 +287,15 @@ public static class SmokeWindows {
             @(Processes) | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
             $removed = Remove-Installation
             Check 'silent-uninstall' $removed '/S /currentuser; installation directory and installed-app entry removed'
+            $report.uriAfterUninstall = (Get-ItemProperty -LiteralPath $uriKey -ErrorAction SilentlyContinue).'(default)'
+            Check 'uri-scheme-removed' ($uriRegistered -and -not (Test-InstalledUriScheme $report.uriAfterUninstall $install)) ([string]$report.uriAfterUninstall)
             Check 'shortcut-removed' ($null -ne $links -and @($links | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 0) ($links -join '; ')
             Check 'preserves-user-data' ((Test-Path -LiteralPath $marker) -and [IO.File]::ReadAllText($marker) -eq $token) "preservesUserData=true: $marker"
             Check 'cleanup' ((Processes).Count -eq 0 -and -not (Test-Path -LiteralPath $install) -and (Entries).Count -eq 0) 'No installed files, registration or owned processes'
         } catch { Check 'cleanup' $false $_.Exception.Message }
         # Collect errors even when startup throws, and include shutdown/cleanup failures.
         Check-Logs $profile
-        foreach ($id in @('silent-install','installed-apps','install-path','bundled-help-manifest','no-retired-endpoint','shortcut','sidecar-bundled-skills','sidecar-local-help','sidecar-probe-exit','app-starting-version','server-ready','processes-alive','graceful-close','clean-exit-code','silent-uninstall','shortcut-removed','preserves-user-data')) {
+        foreach ($id in @('silent-install','installed-apps','install-path','bundled-help-manifest','no-retired-endpoint','shortcut','sidecar-bundled-skills','sidecar-local-help','sidecar-probe-exit','app-starting-version','server-ready','uri-scheme-registered','processes-alive','graceful-close','clean-exit-code','silent-uninstall','uri-scheme-removed','shortcut-removed','preserves-user-data')) {
             if (-not @($checks | Where-Object id -eq $id).Count) { Check $id $false 'Not reached; see execution/cleanup failure' }
         }
     }
