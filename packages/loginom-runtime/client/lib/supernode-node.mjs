@@ -52,6 +52,9 @@ export function createSupernodeOutputNodeSupport(config){
    return verified({node_context:s.prepared_node_context});
   };
   return {verifySource:async()=>verified({not_applicable:true}),mapPorts:async()=>verified({not_applicable:true}),
-   openWizard:inspect,configureBoundary:inspect,finish:async(mode,ctx)=>({...await inspect(ctx),mode,settings_applied:false,execution_started:false})};
+   openWizard:inspect,configureBoundary:inspect,finish:async(mode,ctx)=>({...await inspect(ctx),mode,settings_applied:false,execution_started:false}),
+   waitExecution:async()=>{throw Error('Supernode output boundary Execute is not admitted');},
+   readOutput:async()=>{throw Error('Supernode output boundary output read is not admitted');},
+   verifyContinuation:async()=>false};
  }};
 }

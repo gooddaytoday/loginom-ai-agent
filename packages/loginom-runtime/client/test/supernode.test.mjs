@@ -8,6 +8,8 @@ import vm from 'node:vm';
 import {readSupernodeBrowser} from '../lib/supernode-context.mjs';
 import {nodeApiTools} from '../lib/node-api.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
+import {createActionRuntime} from '../lib/executor.mjs';
+import {actions} from './support/executor-fixture.mjs';
 
 const boundary={input:{kind:'table',name:'Input',label:'Исходные данные',requirement:'required'},output:{kind:'table',name:'Output',label:'Результат'}};
 const ref={document_id:'doc',workflow_id:'wf',node_id:'node'};
@@ -20,6 +22,24 @@ test('Supernode boundary crosses the complete public apply schema and installed 
  assert.doesNotThrow(()=>validateActionParameters(schema,request));
  assert.doesNotThrow(()=>validateNodeApplyRequest(request,nodeApplyHandlers));
  assert.throws(()=>validateNodeApplyRequest({...request,target:{kind:'new',type:'transform.calculator'},mode:'expression'},nodeApplyHandlers));
+});
+
+test('native output boundary passes executor admission without enabling execution, reads or replay',async()=>{
+ const config={targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'},support=createCandidateNodeSupport(config);
+ const r={...structuredClone(request),target:{kind:'existing',type:'control.supernode_output',ref},parameters:{}};
+ assert.doesNotThrow(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers));
+ let probes=0,browserCalls=0;
+ const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,
+  ...support,execute:async()=>{browserCalls++;throw Error('Unexpected browser effect');},
+  nodeTargetAdapterFactory:()=>({observe:async()=>{probes++;throw Error('native-boundary-probe');}}),onRecord:async e=>e});
+ const result=await runtime.runNodeApply(r);
+ assert.ok(probes>0,JSON.stringify(result));
+ assert.match(result.error.message,/native-boundary-probe/);
+ const drivers=support.nodeApplyDriverFactory({operation:{id:r.operation_id,parameters:r}});
+ await assert.rejects(()=>drivers.waitExecution(),/output boundary.*Execute/);
+ await assert.rejects(()=>drivers.readOutput(),/output boundary.*read/);
+ assert.equal(await drivers.verifyContinuation({}),false);
+ assert.equal(browserCalls,0);
 });
 
 test('supernode handler is registered with the approved table boundary mode',()=>{
