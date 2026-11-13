@@ -138,6 +138,16 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   await click(tile.tid);await openSettings();
   const connectionOwner=await page.evaluateHandle(()=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return {wizard:c.FController,node:c.Node.data.node.ParentNode};});
   if(sourceConnectionId)need(await page.evaluate(({b,id})=>{const actual=b.node.FConnectionNode?.__ObjectId;return actual?.Module===id.Module&&actual.Instance===id.Instance;},{b:connectionOwner,id:sourceConnectionId}),'requested connection differs from the existing import reference; use a new import target and operation_id');
+  // The DB settings form binds its model node asynchronously after opening.
+  // Wait for the same controller/tree owner and report which link differs.
+  const ownerState=()=>page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller,n=c.Node?.data?.node;
+   return {controller:c.FController===b.wizard,parent:n?.ParentNode===b.node,model:b.wizard.FModelNode===b.node.FConnectionNode,
+    names:[c.FController?.constructor?.name,b.wizard?.constructor?.name,n?.constructor?.name,b.node?.constructor?.name,b.wizard?.FModelNode?.constructor?.name,b.node?.FConnectionNode?.constructor?.name].join('/')};},connectionOwner);
+  const ownedWizard=async()=>{
+   const until=Date.now()+10000;let s;
+   while(Date.now()<until){await guard();s=await ownerState();if(s.controller&&s.parent&&s.model)return;await page.waitForTimeout(100);}
+   throw Error('Database connection: connection wizard owner changed: '+JSON.stringify(s));
+  };
   const flags=['pedInMemoryDB','pedCreateDBIfNotExists','pedUseEncryption','pedLoginPrompt'];
   // Settings live in several native sub-views; bind each control by its unique suffix.
   const tidOf=async suffix=>{
@@ -145,7 +155,7 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
    need(tids.length===1,'SQLite connection control is missing or ambiguous: '+suffix);return tids[0];
   };
   const read=async()=>{
-   await guard();need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.FController===b.wizard&&c.Node.data.node.ParentNode===b.node&&b.wizard.FModelNode===b.node.FConnectionNode;},connectionOwner),'connection wizard owner changed');
+   await ownedWizard();
    const value=async name=>find(await tidOf(name)).locator('input').inputValue();
    const checked={};for(const f of flags)checked[f]=await find(await tidOf(f+';ValueControl')).evaluate(e=>e.classList.contains('x-form-cb-checked'));
    return {name:await value('fldLabel'),database_path:await value('pedDatabasePath;ValueControl'),...checked};
@@ -173,7 +183,8 @@ export async function databaseConnectionCapability(page,t,readPlacementGraph=rea
   // Reopen the saved object and independently reread the visible settings.
   const saved=(await tiles()).filter(c=>c.name===t.connection.name);need(saved.length===1,'saved connection is not unique');
   await click(saved[0].tid);await openSettings();
-  need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.Node.data.node.ParentNode===b.node&&c.FController.FModelNode===b.node.FConnectionNode;},connectionOwner),'saved connection owner differs');
+  await page.evaluate(b=>{b.wizard=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;},connectionOwner);
+  await ownedWizard();
   const persisted=await read();
   await connectionOwner.dispose();
   need(JSON.stringify(persisted)===JSON.stringify(observed),'saved connection readback differs');
