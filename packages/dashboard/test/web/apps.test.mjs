@@ -16,7 +16,7 @@ const securityHeaders = {
     "img-src http://dashboards.localhost:32769 data: blob:; font-src http://dashboards.localhost:32769; " +
     "connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; manifest-src 'none'; " +
     "media-src 'none'; base-uri 'none'; form-action 'none'; " +
-    "frame-ancestors http://127.0.0.1:32768 http://localhost:32768; sandbox allow-scripts; report-to dashboard",
+    "frame-ancestors http://127.0.0.1:32768 http://localhost:32768; sandbox allow-scripts; report-uri http://dashboards.localhost:32769/_reports",
   "connection-allowlist": "(response-origin); report-to=dashboard",
   "permissions-policy":
     "camera=(), microphone=(), geolocation=(), clipboard-read=(), clipboard-write=(), display-capture=(), " +
@@ -36,6 +36,18 @@ function assertSecurity(response, cache, allowlist = true) {
   }
   assert.equal(response.headers["cache-control"], cache)
 }
+
+test("only strict app hosts serve the platform probe with document security headers", async t => {
+  for (const mode of ["normal", "strict"]) {
+    const { server } = await listen(t, { mode })
+    for (const [path, type] of [["/_probe/", "text/html; charset=utf-8"], ["/_probe/probe.js", "text/javascript; charset=utf-8"]]) {
+      const response = await send(server, "GET", path)
+      assert.equal(response.status, mode === "strict" ? 200 : 404, `${mode} ${path}`)
+      assertSecurity(response, "no-store")
+      if (mode === "strict") assert.equal(response.headers["content-type"], type)
+    }
+  }
+})
 
 async function listen(t, options = {}) {
   const root = await mkdtemp(join(tmpdir(), "dashboard-apps-"))

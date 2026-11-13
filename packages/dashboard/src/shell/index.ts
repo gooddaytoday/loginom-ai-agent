@@ -1,11 +1,13 @@
 import { lookupResponse, snapshotResponse } from "./response"
 import { connect, views } from "./loginom/adapter"
 import { mountDashboard, sandboxFrame } from "./frame"
+import { probe } from "./probe"
 import type { Update, View } from "./loginom/types"
 
 const message = (error: unknown) => String((error as { message?: unknown } | null)?.message ?? error)
 start()
 function start() {
+  let supported: boolean | undefined
   async function post(path: string, body: unknown) {
     const res = await fetch(location.origin + "/dashboard/" + path, {
       method: "POST",
@@ -85,6 +87,13 @@ function start() {
         note.textContent = busy ? "Идёт расчёт" : "Открываем dashboard…"
         const target = await studio.binding(owner, form, node)
         const lookup = lookupResponse(await post("lookup", target))
+        if (lookup.mode === "strict" && lookup.hash !== null) {
+          const result = supported ?? (await probe(lookup.appOrigin, document.body))
+          if (result !== null) supported = result
+          if (overlay !== section) return
+          if (result === null) return void (note.textContent = "Хост dashboard недоступен")
+          if (!result) return void (note.textContent = "Dashboard открывается в Chrome, Edge или Яндекс Браузере на Chromium 152 и новее")
+        }
         await pending
         if (overlay !== section) return
         busy++

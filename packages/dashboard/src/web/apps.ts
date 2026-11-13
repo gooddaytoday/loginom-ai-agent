@@ -10,7 +10,7 @@ export function appHeaders(appOrigin: string, clientOrigins: string[], connectio
       `default-src 'none'; script-src ${appOrigin}; style-src ${appOrigin}; img-src ${appOrigin} data: blob:; ` +
       `font-src ${appOrigin}; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; ` +
       `manifest-src 'none'; media-src 'none'; base-uri 'none'; form-action 'none'; ` +
-      `frame-ancestors ${clientOrigins.join(" ")}; sandbox allow-scripts; report-to dashboard`,
+      `frame-ancestors ${clientOrigins.join(" ")}; sandbox allow-scripts; report-uri ${appOrigin}/_reports`,
     ...(connectionAllowlist && { "connection-allowlist": "(response-origin); report-to=dashboard" }),
     "permissions-policy":
       "camera=(), microphone=(), geolocation=(), clipboard-read=(), clipboard-write=(), display-capture=(), " +
@@ -31,6 +31,31 @@ const types: Record<string, string> = {
   ".webp": "image/webp",
   ".woff2": "font/woff2",
 }
+
+const probeScript = `function blocked() {
+  if (typeof RTCPeerConnection !== "function") return false
+  let rtc
+  try { rtc = new RTCPeerConnection() }
+  catch (error) { return error instanceof DOMException && error.name === "NotAllowedError" }
+  try {
+    // Chromium 154 permits construction but administratively discards ICE candidates.
+    // Without remote SDP this reserved-address candidate cannot initiate a connection.
+    const candidate = rtc.addIceCandidate({ candidate: "candidate:1 1 UDP 1 192.0.2.1 9 typ host", sdpMid: "0" })
+    candidate?.catch(() => {})
+    return candidate === undefined
+  } catch { return false }
+  finally { rtc.close() }
+}
+let answered = false
+addEventListener("message", event => {
+  const data = event.data
+  if (answered || event.source !== parent || event.ports.length !== 1 || typeof data !== "object" || data === null ||
+      Array.isArray(data) || Object.keys(data).length !== 2 || data.type !== "loginom-dashboard/init" || data.version !== 1) return
+  answered = true
+  event.ports[0].postMessage({ type: "probe", ok: blocked() })
+})
+parent.postMessage({ type: "loginom-dashboard/ready", version: 1 }, "*")
+`
 
 export function appHost(options: {
   buildsRoot: string
@@ -58,6 +83,10 @@ export function appHost(options: {
     try {
       if (request.headers.host?.toLowerCase() !== host) return send(403, "Forbidden host")
       const path = request.url!.split("?")[0] ?? ""
+      if (options.mode === "strict" && request.method === "GET" && path === "/_probe/")
+        return send(200, '<!doctype html><meta charset="utf-8"><script src="probe.js"></script>', { "content-type": "text/html; charset=utf-8" })
+      if (options.mode === "strict" && request.method === "GET" && path === "/_probe/probe.js")
+        return send(200, probeScript, { "content-type": "text/javascript; charset=utf-8" })
       if (path === "/_reports" && request.method === "OPTIONS")
         return send(204, "", {
           "access-control-allow-origin": "*",
