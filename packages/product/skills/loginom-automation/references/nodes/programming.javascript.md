@@ -39,8 +39,10 @@ or move unrelated standard operations into it.
 Для неподключённого источника: inputs:[] и parameters.input_state:"unconnected".
 Runtime проверит отсутствие входящих связей и пустой native input mapping;
 пустая подключённая таблица — другой случай. Этот же input_state нужен при
-повторном выполнении/изменении источника. Один Execute; неизвестный эффект не
-повторяй. В обычной табличной ветке input_state опускай.
+повторном выполнении/изменении источника. Setup executes twice: materialize,
+inspect mapping, reactivate. Existing-node execute/cold runs once. Make FS effects
+idempotent; preserve partial failures, never retry unknown effects.
+В обычной табличной ветке input_state опускай.
 
 ## FS
 

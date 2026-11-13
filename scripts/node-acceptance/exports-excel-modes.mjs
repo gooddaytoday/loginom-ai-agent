@@ -90,8 +90,9 @@ try{
   if(config.fs_error_seed!==directory+'/errors'||folders?.children.join(',')!=='errors')throw Error('FS_ERROR_SEED_SCOPE');
   const dir=JSON.stringify(config.fs_error_seed);
   const source='import * as fs from "builtIn/FS";\nimport {OutputTable,DataType} from "builtIn/Data";\n'
-   +'fs.writeFileSync('+dir+'+"/keep.txt","KEEP",{encoding:"utf8",flag:"wx"});\n'
-   +'fs.writeFileSync('+dir+'+"/denied.txt","DENIED",{encoding:"utf8",flag:"wx",mode:0});\n'
+   +'if(!fs.existsSync('+dir+'+"/keep.txt"))fs.writeFileSync('+dir+'+"/keep.txt","KEEP",{encoding:"utf8",flag:"wx"});\n'
+   +'const denied='+dir+'+"/denied.txt";let present=false;try{fs.statSync(denied);present=true;}catch(e){}\n'
+   +'if(!present){const fd=fs.openSync(denied,"wx",0o000);try{fs.writeSync(fd,"DENIED");}finally{fs.closeSync(fd);}}\n'
    +'OutputTable.AssignColumns([{Name:"Seed",DataType:DataType.Integer}]);\nOutputTable.Append();OutputTable.Set("Seed",1);\n';
   const result=await runtime.runNodeApply({operation_id:'fs-error-seed',contract_revision:'1.0.0',document_id:identity.document_id,
    workflow_ref:identity.workflow_ref,target:{kind:'new',type:'programming.javascript',label:'Private FS fixture',position:{x:240,y:80}},
@@ -179,7 +180,8 @@ try{
   await download.delete();
   }
  }
- const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
+ const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,
+  packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
  await record({phase:'excel_seed_cleanup',cleanup});await writeFile(output+'/result.json',JSON.stringify({delivered,cleanup}));
  if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('SEED_CLEANUP');
 }finally{await context.close();}

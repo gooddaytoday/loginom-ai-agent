@@ -5,7 +5,7 @@ import {mock} from 'node:test';
 import {createHash} from 'node:crypto';
 import {createRedactor} from '../../lib/redact.mjs';
 const fault=process.argv[2]??'safe',events=[],calls=[];
-const once=fault==='source-once';let executed=false,nativeActive=false,mappingDirection='input';
+const once=fault==='source-once';let executed=false,nativeActive=false,mappingDirection='input',executionCount=0;
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]};
 const source='import {OutputTable} from "builtIn/Data";\n';
@@ -32,11 +32,11 @@ const snapshot=()=>{const result={prepared_node_context:{...node,node_id:stopped
  return result;};
 const procedure=await import('../../lib/node-procedure.mjs');
 mock.module(new URL('../../lib/node-procedure.mjs',import.meta.url),{namedExports:{...procedure,
- createNodeProcedure:()=>({openPort:async direction=>{mappingDirection=direction;wizard=true;},observe:async({ready})=>{
+ createNodeProcedure:()=>({openPort:async direction=>{mappingDirection=direction;wizard=true;if(once&&direction==='output')nativeActive=false;},observe:async({ready})=>{
   const s=snapshot();if(!ready(s))throw Error('Readiness refused');return s;},perform:async()=>{wizard=false;},
   readOutputPort:async()=>{
    if(!nativeActive)throw Error('Direct output read refused: inactive_output');
-   return {output:{port:0,port_guid:'out-port',execution_id:'once',fresh:true,
+   return {output:{port:0,port_guid:'out-port',execution_id:'execution-'+executionCount,fresh:true,
     freshness_basis:'completed_execution_port_source',schema:[{index:0,name:'Key',label:'Key',type:'integer'}],
     row_count:0,sample_rows:0,sample_complete:true,sample:[],limitations:[]}};
   }})}});
@@ -54,12 +54,12 @@ mock.module(new URL('../../lib/javascript-managed-source-adapter.mjs',import.met
 const execution=await import('../../lib/node-execution-procedure.mjs');
 mock.module(new URL('../../lib/node-execution-procedure.mjs',import.meta.url),{namedExports:{...execution,
  createNodeExecutionProcedure:()=>({prepare:async()=>{calls.push('prepare');},launchGraph:async()=>{
-  calls.push('Execute');return {verified:true,launch_gesture_verified:true,receipt:{status:'SUCCEEDED',cleanup_complete:true,
+  calls.push('Execute');if(once)executionCount++;return {verified:true,launch_gesture_verified:true,receipt:{status:'SUCCEEDED',cleanup_complete:true,
    operation_id:'apply-js:n31',action_key:'ui.act',action_revision:'1',output:{gesture_applied:true}}};},
   identify:async()=>{if(fault==='callback-active')await callback.promise;
-   if(once){executed=true;nativeActive=true;return {node,execution_id:'once'};}
+   if(once){executed=true;nativeActive=true;return {node,execution_id:'execution-'+executionCount};}
    throw new procedure.NodeReadinessTimeout('prepared node available for process console');},
-  waitCompleted:async()=>({verified:true,cleanup_complete:true,status:'completed',execution_id:'once',owner_verified:true})})}});
+  waitCompleted:async()=>({verified:true,cleanup_complete:true,status:'completed',execution_id:'execution-'+executionCount,owner_verified:true})})}});
 const {createJavascriptCodeNodeSupport}=await import('../../lib/javascript-code-node.mjs');
 const {createActionRuntime}=await import('../../lib/executor.mjs');
 const support=createJavascriptCodeNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2',redactor:createRedactor()});
@@ -91,8 +91,8 @@ let job;
 do{job=await runtime.waitNodeApply('apply-js',{timeoutMs:1000});}while(!job.outcome);
 if(once){
  assert.equal(job.outcome.status,'SUCCEEDED',JSON.stringify(job.outcome));
- assert.deepEqual(calls,['Done','prepare','Execute']);
- assert.equal(job.outcome.output.execution.execution_id,'once');
+ assert.equal(calls.filter(c=>c==='Execute').length,2);
+ assert.equal(job.outcome.output.execution.execution_id,'execution-2');
  assert.equal(job.outcome.output.configuration.readback.input_state,'unconnected');
  console.log(JSON.stringify({fault,status:'PASS',calls}));
  process.exit(0);

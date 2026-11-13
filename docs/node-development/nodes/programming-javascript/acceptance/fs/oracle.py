@@ -11,7 +11,7 @@ from zipfile import ZipFile
 HERE = Path(__file__).resolve().parent
 
 
-def files(case, execution=1):
+def files(case, execution=2):
     if case == 'read':
         return {name: (HERE / 'fixtures' / name).read_bytes()
                 for name in ['utf8.txt', 'utf16le.txt', 'cp1251.txt', 'bytes.bin']}
@@ -65,7 +65,7 @@ def expected(case):
                                                      for name, kind in columns], 'rows': rows}]}
 
 
-def verify_archive(case, archive, folder, execution=1):
+def verify_archive(case, archive, folder, execution=2):
     wanted = files(case, execution)
     directories = {folder + '/'}
     for name in wanted:
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--folder')
     parser.add_argument('--check', action='store_true')
-    parser.add_argument('--execution', type=int, choices=[1, 2], default=1)
+    parser.add_argument('--execution', type=int, choices=[2, 3], default=2)
     parser.add_argument('--phase', choices=['fixtures', 'saved', 'moved', 'sidecar', 'warm', 'cold'], default='warm')
     parser.add_argument('--sidecar')
     parser.add_argument('--keep-file', type=Path)

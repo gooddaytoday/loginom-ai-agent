@@ -1998,7 +1998,7 @@ class Runner:
         elif not prepare or books:
             self.phase(phase + '-bytes', [sys.executable, '-B', oracle, '--case', case, '--archive',
                        folder / phase / 'files.zip', '--folder', child,
-                       '--execution', '2' if phase == 'fs-cold' else '1'] if case != 'paths' else
+                       '--execution', '3' if phase == 'fs-cold' else '2'] if case != 'paths' else
                        [sys.executable, '-B', oracle, '--case', case, '--archive', folder / phase / 'files.zip',
                         '--folder', Path(parent).name, '--phase', phase.removeprefix('fs-'),
                         '--sidecar', self.out.name + '-sidecar.txt'], folder, timeout=60)

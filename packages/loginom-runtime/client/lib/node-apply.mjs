@@ -462,10 +462,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
       if(request.finish==='execute')requireValue(id(value.execution_id)
         &&(!materialize||value.execution_id!==state.execution.execution_id
-          ||request.target.type==='programming.javascript'&&request.parameters.input_state==='unconnected'
-            &&value.input_state==='unconnected'&&value.execution_reused===true&&state.execution.status==='completed'
-            &&state.phases.find(p=>p.phase==='input_mapping')?.value?.native_mapping?.input_state==='unconnected'
-            &&state.phases.find(p=>p.phase==='input_mapping')?.value?.native_mapping?.no_incoming_links_verified===true),
+),
         'A fresh execution identity is required');
       else if(request.target.type==='programming.javascript'&&request.finish==='done'){
         // Loginom does not expose whether Done ran internal work. The owned

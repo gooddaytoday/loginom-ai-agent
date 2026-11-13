@@ -17,9 +17,10 @@ checks every archive entry, file byte and directory, including missing, extra
 and duplicate entries. A model-provided Hex column cannot establish this proof.
 
 `js-fs-effects` additionally checks the partial empty destination left by failed
-`COPYFILE_FICLONE_FORCE`. Its append-only ledger must contain one line after the
-model run and two after the single cold execution. Reconfiguring, reading or
-saving cannot silently add executions; copying is never retried or repaired.
+`COPYFILE_FICLONE_FORCE`. Its append-only ledger must contain two lines after
+source setup (materialization and activation after mapping), then three after
+the single cold execution. Reading or saving cannot silently add executions.
+An existing partial destination is preserved, so copying is never retried or repaired.
 
 `js-fs-errors` prepares KEEP and a mode-zero DENIED file through the production
 JavaScript node lifecycle in a private fixture draft before starting the model.

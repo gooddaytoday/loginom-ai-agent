@@ -39,11 +39,10 @@ test('filesystem source requires the opt-in even when a source patch is otherwis
  assert.throws(()=>validateJavascriptCodeRequest(connected.parameters,'script',connected));
 });
 
-test('unconnected executed readback retains the sole completed execution and rejects replay',()=>{
+test('unconnected executed readback requires the fresh final execution',()=>{
  const p=phases();
  p.find(r=>r.phase==='input_mapping').value.native_mapping={verified:true,source_identity_verified:true,
   input_state:'unconnected',no_incoming_links_verified:true,autosync:true,source_fields:[],target_fields:[]};
- p.find(r=>r.phase==='execute').value.execution_id='materialization_execute';
  const readback=javascriptCodeReadback({node,phases:p});
  assert.equal(readback.input_state,'unconnected');
  assert.equal(readback.input_mapping.no_incoming_links_verified,true);
@@ -59,11 +58,11 @@ test('unconnected executed readback retains the sole completed execution and rej
   r=>r.configuration.readback.input_mapping.fields=[{}]]){
   const invalid=structuredClone(result);change(invalid);assert.equal(validate(invalid).valid,false);
  }
- p.find(r=>r.phase==='execute').value.execution_id='replayed';
+ p.find(r=>r.phase==='execute').value.execution_id='materialization_execute';
  assert.throws(()=>javascriptCodeReadback({node,phases:p}),/readback incomplete/);
 });
 
-test('unconnected source keeps its native output active after its only Execute',()=>{
+test('unconnected source reactivates output mapping with a fresh second Execute',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-once'],{encoding:'utf8',timeout:10000});
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
