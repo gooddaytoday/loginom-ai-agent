@@ -1,4 +1,4 @@
-import {pythonSourceIdentity,pythonObservedIdentity} from './python-source-policy.mjs';
+import {pythonSourceIdentity,pythonObservedIdentity,inspectPythonSourcePolicy} from './python-source-policy.mjs';
 
 const need=(v,m)=>{if(!v)throw Error('Python: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -56,6 +56,11 @@ export async function configurePython(channel,p,{request}){
   need(state.node_python.source===p.source_text&&same(identity,target),'saved code differs from source_text after replacement');
  }
  need(state.node_python.separate_process!==false,'separate process must stay enabled');
+ // Execute runs the saved code on the shared server: admit it exactly as source_text.
+ if(request.finish==='execute'){
+  const policy=inspectPythonSourcePolicy(state.node_python.source);
+  need(policy.status==='ADMITTED','saved code refused by '+policy.policy+' ('+policy.reason+(policy.line?' at line '+policy.line:'')+'); replace it with source_text and expected_source_sha256 before Execute');
+ }
  const configuration={verified:true,schema_mode:schemaMode,...(schemaMode==='declared'?{columns}:{}),...identity,
   separate_process:state.node_python.separate_process,previous_source_sha256:before.source_sha256,node_context:state.prepared_node_context};
  await next('python_code','done');

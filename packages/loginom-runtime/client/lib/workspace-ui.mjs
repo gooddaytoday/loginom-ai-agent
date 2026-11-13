@@ -748,7 +748,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // "Python" by Loginom; its code editor stays behind the owned wizard.
       || /(?:^|[;_ -])(?:script|javascript|python|codeeditor)(?:[;_ -]|$)/i.test(controlCodeIdentity(element))
         && nativeGraphControl(element)?.icon!=='bg-vendor-icon-python'
-      || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
+      || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"],[data-tid$=";WizrdMCF;PythonCodeWizard;cmpCodeCM"]');
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
     const errorToastDiagnostics=new Map();
@@ -3665,7 +3665,10 @@ function readRenderedInputMapping(observation) {
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression}:null;
       const expressionCancel=tid===wizard.root_tid+';ExprDataEditForm;btnCancel' && expressionParametersReady
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression,original_row:wizard.expression_selection}:null;
+      // Python code runs on the shared server: only the Python handler (its
+      // prepared node context) may write it, after python-module-v1 admission.
       const expressionWritable=identity && isEnabled && calculatorEditor?.status==='observed' && ['expression','javascript','python'].includes(calculatorEditor.mode)
+        && (calculatorEditor.mode!=='python' || !!definitionPrefix && definitionPrefix===workflow?.prefix)
         && calculatorEditor.selected_expression && calculatorEditor.document.full_text_verified && calculatorEditor.document.writable;
       const fullValue = editable && !sensitive(element) ? String(element.value ?? (element.isContentEditable ? element.textContent : '') ?? '') : undefined;
       const value = fullValue?.slice(0, 2048), valueTruncated = fullValue !== undefined && fullValue.length > 2048;

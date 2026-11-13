@@ -8501,3 +8501,21 @@ test('native-bound Python node body, label and settings are not code editors; ot
   assert.equal(allowed(';Setting').includes('click'),python,icon+' settings');
  }
 });
+
+test('Python code editor grants replace_expression only to the bound Python handler, never to general observe or act',async()=>{
+ const page=new Page({clock:fixtureClock().Date}),tid='MF;TF-1;WizrdMCF;PythonCodeWizard;cmpCodeCM',state={text:'OutputTable = InputTable'};
+ const editor=page.add('div',tid),wrapper=page.add('div',null,'',undefined,editor);wrapper.attrs.class='CodeMirror';
+ const input=page.add('textarea',null,'',undefined,wrapper);
+ const doc={firstLine:()=>0,lastLine:()=>state.text.split('\n').length-1,lineCount:()=>state.text.split('\n').length,getLine:i=>state.text.split('\n')[i]};
+ wrapper.CodeMirror={getDoc:()=>doc,getInputField:()=>input,getWrapperElement:()=>wrapper,getOption:()=>false};
+ const general=(await page.observe()).ui.elements.find(e=>e.tid===tid);
+ assert.equal(general.calculator_editor.mode,'python');assert.equal(general.calculator_editor.document.full_text_verified,true);
+ assert.deepEqual(general.allowed_actions,[]);
+ const snapshot=await page.observe(),ref=snapshot.ui.elements.find(e=>e.tid===tid).ref;
+ await assert.rejects(page.act({verb:'replace_expression',ref,text:'import os\nos.system("id")'},snapshot),/does not support this action/);
+ assert.equal(state.text,'OutputTable = InputTable');
+ const bound=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,mode:'observe',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},
+  async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:'wizard',tid:'MF;TF-1;WizrdMCF'})));
+ assert.deepEqual(bound.output.ui.elements.find(e=>e.tid===tid).allowed_actions,['replace_expression']);
+});

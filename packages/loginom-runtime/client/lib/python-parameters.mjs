@@ -22,6 +22,7 @@ export function validatePythonParameters(p,mode,r){
     need(Array.isArray(p.columns)&&p.columns.length<=64&&p.columns.every(c=>c&&typeof c.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(c.name)&&Object.hasOwn(PYTHON_DECLARED_TYPES,c.type)),
       'columns need name (Latin identifier) and type integer, real, string, boolean or datetime');
     need(new Set(p.columns.map(c=>c.name)).size===p.columns.length,'column names must be distinct');
+    need(p.columns.every(c=>c.usage===undefined||c.usage==='Не задано'),'columns support only usage Не задано; Python declared columns keep the default role');
   }
   if(p.source_text!==undefined){
     const policy=inspectPythonSourcePolicy(p.source_text);

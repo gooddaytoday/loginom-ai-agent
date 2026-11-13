@@ -145,3 +145,18 @@ test('readback is compact and output keeps declared order and types',async()=>{
  await assert.rejects(readPythonOutputs(coerced,{ports:[0]},ctx,configured),/differs from the declared columns/);
  assert.equal((await readPythonOutputs(coerced,{ports:[0]},ctx,{ports:[{port:0,schema:null}]})).status,'complete');
 });
+
+test('existing node saved code is checked by python-module-v1 before Execute, not before Done',async()=>{
+ const unsafe=fakeWizard({generation:true,source:'import os\nos.system("id")\n'});
+ await assert.rejects(configurePython(unsafe.channel,{},{request:request('existing')}),/saved code refused by python-module-v1 \(module:os at line 1\)/);
+ assert.equal(unsafe.actions.some(a=>a.expected_stage==='done'),false);
+ const done=fakeWizard({generation:true,source:'import os\n'});
+ assert.equal((await configurePython(done.channel,{},{request:request('existing',{finish:'done'})})).verified,true);
+ const admitted=fakeWizard({generation:true,source:pandas});
+ assert.equal((await configurePython(admitted.channel,{},{request:request('existing')})).configuration.source_sha256,sha(pandas));
+});
+
+test('declared columns refuse a usage role the Python columns step does not set',()=>{
+ validatePythonParameters({source_text:stdlib,schema_mode:'declared',columns:declared.map(c=>({...c,usage:'Не задано'}))},'script',request());
+ assert.throws(()=>validatePythonParameters({source_text:stdlib,schema_mode:'declared',columns:declared.map((c,i)=>({...c,usage:i?'Не задано':'Активное'}))},'script',request()),/usage Не задано/);
+});
