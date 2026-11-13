@@ -12,13 +12,14 @@ const parameters={group_by:[field('Region')],measures:[measure('Amount','median'
 const fields=[{name:'Region',type:'string'},{name:'Amount',type:'integer'},{name:'Text',type:'string'}];
 const configuration={keys:[{name:'Region',label:'Region',type:'string'}],measures:[{name:'Amount',label:'Amount',type:'integer',functions:32}]};
 
-test('Grouping median is advertised and resolves integer input to mask 32',()=>{
+test('Grouping median is advertised and resolves integer/real input to mask 32',()=>{
  assert.ok(groupingMeasureSchema.properties.function.enum.includes('median'));
  validateGroupingParameters(parameters,'aggregate',request);
  assert.deepEqual(resolveGroupingParameters(parameters,fields).functions,[{name:'Amount',mask:32}]);
  const mixed={...parameters,measures:[measure('Amount','sum','Total'),measure('Amount','median','Metric')]};
  assert.deepEqual(resolveGroupingParameters(mixed,fields).functions,[{name:'Amount',mask:33}]);
- for(const type of ['string','real','boolean','datetime','variant']){
+ assert.deepEqual(resolveGroupingParameters(parameters,fields.map(f=>f.name==='Amount'?{...f,type:'real'}:f)).functions,[{name:'Amount',mask:32}]);
+ for(const type of ['string','boolean','datetime','variant']){
   assert.throws(()=>resolveGroupingParameters(parameters,fields.map(f=>f.name==='Amount'?{...f,type}:f)),/incompatible/);
  }
  for(const fn of ['concat','unknown']){
@@ -47,7 +48,9 @@ test('Grouping preserves a saved median mask and still refuses unknown bits and 
   await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
   assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);
  }
- for(const type of ['string','real']){
+ const real=structuredClone(configuration);real.measures[0].type='real';
+ assert.equal((await configureGrouping(channel(real),{})).preservation.unchanged,true);
+ for(const type of ['string','boolean']){
   const c=structuredClone(configuration);c.measures[0].type=type;
   await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
   assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);

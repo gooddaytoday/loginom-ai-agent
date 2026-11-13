@@ -11,7 +11,7 @@ for(const keepOpen of [true,false])test('browser signal ownership follows keepOp
   require:()=>({chromium:{launchPersistentContext:async(_path,options)=>{launched=options;return context;}}}),
   browserLaunch:()=>({args:[],viewport:{width:1280,height:800}}),mkdir:async()=>{},
   browserEnvironment:()=>({}),browserLoggingArguments:()=>[],browserDownloadScript:()=>'',connectionTimelineScript,
-  setTimeout,clearTimeout,loginPage:async()=>({authenticated:true}),process:{platform:'linux',env:{}},
+  setTimeout,clearTimeout,performance,loginPage:async()=>({authenticated:true}),process:{platform:'linux',env:{}},
  });
  const result=await run({browserPath:'/own/chromium',profile:'/own/profile',candidate:{url:'https://loginom.invalid'},headless:true,keepOpen,onRetry:async()=>{}});
  for(const key of ['handleSIGINT','handleSIGTERM','handleSIGHUP'])assert.equal(launched[key],!keepOpen,key);

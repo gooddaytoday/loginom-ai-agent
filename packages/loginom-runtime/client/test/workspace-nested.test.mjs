@@ -9,7 +9,7 @@ import {Page} from './support/workspace-ui-fixture.mjs';
 
 // LAB-1543 DOM: entering keeps TF-1 and changes breadcrumbs; service GUIDs
 // repeat. Leaving can retain the selected owner's breadcrumb.
-function fixture({loseReply=false,foreignOwner=false,block=false}={}) {
+function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,loseDispatchReply=false}={}) {
   class PackageTreeNode {}; class WorkFlowTreeNode {}; class ModelForm {};
   const prefix='MF;TF-1',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
   const element=(tid,text='')=>({tid,textContent:text,isConnected:true,getAttribute:()=>tid,
@@ -57,8 +57,17 @@ function fixture({loseReply=false,foreignOwner=false,block=false}={}) {
   app.Application={FInstance:{FMainForm:{Items:{Workspace:workspace},FMapTree:{FServerConnection:{UserName:'worker'}}}}};
   const context=vm.createContext({document,location:{origin:'https://app.loginom.ai'},getComputedStyle:()=>({visibility:'visible'}),
     __loginomDockPreparationV1:preparation,bg:{app}});
-  const page={evaluate:(fn,args)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(args)+')',context),
-    locator:selector=>({click:async options=>{if(options?.trial)return;clicks++;if(selector.includes('GenericEnterLabel')){current=inner;crumbs.push('Подмодель','Модуль','Сценарий');if(foreignOwner)owner.FGuid='foreign';}else if(selector.includes('LeaveSubmodelLabel')){current=outer;crumbs=crumbs.slice(0,5).concat('Подмодель');}else throw Error('Unexpected click');masked=true;if(loseReply){loseReply=false;throw Error('lost click reply');}}}),
+  const page={evaluate:(fn,args)=>{
+      const value=vm.runInContext('('+fn.toString()+')('+JSON.stringify(args)+')',context);
+      if(loseDispatchReply&&args?.mode==='dispatch'){loseDispatchReply=false;throw Error('lost dispatch reply');}
+      return value;
+    },
+    locator:selector=>({click:async options=>{if(options?.trial){
+      const failure=trialFail;trialFail=null;
+      if(failure==='throw')throw Error('locator.click: Timeout exceeded (trial)');
+      if(failure==='block')masked=true;
+      return;
+    }clicks++;if(selector.includes('GenericEnterLabel')){current=inner;crumbs.push('Подмодель','Модуль','Сценарий');if(foreignOwner)owner.FGuid='foreign';}else if(selector.includes('LeaveSubmodelLabel')){current=outer;crumbs=crumbs.slice(0,5).concat('Подмодель');}else throw Error('Unexpected click');masked=true;if(loseReply){loseReply=false;throw Error('lost click reply');}}}),
     waitForTimeout:async()=>{masked=false;},mouse:{up:async()=>{}}};
   const adapter=createNodeTargetBrowserAdapter({origin:'https://app.loginom.ai',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')')(page)});
   const navigate=(wf,direction='enter',operationId='enter',{timeoutMs=120000,recoverOnly=false}={})=>vm.runInNewContext('('+makeWorkspacePrepareCode({
@@ -108,13 +117,37 @@ for(const recoverOnly of [false,true])test('NW1 retry after the original deadlin
   assert.equal(unknown.status,'NOT_READY');
   assert.equal(unknown.verification_required,true);
   assert.equal(unknown.effect_possible,true);
-  await setTimeout(Math.max(0,f.preparation.receipts.get('enter').navigationDeadline-Date.now()+1));
+  await setTimeout(301);
   f.unmask();
   const recovered=await f.navigate(f.ref,'enter','enter',{timeoutMs:120000,recoverOnly});
   assert.equal(recovered.status,'READY',JSON.stringify(recovered));
   assert.equal(f.clicks(),1);
   assert.ok((await f.read(recovered.workflow_ref)).nodes.some(n=>n.ref.node_id==='calc'));
   await assert.rejects(f.read(f.ref));
+});
+
+for(const trialFail of ['throw','block'])test('NW1 a refused trial leaves the receipt reserved and the same ID navigates with one click ('+trialFail+')',async()=>{
+  const f=fixture({trialFail}),refused=await f.navigate(f.ref);
+  assert.equal(refused.status,'NOT_READY');assert.equal(refused.effect_possible,false);
+  assert.equal(refused.verification_required,false);assert.equal(f.clicks(),0);
+  assert.equal(f.preparation.receipts.get('enter').phase,'reserved');
+  f.unmask();
+  const observed=await f.navigate(f.ref,'enter','enter',{recoverOnly:true});
+  assert.equal(observed.status,'NOT_READY');assert.equal(observed.effect_possible,false);assert.equal(f.clicks(),0);
+  const retried=await f.navigate(f.ref);
+  assert.equal(retried.status,'READY',JSON.stringify(retried));assert.equal(f.clicks(),1);
+  assert.ok((await f.read(retried.workflow_ref)).nodes.some(n=>n.ref.node_id==='calc'));
+  const replay=await f.navigate(f.ref);
+  assert.equal(replay.status,'READY',JSON.stringify(replay));assert.equal(f.clicks(),1);
+});
+
+test('NW1 a lost dispatch reply is reconciled without a gesture under the same ID',async()=>{
+  const f=fixture({loseDispatchReply:true}),unknown=await f.navigate(f.ref);
+  assert.equal(unknown.status,'NOT_READY');
+  assert.equal(f.preparation.receipts.get('enter').phase,'effect_possible');assert.equal(f.clicks(),0);
+  const retried=await f.navigate(f.ref,'enter','enter',{timeoutMs:300});
+  assert.equal(retried.status,'NOT_READY');assert.equal(retried.effect_possible,true);
+  assert.equal(retried.reason,'DEADLINE');assert.equal(f.clicks(),0);
 });
 
 test('NW1 refuses a foreign nested owner after a gesture and blockers before one',async()=>{
