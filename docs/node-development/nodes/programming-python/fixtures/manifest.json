@@ -1,0 +1,17 @@
+{
+  "note": "Model inputs live in acceptance/<case>/data/; oracle reads values.csv only and never runs the .py files.",
+  "files": {
+    "acceptance/python-stdlib/data/values.csv": {"bytes": 148, "sha256": "26841ba0074b7afe35e9e8a8de9f0c1ee8cad49ebfb44f8784c447208c0a5670", "rows": 4, "encoding": "UTF-8", "delimiter": ",", "decimal": ".", "null_marker": "?", "empty_string": "\"\""},
+    "acceptance/python-pandas/data/values.csv": {"bytes": 148, "sha256": "26841ba0074b7afe35e9e8a8de9f0c1ee8cad49ebfb44f8784c447208c0a5670", "same_as": "acceptance/python-stdlib/data/values.csv"},
+    "acceptance/python-stdlib/data/calculation.py": {"bytes": 512, "sha256": "6b63e44b588c39c04de67bb3970be1d14cde83676c4d5d80554242acf5a8b9df", "uses": "standard library, InputTable.Get / OutputTable.Append+Set"},
+    "acceptance/python-pandas/data/pandas_calculation.py": {"bytes": 394, "sha256": "0e181ac778f88b5d9c0aff091bab1790bbc537eff377705bdfba9b90feab296f", "uses": "pandas: to_data_frame(useNullableArrays=True), prepare_compatible_table, fill_table"}
+  },
+  "columns": {"Id": "integer", "Amount": "real", "Text": "string", "Flag": "boolean", "Date": "datetime"},
+  "edge_values": {
+    "null": "Id=3 Amount; Id=4 Text and Date (Flag=true, so pandas output carries them)",
+    "empty_string": "Id=2 Text=\"\" (not NULL)",
+    "unicode": "Id=3 Text='я'",
+    "reals": "10.5, 20.25, -5.5 and ×3 = 31.5, 60.75, -16.5: exactly representable (0.1×3 gives 0.30000000000000004, observed)",
+    "datetime": "leap day 2024-02-29, seconds 12:30:15"
+  }
+}

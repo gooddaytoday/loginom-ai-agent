@@ -41,7 +41,7 @@ export function inspectNodeProcessControl({task,held=null}) {
  const navigationNode=card.Controller?.Node?.data?.node,ancestors=[];
  let workflow,packageNode;
  for(let n=navigationNode;n&&ancestors.length<32&&!ancestors.includes(n);n=n.ParentNode){
-  ancestors.push(n);if(app.WorkFlowTreeNode&&n instanceof app.WorkFlowTreeNode)workflow=n;
+  ancestors.push(n);if(!workflow&&app.WorkFlowTreeNode&&n instanceof app.WorkFlowTreeNode)workflow=n;
   if(app.PackageTreeNode&&n instanceof app.PackageTreeNode){packageNode=n;break;}
  }
  need(workflow===receipt.nodeTargetWorkflowNode&&packageNode===receipt.packageNode,'native workflow ancestry');

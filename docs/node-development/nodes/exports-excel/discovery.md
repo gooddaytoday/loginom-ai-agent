@@ -163,3 +163,33 @@ inputSchema, что `node-caption-schema.test.mjs`: **43 329 → 44 263 Б**, п
 Новой native-пробы нет (пара карточке не выдана). Сводка известного о 7.4.2,
 NOT_CHECKED-пункты, вывод «несколько листов — огр. 7.4.2» и предложенный
 комплект — [acceptance/variables](acceptance/variables/README.md).
+
+## LAB-1552: две строковые переменные, native-проба 13.11.2026
+
+База `v040@56be59c8041e5b249d26096e1d6854234819253f`, Loginom 7.4.2,
+`https://app.loginom.ai/app/?testable=true`, worker назначенной пары
+`01a14aa4-1756-7550-af99-b8cf2393837a`. Собственный пакет
+`lab1552-native-probe.lgp`; без выполнения Excel (табличный вход не подключался).
+Это native discovery, не бизнес-PASS.
+
+Подтверждены `Graph;Excel_файл;Input_Var-2` и оба переключателя относительно
+`MF;TF-1;WizrdMCF;ExportExcelFilePreviewWizard;`:
+`edtFileName;SwitchButton`, `edtSheetName;SwitchButton`.
+Без подключённого источника они скрыты. После Execute Калькулятора переменных
+и соединения его `Output_Var-0` с `Input_Var-2` оба доступны.
+Это обычный variables input 0, **не control**; предложение expected уточнено.
+
+Picker: `edtFileName;VariableControl;trg_picker` и
+`edtSheetName;VariableControl;trg_picker`; варианты имеют суффиксы
+`VariableControl;boundlist;<caption>`. Caption содержит метку и текущее значение,
+а не обязательно техническое имя. Проба: технические имена ExcelPath/SheetName,
+метки Выражение2/Выражение3; выбраны путь собственного файла и Январь.
+Ссылка — selected record, для которого `data.field1 === combo.getValue()`;
+field1 — native object, не строка и не значение скрытого ValueControl.
+
+После Next/Done, Save, Close, logout, закрытия старого контекста и входа в
+новом чистом контексте открыт тот же пакет. До Execute источника у обоих
+SwitchButton `pressed=true`, выбран ровно один record; captions Выражение2 и
+Выражение3, без значений. Режим переменной сохраняется. После чтения мастер
+отменён, пакет закрыт, выполнен logout, браузер закрыт. Снимки до/cold хранятся
+приватно в workdir/native-probe, в Git не входят.

@@ -11,8 +11,9 @@ import {inspectSavedLgd} from './lgd-cold.mjs'
 import {observeImportBindingInventory} from './import-bindings.mjs';
 import {observeFilterBindingInventory} from './filter-bindings.mjs';
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
+import {inspectColdConditionBranches} from './control-condition.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
-import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
+import {excelColdExpected,verifyExcelColdSettings,verifyExcelColdBindings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
 import {observeSamplingSavedSettings,parseSamplingExpected,checkSamplingCold,checkSamplingGraph,observeSamplingColdMapping} from './sampling-modes.mjs'
 import {checkClusteringRound,observeClusteringSavedSettings} from './clustering-normalized.mjs'
@@ -68,6 +69,7 @@ const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-br
 const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
 const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
 const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
+const { makeSavedPackageStateCode } = await load("client/lib/package-persistence.mjs")
 const { withBrowserReceipt } = await load("client/lib/executor.mjs")
 const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
 const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
@@ -89,7 +91,7 @@ if(excelExpected&&rawExpected.excel_books){
  if(!args["excel-books"])throw Error("COLD_EXCEL_BOOKS_REQUIRED");
  const books=JSON.parse(await readFile(resolve(args["excel-books"]),"utf8"));
  if(books.length!==rawExpected.excel_books.length)throw Error("COLD_EXCEL_BOOKS_COUNT");
- for(const book of books)execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/modes/oracle.py",import.meta.url).pathname,"--case",book.case,"--file",book.file],{stdio:"pipe"});
+ for(const book of books)if(rawExpected.excel_variables)execFileSync('python3',['-B',new URL('../../docs/node-development/nodes/exports-excel/acceptance/variables/oracle.py',import.meta.url).pathname,'--verify',book.phase,book.file],{stdio:'pipe'});else execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/modes/oracle.py",import.meta.url).pathname,"--case",book.case,"--file",book.file],{stdio:"pipe"});
 }else if(excelExpected){
  if(!args.xlsx||!args["xlsx-expected"])throw Error("COLD_XLSX_REQUIRED")
  execFileSync("python3",["-B",new URL("../../docs/node-development/nodes/exports-excel/acceptance/oracle.py",import.meta.url).pathname,"--xlsx",resolve(args.xlsx),"--expected",resolve(args["xlsx-expected"])],{stdio:"pipe"})
@@ -192,11 +194,15 @@ page = context.pages()[0]
   }
 
   const origin = new URL(config.loginom_url).origin
+  const modifiedOptions={sessionId:session,documentId:prepared.document_id,account:config.workflow_profile.loginom_user,
+   packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'};
+  await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_open'});
   const adapter = createNodeTargetBrowserAdapter({ execute, origin, build: "7.4.2" })
   let graph = await adapter.observe(
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
+  await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
   let coldChannelSequence=0;
@@ -270,7 +276,7 @@ page = context.pages()[0]
    state.variableInventory={outputs,links};
   }
   // A bound LGD destination needs the saved variable source's fresh value.
-  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>b.node.type==='imports.text')?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
+  if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>['imports.text','imports.excel'].includes(b.node.type))?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
   // The existing inventory audit executes/reads it without changing settings.
   if(expected.lgd?.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected});
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
@@ -278,6 +284,7 @@ page = context.pages()[0]
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
   if(expected.excel_sinks)for(const sink of expected.excel_sinks)verifyExcelColdSettings(destinations,sink);
   else if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
+  if(expected.excel_bindings)verifyExcelColdBindings(destinations,expected);
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {
@@ -431,6 +438,12 @@ page = context.pages()[0]
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
+  if(target.type==='control.condition'){
+   // Only the branch whose port is read may have executed; its data alone does not prove blocking.
+   if(ports.length!==1)throw Error('CONDITION_COLD_PORTS');
+   const branch_activity=await inspectColdConditionBranches(channel,ports[0].port);
+   await record({phase:'cold_condition_branch_activity',node,execution_id:execution.execution_id,read_port:ports[0].port,branch_activity});
+  }
   const samplingMappings=new Map();
   if(sampling)for(const {port} of ports){
    const proof=await observeSamplingColdMapping({load,channel,node,port,expected});
@@ -727,4 +740,14 @@ async function loadSaved(value) {
   if (typeof parsed === "string" && parsed.endsWith(".lgp")) return { path: parsed }
   if (parsed && typeof parsed.path === "string") return { path: parsed.path, node: parsed.node }
   throw Error("SAVED_SHAPE_INVALID")
+}
+
+async function recordColdPackageModified({execute,record,makeSavedPackageStateCode,options,stage}) {
+ let modified=null;
+ try {
+  const state=await execute(makeSavedPackageStateCode(options));
+  if(typeof state?.modified==='boolean'&&state.read_only===true&&state.package_path===options.packagePath)modified=state.modified;
+ } catch { /* Diagnostic failure must not replace an existing scenario outcome. */ }
+ await record({phase:'cold_package_modified_observed',stage,package_path:options.packagePath,
+  modified,available:modified!==null,read_only:true,settings_applied:false});
 }

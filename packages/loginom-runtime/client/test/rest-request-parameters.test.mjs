@@ -5,6 +5,17 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
+test('C4 accepts a header bound to a string variable through native variables input 0',()=>{
+ const p={...parameters(),headers:[{name:'X-Lab-Cycle',value:{variable:'Cycle'}}]};
+ const r={...request,variable_inputs:[{kind:'variables',input:0}]};
+ assert.equal(new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema)(p).valid,true);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',r));
+ for(const value of [{variable:''},{variable:'Cycle',value:'first'},{variable:12}])
+  assert.throws(()=>validateRestRequestParameters({...p,headers:[{name:'X-Test',value}]},'request',r));
+ assert.throws(()=>validateRestRequestParameters(p,'request',request),/variable input/);
+ assert.throws(()=>validateRestRequestParameters(p,'request',{...r,variable_inputs:[{kind:'control',input:0}]}),/variable input/);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',{...request,target:{kind:'existing'}}));
+});
 for(const method of ['POST','PUT','PATCH','DELETE'])test('C1 validates '+method+' and its body before mutation',()=>{
  const p={...parameters(),connection:{...parameters().connection,method,...(method==='DELETE'?{}:{request_content_type:'application/json'})},...(method==='DELETE'?{}:{body_field:'Body'})};
  const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);

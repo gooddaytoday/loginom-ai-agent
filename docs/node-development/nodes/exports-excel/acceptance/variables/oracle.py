@@ -48,10 +48,10 @@ def expected():
                           {'name': 'SheetName', 'type': 'string', 'initial': 'Январь', 'final': 'Февраль'}],
             'binding_inventory': [
                 {'node': {'type': 'exports.excel'}, 'parameter': '/excel_export/destination', 'mode': 'variable',
-                 'variable': {'kind': 'control', 'input': 0, 'name': 'ExcelPath', 'type': 'string', 'is_null': False},
+                 'variable': {'kind': 'variables', 'input': 0, 'name': 'ExcelPath', 'type': 'string', 'is_null': False},
                  'source': {'type': 'variables.calculator', 'output': 0}},
                 {'node': {'type': 'exports.excel'}, 'parameter': '/excel_export/sheet_name', 'mode': 'variable',
-                 'variable': {'kind': 'control', 'input': 0, 'name': 'SheetName', 'type': 'string', 'is_null': False},
+                 'variable': {'kind': 'variables', 'input': 0, 'name': 'SheetName', 'type': 'string', 'is_null': False},
                  'source': {'type': 'variables.calculator', 'output': 0}}],
             'excel_books': books}
 

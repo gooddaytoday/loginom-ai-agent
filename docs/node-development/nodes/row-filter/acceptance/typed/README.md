@@ -2,8 +2,10 @@
 
 База — голова `coverage-refresh` (#1069) поверх `origin/v040@cb0733a0`. Только
 документы: runtime, run-check и навык не менялись, модельных прогонов не было.
-**Статус: предл.** — свежая native-проба этой карточкой не выполнена (пара не
-выдана); основание — прежние пробы LAB-834/LAB-1002, справка и код runtime.
+**Top-N: готов (LAB-1575)** — native-проба подтвердила picker integer-порога
+номера строки, 1-based, исходный порядок и ссылку после Save/Close/Open.
+Подробности — [discovery-variables.md](../../discovery-variables.md#top-n-native-проба-lab-1575-13112026).
+Real/datetime/NULL: **предл.**, отдельный следующий цикл; здесь не принимаются.
 
 ### Что известно о 7.4.2
 
@@ -11,9 +13,10 @@
 |---|---|---|
 | Операторов «первые/последние N», top/bottom, процентов нет; «первый/последний» — строковые операторы над значением | справка `row-filter/filtering-criteria.html` | документ |
 | Native-поле «номер строки»: `RowNumberer=1`, `DataType=4` | `filter-context.mjs:29`, `filter-procedure.mjs:147`; уже `field.kind:"row_number"` | реализовано |
-| Привязка порога к переменной — только `input_field` integer/string | `filter-bindings.mjs:17`, `:69` | реализовано |
+| Привязка порога к переменной — `input_field` integer/string, integer scalar `row_number` | `filter-bindings.mjs`, LAB-1575 | реализовано |
 | Scalar-редактор `VariantPropEdit;SwitchButton` → picker совместимых переменных (integer) | `../../discovery-variables.md:38-47` | наблюдено для integer |
-| Picker для real/datetime поля и для номера строки | — | **NOT_CHECKED** |
+| Picker для номера строки; integer TopN | LAB-1575, `native-probe/ui.jsonl:3–4,27` | наблюдено; Save/Close/Open |
+| Picker для real/datetime поля | — | **NOT_CHECKED** |
 | Переменные real, datetime, NULL у builtin «Переменные сценария» | `../../../variables-user/discovery.md:1-36` (LAB-898) | наблюдено |
 | Сравнение с NULL ложно, NULL-строки не проходят без условия «пустой» | справка | документ; для NULL-**переменной** — гипотеза |
 | Логический тип: только «истина/ложь/пустой/не пустой», значения для привязки нет | справка, таблица операторов | документ |
@@ -43,7 +46,7 @@
 - [task-variable-null.md](task-variable-null.md) — MinScore = NULL; `expected-null.json`.
 - [oracle.py](oracle.py) — stdlib, без Loginom. `--check` сверяет пять expected и
   проверяет границы и полноту разделения на выходы 0/1. Номер строки 1-based —
-  NOT_CHECKED.
+  подтверждён native-пробой LAB-1575.
 
 ```sh
 python3 -B docs/node-development/nodes/row-filter/acceptance/typed/oracle.py --check

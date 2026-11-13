@@ -31,7 +31,7 @@ export async function readGraph(page, task) {
     const app = bg.app, card = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
     let ancestor = card.Controller.Node?.data?.node, packageNode = null, workflowNode = null;
     for (let i=0;ancestor && i<32;i++,ancestor=ancestor.ParentNode) {
-      if (app.WorkFlowTreeNode && ancestor instanceof app.WorkFlowTreeNode) workflowNode=ancestor;
+      if (!workflowNode && app.WorkFlowTreeNode && ancestor instanceof app.WorkFlowTreeNode) workflowNode=ancestor;
       if (ancestor instanceof app.PackageTreeNode) {packageNode=ancestor;break;}
     }
     if (packageNode !== record.packageNode) fail('Prepared package identity changed');
@@ -65,6 +65,9 @@ export async function readGraph(page, task) {
           || !containers[0].contains(labelElements[0]) || !visible(labelElements[0])))) fail('Node label is not bound to its rendered identity');
       const label = nativeLabel.FRawValue;
       const type = nodeTypes.find(t => t.icon_class === n.FIconCls)?.type ?? n.FIconCls;
+      const boundaryRole=diagram.FIsSubmodel===true&&(diagram.GenericInputNode===n?'input':diagram.GenericOutputNode===n?'output':null);
+      if(boundaryRole&&(n.FIconCls!=='bg-vendor-icon-nullvendor'||!n.data
+        ||(n.FPorts??[]).flatMap(g=>g.FCollection??[]).some(p=>p.parent!==n||p.FCell?.parent!==n.FCell||p.FType!==(boundaryRole==='input'?1:0))))fail('Submodel boundary identity changed');
       const inputs = [], outputs = [], allPorts=[],variableInputs=[],variableOutputs=[];
       for (const ports of n.FPorts ?? []) for (const p of ports.FCollection ?? []) {
         const element = graph.view.getState(p.FCell)?.shape?.node;
@@ -83,7 +86,11 @@ export async function readGraph(page, task) {
         const renamedRegression=type==='datamining.lin_regression' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedCrossTable=type==='transform.cross_table' && previous && previous.nodeTid!==tid && p.FSubType===1;
         const renamedFactorAnalysis=type==='research.factor_analysis' && previous && previous.nodeTid!==tid && p.FSubType===1;
-        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis;
+        // A bound Excel filename renames the node to its %Variable% caption.
+        const renamedExcel=type==='imports.excel' && previous && previous.nodeTid!==tid && p.FSubType===1;
+        const renamedDataPort=renamedBinning || renamedRegression || renamedCrossTable || renamedFactorAnalysis || renamedExcel;
+        // Its variables input is re-rendered under the same caption change.
+        const renamedExcelVariable=type==='imports.excel' && previous && previous.nodeTid!==tid && p.FType===0 && p.FSubType===3;
         const renamedVariablePort=previous&&previous.nodeTid!==tid&&p.FType===1&&p.FSubType===3
           &&['bg-vendor-icon-calcvariables','bg-vendor-icon-datatovariables'].includes(n.FIconCls)
           &&finishes.some(({context,trace})=>context?.verified===true&&context.surface==='graph'
@@ -105,16 +112,19 @@ export async function readGraph(page, task) {
         if((!ptid||variableRedraw) && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell
-            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort)
+            && previous.guid===p.FGuid && previous.data===p.data && (previous.nodeTid===tid || renamedDataPort || renamedVariablePort || renamedExcelVariable)
             && previous.type===p.FType && previous.subtype===p.FSubType))){
           const box=containers[0].getBoundingClientRect();
-          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
+          const rendered=(previous&&!renamedDataPort&&!renamedVariablePort&&!renamedExcelVariable?[...exact(previous.tid)]:[...containers[0].querySelectorAll('[data-tid]')]).filter(e=>{
             const candidate=e.getAttribute('data-tid');
             if(!containers[0].contains(e) || !visible(e) || !candidate?.startsWith(tid+';')
               || (!previous && !/^(Input|Output)_Data(?:Tree)?-\d+$/.test(candidate.slice(tid.length+1))))return false;
             if(renamedDataPort && (!/^(Input|Output)_Data-\d+$/.test(candidate.slice(tid.length+1)) || candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               || p.FType!==(candidate.slice(tid.length+1).startsWith('Input_')?0:1)))return false;
             if(renamedVariablePort&&(!/^Output_Var-\d+$/.test(candidate.slice(tid.length+1))
+              ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
+              ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
+            if(renamedExcelVariable&&(!/^Input_Var-\d+$/.test(candidate.slice(tid.length+1))
               ||candidate.slice(tid.length+1)!==previous.tid.slice(previous.nodeTid.length+1)
               ||[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1))return false;
             if(!variableRedraw&&[...exact(candidate)].filter(e=>containers[0].contains(e)).length!==1)return false;
@@ -172,7 +182,7 @@ export async function readGraph(page, task) {
       }
       nativeBindings.push({node_id:n.FGuid,label:tid.split(";Graph;")[1],inputs:[...inputs],outputs:[...outputs],...kinds,...variablePorts});
       for(const p of byTid.values())if(p.node===n.FGuid)p.index=(p.direction==='Input'?inputs:outputs).indexOf(p.index);
-      return {ref:{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:n.FGuid},type,label,dom_epoch:epoch(dom),
+      return {ref:{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,node_id:n.FGuid},type,label,...(boundaryRole?{boundary_role:boundaryRole}:{}),dom_epoch:epoch(dom),
         position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),...kinds,...variablePorts,
         other_ports:allPorts.filter(p=>! /^(Input|Output)_Data(?:Tree)?-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));
@@ -194,7 +204,8 @@ export async function readGraph(page, task) {
         foreign_links.push(tid);
         const source=connectionPorts.get(prefix+endpoints[0]+';'+endpoints[1]),target=connectionPorts.get(prefix+endpoints[2]+';'+endpoints[3]);
         if(endpoints[1]==='Output_Connection-0' && endpoints[3]==='Input_Connection-0'
-          && source?.node.FIconCls==='bg-vendor-icon-restclientconnection' && target?.node.FIconCls==='bg-vendor-icon-restclient'
+          && (source?.node.FIconCls==='bg-vendor-icon-restclientconnection' && target?.node.FIconCls==='bg-vendor-icon-restclient'
+            || source?.node.FIconCls==='bg-vendor-icon-sqliteunidacdbconnection' && target?.node.FIconCls==='bg-vendor-icon-dbimport')
           && source.port.FCell.edges?.filter(edge=>edge.source===source.port.FCell && edge.target===target.port.FCell
             && graph.view.getState(edge)?.shape?.node===e).length===1)
           rest_connection_links.push({tid,source:source.node.FGuid,target:target.node.FGuid,output:'connection:0',input:'connection:0'});
@@ -794,7 +805,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
     async choosePosition(value,graph,deadline,signal,reserved){
       // Only new REST auto-placement and its private implicit encoder (the
       // reserved argument) use the larger footprint; other nodes keep policy.
-      const clearance=value.target.kind==='new'&&!value.target.position&&(value.target.type==='integration.rest_request'||reserved!==undefined);
+      const clearance=value.target.kind==='new'&&!value.target.position&&(['integration.rest_request','imports.database'].includes(value.target.type)||reserved!==undefined);
       signal?.throwIfAborted();
       if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))
         throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});

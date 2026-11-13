@@ -64,7 +64,7 @@ export function readFilterBrowser(prefix){
    // scalar slots for an interval, list or null/boolean predicate.
    if(type){
     if(d.UseVariables!==0){
-     if(d.RowNumberer!==0||!['integer','string'].includes(type))return fail('filter_variable_type');
+     if(!['integer','string'].includes(type)||d.RowNumberer===1&&(type!=='integer'||d.UseVariables!==1||d.RelationType>5))return fail('filter_variable_type');
      if(d.UseVariables===1&&d.RelationType<=5)row.value=bound(d.CompareValue,type);
      else if(d.UseVariables===128&&[10,11].includes(d.RelationType))row.values=bound(d.CompareValueListAsString,'string');
      else return fail('filter_variable_operator');

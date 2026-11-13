@@ -46,6 +46,16 @@ test('REST readback admits optional observed response Content-Type without chang
   assert.equal(validate(r).valid,true,method);
  }
 });
+test('C4 result retains variable identity separately from a literal header value',()=>{
+ const r=result();
+ r.configuration={status:'applied',readback:{kind:'rest_request',scope:'observed_before_verified_finish',
+  node:{document_id:'d',workflow_id:'w',node_id:'n'},values_are:'observed_ui_values',method:'POST',body_field:'Body',connection:null,
+  query_parameters:[],headers:[{name:'X-Lab-Cycle',value:{variable:'Cycle'}},{name:'X-Literal',value:'fixed'}],
+  receipt_ids:['op:configure','op:node_finish'],package_persistence_verified:false}};
+ assert.equal(validate(r).valid,true);
+ r.configuration.readback.headers[0].value={variable:'Cycle',value:'first'};
+ assert.equal(validate(r).valid,false);
+});
 test('result schema preserves uncertainty and forbids claiming node-level package persistence',()=>{
  assert.equal(validate(result()).valid,true);
  for(const patch of [{package_saved:true},{persisted_package_verified:true},{pending_phase:'retry'},

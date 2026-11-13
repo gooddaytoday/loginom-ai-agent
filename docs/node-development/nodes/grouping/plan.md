@@ -115,6 +115,22 @@ Runtime mode остаётся aggregate, вход 0 / выход 0; обучен
 
 #### Предложение LAB-1558: типы агрегатов, ничья моды, пустой вход
 
+**Цикл Real LAB-1581 (13.11.2026):** native-проба всех вопросов 1–9 выполнена
+до кода на `eb92f4f467ef05cc5c2205a0239891e14f3e553b`, 7.4.2 / mas.
+Ответы — [discovery](discovery.md) и [README комплекта](acceptance/types/README.md).
+`cases.real` подтверждён без изменения oracle; `expected-real.json` выделяет
+его для `group-real`. Real открыт для всех функций, кроме native-недоступного
+concat. Остальные типы runtime остаются последующими циклами. Variant Min
+пропускает NULL (в отличие от гипотезы ниже), unique_count(1, 1.0, "1") = 2;
+оба наблюдения вне oracle текущего цикла. Далее сохранено исходное предложение.
+
+**Цикл Boolean LAB-1616:** `group-boolean` использует неизменённые
+`cases.boolean.stages` через отдельный `expected-boolean.json`: min/max/mode,
+unique_count/null_count, ничья False и all-NULL. Runtime разрешает Boolean
+для count/min/max/mode/unique_count/null_count/first/last/only по матрице Q1;
+sum/avg/median/stddev/concat для DateTime/Boolean/Variant запрещены также
+в сохранённых масках. DateTime/Variant не расширяются в этом цикле.
+
 База `v040@864fad6efe`, 13.11.2026, только документы: runtime, навык и
 run-check не менялись, native-пробы не было (её делает разработчик первым
 шагом цикла). Решение владельца `v040-open-scope`. Комплект —

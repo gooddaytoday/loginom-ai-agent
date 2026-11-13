@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
-test('logreg-ridge uses the approved task and complete independent 32x8 penalized oracle',()=>{
+for(const variant of ['ridge','lasso'])test('logreg-'+variant+' uses the approved task and complete independent 32x8 penalized oracle',()=>{
  const result=spawnSync('python3',['-B','-c',`import importlib.util
 from pathlib import Path
 p=Path('scripts/node-acceptance/run-check.py')
 s=importlib.util.spec_from_file_location('run_check',p)
 m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
-c=m.scenario('logreg-ridge');e=m.expected_for(c,'/own/coefficients.lgp')
-assert c['prompt'].name=='task-ridge.md'
+c=m.scenario('logreg-${variant}');e=m.expected_for(c,'/own/coefficients.lgp')
+assert c['prompt'].name=='task-${variant}.md'
 assert c['input_files']==['train.csv'] and (c['data']/'train.csv').is_file()
 assert c['oracle'].is_file() and c['base'] is None
 assert e['package_path']=='/own/coefficients.lgp'

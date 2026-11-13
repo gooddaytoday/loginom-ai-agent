@@ -727,7 +727,7 @@ export function makeArtifactDownloadCode(options) {
   const artifact=options?.artifact,snapshot=options?.snapshot;
   const matches=snapshot?.ui?.elements?.filter(item=>item.ref===options.file_ref) ?? [];
   const suffix=artifact?.name?.replace(/\s/g,'_').replace(/,/g,'');
-  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xls|xlsx|lgd)$/i.test(artifact.name) || matches.length!==1
+  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xls|xlsx|lgd|db)$/i.test(artifact.name) || matches.length!==1
     || matches[0].label!==artifact.name || matches[0].tid!==snapshot.workflow_ref?.prefix+';FileStorageForm;colName_'+suffix)
     throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLS/XLSX/LGD file');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
@@ -1397,7 +1397,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
     let node=card?.Controller?.Node?.data?.node,packageNode,workflowNode;
     const seen=new Set();for(let i=0;node&&i<32&&!seen.has(node);i++,node=node.ParentNode){seen.add(node);
-      if(app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
+      if(!workflowNode&&app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
       if(app.PackageTreeNode&&node instanceof app.PackageTreeNode){packageNode=node;break;}}
     const graph=exact(binding.prefix+';ModelForm;cmpDiagram');
     if(!(card?.Controller?.FController instanceof app.ModelForm)||graph.length!==1
@@ -3612,7 +3612,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       } finally {running=false;}
     },
     preflightDeliveredArtifact(artifact,snapshot) {
-      if(!/\.(?:csv|tsv|txt|xls|xlsx|lgd)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLS/XLSX/LGD files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
+      if(!/\.(?:csv|tsv|txt|xls|xlsx|lgd|db)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLS/XLSX/LGD/DB files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
       if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),
@@ -3767,7 +3767,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               // request. Its later graph preflight must not navigate Files or
               // inspect an inactive storage view while holding the node gate.
               const entry=[...auxiliary.values()].findLast(e=>e.signature==='storage.source:'+path);
-              if(request.target.type!=='imports.text'||entry?.outcome?.status!=='SUCCEEDED'||!entry?.sourceObservation
+              if(!['imports.text','imports.excel'].includes(request.target.type)||entry?.outcome?.status!=='SUCCEEDED'||!entry?.sourceObservation
                 ||entry.boundImportOperation&&entry.boundImportOperation!==operation.id)
                 throw Error('BINDING_SOURCE_UNVERIFIED: observe the current input file with dock_storage_source before Execute');
               const ref=entry.outcome.output.source.server_source_ref;
