@@ -1,3 +1,26 @@
+LangString VerifyResourcesStatus 1033 "Verifying application resources. This may take a few minutes..."
+LangString VerifyResourcesError 1033 "Application resources could not be verified or the verification cache could not be saved. Installation did not complete. Please run the installer again."
+LangString VerifyResourcesStatus 1049 "Проверка ресурсов приложения. Это может занять несколько минут..."
+LangString VerifyResourcesError 1049 "Не удалось проверить ресурсы приложения или сохранить результат проверки. Установка не завершена. Запустите установщик повторно."
+
+!macro customInstall
+  # Never skip updates: the final installed bytes and current user's profile
+  # must be checked before NSIS can mark the installation successful or launch.
+  SetDetailsPrint textonly
+  DetailPrint "$(VerifyResourcesStatus)"
+  SetDetailsPrint both
+  ClearErrors
+  ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --verify-resources' $0
+  ${if} ${Errors}
+    StrCpy $0 1
+  ${endif}
+  ${if} $0 != 0
+    MessageBox MB_OK|MB_ICONSTOP "$(VerifyResourcesError)" /SD IDOK
+    SetErrorLevel 1
+    Abort
+  ${endif}
+!macroend
+
 !macro customUnInstall
   ${ifNot} ${isUpdated}
     ReadRegStr $0 HKCU "Software\Classes\loginom-ai-agent\shell\open\command" ""

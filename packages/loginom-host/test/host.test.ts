@@ -3,7 +3,7 @@ import { access, copyFile, mkdir, mkdtemp, readdir, rm, stat, symlink, truncate,
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
-import { createLoginomHost } from "../src/host"
+import { createLoginomHost, verifyInstallationResources } from "../src/host"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
@@ -76,7 +76,21 @@ test("Host prewarms one full resource verification and hands every runtime start
       ),
     }),
   )
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+  const installed = await verifyInstallationResources({ root, resources, resourceVersion: "0.4.0" })
+  expect(installed.verification).toEqual({ mode: "full", hashedFiles: 2, cachedFiles: 0 })
+  // Reinstall/--updated cannot certify an old cache without a full pass.
+  expect((await verifyInstallationResources({ root, resources, resourceVersion: "0.4.0" })).verification).toEqual({
+    mode: "full",
+    hashedFiles: 2,
+    cachedFiles: 0,
+  })
+  const host = await createLoginomHost({
+    root,
+    resources,
+    resourceVersion: "0.4.0",
+    codec: credentials("linux"),
+    environment: {},
+  })
   try {
     // Verification happens with no connection or browser admission.
     for (
@@ -107,20 +121,29 @@ test("Host prewarms one full resource verification and hands every runtime start
     expect(proofs[0].hash).toMatch(/^[a-f0-9]{64}$/)
     // Each start rechecks file metadata against the profile cache the prewarm wrote.
     for (const proof of proofs)
-      expect(proof).toEqual({ hash: proofs[0].hash, cachePath: join(root, "resource-verification.json"), cacheVersion: "" })
+      expect(proof).toEqual({
+        hash: proofs[0].hash,
+        cachePath: join(root, "resource-verification.json"),
+        cacheVersion: "0.4.0",
+      })
     expect(await Bun.file(join(root, "resource-verification.json")).exists()).toBe(true)
-    expect(
-      (await Bun.file(join(root, "startup-phases.jsonl")).text())
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line))
-        .filter((event) => event.phase === "resources.verify" && event.status === "ready"),
-    ).toHaveLength(1)
+    const events = (await Bun.file(join(root, "startup-phases.jsonl")).text())
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.phase === "resources.verify" && event.status === "ready")
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ mode: "metadata", hashedFiles: 0, cachedFiles: 2 })
+    expect((await host.verifyInstallationResources()).verification).toEqual({
+      mode: "full",
+      hashedFiles: 2,
+      cachedFiles: 0,
+    })
     await host.close()
     const restored = await createLoginomHost({
       root,
       resources,
-      resourceVersion: "",
+      resourceVersion: "0.4.0",
       codec: credentials("linux"),
       environment: {},
     })

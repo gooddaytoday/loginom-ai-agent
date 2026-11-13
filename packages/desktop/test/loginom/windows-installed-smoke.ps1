@@ -169,6 +169,18 @@ try {
     $uninstaller = Get-ChildItem -LiteralPath $install -Filter 'Uninstall *.exe' | Select-Object -First 1 -ExpandProperty FullName
     Check 'install-path' ((Test-Path -LiteralPath $exe) -and $entries.Count -eq 1 -and $entries[0].UninstallString.Contains($install)) $exe
     $resources = Join-Path $install 'resources\loginom'
+    # Before any ordinary app launch, the installer must have published the
+    # exact profile cache the Host will read. This also exercises /S installs.
+    $cachePath = Join-Path $profile 'desktop\loginom\resource-verification.json'
+    $cache = Get-Content -LiteralPath $cachePath -Raw | ConvertFrom-Json
+    $manifestPath = Join-Path $resources 'resource-manifest.json'
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $cacheReady = $cache.protocol -eq 1 -and $cache.version -eq $ExpectedVersion -and
+        $cache.root -eq (Resolve-Path -LiteralPath $resources).Path -and
+        $cache.manifestHash -eq (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant() -and
+        @($cache.files.PSObject.Properties).Count -eq @($manifest.files).Count
+    Check 'installer-resource-cache' $cacheReady 'Full resource verification cache exists before first app launch'
+    if (-not $cacheReady) { throw 'Installer did not prepare the Host resource cache' }
     $help = Join-Path $resources 'help\help-manifest.json'
     $helpPresent = Test-Path -LiteralPath $help -PathType Leaf
     if ($helpPresent) { Get-Content -LiteralPath $help -Raw | ConvertFrom-Json | Out-Null }
