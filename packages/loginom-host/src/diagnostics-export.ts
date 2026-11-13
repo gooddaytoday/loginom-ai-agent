@@ -522,17 +522,37 @@ export async function profileSecrets(input: {
   let status: "ok" | "unavailable" = "ok"
   if (input.loginom) {
     const directory = join(input.loginom, "connection")
+    const generations = join(directory, "generations")
+    let history: string[] = []
+    try {
+      if (lstatSync(generations, { throwIfNoEntry: false })?.isDirectory()) history = readdirSync(generations)
+    } catch {
+      status = "unavailable"
+    }
     // Never create profile directories: read only an existing store.
-    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false })?.isFile()) {
-      try {
-        if (!input.codec) throw Error("codec-unavailable")
-        const active = await connectionStore(directory, input.codec).read()
-        if (active) {
-          secrets.push(active.apiKey, active.password)
-          users.push(active.username)
+    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false })?.isFile() || history.length) {
+      const store = input.codec && connectionStore(directory, input.codec)
+      // Every generation, not only the active one: an older chat may echo the
+      // login and password of an account the profile used before.
+      const reads = store
+        ? [
+            () => store.read(),
+            ...history
+              .filter((name) => /^\d+\.json$/.test(name))
+              .map((name) => () => store.staged(Number(name.slice(0, -5)))),
+          ]
+        : []
+      if (!store) status = "unavailable"
+      for (const read of reads) {
+        try {
+          const connection = await read()
+          if (connection) {
+            secrets.push(connection.apiKey, connection.password)
+            users.push(connection.username)
+          }
+        } catch {
+          status = "unavailable"
         }
-      } catch {
-        status = "unavailable"
       }
     }
   }

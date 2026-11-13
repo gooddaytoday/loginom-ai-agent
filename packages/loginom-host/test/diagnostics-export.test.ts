@@ -144,6 +144,28 @@ test("secrets planted in the real profile stores never reach any archived byte",
     expect(file).toMatchObject({ size: archive.files.get(file.name)!.length, sha256: sha(archive.files.get(file.name)!) })
 })
 
+test("profile secrets include every connection generation, not only the active one", async () => {
+  const p = profile()
+  const store = connectionStore(join(p.loginom, "connection"), credentials("linux"))
+  const accounts = [
+    { username: "fixture-account-a", apiKey: "fixture-key-of-a", password: "fixture-pass-of-a" },
+    { username: "fixture-account-b", apiKey: "fixture-key-of-b", password: "fixture-pass-of-b" },
+  ]
+  for (const [i, account] of accounts.entries()) {
+    await store.stage({ generation: i + 1, revision: 1, url: "https://app.loginom.ai", ...account })
+    await store.activate(i + 1)
+  }
+  const known = await profileSecrets({ loginom: p.loginom, codec: credentials("linux") })
+  expect(known.status).toBe("ok")
+  expect(known.secrets).toEqual(expect.arrayContaining(accounts.flatMap((item) => [item.apiKey, item.password])))
+  expect(known.users).toEqual(expect.arrayContaining(accounts.map((item) => item.username)))
+  // An unreadable generation keeps the others and is reported, never silently "ok".
+  put(join(p.loginom, "connection", "generations", "3.json"), "{not a record")
+  const partial = await profileSecrets({ loginom: p.loginom, codec: credentials("linux") })
+  expect(partial.status).toBe("unavailable")
+  expect(partial.secrets).toEqual(expect.arrayContaining(["fixture-pass-of-a", "fixture-pass-of-b"]))
+})
+
 test("masks a login only as a whole token and keeps generic logins and chat roles", async () => {
   const p = profile()
   const chat = {
