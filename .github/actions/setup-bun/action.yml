@@ -68,6 +68,48 @@ runs:
       run: python3 -m pip install setuptools || pip install setuptools || true
       shell: bash
 
+    # Hoisted installs can enqueue the same cold patch for multiple lock entries.
+    # Materialize each repeated patched version once before installing the tree.
+    - name: Prepare repeated Windows patches in the Bun cache
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        node <<'NODE'
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const { spawnSync } = require('node:child_process')
+        const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+        const lock = fs.readFileSync('bun.lock', 'utf8')
+        const cache = spawnSync('bun', ['pm', 'cache'], { encoding: 'utf8' })
+        if (cache.error || cache.status !== 0) throw cache.error || new Error('Cannot resolve the Bun cache')
+        for (const [spec, patch] of Object.entries(manifest.patchedDependencies || {})) {
+          if (lock.split(`[${JSON.stringify(spec)},`).length <= 2) continue
+          const name = spec.slice(0, spec.lastIndexOf('@'))
+          const version = spec.slice(spec.lastIndexOf('@') + 1)
+          const directory = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'bun-patch-'))
+          try {
+            const scope = path.join(cache.stdout.trim(), path.dirname(name))
+            const before = fs.existsSync(scope) ? fs.readdirSync(scope).filter(entry =>
+              entry.startsWith(path.basename(spec) + '@') && entry.includes('_patch_hash=')) : []
+            console.log(`Preparing ${spec}; existing patched cache entries: ${JSON.stringify(before)}`)
+            fs.copyFileSync(patch, path.join(directory, 'package.patch'))
+            fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({
+              private: true,
+              dependencies: { [name]: version },
+              patchedDependencies: { [spec]: 'package.patch' },
+            }))
+            const result = spawnSync('bun', ['install', '--ignore-scripts', '--no-save', '--linker', 'hoisted'], {
+              cwd: directory,
+              env: { ...process.env, BUN_INSTALL_CACHE_DIR: cache.stdout.trim() },
+              stdio: 'inherit',
+            })
+            if (result.error || result.status !== 0) throw result.error || new Error(`Cannot prepare ${spec}`)
+          } finally {
+            fs.rmSync(directory, { recursive: true, force: true })
+          }
+        }
+        NODE
+
     - name: Install dependencies
       run: bun install ${{ inputs.install-flags }}
       shell: bash
