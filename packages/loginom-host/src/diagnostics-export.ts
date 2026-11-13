@@ -454,6 +454,8 @@ export async function profileSecrets(input: {
   /** opencode data directory (contains `auth.json`, `mcp-auth.json`). */
   data?: string
   codec?: CredentialCodec
+  /** Dock home `${LOGINOM_DOCK_HOME:-~/.loginom-dock}` with `config.json` (client/bin/dispatch.mjs). */
+  dockHome?: string
   extra?: string[]
 }) {
   const secrets: string[] = [...(input.extra ?? [])]
@@ -481,6 +483,19 @@ export async function profileSecrets(input: {
       if (!lstatSync(path, { throwIfNoEntry: false })) continue
       try {
         collectStrings(JSON.parse(readBounded(path, 1024 * 1024).text), secrets)
+      } catch {
+        status = "unavailable"
+      }
+    }
+  }
+  if (input.dockHome) {
+    // Dock client key `api_key` (loginom-runtime/client/lib/config.mjs).
+    for (const file of ["config.json", join("profiles", "hermes-user.json")]) {
+      const path = join(input.dockHome, file)
+      if (!lstatSync(path, { throwIfNoEntry: false })) continue
+      try {
+        const key = JSON.parse(readBounded(path, 1024 * 1024).text)?.api_key
+        if (typeof key === "string") secrets.push(key)
       } catch {
         status = "unavailable"
       }

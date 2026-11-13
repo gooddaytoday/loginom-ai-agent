@@ -296,3 +296,16 @@ test("P2.2: URL user info is removed for every scheme and the host is masked", a
   expectAbsent(bytes, ["alice", "S3cretPw", "proxy.company.ru", "svc:", "Pg-Pass-77", "10.9.8.7"])
   expect(bytes.toString("utf8")).toMatch(/socks5:\/\/\[redacted\]@host-[0-9a-f]{8}:1080/)
 })
+
+test("P2.3: the Dock configuration api_key is a known value", async () => {
+  const p = profile()
+  put(join(p.root, "dock", "config.json"), JSON.stringify({ api_key: "fixture-dock-api-value", account: "loginom-dock" }))
+  put(join(p.root, "dock", "profiles", "hermes-user.json"), JSON.stringify({ api_key: "fixture-hermes-api-value" }))
+  const known = await profileSecrets({ dockHome: join(p.root, "dock") })
+  expect(known.secrets).toEqual(expect.arrayContaining(["fixture-dock-api-value", "fixture-hermes-api-value"]))
+  const bytes = await archiveBytes({
+    knownSecrets: known.secrets,
+    lines: ["echo fixture-dock-api-value", "echo fixture-hermes-api-value"],
+  })
+  expectAbsent(bytes, ["fixture-dock-api-value", "fixture-hermes-api-value"])
+})

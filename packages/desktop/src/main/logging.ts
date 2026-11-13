@@ -95,7 +95,13 @@ export async function exportDebugLogs() {
   try {
     write("main", "exporting debug logs", { output })
     const loginom = join(app.getPath("userData"), "loginom")
-    const known = await profileSecrets({ loginom, data: dataRoot(), codec: exportCodec, extra: [...exportValues] })
+    const known = await profileSecrets({
+      loginom,
+      data: dataRoot(),
+      codec: exportCodec,
+      dockHome: process.env.LOGINOM_DOCK_HOME || join(homedir(), ".loginom-dock"),
+      extra: [...exportValues],
+    })
     const { zip } = await buildDiagnosticsArchive({
       runtime: join(loginom, "runtime"),
       logs: [
