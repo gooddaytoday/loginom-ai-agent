@@ -1,6 +1,6 @@
 import { mkdtemp, realpath, rm } from "node:fs/promises"
 import { join } from "node:path"
-import { preparePublish, finishPublish } from "@loginom-ai-agent/dashboard/agent/publish"
+import { preparePublish, finishPublish, outputText } from "@loginom-ai-agent/dashboard/agent/publish"
 import { Effect, Schema } from "effect"
 import { dashboardResources } from "@loginom-ai-agent/dashboard/agent/resources"
 import { draftDashboard } from "@loginom-ai-agent/dashboard/agent/draft"
@@ -66,7 +66,8 @@ export const DashboardPublishTool = Tool.define(
             }),
             operation => Effect.tryPromise(() => rm(operation, { recursive: true, force: true })).pipe(Effect.ignore),
           )
-          return { title: "Публикация dashboard", output: result.status + ": " + result.text, metadata: { truncated: false } }
+          const output = outputText(Buffer.from(result.status + ": " + result.text))
+          return { title: "Публикация dashboard", output, metadata: { truncated: false } }
         }).pipe(Effect.orDie),
     }
   }),

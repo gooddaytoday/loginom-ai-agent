@@ -127,7 +127,7 @@ function execute(node: string, args: string[], cwd: string, signal: AbortSignal,
   })
 }
 
-function outputText(bytes: Buffer) {
+export function outputText(bytes: Buffer) {
   return new TextDecoder().decode(bytes.subarray(0, OUTPUT), { stream: true })
 }
 
@@ -146,5 +146,5 @@ async function treeHash(dir: string) {
 
 export function embeddedValues(sample: { rows: readonly (readonly unknown[])[] }, files: Buffer[]) {
   const values = new Set(sample.rows.flat().filter(cell => cell != null).map(String))
-  return [...values].filter(value => value.length >= 6 && files.some(file => file.includes(value)))
+  return [...values].filter(value => [...value].length >= 6 && files.some(file => file.includes(value)))
 }

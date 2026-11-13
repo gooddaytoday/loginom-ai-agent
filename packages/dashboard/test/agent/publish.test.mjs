@@ -9,7 +9,7 @@ import test from "node:test"
 import { buildDashboard } from "../../src/agent/build.ts"
 import { NO_SAMPLE } from "../../src/agent/draft.ts"
 import { prepareDashboard, readDashboardSnapshot } from "../../src/agent/folder.ts"
-import { preparePublish, finishPublish } from "../../src/agent/publish.ts"
+import { embeddedValues, preparePublish, finishPublish } from "../../src/agent/publish.ts"
 import { dashboardServer } from "../../src/web/server.ts"
 
 const resources = { template: resolve(import.meta.dirname, "../../template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE }
@@ -249,4 +249,23 @@ test("embedded-value diagnostics stay within the builder budget and explain publ
   assert.equal(result.ok, false)
   assert.match(result.text, /публичн/)
   assert.ok(Buffer.byteLength(result.text.split("\n").slice(1).join("\n")) <= 8192)
+})
+
+test("confirmed publication survives loss of the local work folder", async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true)
+  await rm(input.work, { recursive: true })
+  const result = await finishPublish({ ...input, ...prepared })
+  assert.equal((await input.lookup()).hash, prepared.build.hash)
+  assert.equal(await readFile(join(input.builds, prepared.control.key, "current"), "utf8"), prepared.build.hash + "\n")
+  assert.equal(result.status, "published")
+  assert.ok(result.text.startsWith(published.text))
+  assert.match(result.text, /локального образца.*Изменить в чате/)
+})
+
+test("the embedded value threshold counts six Unicode code points", () => {
+  const short = "🟢".repeat(3)
+  const boundary = "🟢".repeat(6)
+  assert.deepEqual(embeddedValues({ rows: [[short, boundary]] }, [Buffer.from(boundary)]), [boundary])
 })

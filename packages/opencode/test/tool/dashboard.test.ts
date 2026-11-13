@@ -159,3 +159,29 @@ it.instance("interruption joins an active publication build before removing its 
     expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
   }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
 }))
+
+it.instance("publication limits the complete model output to whole UTF-8 code points", () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const flags = yield* RuntimeFlags.Service
+  const value = "🟢".repeat(8192)
+  yield* Effect.promise(async () => {
+    const sample = Bun.file(join(folder.work, "sample.json"))
+    await Bun.write(sample, JSON.stringify({ ...await sample.json(), rows: [[value]] }))
+    await Bun.write(join(folder.work, "src/main.tsx"), "document.body.textContent = " + JSON.stringify(value))
+  })
+  yield* Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create()
+    const definition = yield* DashboardPublishTool
+    const tool = yield* definition.init()
+    const result = yield* tool.execute({}, {
+      sessionID: session.id, messageID: MessageID.ascending(), agent: "build", messages: [],
+      abort: new AbortController().signal, metadata: () => Effect.void, ask: () => Effect.die("Embedded values must block publication"),
+    })
+    expect(Buffer.byteLength(result.output)).toBeLessThanOrEqual(8192)
+    expect(result.output).toMatch(/^failed: Сборка не удалась\.\n.*публичной\./)
+    expect(result.output.endsWith("🟢")).toBe(true)
+    expect(Buffer.byteLength(result.output + "🟢")).toBeGreaterThan(8192)
+    expect(result.output).not.toContain("�")
+  }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
+}))

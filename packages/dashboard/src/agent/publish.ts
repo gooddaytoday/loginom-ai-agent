@@ -10,7 +10,7 @@ import { NO_SAMPLE } from "./draft.ts"
 import { readDashboardSnapshot, removePublishedSample, type ControlBinding } from "./folder.ts"
 import type { DashboardResources } from "./resources.ts"
 
-export { embeddedValues } from "./build.ts"
+export { embeddedValues, outputText } from "./build.ts"
 
 type Prepared = { control: ControlBinding; build: { hash: string; dir: string } }
 
@@ -62,8 +62,6 @@ export async function finishPublish(input: Prepared & { work: string; builds?: s
     const lookup = response.ok && Schema.decodeUnknownOption(LookupResponse)(await response.json())
     if (!lookup || Option.isNone(lookup) || lookup.value.hash !== hash)
       return { status: "failed", text: "Стенд не подтвердил хеш сборки." }
-    removePublishedSample(input.work, input.control.snapshotId)
-    return { status: "published", text: "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard" }
   } catch (error) {
     if (error instanceof Error && (("errcode" in error && error.errcode === 5) || ("code" in error && error.code === "SQLITE_BUSY")))
       return { status: "failed", text: "Этот dashboard занят другой публикацией. Попробуйте ещё раз." }
@@ -71,4 +69,12 @@ export async function finishPublish(input: Prepared & { work: string; builds?: s
   } finally {
     db?.close()
   }
+
+  const text = "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard"
+  try {
+    removePublishedSample(input.work, input.control.snapshotId)
+  } catch {
+    return { status: "published", text: text + "\nНе удалось проверить удаление локального образца. Для дальнейшей правки нажмите «Изменить в чате» в Studio." }
+  }
+  return { status: "published", text }
 }
