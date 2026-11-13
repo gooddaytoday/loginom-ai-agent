@@ -105,6 +105,11 @@ test('REST C1 requires four single-method cases and excludes the retired eight-r
  for(const name of ['rest-post-body','rest-put-body','rest-patch-body','rest-delete'])assert.ok(text.includes(name));
  assert.ok(!text.includes('rest-methods-body'));
 });
+test('REST reference requires query variables, literal headers and header variables',t=>{
+ const r=repo(t);r.commit('packages/product/skills/loginom-automation/references/nodes/integration.rest_request.md');
+ const text=r.list();
+ for(const name of ['rest-query-variables','rest-headers','rest-variables'])assert.ok(text.includes(name),name);
+});
 for(const path of ['packages/loginom-runtime/client/lib/rest-request.mjs',
  'packages/loginom-runtime/client/lib/rest-request-parameters.mjs',
  'docs/node-development/nodes/integration-restrequest/acceptance/modes/headers/expected.json',
