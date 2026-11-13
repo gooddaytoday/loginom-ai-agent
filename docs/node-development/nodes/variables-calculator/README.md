@@ -8,7 +8,7 @@
 
 Зарегистрирован `variables.calculator` / `expression`. Упорядоченные выражения Loginom создают integer/real/string/boolean переменные; existing patch сохраняет неуказанные выражения; variable output 0.
 
-Ограничения: Без datetime, Variant, промежуточных выражений, замены входных переменных, кэша, перестановки и JavaScript.
+Ограничения: datetime и промежуточные выражения — #928; без Variant, замены входных переменных, кэша, перестановки и JavaScript.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [variables-calculator-node.mjs](../../../../packages/loginom-runtime/client/lib/variables-calculator-node.mjs):1–25; [variables-calculator-parameters.mjs](../../../../packages/loginom-runtime/client/lib/variables-calculator-parameters.mjs):1–66; [variables.calculator.md](../../../../packages/product/skills/loginom-automation/references/nodes/variables.calculator.md):1–28. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
