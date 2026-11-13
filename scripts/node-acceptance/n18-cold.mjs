@@ -21,6 +21,16 @@ export async function verifyN18JavascriptStep({graph,requirement,load,channelFor
  await selectPreparedGraphNode(channel,selected,'cold select n18 Calculator',{refreshReplacedBody:true});
  await openPreparedWizard(channel);
  try{
+  const owned=s=>owns(s.prepared_node_context,node)&&s.prepared_node_context.surface==='wizard';
+  const opened=await channel.observe({condition:'cold n18 saved Calculator wizard',
+   ready:s=>owned(s)&&['input_mapping','calculator'].includes(s.wizard?.stage)});
+  if(opened.wizard.stage==='input_mapping')await channel.perform({condition:'cold n18 advance saved Calculator',
+   ready:s=>owned(s)&&s.wizard?.stage==='input_mapping',identity:s=>s.prepared_node_context,
+   resolve:s=>{
+    const next=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.enabled===true&&e.allowed_actions?.includes('wizard_step'));
+    need(next.length===1,'COLD_N18_CALCULATOR_NEXT_UNCONFIRMED');
+    return {verb:'wizard_step',ref:next[0].ref,expected_stage:'calculator'};
+   }});
   const ready=s=>owns(s.prepared_node_context,node)&&s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true
    &&s.node_calculator.inventory_complete===true&&owns(s.node_calculator.node_context,node);
   const state=await channel.observe({condition:'cold n18 saved Calculator language',readCalculator:true,ready});
