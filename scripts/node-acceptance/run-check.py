@@ -408,6 +408,11 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures',
                     input_files=['orders.csv' if name == 'table-tree-json' else 'documents.csv'], base=None, external=True, tree_conversion=True)
+    if name == 'tree-dates':
+        node = REPO / 'docs/node-development/nodes/trees-jsontotree'
+        src = node / 'acceptance/typed'
+        return dict(source=src, prompt=src / 'task-dates.md', data=node / 'fixtures/typed',
+                    input_files=['documents.csv'], base=None, external=True, tree_only=True, expected_name='expected-dates.json')
     if name in ['tree-null-leaves', 'tree-nested-records', 'tree-empty-containers']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         return dict(source=node / 'acceptance/nested-records', prompt=node / ('acceptance/task-' + name[5:] + '.md'),
@@ -1113,7 +1118,7 @@ for(const stage of JSON.parse(readFileSync(0,'utf8')))
 
 def expected_for(case, package, cold=False):
     src = case['source']
-    if case.get('tree_only'):
+    if case.get('tree_only') and case.get('tree_case'):
         expected = read(src / 'expected.json')['cases'][case['tree_case']]
         return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
     if case.get('coarse_frozen'):
@@ -1740,6 +1745,12 @@ def check_tree(port, expected):
         elif kind == 'real':
             assert (actual.get('is_null') is False and actual.get('precision') == '17_significant_digits'
                     and type(actual.get('value')) in (int, float) and Decimal(str(actual.get('value'))) == Decimal(want['value'])), 'TREE_REAL'
+        elif kind == 'datetime':
+            assert (actual.get('is_null') is False and actual.get('precision') == 'millisecond'
+                    and actual.get('representation') == 'local_datetime'
+                    and isinstance(actual.get('value'), str)
+                    and re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}', actual['value'])
+                    and actual['value'] == want['value']), 'TREE_DATETIME'
         else:
             assert actual.get('value') == want['value'] and (kind != 'boolean' or type(actual.get('value')) is bool), 'TREE_SCALAR'
             assert actual.get('is_null') is (kind == 'null') and (kind != 'null' or actual.get('precision') == 'exact_null'), 'TREE_NULL'
