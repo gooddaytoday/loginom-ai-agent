@@ -50,8 +50,8 @@ export function readConditionWizard(prefix){
   for(const [i,r] of conditions.entries()){const d=r?.data;
    if(!r?.isModel||d?.Index!==i)return fail('condition_record');
    const field=fields?.filter(f=>f.data.Value===d.Value)??[];
-   const v=d.CompareValue;
-   result.conditions.push({index:i,record_id:String(r.internalId),
+   const v=d.CompareValue,cell=exact(params+';ConditionsView;colField_'+i);
+   result.conditions.push({index:i,record_id:String(r.internalId),field_text:cell.length===1?cell[0].textContent.trim():null,
     field:field.length===1?{name:field[0].data.Name,variable:field[0].data.IsVariableField===true,socket_guid:field[0].data.SocketGuid,data_type:field[0].data.DataType}:null,
     data_type:d.DataType,aggregation:d.AggregationType,relation:relations[d.RelationType]??('native:'+d.RelationType),
     value:v===null||typeof v==='string'||Number.isSafeInteger(v)?v:'unsupported',or:d.ConcatenationType!==0,case_sensitive:d.CaseSensitive===true});}
@@ -129,15 +129,21 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
    need(c.relation==='='&&c.value!==null&&c.value!=='unsupported'&&c.aggregation!==1&&!c.or&&!c.case_sensitive,
     'saved Condition is not one variable = value branch; reconfigure it with branches');
    if(!c.field){
-    // The field is resolved only through the cell editor's list: open it,
-    // read the list, and cancel without choosing anything.
+    // A reopened wizard does not share field objects between the saved row
+    // and the editor list: match the rendered field cell («Порт2.Mode»)
+    // against the editor list, opened read-only and cancelled with Escape.
     const before=effect;
     await click(cv+'colField_0');await focused(cv+'tbl;celleditor');await click(cv+'tbl;celleditor;cbx;trg_picker');
-    s=await state(x=>x.field_options?.length>0&&x.conditions[0]?.field!==null,'saved condition field list');
-    c=s.conditions[0];
+    const list=await state(x=>x.field_options?.length>0,'saved condition field list').catch(async error=>{const x=await page.evaluate(readWizard,prefix);
+     throw Error(error.message+'; field '+JSON.stringify(c.field_text)+', options '+JSON.stringify(x.field_options?.map(o=>[o.name,o.variable])??null));});
     await page.keyboard.press('Escape');await page.keyboard.press('Escape');
     s=await state(x=>x.page==='branches'&&x.conditions.length===1&&row(x)===saved,'saved condition unchanged');
     effect=before;
+    const text=c.field_text,options=list.field_options,[table,variables]=ports.map(p=>p.label);
+    const named=options.filter(o=>text===(o.variable?variables:table)+'.'+o.name||text===o.name);
+    need(named.length===1&&named[0].variable===true,
+     'saved Condition field '+JSON.stringify(text)+' is not exactly one input variable of '+JSON.stringify(options.map(o=>(o.variable?variables:table)+'.'+o.name))+'; reconfigure it with branches');
+    c={...c,field:{name:named[0].name,variable:true,socket_guid:named[0].socket_guid,data_type:named[0].data_type}};
    }
    need(c.field?.variable===true,'saved Condition field '+JSON.stringify(c.field?.name??null)+' is not an input variable; reconfigure it with branches');
    s.conditions=[c];

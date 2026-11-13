@@ -105,10 +105,11 @@ test('reads branch ports only when exactly one of the two branches executed',asy
 });
 
 // configureCondition with a scripted wizard: native stores load after the page
-// is shown, and the saved field is resolved only through the cell editor list.
-function wizard({field={name:'Mode',variable:true},value=1,emptyReads=2}={}){
+// is shown. As observed live (run 1794590461778939609, journal :1118), a reopened
+// wizard never resolves the saved row's field object against the editor list.
+function wizard({text='Порт2.Mode',value=1,emptyReads=2}={}){
  const log=[],ui={page:'ports',editor:false,reads:0,editorReads:0};
- const option={record_id:'f1',name:field.name,variable:field.variable,socket_guid:'s',data_type:1};
+ const options=[['*',false],['OrderID',false],['Amount',false],['Mode',true]].map(([name,variable],i)=>({record_id:'f'+i,name,variable,socket_guid:variable?'v':'t',data_type:1}));
  const read=()=>{
   ui.reads++;
   if(ui.page==='ports')return {verified:true,page:'ports',error:null,ports:ui.reads<=emptyReads?[]:[
@@ -117,9 +118,9 @@ function wizard({field={name:'Mode',variable:true},value=1,emptyReads=2}={}){
   if(ui.editor)ui.editorReads++;
   const loaded=ui.editor&&ui.editorReads>emptyReads;
   return {verified:true,page:'branches',error:null,branches:[{index:0,record_id:'b',name:'Detailed',active_in_debug:false}],selected_branch:0,debug_mode:false,
-   conditions:ui.reads<=emptyReads+3?[]:[{index:0,record_id:'c',field:ui.editor&&!loaded?null:ui.editorReads>emptyReads?{name:field.name,variable:field.variable,socket_guid:'s',data_type:1}:null,
+   conditions:ui.reads<=emptyReads+3?[]:[{index:0,record_id:'c',field_text:text,field:null,
     data_type:1,aggregation:0,relation:'=',value,or:false,case_sensitive:false}],
-   field_options:ui.editor?(loaded?[option]:[]):null};
+   field_options:ui.editor?(loaded?options:[]):null};
  };
  const locator=selector=>({click:async()=>{log.push(['click',selector]);
    if(selector.includes(';btnNext'))ui.page=ui.page==='ports'?'branches':'done';
@@ -128,10 +129,10 @@ function wizard({field={name:'Mode',variable:true},value=1,emptyReads=2}={}){
  const page={locator,waitForTimeout:async()=>{},evaluate:async(fn,arg)=>fn===read?read(arg):true,
   keyboard:{press:async key=>{log.push(['press',key]);if(key==='Escape')ui.editor=false;},type:async text=>log.push(['type',text])}};
  const readNode=async()=>({verified:true,surface:'wizard',document_id:'d',workflow_id:'w',node_id:'c'});
- return {log,run:()=>configureCondition(page,{mode:'variable_branch',parameters:{},binding:{workflow_ref:{prefix:'MF;TF-1'}},deadline:Date.now()+60000},readNode,read)};
+ return {log,run:()=>configureCondition(page,{mode:'variable_branch',parameters:{},binding:{workflow_ref:{prefix:'MF;TF-1'}},deadline:Date.now()+3000},readNode,read)};
 }
 
-test('re-execution {} waits for loaded stores and resolves the saved field read-only',async()=>{
+test('re-execution {} waits for loaded stores and matches the saved field cell to an input variable read-only',async()=>{
  const w=wizard(),r=await w.run();
  assert.equal(r.status,'SUCCEEDED',r.error);
  assert.deepEqual(r.configuration.conditions,[{index:0,variable:'Mode',relation:'=',value:1}]);
@@ -143,7 +144,9 @@ test('re-execution {} waits for loaded stores and resolves the saved field read-
 });
 
 for(const [name,options,message] of [
- ['a table field',{field:{name:'Amount',variable:false}},/"Amount" is not an input variable/],
+ ['a table field',{text:'Порт1.Amount'},/"Порт1.Amount" is not exactly one input variable/],
+ ['a variable name on the table port',{text:'Порт1.Mode'},/"Порт1.Mode" is not exactly one input variable/],
+ ['an unrendered field cell',{text:null},/null is not exactly one input variable/],
  ['an unsupported stored value',{value:'unsupported'},/not one variable = value branch/],
 ])test('re-execution {} refuses '+name+' without changing the node',async()=>{
  const w=wizard(options),r=await w.run();
