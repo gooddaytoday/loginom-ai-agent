@@ -136,15 +136,18 @@ export function diagnosticsGroup(name: string): DiagnosticsGroup {
   return "logs"
 }
 
-let prepared: { id: string; zip: Uint8Array } | undefined
+let prepared: { id: string; zip: Uint8Array; order: number } | undefined
+let prepares = 0
 
 // Builds the archive in memory; the preview shows exactly the bytes that Save writes.
+// Overlapping prepares keep the one started last, whatever order they finish in.
 export async function prepareDiagnostics(value: unknown): Promise<DiagnosticsPrepared> {
+  const order = ++prepares
   const request = parseDiagnosticsRequest(value)
   write("main", "preparing diagnostics", { session: !!request.sessionID, include: request.include })
   const { zip, manifest } = await buildDesktopArchive(request)
   const id = randomUUID()
-  prepared = { id, zip }
+  if (!prepared || order > prepared.order) prepared = { id, zip, order }
   return {
     id,
     size: zip.length,
@@ -175,14 +178,16 @@ export async function previewDiagnosticsFile(id: unknown, name: unknown) {
 
 export async function saveDiagnostics(id: unknown, window?: BrowserWindow) {
   if (!prepared || id !== prepared.id) throw new Error("DIAGNOSTICS_NOT_PREPARED")
+  // Take the checked archive now: another prepare may replace the slot while Save as is open.
+  const zip = prepared.zip
   const options = {
     defaultPath: join(app.getPath("downloads"), `loginom-diagnostics-${stamp()}.zip`),
     filters: [{ name: "ZIP", extensions: ["zip"] }],
   }
   const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options)
   if (result.canceled || !result.filePath) return
-  writeFileSync(result.filePath, prepared.zip, { mode: 0o600 })
-  prepared = undefined
+  writeFileSync(result.filePath, zip, { mode: 0o600 })
+  if (prepared?.id === id) prepared = undefined
   write("main", "diagnostics saved", { output: result.filePath })
   shell.showItemInFolder(result.filePath)
   return result.filePath

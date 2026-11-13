@@ -2,7 +2,7 @@ import { Button } from "@opencode-ai/ui/button"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Dialog } from "@opencode-ai/ui/dialog"
-import { createResource, createSignal, For, Show } from "solid-js"
+import { createResource, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
@@ -40,16 +40,18 @@ export function DialogDiagnostics() {
   const platform = usePlatform()
   const session = activeDiagnosticsSession()
   const [include, setInclude] = createStore({ ...DIAGNOSTICS_DEFAULTS, chat: !!session })
-  const [showFiles, setShowFiles] = createSignal(false)
-  const [preview, setPreview] = createSignal<{ name: string; text: string; truncated: boolean }>()
-  const [saving, setSaving] = createSignal(false)
+  const [state, setState] = createStore({
+    showFiles: false,
+    preview: undefined as { name: string; text: string; truncated: boolean } | undefined,
+    saving: false,
+  })
   let chat: Promise<unknown> | undefined
 
   // Every change of groups rebuilds the archive; Save writes the last shown one.
   const [ready] = createResource(
     () => ({ ...include }),
     async (groups) => {
-      setPreview(undefined)
+      setState("preview", undefined)
       const loaded = session && groups.chat ? await (chat ??= session.chat()).catch(() => undefined) : undefined
       return platform.diagnostics!.prepare({ sessionID: session?.sessionID, chat: loaded, include: groups })
     },
@@ -59,13 +61,13 @@ export function DialogDiagnostics() {
     const current = ready()
     if (!current) return
     const result = await platform.diagnostics!.preview(current.id, name)
-    if (result) setPreview({ name, ...result })
+    if (result) setState("preview", { name, ...result })
   }
 
   const save = async () => {
     const current = ready()
-    if (!current || saving()) return
-    setSaving(true)
+    if (!current || state.saving) return
+    setState("saving", true)
     try {
       const path = await platform.diagnostics!.save(current.id)
       if (!path) return
@@ -83,7 +85,7 @@ export function DialogDiagnostics() {
         description: error instanceof Error ? error.message : String(error),
       })
     } finally {
-      setSaving(false)
+      setState("saving", false)
     }
   }
 
@@ -134,11 +136,11 @@ export function DialogDiagnostics() {
             <div class="flex flex-col gap-2">
               <div class="flex items-center justify-between text-12-regular">
                 <span>{language.t("diagnostics.total", { size: size(current().size) })}</span>
-                <Button variant="ghost" size="small" onClick={() => setShowFiles(!showFiles())} data-tid="diagnostics-files-toggle">
-                  {language.t(showFiles() ? "diagnostics.files.hide" : "diagnostics.files.show")}
+                <Button variant="ghost" size="small" onClick={() => setState("showFiles", !state.showFiles)} data-tid="diagnostics-files-toggle">
+                  {language.t(state.showFiles ? "diagnostics.files.hide" : "diagnostics.files.show")}
                 </Button>
               </div>
-              <Show when={showFiles()}>
+              <Show when={state.showFiles}>
                 <div class="max-h-48 overflow-auto text-12-regular" data-tid="diagnostics-files">
                   <For each={current().files}>
                     {(file) => (
@@ -159,7 +161,7 @@ export function DialogDiagnostics() {
                   </For>
                 </div>
               </Show>
-              <Show when={preview()}>
+              <Show when={state.preview}>
                 {(item) => (
                   <pre
                     class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-surface-raised-base p-2 text-11-regular"
@@ -180,7 +182,7 @@ export function DialogDiagnostics() {
           <Button
             variant="primary"
             size="large"
-            disabled={ready.loading || !ready.latest || saving()}
+            disabled={ready.loading || !ready.latest || state.saving}
             onClick={() => void save()}
             data-tid="diagnostics-save"
           >
