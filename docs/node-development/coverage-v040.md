@@ -81,13 +81,14 @@
 
 ## Компоненты без обработчика (30)
 
-У всех есть карточка и подплан (`nodes/<slug>/plan.md`), этап 0 (живое исследование) не начат, комплекта нет, оценки циклов в подпланах нет (н/у). Порядок назначения — по разделу 0 подплана и решению владельца.
+У всех есть карточка и подплан (`nodes/<slug>/plan.md`), кроме перечисленных ниже в «Этап 0 без обработчика», этап 0 (живое исследование) не начат, комплекта нет, оценки циклов в подпланах нет (н/у). Порядок назначения — по разделу 0 подплана и решению владельца.
 
 Предпосылки — поле `prerequisites` в `registry.json` (определения — `prerequisite_definitions`); у всех также `accepted_base` и `shared_contract`.
 
 | Группа | Компоненты (slug) | Класс | Предпосылки из реестра |
 | --- | --- | --- | --- |
-| Управление | `control-condition`, `control-loop` | backlog | `nested_workflow`, `typed_variables` |
+| Управление | `control-condition` | backlog | `nested_workflow`, `typed_variables` (по справке вложенного графа нет — см. подплан, раздел 2) |
+| Управление | `control-loop` | backlog | `nested_workflow`, `typed_variables` |
 | Управление | `control-execnode`, `control-referencenode` | backlog | `nested_workflow` |
 | Управление | `control-supernode` | backlog | `nested_workflow`, `tabular` |
 | Data Mining | `datamining-arimax` | backlog | `tabular`, `ordered_fixture`, `training_contract`, `typed_variables` |
@@ -106,6 +107,13 @@
 | Условный резерв | `exports-tableau` | conditional_reserve | `tabular`, `file_artifacts` |
 | Условный резерв | `imports-onecrequest` | conditional_reserve | `connections`, `onec_fixture` |
 | Условный резерв | `integration-execcmd` | conditional_reserve | `program_fixture` |
+
+### Этап 0 без обработчика
+
+| Узел | Тип (предл.) | Срез этапа 1 | Предусловие | Циклов | Комплект | Ссылки |
+| --- | --- | --- | --- | --- | --- | --- |
+| Условие | `control.condition` | Одно условие на переменной сценария (`Mode = 1`), ветвь Detailed и «Иначе», полный табличный выход выбранной ветви, блокировка второй по readback порта; смена только `Mode` без перенастройки | нет (NW1 не нужен) | 4 (+1, если сетка портов не как у Подмодели) | предл.: `acceptance/task.md`, `fixtures/orders.csv`, `expected-initial.json`, `expected.json`; `oracle.py --check` проходит; индексы портов ветвей — после native-пробы (LAB-1554) | [plan](nodes/control-condition/plan.md) |
+| Цикл | `control.loop` | Групповая обработка по одной строке `pages.csv` над Подмоделью с табличной границей; тело — REST GET `httpbin.org/response-headers` по limit/skip или Калькулятор без сети; FOR с переменной цикла — этап 2, постусловие — этап 3 | этап 1 Подмодели (NW1 #1078 + `control.supernode`) | 5 (около 9 вместе с Подмоделью) | предл.: `acceptance/task.md`, `task-offline.md`, `fixtures/pages.csv`, `expected.json`, `expected-offline.json`; `oracle.py --check` проходит; ответ httpbin сверен побайтно 13.11 (LAB-1554) | [plan](nodes/control-loop/plan.md) |
 
 ## Следующие циклы по приоритету
 
