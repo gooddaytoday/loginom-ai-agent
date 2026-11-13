@@ -239,30 +239,32 @@ export function maskHosts(text: string, allowed: readonly string[] = PUBLIC_HOST
     (_match, scheme: string, userinfo: string | undefined, host: string) =>
       scheme + (userinfo === undefined ? "" : "[redacted]@") + (publicHost(host, allowed) ? host : hostLabel(host)),
   )
-  // Journals hold megabytes of long tokens: test whole tokens with anchored
-  // patterns instead of scanning every offset with a backtracking expression.
-  if (/\d\.\d{1,3}\.\d{1,3}\.\d|\.(?:local|lan|corp|internal|intranet|arpa)(?![\w-])/i.test(text))
-    text = text.replace(/(?<![\w.-])[\w.-]+/g, (token) => {
-      const host = token.replace(/\.+$/, "")
-      if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host))
-        return identifyingIPv4(host) ? hostLabel(host) + token.slice(host.length) : token
-      if (/^(?:[a-z0-9-]+\.)+(?:local|lan|corp|internal|intranet|home\.arpa)$/i.test(host) && !host.startsWith("-"))
-        return hostLabel(host) + token.slice(host.length)
-      return token
-    })
-  // Bare `name.with.dots:port`, as Desktop logs a proxy authority.
-  if (/[a-z0-9-]\.[a-z][a-z0-9-]*:\d/i.test(text))
-    text = text.replace(/(?<![\w.@/\\-])([a-z0-9-]+(?:\.[a-z0-9-]+)+):(\d{1,5})(?![\w.-])/gi, (match, host: string, port: string) => {
-      const tld = host.slice(host.lastIndexOf(".") + 1).toLowerCase()
-      if (!/^[a-z][a-z0-9-]*$/.test(tld) || FILE_EXTENSIONS.has(tld) || Number(port) > 65535) return match
-      return publicHost(host, allowed) || host.startsWith("host-") ? match : `${hostLabel(host)}:${port}`
-    })
-  // IPv6 literals: validated, so times and MAC addresses stay intact.
-  if (/[0-9a-f]?::?[0-9a-f]/i.test(text))
-    text = text.replace(/(?<![\w:.])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![\w:.])/gi, (match) =>
-      isIPv6(match) && match !== "::1" && match !== "::" ? hostLabel(match) : match,
+  // Journals hold megabytes of long tokens: one linear pass over whole tokens
+  // with anchored checks instead of scanning every offset per pattern.
+  if (
+    !/\d\.\d{1,3}\.\d{1,3}\.\d|\.(?:local|lan|corp|internal|intranet|arpa)(?![\w-])|[a-z0-9-]\.[a-z][a-z0-9-]*:\d|::|(?:[0-9a-f]{1,4}:){7}/i.test(
+      text,
     )
-  return text
+  )
+    return text
+  return text.replace(/[\w.:%-]+/g, (token: string, offset: number, source: string) => {
+    const body = token.replace(/[.:]+$/, "")
+    const tail = token.slice(body.length)
+    // IPv6 literals are validated, so times and MAC addresses stay intact.
+    if (body.includes(":") && isIPv6(body.split("%")[0])) return body === "::1" ? token : hostLabel(body) + tail
+    const [host, port, extra] = body.split(":")
+    if (extra !== undefined || (port !== undefined && !/^\d{1,5}$/.test(port))) return token
+    const suffix = (port === undefined ? "" : ":" + port) + tail
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return identifyingIPv4(host) ? hostLabel(host) + suffix : token
+    if (/^(?:[a-z0-9-]+\.)+(?:local|lan|corp|internal|intranet|home\.arpa)$/i.test(host) && !host.startsWith("-"))
+      return hostLabel(host) + suffix
+    // Bare `name.with.dots:port`, as Desktop logs a proxy authority; not paths or user info.
+    if (port === undefined || Number(port) > 65535 || "@/\\".includes(source[offset - 1] ?? "")) return token
+    if (!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(host) || host.startsWith("host-")) return token
+    const tld = host.slice(host.lastIndexOf(".") + 1).toLowerCase()
+    if (!/^[a-z][a-z0-9-]*$/.test(tld) || FILE_EXTENSIONS.has(tld) || publicHost(host, allowed)) return token
+    return hostLabel(host) + suffix
+  })
 }
 
 function readBounded(path: string, limit = DIAGNOSTICS_LIMITS.fileBytes) {
