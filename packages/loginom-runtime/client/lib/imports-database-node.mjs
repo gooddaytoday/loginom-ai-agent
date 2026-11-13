@@ -67,7 +67,10 @@ export function createDatabaseImportNodeSupport(config){
  const definition={type:'imports.database',modes:['table','sql'],revision:'database-import-sqlite-v1',parameterSchema:databaseImportParametersSchema,
   validate:validateDatabaseImportParameters,readback:databaseImportReadback,
   configurationObservation:{condition:'owned database import wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},
-  configureInputs:async()=>verified({not_applicable:true})};
+  configureInputs:async()=>verified({not_applicable:true}),
+  // "Активировать" in the wizard starts its own native process group; capture
+  // the execution baseline after configuration, before the one final launch.
+  executionBaselineAfterConfigure:()=>true};
  return {nodeApplyHandlers:createTabularTransformNodeSupport(config,definition).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const request=options.operation.parameters;let connection=null;
   const linkConnection=async ctx=>{
