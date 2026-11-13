@@ -194,7 +194,8 @@ export async function readGraph(page, task) {
         foreign_links.push(tid);
         const source=connectionPorts.get(prefix+endpoints[0]+';'+endpoints[1]),target=connectionPorts.get(prefix+endpoints[2]+';'+endpoints[3]);
         if(endpoints[1]==='Output_Connection-0' && endpoints[3]==='Input_Connection-0'
-          && source?.node.FIconCls==='bg-vendor-icon-restclientconnection' && target?.node.FIconCls==='bg-vendor-icon-restclient'
+          && (source?.node.FIconCls==='bg-vendor-icon-restclientconnection' && target?.node.FIconCls==='bg-vendor-icon-restclient'
+            || source?.node.FIconCls==='bg-vendor-icon-sqliteunidacdbconnection' && target?.node.FIconCls==='bg-vendor-icon-dbimport')
           && source.port.FCell.edges?.filter(edge=>edge.source===source.port.FCell && edge.target===target.port.FCell
             && graph.view.getState(edge)?.shape?.node===e).length===1)
           rest_connection_links.push({tid,source:source.node.FGuid,target:target.node.FGuid,output:'connection:0',input:'connection:0'});
@@ -785,7 +786,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
     async choosePosition(value,graph,deadline,signal,reserved){
       // Only new REST auto-placement and its private implicit encoder (the
       // reserved argument) use the larger footprint; other nodes keep policy.
-      const clearance=value.target.kind==='new'&&!value.target.position&&(value.target.type==='integration.rest_request'||reserved!==undefined);
+      const clearance=value.target.kind==='new'&&!value.target.position&&(['integration.rest_request','imports.database'].includes(value.target.type)||reserved!==undefined);
       signal?.throwIfAborted();
       if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))
         throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});

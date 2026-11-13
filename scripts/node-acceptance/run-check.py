@@ -183,6 +183,11 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/64bit', input_files=['checksum-none.lgd', 'checksum-compressed.lgd', 'checksum-both.lgd'],
                     expected_name='expected.json', base=None, lgd='checksum',
                     oracle=node / 'acceptance/oracle.py')
+    if name in ['db-import-table', 'db-import-sql']:
+        node = REPO / 'docs/node-development/nodes/imports-database'
+        kind = name.removeprefix('db-import-')
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-' + kind + '.md'), data=node / 'fixtures',
+                    base=None, db_seed='people.db', expected_name='expected-' + kind + '-run.json')
     if name == 'lgd-import-variable':
         node = REPO / 'docs/node-development/nodes/imports-lgd'
         return dict(source=node / 'acceptance/variable', prompt=node / 'acceptance/variable/task.md',
@@ -2109,6 +2114,18 @@ class Runner:
             self.current['new_month'] = 'NOT_RUN'
             books = self.text_mask_inputs(spec, folder, login, build)
             prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
+            files = []
+        if spec.get('db_seed'):
+            # The SQLite file is seeded under a unique own storage name through
+            # the existing verified delivery; the model receives only its path.
+            destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + spec['db_seed']
+            books = [dict(fixture=str(spec['data'] / spec['db_seed']), destination=destination)]
+            write(folder / 'db-inputs.json', dict(login=login, overwrite='reject', books=books))
+            self.phase('db-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
+                       build / 'resources/loginom', folder / 'db-inputs.json', folder / 'db-inputs'], folder, timeout=300)
+            delivered = read(folder / 'db-inputs' / 'result.json')
+            assert [d['destination'] for d in delivered['delivered']] == [destination], 'DB_INPUT_DELIVERY_MISSING'
+            prompt = prompt.replace('{{DB_PATH}}', destination)
             files = []
         if spec.get('text_list_sources'):
             # FileName is the physical server basename. Both inline and small

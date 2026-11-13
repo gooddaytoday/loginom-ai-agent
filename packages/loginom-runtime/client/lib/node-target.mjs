@@ -37,7 +37,7 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
     // Loginom 7.4.2 also connects a nearby REST reference on a manual drop.
     // Only the native reader's typed GUID pair may explain a new foreign tid.
     const service=(after.rest_connection_links??[]).filter(e=>!(before.foreign_links??[]).includes(e.tid));
-    if(service.length>1 || service.some(e=>p.type!=='integration.rest_request'||e.target!==id
+    if(service.length>1 || service.some(e=>!['integration.rest_request','imports.database'].includes(p.type)||e.target!==id
       ||!before.nodes.some(n=>n.ref.node_id===e.source)||!nativeRestServiceEdge(after,e))
       ||!same(after.foreign_links?.filter(tid=>!service.some(e=>e.tid===tid)),before.foreign_links)
       ||!same((after.rest_connection_links??[]).filter(e=>!service.includes(e)),before.rest_connection_links??[]))return null;
@@ -91,7 +91,8 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
 function nativeRestServiceEdge(graph,edge){
   const source=graph.nodes.filter(n=>n.ref.node_id===edge.source),target=graph.nodes.filter(n=>n.ref.node_id===edge.target);
   return edge.output==='connection:0'&&edge.input==='connection:0'&&graph.foreign_links?.filter(tid=>tid===edge.tid).length===1
-    &&source.length===1&&target.length===1&&source[0].type==='bg-vendor-icon-restclientconnection'&&target[0].type==='integration.rest_request'
+    &&source.length===1&&target.length===1&&(source[0].type==='bg-vendor-icon-restclientconnection'&&target[0].type==='integration.rest_request'
+     ||source[0].type==='bg-vendor-icon-sqliteunidacdbconnection'&&target[0].type==='imports.database')
     &&source[0].other_ports?.includes('Output_Connection-0')&&target[0].other_ports?.includes('Input_Connection-0')
     &&[source[0],target[0]].every(n=>n.ref.document_id===graph.document_id&&n.ref.workflow_id===graph.workflow_ref.workflow_id);
 }
