@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** база принятой M2 — `c9dd858ae1`; независимое предварительное ревью всех 18 задач выполнено. Задача 1 в работе, задачи 2–18 ожидают. Подробные проверки, решения и checkpoint — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** база принятой M2 — `c9dd858ae1`; независимое предварительное ревью всех 18 задач выполнено. Задачи 1–2 выполнены; задачи 3–18 ожидают. Задача 1 — `57e59d1992`; задача 2 прошла итоговое независимое ревью и полный browser 132/132. Подробные проверки, решения и checkpoint — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -189,7 +189,7 @@ if (id) {
 - [x] **Step 6: Удалить `publish.mjs`.** `git rm P/script/publish.mjs P/test/publish/publish.test.mjs`; из `test:browser` убрать `test/publish/*.test.mjs`. Проверить: `rg -n "publish\.mjs" packages/dashboard` → только строки документов, которые меняет задача 17.
 - [x] **Step 7: `dist-smoke.test.mjs`.** Запуск собранного `dist/server.mjs` через `startDashboard` с `DASHBOARD_CLI_BUTTON=1`: `POST` снимка → 201, `GET` → 200, второй `GET` → 404; `lookup` → `cliButton: true`; `import("dist/server.mjs")` экспортирует `bindingKey`.
 - [x] **Step 8: Прогон.** `bun typecheck && bun run test` → PASS, покрытие `src/web` ≥ 90%.
-- [ ] **Step 9: Коммит.** `git commit -m "feat(dashboard): serve one-time snapshots by ID"`.
+- [x] **Step 9: Коммит.** `git commit -m "feat(dashboard): serve one-time snapshots by ID"`.
 
 ### Task 2: Оболочка Studio: снимок по нажатию, образец, кнопка CLI
 
@@ -200,25 +200,33 @@ if (id) {
 - Consumes: `lookupResponse`, `snapshotResponse` (задача 1); `table(node, maxRows)` из M2.
 - Produces: `adapter.binding()` → `{ packagePath, workflowGuid, nodeGuid }`. `table()` из M2 не меняется.
 
-- [ ] **Step 1: Фикстура.** В `fixture.mjs` маршрут `/dashboard/targets` заменить на `/dashboard/snapshots`: запрос записывается в `snapshots`, ответ — `{id: <новый UUID>}` (`malformed === "snapshot"` → `{id: 17}`). Ответ `lookup` дополнить `cliButton` из нового параметра фикстуры `cliButton` (по умолчанию `false`). `context.grantPermissions(["clipboard-read", "clipboard-write"], { origin })` — для проверки буфера.
-- [ ] **Step 2: Тесты.** В `shell.test.mjs`:
+- [x] **Step 1: Фикстура.** В `fixture.mjs` маршрут `/dashboard/targets` заменить на `/dashboard/snapshots`: запрос записывается в `snapshots`, ответ — `{id: <новый UUID>}` (`malformed === "snapshot"` → `{id: 17}`). Ответ `lookup` дополнить `cliButton` из нового параметра фикстуры `cliButton` (по умолчанию `false`). `context.grantPermissions(["clipboard-read", "clipboard-write"], { origin })` — для проверки буфера.
+- [x] **Step 2: Тесты.** В `shell.test.mjs`:
   - «Создать dashboard»: `snapshots[0]` — ровно ключи `binding`, `nodeName`, `sample`, `parameters`, `published`; `binding` — три поля без `server` и `port`; `published: false`; ссылка Desktop — `action=create` и `id` из ответа;
   - узел с 150 строками → в `sample.rows` 100 строк; 100 строк по 6 000 символов «ю» → `new TextEncoder().encode(JSON.stringify(sample)).length` ≤ 524 288 и строк меньше 100, а служба (задача 1) такой образец принимает;
   - ошибка выполнения узла (`executeError`) → `snapshots.length === 0`, текст «Узел завершился с ошибкой: <текст фикстуры>. Исправьте сценарий и нажмите ещё раз»;
   - опубликованный dashboard: при открытии снимков нет; нажатие «Изменить в чате» создаёт ровно один снимок с `published: true` и открывает ссылку с `action=edit` и его `id`; второе нажатие — второй снимок;
   - `cliButton: false` → кнопки «Скопировать команду для CLI» нет; `cliButton: true` → кнопка есть и на пути создания, и в шапке опубликованного; нажатие создаёт снимок, в буфере ровно `loginom-ai-agent-cli run --dashboard <id> "<опишите задачу>"`, рядом текст «Команда скопирована».
-- [ ] **Step 3: Тесты падают.** `bun run build && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser/shell.test.mjs` → FAIL.
-- [ ] **Step 4: Адаптер.** `binding()` возвращает три поля (удалить `server: location.origin` и `port: 0`; тип `TargetBinding` — так же).
-- [ ] **Step 5: Оболочка.** В `open()` после выполнения узла:
+- [x] **Step 3: Тесты падают.** `bun run build && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser/shell.test.mjs` → FAIL.
+- [x] **Step 4: Адаптер.** `binding()` возвращает три поля (удалить `server: location.origin` и `port: 0`; тип `TargetBinding` — так же).
+- [x] **Step 5: Оболочка.** В `open()` после выполнения узла:
 
 ```ts
 const snapshot = async () => {
   const error = errors.get(lookup.key)
   if (error) throw Error("Узел завершился с ошибкой: " + error + ". Исправьте сценарий и нажмите ещё раз")
-  const table = await studio.table(node, 100)
-  const rows = [...table.rows]
-  // The service limits the whole sample in UTF-8 bytes; drop trailing rows until it fits.
-  while (rows.length && new TextEncoder().encode(JSON.stringify({ schema: table.schema, rows })).length > 524_288) rows.pop()
+  const table = await studio.table(node, 100, false)
+  const rows: typeof table.rows = []
+  const encoder = new TextEncoder()
+  let bytes = encoder.encode(JSON.stringify({ schema: table.schema, rows })).length
+  if (bytes > 524_288) throw Error("Схема данных превышает допустимый размер образца")
+  // Count the whole sample prefix once: repeatedly encoding all remaining rows blocks Studio.
+  for (const row of table.rows) {
+    const length = encoder.encode(JSON.stringify(row)).length + (rows.length ? 1 : 0)
+    if (bytes + length > 524_288) break
+    rows.push(row)
+    bytes += length
+  }
   return snapshotResponse(
     await post("snapshots", {
       binding: target,
@@ -233,6 +241,7 @@ const link = (id: string) =>
   "loginom-ai-agent://dashboard?id=" + encodeURIComponent(id) + "&action=" + (lookup.hash === null ? "create" : "edit")
 ```
 
+  - образец сохраняет исходные значения ячеек: третий аргумент `table(..., false)` выключает обрезку ячейки SDK; предел образца применяется к целым строкам и UTF-8 всего `{schema, rows}`;
   - путь «Создать dashboard»: `const id = await snapshot()` (ошибку показать в `note.textContent`), ссылка и `chat.click()` — как в M2;
   - «Изменить в чате»: `onclick` вызывает `snapshot()`, затем `window.open(link(id), "_blank", "noopener")`; ошибку показывает в `note`;
   - кнопка CLI добавляется в шапку, только если `lookup.cliButton`:
@@ -249,9 +258,9 @@ cli.onclick = async () => {
 }
 ```
 
-  Текст выводится только через `textContent`.
-- [ ] **Step 6: Прогон и размер.** `bun typecheck && bun run build && bun run check:size && bun run test:browser` → PASS; обновить замер в `check-size.ts`.
-- [ ] **Step 7: Коммит.** `git commit -m "feat(dashboard): create snapshots on demand from Studio"`.
+  Текст выводится только через `textContent`. Результат CLI и ошибки действий используют отдельный элемент статуса, чтобы сохранять резервную ссылку Desktop, в том числе при отложенном первом снимке создания. Каждое получение снимка заново читает имя узла; проверка текущего overlay идёт после этого чтения.
+- [x] **Step 6: Прогон и размер.** `bun typecheck && bun run build && bun run check:size && bun run test:browser` → PASS; обновить замер в `check-size.ts`.
+- [x] **Step 7: Коммит.** `git commit -m "feat(dashboard): create snapshots on demand from Studio"`.
 
 ### Task 3: Папка dashboard и текст служебной части
 

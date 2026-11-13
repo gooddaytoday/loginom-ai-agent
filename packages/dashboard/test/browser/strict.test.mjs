@@ -13,7 +13,7 @@ test("strict mode opens a protected host and caches support before calculation a
     const state = await app.settled()
     assert.equal(state.table.rows[0][0], 42)
     assert.equal(await app.page.evaluate(() => window.fixture.calls), 1)
-    assert.equal(app.snapshots.length, attempt + 1)
+    assert.equal(app.snapshots.length, 0)
     assert.equal(probes, 1)
     assert.equal(await app.page.locator("iframe").count(), 1)
     await app.page.getByRole("button", { name: "Вернуться к сценарию", exact: true }).click()

@@ -13,6 +13,8 @@ export async function fixture(
   t,
   {
     published = false,
+    cliButton = false,
+    clipboardWrite = true,
     popupBlocking = false,
     app = "recorder",
     mode = "normal",
@@ -86,7 +88,7 @@ export async function fixture(
         addEventListener('beforeunload', event => {event.preventDefault(); event.returnValue = ''});
         window.fixture = {status: ${JSON.stringify(status)}, calls: 0, columns: ${JSON.stringify(table.schema)}, rows: ${JSON.stringify(table.rows)}, wait: false};
         const node = {
-          get_Guid: async () => 'node-guid',
+          get_Guid: async () => '77c145b1-6ce3-458f-aa36-e6afdab2a930',
           get_DisplayName: async () => 'Fixture node',
           get_Status: async () => window.fixture.status,
           ActivateCancellable: async () => {
@@ -109,7 +111,7 @@ export async function fixture(
         const owner = {View: {el: {dom: document.getElementById('model')}}};
         const form = {
           GetOneSelectedNode: () => visual,
-          FGenericNode: {get_Guid: async () => 'workflow-guid'},
+          FGenericNode: {get_Guid: async () => '27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7'},
           FDiagram: {GetMxGraph: () => ({getSelectionModel: () => ({addListener() {}, removeListener() {}})})},
           Items: {tlbModel: {
             getComponent() {},
@@ -214,7 +216,10 @@ export async function fixture(
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" })
       return response.end("<!doctype html><title>Safe destination</title>")
     }
-    response.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-security-policy": csp })
+    response.writeHead(200, {
+      "content-type": "text/html; charset=utf-8", "content-security-policy": csp,
+      ...(!clipboardWrite && { "permissions-policy": "clipboard-write=()" }),
+    })
     response.end(html)
   })
   studio.on("upgrade", (_request, socket) => {
@@ -225,6 +230,7 @@ export async function fixture(
   await once(studio, "listening")
   t.after(() => new Promise(resolve => studio.close(resolve)))
   const origin = `http://127.0.0.1:${studio.address().port}`
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin })
   const reports = []
   const host = appHost({ buildsRoot: root, appOrigin, clientOrigins: [origin], mode, connectionAllowlist, log: line => reports.push(line) })
   host.listen(port, "127.0.0.1")
@@ -247,27 +253,15 @@ export async function fixture(
                 hash: published ? "b".repeat(64) : null,
                 appOrigin,
                 mode: lookupMode,
+                cliButton,
               },
       })
-    if (url.pathname === "/dashboard/targets") {
+    if (url.pathname === "/dashboard/snapshots") {
       snapshots.push(route.request().postDataJSON())
       return route.fulfill({
-        json:
-          malformed === "snapshot"
-            ? { id: 17, nodeName: null }
-            : {
-                id: "00000000-0000-4000-8000-" + String(snapshots.length).padStart(12, "0"),
-                key: "a".repeat(64),
-                nodeName: snapshots.at(-1).nodeName,
-                sourceDir: "/fixture",
-                binding: snapshots.at(-1).binding,
-                schema: [{ name: "count", type: 1 }],
-                rows: [[42]],
-                tableSource: "live",
-                parameters: snapshots.at(-1).parameters,
-                adapter: "window.frameElement.dashboard",
-                commands: { init: "init", typecheck: "typecheck", build: "build", publish: "publish" },
-              },
+        json: malformed === "snapshot" ? { id: 17 } : {
+          id: "00000000-0000-4000-8000-" + String(snapshots.length).padStart(12, "0"),
+        },
       })
     }
     if (url.pathname === "/shell.js")

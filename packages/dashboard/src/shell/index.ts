@@ -5,6 +5,7 @@ import { probe } from "./probe"
 import type { Update, View } from "./loginom/types"
 
 const message = (error: unknown) => String((error as { message?: unknown } | null)?.message ?? error)
+const nodeError = (error: unknown) => Error("Узел завершился с ошибкой: " + message(error) + ". Исправьте сценарий и нажмите ещё раз")
 start()
 function start() {
   let supported: boolean | undefined
@@ -75,6 +76,9 @@ function start() {
       const note = document.createElement("p")
       note.style.cssText = "padding:0 20px"
       note.setAttribute("role", "status")
+      const feedback = document.createElement("p")
+      feedback.style.cssText = "padding:0 20px"
+      feedback.setAttribute("role", "status")
       section.append(header, note)
       owner.View.el.dom.append(section)
       back.focus()
@@ -105,7 +109,7 @@ function start() {
               errors.delete(lookup.key)
             } catch (e: unknown) {
               errors.set(lookup.key, message(e))
-              throw e
+              throw nodeError(e)
             }
           }
         })
@@ -116,18 +120,29 @@ function start() {
         const available = await parameters()
         const nodeName = await studio.name(node)
         const capture = async (params = available) => {
-          // Desktop samples retain their original values; size limits apply only to sandbox state.
-          const sample = !errors.has(lookup.key) && (await studio.active(node)) ? await studio.table(node, 12, false) : null
+          if (errors.has(lookup.key)) throw nodeError(errors.get(lookup.key))
+          const sample = await studio.table(node, 100, false)
+          const rows: typeof sample.rows = []
+          const encoder = new TextEncoder()
+          let bytes = encoder.encode(JSON.stringify({ schema: sample.schema, rows })).length
+          if (bytes > 524_288) throw Error("Схема данных превышает допустимый размер образца")
+          // Count each original row once; removing rows by re-encoding the whole sample blocks Studio.
+          for (const row of sample.rows) {
+            const length = encoder.encode(JSON.stringify(row)).length + (rows.length ? 1 : 0)
+            if (bytes + length > 524_288) break
+            rows.push(row)
+            bytes += length
+          }
+          const capturedName = await studio.name(node)
           if (overlay !== section) return
-          return snapshotResponse(await post("targets", {
+          return snapshotResponse(await post("snapshots", {
             binding: target,
-            nodeName,
-            sample: sample ? { schema: sample.schema, rows: sample.rows } : null,
+            nodeName: capturedName,
+            sample: { schema: sample.schema, rows },
             parameters: params.map(parameter => ({ name: parameter.name, value: parameter.value })),
+            published: lookup.hash !== null,
           }))
         }
-        const snapshot = await capture()
-        if (overlay !== section || !snapshot) return
         title.textContent = nodeName
         const chatUrl = (id: string) =>
           "loginom-ai-agent://dashboard?id=" +
@@ -142,7 +157,35 @@ function start() {
           link.textContent = "Открыть чат в Desktop"
           return link
         }
+        const snapshotAction = (action: (id: string) => void | Promise<void>) => {
+          const task = pending.then(async () => {
+            if (overlay !== section) return
+            const fresh = await capture(await parameters())
+            if (overlay !== section || !fresh) return
+            await action(fresh.id)
+          })
+          pending = task.catch((e: unknown) => {
+            if (overlay !== section) return
+            feedback.textContent = message(e)
+            section.append(feedback)
+          })
+        }
+        if (lookup.cliButton) {
+          const cli = document.createElement("button")
+          cli.type = "button"
+          cli.textContent = "Скопировать команду для CLI"
+          cli.style.cssText = "cursor:pointer;padding:7px 6px"
+          cli.onclick = () => snapshotAction(async id => {
+            await navigator.clipboard.writeText(`loginom-ai-agent-cli run --dashboard ${id} "<опишите задачу>"`)
+            if (overlay !== section) return
+            feedback.textContent = "Команда скопирована"
+            section.append(feedback)
+          })
+          back.before(cli)
+        }
         if (lookup.hash === null) {
+          const snapshot = await capture()
+          if (overlay !== section || !snapshot) return
           const chat = desktopLink(snapshot.id)
           note.replaceChildren("Опишите dashboard для узла «" + nodeName + "» в чате. ", chat)
           // A long first execution can outlive the browser's user gesture. The same link remains clickable.
@@ -153,25 +196,15 @@ function start() {
         chat.type = "button"
         chat.textContent = "Изменить в чате"
         chat.style.cssText = "cursor:pointer;text-decoration:underline;padding:7px 6px"
-        chat.onclick = () => {
-          const task = pending.then(async () => {
-            if (overlay !== section) return
-            const fresh = await capture(await parameters())
-            if (overlay !== section || !fresh) return
-            // A queued calculation can outlive the user gesture required for opening Desktop.
-            if (!navigator.userActivation?.isActive) {
-              note.replaceChildren("Продолжите в Desktop: ", desktopLink(fresh.id))
-              section.append(note)
-              return
-            }
-            window.open(chatUrl(fresh.id), "_blank", "noopener")
-          })
-          pending = task.catch((e: unknown) => {
-            if (overlay !== section) return
-            note.textContent = "Dashboard: " + message(e)
+        chat.onclick = () => snapshotAction(id => {
+          // A queued calculation can outlive the user gesture required for opening Desktop.
+          if (!navigator.userActivation?.isActive) {
+            note.replaceChildren("Продолжите в Desktop: ", desktopLink(id))
             section.append(note)
-          })
-        }
+            return
+          }
+          window.open(chatUrl(id), "_blank", "noopener")
+        })
         back.before(chat)
         const state = async (params = available) => {
           const error = errors.get(lookup.key) ?? null
@@ -239,7 +272,7 @@ function start() {
         note.remove()
         section.append(frame)
       } catch (e: unknown) {
-        note.textContent = "Dashboard: " + message(e)
+        note.textContent = message(e)
       }
     }
 
