@@ -16,11 +16,8 @@ header { display: flex; align-items: flex-end; justify-content: space-between; g
 .mark i:last-child { height: 100%; }
 h1, h2, p { margin: 0; }
 h1 { margin-top: 16px; font-size: clamp(32px, 4vw, 56px); font-weight: 550; letter-spacing: -.055em; line-height: 1.05; }
-.filter { display: grid; gap: 7px; min-width: 190px; color: #4c5e54; font-weight: 600; font-size: 12px; }
-input, button { font: inherit; color: inherit; }
-input { border: 1px solid #b6c3b9; border-radius: 8px; width: 100%; background: white; padding: 10px 12px; font-size: 16px; color: #20312c; }
-input:focus-visible, button:focus-visible { outline: 3px solid #6a9464; outline-offset: 2px; }
-input:disabled { color: #55675d; }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid #6a9464; outline-offset: 2px; }
 button { border: 1px solid #bdc9bc; border-radius: 6px; padding: 6px 12px; background: #fff; cursor: pointer; }
 button:hover { background: #ebefe6; }
 .status { margin: 18px 0 21px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; line-height: 1.4; color: #58685f; }
@@ -66,7 +63,6 @@ td.return { color: #2c5943; font-weight: 600; }
 }
 @media (max-width: 680px) {
   header { align-items: flex-start; flex-direction: column; gap: 18px; }
-  .filter { max-width: 260px; width: 100%; }
   .status { margin-block: 14px; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .metric p { margin-top: 14px; }

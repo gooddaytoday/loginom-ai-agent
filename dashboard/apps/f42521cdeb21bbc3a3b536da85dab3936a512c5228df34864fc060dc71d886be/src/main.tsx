@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { createRoot } from "react-dom/client"
-import { dashboard, type DashboardState } from "./loginom"
+import { onState, type DashboardState } from "./loginom"
 import "./style.css"
 
 type Table = NonNullable<DashboardState["table"]>
@@ -113,73 +113,37 @@ function Results({ channels }: { channels: Channel[] }) {
 }
 
 function App() {
-  const [data, setData] = useState<{ channels: Channel[]; threshold: number | null } | null>(null)
-  const [busy, setBusy] = useState(true)
+  const [state, setState] = useState<DashboardState>()
+  const [channels, setChannels] = useState<Channel[] | null>(null)
   const [error, setError] = useState("")
-  const [needsRun, setNeedsRun] = useState(false)
-  const input = useRef<HTMLInputElement>(null)
-
-  const revision = useRef(0)
-  const draftRevision = useRef(0)
-
-  async function calculate(operation: () => Promise<DashboardState>) {
-    const request = ++revision.current
-    const draft = draftRevision.current
-    setBusy(true)
-    setError("")
+  useEffect(() => onState(value => {
+    setState(value)
+    setError(value.error ?? "")
+    if (!value.table || value.error) return setChannels(null)
     try {
-      const state = await operation()
-      if (request !== revision.current) return
-      if (input.current && draft === draftRevision.current) {
-        input.current.value = state.value === null ? "" : String(state.value)
-      }
-      if (state.error) throw Error(state.error)
-      setNeedsRun(state.table === null)
-      if (state.table) setData({ channels: channelsFrom(state.table), threshold: state.value })
+      setChannels(channelsFrom(value.table))
     } catch (failure) {
-      if (request !== revision.current) return
+      setChannels(null)
       setError(failure instanceof Error ? failure.message : String(failure))
-      setNeedsRun(true)
-    } finally {
-      if (request === revision.current) setBusy(false)
     }
-  }
-
-  useEffect(() => {
-    if (!dashboard) {
-      setBusy(false)
-      setError("Откройте dashboard через кнопку Dashboard выбранного узла в Loginom.")
-      return
-    }
-    const adapter = dashboard
-    void calculate(() => adapter.state())
-    const field = input.current!
-    function commit() {
-      if (!field.reportValidity()) return
-      void calculate(() => adapter.change(field.valueAsNumber))
-    }
-    field.addEventListener("change", commit)
-    return () => field.removeEventListener("change", commit)
-  }, [])
-
+  }), [])
+  if (window.parent === window) return <p role="status">Откройте dashboard кнопкой Dashboard в Studio</p>
+  const busy = !state || state.busy
   return <main>
     <header>
       <div className="heading">
         <div className="node"><span className="mark" aria-hidden="true"><i /><i /><i /></span>По убыванию ROI</div>
         <h1>Эффективность маркетинга</h1>
       </div>
-      <label className="filter">Минимальный бюджет кампании
-        <input ref={input} onInput={() => draftRevision.current++} type="number" min="0" step="any" required disabled={!dashboard} />
-      </label>
     </header>
     <div className="status" role="status">
       {busy && <span>Идёт расчёт…</span>}
-      {error && <span className="failure">{error}</span>}
-      {!busy && needsRun && !error && <span>Узел ещё не рассчитан.</span>}
-      {needsRun && dashboard && !busy && <button onClick={() => void calculate(() => dashboard!.run())}>Выполнить</button>}
-      {data && <span className="threshold">Расчёт при пороге <strong>{thresholdLabel(data.threshold)}</strong></span>}
+      {error && <span role="alert" className="failure">{error}</span>}
+      {!busy && !channels && !error && <span>Нет данных</span>}
+      {state && <span className="threshold">Расчёт при пороге MinBudget = {thresholdLabel(state.parameters.find(parameter => parameter.name === "MinBudget")?.value ?? null)}</span>}
+      {channels && state?.table?.truncated && <span>показана часть: {state.table.rows.length} из {state.table.totalRows}</span>}
     </div>
-    {data && <Results channels={data.channels} />}
+    {channels && <Results channels={channels} />}
   </main>
 }
 
