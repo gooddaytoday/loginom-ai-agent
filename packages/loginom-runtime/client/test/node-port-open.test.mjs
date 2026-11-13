@@ -107,6 +107,24 @@ test('port opening binds menu and wizard native identities and replays without a
  const again=await f.run();assert.equal(again.status,'SUCCEEDED',again.error);assert.equal(again.replayed,true);assert.equal(f.gestures.length,2);
 });
 
+for(const fault of ['none','nonempty','foreign-type','foreign-column'])test('empty JS input admits only its disabled native delete header '+fault,async()=>{
+ const f=fixture('input'),base='MF;TF;WizrdMCF;TuneDataSourceMappingWizard;';
+ f.node.FIconCls=fault==='foreign-type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-javascript';
+ const root=f.wizard.FView.el.dom,column=f.el(base+'colTargetDelete');column.parent=root;
+ f.nativeControls.set(column.id,{el:{dom:fault==='foreign-column'?{}:column},disabled:true});
+ for(const key of ['grdSourceColumns;tbl','grdTargetColumns;tbl']){
+  const el=f.el(base+key);el.parent=root;
+  const items=fault==='nonempty'?[{}]:[];
+  f.nativeControls.set(el.id,{el:{dom:el},getStore:()=>({$className:'Ext.data.Store',
+   isLoading:()=>false,getCount:()=>items.length,getTotalCount:()=>items.length,getData:()=>({items})})});
+ }
+ const mask=f.el(null);mask.parentElement=column;mask.textContent='';
+ mask.getAttribute=name=>name==='role'?null:null;
+ mask.classList={contains:name=>name==='x-mask'};
+ f.flags.finishMasks=[mask];f.task.deadline=Date.now()+150;
+ const result=await f.run();assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result));
+});
+
 function groupingBusy(f){
  const root=f.graph.FDiagram.FmxGraph.container,panel=f.el('MF;TF;ModelForm');
  panel.tagName='DIV';panel.getAttribute=key=>key==='data-tid'?panel.tid:key==='class'?'x-panel bg-mask-message':null;

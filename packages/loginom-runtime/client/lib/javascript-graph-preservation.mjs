@@ -16,7 +16,7 @@ export function javascriptUnconnectedInputMapping(mapping,graph,node){
   verifyJavascriptUnconnectedInput(graph,node);
   const context=mapping?.node_context,port=context?.input_port;
   need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.source_identity_verified===true
-    &&mapping.state_source==='cached_mapping_stores'&&mapping.mapping_wizard==='DataSetInputSocketWizard'
+    &&mapping.state_source==='cached_mapping_stores'&&mapping.mapping_wizard==='TuneDataSourceMappingWizard'
     &&mapping.settings_applied===false&&mapping.package_saved===false
     &&typeof mapping.autosync==='boolean'&&Array.isArray(mapping.source_fields)&&mapping.source_fields.length===0
     &&Array.isArray(mapping.target_fields)&&mapping.target_fields.length===0

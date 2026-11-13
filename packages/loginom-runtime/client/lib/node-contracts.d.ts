@@ -90,13 +90,15 @@ export interface JavascriptConfigurationReadback {
   settings_preserved: true; wizard_commit_verified: true;
   /** Explicit execution is separate from Loginom's unknown internal Done effects. */
   execution_effects: {explicit_execute_requested: boolean; internal_execution_started: null};
-  input_state?: 'unconnected';
   input_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
-    type: string; data_kind: string; source_name: string}>} |
-    {port: 0; autosync: boolean; fields: []; input_state: 'unconnected'; no_incoming_links_verified: true};
+    type: string; data_kind: string; source_name: string}>};
   output_mapping?: {port: 0; autosync: boolean; fields: Array<{index: number; name: string; label: string;
     type: string; data_kind: string; source_name: string; excluded: boolean}>};
   package_persistence_verified: false;
+}
+export interface JavascriptUnconnectedConfigurationReadback extends JavascriptConfigurationReadback {
+  input_state: 'unconnected';
+  input_mapping?: {port: 0; autosync: boolean; fields: []; input_state: 'unconnected'; no_incoming_links_verified: true};
 }
 export interface CalculatorParameters {
   expressions: Array<{target: {kind: 'new'} | {kind: 'existing'; name: string};

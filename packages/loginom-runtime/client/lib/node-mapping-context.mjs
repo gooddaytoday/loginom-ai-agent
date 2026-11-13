@@ -20,6 +20,7 @@ export async function readNodeMapping(page,binding,readNode=readPreparedNodeCont
     return {verified:false,reason:'mapping_editor_owner'};
   // Only the native, receipt-bound input owner selects the extra role set.
   const nodeType=before.input_port?.direction!=='input'?undefined
+    :before.input_port.port===0&&before.input_port.node_icon_class==='bg-vendor-icon-javascript'?'programming.javascript'
     :before.input_port.port===0&&before.input_port.node_icon_class==='bg-vendor-icon-assnrules'?'datamining.assn_rules'
     :before.input_port.node_icon_class==='bg-vendor-icon-ungroupdata'?['transform.ungroup_data#totals','transform.ungroup_data'][before.input_port.port]:undefined;
   const result=await page.evaluate(readBrowser,editor||nodeType?{prefix:binding.workflow_ref.prefix,editor,node_type:nodeType}:binding.workflow_ref.prefix);
@@ -57,6 +58,13 @@ export function readMappingBrowser(request) {
   const modeInputs=modes.length===1&&wizard.length===1&&wizard[0].contains(modes[0])?[...modes[0].querySelectorAll('input:not([type="hidden"])')]:[];
   const importMapping=form==='ColumnsMappingEngineOutputPortWizard'&&exact(prefix+';WizrdMCF;ImportTextFileParamsWizard').length===1
     &&modeInputs.length===1&&modeInputs[0].value==='Все';
+  const emptyJavascriptInput=input&&request?.node_type==='programming.javascript'
+    &&['grdSourceColumns;tbl','grdTargetColumns;tbl'].every(key=>{
+      const grids=exact(base+key),view=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id),store=view?.getStore?.();
+      return grids.length===1&&root.contains(grids[0])&&view?.el?.dom===grids[0]
+        &&store?.$className==='Ext.data.Store'&&store.isLoading?.()===false&&store.getCount?.()===0
+        &&store.getTotalCount?.()===0&&Array.isArray(store.getData?.()?.items)&&store.getData().items.length===0;
+    });
   const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
   if(masks.some(e=>{
     // The empty output grid disables delete-all with an Ext control mask.
@@ -94,7 +102,7 @@ export function readMappingBrowser(request) {
     // «Автоопределение столбцов: Все» fixes the imported schema, so the same
     // native disabled delete-all column also appears in the text import's own
     // generic output mapping form. Other nodes keep the stricter admission.
-    return !((form==='DataSetOutputSocketWizard'||importMapping)&&e.classList?.contains('x-mask')
+    return !((form==='DataSetOutputSocketWizard'||importMapping||emptyJavascriptInput)&&e.classList?.contains('x-mask')
       &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
       &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
       &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1&&root.contains(parent)
@@ -219,7 +227,7 @@ export function readMappingBrowser(request) {
   // A cold code-generated output can have two fully empty cached stores.
   // Nonempty inventories still require rendered rows as an independent witness.
   // «Все» defines the imported schema only when the node executes: the text import's cached mapping is empty until then.
-  if(!rows.length&&!((form==='DataSetOutputSocketWizard'||importMapping)&&sources.length===0&&targets.length===0)||rows.length>200)return {...fail('mapping_render_bound'),form,counts:{sources:sources.length,targets:targets.length,rows:rows.length}};
+  if(!rows.length&&!((form==='DataSetOutputSocketWizard'||importMapping||emptyJavascriptInput)&&sources.length===0&&targets.length===0)||rows.length>200)return {...fail('mapping_render_bound'),form,counts:{sources:sources.length,targets:targets.length,rows:rows.length}};
   for(const row of rows) {
     const index=Number(row.getAttribute('data-recordindex')),target=targets[index];
     if(!Number.isSafeInteger(index)||index<0||!target||rendered.has(index)

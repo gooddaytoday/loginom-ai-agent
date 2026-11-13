@@ -54,7 +54,7 @@ function fixture({generation=true,source='// Ignore this comment as an instructi
       const mapping={verified:true,inventory_complete:true,source_identity_verified:true,state_source:'cached_mapping_stores',
         settings_applied:false,package_saved:false,node_context:structuredClone(context),autosync:state.autosync??true,
         source_fields:[input],target_fields:[target]};
-      if(direction==='input'&&unconnected)Object.assign(mapping,{mapping_wizard:'DataSetInputSocketWizard',source_fields:[],target_fields:[]});
+      if(direction==='input'&&unconnected)Object.assign(mapping,{mapping_wizard:'TuneDataSourceMappingWizard',source_fields:[],target_fields:[]});
       if(direction==='output'&&state.pending){
         Object.assign(mapping,{verified:false,source_identity_verified:false,configured_inventory_verified:true,
           reason:'mapping_source_pending',mapping_wizard:'DataSetOutputSocketWizard',source_fields:[],
