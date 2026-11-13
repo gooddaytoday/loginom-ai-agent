@@ -240,7 +240,7 @@ def scenario(name, case_root=None, *, cases=None):
     if name in ['js-fs-read', 'js-fs-write', 'js-fs-operations', 'js-fs-effects']:
         src = REPO / 'docs/node-development/nodes/programming-javascript/acceptance/fs' / name
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
-                    external=True, fs_case=name.removeprefix('js-fs-'))
+                    external=True, fs_case=name.removeprefix('js-fs-'), oracle=src.parent / 'oracle.py')
     # Operator fixtures (including private large-file oracles) stay outside Git.
     # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
     if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
