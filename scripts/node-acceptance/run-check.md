@@ -95,6 +95,15 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-real` uses grouping `acceptance/types/task-real.md` and only
+`fixtures/types/types.csv`. `expected-real.json` contains the unchanged
+`cases.real.stages` from the LAB-1558 proposal; its independent `oracle.py
+--check` stays outside the model workspace. Native Real median/mode/stddev,
+all-NULL and the mode tie are checked as complete typed rows with exact field
+order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
+the existing node, cold execution without configuration and cleanup use stock
+checks. Only the business task and CSV reach the model.
+
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
 `{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",
