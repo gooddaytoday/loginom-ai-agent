@@ -51,7 +51,7 @@ Use only the assigned user-storage subtree; no parent traversal or foreign paths
 Unsaved relative paths use the personal folder; saved paths use the LGP directory.
 After moving an LGP, its sidecar must be delivered separately.
 readFileSync(path,encoding), writeFileSync/appendFileSync(path,data,{encoding,flag,writeBOM}).
-Encodings: utf8, utf16le, win1251/cp1251. No encoding returns ArrayBuffer:
+Encodings: utf8, utf16le, cp1251. No encoding returns ArrayBuffer:
 use Uint8Array and Array.from; Node Buffer is unavailable. openSync returns a
 FileHandle; closeSync in finally. readSync/writeSync support offsets/length/position;
 fstatSync/ftruncateSync use the handle. statSync/lstatSync, existsSync, readdirSync,
