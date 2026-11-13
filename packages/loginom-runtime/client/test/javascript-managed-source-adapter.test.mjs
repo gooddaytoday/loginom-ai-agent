@@ -114,7 +114,7 @@ test('source boundary journals only the failed predicate: '+fault,async()=>{
   assert.equal(JSON.stringify(detail).includes('PRIVATE'),false);
   assert.equal(JSON.stringify(refused).includes('diagnostic'),false);
   assert.equal(refused.javascriptSourceBoundary,undefined);
-  assert.deepEqual(f.calls,['type','open','schema'],'no extra browser read or Next on refusal');
+  assert.deepEqual(f.calls,['type','open','page','schema'],'no extra browser read or Next after schema refusal');
   assert.equal(admission.state,'retired');
 });
 
@@ -212,7 +212,7 @@ test('managed source adapter admits full source after owned open/schema/Next/thr
   assert.equal(receipt.intent, 'preserve');
   assert.equal(receipt.previous_source.source_utf8_bytes, Buffer.byteLength(source, 'utf8'));
   assert.ok(!JSON.stringify(receipt).includes(source));
-  assert.deepEqual(f.calls, ['type', 'open', 'schema', 'next', 'page', 'source', 'source', 'source', 'close', 'dispose']);
+  assert.deepEqual(f.calls, ['type', 'open', 'page', 'schema', 'next', 'page', 'source', 'source', 'source', 'close', 'dispose']);
   assert.equal(f.events.filter(event => event.phase === 'source_delivery_verified').length, 1);
   assert.equal(f.events.filter(event => event.phase === 'source_discard_settled').length, 1);
 });

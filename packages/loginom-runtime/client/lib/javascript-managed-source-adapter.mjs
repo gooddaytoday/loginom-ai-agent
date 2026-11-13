@@ -136,7 +136,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
           return;
         }
         need(observed.page?.tid === task.workflow_ref.prefix + ';WizrdMCF;JavaScriptColumnsWizard'
-          && observed.page.index === 0, 'Managed JavaScript Code page changed');
+          && observed.page.index === (task.inputPage?1:0), 'Managed JavaScript Code page changed');
       }
       await wait(Math.min(100, Math.max(1, task.deadline - Date.now())));
     }
@@ -191,6 +191,22 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       const task = opened.task;
       need(same(task.owner, {document_id: node.document_id, workflow_id: node.workflow_id, node_id: node.node_id}),
         'Managed JavaScript opened another node');
+      const firstPage=await execute(driver.makeJavascriptManagedPageCode(task));
+      if(firstPage.page?.tid===task.workflow_ref.prefix+';WizrdMCF;TuneDataSourceInputPortWizard'){
+        need(firstPage.ready===true&&firstPage.page.index===0&&firstPage.page.indicator_count===5,
+          'Managed JavaScript empty input page changed');
+        task.inputPage=true;
+        const next=await driver.dispatchManagedJavascriptNext({task,execute,record,receiptOptions,input:true});
+        need(next?.status==='SUCCEEDED'&&next.output?.next_gesture_returned===true,
+          'Managed JavaScript empty input Next refused');
+        for(;;){
+          const page=await execute(driver.makeJavascriptManagedPageCode(task));
+          if(page.page?.tid===task.workflow_ref.prefix+';WizrdMCF;JavaScriptColumnsWizard'
+            &&page.page.index===1&&page.page.indicator_count===5)break;
+          need(Date.now()<task.deadline,'Managed JavaScript empty input Next deadline');
+          await wait(100);
+        }
+      }
       const schema = await execute(driver.makeJavascriptSchemaContextCode(task.prepared));
       need(schema?.verified === true && schema.node_context?.verified === true
         && schema.node_context.surface === 'wizard'
@@ -272,9 +288,9 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       const settled=await driver.waitManagedJavascriptCodeSettlement({task:handle.task,before,execute,record,wait});
       if(settled.wizard_error_refusal===true)await rejectDraft(handle,before,settled,'code_next');
       const donePage=await execute(driver.makeJavascriptManagedPageCode(handle.task));
-      need(donePage?.ready===true&&donePage.node_guid===node.node_id&&donePage.page?.indicator_count===4
+      need(donePage?.ready===true&&donePage.node_guid===node.node_id&&donePage.page?.indicator_count===(handle.task.inputPage?5:4)
         &&donePage.page.tid===handle.task.workflow_ref.prefix+';WizrdMCF;DoneWizard'
-        &&donePage.page.index===3&&donePage.page.visible_editors===0&&Date.now()<handle.task.deadline,
+        &&donePage.page.index===(handle.task.inputPage?4:3)&&donePage.page.visible_editors===0&&Date.now()<handle.task.deadline,
       'Managed JavaScript Done page owner changed');
       const doneBefore=await execute(driver.makeJavascriptManagedStageCode(handle.task));
       need(doneBefore?.owner_verified===true&&doneBefore.native_owner_verified===true&&same(doneBefore.owner,handle.task.owner)
