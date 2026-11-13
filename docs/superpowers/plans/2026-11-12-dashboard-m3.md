@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** задачи 1–12 выполнены и независимо проверены по поведению; задачи 13–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** задачи 1–13 выполнены и независимо проверены по поведению; задачи 14–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -1386,15 +1386,15 @@ export function dashboardFlag(args: string[], mode: "run" | "tui"): { id: string
 export function setRunDashboard(text?: string): void // a synthetic part appended after the user's message
 ```
 
-- [ ] **Step 1: Тесты.** `standalone-dashboard.test.ts` (`bun:test`):
+- [x] **Step 1: Тесты.** `standalone-dashboard.test.ts` (`bun:test`):
   - `["--dashboard", ID, "--", "текст"]` и `["--dashboard=" + ID, "текст"]` → `{id, rest}` без флага;
   - без флага → `undefined`;
   - вместе с `--dir`, `--attach`, `--continue`, `-c`, `--session`, `-s`, `--fork`, `--command` (и формами `--x=…`), без значения, в режиме `tui` → `"invalid"`;
   - флаг после `--` не считается флагом;
   - аргументы для разбора `run` — `["--dir", work, ...rest]`: для `["--dashboard", ID, "--", "текст"]` yargs (с `populate--`) получает `dir` = `work`, а `"текст"` остаётся сообщением; при `[...rest, "--dir", work]` флаг ушёл бы в `argv["--"]`, и сессия пошла бы в текущем каталоге с обычным профилем. Тест разбирает итоговые аргументы настоящим `RunCommand.builder` и проверяет `argv.dir`.
   Интеграция — по образцу `standalone-preflight.test.ts` (`invoke(fixture, …)`, `TestLLMServer`): если фикстура умеет сохранить подключение (`generation > 0`) без живого стенда, тест поднимает настоящий `dashboardServer` как стенд и проверяет, что модель получила синтетическую часть `dashboardPrompt("create", true)`, сессия идёт в `<профиль>/data/dashboards/…/work`, а инструментов `bash` в запросе к модели нет. Если не умеет — ограничиться модульными тестами, проверка переходит в приёмку (шаг 10), и это записывается в отчёт задачи.
-- [ ] **Step 2: Тесты падают.** → FAIL.
-- [ ] **Step 3: Разбор флага.**
+- [x] **Step 2: Тесты падают.** → FAIL.
+- [x] **Step 3: Разбор флага.**
 
 ```ts
 const conflicts = ["--dir", "--attach", "--continue", "-c", "--session", "-s", "--fork", "--command"]
@@ -1412,8 +1412,8 @@ export function dashboardFlag(args: string[], mode: "run" | "tui") {
 }
 ```
 
-- [ ] **Step 4: `standalone-run.ts`.** До запуска хоста: `const dashboard = dashboardFlag(args, mode)`; `"invalid"` → `failure("CLI_ARGUMENT_INVALID", 2)`. После чтения `status`: если `dashboard` задан — `!status.value.generation` → `failure("LOGINOM_CONFIG_REQUIRED", 2)`; затем `prepareDashboard({ id, origin: new URL(status.value.url).origin, dashboards: dashboardDataRoot(process.env), template: join(bundle.resources, "dashboard", "template") })` (окружение профиля CLI уже содержит `LOGINOM_AI_AGENT_CLI_ROOT`); ошибка → `failure("DASHBOARD_SNAPSHOT_UNAVAILABLE", 1)`; успех → аргументы разбора — `["--dir", target.directory, ...filtered]` (флаг до возможного `--`). Существующее удаление `--headless`/`--no-headless` применять к `dashboard.rest` либо исходным аргументам после проверки dashboard-флага, учитывая разделитель оставшегося массива: фильтр не должен превращать `--dashboard --headless <ID>` в корректный флаг. После успешной подготовки вызвать `setRunDashboard(dashboardPrompt(target.action, target.fresh))`; `cleanup.detach` сбрасывает его (`setRunDashboard()`).
-- [ ] **Step 5: `run.ts`.**
+- [x] **Step 4: `standalone-run.ts`.** До запуска хоста: `const dashboard = dashboardFlag(args, mode)`; `"invalid"` → `failure("CLI_ARGUMENT_INVALID", 2)`. После чтения `status`: если `dashboard` задан — `!status.value.generation` → `failure("LOGINOM_CONFIG_REQUIRED", 2)`; затем `prepareDashboard({ id, origin: new URL(status.value.url).origin, dashboards: dashboardDataRoot(process.env), template: join(bundle.resources, "dashboard", "template") })` (окружение профиля CLI уже содержит `LOGINOM_AI_AGENT_CLI_ROOT`); ошибка → `failure("DASHBOARD_SNAPSHOT_UNAVAILABLE", 1)`; успех → аргументы разбора — `["--dir", target.directory, ...filtered]` (флаг до возможного `--`). Существующее удаление `--headless`/`--no-headless` применять к `dashboard.rest` либо исходным аргументам после проверки dashboard-флага, учитывая разделитель оставшегося массива: фильтр не должен превращать `--dashboard --headless <ID>` в корректный флаг. После успешной подготовки вызвать `setRunDashboard(dashboardPrompt(target.action, target.fresh))`; `cleanup.detach` сбрасывает его (`setRunDashboard()`).
+- [x] **Step 5: `run.ts`.**
 
 ```ts
 let dashboardPart: string | undefined
@@ -1424,8 +1424,8 @@ export function setRunDashboard(text?: string) {
 parts: [...files, { type: "text", text: message }, ...(dashboardPart ? [{ type: "text" as const, text: dashboardPart, synthetic: true }] : [])],
 ```
 
-- [ ] **Step 6: Прогон.** `bun typecheck`; `bun test test/cli/standalone-dashboard.test.ts test/cli` → PASS.
-- [ ] **Step 7: Коммит.** `git commit -m "feat(opencode): start CLI dashboard sessions from a snapshot ID"`.
+- [x] **Step 6: Прогон.** `bun typecheck`; `bun test test/cli/standalone-dashboard.test.ts test/cli` → PASS.
+- [x] **Step 7: Коммит.** `git commit -m "feat(opencode): start CLI dashboard sessions from a snapshot ID"`.
 
 ### Task 14: Навык `loginom-dashboard`
 
@@ -1433,8 +1433,8 @@ parts: [...files, { type: "text", text: message }, ...(dashboardPart ? [{ type: 
 - Create: `packages/product/skills/loginom-dashboard/SKILL.md`
 - Modify: `packages/product/src/skills.ts`, `O/test/skill/bundled-skills.test.ts` (если упорядоченные списки требуют), `O/test/cli/bundled-skills.test.ts` (≈158, ≈191), `packages/loginom-host/test/stage-resources.test.ts` (≈145), `packages/desktop/test/loginom/product-skills-smoke.mjs` (≈136, ≈208)
 
-- [ ] **Step 1: Тесты.** Обновить жёсткие списки навыков на `["loginom-automation", "loginom-dashboard", "package-docs"]` (отсортировано). Тест каталога `bundled-skills.test.ts` (строки 29–35, 90–103) идёт по `reservedSkillNames` и после шага 3 требует новый каталог.
-- [ ] **Step 2: Тесты падают.** `cd packages/opencode && bun test test/skill/bundled-skills.test.ts` → FAIL после изменения `reservedSkillNames` и до создания `SKILL.md`.
+- [ ] **Step 1: Тесты.** Сначала в одном тесте каталога задать ожидаемые три имени и получить RED до изменения production-реестра/создания навыка. После его GREEN обновлять остальные жёсткие списки по одному на `["loginom-automation", "loginom-dashboard", "package-docs"]` (отсортировано). Тест каталога `bundled-skills.test.ts` (строки 29–35, 90–103) идёт по `reservedSkillNames` и после шага 3 требует новый каталог. В Desktop smoke вместе с фильтром трёх имён обновить ожидаемый `productCommands.length` с 2 до 3; повреждённая поставка по-прежнему даёт 0.
+- [ ] **Step 2: Тест падает.** В `packages/opencode`: `bun run test test/skill/bundled-skills.test.ts -t "one canonical directory"` → FAIL: ожидается `loginom-dashboard`, которого ещё нет в поставке. Production-реестр и файлы навыка до этого не меняются.
 - [ ] **Step 3: Имя.** `reservedSkillNames = ["loginom-automation", "package-docs", "loginom-dashboard"] as const`.
 - [ ] **Step 4: Навык.** `SKILL.md` (frontmatter — только разрешённые ключи; ссылок за пределы каталога навыка нет):
 
