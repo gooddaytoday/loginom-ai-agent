@@ -113,6 +113,71 @@ Runtime mode остаётся aggregate, вход 0 / выход 0; обучен
 
 Перечень будущей полноты сохраняет прежний подплан: частично принятые действия перепроверяются на этапе 0, дополнительные controls/типы/режимы назначаются отдельно; совпавшее название режима не расширяет scope.
 
+#### Предложение LAB-1558: типы агрегатов, ничья моды, пустой вход
+
+База `v040@864fad6efe`, 13.11.2026, только документы: runtime, навык и
+run-check не менялись, native-пробы не было (её делает разработчик первым
+шагом цикла). Решение владельца `v040-open-scope`. Комплект —
+[acceptance/types](acceptance/types/README.md), fixtures — `fixtures/types/`
+(SHA в `fixtures/manifest.json`), `oracle.py --check` проходит.
+
+**Что 7.4.2 даёт штатно (справка, не наблюдение).** Таблица «Агрегация
+показателей и возможные типы данных» в `processors/transformation/grouping.md`
+потеряла иконки-заголовки шести типов. По строкам «Сумма» (integer+real) и
+«Список» (string+integer, сказано текстом) вероятный порядок: строка, целое,
+вещественное, затем дата, логический, Variant. Тогда median/stddev/avg/sum —
+только integer/real, а count/min/max/mode/unique/null/first/last/only — все
+шесть типов. Это вывод, первый вопрос пробы. Ничья моды — наименьшее значение
+(`processors/func/aggregation-functions.md`, «Мода»). Пустой вход справка
+не описывает. Кросс-таблица 7.4.2 на тех же типах (`transform-crosstable/discovery.md:55-62`)
+даёт min/max/first/last с типом входа, у Variant — native subtype; Variant Min
+считает NULL нижним значением. Огр. 7.4.2 для Группировки пока не выявлено.
+
+**Что мешает в коде.** `grouping-parameters.mjs:6` (`inputTypes`) пускает
+median/stddev только для integer, mode/null_count/first/last/only/unique_count/concat —
+для integer/string. Min/max/count не ограничены, но real/date/Boolean ни разу
+не принимались. Variant-выход Группировки читается без точного подтипа:
+`transform.group_data` нет в `typedVariants` (`node-procedure.mjs:269`).
+
+**Предложенный срез, по циклу на случай.** Real и Boolean идут первыми,
+потому что дают ничью моды на новых типах. Date — после них. Variant — после
+`typedVariants`. mode_tie и empty не требуют production-кода, если проба
+подтвердит правила: там только тест, строка навыка и регистрация.
+
+| Цикл | Случай | Production-изменение (ориентир) |
+|---|---|---|
+| 1 | real | `inputTypes`: real для median/stddev/mode (+ остальных по матрице пробы); тип выхода — `grouping-output.mjs:13` уже real/тип входа |
+| 2 | boolean | `inputTypes`: boolean для mode/unique_count/null_count/first/last/only |
+| 3 | date | `inputTypes`: datetime для last/null_count (+ mode/unique по пробе); min/max уже пропускаются |
+| 4 | variant | `inputTypes`: variant; `transform.group_data` в `typedVariants` (одна строка общего кода, как у Сортировки) |
+| 5 | mode_tie + empty | без кода или минимальная правка по пробе; две строки в `transform.group_data.md` |
+
+Оценка этапа 1 — **5 циклов** (+1 резерв, если проба покажет отличие
+Variant или пустого входа). Ориентир 20–60 строк production и адресные
+тесты `grouping-*.test.mjs`. Навык: `transform.group_data.md` 4865/6000 Б,
+нужна одна строка «real/date/Boolean/Variant: какие функции» (~250 Б) и
+правило ничьей (~120 Б). Карточка типа и маршрутизация не растут: режим тот же.
+
+**Вопросы native-пробы** (FactorEditDialog по `data-tid`, свой пакет):
+
+1. Какие `chb-N` включены у полей real, DateTime, Boolean и Variant? Это
+   ответ на матрицу справки без заголовков.
+2. Ничья моды integer/string/real/Boolean: выбирается наименьшее? Отдельно —
+   строки, где порядок кодовых точек и локали расходится (`Beta`/`alpha`).
+3. Ничья моды DateTime и Variant разных подтипов: что выбирается?
+4. Mode all-NULL у real и Boolean: 0.0 и False, как 0 и пустая строка у
+   integer/string, или NULL?
+5. Min/Max у Boolean выдают Boolean (False < True)? Тип выхода median/stddev
+   у real — real?
+6. Variant: Min считает NULL нижним, как в Кросс-таблице? Каков подтип у
+   First/Last после Свёртки? Порядок строк Свёртки — RowID × столбцы?
+7. Пустой вход (только заголовок): Execute успешен, результат — 0 строк с
+   объявленными типами? Или ошибка/предупреждение?
+8. DateTime-ключ и DateTime-мера: нет ли неоднозначности часового пояса
+   стенда (нужен ли полдень вместо полуночи)?
+9. Unique_count у Variant: 1, 1.0 и "1" — одно значение или три? (В срез
+   не входит, только наблюдение.)
+
 ## 3. Данные и независимые проверки
 
 Комплект `nodes/grouping/acceptance/` собирает будущая карточка:
