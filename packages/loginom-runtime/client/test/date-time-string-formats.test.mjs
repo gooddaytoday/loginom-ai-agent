@@ -13,7 +13,7 @@ test('string operations validate: format only on string_custom and required ther
  for(const bad of [op('string_custom','U'),op('string_year','Y','%Y'),op('year','Y','%Y'),op('string_custom','U',''),op('string_custom','U','a\nb'),op('string_custom','U','x'.repeat(129)),op('string_custom','U',7)])
   assert.throws(()=>validateDateTimeParameters(params(bad),'calendar',request),/format|invalid/);
  assert.throws(()=>validateDateTimeParameters(params(op('string_custom','U','%Y'),op('string_custom','V','%m')),'calendar',request),/repeated/);
- assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,22);
+ assert.equal(Object.keys(DATE_TIME_OPERATIONS).length,25);
  const item=dateTimeParametersSchema.properties.fields.items.properties.transformations.items;
  assert.deepEqual(item.required,['operation','name','label']);assert.ok(item.properties.format);
  assert.ok(['string_year','string_date','string_time','string_custom'].every(o=>item.properties.operation.enum.includes(o)));

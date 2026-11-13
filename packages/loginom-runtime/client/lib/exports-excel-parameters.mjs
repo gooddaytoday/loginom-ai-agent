@@ -32,6 +32,8 @@ export function validateExcelExportParameters(p,mode,r,directories=null){
  if(s.bindings!==undefined){
   need(s.bindings&&typeof s.bindings==='object'&&!Array.isArray(s.bindings)&&Object.keys(s.bindings).length>0,'Invalid Excel bindings');
   for(const [key,b]of Object.entries(s.bindings))need(['destination','sheet_name'].includes(key)&&b&&typeof b==='object'&&!Array.isArray(b)&&Object.keys(b).join(',')==='variable'&&typeof b.variable==='string'&&b.variable.length>0&&b.variable.length<=128&&!/[\0\r\n]/.test(b.variable)&&!Object.hasOwn(s,key),'Invalid or conflicting Excel binding: '+key);
+  // Close returns before the variables input is mapped, so a binding could only be blamed falsely.
+  need(r.finish!=='close','Invalid parameters.excel_export.bindings: finish=close discards the draft; use done or execute to bind variables');
   if(r.target.kind==='new')need(r.variable_inputs?.length===1&&r.variable_inputs[0].kind==='variables'&&r.variable_inputs[0].input===0,'Excel bindings need variables input 0');
  }
  if(r.target.kind==='new')for(const k of ['destination','sheet_name','header','overwrite'])need(Object.hasOwn(s,k)||['destination','sheet_name'].includes(k)&&s.bindings?.[k],'Invalid parameters.excel_export.'+k+': required on new export');
