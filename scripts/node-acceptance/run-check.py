@@ -825,6 +825,12 @@ def scenario(name, case_root=None, *, cases=None):
         variant = name == 'collapse-variant'
         return dict(source=src, prompt=src / ('task-variant.md' if variant else 'task-mixed.md'), data=src / 'fixtures',
                     base=None, input_files=['mixed.csv'], expected_name='expected-variant.json' if variant else 'expected.json')
+    if name in ['date-time-parts', 'date-time-parts-week']:
+        src = REPO / 'docs/node-development/nodes/date-time/acceptance/parts'
+        week = name.endswith('-week')
+        return dict(source=src, prompt=src / ('task-week.md' if week else 'task.md'),
+                    data=src / 'data', base=None, input_files=['parts.csv'],
+                    expected_name='expected-week.json' if week else 'expected.json')
     if name == 'date-time-minsec':
         src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
