@@ -1,0 +1,182 @@
+{
+  "sources": {
+    "SPEC.md": "a505e3d353eb1128946a30190c9327b89c5f9dd6855cd325520175953f008066",
+    "acceptance.json": "99e303066ad82da1c1fdce6a36b315abf6d1b65cdd7aefb1a47f4412713ad2ef",
+    "data/wilson_batches.csv": "aaed4bbf75cfbb0847f6c7b595b1f02f9f11f591f243134436f625466d57a45b",
+    "data/wilson_cohorts.csv": "e633a55710e1b637611957112beecd45241aa125381a340aadd1a1124155fc3c",
+    "oracle.csv": "a3a3ffaa2fd2d9997f696c2116533f0213cd2035a6982e1eb5487b89869d25fc",
+    "oracle.py": "209d3ff70204dec5b3a53a3839e999aad428210dd5f539df36418d231cd7f2e7",
+    "provenance.json": "bde4eaab9c587a43a6114e074c62ec290819efa6a4abba4ceba1d03fd624d0de",
+    "reference.lgp": "fb3fc22b7793d96a9e31710e6ce1900b01836b43bebb54d167eae6bf605d9095",
+    "task.json": "fc062b9593458746bb53935138c48a4214dec9e7f7644c9a43ca92575f42ba07"
+  },
+  "cases": [
+    {
+      "id": "wald",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(observed_rate+1.96*1.96/(2*n_safe))/d\"",
+          "to": "Expression=\"observed_rate\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"1.96*Sqrt(observed_rate*(1-observed_rate)/n_safe+1.96*1.96/(4*n_safe*n_safe))/d\"",
+          "to": "Expression=\"1.96*Sqrt(observed_rate*(1-observed_rate)/n_safe)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(trials=0,Null,IF(successes=0,0,center-half))\"",
+          "to": "Expression=\"IF(trials=0,Null,IF(center-half&lt;0,0,center-half))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(trials=0,Null,IF(successes=trials,1,center+half))\"",
+          "to": "Expression=\"IF(trials=0,Null,IF(center+half&gt;1,1,center+half))\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "interval",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "wald.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('wald')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "min-batch-counts",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdSum\"",
+          "to": "GroupFunctions=\"gdMin\"",
+          "count": 2
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Source=\"trials_Sum\"",
+          "to": "Source=\"trials_Min\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Source=\"successes_Sum\"",
+          "to": "Source=\"successes_Min\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "denominator",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "min-batch-counts.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "n = sum(n for n, k in batches[cohort])",
+            "to": "n = min((n for n, k in batches[cohort]), default=0)",
+            "count": 1
+          },
+          {
+            "from": "k = sum(k for n, k in batches[cohort])",
+            "to": "k = min((k for n, k in batches[cohort]), default=0)",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "point-decision",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IF(lower&gt;target_rate,",
+          "to": "IF(observed_rate&gt;target_rate,",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IF(upper&lt;target_rate,",
+          "to": "IF(observed_rate&lt;target_rate,",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "decision",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "point-decision.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('point-decision')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "empty-zero",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(observed_rate,6)\"",
+          "to": "Expression=\"IF(trials=0,0,Round(observed_rate,6))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(lower,6)\"",
+          "to": "Expression=\"IF(trials=0,0,Round(lower,6))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(upper,6)\"",
+          "to": "Expression=\"IF(trials=0,0,Round(upper,6))\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "IF(trials=0,&quot;no_data&quot;,",
+          "to": "IF(trials=0,&quot;below&quot;,",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "denominator",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "empty-zero.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('empty-zero')",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}
