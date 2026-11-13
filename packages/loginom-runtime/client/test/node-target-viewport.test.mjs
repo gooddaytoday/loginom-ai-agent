@@ -20,8 +20,8 @@ function fixture(kind,fault) {
  const tab={classList:{contains:()=>true}},document={querySelectorAll:q=>q==='[data-tid="tab"]'?[tab]:q==='[data-tid="'+prefix+';ModelForm;cmpDiagram"]'?[canvas]:[],elementFromPoint:(x,y)=>{
   for(const e of [label,body]){const b=e.getBoundingClientRect();if(x>=b.x&&x<=b.x+b.width&&y>=b.y&&y<=b.y+b.height&&x<1280)return e;}return x<1280&&y<800?canvas:null;
  }};
- const nativeNode={FGuid:'node',FCell:{}},nativeNodes=[nativeNode],view={scale:1,getState:()=>({shape:{node:body}})};
- const controller={FController:{FInitialScale:1,FDiagram:{FNodes:{FCollection:nativeNodes},FmxGraph:{view,getSelectionCells:()=>[]}}}};
+ const nativeNode={FGuid:'node',FCell:{}},nativeNodes=[nativeNode],view={scale:1,translate:{x:0,y:0},getState:()=>({shape:{node:body}})};
+ const controller={FController:{FInitialScale:1,FDiagram:{FNodes:{FCollection:nativeNodes},FmxGraph:{view,container:canvas,gridSize:8,gridEnabled:true,graphHandler:{scaleGrid:false},getSelectionCells:()=>[]}}}};
  const app={Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}};
  const context={innerWidth:1280,innerHeight:800,document,__loginomDockPreparationV1:{document,id:'doc',receipts:new Map([['prepare',{phase:'verified',workflowId:'flow',tab}]]),nodeTargetDomEpochs:{objects:new Map([[canvas,1]])}},
   bg:{app}};
@@ -82,6 +82,7 @@ for(const kind of ['rename','move'])test('target '+kind+' reveals its exact offs
  const f=fixture(kind),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);
  assert.deepEqual(f.order,['reveal',kind]);assert.ok(verifyNodeTargetEffect(f.effect,r.after,(n,p)=>n.position.x===Math.round(p.x/8)*8&&n.position.y===Math.round(p.y/8)*8));
  assert.equal(r.placement_navigation.fully_visible,true);assert.equal(r.cleanup_complete,true);
+ if(kind==='move')assert.deepEqual(structuredClone(r.move_geometry),{before:{scale:.75,grid_size:8,grid_enabled:true,scale_grid:false,translate:{x:0,y:0},scroll:{x:0,y:0}},after:{scale:.75,grid_size:8,grid_enabled:true,scale_grid:false,translate:{x:0,y:0},scroll:{x:0,y:0}}});
 });
 for(const kind of ['rename','move'])for(const fault of ['unknown','foreign','not_visible'])test('target '+kind+' refuses '+fault+' viewport before its node gesture',async()=>{
  const f=fixture(kind,fault),r=await f.run();assert.notEqual(r.status,'SUCCEEDED');assert.deepEqual(f.order,['reveal']);
