@@ -124,6 +124,13 @@ concat. Остальные типы runtime остаются последующ�
 пропускает NULL (в отличие от гипотезы ниже), unique_count(1, 1.0, "1") = 2;
 оба наблюдения вне oracle текущего цикла. Далее сохранено исходное предложение.
 
+**Цикл Boolean LAB-1616:** `group-boolean` использует неизменённые
+`cases.boolean.stages` через отдельный `expected-boolean.json`: min/max/mode,
+unique_count/null_count, ничья False и all-NULL. Runtime разрешает Boolean
+для count/min/max/mode/unique_count/null_count/first/last/only по матрице Q1;
+sum/avg/median/stddev/concat для DateTime/Boolean/Variant запрещены также
+в сохранённых масках. DateTime/Variant не расширяются в этом цикле.
+
 База `v040@864fad6efe`, 13.11.2026, только документы: runtime, навык и
 run-check не менялись, native-пробы не было (её делает разработчик первым
 шагом цикла). Решение владельца `v040-open-scope`. Комплект —

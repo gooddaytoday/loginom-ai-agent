@@ -51,6 +51,8 @@ Variant прочитан с native-подтипами. Пакет сохранё
    Variant: включены 1,2,3,6,8,9,10,11,12; выключены 0,4,5,7,13.
    То есть count/min/max/mode/unique_count/null_count/first/last/only —
    у всех четырёх типов, sum/avg/median/stddev — также у Real, concat — нет.
+   У Real unique_count/null_count/first/last/only подтверждены только матрицей;
+   значения и типы выхода в этой пробе не наблюдались.
 2. Ничья: integer 5/3 → 3; Real 1.5/0.5 → 0.5; Boolean True/False → False;
    string Beta/alpha → Beta (порядок кодовых точек, не локальная сортировка).
 3. DateTime: при равной частоте выбирается ранняя дата; на группе A

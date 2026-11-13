@@ -52,14 +52,22 @@ def expected(case):
     keep, ordered = CASES[case]
     rows = source()
     split = {0: [], 1: []}
-    for number, row in enumerate(rows, start=1):  # row_number is 1-based (NOT_CHECKED natively)
+    for number, row in enumerate(rows, start=1):  # 1-based, native probe LAB-1575
         split[0 if keep(number, row) else 1].append({k: cell(k, v) for k, v in row.items()})
-    return {'package_path': '{{PACKAGE_PATH}}', 'null_marker': 'NULL',
+    result = {'package_path': '{{PACKAGE_PATH}}', 'null_marker': 'NULL',
             'nodes': [{'type': 'transform.filter_data'}],
             'outputs': [{'output_node_type': 'transform.filter_data', 'output_port': port,
                          'ordered': ordered, 'column_order': 'any',
                          'columns': [column(n, t) for n, t in TYPES.items()], 'rows': split[port]}
                         for port in (0, 1)]}
+    if case.startswith('top-'):
+        result['row_filter_top_n'] = True
+        result['variable_inventory'] = {
+            'outputs': [{'node': {'type': 'variables.user'}, 'port': 4,
+                         'variables': [{'name': 'TopN', 'type': 'integer', 'value': 3 if case == 'top-initial' else 5}]}],
+            'links': [{'source': {'type': 'variables.user'}, 'output': 4,
+                       'target': {'type': 'transform.filter_data'}, 'input': 0, 'kind': 'control'}]}
+    return result
 
 
 def column(name, kind):

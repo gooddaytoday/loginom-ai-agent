@@ -123,5 +123,36 @@
         }
       ]
     }
-  ]
+  ],
+  "row_filter_top_n": true,
+  "variable_inventory": {
+    "outputs": [
+      {
+        "node": {
+          "type": "variables.user"
+        },
+        "port": 4,
+        "variables": [
+          {
+            "name": "TopN",
+            "type": "integer",
+            "value": 5
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": {
+          "type": "variables.user"
+        },
+        "output": 4,
+        "target": {
+          "type": "transform.filter_data"
+        },
+        "input": 0,
+        "kind": "control"
+      }
+    ]
+  }
 }
