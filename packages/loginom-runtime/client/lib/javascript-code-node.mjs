@@ -107,7 +107,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter,materializationSettled=false;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter,materializationSourceProof,materializationSettled=false;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -351,6 +351,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       async materializeOutput(ctx){
         enter(ctx);return withJavascriptSourcePolicyBoundary({phase:'materialization_start',owner,deadline:ctx.deadline,record:onRecord},
           ()=>admission.withEffect({receipt:configured,owner},async()=>{
+            materializationSourceProof={source_sha256:configured.effective_source.source_sha256,
+              settings_sha256:configured.settings_sha256};
             try{return await launch(ctx);}finally{materializationSettled=true;}
           }));
       },
@@ -374,16 +376,28 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         }
         need(mode==='execute'&&outputMapping&&executionReceipt?.status==='completed',
           'JavaScript final Execute requires completed materialization and full output mapping');
+        if(request.parameters.input_state==='unconnected'){
+          // The owned source/settings reader runs immediately before the sole
+          // Execute in withEffect above. Reopening Settings here deactivates
+          // its completed native output, even when the draft is discarded.
+          // Only read-only mapping closes and fresh graph proof follow Execute.
+          verifyJavascriptUnconnectedInput(await graph(ctx),nodeRef(owner));
+          need(materializationSettled===true&&materializationSourceProof?.source_sha256===expected.source_sha256
+            &&materializationSourceProof.settings_sha256===configured.settings_sha256
+            &&doneReceipt.source_sha256===expected.source_sha256&&doneReceipt.settings_sha256===configured.settings_sha256
+            &&inputMapping?.input_state==='unconnected'&&inputMapping.no_incoming_links_verified===true
+            &&executionReceipt.verified===true&&executionReceipt.owner_verified===true,
+          'JavaScript source execution reuse unavailable');
+          const proof={phase:'javascript_unconnected_execution_retained',operation_id:operation.id,node:nodeRef(owner),
+            execution_id:executionReceipt.execution_id,...materializationSourceProof,source_read_before_execute:true,
+            no_incoming_links_verified:true,settings_opened_after_execute:false};
+          const ack=await onRecord(structuredClone(proof));
+          need(Object.keys(proof).every(key=>same(ack?.[key],proof[key])),'JavaScript retained execution ACK differs');
+          return {...executionReceipt,mode:'execute',settings_applied:false,explicit_execute_requested:true,
+            source_sha256:expected.source_sha256,input_state:'unconnected',execution_reused:true};
+        }
         return withJavascriptSourcePolicyBoundary({phase:'finish',owner,deadline:ctx.deadline,record:onRecord},async()=>{
           const fresh=policyAdmission('existing',owner,ctx.deadline,expected,configured.settings_sha256),receipt=await fresh.admit({});
-          if(request.parameters.input_state==='unconnected'){
-            verifyJavascriptUnconnectedInput(await graph(ctx),nodeRef(owner));
-            need(inputMapping?.input_state==='unconnected'&&inputMapping.no_incoming_links_verified===true
-              &&executionReceipt.verified===true&&executionReceipt.owner_verified===true,
-            'JavaScript source execution reuse unavailable');
-            return {...executionReceipt,mode:'execute',settings_applied:false,explicit_execute_requested:true,
-              source_sha256:expected.source_sha256,input_state:'unconnected',execution_reused:true};
-          }
           return fresh.withEffect({receipt,owner},()=>launch(ctx));
         });
       },

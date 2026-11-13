@@ -63,6 +63,12 @@ test('unconnected executed readback retains the sole completed execution and rej
  assert.throws(()=>javascriptCodeReadback({node,phases:p}),/readback incomplete/);
 });
 
+test('unconnected source keeps its native output active after its only Execute',()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-once'],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+});
+
 for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-configure-cancel.mjs',import.meta.url)),point],{encoding:'utf8',timeout:10000});
