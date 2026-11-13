@@ -1,10 +1,12 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
+import { spawn } from "node:child_process"
+import { createInterface } from "node:readline"
 import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
-import { folderName, prepareDashboard } from "../../src/agent/folder.ts"
+import { folderName, prepareDashboard, readDashboardSnapshot } from "../../src/agent/folder.ts"
 import { bindingKey } from "../../src/contract/snapshot.ts"
 import { dashboardServer } from "../../src/web/server.ts"
 
@@ -263,4 +265,78 @@ test("local lookup ignores corrupt or unbound entries and requires a matching ex
   await writeFile(join(result.directory, "../control/binding.json"), control)
   await rm(result.directory, { recursive: true })
   assert.equal(await findDashboard(app.dashboards, input.id), undefined)
+})
+
+
+async function snapshotProcess(t, app, runtime, input) {
+  const file = join(app.root, crypto.randomUUID() + ".json")
+  await writeFile(file, JSON.stringify(input))
+  const child = spawn(runtime, [resolve(import.meta.dirname, "snapshot-process.mjs"), file], { stdio: ["ignore", "pipe", "pipe"] })
+  const output = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+  const exited = once(child, "exit")
+  let stderr = ""
+  child.stderr.on("data", chunk => stderr += chunk)
+  t.after(async () => { child.kill("SIGKILL"); await exited })
+  return {
+    child,
+    async line() { return (await output.next()).value },
+    async done() { assert.deepEqual(await exited, [0, null], stderr) },
+  }
+}
+
+test("Node refresh excludes Bun readers, survives interruption and accepts a new Studio snapshot", { skip: process.platform === "win32", timeout: 15_000 }, async t => {
+  const app = await fixture(t)
+  const prepared = await prepareDashboard(await app.create())
+  await rm(join(prepared.directory, "../control/snapshot.sqlite"))
+  const next = { ...snapshot, nodeName: "Updated", parameters: [{ name: "New", value: 99 }], sample: { schema: [{ name: "updated", type: 1 }], rows: [[99], [100]] } }
+  for (const crash of [false, true]) {
+    const options = await app.create(next)
+    const response = await fetch(app.origin + "/dashboard/snapshots/" + options.id)
+    const writer = await snapshotProcess(t, app, process.execPath, { action: "refresh", options, snapshot: await response.json() })
+    assert.equal(await writer.line(), "paused")
+    assert.equal(await readFile(join(prepared.directory, "snapshot.json"), "utf8").then(JSON.parse).then(value => value.nodeName), "Updated")
+    await assert.rejects(stat(join(prepared.directory, "sample.json")), { code: "ENOENT" })
+    const reader = await snapshotProcess(t, app, "bun", { action: "read", work: prepared.directory })
+    assert.equal(await reader.line(), "reading")
+    // A separate process must stay blocked while the writer owns the transaction.
+    const result = reader.line()
+    assert.equal(await Promise.race([result.then(() => "read"), new Promise(resolve => setTimeout(() => resolve("waiting"), 100))]), "waiting")
+    writer.child.kill(crash ? "SIGKILL" : "SIGCONT")
+    const saved = JSON.parse(await result)
+    await reader.done()
+    if (!crash) {
+      await writer.done()
+      assert.equal(saved.control.snapshotId, options.id)
+      assert.equal(saved.control.nodeName, "Updated")
+      assert.deepEqual(saved.sample, next.sample)
+      assert.deepEqual(saved.snapshot.parameters, next.parameters)
+      const { draftDashboard } = await import("../../src/agent/draft.ts")
+      const output = await draftDashboard({ work: prepared.directory, resources: { node: process.execPath, template: app.template, page: resolve(import.meta.dirname, "../../dist/draft.js") } })
+      const url = output.match(/http:\/\/localhost:\d+\/[a-f0-9]{64}\//)?.[0]
+      assert.ok(url, output)
+      const data = await (await fetch(url + "data")).json()
+      assert.equal(data.nodeName, "Updated")
+      assert.deepEqual(data.sample, next.sample)
+      continue
+    }
+    assert.equal(saved, null)
+    const draft = await import("../../src/agent/draft.ts")
+    assert.equal(await draft.draftDashboard({ work: prepared.directory, resources: {} }), draft.NO_SAMPLE)
+    await prepareDashboard(await app.create(next))
+    assert.deepEqual(readDashboardSnapshot(prepared.directory).sample, next.sample)
+  }
+})
+
+test("a Bun snapshot owner excludes a Node reader and process exit releases the lock", { skip: process.platform === "win32", timeout: 10_000 }, async t => {
+  const app = await fixture(t)
+  const prepared = await prepareDashboard(await app.create())
+  const writer = await snapshotProcess(t, app, "bun", { action: "lock", work: prepared.directory })
+  assert.equal(await writer.line(), "paused")
+  const reader = await snapshotProcess(t, app, process.execPath, { action: "read", work: prepared.directory })
+  assert.equal(await reader.line(), "reading")
+  const result = reader.line()
+  assert.equal(await Promise.race([result.then(() => "read"), new Promise(resolve => setTimeout(() => resolve("waiting"), 100))]), "waiting")
+  writer.child.kill("SIGKILL")
+  assert.deepEqual(JSON.parse(await result).sample, snapshot.sample)
+  await reader.done()
 })

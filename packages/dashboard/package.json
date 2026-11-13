@@ -12,7 +12,7 @@
     "check:size": "bun run script/check-size.ts",
     "test": "bun run build && bun run test:coverage && \"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/web/dist-smoke.test.mjs test/web/shell-contract.test.mjs test/web/sdk.test.mjs test/agent/folder.test.mjs test/draft/server.test.mjs",
     "test:coverage": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test --experimental-test-coverage --test-coverage-include='**/src/web/**' --test-coverage-lines=90 --test-coverage-functions=90 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./script/check-web-coverage.mjs --test-reporter-destination=stdout test/web/server.test.mjs test/web/apps.test.mjs",
-    "test:browser": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/browser/*.test.mjs test/build/*.test.mjs"
+    "test:browser": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/browser/*.test.mjs test/build/*.test.mjs test/agent/draft.test.mjs"
   },
   "dependencies": {
     "effect": "catalog:"
@@ -22,5 +22,12 @@
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:"
+  },
+  "imports": {
+    "#sqlite": {
+      "bun": "./src/agent/sqlite.bun.ts",
+      "node": "./src/agent/sqlite.node.ts",
+      "default": "./src/agent/sqlite.bun.ts"
+    }
   }
 }

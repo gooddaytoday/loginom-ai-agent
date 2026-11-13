@@ -1,6 +1,8 @@
 import { expect } from "bun:test"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
+import { prepareDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
+import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { DashboardSession } from "@/product/dashboard-session"
 import { asSchema } from "ai"
 import { pathToFileURL } from "node:url"
@@ -702,6 +704,7 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
         async release() {},
       }
       const { tools, user, history } = yield* resolveProfile(profile, loginom)
+      expect(tools.dashboard_draft).toBeUndefined()
       expect(scopes).toEqual([{ mode: "bind", scope: { taskMessageID: user, profile } }])
       expect(tools.loginom_find).toBeDefined()
       expect(tools.loginom_dock_diagnostics).toBeDefined()
@@ -946,19 +949,21 @@ codeMode.instance("a dashboard directory selects its real builtin whitelist befo
       )
       expect(result.session.directory).toBe(work)
       const ids = Object.keys(result.tools)
-      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch"].includes(id))).toBe(
+      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft"].includes(id))).toBe(
         true,
       )
-      for (const id of ["read", "glob", "grep", "skill"]) expect(ids).toContain(id)
-      if (options.api === "gpt-5") {
-        expect(ids).toContain("apply_patch")
-        expect(ids).not.toContain("edit")
-        expect(ids).not.toContain("write")
-        continue
-      }
-      expect(ids).toContain("edit")
-      expect(ids).toContain("write")
-      expect(ids).not.toContain("apply_patch")
+      for (const id of ["read", "glob", "grep", "skill", "dashboard_draft"]) expect(ids).toContain(id)
+      expect(result.tools.apply_patch || (result.tools.edit && result.tools.write)).toBeDefined()
+      const file = join(work, "src", crypto.randomUUID() + ".ts")
+      const writer = result.tools.apply_patch ?? result.tools.write
+      if (!writer.execute) throw Error("Dashboard writer unavailable")
+      yield* Effect.promise(() => writer.execute!(
+        result.tools.apply_patch
+          ? { patchText: "*** Begin Patch\n*** Add File: " + file + "\n+export {}\n*** End Patch" }
+          : { filePath: file, content: "export {}\n" },
+        { toolCallId: "dashboard-writer", abortSignal: new AbortController().signal, messages: [] },
+      ))
+      expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("export {}\n")
       if (options.emptyHistory) {
         yield* Effect.promise(() => rm(work, { recursive: true }))
         const execute = result.tools.read.execute!
@@ -972,5 +977,27 @@ codeMode.instance("a dashboard directory selects its real builtin whitelist befo
         if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("LOGINOM_SCOPE_DENIED")
       }
     }
+  }),
+)
+
+
+codeMode.instance("a folder prepared by Desktop resolves dashboard tools without bash", () =>
+  Effect.gen(function* () {
+    expect(dashboardDataRoot(process.env)).toBe(DashboardSession.dashboardRoot())
+    const id = crypto.randomUUID()
+    const prepared = yield* Effect.promise(() => prepareDashboard({
+      id, origin: "http://localhost:32768", dashboards: dashboardDataRoot(process.env),
+      template: resolve(import.meta.dir, "../../../dashboard/template"),
+      fetch: Object.assign(async () => Response.json({
+        id, created: new Date().toISOString(), published: false, nodeName: "Dashboard skeleton",
+        binding: { packagePath: "/user/skeleton-" + id + ".lgp", workflowGuid: "27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7", nodeGuid: "77c145b1-6ce3-458f-aa36-e6afdab2a930" },
+        parameters: [], sample: { schema: [{ name: "count", type: 1 }], rows: [[1], [2]] },
+      }), { preconnect: () => undefined }),
+    }))
+    yield* Effect.addFinalizer(() => Effect.promise(() => rm(join(prepared.directory, ".."), { recursive: true, force: true })))
+    const result = yield* resolveProfile("default").pipe(provideInstance(prepared.directory))
+    expect(result.tools.dashboard_draft).toBeDefined()
+    expect(result.tools.bash).toBeUndefined()
+    expect(result.tools.dashboard_publish).toBeUndefined()
   }),
 )
