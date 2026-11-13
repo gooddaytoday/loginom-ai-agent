@@ -30,7 +30,8 @@ export function publishDiagnosticsSession(session: DiagnosticsSession | undefine
 
 export function summarizeDiagnostics(files: DiagnosticsFile[]) {
   return DIAGNOSTICS_GROUPS.map((group) => {
-    const items = files.filter((file) => file.group === group)
+    // manifest.json is in every archive: it is listed but belongs to no chosen group.
+    const items = files.filter((file) => file.group === group && file.name !== "manifest.json")
     const included = items.filter((file) => file.status === "included")
     return {
       group,

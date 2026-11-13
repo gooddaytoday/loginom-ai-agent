@@ -28,25 +28,25 @@ export async function standalone(
     process.stdout.write(`${InstallationVersion}\n`)
     return
   }
+  const command = options.filter((value) => !HEADLESS_FLAGS.includes(value))[0]
   // Reads the profile without its guard, so it also works while a `run` hangs.
-  if (options[0] === "diagnostics") {
+  // Diagnostics never open a UI, so the headless flags do not apply to it.
+  if (command === "diagnostics") {
     const channel = cliChannel()
     const { diagnosticsCommand } = await import("@loginom-ai-agent/loginom-host/diagnostics-cli")
     process.exitCode = await diagnosticsCommand(
-      args,
+      args.filter((value) => !HEADLESS_FLAGS.includes(value)),
       cliProfile({ channel, root: process.env.LOGINOM_AI_AGENT_CLI_PROFILE }),
       { version: InstallationVersion, channel },
     )
     return
   }
-  if (
-    ["run", "providers", "auth", "models"].includes(
-      options.filter((value) => !["--headless", "--no-headless"].includes(value))[0],
-    )
-  )
+  if (["run", "providers", "auth", "models"].includes(command))
     return withStandaloneCancellation(() => executeProfile(args, execute))
   return executeProfile(args, execute)
 }
+
+const HEADLESS_FLAGS = ["--headless", "--no-headless"]
 
 function cliChannel() {
   return productChannel(

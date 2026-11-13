@@ -61,7 +61,7 @@ export type DiagnosticsInput = {
   /** Session export `{ info, messages: [{ info, parts }] }`. */
   chat?: unknown
   /** Extra sources collected for the last 24 hours: the first (current application logs) precedes startup failures, the rest follow them. */
-  logs?: { dir: string; prefix: string }[]
+  logs?: { dir: string; prefix: string; /** Keeps only matching archive names within the window. */ match?: RegExp }[]
   /** Values that must never appear in the archive. */
   knownSecrets?: string[]
   /** Login names replaced by `[user]`. */
@@ -358,11 +358,13 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
     ...attemptMeta.map((entry) => ({ name: entry.name, priority: 3, entry })),
     ...diagnostics.map((entry) => ({ name: entry.name, priority: 3, entry })),
     ...(input.logs ?? []).flatMap((source, index) =>
-      collectDiagnosticFiles(source.dir, source.prefix, undefined, limits.windowMs).map((entry) => ({
-        name: entry.name,
-        priority: index === 0 ? 4 : 5 + index,
-        entry,
-      })),
+      collectDiagnosticFiles(source.dir, source.prefix, undefined, limits.windowMs)
+        .filter((entry) => !source.match || source.match.test(entry.name))
+        .map((entry) => ({
+          name: entry.name,
+          priority: index === 0 ? 4 : 5 + index,
+          entry,
+        })),
     ),
     ...startup.map((entry) => ({ name: entry.name, priority: 5, entry })),
   ].sort((a, b) => a.priority - b.priority)
@@ -529,8 +531,9 @@ export async function profileSecrets(input: {
     } catch {
       status = "unavailable"
     }
-    // Never create profile directories: read only an existing store.
-    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false })?.isFile() || history.length) {
+    // Never create profile directories: read only an existing store. Any entry
+    // counts: the store refuses a linked record, which is then reported unavailable.
+    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false }) || history.length) {
       const store = input.codec && connectionStore(directory, input.codec)
       // Every generation, not only the active one: an older chat may echo the
       // login and password of an account the profile used before.

@@ -152,13 +152,26 @@ export async function prepareDiagnostics(value: unknown): Promise<DiagnosticsPre
     id,
     size: zip.length,
     selection: manifest.selection,
-    files: (manifest.files as Array<Record<string, unknown>>).map((file) => ({
-      name: String(file.name),
-      group: diagnosticsGroup(String(file.name)),
-      status: String(file.status),
-      ...(typeof file.size === "number" ? { size: file.size } : {}),
-      ...(typeof file.reason === "string" ? { reason: file.reason } : {}),
-    })),
+    files: [
+      ...(manifest.files as Array<Record<string, unknown>>).map((file) => ({
+        name: String(file.name),
+        group: diagnosticsGroup(String(file.name)),
+        status: String(file.status),
+        ...(typeof file.size === "number" ? { size: file.size } : {}),
+        ...(typeof file.reason === "string" ? { reason: file.reason } : {}),
+      })),
+      // The manifest describes the other files and is archived too: list it so it can be opened.
+      { name: "manifest.json", group: diagnosticsGroup("manifest.json"), status: "included", size: await entrySize(zip, "manifest.json") },
+    ],
+  }
+}
+
+async function entrySize(zip: Uint8Array, name: string) {
+  const reader = new ZipReader(new Uint8ArrayReader(zip))
+  try {
+    return (await reader.getEntries()).find((item) => item.filename === name && !item.directory)?.uncompressedSize ?? 0
+  } finally {
+    await reader.close()
   }
 }
 
@@ -216,7 +229,8 @@ async function buildDesktopArchive(request: Partial<DiagnosticsRequest>) {
         ...(include.logs
           ? [{ dir: root, prefix: "desktop" }, ...serverLogRoots().map((dir, i) => ({ dir, prefix: `server-${i + 1}` }))]
           : []),
-        ...(include.logs || include.dumps ? [{ dir: app.getPath("crashDumps"), prefix: "crashpad" }] : []),
+        // Crashpad keeps settings and report metadata beside the dumps; only dumps are diagnostics.
+        ...(include.logs || include.dumps ? [{ dir: app.getPath("crashDumps"), prefix: "crashpad", match: /\.dmp$/i }] : []),
       ],
       attachDumps: include.dumps,
       knownSecrets: known.secrets,
