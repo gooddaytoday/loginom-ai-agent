@@ -284,6 +284,26 @@ function restQueryHistory(){
 test('REST query variables audit accepts integer snapshots and unchanged same-node execution',()=>{
  const {events,initial,final}=restQueryHistory();assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
 });
+test('REST query audit allows a new downstream Calculator after the initial REST response',()=>{
+ const {events,initial,final}=restQueryHistory();
+ events.splice(8,0,{phase:'node_apply_prepared',operation_id:'parse-initial',request:{
+  target:{kind:'new',type:'transform.calculator'},mode:'expression',
+  inputs:[{source:events[7].result.node,output:0,input:0}],
+  parameters:{expressions:[{name:'limit',formula:'return JSON.parse(Response).args.limit;'}]}
+ }});
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const edit of ['parameters','read parameters','GUID','input','variable input','mappings','connection readback'])test('REST query audit still rejects REST reconfiguration: '+edit,()=>{
+ const {events,initial,final}=restQueryHistory(),r=events[10].request;
+ if(edit==='parameters'){r.mode='request';r.parameters={connection:{base_url:'https://example.invalid'}};}
+ if(edit==='read parameters')r.parameters.connection={base_url:'https://example.invalid'};
+ if(edit==='GUID')r.target.ref.node_id='replacement';
+ if(edit==='input')r.inputs=[{source:{node_id:'different'},input:0,output:0}];
+ if(edit==='variable input')r.variable_inputs=[{source:{node_id:'different'},input:0,output:4,kind:'variables'}];
+ if(edit==='mappings')r.mappings=[{field:'limit',source:'other'}];
+ if(edit==='connection readback')events[11].result.configuration={readback:{...structuredClone(events[7].result.configuration.readback),connection:{base_url:'https://example.invalid'}}};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_(RECONFIGURED|REPLACED|CONNECTION)/);
+});
 test('REST query initial response can be an independent read after verified configuration',()=>{
  const {events,initial,final}=restQueryHistory(),read=structuredClone(events[7]);
  read.result.operation_id='read-first';delete read.result.configuration;

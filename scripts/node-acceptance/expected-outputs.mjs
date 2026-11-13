@@ -511,11 +511,12 @@ export function auditRestQueryVariables(events,initial,final){
  const a=configured.find(c=>c.index<=first.index&&same(c.result.node,first.result.node)&&c.result.configuration.readback.connection)?.result.configuration.readback,b=second.result.configuration?.readback;
  need(a,'REST_QUERY_INITIAL_CONNECTION_READBACK');
  need(a.method==='GET'&&(!b||b.method==='GET')&&a.connection?.base_url==='https://httpbin.org/anything','REST_QUERY_CONNECTION');
+ need(!b?.connection||JSON.stringify(a.connection)===JSON.stringify(b.connection),'REST_QUERY_CONNECTION');
  need(JSON.stringify(a.query_parameters.map(p=>p.name))==='["limit","skip"]'&&(!b||JSON.stringify(a.query_parameters)===JSON.stringify(b.query_parameters)),'REST_QUERY_BINDINGS_CHANGED');
  for(const e of requests.filter(e=>e.index>first.index&&e.index<second.index)){
-  const r=e.request;if(['variables.user','exports.text'].includes(r.target.type))continue;
-  need(r.target.kind==='existing'&&(!r.mappings?.length)&&(r.mode==='read_existing_output'||Object.keys(r.parameters??{}).length===0),'REST_QUERY_RECONFIGURED');
-  if(r.target.type==='integration.rest_request')need(same(r.target.ref,first.result.node)&&!r.inputs?.length&&!r.variable_inputs?.length,'REST_QUERY_REPLACED');
+  const r=e.request;if(r.target.type!=='integration.rest_request'&&!same(r.target.ref,first.result.node))continue;
+  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'&&k==='source_operation_id'),'REST_QUERY_RECONFIGURED');
+  need(r.target.type==='integration.rest_request'&&same(r.target.ref,first.result.node)&&!r.inputs?.length&&!r.variable_inputs?.length,'REST_QUERY_REPLACED');
  }
  const completed=requests.flatMap(q=>{const c=checkpoints.find(c=>c.result.operation_id===q.operation_id);return c?[{...q,node:c.result.node}]:[];});
  const tables=completed.filter(q=>q.request.target.type==='variables.to_table'&&q.request.variable_inputs?.some(i=>i.kind==='variables'&&i.input===0&&i.output===4&&same(i.source,before.result.node)));
