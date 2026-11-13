@@ -10,6 +10,7 @@ import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
+import {finishPreparedOutputPort} from './port-mapping-procedure.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
 import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusal.mjs';
@@ -23,6 +24,36 @@ import {refuseJavascriptPortFullRead} from './native-read-refusal.mjs';
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
 const verified=(value={})=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
+
+// Private diagnostic: cached UI state only, no data proxy calls or mutation.
+async function readJavascriptMappingActivity(page,task){
+ return page.evaluate(task=>{
+  const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
+  if(prep?.document!==document||prep.id!==task.node.document_id||app?.Version!==task.build||location.origin!==task.origin)
+   throw Error('JavaScript activity document changed');
+  const records=[...prep.receipts.values()].filter(r=>r.phase==='verified'&&r.workflowId===task.node.workflow_id);
+  const receipt=records.find(r=>r.nodeTargetWorkflowNode),tab=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+  const tabs=[...document.querySelectorAll('[data-tid='+JSON.stringify(task.tab_tid)+']')];
+  if(!receipt||tabs.length!==1||tabs[0]!==receipt.tab||!tabs[0].classList.contains('x-tab-active'))throw Error('JavaScript activity owner changed');
+  const model=tab?.Controller?.FController,diagram=model?.FDiagram;
+  let node,port,surface;
+  if(diagram){
+   const nodes=diagram.FNodes?.FCollection?.filter(n=>n.FGuid===task.node.node_id);
+   if(nodes?.length!==1||diagram.FmxGraph?.container?.getAttribute('data-tid')!==task.prefix+';ModelForm;cmpDiagram')throw Error('JavaScript activity graph changed');
+   node=nodes[0];surface='graph';
+   const ports=node.FPorts.flatMap(p=>p.FCollection).filter(p=>p.FType===1&&p.FSubType===1);
+   if(ports.length!==1)throw Error('JavaScript activity output changed');port=ports[0];
+  }else{
+   const opens=[...(prep.outputPortOpenReceipts?.values()??[])].filter(o=>o.phase==='verified'&&o.node_id===task.node.node_id
+    &&o.workflow===receipt.nodeTargetWorkflowNode&&o.wizard===model);
+   if(opens.length!==1)throw Error('JavaScript activity mapping owner changed');
+   node=opens[0].node;port=opens[0].port;surface='output_mapping';
+  }
+  if(node.FGuid!==task.node.node_id||node.FIconCls!=='bg-vendor-icon-javascript'||port.parent!==node)throw Error('JavaScript activity native owner changed');
+  return {surface,node_id:node.FGuid,node_status:node.FStatus,node_state:node.FState??null,running:node.FRunning,
+   port_guid:port.FGuid,port_status:port.FStatus,port_active:port.FStatus===1};
+ },task);
+}
 
 // C/D lifecycle support, injected by acceptance until edit/reread and
 // candidate delivery are complete. No operator fixture or expected data enters it.
@@ -151,7 +182,16 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     };
     const readMapping=async(direction,ctx)=>{
       enter(ctx);const before=await graph(ctx);
+      const diagnostic=direction==='output'&&request.parameters.input_state==='unconnected'
+        &&process.env.LOGINOM_JS_MAPPING_DIAGNOSTIC==='1';
+      const activity=async point=>{
+        const value=await execute('async page=>('+readJavascriptMappingActivity.toString()+')(page,'+JSON.stringify({
+          node:nodeRef(owner),tab_tid:request.workflow_ref.tab_tid,prefix:request.workflow_ref.prefix,origin:targetOrigin,build:targetBuild})+')');
+        await onRecord({phase:'javascript_mapping_activity',operation_id:operation.id,point,...value});
+      };
+      if(diagnostic)await activity('before_output_open');
       await channel.openPort(direction,0);
+      if(diagnostic)await activity('after_output_open');
       const state=await channel.observe({condition:'complete owned JavaScript '+direction+' mapping',readMappings:true,
         ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true
           &&s.node_mapping.source_identity_verified===true&&s.prepared_node_context?.verified===true});
@@ -171,6 +211,13 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           verifyJavascriptMappingGraph(before,after,nodeRef(owner));
           await onRecord({phase:'javascript_mapping_graph_verified',direction,node:nodeRef(owner),before,after});
         }});
+      if(diagnostic){
+        await activity('after_output_close');
+        await channel.openPort('output',0);
+        await activity('before_output_done');
+        await finishPreparedOutputPort(channel);
+        await activity('after_output_done');
+      }
       return unconnected?javascriptUnconnectedInputMapping(mapping,before,nodeRef(owner)):mapping;
     };
     const launch=async ctx=>{
