@@ -1,0 +1,125 @@
+{
+  "sources": {
+    "reference.lgp": "cb33026a37e97b44ad054b726967926ba0c0a1cdddc0921447f713c3f5e2a649",
+    "oracle.csv": "2139d455586c13a9e38d37b4975ef6ff6e365b718f0ea30afc166a4c91ad3a94",
+    "provenance.json": "31fc98288fb1ce24e3e574b0360a84f4c4e509c364e6c69ec5e076a2b3a17123",
+    "oracle.py": "0ff18b2dcdfffbbdb04ff4f0fc4f38fd8673ebebd0af1063330408f05e638411",
+    "SPEC.md": "d035e4fcb42fd4e47fffb88cb596ae556f63c376be082fd227d73bf603c17162",
+    "task.json": "ff279955078d26465608fcbf7c3c38eb544e892d67e51bee51cfd64c4ddce92c",
+    "acceptance.json": "de8c48f0383bae98651e7897f3bd9cf5d4e50082cfb713e4d74d39397043b38c",
+    "data/bridge_observations.csv": "43765c094c067595f5fbacc2160fb012e9f98bce4fe216489a0408c521d68fdf"
+  },
+  "cases": [
+    {
+      "id": "base-only",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(p1-p0)*(q0+q1)/2\"",
+          "to": "Expression=\"(p1-p0)*q0\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(q1-q0)*(p0+p1)/2\"",
+          "to": "Expression=\"(q1-q0)*p0\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "interaction",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "base-only.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate(\"base-only\")",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "price-first",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(p1-p0)*(q0+q1)/2\"",
+          "to": "Expression=\"(p1-p0)*q0\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(q1-q0)*(p0+p1)/2\"",
+          "to": "Expression=\"(q1-q0)*p1\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "interaction",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "price-first.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate(\"price-first\")",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "averaged-contributions",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdSum\" Order=\"2\"",
+          "to": "GroupFunctions=\"gdAvg\" Order=\"2\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "GroupFunctions=\"gdSum\" Order=\"3\"",
+          "to": "GroupFunctions=\"gdAvg\" Order=\"3\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Source=\"price_effect_Sum\"",
+          "to": "Source=\"price_effect_Avg\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Source=\"quantity_effect_Sum\"",
+          "to": "Source=\"quantity_effect_Avg\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "bridge",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "averaged-contributions.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        result.append(dict(division=division,",
+            "to": "        price, quantity = price/len(raw[division]), quantity/len(raw[division])\n        result.append(dict(division=division,",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}
