@@ -16,6 +16,7 @@ export async function standalone(
     process.stdout.write(
       `${Product.name} CLI\n\nUsage: ${Product.cliExecutable} [options] [command]\n\n` +
         "Commands: run, providers (auth), models, loginom setup/check/status/cancel-pending/recover\n" +
+        "          diagnostics export [--session <id>] [--output <path>] [--no-chat]\n" +
         "Without a command: interactive TUI\n\n" +
         "Options: --headless, --no-headless, --help, --version\n" +
         "Management: --format json; setup --stdin-json; recover --acknowledge [id...]\n" +
@@ -27,6 +28,17 @@ export async function standalone(
     process.stdout.write(`${InstallationVersion}\n`)
     return
   }
+  // Reads the profile without its guard, so it also works while a `run` hangs.
+  if (options[0] === "diagnostics") {
+    const channel = cliChannel()
+    const { diagnosticsCommand } = await import("@loginom-ai-agent/loginom-host/diagnostics-cli")
+    process.exitCode = await diagnosticsCommand(
+      args,
+      cliProfile({ channel, root: process.env.LOGINOM_AI_AGENT_CLI_PROFILE }),
+      { version: InstallationVersion, channel },
+    )
+    return
+  }
   if (
     ["run", "providers", "auth", "models"].includes(
       options.filter((value) => !["--headless", "--no-headless"].includes(value))[0],
@@ -36,13 +48,17 @@ export async function standalone(
   return executeProfile(args, execute)
 }
 
+function cliChannel() {
+  return productChannel(
+    process.env.LOGINOM_AI_AGENT_CHANNEL ?? (InstallationChannel === "local" ? "dev" : InstallationChannel),
+  )
+}
+
 async function executeProfile(
   args: string[],
   execute: (args: string[], paths: ReturnType<typeof cliProfile>) => Promise<void>,
 ) {
-  const channel = productChannel(
-    process.env.LOGINOM_AI_AGENT_CHANNEL ?? (InstallationChannel === "local" ? "dev" : InstallationChannel),
-  )
+  const channel = cliChannel()
   const profile = await acquireProfile(
     cliProfile({
       channel,
