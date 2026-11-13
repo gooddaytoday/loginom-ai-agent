@@ -1,5 +1,5 @@
 import { inputStore, type InputFile } from "./inputs"
-import { appendFile, readFile, rm } from "node:fs/promises"
+import { appendFile, mkdir, readFile, rm } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { Schema } from "effect"
@@ -17,6 +17,7 @@ import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 export async function createLoginomHost(options: {
   root: string
   resources: string
+  resourceVersion?: string
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
   headless?: boolean
@@ -51,46 +52,75 @@ export async function createLoginomHost(options: {
   const shutdown = { failed: false }
   const resourceController = new AbortController()
   const resourceStarted = performance.now()
-  // Start before the settings click. Every browser in this Host session awaits
-  // the same full hash pass; a new Host starts a new pass, never a disk cache.
-  const verifiedResources = verifyResources(resources, {
-    nodePath: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-    nodeVersion: release.nodeVersion,
-    signal: resourceController.signal,
-  }).then(
-    async (result) => {
-      await appendFile(
-        join(root, "startup-phases.jsonl"),
-        JSON.stringify({
-          version: 1,
-          recorded_at: new Date().toISOString(),
-          phase: "resources.verify",
-          status: "ready",
-          duration_ms: Math.round(performance.now() - resourceStarted),
-          files: result.manifest.files.length,
-        }) + "\n",
-        { mode: 0o600 },
-      ).catch(() => undefined)
-      return result.manifestHash
-    },
-    async (error) => {
-      await appendFile(
-        join(root, "startup-phases.jsonl"),
-        JSON.stringify({
-          version: 1,
-          recorded_at: new Date().toISOString(),
-          phase: "resources.verify",
-          status: "failed",
-          duration_ms: Math.round(performance.now() - resourceStarted),
-          error: startupDiagnostic(error),
-        }) + "\n",
-        { mode: 0o600 },
-      ).catch(() => undefined)
-      // The real runtime still performs full verification if prewarming failed.
-      // This preserves fail-closed admission and the original classified failure.
-      return undefined
-    },
+  // Desktop supplies its version; packaged CLI already carries the version in
+  // its verified artifact manifest. Development fixtures may omit it.
+  const resourceVersion =
+    options.resourceVersion ??
+    (await readFile(join(resources, "../../cli-manifest.json"), "utf8")
+      .then(
+        (text) => JSON.parse(text)?.metadata?.version ?? "",
+        () => "",
+      )
+      .catch(() => ""))
+  // Start before the settings click. No browser is admitted until this pass
+  // drains; unchanged installations use the owner-authorized profile cache.
+  const verifiedResources = appendFile(
+    join(root, "startup-phases.jsonl"),
+    JSON.stringify({
+      version: 1,
+      recorded_at: new Date().toISOString(),
+      phase: "resources.verify",
+      status: "starting",
+      pid: process.pid,
+    }) + "\n",
+    { mode: 0o600 },
   )
+    .catch(() => undefined)
+    .then(() =>
+      verifyResources(resources, {
+        nodePath: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+        nodeVersion: release.nodeVersion,
+        signal: resourceController.signal,
+        cachePath: join(root, "resource-verification.json"),
+        cacheVersion: resourceVersion,
+      }),
+    )
+    .then(
+      async (result) => {
+        await appendFile(
+          join(root, "startup-phases.jsonl"),
+          JSON.stringify({
+            version: 1,
+            recorded_at: new Date().toISOString(),
+            phase: "resources.verify",
+            status: "ready",
+            duration_ms: Math.round(performance.now() - resourceStarted),
+            files: result.manifest.files.length,
+            pid: process.pid,
+            ...result.verification,
+          }) + "\n",
+          { mode: 0o600 },
+        ).catch(() => undefined)
+        return result.manifestHash
+      },
+      async (error) => {
+        await appendFile(
+          join(root, "startup-phases.jsonl"),
+          JSON.stringify({
+            version: 1,
+            recorded_at: new Date().toISOString(),
+            phase: "resources.verify",
+            status: "failed",
+            duration_ms: Math.round(performance.now() - resourceStarted),
+            error: startupDiagnostic(error),
+          }) + "\n",
+          { mode: 0o600 },
+        ).catch(() => undefined)
+        // The real runtime still performs full verification if prewarming failed.
+        // This preserves fail-closed admission and the original classified failure.
+        return undefined
+      },
+    )
   type Runtime = Awaited<ReturnType<typeof supervise>>
   function retain(generation: { children: Map<string, Promise<Runtime>> }, chat: string, child: Promise<Runtime>) {
     const tracked = child.then((runtime) => {
@@ -131,16 +161,82 @@ export async function createLoginomHost(options: {
     const timeout = AbortSignal.timeout(Math.max(1, startupDeadline - Date.now()))
     const waiting = signal ? AbortSignal.any([signal, timeout]) : timeout
     const cancelled: { reject?: (error: unknown) => void } = {}
-    const cancel = () => cancelled.reject?.(signal?.aborted ? signal.reason : Error("LOGINOM_RUNTIME_TIMEOUT"))
+    const cancel = () =>
+      cancelled.reject?.(
+        signal?.aborted
+          ? signal.reason
+          : Error("LOGINOM_RUNTIME_TIMEOUT", {
+              cause: Object.assign(Error("Resource prewarm did not finish before the startup deadline"), {
+                code: "LOGINOM_RESOURCE_PREWARM_PENDING",
+              }),
+            }),
+      )
+    const waitStarted = performance.now()
+    const stateDir = join(root, validation ? "validation" : "runtime")
+    const waitFailure = async (error: unknown): Promise<never> => {
+      await mkdir(stateDir, { recursive: true, mode: 0o700 })
+        .then(() =>
+          appendFile(
+            join(stateDir, "startup-failures.jsonl"),
+            JSON.stringify({
+              version: 1,
+              recorded_at: new Date().toISOString(),
+              phase: "resources.wait",
+              generation: connection.generation,
+              chat,
+              elapsed_ms: Math.round(performance.now() - waitStarted),
+              error: startupDiagnostic(error, [connection.username, connection.password, connection.apiKey]),
+            }) + "\n",
+            { mode: 0o600 },
+          ),
+        )
+        .catch(() => undefined)
+      throw error
+    }
+    await appendFile(
+      join(root, "startup-phases.jsonl"),
+      JSON.stringify({
+        version: 1,
+        recorded_at: new Date().toISOString(),
+        phase: "resources.wait",
+        status: "starting",
+        generation: connection.generation,
+        chat,
+      }) + "\n",
+      { mode: 0o600 },
+    ).catch(() => undefined)
     const resourceManifestHash = await Promise.race([
       verifiedResources,
       new Promise<never>((_resolve, reject) => {
         cancelled.reject = reject
         waiting.addEventListener("abort", cancel, { once: true })
+        if (waiting.aborted) cancel()
       }),
-    ]).finally(() => waiting.removeEventListener("abort", cancel))
+    ])
+      .catch(waitFailure)
+      .finally(() => waiting.removeEventListener("abort", cancel))
+    await appendFile(
+      join(root, "startup-phases.jsonl"),
+      JSON.stringify({
+        version: 1,
+        recorded_at: new Date().toISOString(),
+        phase: "resources.wait",
+        status: "ready",
+        generation: connection.generation,
+        chat,
+        duration_ms: Math.round(performance.now() - waitStarted),
+      }) + "\n",
+      { mode: 0o600 },
+    ).catch(() => undefined)
     signal?.throwIfAborted()
-    if (Date.now() >= startupDeadline) throw Error("LOGINOM_RUNTIME_TIMEOUT")
+    if (Date.now() >= startupDeadline)
+      return waitFailure(
+        Error("LOGINOM_RUNTIME_TIMEOUT", {
+          cause: Object.assign(Error("Resource prewarm exhausted the startup deadline"), {
+            code: "LOGINOM_RESOURCE_PREWARM_PENDING",
+          }),
+        }),
+      )
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     return supervise(
       {
@@ -299,6 +395,7 @@ export async function createLoginomHost(options: {
     browserRecovery: options.browserRecovery === true,
     references,
     async close() {
+      service.beginClose()
       resourceController.abort()
       await verifiedResources
       await service.close()

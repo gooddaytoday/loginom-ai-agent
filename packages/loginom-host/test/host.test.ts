@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { access, copyFile, mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, mkdtemp, readdir, rm, stat, symlink, truncate, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
@@ -79,7 +79,16 @@ test("Host prewarms one full resource verification and reuses its manifest proof
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
   try {
     // Verification happens with no connection or browser admission.
-    for (let retry = 0; retry < 200 && !(await Bun.file(join(root, "startup-phases.jsonl")).exists()); retry++)
+    for (
+      let retry = 0;
+      retry < 400 &&
+      !(
+        await Bun.file(join(root, "startup-phases.jsonl"))
+          .text()
+          .catch(() => "")
+      ).includes('"status":"ready"');
+      retry++
+    )
       await Bun.sleep(10)
     expect(await Bun.file(join(root, "startup-phases.jsonl")).text()).toContain('"status":"ready"')
     const candidate = {
@@ -97,7 +106,108 @@ test("Host prewarms one full resource verification and reuses its manifest proof
     expect(proofs).toHaveLength(2)
     expect(proofs[0]).toMatch(/^[a-f0-9]{64}$/)
     expect(proofs[1]).toBe(proofs[0])
-    expect((await Bun.file(join(root, "startup-phases.jsonl")).text()).trim().split("\n")).toHaveLength(1)
+    expect(
+      (await Bun.file(join(root, "startup-phases.jsonl")).text())
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .filter((event) => event.phase === "resources.verify" && event.status === "ready"),
+    ).toHaveLength(1)
+    await host.close()
+    const restored = await createLoginomHost({
+      root,
+      resources,
+      resourceVersion: "",
+      codec: credentials("linux"),
+      environment: {},
+    })
+    try {
+      for (let retry = 0; retry < 400; retry++) {
+        const events = (await Bun.file(join(root, "startup-phases.jsonl")).text())
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line))
+          .filter((event) => event.phase === "resources.verify" && event.status === "ready")
+        if (events.length === 2) {
+          expect(events[1]).toMatchObject({ mode: "metadata", hashedFiles: 0, cachedFiles: 2 })
+          break
+        }
+        if (retry === 399) throw Error("RESTORED_CACHE_NOT_READY")
+        await Bun.sleep(10)
+      }
+    } finally {
+      await restored.close()
+    }
+  } finally {
+    await host.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 15_000)
+
+test("Host retains prewarm wait cancellation before any browser child starts", async () => {
+  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE")
+  const directory = await mkdtemp(join(tmpdir(), "loginom-prewarm-wait-")),
+    root = join(directory, "profile"),
+    resources = join(directory, "resources")
+  const binary = process.platform === "win32" ? "bin/node.exe" : "bin/node"
+  await mkdir(join(resources, "bin"), { recursive: true })
+  await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await copyFile(node, join(resources, binary), constants.COPYFILE_FICLONE)
+  await writeFile(join(resources, "browser"), "")
+  await truncate(join(resources, "browser"), 512 * 1024 * 1024)
+  const hash = createHash("sha256"),
+    block = Buffer.alloc(1024 * 1024)
+  for (let i = 0; i < 512; i++) hash.update(block)
+  await writeFile(
+    join(resources, "resource-manifest.json"),
+    JSON.stringify({
+      protocol: 1,
+      nodeVersion: "24.19.0",
+      node: binary,
+      browser: "browser",
+      files: [
+        {
+          path: binary,
+          sha256: createHash("sha256")
+            .update(Buffer.from(await Bun.file(node).arrayBuffer()))
+            .digest("hex"),
+        },
+        { path: "browser", sha256: hash.digest("hex") },
+      ],
+    }),
+  )
+  await writeFile(
+    join(resources, "runtime/src/knowledge-entry.mjs"),
+    `process.on('message',m=>{
+    if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.generation,started:true}});
+    if(m.operation==='list')process.send({id:m.id,result:{tools:[]}});
+    if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+  });`,
+  )
+  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+  try {
+    const checking = host.api
+      .check({ revision: 0, url: "https://example.test", username: "fixture", password: { operation: "empty" } })
+      .catch((error) => error)
+    for (let i = 0; i < 1000; i++) {
+      if (
+        (
+          await Bun.file(join(root, "startup-phases.jsonl"))
+            .text()
+            .catch(() => "")
+        ).includes('"phase":"resources.wait"')
+      )
+        break
+      if (i === 999) throw Error("PREWARM_WAIT_NOT_OBSERVED")
+      await Bun.sleep(5)
+    }
+    host.beginClose()
+    expect((await checking).message).toBe("LOGINOM_HOST_CLOSED")
+    const evidence = await Bun.file(join(root, "validation/startup-failures.jsonl")).text()
+    expect(evidence).toContain('"phase":"resources.wait"')
+    expect(evidence).toContain("LOGINOM_HOST_CLOSED")
+    expect(await readdir(join(root, "validation"))).not.toContain("generations")
   } finally {
     await host.close()
     await rm(directory, { recursive: true, force: true })

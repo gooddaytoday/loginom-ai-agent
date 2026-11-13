@@ -11,9 +11,7 @@ import { closeManagedResources } from "./managed-resources-close.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
-import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
-import { createBridge } from "../client/lib/bridge.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
@@ -190,6 +188,9 @@ async function handle(message) {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
+      // Connection validation never needs the executor's large dependency tree.
+      const { createSession } = await import("../client/lib/session.mjs")
+      const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:join(directory,'browser-downloads'),
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
