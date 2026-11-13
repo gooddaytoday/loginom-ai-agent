@@ -18,7 +18,8 @@ test('Grouping unique_count is advertised and resolves string/integer with count
  assert.ok(groupingMeasureSchema.properties.function.enum.includes('unique_count'));
  validateGroupingParameters(parameters,'aggregate',request);
  assert.deepEqual(resolveGroupingParameters(parameters,fields).functions,[{name:'Customer',mask:258},{name:'CustomerId',mask:256}]);
- for(const type of ['real','boolean','datetime','variant']){
+ assert.deepEqual(resolveGroupingParameters(parameters,fields.map(f=>f.name==='CustomerId'?{...f,type:'real'}:f)).functions,[{name:'Customer',mask:258},{name:'CustomerId',mask:256}]);
+ for(const type of ['boolean','datetime','variant']){
   assert.throws(()=>resolveGroupingParameters(parameters,fields.map(f=>f.name==='CustomerId'?{...f,type}:f)),/incompatible/);
  }
  for(const fn of ['concat','list']){
@@ -56,7 +57,9 @@ test('Grouping preserves saved unique_count masks, refusing unknown bits and inc
   await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
   assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);
  }
- const c=structuredClone(configuration);c.measures[1].type='real';
+ const real=structuredClone(configuration);real.measures[1].type='real';
+ assert.equal((await configureGrouping(channel(real),{})).preservation.unchanged,true);
+ const c=structuredClone(configuration);c.measures[1].type='boolean';
  await assert.rejects(configureGrouping(channel(c),{}),/unsupported/);
  assert.throws(()=>groupingOutputDefinitions(c),/Unsupported/);
 });
