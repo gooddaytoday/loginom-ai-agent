@@ -269,3 +269,153 @@ test("truncated diagnostics preserve the exact first bytes across output chunks"
   assert.equal(result.ok, false)
   assert.equal(result.output, expected)
 })
+
+test("external reference paths are refused before TypeScript without a build result", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "external.d.ts")
+  await writeFile(external, "declare const syntheticExternal: string")
+  await writeFile(join(input.work, "src/main.tsx"), `/// <reference path="${external.replaceAll("\\", "/")}" />
+export {}`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, "external reference unexpectedly compiled")
+  assert.match(result.output, /reference.*src\//)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("ambient type references are refused before TypeScript", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), '/// <reference types="node" />\nexport {}')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false)
+  assert.match(result.output, /reference types="node".*запрещён/)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("raw imports of owned external files are refused before TypeScript", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "external.txt")
+  await writeFile(external, "synthetic external content")
+  await writeFile(join(input.work, "src/main.tsx"), `import x from "${external.replaceAll("\\", "/")}?raw"; document.body.textContent = x`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false)
+  assert.match(result.output, /с параметрами запрещён/)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("source glob imports are refused before TypeScript", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import.meta.glob("/**"); export {}')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false)
+  assert.match(result.output, /import\.meta\.glob запрещён/)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("source URL assets cannot read an owned external file", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "external.txt")
+  await writeFile(external, "synthetic external content")
+  await writeFile(join(input.work, "src/main.tsx"), `document.body.textContent = new URL(${JSON.stringify(external.replaceAll("\\", "/"))}, import.meta.url).href`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /new URL.*import\.meta\.url.*запрещён/)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("CSS URL assets must stay inside captured src", async t => {
+  const input = await fixture(t)
+  await mkdir(dirname(input.out), { recursive: true })
+  await writeFile(join(dirname(input.out), "external.woff2"), Buffer.alloc(16, 1))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), '@font-face { font-family: synthetic; src: url(../../../external.woff2) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("CSS imports cannot read an owned external stylesheet", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "external.css")
+  await writeFile(external, "body { color: rebeccapurple }")
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), `@import "${external.replaceAll("\\", "/")}";`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("quoted CSS URLs with a closing parenthesis still cannot escape src", async t => {
+  const input = await fixture(t)
+  await mkdir(dirname(input.out), { recursive: true })
+  await writeFile(join(dirname(input.out), "external).woff2"), Buffer.alloc(16, 1))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/style.css"), '@font-face { font-family: synthetic; src: url("../../../external).woff2") }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /CSS.*только на файл внутри src\//)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("module imports outside the dashboard contract are refused before TypeScript", async t => {
+  for (const [specifier, message] of [
+    ["./logo.png?url", /с параметрами запрещён/],
+    ["lodash", /не входит в шаблон dashboard/],
+    ["recharts/../../../../package.json", /не входит в шаблон dashboard/],
+  ]) await t.test(specifier, async t => {
+    const input = await fixture(t)
+    await writeFile(join(input.work, "src/logo.png"), Buffer.from("synthetic image"))
+    await writeFile(join(input.work, "src/main.tsx"), `import x from ${JSON.stringify(specifier)}; console.log(x)`)
+    const result = await buildDashboard(input)
+    assert.equal(result.ok, false, result.output)
+    assert.match(result.output, message)
+    assert.doesNotMatch(result.output, /error TS/)
+    assert.deepEqual(await readdir(input.out), [])
+  })
+})
+
+test("type-only imports cannot read an owned external module", async t => {
+  const input = await fixture(t)
+  const external = join(dirname(input.work), "external.ts")
+  await writeFile(external, "export type X = string")
+  await writeFile(join(input.work, "src/main.tsx"), `import type { X } from ${JSON.stringify(external.replaceAll("\\", "/"))}; const x: X = "synthetic"; console.log(x)`)
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /по абсолютному пути или адресу запрещён/)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("nested CSS imports are checked before Vite can inline them", async t => {
+  const input = await fixture(t)
+  await mkdir(dirname(input.out), { recursive: true })
+  await writeFile(join(dirname(input.out), "external.woff2"), Buffer.alloc(16, 1))
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./a.css"; export {}')
+  await writeFile(join(input.work, "src/a.css"), '@import "./b.css";')
+  await writeFile(join(input.work, "src/b.css"), '@font-face { font-family: synthetic; src: url(../../../external.woff2) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, false, result.output)
+  assert.match(result.output, /b\.css:.*CSS.*только на файл внутри src\//)
+  assert.doesNotMatch(result.output, /error TS/)
+  assert.deepEqual(await readdir(input.out), [])
+})
+
+test("local font assets inside src build successfully", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), 'import "./style.css"; export {}')
+  await writeFile(join(input.work, "src/font.woff2"), Buffer.alloc(16, 1))
+  await writeFile(join(input.work, "src/style.css"), '@font-face { font-family: synthetic; src: url(./font.woff2) }')
+  const result = await buildDashboard(input)
+  assert.equal(result.ok, true, result.output)
+  const assets = join(result.dir, "assets")
+  const css = (await readdir(assets)).find(name => name.endsWith(".css"))
+  assert.ok(css)
+  assert.match(await readFile(join(assets, css), "utf8"), /@font-face/)
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), result.hash + "\n")
+})

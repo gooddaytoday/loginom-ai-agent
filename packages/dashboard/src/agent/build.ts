@@ -4,7 +4,7 @@ import { existsSync } from "node:fs"
 import { cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, unlink, writeFile } from "node:fs/promises"
 import { dirname, extname, join, relative, sep } from "node:path"
 
-export const PLATFORM_FILES = ["index.html", "tsconfig.json", "env.d.ts", "vite.config.mjs"]
+export const PLATFORM_FILES = ["index.html", "tsconfig.json", "env.d.ts", "vite.config.mjs", "resolver.mjs", "scan.mjs"]
 let commits = Promise.resolve()
 const OUTPUT = 8_192
 const TYPES = new Set([".ts", ".tsx", ".css", ".json", ".svg", ".png", ".jpg", ".webp", ".woff2"])
@@ -57,6 +57,7 @@ export async function buildDashboard(input: { work: string; template: string; no
       output = Buffer.concat([output, Buffer.from(chunk).subarray(0, OUTPUT - output.length)])
     }
     for (const args of [
+      ["scan.mjs"],
       ["node_modules/typescript/bin/tsc", "--noEmit", "--pretty", "false", "-p", "tsconfig.json"],
       ["node_modules/vite/bin/vite.js", "build", "--configLoader", "native", "--base", "./", "--outDir", "dist", "--emptyOutDir", "--logLevel", "warn"],
     ]) {
