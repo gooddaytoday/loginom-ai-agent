@@ -132,7 +132,7 @@ test("secrets planted in the real profile stores never reach any archived byte",
       `runtime/generations/1/chats/${sha("ses_target")}/attempts/a1/session.json`,
     ].sort(),
   )
-  for (const file of manifest.files.filter((file: any) => file.status === "included"))
+  for (const file of manifest.files.filter((file: any) => file.status === "included") as any[])
     expect(file).toMatchObject({ size: archive.files.get(file.name)!.length, sha256: sha(archive.files.get(file.name)!) })
 })
 
