@@ -574,6 +574,7 @@ first column of the array branch), CSV, Save, cold.
    `start --head <SHA> --scenarios <name> --pair "$PAIR" --cold` and foreground `wait`.
    Add its file patterns/scenario hint to `required-checks.py`; for an additive
    contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
+   `required-checks.py verify` results: `exit 0`, `FAIL`, `NOT_RUN`, `CI`, `COVERED`, `APPROVED` (formats and summary in `required-checks.md`).
 
 Offline tests: from `scripts/node-acceptance/tests`, run
 `python3 -m unittest test_run_check test_run_check_build test_catalog_delta -v`.
