@@ -7,7 +7,8 @@ import {validatePythonParameters} from '../lib/python-parameters.mjs';
 import {configurePython} from '../lib/python-procedure.mjs';
 import {pythonConfigurationReadback} from '../lib/python-readback.mjs';
 import {readPythonOutputs} from '../lib/python-output.mjs';
-import {makePythonColumnsCode} from '../lib/python-columns.mjs';
+import {makePythonColumnsCode,configurePythonColumnsPage} from '../lib/python-columns.mjs';
+import vm from 'node:vm';
 import {validateNodeApplyEnvelope} from '../lib/node-api.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 
@@ -195,4 +196,63 @@ test('f-string literal text, escaped braces and nested specs stay admitted; only
   assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
  assert.equal(inspectPythonSourcePolicy('x = f"{open(1)}"\n').reason,'name:open');
  assert.equal(inspectPythonSourcePolicy('x = f"{1}}"\n').reason,'fstring_braces');
+});
+
+// Fake columns page: Add → EditColumnDefForm → type picker → Apply. After each
+// Apply, `cover` probes of elementFromPoint hit a foreign mask (closing editor),
+// as on mas3 (LAB-1640: second Add refused 'Python column control covered').
+function columnsPage({cover=0,coverAfterApply=false,missingType=null,deadline=Date.now()+20000}={}){
+ const root='MF;TF;WizrdMCF',base=root+';PythonColumnsWizard',form=root+';EditColumnDefForm',els=new Map(),cmps=new Map();
+ const names={1:'Логический',2:'Дата/Время',3:'Вещественный',4:'Целый',5:'Строковый'};
+ const records=[],at=new Map();let open=false,pickerShown=false,draft=null,covering=coverAfterApply?0:cover,probes=0,clicks=0,ids=0;
+ const el=(tid,x,y,visible=()=>true)=>{const e={id:'e'+(++ids),tid,getAttribute:k=>k==='data-tid'?tid:null,checkVisibility:()=>visible(),
+  getBoundingClientRect:()=>({x:x-5,y:y-5,width:10,height:10}),contains:o=>o===e,closest:()=>e};if(tid)els.set(tid,e);at.set(x+','+y,e);return e;};
+ const mask={className:'x-mask',closest:()=>null};
+ const grid=el(base+';grdTargetColumns;tbl',300,300);cmps.set(grid.id,{el:{dom:grid},getStore:()=>({isLoading:()=>false,getData:()=>({items:records.map(data=>({data}))})})});
+ el(base+';btnAddMappingColumn',10,10);
+ const formEl=el(form,500,500,()=>open);
+ const field=(key,get)=>{const e=el(form+';'+key,500,400+ids,()=>open);cmps.set(e.id,{el:{dom:e},getValue:get,getRawValue:get});};
+ field('edtName',()=>draft?.name);field('edtDisplayName',()=>draft?.label);field('cbxDataKind',()=>'Непрерывный');
+ const pickerEl=el(null,700,700,()=>pickerShown),types=Object.entries(names).filter(([v])=>Number(v)!==missingType).map(([v,t])=>({data:{Value:Number(v),DisplayText:t}}));
+ const nodes=types.map((r,i)=>{const n=el(null,700,720+i*20,()=>pickerShown);n.record=r;return n;});
+ const combo=el(form+';cbxDataType',500,600,()=>open);
+ cmps.set(combo.id,{el:{dom:combo},getValue:()=>draft?.type,getStore:()=>({getData:()=>({items:types})}),picker:{el:{dom:pickerEl},getNode:r=>nodes.find(n=>n.record===r),getRecord:n=>n.record}});
+ const document={querySelectorAll:q=>{const e=els.get(JSON.parse(q.slice(10,-1)));return e?[e]:[];},
+  elementFromPoint:(x,y)=>{probes++;if(covering>0){covering--;return mask;}return at.get(x+','+y)??null;}};
+ const context=vm.createContext({document,Ext:{getCmp:id=>cmps.get(id)}});
+ const page={
+  evaluate:async(fn,arg)=>{try{return await vm.runInContext('('+fn.toString()+')',context)(arg);}catch(error){throw Error('page.evaluate: Error: '+error.message);}},
+  waitForTimeout:async ms=>new Promise(r=>setTimeout(r,Math.min(ms,5))),
+  mouse:{click:async(x,y)=>{clicks++;const e=at.get(x+','+y);
+   if(e?.tid===base+';btnAddMappingColumn'){open=true;draft={name:'',label:'',type:6};}
+   else if(e?.record&&pickerShown){draft.type=e.record.data.Value;pickerShown=false;}
+   else throw Error('click outside a control');}},
+  locator:selector=>{const tid=JSON.parse(selector.slice(10,selector.indexOf(']')));const key=tid.slice(form.length+1);return {
+   count:async()=>open&&['edtName','edtDisplayName'].includes(key)?1:0,
+   fill:async v=>{draft[key==='edtName'?'name':'label']=v;},press:async()=>{},
+   click:async()=>{if(!open)throw Error('hidden');if(key==='cbxDataType;trg_picker')pickerShown=true;
+    else if(key==='btnApply'){records.push({Name:draft.name,DisplayName:draft.label,DataType:draft.type});open=false;draft=null;if(coverAfterApply)covering=cover;}
+    else if(key==='btnCancel'){open=false;draft=null;}},
+   waitFor:async()=>{}};}};
+ const task={binding:{workflow_ref:{prefix:'MF;TF'}},columns:declared.map(c=>({...c,code:{integer:4,real:3,string:5,boolean:1,datetime:2}[c.type]})),deadline};
+ const readNode=async()=>({verified:true,surface:'wizard',document_id:'doc',workflow_id:'wf',node_id:'py'});
+ return {run:()=>configurePythonColumnsPage(page,task,readNode),records,get probes(){return probes;}};
+}
+
+test('declared columns wait out a transient cover over Add after Apply and still refuse a lasting one',{timeout:30000},async()=>{
+ const transient=columnsPage({cover:3,coverAfterApply:true});
+ const ok=await transient.run();
+ assert.equal(ok.status,'SUCCEEDED',ok.error);assert.deepEqual(ok.columns,declared);
+ const lasting=columnsPage({cover:1e9,coverAfterApply:true,deadline:Date.now()+20000}),started=Date.now();
+ const refused=await lasting.run();
+ assert.equal(refused.status,'AMBIGUOUS');assert.equal(refused.cleanup_complete,true);assert.equal(lasting.records.length,1);
+ assert.match(refused.error,/Python column control covered by x-mask/);
+ assert.ok(Date.now()-started<15000,'a lasting cover is refused before the operation deadline');
+});
+
+test('declared columns refuse at once when the open type picker lacks the wanted option',async()=>{
+ const f=columnsPage({missingType:2,deadline:Date.now()+3000}),started=Date.now();
+ const r=await f.run();
+ assert.equal(r.status,'AMBIGUOUS');assert.match(r.error,/type option missing: Дата\/Время/);assert.equal(r.cleanup_complete,true);
+ assert.ok(Date.now()-started<1500,'no polling until the deadline');
 });

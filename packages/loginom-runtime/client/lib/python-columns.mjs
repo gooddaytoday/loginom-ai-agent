@@ -20,7 +20,7 @@ export async function configurePythonColumnsPage(page,task,readNode){
   const shown=e=>e?.checkVisibility?.({checkVisibilityCSS:true})===true;
   const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')].filter(shown);
   const point=e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);
-   if(!hit||!(hit===e||e.contains(hit)))throw Error('Python column control covered');return {x,y};};
+   if(!hit||!(hit===e||e.contains(hit)))throw Error('Python column control covered by '+(hit?.closest?.('[data-tid]')?.getAttribute('data-tid')||String(hit?.className||hit?.tagName||'nothing')).slice(0,160));return {x,y};};
   if(mode==='inventory'){
    const grids=exact(base+';grdTargetColumns;tbl'),grid=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id),store=grid?.getStore?.(),records=store?.getData?.()?.items;
    if(grid?.el?.dom!==grids[0]||!Array.isArray(records)||store.isLoading?.())throw Error('Python columns grid unavailable');
@@ -41,13 +41,16 @@ export async function configurePythonColumnsPage(page,task,readNode){
   if(mode==='type'){
    const combo=cmp('cbxDataType'),picker=combo?.picker,items=combo?.getStore?.()?.getData?.()?.items??[];
    const matches=items.filter(r=>r.data.Value===extra.value&&(r.data.DisplayText===undefined||r.data.DisplayText===extra.label));
-   if(matches.length!==1||!picker?.el?.dom||!shown(picker.el.dom))throw Error('Python column type option unavailable: '+extra.label);
+   if(!picker?.el?.dom||!shown(picker.el.dom)||!items.length)throw Error('Python column type option unavailable: '+extra.label);
+   if(matches.length!==1)throw Error('Python column type option missing: '+extra.label);
    const node=picker.getNode(matches[0]);if(!node||picker.getRecord(node)!==matches[0])throw Error('Python column type option unbound');
    return point(node);
   }
   throw Error('Unknown Python columns inspection');
  },{root,base,mode,extra});
- const settle=async(check)=>{for(;;){try{const value=await check();if(value)return value;}catch(error){if(!/covered|unavailable|Unique Python column editor/.test(error.message))throw error;}await page.waitForTimeout(Math.min(100,remaining()));}};
+ // Transient states (editor closing, mask/animation over a control, picker not
+ // shown yet) are polled; a bounded wait rethrows the last observed refusal.
+ const settle=async(check,limit=Infinity)=>{const until=Date.now()+limit;for(;;){try{const value=await check();if(value)return value;}catch(error){if(!/covered|unavailable|Unique Python column editor/.test(error.message))throw error;if(Date.now()>=until)throw error;}await page.waitForTimeout(Math.min(100,remaining()));}};
  const labels={1:'Логический',2:'Дата/Время',3:'Вещественный',4:'Целый',5:'Строковый'};
  try{
   const node=await readNode(page,b);
@@ -59,7 +62,7 @@ export async function configurePythonColumnsPage(page,task,readNode){
   for(const [index,column] of task.columns.entries()){
    if(inventory.columns[index]&&same(inventory.columns[index],wanted[index]))continue;
    if(inventory.columns[index])throw Error('Existing declared column '+column.name+' differs in type or label');
-   const add=await inspect('button',{name:'btnAddMappingColumn'});effect=true;await page.mouse.click(add.x,add.y);
+   const add=await settle(()=>inspect('button',{name:'btnAddMappingColumn'}),10000);effect=true;await page.mouse.click(add.x,add.y);
    let dialog=await settle(()=>inspect('dialog'));formTid=dialog.form;
    const fill=async(key,value)=>{const input=page.locator('[data-tid='+JSON.stringify(formTid+';'+key)+'] input:visible');if(await input.count()!==1)throw Error('Unique Python column field required: '+key);
     await input.fill(value,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});};
