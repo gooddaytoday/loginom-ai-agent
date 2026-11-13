@@ -256,7 +256,7 @@ jobs:
       - name: Install locked CLI dependencies
         uses: ./.github/actions/setup-bun
         with:
-          install-flags: --frozen-lockfile --linker hoisted --ignore-scripts --network-concurrency=1
+          install-flags: --frozen-lockfile --linker hoisted --ignore-scripts
       - name: Setup Loginom pinned inputs
         uses: ./.github/actions/setup-loginom-inputs
       - name: Build native CLI with the production Node Host
