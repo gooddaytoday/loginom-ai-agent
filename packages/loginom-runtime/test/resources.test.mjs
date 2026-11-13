@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { copyFile, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { constants } from "node:fs"
 import { createHash } from "node:crypto"
 import { spawn } from "node:child_process"
@@ -93,7 +93,7 @@ test("host verification uses its pinned Node identity and binds the session proo
     const identity = { nodePath: join(root, "node"), nodeVersion: process.versions.node }
     const verified = await verifyResources(root, identity)
     assert.match(verified.manifestHash, /^[a-f0-9]{64}$/)
-    assert.equal((await verifyResources(root, { ...identity, manifestHash: verified.manifestHash })).browserPath, join(root, "browser"))
+    assert.equal((await verifyResources(root, { ...identity, manifestHash: verified.manifestHash })).browserPath, join(await realpath(root), "browser"))
     await assert.rejects(verifyResources(root, { ...identity, nodeVersion: "0.0.0" }), /LOGINOM_RESOURCES_INVALID/)
     await writeFile(join(root, "browser"), "tampered")
     await assert.rejects(verifyResources(root, identity), /LOGINOM_RESOURCE_HASH_MISMATCH/)
