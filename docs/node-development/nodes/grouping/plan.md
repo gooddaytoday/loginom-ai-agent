@@ -131,7 +131,13 @@ run-check не менялись, native-пробы не было (её дела�
 (`processors/func/aggregation-functions.md`, «Мода»). Пустой вход справка
 не описывает. Кросс-таблица 7.4.2 на тех же типах (`transform-crosstable/discovery.md:55-62`)
 даёт min/max/first/last с типом входа, у Variant — native subtype; Variant Min
-считает NULL нижним значением. Огр. 7.4.2 для Группировки пока не выявлено.
+считает NULL нижним значением.
+
+**Огр. 7.4.2 (по справке, сверить вопросом пробы 1).** «Список» (concat) —
+только строковый и целый тип: это сказано текстом в `aggregation-functions.md`,
+поэтому concat для real/date/Boolean/Variant не планируется. Сумма, среднее,
+медиана и СКО вне integer/real — тоже огр. 7.4.2. Этот вывод опирается на
+восстановленный порядок столбцов, проба его подтверждает.
 
 **Что мешает в коде.** `grouping-parameters.mjs:6` (`inputTypes`) пускает
 median/stddev только для integer, mode/null_count/first/last/only/unique_count/concat —
