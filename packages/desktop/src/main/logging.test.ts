@@ -357,6 +357,18 @@ test("the Desktop archive follows the selected session, its chat and the chosen 
   expect(await previewDiagnosticsFile(ready.id, "chat/session.json")).toBeUndefined()
 })
 
+test("only crash dumps are taken from the crash directory", async () => {
+  const fixture = sessionFixture()
+  put(join(paths.crashDumps, "settings.dat"), "crashpad settings")
+  put(join(paths.crashDumps, "pending/a.meta"), "crashpad metadata")
+  for (const include of [{}, { dumps: true }]) {
+    const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat, include })
+    expect(ready.files.filter((file) => file.name.startsWith("crashpad/")).map((file) => file.name)).toEqual([
+      "crashpad/pending/a.dmp",
+    ])
+  }
+})
+
 test("Save as offers Downloads, writes the previewed archive privately and honours cancel", async () => {
   const fixture = sessionFixture()
   const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat })

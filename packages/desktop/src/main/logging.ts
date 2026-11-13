@@ -216,7 +216,8 @@ async function buildDesktopArchive(request: Partial<DiagnosticsRequest>) {
         ...(include.logs
           ? [{ dir: root, prefix: "desktop" }, ...serverLogRoots().map((dir, i) => ({ dir, prefix: `server-${i + 1}` }))]
           : []),
-        ...(include.logs || include.dumps ? [{ dir: app.getPath("crashDumps"), prefix: "crashpad" }] : []),
+        // Crashpad keeps settings and report metadata beside the dumps; only dumps are diagnostics.
+        ...(include.logs || include.dumps ? [{ dir: app.getPath("crashDumps"), prefix: "crashpad", match: /\.dmp$/i }] : []),
       ],
       attachDumps: include.dumps,
       knownSecrets: known.secrets,
