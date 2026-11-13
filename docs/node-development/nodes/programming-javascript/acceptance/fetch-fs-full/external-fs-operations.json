@@ -1,0 +1,28 @@
+{
+  "http": [],
+  "files": {
+    "source.bin": "00017f80ff",
+    "archive/final.bin": "00017f",
+    "patched.bin": "4101000000"
+  },
+  "inventory": [
+    {
+      "path": "archive/final.bin",
+      "kind": "file"
+    },
+    {
+      "path": "patched.bin",
+      "kind": "file"
+    },
+    {
+      "path": "source.bin",
+      "kind": "file"
+    },
+    {
+      "path": "archive",
+      "kind": "directory"
+    }
+  ],
+  "tls_failed_handshakes": 0,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}

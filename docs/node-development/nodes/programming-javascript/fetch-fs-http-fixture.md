@@ -1,9 +1,13 @@
 # Управляемый HTTP fixture для Fetch/FS
 
 Предложение LAB-1549 для полного [GitHub #69](https://github.com/gooddaytoday/loginom-ai-agent/issues/69).
-Разворачивает владелец на mas. Этот документ не запускает сервис.
-Источник запросов — сервер Loginom, а не браузер или CLI. Предполагаемый HTTP
-origin — `http://10.200.13.132:18080`; HTTPS-порт согласует владелец.
+Разворачивает владелец. Этот документ не запускает сервис.
+Источник запросов — сервер Loginom, а не браузер или CLI. Исходный LAN
+origin `http://10.200.13.132:18080` недоступен по подтверждённой пробе.
+Решение от 13.11: предварительно внутри VM сервера Loginom на localhost;
+доступ к VM ещё не выдан. Origin и HTTPS-порт назначает владелец.
+`FIXTURE_BASE_URL` — полный data prefix, например `http://localhost:18080/runs/example-run`,
+а `FIXTURE_TLS_BASE_URL` — соответствующий HTTPS data prefix.
 Для каждого прогона выделяется уникальный `run_id`. Все пути данных начинаются
 с `/runs/{run_id}`. Данные искусственные, авторизация пользовательских сервисов
 не используется. До приёмки подтвердить доступность обоих портов из JS-узла.
@@ -28,6 +32,7 @@ origin — `http://10.200.13.132:18080`; HTTPS-порт согласует вл�
 | GET `/redirect/307` | 307, тот же Location | пустое тело |
 | GET `/slow?ms=3000` | 200 JSON после 3000 мс | `{"ready":true}`; задержка до headers, монотонный таймер |
 | POST `/receipts` | 201, JSON | request `{"id":"A","amount":"37.50"}` → `{"accepted":true,"sequence":1}`; sequence увеличивается на каждый фактический POST |
+| POST `/reports` | 201, JSON | тело — точные байты summary.csv из совместной задачи → `{"accepted":true,"sequence":1}`; тот же счётчик регистрации данного run |
 | PUT `/draft` | 200 JSON | request `{"value":"draft"}` → `{"stored":true}`; заменяет только draft данного run |
 | PATCH `/draft` | 200 JSON | request `{"value":"final"}` → `{"stored":true}` |
 | DELETE `/draft` | 200 JSON | `{"deleted":true}`; удаляет только draft данного run |
@@ -40,8 +45,18 @@ origin — `http://10.200.13.132:18080`; HTTPS-порт согласует вл�
 Для TLS-проверки нужны журнал handshake на fixture и отдельная удачная HTTP
 контрольная проба: пустой HTTP ledger сам по себе не доказывает TLS-ошибку.
 Текст ошибки сохранять как evidence, oracle сравнивает её класс/исход.
+TLS завершается до HTTP path: связывать handshake с run_id по URL невозможно.
+Для отрицательной TLS-пробы выделить отдельный listener/порт данному run
+и вернуть его в FIXTURE_TLS_BASE_URL. Админ GET
+`/admin/runs/{run_id}/tls-handshakes` возвращает записи вида
+`{"run_id":"example-run","listener_id":"tls-example-run","failed":true,"at":"2026-11-13T12:00:00.000Z"}`.
+Не смешивать два одновременных прогона на одном TLS listener. Reset очищает
+также этот журнал после завершения listener. Oracle отдельно требует одну
+failed handshake и табличный tls_error; HTTP ledger остаётся без `/tls`.
 Для `/slow` фиксировать получение запроса и закрытие клиентского соединения;
-abort не доказывает отмену серверного эффекта. Не отправлять POST на внешний URL.
+abort не доказывает отмену серверного эффекта. Публичный POST `/anything`
+отдельно разрешён владельцем только для нативного исследования; приёмочные
+POST выполняются на этом управляемом fixture.
 
 ## Ledger и административный доступ
 

@@ -1,4 +1,4 @@
-# LAB-1549: этап 0 остановлен на доступности LAN
+# LAB-1549: первоначальный checkpoint LAN (до продолжения)
 
 База `v040@8b6462aaf26bb7767089f77a6203a8e224ac5d58`, mas3, 13.11.2026; runtime не менялся, CLI не собирался.
 Собственная назначенная worker/reviewer пара; отдельные headless Chromium 1246/Node 24.19.0 (DISPLAY отсутствует), только `https://app.loginom.ai/app/?testable=true`.
@@ -12,9 +12,9 @@ Preview: обычная таблица `Case:String, Value:String`; `InputTable`
 Evidence во вложении карточки: `09-network-result.json:376–396` (data-tid `JavaScriptOutputPreviewForm;normalHeaderCt;0_2`/`1_2`, `0_3`/`1_3`), исходник `05-network-only-source.txt`, screenshot. Load1/load5: до исследования 1.91/1.00, после остановки 1.92/3.17, итог 2.02/2.70; точный старт проб не снят, класс нагрузки не заявляется.
 Первая смешанная Preview-проба остановлена до получения сетевого итога; мастер остался под loading mask. Новый профиль/пакет второй роли дал результат выше. Это операторская диагностика, не FAIL/PASS автономного run-check; профили сохранены без discard, процессы браузера закрыты.
 Подготовлены предложения [HTTP fixture](fetch-fs-http-fixture.md) и [контракта](fetch-fs-contract.md); существующие [пробы и комплекты LAB-842](fetch-fs-discovery.md) остаются историческими, их PASS не переносится.
-Не выполнены из-за stop: новые FS-пробы/пути saved-unsaved-moved, полный Fetch API/async/cancel, новые бизнес-задачи/oracle/expected, измеренная предложенная карточка знаний и окончательный план циклов. Нельзя считать полный #69 или этап 0 завершённым.
+На момент этого checkpoint не выполнены из-за stop: новые FS-пробы/пути saved-unsaved-moved, полный Fetch API/async/cancel, новые бизнес-задачи/oracle/expected, измеренная предложенная карточка знаний и окончательный план циклов. Нельзя считать полный #69 или этап 0 завершённым.
 Предварительный порядок этапа 1: GET (2 цикла), async/errors (2–3), POST/методы (2–3), FS read/write (2–3), FS операции (2–3), zero-input (1–2), совместный сценарий/CLI (2–3); всего 13–19 циклов, ориентир 1000–1800 строк вместе с тестами, уточнить после оставшихся проб.
 Локальные кандидаты: `javascript-module-policy.mjs:33`, `javascript-parameters.mjs:17–19`, `javascript-code-node.mjs:71–78,338–363`, `javascript-managed-source-adapter.mjs`, `javascript-source-admission.mjs`, `javascript-execution-continuation.mjs`, JS knowledge/tests и skill reference. Общий execution/cancel не менять; необходимость неаддитивной общей правки — отдельный stop.
 Замер базы: `node --test test/model-schema-budget.test.mjs`, exit 0, 195 PASS; model_tool_bytes=8051/20000, full_input_schema_bytes=83935 (без предела, модели не отправляется), card без mode=14007, с script=17527/12000. Превышение 5527 Б требует сокращения на этапе 1; старое исключение теста лимит владельца не отменяет.
 SKILL.md=33031/40000 Б, routing=156/~200 Б (без LF), reference=3558/6000 Б. Этот частичный docs-PR не меняет модельный текст: размеры после него те же; это не прогноз размеров окончательного расширения и не разрешение поднять бюджеты.
-Следующий шаг после решения владельца о доступном fixture: закончить нативную матрицу и приёмочный комплект, утвердить критерии полного #69, затем начинать runtime red→green и run-check по точному SHA.
+После принятия LAN-пробы владелец разрешил продолжить без fixture: актуальные результаты и полный комплект — [нативная матрица](fetch-fs-native-matrix.md). Этот checkpoint сохраняет историю первой части.

@@ -1,0 +1,18 @@
+{
+  "http": [],
+  "files": {
+    "keep.txt": "4b454550"
+  },
+  "inventory": [
+    {
+      "path": "keep.txt",
+      "kind": "file"
+    },
+    {
+      "path": "denied.txt",
+      "kind": "file"
+    }
+  ],
+  "tls_failed_handshakes": 0,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}

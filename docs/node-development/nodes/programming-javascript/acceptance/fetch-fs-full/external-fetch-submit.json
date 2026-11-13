@@ -1,0 +1,26 @@
+{
+  "http": [
+    {
+      "method": "POST",
+      "suffix": "/receipts",
+      "body_hex": "7b226964223a2241222c22616d6f756e74223a2233372e3530227d",
+      "content_type": "application/json"
+    },
+    {
+      "method": "POST",
+      "suffix": "/receipts",
+      "body_hex": "7b226964223a2242222c22616d6f756e74223a22382e3530227d",
+      "content_type": "application/json"
+    },
+    {
+      "method": "POST",
+      "suffix": "/receipts",
+      "body_hex": "7b226964223a2243222c22616d6f756e74223a22302e3030227d",
+      "content_type": "application/json"
+    }
+  ],
+  "files": {},
+  "inventory": [],
+  "tls_failed_handshakes": 0,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}

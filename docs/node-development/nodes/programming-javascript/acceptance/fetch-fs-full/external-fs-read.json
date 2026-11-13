@@ -1,0 +1,29 @@
+{
+  "http": [],
+  "files": {
+    "utf8.txt": "d09fd180d0b8d0b2d0b5d1822c20d081d0b60a3432",
+    "utf16le.txt": "01043604",
+    "cp1251.txt": "a8e6",
+    "bytes.bin": "00017f80ff"
+  },
+  "inventory": [
+    {
+      "path": "bytes.bin",
+      "kind": "file"
+    },
+    {
+      "path": "cp1251.txt",
+      "kind": "file"
+    },
+    {
+      "path": "utf16le.txt",
+      "kind": "file"
+    },
+    {
+      "path": "utf8.txt",
+      "kind": "file"
+    }
+  ],
+  "tls_failed_handshakes": 0,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}

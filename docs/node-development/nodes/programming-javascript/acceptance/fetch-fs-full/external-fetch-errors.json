@@ -1,0 +1,32 @@
+{
+  "http": [
+    {
+      "method": "GET",
+      "suffix": "/missing",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/failure",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/malformed",
+      "body_hex": "",
+      "content_type": null
+    },
+    {
+      "method": "GET",
+      "suffix": "/slow?ms=3000",
+      "body_hex": "",
+      "content_type": null
+    }
+  ],
+  "files": {},
+  "inventory": [],
+  "tls_failed_handshakes": 1,
+  "scope": "one explicit execution; configure/read must have an empty effect delta"
+}
