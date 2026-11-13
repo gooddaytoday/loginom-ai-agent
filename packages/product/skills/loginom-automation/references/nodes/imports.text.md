@@ -12,6 +12,21 @@ Native preview FIRST; compare ORIGINAL text.
 garbled: fresh `dock_storage_source`, `CP1251`. No rare types proof.
 Reuse after download/sampling with full sample settings.
 
+After upload/preview, target the SAME existing Import with its returned ref.
+Preview Close does not save settings. Send complete source/format/columns,
+not a type-only patch. Example `parameters` below: replace receipt IDs and
+source_path with the verified delivery's exact destination; adapt CSV settings.
+Every column needs unique technical name, label, type, data_kind and used;
+source_name alone is insufficient. Preserve the original header in source_name
+when renaming. No duplicate names. Use finish:"done" before the final calculation.
+<!-- existing-import-example -->
+```json
+{"source":{"kind":"verified_delivery","artifact_id":"from-delivery","upload_operation_id":"deliver:upload"},"settings":{
+"source":{"source_path":"/owned/upload.csv","encoding":"UTF-8","first_line_as_title":true,"rows_to_skip":0},
+"format":{"delimiter":",","decimal_separator":".","null_marker":"?","text_qualifier":"\"","auto_detect_columns":"none"},
+"columns":[{"name":"Id","label":"Id","type":"integer","data_kind":"Дискретный","used":true}]}}
+```
+
 Import output renames/types: edit SAME Import's `settings.columns`, no Reform.
 "Do not reconfigure CSV loading": keep `settings.source`/`settings.format`/`mappings`,
 fields/order; edit requested fields only. Deliver this session's attachment with

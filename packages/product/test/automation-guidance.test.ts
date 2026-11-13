@@ -3,6 +3,24 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
+test("existing import after preview has a complete production-valid settings example", async () => {
+  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/imports.text.md", import.meta.url)).text()
+  const example = settings.match(/<!-- existing-import-example -->\n```json\n([\s\S]*?)\n```/)
+  expect(example).not.toBeNull()
+  const parameters = JSON.parse(example![1])
+  expect(parameters.source.kind).toBe("verified_delivery")
+  expect(parameters.settings.source.source_path).toStartWith("/")
+  const checked = Bun.spawnSync([
+    process.execPath,
+    "--eval",
+    `import { validateInitialExistingImportSettings } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/text-import-procedure.mjs", import.meta.url).href)};
+     const p=JSON.parse(process.argv[1]);validateInitialExistingImportSettings(p.settings,p.settings.source.source_path);`,
+    JSON.stringify(parameters),
+  ])
+  expect(checked.exitCode, checked.stderr.toString()).toBe(0)
+  expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
+})
+
 test("missing Loginom connection directs the user to settings without searching for credentials", async () => {
   const browser = await Bun.file(new URL("../skills/loginom-automation/references/browser.md", import.meta.url)).text()
   expect(skill).toMatch(/LOGINOM_CONFIG_REQUIRED[\s\S]*?unconfigured[\s\S]*?references\/browser.md/)
