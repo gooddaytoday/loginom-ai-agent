@@ -1,18 +1,32 @@
 import {makeExcelExportContextCode,readExcelExportContext,readExcelExportBrowser} from './exports-excel-context.mjs';
 import {readPreparedNodeContext} from './node-context.mjs';
-import {EXCEL_EXPORT_FIELDS,validateExcelExportDestination,validateNativeExcelExport} from './exports-excel-parameters.mjs';
+import {EXCEL_EXPORT_FIELDS,validateExcelExportDestination,validateExcelSheetName,validateNativeExcelExport} from './exports-excel-parameters.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createHash} from 'node:crypto';
 const need=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export async function configureExcelExport(channel,p,ctx,options){
  const binding={document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node};
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Excel export configuration deadline elapsed');};
- const native=async()=>{guard();const r=await options.execute(makeExcelExportContextCode(binding));guard();need(r.verified&&r.stage==='excel_export','Excel export context unavailable: '+r.reason);await options.onRecord({phase:'excel_export_native_read',operation_id:options.operation.id,configuration:r});return r;};
+ const native=async()=>{guard();const r=await options.execute(makeExcelExportContextCode(binding,options.variableMapping));guard();need(r.verified&&r.stage==='excel_export','Excel export context unavailable: '+r.reason);await options.onRecord({phase:'excel_export_native_read',operation_id:options.operation.id,configuration:r});return r;};
  const readUi=()=>channel.observe({condition:'bound Excel export',ready:s=>s.wizard?.stage==='excel_export'});
  const one=xs=>{need(xs.length===1,'Unique Excel export control required');return xs[0];};
  let current=await native();const initial=current;
  const request=options.operation.nodeApply.request,mode=request.mode??'xlsx';
- const requested=request.target.kind==='new'?{file_type:mode==='xls'?0:1,destination:p.destination,sheet_name:p.sheet_name,header:p.header,number_format:p.number_format??'general',decimal_count:p.decimal_count??2,divide_thousands:p.divide_thousands??false}:p;
+ for(const key of ['destination','sheet_name']){
+  const wanted=p.bindings?.[key]?.variable;
+  if(wanted===undefined&&p[key]===undefined)continue;
+  if(wanted!==undefined){
+   const fields=options.variableMapping?.fields?.filter(f=>f.name===wanted&&f.source&&f.type===5&&!f.is_null)??[];
+   need(fields.length===1,'Excel binding requires one connected non-NULL string variable: '+key);
+   if(key==='destination')validateExcelExportDestination(fields[0].value,options.storageDirectories);
+   else validateExcelSheetName(fields[0].value);
+  }
+  if(wanted!==undefined&&(current.values[key].variable!==true||current.values[key].variable_name!==wanted)||wanted===undefined&&current.values[key].variable){
+   const result=await runExcelExportNext({binding,before:current,variableMapping:options.variableMapping,change_binding:{key,variable:wanted??null},origin:options.targetOrigin,operation_id:options.operation.id+':excel-bind-'+key,deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
+   need(result.status==='SUCCEEDED'&&result.cleanup_complete,'Excel binding unconfirmed: '+key);current=await native();
+  }
+ }
+ const requested=request.target.kind==='new'?{file_type:mode==='xls'?0:1,...(p.destination!==undefined?{destination:p.destination}:{}),...(p.sheet_name!==undefined?{sheet_name:p.sheet_name}:{}),header:p.header,number_format:p.number_format??'general',decimal_count:p.decimal_count??2,divide_thousands:p.divide_thousands??false}:p;
  const settings=Object.fromEntries(['file_type','destination','sheet_name','header','number_format','decimal_count','divide_thousands'].filter(key=>Object.hasOwn(requested,key)).map(key=>[key,requested[key]]));
  for(const [key,value]of Object.entries(settings)){
   if(key==='overwrite')continue;
@@ -46,7 +60,7 @@ export async function configureExcelExport(channel,p,ctx,options){
   error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'text_export_unsupported_retained'};throw error;
  }
  const destination=validateExcelExportDestination(current.values.destination.value,options.storageDirectories);
- const result=await runExcelExportNext({binding,before:current,destination,overwrite:p.overwrite??'reject',origin:options.targetOrigin,operation_id:options.operation.id+':excel-next',deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
+ const result=await runExcelExportNext({binding,before:current,variableMapping:options.variableMapping,destination,overwrite:p.overwrite??'reject',origin:options.targetOrigin,operation_id:options.operation.id+':excel-next',deadline:Math.min(ctx.deadline,Date.now()+15000)},ctx,options);
  need(result.status==='SUCCEEDED'&&result.cleanup_complete,'Excel export Next uncertain');
  if(result.output.rejected){const closed=await options.close(channel);const e=Error('Excel destination exists; reject policy preserved it');e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:closed.cleanup_complete,settings_unchanged:true,verification:'text_export_conflict_rejected'};throw e;}
  configured.destination_check=result.output;
@@ -64,12 +78,12 @@ export async function excelExportNext(page,task,readNode,readContext,readBrowser
  let effect=false;const result=(status,code,output={},cleanup=false)=>({status,action_key:'node.export.next',action_revision:'1',operation_id:task.operation_id,phase:'export_next',effect_possible:effect,cleanup_complete:cleanup,output,error:code?{code,message:code}:null,trace});
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),base=task.binding.workflow_ref.prefix+';WizrdMCF;';
  const remaining=()=>{if(page[Symbol.for('loginom-dock.text-export-cancel')]?.has(task.operation_id))throw Error('Export Next cancelled');const n=task.deadline-Date.now();if(!Number.isSafeInteger(task.deadline)||n<=0)throw Error('Export Next deadline elapsed');return n;};
- const read=async()=>{remaining();const r=await readContext(page,task.binding,readNode,readBrowser,fields);remaining();return r;};
+ const read=async()=>{remaining();const r=await readContext(page,task.binding,readNode,readBrowser,fields,task.variableMapping);remaining();return r;};
  try{
   remaining();
-  if(!['reject','replace'].includes(task.overwrite)||!await page.evaluate(origin=>location.origin===new URL(origin).origin,task.origin))return result('NOT_APPLIED','EXPORT_NEXT_SCOPE',{},true);
+  if(!task.change_binding&&!['reject','replace'].includes(task.overwrite)||!await page.evaluate(origin=>location.origin===new URL(origin).origin,task.origin))return result('NOT_APPLIED','EXPORT_NEXT_SCOPE',{},true);
   remaining();
-  const before=await read();if(!before.verified||before.stage!=='excel_export'||!same(before,task.before)||before.values.destination.value!==task.destination)return result('NOT_APPLIED','EXPORT_NEXT_CONTEXT',{},true);
+  const before=await read();if(!before.verified||before.stage!=='excel_export'||!same(before,task.before)||!task.change_binding&&before.values.destination.value!==task.destination)return result('NOT_APPLIED','EXPORT_NEXT_CONTEXT',{},true);
   const click=async(tid,label)=>{
    remaining();const l=page.locator('[data-tid='+JSON.stringify(tid)+']');if(await l.count()!==1)throw Error('ambiguous control');remaining();
    const h=await l.elementHandle();try{
@@ -77,6 +91,32 @@ export async function excelExportNext(page,task,readNode,readContext,readBrowser
     const timeout=Math.min(5000,remaining());if(!ok)throw Error('control blocked');effect=true;await h.click({timeout});remaining();
    }finally{await h.dispose();}
   };
+  if(task.change_binding){
+   const {key,variable:name}=task.change_binding;
+   if(!['destination','sheet_name'].includes(key))return result('NOT_APPLIED','EXPORT_BINDING_SCOPE',{},true);
+   const tid=base+'ExportExcelFilePreviewWizard;'+(key==='destination'?'edtFileName':'edtSheetName');
+   if(name!==null&&(typeof name!=='string'||!(task.variableMapping?.fields??[]).some(f=>f.name===name&&f.source&&f.type===5&&!f.is_null)))return result('NOT_APPLIED','EXPORT_BINDING_SCOPE',{},true);
+   if(before.values[key].variable!==(name!==null)){record('binding_switch_started');await click(tid+';SwitchButton');record('binding_switch_completed');}
+   if(name!==null){
+    const source=task.variableMapping.fields.filter(f=>f.name===name&&f.source&&f.type===5&&!f.is_null);
+    if(source.length!==1||typeof source[0].value!=='string')throw Error('unique observed string variable required');
+    const caption=(source[0].label??name)+' ( '+source[0].value+' )';
+    await page.locator('[data-tid='+JSON.stringify(tid+';VariableControl;trg_picker')+']').waitFor({state:'visible',timeout:Math.min(5000,remaining())});remaining();
+    record('binding_picker_started');await click(tid+';VariableControl;trg_picker');record('binding_picker_completed');
+    const choice=await page.evaluate(({tid,caption})=>{
+     const es=document.querySelectorAll('[data-tid='+JSON.stringify(tid+';VariableControl')+']'),c=es.length===1&&Ext.getCmp(es[0].id);
+     const rows=c?.getStore?.()?.getData?.()?.items;
+     if(!Array.isArray(rows)||rows.filter(r=>r.data.field2===caption).length!==1)return null;
+     const root=c.getPicker?.()?.el?.dom,options=root?[...root.querySelectorAll('[data-tid]')].filter(e=>e.checkVisibility({checkVisibilityCSS:true})&&e.textContent.trim()===caption):[];
+     return options.length===1&&options[0].getAttribute('data-tid').startsWith(tid+';VariableControl;boundlist;')?options[0].getAttribute('data-tid'):null;
+    },{tid,caption});
+    if(!choice)throw Error('unique native variable option required');record('binding_choice_started');await click(choice,caption);record('binding_choice_completed');
+   }
+   const after=await read();
+   if(!after.verified||after.stage!=='excel_export'||after.values[key].variable!==(name!==null)||name!==null&&after.values[key].variable_name!==name
+    ||Object.keys(before.values).some(k=>k!==key&&!same(before.values[k],after.values[k])))throw Error('binding readback differs');
+   return result('SUCCEEDED',null,{verified:true,configuration:after},true);
+  }
   record('export_next_click_started');await click(base+'btnNext');record('export_next_clicked');let answered=false,decision=null,lastState=null;
   while(remaining()>0){
    const owner=await readNode(page,task.binding);if(!owner.verified||owner.surface!=='wizard'||owner.node_id!==task.binding.node.node_id)throw Error('owner changed');
