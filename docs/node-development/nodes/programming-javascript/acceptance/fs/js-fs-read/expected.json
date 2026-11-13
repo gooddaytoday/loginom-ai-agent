@@ -39,24 +39,24 @@
           "FileName": "utf8.txt",
           "ByteCount": 21,
           "Text": "Привет, Ёж\n42",
-          "Hex": null
+          "Hex": ""
         },
         {
           "FileName": "utf16le.txt",
           "ByteCount": 4,
           "Text": "Ёж",
-          "Hex": null
+          "Hex": ""
         },
         {
           "FileName": "cp1251.txt",
           "ByteCount": 2,
           "Text": "Ёж",
-          "Hex": null
+          "Hex": ""
         },
         {
           "FileName": "bytes.bin",
           "ByteCount": 5,
-          "Text": null,
+          "Text": "",
           "Hex": "00017f80ff"
         }
       ]

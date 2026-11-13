@@ -2,6 +2,12 @@ These are the filesystem-only cases from the approved stage-zero matrix.
 `task.md` is the model's business request. Fixtures, expected tables and the
 oracle remain private to `run-check`; none is attached to the model conversation.
 
+The read and error tasks leave inapplicable text fields blank: their typed
+expectations require empty strings, not NULL. The paths task explicitly asks
+for NULL when the sidecar is missing and retains that distinct expectation.
+The common table matcher is unchanged; negative controls reject exchanging
+NULL and empty strings in either direction. Independent byte audits are unchanged.
+
 `run-check start --head <sha> --scenarios js-fs-read,js-fs-write,js-fs-operations,js-fs-effects,js-fs-errors,js-fs-paths --pair <pair> --cold`
 followed by `run-check wait <output>` runs the ordinary model, full table, CSV,
 Save, cold and cleanup checks. Repeat with new output directories on the same

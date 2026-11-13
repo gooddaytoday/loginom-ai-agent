@@ -38,12 +38,12 @@
         {
           "Case": "missing",
           "Outcome": "missing",
-          "Text": null
+          "Text": ""
         },
         {
           "Case": "permission",
           "Outcome": "denied",
-          "Text": null
+          "Text": ""
         }
       ]
     }

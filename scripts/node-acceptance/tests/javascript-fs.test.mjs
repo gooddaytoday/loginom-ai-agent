@@ -1,6 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
+import {matchesExpectedOutput} from '../expected-outputs.mjs';
+
+test('FS blank text cells are empty strings while missing sidecar text remains NULL',()=>{
+ const expected=kind=>JSON.parse(readFileSync(new URL(`../../../docs/node-development/nodes/programming-javascript/acceptance/fs/js-fs-${kind}/expected.json`,import.meta.url))).outputs[0];
+ const table=(want,rows)=>({row_count:rows.length,sample_complete:true,precision:{numbers_verified:true},
+  schema:want.columns.map((c,index)=>({index,name:c.name,label:c.name,type:c.type})),
+  sample:rows.map(row=>want.columns.map(c=>({type:c.type,is_null:row[c.name]===null,
+   value:c.type==='integer'?String(row[c.name]):row[c.name]})))});
+ for(const kind of ['read','errors']){
+  const want=expected(kind);
+  const rows=want.rows.map(row=>kind==='read'?{...row,...(row.FileName==='bytes.bin'?{Text:''}:{Hex:''})}
+   :{...row,...(row.Case==='exclusive'?{}:{Text:''})});
+  const actual=table(want,rows);
+  assert.equal(matchesExpectedOutput(actual,want),true,`${kind}: business blank strings must match the cold table`);
+  const wrong=structuredClone(actual);
+  const index=kind==='read'?0:1,column=want.columns.findIndex(c=>c.name===(kind==='read'?'Hex':'Text'));
+  Object.assign(wrong.sample[index][column],{is_null:true,value:null});
+  assert.equal(matchesExpectedOutput(wrong,want),false,`${kind}: NULL must not replace an empty string`);
+ }
+ const want=expected('paths'),actual=table(want,want.rows);
+ assert.equal(matchesExpectedOutput(actual,want),true);
+ const wrong=structuredClone(actual),column=want.columns.findIndex(c=>c.name==='Text');
+ Object.assign(wrong.sample[0][column],{is_null:false,value:''});
+ assert.equal(matchesExpectedOutput(wrong,want),false,'paths: empty text must not replace explicit NULL');
+});
 
 test('FS oracle rejects repeated effects, corrupt bytes, missing/extra files and duplicate ZIP entries',()=>{
  const result=spawnSync('python3',['-B','-c',String.raw`

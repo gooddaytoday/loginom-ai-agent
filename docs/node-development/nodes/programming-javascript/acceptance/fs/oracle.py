@@ -45,8 +45,8 @@ def expected(case):
     if case == 'errors':
         columns = [('Case', 'string'), ('Outcome', 'string'), ('Text', 'string')]
         rows = [{'Case': 'exclusive', 'Outcome': 'exists', 'Text': 'KEEP'},
-                {'Case': 'missing', 'Outcome': 'missing', 'Text': None},
-                {'Case': 'permission', 'Outcome': 'denied', 'Text': None}]
+                {'Case': 'missing', 'Outcome': 'missing', 'Text': ''},
+                {'Case': 'permission', 'Outcome': 'denied', 'Text': ''}]
     elif case == 'effects':
         columns = [('Case', 'string'), ('Outcome', 'string'), ('DestinationBytes', 'integer')]
         rows = [{'Case': 'clone_force', 'Outcome': 'failed', 'DestinationBytes': 0}]
@@ -54,8 +54,8 @@ def expected(case):
         columns = [('FileName', 'string'), ('ByteCount', 'integer'), ('Text', 'string'), ('Hex', 'string')]
         codecs = {'utf8.txt': 'utf8', 'utf16le.txt': 'utf-16le', 'cp1251.txt': 'cp1251'}
         rows = [{'FileName': name, 'ByteCount': len(data[name]),
-                 'Text': data[name].decode(codecs[name]) if name in codecs else None,
-                 'Hex': None if name in codecs else data[name].hex()} for name in names]
+                 'Text': data[name].decode(codecs[name]) if name in codecs else '',
+                 'Hex': '' if name in codecs else data[name].hex()} for name in names]
     else:
         columns = [('FileName', 'string'), ('ByteCount', 'integer'), ('Hex', 'string')]
         rows = [{'FileName': name, 'ByteCount': len(data[name]), 'Hex': data[name].hex()} for name in names]
