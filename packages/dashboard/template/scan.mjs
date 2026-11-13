@@ -80,7 +80,8 @@ function cssReferences(code, file) {
       continue
     }
     if (token[0] === "word") {
-      word = token[1].toLowerCase()
+      // PostCSS may keep a comma separator and the next function name in one word.
+      word = token[1].split(",").at(-1).toLowerCase()
       continue
     }
     if (token[0] === "(") {
@@ -129,6 +130,5 @@ function isMetaProperty(node, name) {
 }
 
 function unwrap(node) {
-  if (node && ts.isParenthesizedExpression(node)) return unwrap(node.expression)
-  return node
+  return node && ts.skipOuterExpressions(node)
 }
