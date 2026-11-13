@@ -1374,7 +1374,7 @@ if (permission.permission === "dashboard_publish") return false
 
 **Files:**
 - Create: `O/src/cli/standalone-dashboard.ts`, `O/test/cli/standalone-dashboard.test.ts`
-- Modify: `O/src/cli/standalone-run.ts`, `O/src/cli/cmd/run.ts` (≈977)
+- Modify: `O/src/cli/standalone-run.ts`, `O/src/cli/cmd/run.ts` (≈977), `O/test/fixture/standalone.ts` (необязательный boolean, отключающий подстановку `--dir` только в тестовом вызове dashboard; прежние вызовы неизменны)
 
 **Interfaces:**
 - Produces:
@@ -1412,7 +1412,7 @@ export function dashboardFlag(args: string[], mode: "run" | "tui") {
 }
 ```
 
-- [ ] **Step 4: `standalone-run.ts`.** До запуска хоста: `const dashboard = dashboardFlag(filtered, mode)`; `"invalid"` → `failure("CLI_ARGUMENT_INVALID", 2)`. После чтения `status`: если `dashboard` задан — `!status.value.generation` → `failure("LOGINOM_CONFIG_REQUIRED", 2)`; затем `prepareDashboard({ id, origin: new URL(status.value.url).origin, dashboards: dashboardDataRoot(process.env), template: join(bundle.resources, "dashboard", "template") })` (окружение профиля CLI уже содержит `LOGINOM_AI_AGENT_CLI_ROOT`); ошибка → `failure("DASHBOARD_SNAPSHOT_UNAVAILABLE", 1)`; успех → аргументы разбора — `["--dir", target.directory, ...dashboard.rest]` (флаг до возможного `--`), `setRunDashboard(dashboardPrompt(target.action, target.fresh))`, а `cleanup.detach` сбрасывает его (`setRunDashboard()`).
+- [ ] **Step 4: `standalone-run.ts`.** До запуска хоста: `const dashboard = dashboardFlag(args, mode)`; `"invalid"` → `failure("CLI_ARGUMENT_INVALID", 2)`. После чтения `status`: если `dashboard` задан — `!status.value.generation` → `failure("LOGINOM_CONFIG_REQUIRED", 2)`; затем `prepareDashboard({ id, origin: new URL(status.value.url).origin, dashboards: dashboardDataRoot(process.env), template: join(bundle.resources, "dashboard", "template") })` (окружение профиля CLI уже содержит `LOGINOM_AI_AGENT_CLI_ROOT`); ошибка → `failure("DASHBOARD_SNAPSHOT_UNAVAILABLE", 1)`; успех → аргументы разбора — `["--dir", target.directory, ...filtered]` (флаг до возможного `--`). Существующее удаление `--headless`/`--no-headless` применять к `dashboard.rest` либо исходным аргументам после проверки dashboard-флага, учитывая разделитель оставшегося массива: фильтр не должен превращать `--dashboard --headless <ID>` в корректный флаг. После успешной подготовки вызвать `setRunDashboard(dashboardPrompt(target.action, target.fresh))`; `cleanup.detach` сбрасывает его (`setRunDashboard()`).
 - [ ] **Step 5: `run.ts`.**
 
 ```ts
