@@ -37,7 +37,29 @@ export function readLinRegressionBrowser(prefix) {
  if(active(partitionBase)){
   const values={},names={train:'SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer',test:'SizeGridForm;colRelativeSize;FloatPropEdit-1;PropContainer;ValueContainer',sampling:'pedSamplingMethod',validation:'ValidationSettings;pedLearnValidationMethod'};
   for(const [key,path] of Object.entries(names)){const c=exactValue(partitionBase+';'+path+';ValueControl');if(!c||!Number.isFinite(c.getValue()))return {verified:false,reason:'linregression_partition'};values[key]=c.getValue();}
-  return {verified:true,kind:'partition',values};
+  const sizes=[];
+  for(const index of [0,1]){
+   const suffix=index?'-1':'',base=partitionBase+';SizeGridForm;',path=';FloatPropEdit'+suffix+';PropContainer;ValueContainer;ValueControl';
+   const absolute_control_tid=base+'colAbsoluteSize'+path,absolute=exactValue(absolute_control_tid),relative=exactValue(base+'colRelativeSize'+path);
+   const cells=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+'colSizeType_'+index)+']')].filter(e=>e.querySelectorAll('img[role=button]').length===1),icons=cells.length===1?cells[0].querySelectorAll('img[role=button]'):[];
+   const identity=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')],icon=icons[0],icon_ref=identity?.document===document?identity.ids?.get(icon):null;
+   if(!absolute||!relative||typeof absolute.isDisabled!=='function'||typeof relative.isDisabled!=='function'||absolute.isDisabled()===relative.isDisabled()
+    ||!Number.isSafeInteger(absolute.getValue())||absolute.getValue()<0||icons.length!==1||typeof icon_ref!=='string'||identity.refs?.get(icon_ref)?.deref()!==icon)return {verified:false,reason:'linregression_partition_units'};
+   for(const key of ['colAbsoluteSize','colRelativeSize']){
+    const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(base+key+';FloatPropEdit'+suffix+';SwitchButton')+']')];
+    if(es.length!==1||globalThis.Ext?.getCmp?.(es[0].id)?.pressed!==false)return {verified:false,reason:'linregression_partition_binding'};
+   }
+   sizes.push({index,unit:absolute.isDisabled()?'percent':'rows',count:absolute.getValue(),absolute_control_tid,icon_ref});
+  }
+  let sequence=null;
+  if(values.sampling===1){
+   const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(partitionBase+';SequenceMethodForm;grdSequence')+']')],grid=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id),store=grid?.getStore?.(),records=store?.getData?.()?.items;
+   if(grid?.el?.dom!==es[0]||store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(records)||records.length!==3||store.getCount?.()!==3
+    ||records.some((r,i)=>!r.isModel||r.data?.SequenceOrder!==i||![0,1,2].includes(r.data?.PartitionType)||r.data?.SizePath!==''))return {verified:false,reason:'linregression_partition_sequence'};
+   sequence=records.map(r=>r.data.PartitionType);
+   if(new Set(sequence).size!==3)return {verified:false,reason:'linregression_partition_sequence'};
+  }
+  return {verified:true,kind:'partition',values,sizes,sequence};
  }
 
  const normBase=prefix+';WizrdMCF;NormTuneWizard;',normRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(normBase.slice(0,-1))+']')];

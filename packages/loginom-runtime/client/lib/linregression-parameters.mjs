@@ -10,7 +10,11 @@ export function validateLinRegressionParameters(p,mode,r){
  if(mode==='elastic')need(p.linear_regression&&typeof p.linear_regression==='object'&&!Array.isArray(p.linear_regression)&&Object.keys(p.linear_regression).length===2&&['lambda_l1','lambda_l2'].every(k=>Number.isFinite(p.linear_regression[k])&&p.linear_regression[k]>=0)&&Number.isFinite(p.linear_regression.lambda_l1+p.linear_regression.lambda_l2)&&p.linear_regression.lambda_l1+p.linear_regression.lambda_l2>0,'elastic requires linear_regression:{lambda_l1:nonnegative finite number,lambda_l2:nonnegative finite number}, with positive sum; no automatic setup, bindings or solver parameters');
  if(p.linear_regression!==undefined&&mode==='enter'){
   const settings=p.linear_regression;
-  need(settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).length===1&&['coefficients','full'].includes(settings.statistics),'enter accepts only linear_regression:{statistics:"coefficients"|"full"}; linear_regression.selection is supported only in forward/backward/stepwise');
+  need(settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).length>0&&Object.keys(settings).every(k=>['statistics','partition'].includes(k))&&(settings.statistics===undefined||['coefficients','full'].includes(settings.statistics)),'enter accepts only linear_regression statistics and partition; linear_regression.selection is supported only in forward/backward/stepwise');
+  if(settings.partition!==undefined){
+   const split=settings.partition;
+   need(split&&typeof split==='object'&&!Array.isArray(split)&&Object.keys(split).length===3&&Object.keys(split).every(k=>['method','train_count','test_count'].includes(k))&&split.method==='sequential'&&Number.isSafeInteger(split.train_count)&&split.train_count>0&&Number.isSafeInteger(split.test_count)&&split.test_count>=0&&Number.isSafeInteger(split.train_count+split.test_count),'partition requires method:"sequential", positive train_count and nonnegative test_count in rows');
+  }
  }else if(p.linear_regression!==undefined&&mode!=='ridge'&&mode!=='lasso'&&mode!=='elastic'){
   const settings=p.linear_regression;
   need(['forward','backward','stepwise'].includes(mode)&&settings&&typeof settings==='object'&&!Array.isArray(settings)&&Object.keys(settings).every(k=>k==='selection'),'linear_regression.selection is supported only in forward/backward/stepwise');

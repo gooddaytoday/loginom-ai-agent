@@ -56,6 +56,50 @@ export async function configureLinRegressionRoles(channel,p,inputMapping,{preser
  return {verified:true,cleanup_complete:true,effect_possible:edits>0,baseline_configuration:baseline,configuration,applied_editors:edits,settings_applied:false};
 }
 
+export async function configureLinRegressionPartition(channel,wanted){
+ const ready=s=>s.wizard?.stage==='learn_partition'&&s.node_linregression?.verified===true&&s.node_linregression.kind==='partition';
+ const observe=condition=>channel.observe({condition,readLinRegression:true,ready});
+ const one=(s,predicate)=>{const es=s.ui.elements.filter(predicate);need(es.length===1,'one owned partition control required');return es[0];};
+ let state=await observe('complete regression training partition');
+ const act=async(condition,key,action)=>{
+  await channel.perform({condition,initialObservation:state,ready,identity:s=>({node:s.prepared_node_context,partition:s.node_linregression}),
+   resolve:s=>({...action,ref:one(s,e=>(e.tid===s.wizard.root_tid+';LearnPartitionWizard;'+key||e.identity?.anchor_tid===s.wizard.root_tid+';LearnPartitionWizard;'+key)&&e.allowed_actions.includes(action.verb)).ref})});
+  state=await observe(condition+' readback');
+ };
+ need(state.node_linregression.values.validation===0,'validation is unsupported');
+ if(!wanted){
+  need(state.node_linregression.sizes.every(s=>s.unit==='percent')&&state.node_linregression.values.train===100&&state.node_linregression.values.test===0,'explicit sequential partition is required for training with a holdout');
+  return state.node_linregression.values;
+ }
+ if(state.node_linregression.values.sampling!==1){
+  await act('open regression sampling methods','pedSamplingMethod;ValueControl;trg_picker',{verb:'click'});
+  const key='pedSamplingMethod;ValueControl;boundlist;Последовательный';
+  state=await channel.observe({condition:'native sequential regression option',readLinRegression:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';LearnPartitionWizard;'+key&&e.allowed_actions.includes('click'))});
+  await act('select sequential regression split',key,{verb:'click'});
+ }
+ need(state.node_linregression.values.sampling===1,'sequential sampling readback differs');
+ if(!same(state.node_linregression.sequence,[0,1,2]))await act('reset train test unused order','SequenceMethodForm;btnGroupPositionReset',{verb:'click'});
+ need(same(state.node_linregression.sequence,[0,1,2]),'train test unused order differs');
+ for(const [index,count] of [wanted.train_count,wanted.test_count].entries()){
+  const unit=state.node_linregression.sizes[index];
+  if(unit.unit==='percent'){
+   await channel.perform({condition:'switch regression partition size to rows',initialObservation:state,ready,identity:s=>({node:s.prepared_node_context,partition:s.node_linregression}),
+    resolve:s=>({verb:'click',ref:one(s,e=>e.ref===s.node_linregression.sizes[index].icon_ref&&e.signature?.tag==='img'&&e.allowed_actions.includes('click')).ref})});
+   state=await observe('regression partition row unit readback');
+  }
+  const current=state.node_linregression.sizes[index];need(current.unit==='rows','partition size unit differs');
+  if(current.count!==count){
+   const key=current.absolute_control_tid.slice((state.wizard.root_tid+';LearnPartitionWizard;').length);
+   await act('fill regression partition row count',key,{verb:'fill',text:String(count)});
+   await act('commit regression partition row count',key,{verb:'press',key:'Tab'});
+  }
+  need(state.node_linregression.sizes[index].count===count,'partition row count readback differs');
+ }
+ const observed=state.node_linregression;
+ need(observed.values.validation===0&&observed.values.sampling===1&&same(observed.sequence,[0,1,2])&&observed.sizes.every((s,i)=>s.unit==='rows'&&s.count===[wanted.train_count,wanted.test_count][i]),'final sequential partition differs');
+ return {method:'sequential',train_count:observed.sizes[0].count,test_count:observed.sizes[1].count};
+}
+
 export async function configureLinRegression(channel,p,{request,inputMapping}){
  const elastic=request.mode==='elastic',lasso=request.mode==='lasso',ridge=request.mode==='ridge',preserve=request.mode==='apply',forward=request.mode==='forward',backward=request.mode==='backward',stepwise=request.mode==='stepwise',selecting=forward||backward||stepwise,method=elastic?6:lasso?5:ridge?4:stepwise?3:backward?2:forward?1:0,methodLabel=ridge?null:stepwise?'Stepwise (Пошаговое включение/исключение)':backward?'Backward (Пошаговое исключение)':forward?'Forward (Пошаговое включение)':'Enter (Принудительное включение)';
  const roles=await configureLinRegressionRoles(channel,p,inputMapping,{preserve});
@@ -77,9 +121,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
   state=await channel.observe({condition:'regression input activated',readLinRegression:true,ready:s=>ready('normalization')(s)&&s.node_linregression.source_status!=='Не активировано'});
  }
  await next('normalization','learn_partition');
- state=await observe('partition','complete regression training partition');
- need(state.node_linregression.values.train===100&&state.node_linregression.values.test===0&&state.node_linregression.values.validation===0,'stage 1 requires 100 percent training, no holdout and no validation');
- const partition=state.node_linregression;
+ const partition=await configureLinRegressionPartition(channel,p.linear_regression?.partition);
  await next('learn_partition','lin_regression');
  state=await observe('parameters','complete regression parameters');
  const control=(s,key,verb)=>one(s,e=>{const tid=s.wizard.root_tid+';'+(s.wizard.stage==='lin_regression_details'?'LinRegressionWizard-1':'LinRegressionWizard')+';'+key;return (e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb);},'Regression control unavailable: '+key);
@@ -219,5 +261,5 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  if(enter&&statistics==='full')need(details.values.pedPredictionIntervalLevel===95,'full coefficient statistics require the native 95% confidence level');
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso||elastic?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{statistics,confidence_level:details.values.pedPredictionIntervalLevel}),normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso||elastic?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{statistics,confidence_level:details.values.pedPredictionIntervalLevel}),normalization:normalization.fields,partition,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }

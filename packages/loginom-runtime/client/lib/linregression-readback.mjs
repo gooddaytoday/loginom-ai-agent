@@ -10,5 +10,5 @@ export function linRegressionConfigurationReadback({node,phases,operation_id}){
  return {kind:'lin_regression',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:structuredClone(node),
   receipt_ids:[input,configured,saved,mapped,finished].map(p=>p.receipt_id),mode:applying?'apply':c.mode??'enter',...(['ridge','lasso','elastic'].includes(c.mode)?{regularization:structuredClone(c.regularization),epsilon:c.epsilon}:{}),...(!applying&&(c.mode??'enter')==='enter'?{statistics:c.statistics??'coefficients',...(c.confidence_level===undefined?{}:{confidence_level:c.confidence_level})}:{}),...(['forward','backward','stepwise'].includes(c.mode)?{selection:structuredClone(c.selection),epsilon:c.epsilon}:{}),
   input_fields:c.fields.filter(f=>f.usage_type===3).map(f=>f.name),target_field:c.target_field,intercept:c.intercept,normalization:'none',
-  training:structuredClone(training),package_persistence_verified:false};
+  ...(c.partition?.method==='sequential'?{partition:structuredClone(c.partition)}:{}),training:structuredClone(training),package_persistence_verified:false};
 }
