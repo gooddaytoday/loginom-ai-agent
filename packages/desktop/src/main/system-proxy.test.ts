@@ -140,6 +140,21 @@ test("stop() settles detection while chromium hangs", async () => {
   expect(Date.now() - started).toBeLessThan(500)
 })
 
+test("Windows detection with an immediate read does not wait for the PowerShell timeout without Chromium", async () => {
+  const started = Date.now()
+  const detection = startSystemProxyDetection({
+    platform: "win32",
+    environment: {},
+    read: async () => ({
+      windows: { autoDetect: false, autoConfigUrl: "", proxy: "", bypass: "" },
+    }),
+  })
+  const result = await detection.result
+  expect(result.state).toBe("direct")
+  expect(result.notices).toEqual([])
+  expect(Date.now() - started).toBeLessThan(9000)
+}, 35_000)
+
 test("Windows detection allows a cold read beyond the former total cap", async () => {
   const detection = startSystemProxyDetection({
     platform: "win32",

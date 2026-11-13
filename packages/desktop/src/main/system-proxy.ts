@@ -37,7 +37,7 @@ export function startSystemProxyDetection(input: {
 } = {}): SystemProxyDetection {
   const environment = input.environment ?? {}
   const windows = (input.platform ?? process.platform) === "win32"
-  const deadlineMs = input.deadlineMs ?? (windows ? WINDOWS_POWERSHELL_TIMEOUT_MS : 8000)
+  const deadlineMs = input.deadlineMs ?? 8000
   const abort = new AbortController()
   let chromium: ((url: string) => Promise<string>) | undefined
   let release = () => undefined as void
@@ -53,7 +53,7 @@ export function startSystemProxyDetection(input: {
   const emptySnapshot: SystemProxySnapshot = {}
   const readPromise = skipped
     ? Promise.resolve({ ok: true as const, snapshot: emptySnapshot })
-    : loadSnapshot(input, abort.signal, deadlineMs)
+    : loadSnapshot(input, abort.signal, windows ? WINDOWS_POWERSHELL_TIMEOUT_MS : deadlineMs)
   const result = Promise.race([detect(), capped]).finally(() => {
     abort.abort()
     clearTimeout(timer)
