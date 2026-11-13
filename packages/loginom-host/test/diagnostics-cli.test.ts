@@ -113,15 +113,88 @@ test("--session exports that session's attempts and chat to --output and prints 
   if (process.platform !== "win32") expect(statSync(output).mode & 0o777).toBe(0o600)
 })
 
-test("--no-chat leaves the chat out; without --session the latest session is used", async () => {
+test("without --session the latest session is used", async () => {
   const profile = await cliProfile()
+  const output = join(profile.base, "latest.zip")
+  const result = await run(["diagnostics", "export", "--output", output], profile)
+  expect(result.code).toBe(0)
+  const { files, manifest } = await unpack(output)
+  expect(manifest).toMatchObject({ selection: "session", chat: "included" })
+  expect(JSON.parse(files.get("chat/session.json")!).info.id).toBe("ses_new")
+  expect([...files.keys()]).toContain(`runtime/generations/1/chats/${sha("ses_new")}/attempts/a1/execution-events.jsonl`)
+  expect([...files.keys()].some((name) => name.includes(sha("ses_old")))).toBe(false)
+})
+
+test("--no-chat never opens the chat database and leaves the chat out", async () => {
+  const profile = await cliProfile()
+  // A database that cannot be read must not matter when the chat is not requested.
+  writeFileSync(join(profile.paths.data, "loginom-ai-agent.db"), "not a database")
   const output = join(profile.base, "nochat.zip")
   const result = await run(["diagnostics", "export", "--no-chat", "--output", output], profile)
   expect(result.code).toBe(0)
   const { files, manifest } = await unpack(output)
-  expect(manifest).toMatchObject({ selection: "session", chat: "not-requested" })
+  expect(manifest).toMatchObject({ selection: "recent", chat: "not-requested" })
+  expect(manifest.chatReason).toBeUndefined()
   expect([...files.keys()].some((name) => name.startsWith("chat/"))).toBe(false)
   expect([...files.keys()]).toContain(`runtime/generations/1/chats/${sha("ses_new")}/attempts/a1/execution-events.jsonl`)
+  expect([...files.keys()]).toContain("cli/loginom-ai-agent.log")
+  // With --session the attempts still follow that session.
+  const selected = join(profile.base, "nochat-session.zip")
+  expect((await run(["diagnostics", "export", "--no-chat", "--session", "ses_old", "--output", selected], profile)).code).toBe(0)
+  const old = await unpack(selected)
+  expect(old.manifest).toMatchObject({ selection: "session", chat: "not-requested" })
+  expect([...old.files.keys()]).toContain(`runtime/generations/1/chats/${sha("ses_old")}/attempts/a1/execution-events.jsonl`)
+})
+
+test("an unreadable chat database leaves the chat unavailable and exports everything else", async () => {
+  for (const damage of ["garbage", "no-tables"] as const) {
+    const profile = await cliProfile()
+    const file = join(profile.paths.data, "loginom-ai-agent.db")
+    rmSync(file)
+    if (damage === "garbage") writeFileSync(file, "SQLite format 3\0" + "x".repeat(4096))
+    else new Database(file, { create: true }).close()
+    for (const args of [[], ["--session", "ses_new"]]) {
+      const output = join(profile.base, `${damage}-${args.length}.zip`)
+      const result = await run(["diagnostics", "export", ...args, "--output", output], profile)
+      expect({ damage, args, code: result.code }).toEqual({ damage, args, code: 0 })
+      expect(result.stderr).toContain("chat: unavailable")
+      expect(result.stderr).not.toContain("SQLITE")
+      const { files, manifest } = await unpack(output)
+      expect(manifest).toMatchObject({ chat: "unavailable", chatReason: "database-unreadable" })
+      expect([...files.keys()].some((name) => name.startsWith("chat/"))).toBe(false)
+      expect([...files.keys()]).toContain(`runtime/generations/1/chats/${sha("ses_new")}/attempts/a1/execution-events.jsonl`)
+      expect([...files.keys()]).toContain("cli/loginom-ai-agent.log")
+    }
+  }
+})
+
+test("credentials of an earlier connection are masked in an older chat after switching accounts", async () => {
+  const profile = await cliProfile()
+  const store = connectionStore(join(profile.paths.loginom, "connection"), cliCredentials("linux"))
+  await store.stage({
+    generation: 2,
+    revision: 1,
+    url: "https://app.loginom.ai",
+    username: "fixture-cli-other",
+    apiKey: "fixture-cli-other-key",
+    password: "fixture-cli-other-pass",
+  })
+  await store.activate(2)
+  // Plain text, no credential assignment: only known values can mask it.
+  const db = new Database(join(profile.paths.data, "loginom-ai-agent.db"))
+  db.run("INSERT INTO part VALUES ('prt_plain', 'msg_ses_old', 'ses_old', ?)", [
+    JSON.stringify({ type: "text", text: "signed in as fixture-cli-person with fixture-cli-loginom-pass" }),
+  ])
+  db.close()
+  const output = join(profile.base, "switched.zip")
+  expect((await run(["diagnostics", "export", "--session", "ses_old", "--output", output], profile)).code).toBe(0)
+  const { raw, files, manifest } = await unpack(output)
+  expect(manifest).toMatchObject({ chat: "included", knownSecrets: "ok" })
+  expect(files.get("chat/session.json")).toContain("signed in as")
+  const bytes = Buffer.concat([raw, ...[...files].flatMap(([name, text]) => [Buffer.from(name), Buffer.from(text)])])
+  for (const value of ["fixture-cli-loginom-pass", "fixture-cli-loginom-key", "fixture-cli-person"])
+    for (const variant of [value, Buffer.from(value).toString("base64")])
+      expect({ variant, found: bytes.includes(Buffer.from(variant)) }).toEqual({ variant, found: false })
 })
 
 test("the default output is loginom-diagnostics-<stamp>.zip in the working directory and is never overwritten", async () => {

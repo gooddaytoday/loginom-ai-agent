@@ -60,18 +60,30 @@ export async function diagnosticsCommand(args: string[], paths: DiagnosticsProfi
     return 1
   }
   try {
-    const store = await openSessions(join(paths.data, "loginom-ai-agent.db"))
     let chatStatus = parsed.values["no-chat"] ? "not-requested" : "unavailable"
+    let chatReason: string | undefined
     let chat: unknown
     let sessionID = session
-    try {
-      sessionID ??= store?.latest()
-      if (!parsed.values["no-chat"] && store && sessionID) {
-        chat = store.export(sessionID)
-        chatStatus = chat ? "included" : "not-found"
+    // --no-chat never opens the chat database. A damaged or incomplete database
+    // leaves the chat unavailable; runtime and logs are exported anyway.
+    if (!parsed.values["no-chat"]) {
+      let store: Awaited<ReturnType<typeof openSessions>>
+      try {
+        store = await openSessions(join(paths.data, "loginom-ai-agent.db"))
+        sessionID ??= store?.latest()
+        if (store && sessionID) {
+          chat = store.export(sessionID)
+          chatStatus = chat ? "included" : "not-found"
+        }
+      } catch {
+        chat = undefined
+        chatStatus = "unavailable"
+        chatReason = "database-unreadable"
+      } finally {
+        try {
+          store?.close()
+        } catch {}
       }
-    } finally {
-      store?.close()
     }
     const installed = options.installed ?? resolve(dirname(process.execPath), "..")
     const resources = environment.LOGINOM_AI_AGENT_CLI_BUNDLE ?? join(installed, "resources", "loginom")
@@ -99,6 +111,7 @@ export async function diagnosticsCommand(args: string[], paths: DiagnosticsProfi
         versions: process.versions,
         knownSecrets: known.status,
         chat: chatStatus,
+        ...(chatReason ? { chatReason } : {}),
       },
     })
     writeFileSync(target, zip, { mode: 0o600, flag: "wx" })
