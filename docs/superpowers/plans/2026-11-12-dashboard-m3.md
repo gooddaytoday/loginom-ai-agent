@@ -1302,16 +1302,16 @@ process.stdout.write(JSON.stringify({ ok: state === "ready" && errors.length ===
 
 **Files:**
 - Create: `P/src/agent/publish.ts`, `P/test/agent/publish.test.mjs` (в `test:browser`: нужен `template/node_modules`)
-- Modify: `P/package.json` (`test:browser` + `test/agent/publish.test.mjs`), `packages/app/src/context/permission-auto-respond.ts`, `packages/app/src/context/permission-auto-respond.test.ts`, `.github/workflows/test.yml` (задача `unit`: установка набора шаблона), `O/src/tool/dashboard.ts` (`DashboardPublishTool`), `O/src/product/tool-contributor.ts`, `O/src/product/dashboard-session.ts` (`dashboardRules`), `O/src/session/tools.ts` (≈117 `ask`), `O/test/tool/dashboard.test.ts`, `O/test/product/dashboard-session.test.ts`, `packages/app/src/pages/session/composer/session-permission-dock.tsx`, `packages/app/src/i18n/en.ts`, `packages/app/src/i18n/ru.ts`
+- Modify: `P/src/agent/build.ts`, `P/src/agent/folder.ts`, `P/package.json` (`test:browser` + `test/agent/publish.test.mjs`), `packages/app/src/context/permission-auto-respond.ts`, `packages/app/src/context/permission-auto-respond.test.ts`, `.github/workflows/test.yml` (задача `unit`: установка набора шаблона), `O/src/tool/dashboard.ts` (`DashboardPublishTool`), `O/src/product/tool-contributor.ts`, `O/src/product/dashboard-session.ts` (`dashboardRules`), `O/src/session/tools.ts` (≈117 `ask`), `O/test/tool/dashboard.test.ts`, `O/test/product/dashboard-session.test.ts`, `packages/app/src/pages/session/composer/session-permission-dock.tsx`, `packages/app/src/i18n/en.ts`, `packages/app/src/i18n/ru.ts`
 
 **Interfaces:**
-- Consumes: `buildDashboard`, `sourceFiles` (4), `readControl`, `readSample`, `NO_SAMPLE` (7), `LookupResponse` (1).
+- Consumes: `buildDashboard` (4), согласованный `readDashboardSnapshot` и SQLite-примитив (7), `NO_SAMPLE`, `LookupResponse` (1).
 - Produces:
 
 ```ts
 // src/agent/publish.ts
 export function embeddedValues(sample: { rows: unknown[][] }, files: Buffer[]): string[]
-export async function preparePublish(input: { work: string; resources: DashboardResources; signal?: AbortSignal }):
+export async function preparePublish(input: { work: string; operation: string; resources: DashboardResources; signal?: AbortSignal }):
   Promise<{ ok: false; text: string } | { ok: true; control: ControlBinding; build: { hash: string; dir: string } }>
 export async function finishPublish(input: { work: string; control: ControlBinding; build: { hash: string; dir: string }; builds?: string; fetch?: typeof fetch }):
   Promise<{ status: "published" | "failed"; text: string }>
@@ -1333,62 +1333,15 @@ export const dashboardRules: (profile: TaskScope.Profile) => PermissionV1.Rule[]
   - Задача CI `unit` (`.github/workflows/test.yml`) до `bun turbo test` ставит набор шаблона той же командой, что `dashboard-browser` (`npm ci --ignore-scripts` в `packages/dashboard/template` закреплённым Node), — иначе тест подтверждения публикации в CI пропускался бы.
 - [ ] **Step 3: Тесты падают.** → FAIL.
 - [ ] **Step 4: Реализация пакета.**
-
-```ts
-// Every file in src/ counts, including images: the model can write text into any of them.
-export function embeddedValues(sample: { rows: unknown[][] }, files: Buffer[]) {
-  const values = new Set(sample.rows.flat().filter((value) => value !== null).map(String).filter((value) => value.length >= 6))
-  return [...values].filter((value) => files.some((bytes) => bytes.includes(value)))
-}
-
-export async function preparePublish(input: { work: string; resources: DashboardResources; signal?: AbortSignal }) {
-  const sample = await readSample(input.work)
-  if (!sample) return { ok: false as const, text: NO_SAMPLE }
-  const control = await readControl(input.work)
-  const build = await buildDashboard({ work: input.work, template: input.resources.template, node: input.resources.node, out: join(input.work, "..", "control", "draft"), signal: input.signal })
-  if (!build.ok) return { ok: false as const, text: "Сборка не удалась, публикация остановлена.\n" + build.output }
-  const listed = await sourceFiles(input.work)
-  const files = "files" in listed ? listed.files : []
-  const found = embeddedValues(sample, await Promise.all(files.map((file) => readFile(join(input.work, file)))))
-  if (found.length)
-    return {
-      ok: false as const,
-      text: `В исходниках найдены значения из образца данных: ${found.slice(0, 5).map((value) => "«" + value + "»").join(", ")}. Сборка раздаётся без входа, поэтому данные нельзя вшивать в код. Исправьте код и опубликуйте снова.`,
-    }
-  return { ok: true as const, control, build: { hash: build.hash, dir: build.dir } }
-}
-
-export async function finishPublish(input: { work: string; control: ControlBinding; build: { hash: string; dir: string }; builds?: string; fetch?: typeof fetch }) {
-  const builds = input.builds ?? join(homedir(), "loginom-dashboard", "builds")
-  // Temporary until M4: only the stand on this machine, whose web serves this directory.
-  if (!["127.0.0.1", "localhost"].includes(new URL(input.control.origin).hostname) || !existsSync(builds))
-    return { status: "failed" as const, text: "Публикация на этот стенд появится в следующей версии." }
-  const keyDir = join(builds, input.control.key)
-  await mkdir(keyDir, { recursive: true, mode: 0o700 })
-  const target = join(keyDir, input.build.hash)
-  if (!existsSync(target)) {
-    const staging = await mkdtemp(join(keyDir, ".build-"))
-    await cp(input.build.dir, staging, { recursive: true })
-    await rename(staging, target).catch(async (error) => {
-      await rm(staging, { recursive: true, force: true })
-      if (!existsSync(target)) throw error
-    })
-  }
-  await writeFile(join(keyDir, ".current.tmp"), input.build.hash + "\n", { mode: 0o600 })
-  await rename(join(keyDir, ".current.tmp"), join(keyDir, "current"))
-  const response = await (input.fetch ?? fetch)(input.control.origin + "/dashboard/lookup", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input.control.binding),
-    redirect: "error",
-  })
-  const lookup = Schema.decodeUnknownOption(LookupResponse)(response.ok ? await response.json() : undefined)
-  if (Option.isNone(lookup) || lookup.value.hash !== input.build.hash)
-    return { status: "failed" as const, text: "Стенд не показывает новую сборку. Проверьте компоненты dashboard на стенде." }
-  await rm(join(input.work, "sample.json"), { force: true })
-  return { status: "published" as const, text: "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard." }
-}
-```
+  - embeddedValues сохраняет заданную семантику: непустые относительно null ячейки превращаются в строки, уникальные значения длиной от 6 символов ищутся Buffer.includes во всех файлах src, включая бинарные расширения. В сообщении показать не больше пяти значений и объяснить публичность сборки.
+  - preparePublish получает единый согласованный snapshot/control/sample. Каталог operation принадлежит вызывающему на всё время prepare → ask → finish; prepare не создаёт скрытого постоянного состояния. Work разрешить через realpath до вычисления sibling control.
+  - В buildDashboard добавить один специфичный необязательный publication-параметр с sample и operation. После штатной повторной проверки собственной captured src проверить именно её байты, до запуска scanner/tsc/Vite. Живой work после копирования для этой проверки не читать. Сохранить существующие лимиты, Node FS boundary и диагностику; не вводить универсальный observer/callback framework.
+  - Пока builder ещё владеет staging/dist, сохранить приватную копию результата в operation до передачи dist общему control/draft/hash. Обычные current/prune остаются; prepared.build.dir указывает на удержанную копию, которую другие draft-сборки удалить не могут. Не копировать уже опубликованный общий hash после возврата builder. embeddedValues может быть реализован/переэкспортирован без цикла build↔publish.
+  - finishPublish сохраняет временный local-only контракт: только localhost/127.0.0.1 и существующий каталог builds. Для остальных origin/отсутствующего builds ничего на стенде не менять и вернуть заданный failed текст.
+  - Отдельное SQLite-исключение builds/key удерживается от начала установки до полного bounded lookup/read-back. Второй publisher того же key немедленно получает занятость; другие ключи не блокируются. Переиспользовать Node/Bun SQLite primitive без lease, таблиц, retries или нового lock service.
+  - Hash staging и .current.tmp находятся на том же томе в keyDir. Полная cp предшествует rename hash; current меняется атомарно после установки. Под удержанным key lock уникальный pointer temp не нужен. Старые hash остаются, повтор той же сборки идемпотентен.
+  - После lookup с ожидаемым hash через существующее snapshot-исключение удалить sample только при совпадении исходного snapshotId, включая случай нового снимка с теми же строками. Для этого добавить узкую операцию удаления в folder.ts, не разносить проверку ID и unlink.
+  - Отказ подготовки/пользователя не меняет current; failed lookup сохраняет sample. Исключения освобождаются в finally. Очистка private operation выполняется владельцем после завершения использующих её Promise; orphan collector, M4 publisher/store и долговечная очередь исключены.
 
 - [ ] **Step 5: Бэкенд.** `dashboard-session.ts`:
 
@@ -1397,35 +1350,14 @@ export const dashboardRules = (profile: TaskScope.Profile): PermissionV1.Rule[] 
   profile === "loginom-dashboard" ? [{ permission: "dashboard_publish", pattern: "*", action: "ask" }] : []
 ```
 
-  `tools.ts` (≈117): `ruleset: Permission.merge(input.agent.permission, input.session.permission ?? [], dashboardRules(profile))` — последнее правило побеждает настройки агента и пользователя. `DashboardPublishTool` в `O/src/tool/dashboard.ts`:
+  tools.ts: dashboardRules(profile) добавляется последним при Permission.merge, после настроек агента и сессии/пользователя. Это правило применяется к ctx.ask в SessionTools.resolve, а не только к декларации инструмента.
 
-```ts
-export const DashboardPublishTool = Tool.define(
-  "dashboard_publish",
-  Effect.gen(function* () {
-    const sessions = yield* Session.Service
-    const flags = yield* RuntimeFlags.Service
-    return {
-      description:
-        "Publish the current dashboard draft to the Loginom stand after the user explicitly asked for it. Asks the user to confirm the node and package. Takes no arguments.",
-      parameters: Parameters,
-      execute: (_params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
-        Effect.gen(function* () {
-          const session = yield* sessions.get(ctx.sessionID)
-          const resources = dashboardResources(flags.loginomResources)
-          const prepared = yield* Effect.promise(() => preparePublish({ work: session.directory, resources, signal: ctx.abort }))
-          if (!prepared.ok) return { title: "Публикация dashboard", output: "failed: " + prepared.text, metadata: { truncated: false } }
-          // No "always" patterns: every publication is confirmed again.
-          yield* ctx.ask({ permission: "dashboard_publish", patterns: [prepared.control.nodeName, prepared.control.binding.packagePath], always: [], metadata: {} })
-          const result = yield* Effect.promise(() => finishPublish({ work: session.directory, control: prepared.control, build: prepared.build }))
-          return { title: "Публикация dashboard", output: result.status + ": " + result.text, metadata: { truncated: false } }
-        }).pipe(Effect.orDie),
-    }
-  }),
-)
-```
+  DashboardPublishTool в dashboard.ts принимает пустые Parameters и доступен только в dashboard вместе с draft. При исполнении загрузить sessions.getForExecution, как в существующем dashboard_draft: сохранённый профиль не ослабляется при потере папки. Ресурсы — только из поставки.
 
-  `tool-contributor.ts`: в профиле dashboard оба инструмента.
+  Через Effect.acquireUseRelease создать приватный operation в настоящем control и владеть им до конца prepare → ask → finish. Два ограниченных файловых Promise подготовки/завершения дожидаются окончания перед уборкой при отмене (локальная uninterruptible секция); передавать signal туда, где операция его поддерживает, и ограничить HTTP ожидание. Сам ctx.ask остаётся прерываемым. Не создавать отдельный run manager или повторное состояние согласия.
+
+  После успешного prepare вызвать ctx.ask с permission dashboard_publish, patterns [prepared.control.nodeName, prepared.control.binding.packagePath], always:[], metadata:{}. Только после разового разрешения вызвать finishPublish с удержанными control/build. Ответ инструмента сохраняет title «Публикация dashboard» и status-prefixed output из результата. Освобождение operation не должно обгонять файловую работу; подтверждённый результат не подменять ошибкой вспомогательной уборки.
+
 - [ ] **Step 6a: Без автоответа.** В `permission-auto-respond.ts` тип параметра `permission` у `autoRespondsPermission` и `sessionAutoAccept` — `{ sessionID: string; permission?: string }`; первой строкой обеих функций:
 
 ```ts
@@ -1434,7 +1366,7 @@ if (permission.permission === "dashboard_publish") return false
 ```
 
   `permission.tsx` уже передаёт туда полный `PermissionRequest`; других изменений не нужно.
-- [ ] **Step 6: Окно разрешений.** `session-permission-dock.tsx`: кнопку `ui.permission.allowAlways` обернуть в `<Show when={props.request.always.length > 0}>`. i18n: `settings.permissions.tool.dashboard_publish.description` — ru «Опубликовать dashboard на стенд. Проверьте узел и пакет ниже», en «Publish the dashboard to the stand. Check the node and package below». Проверка: e2e `session-request-docks.spec.ts` дополнить запросом с `always: []` → две кнопки, если e2e приложения запускается в этой среде; иначе — ручная проверка в приёмке (шаг 5) и запись в отчёт задачи.
+- [ ] **Step 6: Окно разрешений.** `session-permission-dock.tsx`: кнопку `ui.permission.allowAlways` обернуть в `<Show when={props.request.always.length > 0}>`. i18n: `settings.permissions.tool.dashboard_publish.description` — ru «Опубликовать dashboard на стенд. Проверьте узел и пакет ниже», en «Publish the dashboard to the stand. Check the node and package below». Проверка: e2e `session-request-docks.spec.ts` дополнить запросом с `always: []` → две кнопки, если e2e приложения запускается в этой среде; иначе — ручная проверка в приёмке задачи 18 и запись в отчёт задачи.
 - [ ] **Step 7: Прогон.** `bun typecheck` в `packages/opencode`, `packages/app`, `packages/dashboard`; тесты шагов 1–2 (в `packages/app` — `bun test src/context/permission-auto-respond.test.ts`) → PASS.
 - [ ] **Step 8: Коммит.** `git commit -m "feat(dashboard): publish drafts to the local stand with confirmation"`.
 
