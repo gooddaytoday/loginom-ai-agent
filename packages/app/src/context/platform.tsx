@@ -7,6 +7,7 @@ import type { DesktopMenuAction } from "../desktop-menu"
 import { ServerConnection } from "./server"
 import type { WslServersPlatform } from "../wsl/types"
 import type { UpdaterPlatform } from "../updater"
+import type { DiagnosticsApi } from "@/utils/diagnostics"
 import type { DraftStore } from "@/utils/draft-store"
 import type { SystemProxyStatus } from "@/system-proxy"
 
@@ -120,6 +121,9 @@ type PlatformBase = {
 
   /** Export collected diagnostic logs (desktop only) */
   exportDebugLogs?(): Promise<string>
+
+  /** Prepare, preview and save a diagnostics archive (desktop only) */
+  diagnostics?: DiagnosticsApi
 
   /** Force focus styles on interactive elements through desktop devtools (desktop only) */
   setForceFocus?(enabled: boolean): Promise<void>

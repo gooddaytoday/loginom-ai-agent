@@ -363,6 +363,9 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/text-export/acceptance/cp1251'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     export_count=2, csv_header='labels', text_export_encodings=['cp1251', 'utf-8'])
+    if name == 'excel-export-variables':
+        src = REPO / 'docs/node-development/nodes/exports-excel/acceptance/variables'
+        return dict(source=src, prompt=src / 'task.md', data=src.parents[1] / 'fixtures', input_files=['modes.csv'], base=None, excel_mode='variables')
     if name in ['excel-export-xls', 'excel-export-numeric', 'excel-export-replace']:
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance'
         mode = name.removeprefix('excel-export-')
@@ -1148,6 +1151,11 @@ def expected_for(case, package, cold=False):
             'expected', '/dev/stdin', 'uniform', package], input=json.dumps(proposal).encode()))
     if case.get('excel_xls_refusal'):
         return dict(package_path=package,nodes=[dict(type='imports.text',label_any=True)],outputs=[],refusal=dict(text='XLS'))
+    if case.get('excel_mode') == 'variables':
+        approved = read(src / 'expected.json')
+        return dict(package_path=package, nodes=[dict(type='imports.text', label_any=True), *approved['nodes']],
+                    outputs=approved['excel_books'], excel_books=approved['excel_books'], excel_variables=True,
+                    excel_bindings=approved['binding_inventory'])
     if case.get('excel_mode'):
         approved = read(src / 'modes/expected.json')
         formats = ['xlsx']  # LAB-1057: XLS is a pre-mutation platform refusal, not a workbook case.
@@ -2058,6 +2066,12 @@ class Runner:
             routes = dict(zip(exports, destinations))
             names = '|'.join(map(re.escape, sorted(exports, key=len, reverse=True)))
             prompt = re.sub(r'(?<![\w-])(?:' + names + r')(?![\w-])', lambda match: routes[match.group()], prompt)
+        if spec.get('excel_mode') == 'variables':
+            prompt = prompt.replace('{{EXCEL_INITIAL_DESTINATION}}', destinations[0]).replace('{{EXCEL_FINAL_DESTINATION}}', destinations[1])
+            expected['variable_inventory'] = dict(outputs=[dict(node=dict(type='variables.calculator'), port=0, ordered=False,
+                variables=[dict(name='ExcelPath', label_any=True, type='string', value=destinations[1]),
+                           dict(name='SheetName', label_any=True, type='string', value='Февраль')])],
+                links=[dict(source=dict(type='variables.calculator'), output=0, target=dict(type='exports.excel'), input=0, kind='variables')])
         if spec.get('text_mask'):
             prompt += '\nВыгрузи и скачай первоначальную таблицу в ' + destinations[0] + '. Новая выгрузка придёт следующим сообщением.'
         if not spec.get('upload_only'):
@@ -2523,6 +2537,47 @@ class Runner:
                     '--case', kind, '--file', actual], folder, timeout=60)
             self.current['csv'] = 'PASS (exact text bytes)'
             return session, expected, actual, ';'
+        if spec.get('excel_mode') == 'variables':
+            successful = [(n, o, o.get('configuration', {}).get('readback', {})) for n, o in replies
+                          if o.get('status') == 'SUCCEEDED' and o.get('execution', {}).get('status') == 'completed'
+                          and o.get('configuration', {}).get('readback', {}).get('kind') == 'excel_export']
+            wanted_bindings = dict(destination=dict(variable='ExcelPath'), sheet_name=dict(variable='SheetName'))
+            stages = []
+            manifest = []
+            for book in expected['excel_books']:
+                matches = [(n, o, r) for n, o, r in successful if r.get('destination') == book['export_destination']
+                           and r.get('settings', {}).get('sheet_name') == book['sheet_name'] and r.get('bindings') == wanted_bindings
+                           and any(f.get('destination') == book['export_destination'] and f.get('bytes', 0) > 0 for f in o.get('output', {}).get('file_artifacts', []))]
+                assert matches, 'EXCEL_VARIABLE_EXPORT_MISSING:' + book['phase']
+                stages.append(matches[0])
+                actual = folder / book['filename']
+                shutil.copyfile(downloaded_csv(profile, book['export_destination']), actual)
+                self.phase('oracle-' + book['phase'], [sys.executable, '-B', src / 'oracle.py', '--verify', book['phase'], actual], folder, timeout=60)
+                manifest.append(dict(file=str(actual), phase=book['phase']))
+            assert stages[0][0] < stages[1][0] and stages[0][1]['node'] == stages[1][1]['node'], 'EXCEL_VARIABLE_SAME_NODE'
+            calculators = [(n, o, o.get('configuration', {}).get('readback', {})) for n, o in replies
+                           if o.get('status') == 'SUCCEEDED' and o.get('execution', {}).get('status') == 'completed'
+                           and o.get('configuration', {}).get('readback', {}).get('kind') == 'variables_calculator']
+            first = [c for c in calculators if c[0] < stages[0][0]]
+            second = [c for c in calculators if stages[0][0] < c[0] < stages[1][0]]
+            assert first and second and first[-1][1]['node'] == second[-1][1]['node'], 'EXCEL_VARIABLE_SAME_CALCULATOR'
+            unchanged = lambda r: [{k: v for k, v in e.items() if k != 'formula'} for e in r['expressions']]
+            assert unchanged(first[-1][2]) == unchanged(second[-1][2]), 'EXCEL_VARIABLE_SOURCE_ONLY_VALUES'
+
+            requests = [event.get('part', {}).get('state', {}).get('input', {}) for _, event in events
+                        if event.get('type') == 'tool_use' and event.get('part', {}).get('tool') == 'loginom_dock_node_apply']
+            assert any(r.get('operation_id') == stages[1][1].get('operation_id') and r.get('target', {}).get('kind') == 'existing'
+                       and r.get('target', {}).get('ref', {}).get('node_id') == stages[1][1]['node']['node_id']
+                       and r.get('parameters') == {} and r.get('finish') == 'execute' for r in requests), 'EXCEL_VARIABLE_EMPTY_REPEAT'
+            assert all(r.get('destination_check', {}).get('existed') is False and r.get('destination_check', {}).get('overwrite') == 'reject'
+                       for _, _, r in stages), 'EXCEL_VARIABLE_REJECT_POLICY'
+
+            final_calls = [o for _, o in replies if o.get('node') == stages[1][1]['node'] and o.get('configuration', {}).get('readback', {}).get('kind') == 'excel_export']
+            assert len({o['node']['node_id'] for o in final_calls}) == 1, 'EXCEL_VARIABLE_NODE_RECREATED'
+            actual = folder / 'excel-books.json'
+            write(actual, manifest)
+            self.current['csv'] = 'PASS (Excel)'
+            return session, expected, actual, ','
         if spec.get('excel_mode'):
             manifest = []
             for book in expected['excel_books']:

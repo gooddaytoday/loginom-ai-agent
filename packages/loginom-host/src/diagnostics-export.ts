@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync } from "node:fs"
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readSync, readdirSync, statSync } from "node:fs"
 import { isIPv6 } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -70,9 +70,34 @@ export type DiagnosticsInput = {
   /** Build provenance and environment; written to manifest.json after redaction. */
   manifest?: Record<string, unknown>
   limits?: Partial<typeof DIAGNOSTICS_LIMITS>
+  /**
+   * Attach crash dumps (`*.dmp`) found among the sources as they are. They hold
+   * process memory and cannot be redacted, so only an explicit user choice sets this.
+   */
+  attachDumps?: boolean
 }
 
 type Source = { name: string; priority: number; entry?: DiagnosticsEntry; chat?: unknown }
+const MAX_DUMP_BYTES = 8 * 1024 * 1024
+
+function readWhole(path: string, limit: number) {
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+  try {
+    const info = fstatSync(fd)
+    if (!info.isFile()) throw Error("not-a-file")
+    if (info.size > limit) throw Error("too-large")
+    const data = Buffer.alloc(info.size)
+    let length = 0
+    while (length < data.length) {
+      const read = readSync(fd, data, length, data.length - length, length)
+      if (!read) break
+      length += read
+    }
+    return data.subarray(0, length)
+  } finally {
+    closeSync(fd)
+  }
+}
 
 export function collectDiagnosticFiles(dir: string, prefix: string, pattern?: RegExp, windowMs = DIAGNOSTICS_LIMITS.windowMs) {
   const cutoff = Date.now() - windowMs
@@ -344,7 +369,14 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
 
   const writer = new ZipWriter(new BlobWriter("application/zip"))
   const files: Array<Record<string, unknown>> = []
-  const prepared: Array<{ source: Source; record: Record<string, unknown>; text: string; rows?: unknown[]; json?: unknown }> = []
+  const prepared: Array<{
+    source: Source
+    record: Record<string, unknown>
+    text: string
+    rows?: unknown[]
+    json?: unknown
+    binary?: Uint8Array
+  }> = []
   let selectedBytes = 0
   for (const source of sources.slice(0, limits.files)) {
     const name = scrub(redactor.text(source.name))
@@ -361,7 +393,12 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
       record.reason = "secret-in-path"
       continue
     }
-    const expected = Math.min(source.entry?.size ?? 0, limits.fileBytes)
+    const dump = input.attachDumps === true && !!source.entry && /\.dmp$/i.test(source.entry.path)
+    const expected = dump ? source.entry!.size : Math.min(source.entry?.size ?? 0, limits.fileBytes)
+    if (dump && expected > MAX_DUMP_BYTES) {
+      record.reason = "dump-too-large"
+      continue
+    }
     if (selectedBytes + expected > limits.archiveBytes - RESERVE) {
       record.reason = "archive-budget"
       continue
@@ -376,6 +413,13 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
         continue
       }
       const entry = source.entry!
+      if (dump) {
+        const binary = readWhole(entry.path, MAX_DUMP_BYTES)
+        Object.assign(record, { originalSize: binary.length, kind: "crash-dump", redacted: false })
+        prepared.push({ source, record, text: "", binary })
+        selectedBytes += binary.length
+        continue
+      }
       const { text, truncated, originalSize } = readBounded(entry.path, limits.fileBytes)
       record.originalSize = originalSize
       record.truncated = truncated
@@ -403,8 +447,20 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
 
   let total = 0
   // Learn credentials across all selected sources before exporting earlier echoes.
-  for (const { source, record, text, rows, json } of prepared) {
+  for (const { source, record, text, rows, json, binary } of prepared) {
     try {
+      if (binary) {
+        if (total + binary.length > limits.archiveBytes - RESERVE) {
+          record.reason = "archive-budget"
+          continue
+        }
+        const name = scrub(redactor.text(source.name))
+        record.name = name
+        await writer.add(name, new BlobReader(new Blob([new Uint8Array(binary)])))
+        total += binary.length
+        Object.assign(record, { status: "included", size: binary.length, sha256: sha256(binary) })
+        continue
+      }
       let cleaned = rows
         ? rows.map((row) => JSON.stringify(redactor.redact(row))).join("\n") + "\n"
         : json !== undefined
@@ -436,6 +492,7 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
   const manifest = {
     ...input.manifest,
     selection: input.sessionID ? "session" : "recent",
+    attachDumps: input.attachDumps === true,
     ...(input.sessionID ? { session: sha256(input.sessionID).slice(0, 16) } : {}),
     limits: { archiveBytes: limits.archiveBytes, fileBytes: limits.fileBytes, recentAttempts: limits.recentAttempts },
     files,
@@ -465,17 +522,37 @@ export async function profileSecrets(input: {
   let status: "ok" | "unavailable" = "ok"
   if (input.loginom) {
     const directory = join(input.loginom, "connection")
+    const generations = join(directory, "generations")
+    let history: string[] = []
+    try {
+      if (lstatSync(generations, { throwIfNoEntry: false })?.isDirectory()) history = readdirSync(generations)
+    } catch {
+      status = "unavailable"
+    }
     // Never create profile directories: read only an existing store.
-    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false })?.isFile()) {
-      try {
-        if (!input.codec) throw Error("codec-unavailable")
-        const active = await connectionStore(directory, input.codec).read()
-        if (active) {
-          secrets.push(active.apiKey, active.password)
-          users.push(active.username)
+    if (lstatSync(join(directory, "connection.json"), { throwIfNoEntry: false })?.isFile() || history.length) {
+      const store = input.codec && connectionStore(directory, input.codec)
+      // Every generation, not only the active one: an older chat may echo the
+      // login and password of an account the profile used before.
+      const reads = store
+        ? [
+            () => store.read(),
+            ...history
+              .filter((name) => /^\d+\.json$/.test(name))
+              .map((name) => () => store.staged(Number(name.slice(0, -5)))),
+          ]
+        : []
+      if (!store) status = "unavailable"
+      for (const read of reads) {
+        try {
+          const connection = await read()
+          if (connection) {
+            secrets.push(connection.apiKey, connection.password)
+            users.push(connection.username)
+          }
+        } catch {
+          status = "unavailable"
         }
-      } catch {
-        status = "unavailable"
       }
     }
   }
@@ -484,7 +561,7 @@ export async function profileSecrets(input: {
       const path = join(input.data, file)
       if (!lstatSync(path, { throwIfNoEntry: false })) continue
       try {
-        collectStrings(JSON.parse(readBounded(path, 1024 * 1024).text), secrets)
+        collectStrings(JSON.parse(readStore(path)), secrets)
       } catch {
         status = "unavailable"
       }
@@ -496,7 +573,7 @@ export async function profileSecrets(input: {
       const path = join(input.dockHome, file)
       if (!lstatSync(path, { throwIfNoEntry: false })) continue
       try {
-        const key = JSON.parse(readBounded(path, 1024 * 1024).text)?.api_key
+        const key = JSON.parse(readStore(path))?.api_key
         if (typeof key === "string") secrets.push(key)
       } catch {
         status = "unavailable"
@@ -515,4 +592,12 @@ function collectStrings(value: unknown, out: string[], depth = 0) {
       if (credentialFields.has(key)) out.push(item)
     } else collectStrings(item, out, depth + 1)
   }
+}
+
+// Credential stores are read only to learn values for masking and are never
+// archived, so a store linked from elsewhere (shared OAuth) is followed.
+function readStore(path: string) {
+  const info = statSync(path)
+  if (!info.isFile() || info.size > 1024 * 1024) throw Error("store-unreadable")
+  return readFileSync(path, "utf8")
 }

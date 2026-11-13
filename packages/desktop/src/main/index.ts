@@ -24,6 +24,9 @@ import {
   configureDiagnosticsExport,
   exportDebugLogs,
   initCrashReporter,
+  prepareDiagnostics,
+  previewDiagnosticsFile,
+  saveDiagnostics,
   initLogging,
   startNetLog,
   startSession,
@@ -405,6 +408,7 @@ const main = Effect.gen(function* () {
     showUpdater: () => showUpdaterDialog(desktopUpdater, true),
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
+    diagnostics: { prepare: prepareDiagnostics, preview: previewDiagnosticsFile, save: saveDiagnostics },
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     setNativeTranslations: (bundle) => {
       if (setNativeTranslations(bundle)) createMenu(menuDeps)
