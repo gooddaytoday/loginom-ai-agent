@@ -1,0 +1,101 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "control.supernode"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "control.supernode",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Note",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Flag",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "Moment",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Doubled",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 3,
+          "Amount": 1.25,
+          "Note": "alpha",
+          "Flag": true,
+          "Moment": "2026-01-03 10:00:00",
+          "Doubled": 2.5
+        },
+        {
+          "RowID": 1,
+          "Amount": null,
+          "Note": "",
+          "Flag": false,
+          "Moment": "2026-01-01 00:00:00",
+          "Doubled": null
+        },
+        {
+          "RowID": 2,
+          "Amount": -2.5,
+          "Note": null,
+          "Flag": true,
+          "Moment": null,
+          "Doubled": -5.0
+        },
+        {
+          "RowID": 2,
+          "Amount": -2.5,
+          "Note": null,
+          "Flag": true,
+          "Moment": null,
+          "Doubled": -5.0
+        },
+        {
+          "RowID": 4,
+          "Amount": 0.0,
+          "Note": "zero",
+          "Flag": null,
+          "Moment": "2026-01-04 12:30:00",
+          "Doubled": 0.0
+        }
+      ]
+    }
+  ]
+}
