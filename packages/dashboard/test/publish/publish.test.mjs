@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
 import { once } from "node:events"
+import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -51,19 +52,20 @@ const text = await readFile("src/text.txt", "utf8")
 await writeFile("dist/index.html", "<p>" + text + "</p>")
 await writeFile("dist/assets/app.js", "console.log(" + JSON.stringify(text) + ")")
 `)
-  const publish = (args = []) => execute(process.execPath, [...args, script, snapshot.id], {
+  const publish = (args = [], environment = {}) => execute(process.execPath, [...args, script, snapshot.id], {
     env: {
       ...process.env,
       PATH: dirname(process.execPath) + ":" + process.env.PATH,
       DASHBOARD_BASE: base,
       DASHBOARD_APPS: join(root, "dashboard/apps"),
       DASHBOARD_BUILDS: buildsRoot,
+      ...environment,
     },
   })
   return { snapshot, sample, publish, keyDir: join(buildsRoot, snapshot.key) }
 }
 
-test("publishing creates a complete hashed build with private metadata and current last", async t => {
+test("publishing creates a complete hashed build with private metadata", async t => {
   const { snapshot, sample, publish, keyDir } = await fixture(t)
   await publish()
   const current = await readFile(join(keyDir, "current"), "utf8")
@@ -76,6 +78,71 @@ test("publishing creates a complete hashed build with private metadata and curre
   assert.deepEqual(JSON.parse(await readFile(join(keyDir, "sample.json"), "utf8")), sample)
   assert.deepEqual((await readdir(keyDir)).sort(), [hash, "binding.json", "current", "sample.json"].sort())
   assert.deepEqual((await readdir(join(keyDir, hash))).sort(), ["assets", "index.html"])
+})
+
+test("concurrent publication rejects before changing dist and succeeds on retry", { timeout: 30_000 }, async t => {
+  const { snapshot, publish, keyDir } = await fixture(t)
+  await writeFile(join(snapshot.sourceDir, "build.mjs"), `
+import { existsSync } from "node:fs"
+import { mkdir, rm, writeFile } from "node:fs/promises"
+const job = process.env.PUBLISH_JOB
+async function wait(name) {
+  const deadline = Date.now() + 20000
+  while (!existsSync(name)) {
+    if (Date.now() > deadline) throw Error("build barrier timeout")
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+}
+await rm("dist", { recursive: true, force: true })
+await mkdir("dist/assets", { recursive: true })
+if (job === "B") {
+  await writeFile("b-empty", "")
+  await wait("release-b")
+}
+await writeFile("dist/index.html", '<script src="./assets/app.js"></script>')
+await writeFile("dist/assets/app.js", JSON.stringify(job))
+if (job === "A") {
+  await writeFile("a-built", "")
+  await wait("release-a")
+}
+`)
+  const wait = async check => {
+    const deadline = Date.now() + 20_000
+    while (!check()) {
+      assert.ok(Date.now() < deadline, "publisher barrier timeout")
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+  }
+  const first = publish([], { PUBLISH_JOB: "A" }).then(value => ({ value }), error => ({ error }))
+  const contenders = [first]
+  try {
+    await wait(() => existsSync(join(snapshot.sourceDir, "a-built")))
+    let finished = false
+    const second = publish([], { PUBLISH_JOB: "B" })
+      .then(value => ({ value }), error => ({ error }))
+      .finally(() => { finished = true })
+    contenders.push(second)
+    await wait(() => finished || existsSync(join(snapshot.sourceDir, "b-empty")))
+    await writeFile(join(snapshot.sourceDir, "release-a"), "")
+    assert.equal((await first).error, undefined)
+    const previous = (await readFile(join(keyDir, "current"), "utf8")).trim()
+    const complete = ["index.html", "assets/app.js"].every(file => existsSync(join(keyDir, previous, file)))
+    await writeFile(join(snapshot.sourceDir, "release-b"), "")
+    const competing = await second
+    assert.ok(complete, "a successful publisher installed an incomplete build")
+    assert.equal(competing.error?.code, 1)
+    assert.match(competing.error.stderr, /Публикация этого приложения уже выполняется/)
+    assert.equal(existsSync(join(snapshot.sourceDir, "b-empty")), false)
+    await publish([], { PUBLISH_JOB: "B" })
+    const current = (await readFile(join(keyDir, "current"), "utf8")).trim()
+    assert.notEqual(current, previous)
+    assert.equal(await readFile(join(keyDir, previous, "assets/app.js"), "utf8"), '"A"')
+    assert.equal(await readFile(join(keyDir, current, "assets/app.js"), "utf8"), '"B"')
+    assert.equal(await readFile(join(keyDir, current, "index.html"), "utf8"), '<script src="./assets/app.js"></script>')
+  } finally {
+    await Promise.all(["release-a", "release-b"].map(name => writeFile(join(snapshot.sourceDir, name), "")))
+    await Promise.all(contenders)
+  }
 })
 
 test("publishing identical bytes reuses the same build directory", async t => {
