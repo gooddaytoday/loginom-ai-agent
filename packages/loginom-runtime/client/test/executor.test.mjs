@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
+import { compactActionResult } from '../lib/user-results.mjs';
 
 test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
   for (const action of ['package.save_checkpoint', 'package.save_as']) {
@@ -74,12 +75,16 @@ test('both saves reuse an already open Packages menu without a closing toggle', 
   }
 });
 
-test('a cleanup failure keeps the original Save exception in its existing trace', async () => {
+test('a cleanup failure reports the original Save exception separately from cleanup', async () => {
   const page = linkPage(), click = page.click.bind(page);
   page.click = async item => { if (item.symbol === 'packages.save_as') throw Error('Primary Save refusal'); return click(item); };
   page.keyboard.press = async () => {};
   const outcome = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/refused.lgp', conflict_policy: 'fail' });
-  assert.equal(outcome.error.code, 'CLEANUP_FAILED');
+  assert.equal(outcome.error.code, 'CAPABILITY_ERROR');
+  assert.equal(outcome.error.message, 'Primary Save refusal');
+  assert.equal(outcome.output.cleanup_error.code, 'CLEANUP_FAILED');
+  assert.equal(outcome.output.cleanup_error.resource, 'transient_dialog');
+  assert.equal(outcome.status, 'AMBIGUOUS');
   assert.equal(outcome.cleanup_complete, false);
   assert.equal(outcome.trace.find(item => item.event === 'action_failed').message, 'Primary Save refusal');
 });
@@ -148,8 +153,8 @@ test('an opened package or missing creation receipt never authorizes layout', as
   }
 });
 
-test('native layout refusal, disabled control, wizard and running package do not fail saving', async () => {
-  for (const mode of ['refused','disabled','wizard','running','missing-button']) {
+test('native layout refusal, disabled control and wizard do not fail saving', async () => {
+  for (const mode of ['refused','disabled','wizard','missing-button']) {
     const page = await arrangePage({ wizard: mode === 'wizard', running: mode === 'running' });
     page.failArrange = mode === 'refused';
     const elements = page.elements.bind(page);
@@ -162,6 +167,78 @@ test('native layout refusal, disabled control, wizard and running package do not
     assert.equal(writes, 1);
     assert.equal(result.trace.find(item => item.event === 'package_arrangement').warning, true);
     assert.equal(page.arrangements, mode === 'refused' ? 1 : 0);
+  }
+});
+
+test('both saves refuse a confirmed running package before any gesture regardless of layout ownership', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) for (const intent of ['new_draft','open_package']) {
+    const page = await arrangePage({ intent, running: true });
+    const clicked = [], click = page.click.bind(page);
+    page.click = async item => { clicked.push(item.symbol); return click(item); };
+    const outcome = await run(page, action, { path: '/user/data/packages/running.lgp', conflict_policy: 'fail' });
+    assert.equal(outcome.status, 'FAILED', JSON.stringify(outcome));
+    assert.equal(outcome.effect_possible, false);
+    assert.equal(outcome.cleanup_complete, true);
+    assert.match(outcome.error.message, /running|locked/i);
+    assert.deepEqual(clicked, []);
+    assert.equal(page.storage.size, 0);
+  }
+});
+
+test('both saves recheck running state after staging the dialog before sending Save', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = await arrangePage(), click = page.click.bind(page);
+    const packageNode = page.context.__loginomDockPreparationV1.receipts.get('prepare').packageNode;
+    page.click = async item => {
+      if (item.tag === 'input') packageNode.HasRunningNodes = () => true;
+      return click(item);
+    };
+    const outcome = await run(page, action, { path: '/user/data/packages/running-race.lgp', conflict_policy: 'fail' });
+    assert.equal(outcome.status, 'AMBIGUOUS', JSON.stringify(outcome));
+    assert.equal(outcome.cleanup_complete, true);
+    assert.equal(page.storage.size, 0);
+    assert.equal(outcome.trace.some(item => item.event === 'save_requested'), false);
+  }
+});
+
+test('a sent Save refusal survives cleanup timeout, inspect and restore without another write', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) for (const lostResponse of [false,true]) {
+    const page = linkPage(), click = page.click.bind(page);
+    let responses = 0;
+    const engine = runtime(page, { execute: async code => {
+      const result = await page.execute(code);
+      if (++responses === 2 && lostResponse) throw new Error('Save response lost after cleanup timeout');
+      return result;
+    } });
+    let writes = 0;
+    page.click = async item => {
+      if (item.symbol !== 'file_dialog.confirm') return click(item);
+      writes++;
+      page.error = 'Сценарий содержит 1 заблокированных узлов';
+    };
+    page.keyboard.press = async () => {};
+    const params = { path: '/user/data/packages/refused-running.lgp', conflict_policy: 'fail' };
+    const refused = await engine.run(action, params, { operationId: 'refused-save' });
+    assert.equal(refused.status, 'AMBIGUOUS', JSON.stringify(refused));
+    if (lostResponse) assert.equal(refused.error.code, 'BROWSER_CALL_UNCERTAIN');
+    else {
+      assert.equal(refused.error.message, page.error);
+      assert.equal(refused.output.cleanup_error.code, 'CLEANUP_FAILED');
+    }
+    assert.notEqual(refused.cleanup_complete, true);
+    const inspected = await engine.inspect({ operationId: 'refused-save' });
+    assert.equal(inspected.output.outcome.error.message, page.error);
+    assert.equal(inspected.output.outcome.output.cleanup_error.code, 'CLEANUP_FAILED');
+    assert.equal(compactActionResult(inspected).output.outcome.error.message, page.error);
+    const repeated = await engine.run(action, params, { operationId: 'refused-save' });
+    assert.equal(compactActionResult(repeated).output.cleanup_error.code, 'CLEANUP_FAILED');
+    page.keyboard.press = async () => { page.error = null; page.dialog = null; page.menu = false; };
+    await engine.recover('refused-save', { strategy: 'restore_control', recoveryOperationId: 'restore-refused-save' });
+    assert.equal(writes, 1);
+    assert.equal(page.storage.size, 0);
+    const restored = await engine.inspect({ operationId: 'refused-save' });
+    assert.equal(restored.output.outcome.error.message, 'Сценарий содержит 1 заблокированных узлов');
+    assert.notEqual(restored.output.outcome.status, 'SUCCEEDED');
   }
 });
 

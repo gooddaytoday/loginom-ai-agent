@@ -6,6 +6,7 @@ export const excelExportSettingsSchema={type:'object',description:'XLSX workbook
  sheet_name:{type:'string',minLength:1,maxLength:31,description:'One worksheet; no []:*?/\\ or edge apostrophes.'},
  header:{type:'string',enum:['none','names','labels'],description:'No header, names or labels.'},
  overwrite:{type:'string',enum:['reject','replace'],description:'reject preserves an existing file; replace explicitly authorizes replacing the ENTIRE workbook, deleting all old sheets.'},
+ bindings:{type:'object',additionalProperties:false,minProperties:1,properties:Object.fromEntries(['destination','sheet_name'].map(key=>[key,{type:'object',additionalProperties:false,required:['variable'],properties:{variable:{type:'string',minLength:1,maxLength:128}},description:'Exact mapped string variable on variable_inputs kind variables, input 0. Omit the bound literal; source must be executed.'}]))},
  number_format:{type:'string',enum:['general','numeric'],description:'Cell display style only; numeric never rounds stored values.'},
  decimal_count:{type:'integer',minimum:0,maximum:30,description:'Displayed decimals for numeric style, default 2 on new nodes.'},
  divide_thousands:{type:'boolean',description:'Thousands separator for numeric style, default false on new nodes.'}
@@ -28,7 +29,12 @@ export function validateExcelExportParameters(p,mode,r,directories=null){
  need(r.read.ports.length===0&&(r.read.sample_rows??0)===0&&(r.read.require_exact_numbers??false)===false,'Invalid parameters.read: Excel sink requires ports:[], sample_rows:0, require_exact_numbers:false');
  need(r.mappings.length===0,'Invalid parameters.mappings: Excel export has no requested mappings');
  need(r.inputs.length<=1&&(r.target.kind==='existing'||r.inputs.length===1),'Invalid parameters.inputs: new Excel export needs one table');
- if(r.target.kind==='new')for(const k of ['destination','sheet_name','header','overwrite'])need(Object.hasOwn(s,k),'Invalid parameters.excel_export.'+k+': required on new export');
+ if(s.bindings!==undefined){
+  need(s.bindings&&typeof s.bindings==='object'&&!Array.isArray(s.bindings)&&Object.keys(s.bindings).length>0,'Invalid Excel bindings');
+  for(const [key,b]of Object.entries(s.bindings))need(['destination','sheet_name'].includes(key)&&b&&typeof b==='object'&&!Array.isArray(b)&&Object.keys(b).join(',')==='variable'&&typeof b.variable==='string'&&b.variable.length>0&&b.variable.length<=128&&!/[\0\r\n]/.test(b.variable)&&!Object.hasOwn(s,key),'Invalid or conflicting Excel binding: '+key);
+  if(r.target.kind==='new')need(r.variable_inputs?.length===1&&r.variable_inputs[0].kind==='variables'&&r.variable_inputs[0].input===0,'Excel bindings need variables input 0');
+ }
+ if(r.target.kind==='new')for(const k of ['destination','sheet_name','header','overwrite'])need(Object.hasOwn(s,k)||['destination','sheet_name'].includes(k)&&s.bindings?.[k],'Invalid parameters.excel_export.'+k+': required on new export');
  if('destination'in s){validateExcelExportDestination(s.destination,directories);need(s.destination.toLowerCase().endsWith('.'+mode),'Invalid parameters.excel_export.destination: extension must match mode');}
  if('sheet_name'in s)validateExcelSheetName(s.sheet_name);
  if('header'in s)need(['none','names','labels'].includes(s.header),'Invalid parameters.excel_export.header');

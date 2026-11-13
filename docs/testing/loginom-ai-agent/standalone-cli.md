@@ -326,6 +326,13 @@ MessagePort close в проверенном сценарии, несмотря �
 затем из `packages/opencode` выполнить `bun run dev:cli loginom status --format json`.
 Это ручной development путь; подписи/hashes manifest и installed auto-discovery пока не проверяются.
 
+`loginom status` показывает сохранённое подключение и незавершённые операции (recovery);
+не ждёт готовности и не запускает Chromium. По умолчанию — русский текст
+(«Подключение настроено: …» / «Подключение не настроено — `loginom setup`.» /
+«Требуется восстановление: N операций …»). В `--format json` поля View сохранены, но
+`starting` нового Host выдаётся как `configured` (при `generation` > 0) или `unconfigured`;
+`ready`, `pending`, `recoverable-error` — как есть. Готовность соединения проверяет `loginom check`.
+
 Автоматизация setup: `loginom setup --stdin-json --format json` принимает объект
 с необязательными строковыми `url`, `username`, `password` через отдельный
 stdin команды. Пропущенный пароль сохраняется; `password: ""` задаёт пустой пароль.

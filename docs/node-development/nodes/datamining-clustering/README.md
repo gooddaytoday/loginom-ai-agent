@@ -13,7 +13,7 @@
 
 Зарегистрирован `datamining.clustering` / `k_means`. k_means: k 2…1000, seed; normalization none/standardize/scale_minus_one_one/scale_zero_one/absolute_scale. Train текущего входа; выход 0 — строки, Cluster/Distance; выход 1 — центры в исходных единицах. Distance в нормированных единицах.
 
-Ограничения: Только continuous integer/real, один вход, без mapping overrides; g-means и saved-model apply не поддержаны. Пропуск normalization у existing сохраняет однородный поддерживаемый метод; смешанные методы требуют явного выбора; ручной диапазон и контроль диапазона не поддержаны.
+Ограничения: Только continuous integer/real, один вход, без mapping overrides; g-means — #873, apply сохранённой модели — #884. Пропуск normalization у existing сохраняет однородный поддерживаемый метод; смешанные методы требуют явного выбора; ручной диапазон и контроль диапазона не поддержаны.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [clustering-node.mjs](../../../../packages/loginom-runtime/client/lib/clustering-node.mjs):1–36; [clustering-parameters.mjs](../../../../packages/loginom-runtime/client/lib/clustering-parameters.mjs):1–19; [datamining.clustering.md](../../../../packages/product/skills/loginom-automation/references/nodes/datamining.clustering.md):1–36. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

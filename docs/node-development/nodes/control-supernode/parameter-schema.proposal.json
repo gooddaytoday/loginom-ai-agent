@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "description": "Stage-1 proposal only. Create one mandatory table input and one table output. Existing omission preserves ports; supplied boundary is complete, never a partial patch. Navigation needs separately approved workflow support.",
+  "additionalProperties": false,
+  "properties": {
+    "boundary": {
+      "type": "object",
+      "description": "Complete supported 1-to-1 boundary. Required for a new node; editing a connected boundary must preserve GUIDs and refuse destructive changes before mutation.",
+      "additionalProperties": false,
+      "required": ["input", "output"],
+      "properties": {
+        "input": {
+          "type": "object",
+          "description": "External input 0, mirrored as output 0 of the inner InputNode. Required source is bound by top-level inputs, never a cross-workflow link.",
+          "additionalProperties": false,
+          "required": ["kind", "name", "label", "requirement"],
+          "properties": {
+            "kind": {"type": "string", "enum": ["table"], "description": "Only a native table socket in this slice; variables and trees are rejected."},
+            "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$", "description": "Explicit technical port name; ASCII identifier, unique among input ports. Automatic and unnamed ports are outside this slice."},
+            "label": {"type": "string", "minLength": 1, "maxLength": 128, "description": "Literal display label of the input; independent of its technical name."},
+            "requirement": {"type": "string", "enum": ["required"], "description": "Source must be connected; optional inputs are deferred."}
+          }
+        },
+        "output": {
+          "type": "object",
+          "description": "External output 0, mirrored as input 0 of the inner OutputNode. An inner local link supplies the data.",
+          "additionalProperties": false,
+          "required": ["kind", "name", "label"],
+          "properties": {
+            "kind": {"type": "string", "enum": ["table"], "description": "Native table output only; read external output 0 after executing the parent."},
+            "name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$", "description": "Explicit technical port name, unique among output ports; input and output namespaces are separate."},
+            "label": {"type": "string", "minLength": 1, "maxLength": 128, "description": "Literal output display label, retained on the inner mirrored port."}
+          }
+        }
+      }
+    }
+  }
+}

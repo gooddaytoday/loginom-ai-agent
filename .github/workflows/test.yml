@@ -421,6 +421,9 @@ jobs:
         working-directory: packages/opencode
         # A rare hang inside the effect run otherwise holds the job until its 60-minute limit.
         timeout-minutes: 10
+        # The exerciser runs without test/preload.ts; keep its background plugin install offline.
+        env:
+          npm_config_offline: "true"
         run: bun run test:httpapi
 
   desktop:

@@ -6,12 +6,47 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
+import {verifyNodeTargetEffect,prepareNodeTarget,inspectNodeTarget} from '../lib/node-target.mjs';
+
+const moveView={scale:0.5131581182307065,grid_size:8,scale_grid:false,grid_enabled:true,
+ scroll:{x:56,y:0},translate:{x:0,y:0}};
+function nativeMove() {
+ const before={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,links:[],foreign_links:[],
+  nodes:[{ref:ref('target'),type:'transform.group_data',position:{x:3096,y:208},inputs:[0],outputs:[0]}]};
+ const effect={id:'move:graph:0',kind:'move',before,parameters:{ref:ref('target'),position:requested},
+  receipt:{status:'SUCCEEDED',cleanup_complete:true,move_geometry:{before:structuredClone(moveView),after:structuredClone(moveView)}}};
+ const after={...structuredClone(before),nodes:[{...before.nodes[0],position:observed}]};
+ const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:()=>{throw Error('Unexpected transport');}});
+ return {effect,after,adapter};
+}
+test('#763 real adapter verifies the exact native screen-grid landing at 51% with scroll',()=>{
+ const {effect,after,adapter}=nativeMove();
+ assert.ok(verifyNodeTargetEffect(effect,after,adapter.positionMatches));
+ for(const axis of ['x','y']){
+  const changed=structuredClone(after);changed.nodes[0].position[axis]+=0.2;
+  assert.equal(verifyNodeTargetEffect(effect,changed,adapter.positionMatches),null);
+ }
+ assert.equal(adapter.positionMatches(after.nodes[0],requested),false);
+});
+for(const change of [
+ e=>{delete e.receipt;},
+ e=>{e.receipt.status='AMBIGUOUS';},
+ e=>{e.receipt.cleanup_complete=false;},
+ e=>{e.receipt.move_geometry.after.scroll.x++;},
+ e=>{e.receipt.move_geometry.before.scale=0;},
+ e=>{e.receipt.move_geometry.before.grid_size=0;},
+ e=>{e.receipt.move_geometry.before.scale_grid=true;},
+ e=>{e.parameters.ref.node_id='foreign';},
+])test('#763 screen-grid evidence must be completed, stable and bound: '+change,()=>{
+ const {effect,after,adapter}=nativeMove();change(effect);
+ assert.equal(verifyNodeTargetEffect(effect,after,adapter.positionMatches),null);
+});
 
 // #763: recorded native geometry, not a widened positionMatches tolerance.
 const requested={x:600,y:400},observed={x:601.6421119999986,y:395.0768416000001};
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
-function fixture({lost=false,change,receiptStatus='SUCCEEDED',cleanup=true,completed=true,failJournal=false,record=async e=>e,label='Месяцы магазина'}={}){
+function fixture({lost=false,change,receiptStatus='SUCCEEDED',cleanup=true,completed=true,failJournal=false,record=async e=>e,label='Месяцы магазина',nativeGrid=false}={}){
  const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,
   nodes:[{ref:ref('source'),type:'imports.text',label:'Source',position:{x:96,y:96},locked:false,inputs:[],outputs:[0]},
    {ref:ref('target'),type:'transform.group_data',label,position:{x:3096,y:208},locked:false,inputs:[0],outputs:[0],dom_epoch:3200}],
@@ -20,26 +55,46 @@ function fixture({lost=false,change,receiptStatus='SUCCEEDED',cleanup=true,compl
  const request={operation_id:'move',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
   target:{kind:'existing',type:'transform.group_data',ref:ref('target'),position:requested},inputs:[],mode:'aggregate',parameters:{},mappings:[],finish:'execute',
   read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
- const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},execute:async()=>{throw Error('Unexpected public transport');},
-  nodeTargetAdapterFactory:()=>createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async code=>{
+ const adapter=()=>createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async code=>{
    if(code.includes('function activatePreparedWorkflow'))return {status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'doc',workflow_ref:workflow};
    if(code.includes('async function mutateGraph')){
     calls.push('move');graph.nodes[1].position=structuredClone(observed);graph.nodes[1].dom_epoch++;
     change?.(graph);
     receipt={status:receiptStatus,effect_possible:true,cleanup_complete:cleanup,after:structuredClone(graph),
-     placement_navigation:{fully_visible:true,view:{scale:0.5131581182307065,scroll:{x:56,y:0},viewportWidth:1920,viewportHeight:945}}};
+     placement_navigation:{fully_visible:true,view:{scale:0.5131581182307065,scroll:{x:56,y:0},viewportWidth:1920,viewportHeight:945}},
+     ...(nativeGrid?{move_geometry:{before:structuredClone(moveView),after:structuredClone(moveView)}}:{})};
     if(lost)throw Error('Lost move reply');return structuredClone(receipt);
    }
    if(code.includes('async function readGraph'))return structuredClone(graph);
    assert.ok(code.includes('receipt_read'));return {output:{state:completed?'completed':'running',receipt:structuredClone(receipt)}};
-  }}),
+  }});
+ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},execute:async()=>{throw Error('Unexpected public transport');},
+  nodeTargetAdapterFactory:adapter,
   nodeApplyHandlers:new Map([['transform.group_data',{revision:'1',modes:['aggregate'],validate:()=>{},configure:async()=>{calls.push('configure');throw Error('Must preserve committed settings');}}]]),
   nodeApplyDriverFactory:()=>Object.fromEntries(['verifySource','mapPorts','openWizard','finish','waitExecution','readOutput','verifyContinuation'].map(name=>[name,async()=>{
    calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false};
   }])),
   onRecord:async event=>{events.push(structuredClone(event));if(failJournal&&event.target_state?.move_mismatch)throw Error('disk unavailable');return record(event);}});
- return {runtime,request,graph,calls,events};
+ return {runtime,request,graph,calls,events,adapter:adapter()};
 }
+
+for(const lost of [false,true])test('#763 native grid move settles through real target adapter, lost reply='+lost,async()=>{
+ const f=fixture({nativeGrid:true,lost}),operation={id:'move',deadline:Date.now()+10000};
+ const request={document_id:f.request.document_id,workflow_ref:f.request.workflow_ref,target:f.request.target,
+  inputs:[]};
+ const record=async e=>e;
+ const result=await prepareNodeTarget({request,operation,adapter:f.adapter,record});
+ if(!lost)assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ else {
+  assert.equal(result.status,'AMBIGUOUS');
+  const inspected=await inspectNodeTarget({request,operation,adapter:f.adapter,record,deadline:operation.deadline});
+  assert.equal(inspected.pending,null);assert.equal(operation.targetPhase.pending,null);
+  const resumed=await prepareNodeTarget({request,operation,adapter:f.adapter,record});
+  assert.equal(resumed.status,'SUCCEEDED',JSON.stringify(resumed));
+ }
+ assert.deepEqual(f.calls,['move']);assert.equal(operation.targetPhase.move_mismatch,undefined);
+ assert.equal(f.graph.nodes[1].label,'Месяцы магазина');
+});
 
 for(const corruptAck of [false,true])test('move failure inspection ACK through real journal with URL/Cyrillic label, corrupt='+corruptAck,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'lab1041-move-'));t.after(()=>rm(directory,{recursive:true,force:true}));

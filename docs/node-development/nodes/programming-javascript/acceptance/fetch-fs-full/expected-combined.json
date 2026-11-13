@@ -1,0 +1,53 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Rows",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "FileName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ByteCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "ReceiptNo",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Rows": 3,
+          "Amount": 46.0,
+          "FileName": "summary.csv",
+          "ByteCount": 32,
+          "ReceiptNo": 1
+        }
+      ]
+    }
+  ]
+}

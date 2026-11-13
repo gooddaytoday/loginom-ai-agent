@@ -1,0 +1,51 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "FileName",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "ByteCount",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Hex",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "FileName": "source.bin",
+          "ByteCount": 5,
+          "Hex": "00017f80ff"
+        },
+        {
+          "FileName": "archive/final.bin",
+          "ByteCount": 3,
+          "Hex": "00017f"
+        },
+        {
+          "FileName": "patched.bin",
+          "ByteCount": 5,
+          "Hex": "4101000000"
+        }
+      ]
+    }
+  ]
+}

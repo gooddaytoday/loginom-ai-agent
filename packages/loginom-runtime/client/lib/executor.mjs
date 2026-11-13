@@ -1376,7 +1376,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       seen.add(node);
       if (app.PackageTreeNode && node instanceof app.PackageTreeNode) {
         const path = node.PackageFileName;
-        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true };
+        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
+          running: node.HasRunningNodes?.() === true };
       }
       node = node.ParentNode;
     }
@@ -1512,6 +1513,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   };
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
     const before = await packageCheckpoint();
+    if (before.package_identity.running)
+      throw new Error('Cannot save the package while a process is running or its nodes are locked. Wait for the process to finish or stop it before requesting a new Save. No save request was sent.');
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
     if (before.package_identity.read_only && normalizeStoredPath(before.package_identity.path) === before.path)
       throw new Error('The active package is read-only. Save a copy to an explicitly different package path.');
@@ -1571,7 +1574,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await writeFileName(input, before.path);
     // Keep the original graph; inspect it after staging the dialog, beyond the
     // layout repaint, and before the gesture that writes the package.
-    if (!same(await packageCheckpoint(), before)) throw Error('Package changed after save preflight');
+    const staged = await packageCheckpoint();
+    if (staged.package_identity.running)
+      throw new Error('Cannot save the package while a process is running or its nodes are locked. No save request was sent.');
+    if (!same(staged, before)) throw Error('Package changed after save preflight');
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
@@ -1755,8 +1761,13 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       const cleanup = async (name, operation) => {
         try { await operation(); record('cleanup_completed', { resource: name }); }
         catch (error) {
-          record('cleanup_failed', { resource: name });
-          outcome = result('AMBIGUOUS', {}, { code: 'CLEANUP_FAILED', message: safeMessage(error) });
+          const cleanupError = { code: 'CLEANUP_FAILED', message: safeMessage(error) };
+          record('cleanup_failed', { resource: name, ...cleanupError });
+          // Keep Loginom's Save refusal visible even when dismissing its dialog
+          // exhausts the deadline. Neither observation is a save receipt.
+          outcome = ['packageSaveAs', 'packageSaveCheckpoint'].includes(task.handler) && outcome.error
+            ? { ...outcome, status: 'AMBIGUOUS', output: { ...outcome.output, cleanup_error: { resource: name, ...cleanupError } } }
+            : result('AMBIGUOUS', {}, cleanupError);
         }
       };
       if (mouseHeld) await cleanup('mouse', () => page.mouse.up());
@@ -2311,6 +2322,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       if(operation.cleanupConfirmed===false && operation.verification?.byteOutcome?.output?.bytes_verified===true)
         return failed(operation,'TRANSFER_FINALIZATION_PENDING','Verified bytes are retained; transfer cleanup has not completed');
+      if (['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key)
+          && operation.outcome?.error && operation.outcome.output?.cleanup_error)
+        return { ...operation.outcome, cleanup_complete: operation.cleanupConfirmed === true };
       if (operation.cleanupConfirmed === false) return failed(operation, 'CLEANUP_RECEIPT_MISSING',
         'The browser call finished but cleanup is unconfirmed. Inspect and restore_control before further mutations.');
       if (['ui.act','artifact.upload'].includes(operation.action.capability)) {
@@ -3162,6 +3176,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             const restored = await execute(withBrowserReceipt(body, receipt), { timeout: 15000 });
             if (!restored.cleanup_complete) { operation.cleanupConfirmed = false; outcome = failed(operation, 'CLEANUP_FAILED', 'Browser cleanup failed'); }
             else { operation.cleanupConfirmed = true; outcome = operation.action.capability === 'ui.act'
+              || ['package.save_as', 'package.save_checkpoint'].includes(operation.action.action_key)
+                && operation.outcome?.error && operation.outcome.output?.cleanup_error
               ? { ...operation.outcome, cleanup_complete: true } : await invoke(operation, 'reconcile'); }
           }
         } catch (error) {

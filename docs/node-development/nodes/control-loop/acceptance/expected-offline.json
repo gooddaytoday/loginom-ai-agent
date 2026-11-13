@@ -1,0 +1,64 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "control.supernode"
+    },
+    {
+      "type": "control.loop"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "control.loop",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "PageNo",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Limit",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Skip",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "LastIndex",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "PageNo": 1,
+          "Limit": 2,
+          "Skip": 0,
+          "LastIndex": 1
+        },
+        {
+          "PageNo": 2,
+          "Limit": 2,
+          "Skip": 2,
+          "LastIndex": 3
+        },
+        {
+          "PageNo": 3,
+          "Limit": 2,
+          "Skip": 4,
+          "LastIndex": 5
+        }
+      ]
+    }
+  ]
+}
