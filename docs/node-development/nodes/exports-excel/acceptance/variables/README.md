@@ -24,6 +24,8 @@
 выход builtin «Переменные сценария» до активации не исполняется
 (`../../../exports-lgd/acceptance/task-variable.md:8`). Путь к файлу собирает
 run-check (`{{EXCEL_*_DESTINATION}}`, по образцу `{{LGD_INITIAL_DESTINATION}}`).
+Имена файлов в этих путях должны быть `excel-var-a.xlsx` и `excel-var-b.xlsx`:
+oracle сверяет `path.name` с `filename` (иначе FAIL `FILENAME`).
 
 ### Файлы
 

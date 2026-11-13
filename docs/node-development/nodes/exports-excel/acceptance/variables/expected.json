@@ -11,7 +11,7 @@
       "label_any": true
     }
   ],
-  "variables": [
+  "binding_values": [
     {
       "name": "ExcelPath",
       "type": "string",

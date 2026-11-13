@@ -43,7 +43,7 @@ def expected():
     return {'proposal': True, 'package_path': '{{PACKAGE_PATH}}',
             'nodes': [{'type': 'variables.calculator', 'label_any': True},
                       {'type': 'exports.excel', 'label_any': True}],
-            'variables': [{'name': 'ExcelPath', 'type': 'string',
+            'binding_values': [{'name': 'ExcelPath', 'type': 'string',
                            'initial': '{{EXCEL_INITIAL_DESTINATION}}', 'final': '{{EXCEL_FINAL_DESTINATION}}'},
                           {'name': 'SheetName', 'type': 'string', 'initial': 'Январь', 'final': 'Февраль'}],
             'binding_inventory': [
