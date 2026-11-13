@@ -50,6 +50,11 @@
       "rows": 16,
       "sha256": "f4cb98487bd02da67709bd9c9fddf4362aaa1a37201dee1ec72965523255086b"
     },
+    "units.csv": {
+      "bytes": 276,
+      "rows": 16,
+      "sha256": "4464806051d5b05b052429eb760b4adc0cb010500fea07a9aae90f89c66829a8"
+    },
     "zero.csv": {
       "bytes": 343,
       "rows": 16,
@@ -208,6 +213,24 @@
         "IsTest": "boolean"
       },
       "nullable": []
+    },
+    "units.csv": {
+      "column_order": [
+        "RowID",
+        "Price",
+        "Distance",
+        "Promo",
+        "Y"
+      ],
+      "types": {
+        "RowID": "integer",
+        "Price": "integer/continuous",
+        "Distance": "integer/continuous",
+        "Promo": "integer/continuous",
+        "Y": "real/continuous (explicit import)"
+      },
+      "nullable": [],
+      "derivation": "design.csv: Price=200+100*X1, Distance=3+2*X2, Promo=(X3+1)/2, same Y"
     },
     "zero.csv": {
       "column_order": [

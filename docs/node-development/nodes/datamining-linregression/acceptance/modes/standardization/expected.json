@@ -32,169 +32,149 @@
           "type": "integer"
         },
         {
-          "name": "X1",
+          "name": "Price",
           "type": "integer"
         },
         {
-          "name": "X2",
+          "name": "Distance",
           "type": "integer"
         },
         {
-          "name": "X3",
+          "name": "Promo",
           "type": "integer"
         },
         {
           "name": "Y",
           "type": "real"
-        },
-        {
-          "name": "IsTest",
-          "type": "boolean"
         }
       ],
       "rows": [
         {
           "RowID": 1,
-          "X1": -1,
-          "X2": -1,
-          "X3": -1,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 0,
           "Y": 0.25,
-          "IsTest": false,
           "Y_rergession": 0.5
         },
         {
           "RowID": 2,
-          "X1": -1,
-          "X2": -1,
-          "X3": -1,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 0,
           "Y": 0.75,
-          "IsTest": false,
           "Y_rergession": 0.5
         },
         {
           "RowID": 3,
-          "X1": -1,
-          "X2": -1,
-          "X3": 1,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 1,
           "Y": 0.25,
-          "IsTest": false,
           "Y_rergession": 0.5
         },
         {
           "RowID": 4,
-          "X1": -1,
-          "X2": -1,
-          "X3": 1,
+          "Price": 100,
+          "Distance": 1,
+          "Promo": 1,
           "Y": 0.75,
-          "IsTest": false,
           "Y_rergession": 0.5
         },
         {
           "RowID": 5,
-          "X1": -1,
-          "X2": 1,
-          "X3": -1,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 0,
           "Y": 1.25,
-          "IsTest": false,
           "Y_rergession": 1.5
         },
         {
           "RowID": 6,
-          "X1": -1,
-          "X2": 1,
-          "X3": -1,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 0,
           "Y": 1.75,
-          "IsTest": false,
           "Y_rergession": 1.5
         },
         {
           "RowID": 7,
-          "X1": -1,
-          "X2": 1,
-          "X3": 1,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 1,
           "Y": 1.25,
-          "IsTest": false,
           "Y_rergession": 1.5
         },
         {
           "RowID": 8,
-          "X1": -1,
-          "X2": 1,
-          "X3": 1,
+          "Price": 100,
+          "Distance": 5,
+          "Promo": 1,
           "Y": 1.75,
-          "IsTest": false,
           "Y_rergession": 1.5
         },
         {
           "RowID": 9,
-          "X1": 1,
-          "X2": -1,
-          "X3": -1,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 0,
           "Y": 4.25,
-          "IsTest": false,
           "Y_rergession": 4.5
         },
         {
           "RowID": 10,
-          "X1": 1,
-          "X2": -1,
-          "X3": -1,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 0,
           "Y": 4.75,
-          "IsTest": false,
           "Y_rergession": 4.5
         },
         {
           "RowID": 11,
-          "X1": 1,
-          "X2": -1,
-          "X3": 1,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 1,
           "Y": 4.25,
-          "IsTest": false,
           "Y_rergession": 4.5
         },
         {
           "RowID": 12,
-          "X1": 1,
-          "X2": -1,
-          "X3": 1,
+          "Price": 300,
+          "Distance": 1,
+          "Promo": 1,
           "Y": 4.75,
-          "IsTest": false,
           "Y_rergession": 4.5
         },
         {
           "RowID": 13,
-          "X1": 1,
-          "X2": 1,
-          "X3": -1,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 0,
           "Y": 5.25,
-          "IsTest": false,
           "Y_rergession": 5.5
         },
         {
           "RowID": 14,
-          "X1": 1,
-          "X2": 1,
-          "X3": -1,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 0,
           "Y": 5.75,
-          "IsTest": false,
           "Y_rergession": 5.5
         },
         {
           "RowID": 15,
-          "X1": 1,
-          "X2": 1,
-          "X3": 1,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 1,
           "Y": 5.25,
-          "IsTest": false,
           "Y_rergession": 5.5
         },
         {
           "RowID": 16,
-          "X1": 1,
-          "X2": 1,
-          "X3": 1,
+          "Price": 300,
+          "Distance": 5,
+          "Promo": 1,
           "Y": 5.75,
-          "IsTest": false,
           "Y_rergession": 5.5
         }
       ],
@@ -223,15 +203,15 @@
           "Y_coefficients": 3.0
         },
         {
-          "Name": "X1",
-          "Y_coefficients": 2.0
+          "Name": "Price",
+          "Y_coefficients": 2.065591117977289
         },
         {
-          "Name": "X2",
-          "Y_coefficients": 0.5
+          "Name": "Distance",
+          "Y_coefficients": 0.5163977794943222
         },
         {
-          "Name": "X3",
+          "Name": "Promo",
           "Y_coefficients": 0.0
         }
       ],
