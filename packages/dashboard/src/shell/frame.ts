@@ -20,7 +20,7 @@ export function sandboxFrame(src: string) {
   return frame
 }
 
-export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): void; silent(): void }) {
+export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): void; silent(): void; ready?(): void }) {
   let port: MessagePort | undefined
   let last: (DashboardState & { type: "state" }) | undefined
   let loads = 0
@@ -64,6 +64,7 @@ export function mountDashboard(frame: HTMLIFrameElement, handlers: { close(): vo
     port.onmessage = admit
     frame.contentWindow!.postMessage({ type: "loginom-dashboard/init", version: 1 }, "*", [channel.port2])
     if (last) port.postMessage(last)
+    handlers.ready?.()
   }
   // The first load may come before or after the first ready; any later document is foreign.
   frame.addEventListener("load", () => {

@@ -54,7 +54,7 @@ addEventListener("message", event => {
   await once(studio, "listening")
   t.after(() => new Promise(resolve => studio.close(resolve)))
   const origin = `http://127.0.0.1:${studio.address().port}`
-  const server = appHost({ buildsRoot: root, appOrigin, clientOrigins: [origin], mode: "normal", log() {} })
+  const server = appHost({ builds: key => join(root, key), appOrigin, clientOrigins: [origin], mode: "normal", log() {} })
   server.listen(port, "127.0.0.1")
   await once(server, "listening")
   t.after(() => new Promise(resolve => server.close(resolve)))

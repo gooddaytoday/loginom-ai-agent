@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs"
 import { randomUUID } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
@@ -124,7 +125,19 @@ export function startDashboard(env: NodeJS.ProcessEnv = process.env) {
     allowedHosts:
       env.DASHBOARD_CLIENT_ORIGINS === undefined ? undefined : clientOrigins.map((origin) => new URL(origin).host),
   })
-  const apps = appHost({ buildsRoot, appOrigin, clientOrigins, mode })
+  const apps = appHost({
+    builds: key => {
+      try {
+        const root = realpathSync(buildsRoot)
+        const dir = join(root, key)
+        return realpathSync(dir) === dir ? dir : undefined
+      } catch (error) {
+        if (error instanceof Error && "code" in error && ["ENOENT", "ENOTDIR"].includes(String(error.code))) return
+        throw error
+      }
+    },
+    appOrigin, clientOrigins, mode,
+  })
   api.listen(Number(env.DASHBOARD_PORT ?? 8100), host)
   apps.listen(Number(env.DASHBOARD_APP_PORT ?? 8101), host)
   return { api, apps }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -111,5 +111,14 @@ test("the standalone Node bundle preserves snapshot HTTP and an existing publica
   assert.equal(page.status, 200)
   assert.ok(page.headers.get("content-security-policy"))
   assert.equal(await page.text(), "Existing dashboard")
+  const outside = join(root, "outside")
+  await mkdir(join(outside, hash), { recursive: true })
+  await writeFile(join(outside, hash, "index.html"), "Outside dashboard")
+  for (const [alias, target] of [["c".repeat(64), outside], ["d".repeat(64), join(root, "builds", key)]]) {
+    await symlink(target, join(root, "builds", alias), process.platform === "win32" ? "junction" : "dir")
+    const response = await fetch(`${appOrigin}/apps/${alias}/${hash}/`)
+    assert.equal(response.status, 404)
+    assert.ok(response.headers.get("content-security-policy"))
+  }
 })
 

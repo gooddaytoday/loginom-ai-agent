@@ -232,7 +232,7 @@ export async function fixture(
   const origin = `http://127.0.0.1:${studio.address().port}`
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin })
   const reports = []
-  const host = appHost({ buildsRoot: root, appOrigin, clientOrigins: [origin], mode, connectionAllowlist, log: line => reports.push(line) })
+  const host = appHost({ builds: key => join(root, key), appOrigin, clientOrigins: [origin], mode, connectionAllowlist, log: line => reports.push(line) })
   host.listen(port, "127.0.0.1")
   await once(host, "listening")
   t.after(() => new Promise(resolve => host.close(resolve)))

@@ -21,3 +21,13 @@ const shell = await Bun.build({
 if (!shell.success) throw new AggregateError(shell.logs, "Could not build dashboard shell")
 
 await Bun.write(join(import.meta.dirname, "../template/src/loginom.ts"), Bun.file(join(import.meta.dirname, "../src/sdk/loginom.ts")))
+
+const draft = await Bun.build({
+  entrypoints: [join(import.meta.dirname, "../src/draft/page.ts")],
+  outdir: join(import.meta.dirname, "../dist"),
+  naming: "draft.js",
+  target: "browser",
+  format: "iife",
+  minify: true,
+})
+if (!draft.success) throw new AggregateError(draft.logs, "Could not build dashboard draft page")

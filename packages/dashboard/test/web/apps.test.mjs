@@ -63,7 +63,7 @@ async function listen(t, options = {}) {
   await writeFile(join(dir, "sample.json"), "sample-secret")
   const lines = []
   const server = appHost({
-    buildsRoot,
+    builds: key => join(buildsRoot, key),
     appOrigin: dash,
     clientOrigins: ["http://127.0.0.1:32768", "http://localhost:32768"],
     mode: "normal",
@@ -252,5 +252,12 @@ test("asset links cannot expose a disallowed file inside the same build", async 
   const response = await send(server, "GET", `/apps/${key}/${hash}/assets/aliased.js`)
   assert.equal(response.status, 404)
   assert.equal(response.body.includes("fixture map.js.map"), false)
+  assertSecurity(response, "no-store")
+})
+
+test("an unknown builds mapping returns a protected missing response", async t => {
+  const { server, key, hash } = await listen(t, { builds: () => undefined })
+  const response = await send(server, "GET", `/apps/${key}/${hash}/`)
+  assert.equal(response.status, 404)
   assertSecurity(response, "no-store")
 })

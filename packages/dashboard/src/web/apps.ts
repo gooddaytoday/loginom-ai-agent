@@ -1,5 +1,5 @@
 import { readFile, realpath } from "node:fs/promises"
-import { createServer, type IncomingMessage } from "node:http"
+import { createServer, type IncomingMessage, type Server } from "node:http"
 import { extname, join } from "node:path"
 
 export type Mode = "normal" | "strict"
@@ -58,7 +58,8 @@ parent.postMessage({ type: "loginom-dashboard/ready", version: 1 }, "*")
 `
 
 export function appHost(options: {
-  buildsRoot: string
+  server?: Server
+  builds: (key: string) => string | undefined
   appOrigin: string
   clientOrigins: string[]
   mode: Mode
@@ -72,7 +73,8 @@ export function appHost(options: {
   }
   const host = new URL(options.appOrigin).host
   const log = options.log ?? console.log
-  const server = createServer({ requireHostHeader: false }, async (request, response) => {
+  const server = options.server ?? createServer({ requireHostHeader: false })
+  server.on("request", async (request, response) => {
     const send = (status: number, body: string | Buffer, extra: Record<string, string> = {}) => {
       response.writeHead(status, {
         ...headers,
@@ -106,7 +108,8 @@ export function appHost(options: {
       if (!app) return send(404, "Not found")
       const asset = app[3]
       const type = asset ? types[extname(asset)] : "text/html; charset=utf-8"
-      const data = type && (await buildFile(options.buildsRoot, app[1]!, app[2]!, asset ? join("assets", asset) : "index.html"))
+      const dir = options.builds(app[1]!)
+      const data = type && dir && (await buildFile(dir, app[2]!, asset ? join("assets", asset) : "index.html"))
       if (!data) return send(404, "Not found")
       if (!asset) return send(200, data, { "content-type": type })
       return send(200, data, {
@@ -127,12 +130,12 @@ export function appHost(options: {
   return server
 }
 
-async function buildFile(root: string, key: string, hash: string, name: string) {
+async function buildFile(root: string, hash: string, name: string) {
   try {
     const builds = await realpath(root)
-    const dir = await realpath(join(builds, key, hash))
+    const dir = await realpath(join(builds, hash))
     const file = await realpath(join(dir, name))
-    if (dir !== join(builds, key, hash) || file !== join(dir, name)) return
+    if (dir !== join(builds, hash) || file !== join(dir, name)) return
     return await readFile(file)
   } catch (error) {
     if (error instanceof Error && "code" in error && ["ENOENT", "ENOTDIR", "EISDIR"].includes(String(error.code))) return
