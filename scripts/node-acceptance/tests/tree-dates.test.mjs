@@ -13,6 +13,7 @@ assert c['tree_only'] and c['external'] and c['base'] is None
 assert c['prompt'].name=='task-dates.md' and c['input_files']==['documents.csv']
 approved=r.read(c['source']/'expected.json')['cases']['dates']['tree_outputs']
 assert e['outputs']==[] and e['tree_outputs']==approved and e['package_path']=='/owned/tree.lgp'
+assert e.get('proposed_tree_output')==approved[0], 'main tree audit contract missing'
 assert r.expected_for(c,'/owned/tree.lgp',cold=True)==e
 assert all(n['label_any'] for n in e['nodes'])
 class StopBeforeModel(Exception):pass

@@ -1118,9 +1118,14 @@ for(const stage of JSON.parse(readFileSync(0,'utf8')))
 
 def expected_for(case, package, cold=False):
     src = case['source']
-    if case.get('tree_only') and case.get('tree_case'):
-        expected = read(src / 'expected.json')['cases'][case['tree_case']]
-        return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
+    if case.get('tree_only'):
+        if case.get('tree_case'):
+            expected = read(src / 'expected.json')['cases'][case['tree_case']]
+            return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
+        expected = read(src / case['expected_name'])
+        assert len(expected.get('tree_outputs', [])) == 1, 'TREE_CONTRACT_COUNT'
+        # The main audit consumes this legacy key; cold consumes tree_outputs.
+        return dict(expected, package_path=package, proposed_tree_output=expected['tree_outputs'][0])
     if case.get('coarse_frozen'):
         return {**expected_for({**case, 'coarse_frozen': False}, package, cold=cold), 'coarse_frozen': True}
     if case.get('autocorrelation_edge'):
