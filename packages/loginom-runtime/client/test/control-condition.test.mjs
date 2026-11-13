@@ -78,14 +78,15 @@ test('readback names each branch output port and the built-in Иначе',()=>{
   assert.throws(()=>conditionConfigurationReadback({node:ref('c'),phases:phases(bad),operation_id:'op'}),/required/);
 });
 
-test('reads every requested branch port with its observed schema and propagates a blocked-port refusal',async()=>{
+test('reports which branch executed and refuses to read the blocked branch port',async()=>{
  const reads=[];
- const channel={readOutputPort:async({port})=>{reads.push(port);
-  if(port===0)throw Error('Requested output is not active');
-  return {output:{port,port_guid:'g'+port,sample_complete:true,schema:[{name:'OrderID',type:'integer'}]}};}};
+ const channel={observe:async({ready})=>{const s={node_outputs:{verified:true,surface:'graph',ports:[
+   {index:0,label:'Detailed - Порт1',active:false},{index:1,label:'Иначе - Порт1',active:true}]}};assert.equal(ready(s),true);return s;},
+  readOutputPort:async({port})=>{reads.push(port);return {output:{port,port_guid:'g'+port,sample_complete:true,schema:[{name:'OrderID',type:'integer'}]}};}};
  const ctx={execution:{execution_id:'e'},receipt_id:'r',portExecution:{}};
  const out=await readConditionOutputs(channel,{ports:[1],sample_rows:10,require_exact_numbers:false},ctx);
  assert.deepEqual(out.ports.map(p=>[p.port,p.schema[0].index]),[[1,0]]);
- await assert.rejects(readConditionOutputs(channel,{ports:[0],sample_rows:10,require_exact_numbers:false},ctx),/not active/);
- assert.deepEqual(reads,[1,0]);
+ assert.deepEqual(out.branch_activity,[{port:0,label:'Detailed - Порт1',executed:false},{port:1,label:'Иначе - Порт1',executed:true}]);
+ await assert.rejects(readConditionOutputs(channel,{ports:[0],sample_rows:10,require_exact_numbers:false},ctx),/did not execute/);
+ assert.deepEqual(reads,[1]);
 });

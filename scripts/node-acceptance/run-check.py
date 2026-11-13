@@ -682,6 +682,10 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / 'task-apply.md', data=src / 'data', base=None,
                     input_files=['train.csv', 'holdout.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
+    if name == 'condition-variable':
+        src = REPO / 'docs/node-development/nodes/control-condition/acceptance'
+        return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures', base=None,
+                    input_files=['orders.csv'], export_count=2, condition_initial='expected-initial.json')
     if name == 'logreg-enter':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -2674,6 +2678,8 @@ class Runner:
                             else sorting_stages(spec)[index] if spec.get('sorting_case')
                             else read(src / spec['excel_named_initial'])['outputs'][0] if spec.get('excel_named_initial') and index == 0
                             else expected['outputs'][0] if spec.get('excel_named_initial')
+                            else read(src / spec['condition_initial'])['outputs'][0] if spec.get('condition_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('condition_initial')
                             else read(src / spec['import_initial'])['outputs'][0] if spec.get('import_initial') and index == 0
                             else expected['outputs'][0] if spec.get('import_initial')
                             else bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0] if spec.get('lgd_initial') and index == 0
