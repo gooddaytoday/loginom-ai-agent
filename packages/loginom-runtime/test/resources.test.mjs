@@ -3,12 +3,10 @@ import assert from "node:assert/strict"
 import { copyFile, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { constants } from "node:fs"
 import { createHash } from "node:crypto"
-import { execFile } from "node:child_process"
-import { promisify } from "node:util"
+import { spawn } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { verifyResources } from "../src/resources.mjs"
-const execute = promisify(execFile)
 const verifier = new URL("../src/resources.mjs", import.meta.url).href
 const node = process.platform === "win32" ? "bin/node.exe" : "bin/node"
 
@@ -21,8 +19,9 @@ for (const variant of [
   "missing-browser",
   "wrong-node-version",
 ]) {
-  test(`bundled resource validation: ${variant}`, async () => {
+  test(`bundled resource validation: ${variant}`, async (t) => {
     const root = await mkdtemp(join(tmpdir(), "Loginom ресурсы "))
+    const running = { child: undefined, closed: Promise.resolve() }
     try {
       await mkdir(join(root, "bin"))
       await copyFile(process.execPath, join(root, node), constants.COPYFILE_FICLONE)
@@ -47,16 +46,37 @@ for (const variant of [
       if (variant === "wrong-node-version") manifest.nodeVersion = "0.0.0"
       await writeFile(join(root, "resource-manifest.json"), JSON.stringify(manifest))
       const program = `import {verifyResources} from ${JSON.stringify(verifier)}; await verifyResources(process.argv[1]); console.log('VERIFIED');`
-      const outcome = await execute(join(root, node), ["--input-type=module", "-e", program, root], {
+      const child = spawn(join(root, node), ["--input-type=module", "-e", program, root], {
+        stdio: ["ignore", "pipe", "pipe"],
+        signal: t.signal,
         env: { PATH: "", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot } : {}) },
-      }).then(
-        (result) => result.stdout.trim(),
-        (error) => error.stderr,
-      )
+      })
+      running.child = child
+      const stdout = [], stderr = []
+      child.stdout.setEncoding("utf8").on("data", chunk => stdout.push(chunk))
+      child.stderr.setEncoding("utf8").on("data", chunk => stderr.push(chunk))
+      const exited = new Promise(resolve => {
+        child.once("error", error => resolve({ error }))
+        child.once("exit", (code, signal) => resolve({ code, signal }))
+      })
+      running.closed = new Promise(resolve => child.once("close", resolve))
+      const status = await exited
+      await running.closed
+      assert.ifError(status.error)
+      assert.equal(status.signal, null)
+      assert.equal(status.code, variant === "valid" ? 0 : 1)
+      const outcome = (variant === "valid" ? stdout : stderr).join("").trim()
       if (variant === "valid") assert.equal(outcome, "VERIFIED")
       if (variant !== "valid") assert.match(outcome, /LOGINOM_RESOURCE(S_INVALID|_HASH_MISMATCH)/)
+      if (variant === "traversal") assert.match(outcome, /LOGINOM_RESOURCES_INVALID/)
     } finally {
-      await rm(root, { recursive: true, force: true })
+      // Never unlink an executable while its child or stdio is still alive,
+      // including cancellation/error paths. Do not let cleanup hide a live child.
+      if (running.child && running.child.exitCode === null && running.child.signalCode === null) running.child.kill()
+      await running.closed
+      // Only after close: bounded fallback for the observed Windows EBUSY.
+      await rm(root, { recursive: true, force: true,
+        ...(process.platform === "win32" ? { maxRetries: 5, retryDelay: 100 } : {}) })
     }
   })
 }
