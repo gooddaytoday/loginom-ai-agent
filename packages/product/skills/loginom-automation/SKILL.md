@@ -198,6 +198,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Импорт XLSX | `imports.excel` / xlsx | [читать](references/nodes/imports.excel.md) |
 | Импорт CSV/TXT | `imports.text` / delimited | [читать](references/nodes/imports.text.md) |
 |Импорт Loginom Data|`imports.lgd` / native|[читать](references/nodes/imports.lgd.md)|
+|Импорт из базы данных (SQLite)|`imports.database` / table, sql|[читать](references/nodes/imports.database.md)|
 |Экспорт Loginom Data|`exports.lgd` / native|[читать](references/nodes/exports.lgd.md)|
 | Формулы, в том числе Var.* | `transform.calculator` / expression | [читать](references/nodes/transform.calculator.md) |
 | Параметры полей: переименование и обмен имён, метка, смена типа, кэширование | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |

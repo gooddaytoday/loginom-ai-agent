@@ -1,3 +1,4 @@
+import {createDatabaseImportNodeSupport} from './imports-database-node.mjs';
 import {prepareImportBinding,importBindingChannel,readImportBindings} from './import-bindings.mjs';
 import {createVariablesReplaceNodeSupport} from './variables-replace-node.mjs';
 import {createVariablesColumnUnionNodeSupport} from './variables-coluniondatavar-node.mjs';
@@ -67,7 +68,7 @@ export function createCandidateNodeSupport(config) {
  const dataToVar=createDataToVarNodeSupport(config);
  const variablesColumnUnion=createVariablesColumnUnionNodeSupport(config);
  const userVariables=createUserVariablesNodeSupport(config),variablesCalculator=createVariablesCalculatorNodeSupport(config),variablesToTable=createVariablesToTableNodeSupport(config);
- const lgdImport=createLgdImportNodeSupport(config),lgdExport=createLgdExportNodeSupport(config);
+ const lgdImport=createLgdImportNodeSupport(config),lgdExport=createLgdExportNodeSupport(config),databaseImport=createDatabaseImportNodeSupport(config);
  const factorAnalysis=createFactorAnalysisNodeSupport(config);
  const tableTree=createTreeConversionNodeSupport(config,{table:true}),treeJson=createTreeConversionNodeSupport(config,{table:false});
  const assnRules=createAssnRulesNodeSupport(config);
@@ -89,7 +90,7 @@ export function createCandidateNodeSupport(config) {
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...variablesReplace.nodeApplyHandlers,...variablesColumnUnion.nodeApplyHandlers,...variablesCalculator.nodeApplyHandlers,...dataToVar.nodeApplyHandlers,...variablesToTable.nodeApplyHandlers,...userVariables.nodeApplyHandlers,...quality.nodeApplyHandlers,...colUnion.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...databaseImport.nodeApplyHandlers,...variablesReplace.nodeApplyHandlers,...variablesColumnUnion.nodeApplyHandlers,...variablesCalculator.nodeApplyHandlers,...dataToVar.nodeApplyHandlers,...variablesToTable.nodeApplyHandlers,...userVariables.nodeApplyHandlers,...quality.nodeApplyHandlers,...colUnion.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||nodeApplyHandlers.get(type)?.unchangedExecution?.(options.operation.parameters)===true||isUnchangedTransformExecution(options.operation.parameters,nodeApplyHandlers.get(type));
@@ -106,6 +107,7 @@ export function createCandidateNodeSupport(config) {
   if(type==='variables.to_table')return variablesToTable.nodeApplyDriverFactory(options);
   if(type==='research.quality')return quality.nodeApplyDriverFactory(options);
   if(type==='imports.lgd')return lgdImport.nodeApplyDriverFactory(options);
+  if(type==='imports.database')return databaseImport.nodeApplyDriverFactory(options);
   if(type==='exports.lgd')return lgdExport.nodeApplyDriverFactory(options);
   if(type==='trees.from_table')return tableTree.nodeApplyDriverFactory(options);
   if(type==='trees.to_json')return treeJson.nodeApplyDriverFactory(options);
