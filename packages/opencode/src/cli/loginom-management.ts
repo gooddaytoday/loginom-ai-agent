@@ -41,7 +41,18 @@ export async function loginomManagement(
   const decoded = view(await host.request("connection.status", {}))
   if (Option.isNone(decoded)) throw new Error("LOGINOM_REPLY_INVALID")
   const current = decoded.value
-  if (command === "status") return current
+  if (command === "status") {
+    if (!current.generation || current.state !== "starting") return current
+    // Each command starts its own host; report this generation once its Help catalog has loaded.
+    const ready = await host.request("connection.ready", {}).catch((error: unknown) => {
+      if (error instanceof Error && error.message === "LOGINOM_CONNECTION_NOT_READY")
+        return host.request("connection.status", {})
+      throw error
+    })
+    const settled = view(ready)
+    if (Option.isNone(settled)) throw new Error("LOGINOM_REPLY_INVALID")
+    return settled.value
+  }
   if (command === "cancel-pending") return host.request("connection.cancel-pending", { revision: current.revision })
   if (command === "recover") {
     if (!current.recoveries?.length) return current

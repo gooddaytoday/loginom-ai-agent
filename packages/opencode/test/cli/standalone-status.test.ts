@@ -427,6 +427,8 @@ test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancella
           hasPassword: true,
         },
       })
+      // Each command launches its own host; status waits for this generation's Help catalog.
+      expect(await command(["status"])).toMatchObject({ code: 0, result: { state: "ready", generation: 1 } })
       expect(await command(["setup", "--stdin-json"], JSON.stringify({ password: "" }))).toMatchObject({
         code: 0,
         result: {
@@ -481,7 +483,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancella
         await journal.settle(dropped, false)
         const advisory = await command(["status"])
         expect(advisory.code).toBe(0)
-        expect(["starting", "ready"]).toContain(advisory.result.state)
+        expect(advisory.result.state).toBe("ready")
         expect(advisory.result.recoveries).toBeUndefined()
         expect((await recoveryStore(join(profile, "loginom/recovery"), { strict: true })).pending()).toEqual([])
         const run = Bun.spawn(
