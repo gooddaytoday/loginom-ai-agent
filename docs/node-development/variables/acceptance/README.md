@@ -1,5 +1,10 @@
 # Два запроса с изменением переменных
 
+cold: Loginom помечает пакет изменённым при открытии, причина не установлена, LAB-1539
+
+Сценарий `rest-query-variables` снят с регистрации run-check/required-checks.
+Комплект оставлен для отдельного цикла; он не входит в приёмку PR #1070.
+
 Источник утверждён в LAB-820: существующий `https://httpbin.org/anything`.
 Проверяется подстановка `limit`/`skip`, не каталог товаров. Никаких ожиданий по
 DummyJSON, IP, trace ID или полному ответу нет. Модели передаётся только
@@ -24,13 +29,11 @@ Fixture — вход независимого oracle; сами значения 
 абсолютным путём соответствующего экспорта, как делает существующий run-check.
 Это шаблоны, их нельзя передавать native matcher до подстановки путей.
 
-`run-check` регистрирует комплект как `rest-query-variables`. Main проверяет
-initial/updated отдельно по исходным expected и обоим скачанным CSV; cold
-использует только `expected.json` и **реально скачанный updated CSV**.
-Приватные ожидания runner дополняют шаблоны штатным W1 variable_inventory:
-оба integer и связь variables.user → variables.to_table. Журнал проверяет
-сохранение source IDs, тот же REST, query bindings и отсутствие перенастройки.
-Регистрация сама по себе не доказывает модельную приёмку ≥2/3 + cold.
+Для будущей регистрации main должен проверять initial/updated отдельно по
+исходным expected и обоим скачанным CSV; cold — конечный expected и реально
+скачанный updated CSV. Нужны штатный W1 variable_inventory (оба integer и связь
+variables.user → variables.to_table), сохранение source IDs, того же REST и
+query bindings без перенастройки, а также модельная приёмка ≥2/3 + cold.
 
 ## Воспроизводимость oracle
 

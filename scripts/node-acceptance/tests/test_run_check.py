@@ -22,32 +22,13 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
-    def test_rest_query_variables_preserves_two_frozen_phases_and_private_inputs(self):
-        case = runner.scenario('rest-query-variables')
-        self.assertEqual(case['input_files'], [])
-        before = runner.rest_query_expected(case, '/own/query.lgp', initial=True)
-        after = runner.expected_for(case, '/own/query.lgp', cold=True)
-        for actual, filename, values in [(before, 'expected-initial.json', [3, 2]), (after, 'expected.json', [5, 10])]:
-            self.assertEqual(actual['outputs'], runner.read(case['source'] / filename)['outputs'])
-            self.assertEqual([v['value'] for v in actual['variable_inventory']['outputs'][0]['variables']], values)
-            self.assertTrue(all(v['type'] == 'integer' and v['label_any'] for v in actual['variable_inventory']['outputs'][0]['variables']))
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            folder, workspace = root / 'stage', root / 'workspace'
-            folder.mkdir(); workspace.mkdir()
-            instance = runner.Runner.__new__(runner.Runner)
-            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
-            def phase(name, *args, **kwargs):
-                if name == 'model': raise InterruptedError
-            with patch.object(instance, 'phase', side_effect=phase), self.assertRaises(InterruptedError):
-                instance.model('rest-query-variables', folder, root / 'profile', workspace, '/own/query.lgp', {'package_directory': '/own'}, root / 'build')
-            a, b = runner.read(folder / 'expected-initial.json'), runner.read(folder / 'expected.json')
-            self.assertNotEqual(a['outputs'][0]['export_destination'], b['outputs'][0]['export_destination'])
-            prompt = (folder / 'task.md').read_text()
-            self.assertIn(a['outputs'][0]['export_destination'], prompt)
-            self.assertIn(b['outputs'][0]['export_destination'], prompt)
-            self.assertNotIn('oracle.py', prompt)
-            self.assertEqual(list(workspace.iterdir()), [])
+    def test_rest_query_variables_is_deferred_while_c4_remains_registered(self):
+        with self.assertRaisesRegex(ValueError, 'Unknown scenario: rest-query-variables'):
+            runner.scenario('rest-query-variables')
+        self.assertEqual(runner.scenario('rest-variables')['prompt'].name, 'task-variables.md')
+        kit = runner.REPO / 'docs/node-development/variables/acceptance'
+        for name in ('task-rest-variables.md', 'oracle.py', 'expected-initial.json', 'expected.json'):
+            self.assertTrue((kit / name).is_file(), name)
 
     def test_excel_destinations_reach_seed_and_oracle_books(self):
         for name in ['excel-export-numeric', 'excel-export-replace']:

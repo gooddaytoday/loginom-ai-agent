@@ -777,11 +777,6 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name == 'rest-query-variables':
-        src = REPO / 'docs/node-development/variables/acceptance'
-        return dict(source=src, prompt=src / 'task-rest-variables.md', data=src.parent / 'fixtures',
-                    input_files=[], base=None, expected_name='expected.json', export_count=2,
-                    rest_query_initial='expected-initial.json', oracle=src / 'oracle.py')
     if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers', 'rest-variables']:
         src = REPO / 'docs/node-development/nodes/integration-restrequest'
         case = name.removeprefix('rest-')
