@@ -1,0 +1,91 @@
+{
+  "task_id": "weighted-latency-quantiles-business",
+  "dataset_sha256": {
+    "latency_frequencies.csv": "c67eb50f5505ca4a1f754b9b6ad7100912c018b20bd27670892eb995735407c7",
+    "latency_services.csv": "343da43b5c5e60c56959e96412570cfe3a27d56e14c74b253493cbfb4cbd4ace"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "6fb67993b49ee7e518c29def0b7bcb9601af3d8a0ac9718a3d98a1dc44108e89"
+  },
+  "reference_sha256": "c19773f7dec812328f36c726e57877895ac05c54d44f79aaef9189548a401889",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/latency_services.csv",
+        "storage": "PRIVATE_AUTHORING_STORAGE/28462aa5cf56e20a8678f8128d3b903087884c23e08626e2e9df458155c22dcc-0-latency_services.csv",
+        "matches": true
+      },
+      {
+        "input": "data/latency_frequencies.csv",
+        "storage": "PRIVATE_AUTHORING_STORAGE/28462aa5cf56e20a8678f8128d3b903087884c23e08626e2e9df458155c22dcc-1-latency_frequencies.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e28e14e47ffebW1z4L9Kv5FLs5",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-13T22:54:33+00:00",
+    "duration_s": 1409,
+    "tokens": {
+      "input": 121209,
+      "output": 12273,
+      "reasoning": 1359
+    },
+    "tool_calls": 68,
+    "tool_errors": 4,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL",
+  "build_provenance": {
+    "base_commit": "29ea34e27b8f96ed27b744f639c9f48933f52443",
+    "reviewed_palette_patch": "54d5afd358",
+    "qualified_source_tree_sha256": "8960de91493f645f21010fccead6e5d41b7fdf9f6d08ebcda3ee7f32b280e59b",
+    "dirty_reviewed_palette_only": true
+  },
+  "authoring_budget": {
+    "global_started": 1,
+    "global_remaining": 2,
+    "attempt1": "unassisted shared detailed reference",
+    "business_authoring_attempts": 0
+  },
+  "cold": {
+    "accepted": "cold1 all24 native nodes; new fullCSV check-rerun PASS; actual server LGP SHA unchanged; NoSave/NoSettings; cleanup confirmed; unchanged accepted wide helper"
+  },
+  "source_task": "weighted-latency-quantiles-detailed",
+  "shared_reference": true,
+  "authoring_form": "detailed",
+  "blind_business": {
+    "performed_by": "coordinator in fresh B+inputs only context",
+    "frozen_before_comparison": true,
+    "full_csv_pass": true,
+    "solver_repeated": false
+  }
+}
