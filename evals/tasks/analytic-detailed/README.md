@@ -1,6 +1,6 @@
 # Подробные аналитические постановки
 
-Парная форма — [analytic-business](../analytic-business/README.md). Процедура приёмки и статусы пар находятся в [плане кампании](../../../docs/superpowers/plans/2026-10-28-analytics-expansion-implementation.md) и [карточках](../../../docs/superpowers/specs/2026-10-28-analytics-expansion-pairs.md).
+Парная форма — [analytic-business](../analytic-business/README.md). Приёмка и статусы пар кампании расширения — в [плане](../../../docs/superpowers/plans/2026-10-28-analytics-expansion-implementation.md) и [карточках](../../../docs/superpowers/specs/2026-10-28-analytics-expansion-pairs.md); пилота Multica — в [отчёте пилота](../../../docs/testing/loginom-ai-agent/analytics-pilot.md).
 
 Команды выполняются из `evals/`. Для live-прогонов заранее экспортируйте pins принятого controller/handoff: CLI, модели, slots/budget, профили и judge home. Используйте существующую подготовленную среду; общий [harness](../../README.md) описывает интерфейс.
 
