@@ -197,8 +197,18 @@ test('bound existing patches reject a literal conflict or an unobserved variable
  }
 });
 
- test('unconfigured patch without explicit path refuses before any settings gesture and leaves request intact',async()=>{
-  for(const change of [p=>delete p.source.source_path,p=>delete p.source,p=>delete p.format,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
+ test('unconfigured patch uses the verified single path with readback and leaves request intact',async()=>{
+  const f=fixture({unconfigured:true});delete f.parameters.source.source_path;
+  const before=structuredClone(f.parameters);
+  const result=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv');
+  assert.equal(result.verified,true);
+  assert.equal(result.source.fields.source_path.value,'/test/new.csv');
+  assert.deepEqual(result.columns.map(c=>c.name),['Id','Title']);
+  assert.deepEqual(f.parameters,before);
+  assert.equal(f.refreshes,0);
+ });
+ test('unconfigured patch with incomplete settings refuses before any settings gesture and leaves request intact',async()=>{
+  for(const change of [p=>delete p.source,p=>delete p.format,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
    const f=fixture({unconfigured:true});change(f.parameters);const before=structuredClone(f.parameters);
    await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'),e=>e instanceof ImportInitialSettingsError&&/complete settings.source.*explicit source_path/.test(e.message));
    assert.deepEqual(f.gestures,[]);assert.deepEqual(f.parameters,before);
