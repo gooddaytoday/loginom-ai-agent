@@ -15,7 +15,7 @@ mapped control input 0; сначала подтверди тип/связь че
 не проходит обычное сравнение/in. Интервалы и остальные типы переменных,
 кавычки/разделитель внутри элемента и NULL-переменные в этом срезе исключены.
 
-Отбор по управляющей переменной: `dock_node_apply`,
+Для отбора по управляющей переменной выбирай этот узел: `dock_node_apply`,
 `target.type:"transform.filter_data"`, `mode:"conditions"`, `parameters.groups`.
 Источник — исполняемый `variables.calculator`, mode `expression`, либо
 `variables.from_table`, mode `aggregate`. Выполни источник до подключения
@@ -35,10 +35,10 @@ Binding несовместим с literal и `{kind:"variable"}` в том же 
 Подключи W1 `variable_inputs`, kind `control`, input 0. Источник builtin
 `variables.user` использует output 4; настрой его mode `values`, finish `done`,
 сохрани пакет и прочитай переменные отдельным `dock_node_read`. Builtin не Execute.
-Поддержаны точные integer/string scalar-сравнения, без NULL и преобразований;
+Точные integer/string scalar-сравнения, без NULL и преобразований;
 для string явно `case_sensitive`. Проверь `configuration.bindings` после Done.
 Без output mappings сохраняй штатную автосинхронизацию; явные настройки — `mappings`.
-Порядок полей бери из последней schema: после Save/reopen autosync может его менять.
+Порядок полей бери из schema: после Save/reopen autosync может его менять.
 Для привязки существующего условия используй `parameters:{}` и `bindings`;
 pointer относится к сохранённым groups. Остальные условия и их строки сохраняются.
 После изменения только Limit выполни тот же Фильтр: `parameters:{}`, `bindings:[]`,
@@ -46,7 +46,7 @@ pointer относится к сохранённым groups. Остальные 
 Не создавай второй Фильтр.
 Первые N строк: `field:{kind:"row_number"},type:"integer",operator:"<="` без
 `value`, binding того же pointer к integer TopN. Номер строки 1-based; порядок
-исходный. Меняй только TopN (3→5), затем Execute того же Фильтра. После cold
+исходный. Меняй только TopN, затем Execute того же Фильтра. После cold
 проверь `row_number` и ссылку TopN. Последние N отдельным режимом не поддержаны.
 Без patch повторное Execute идёт read-only путём для всех Фильтров, включая
 legacy: `parameters:{}`, `inputs:[]`, `mappings:[]`, без `variable_inputs` и bindings.

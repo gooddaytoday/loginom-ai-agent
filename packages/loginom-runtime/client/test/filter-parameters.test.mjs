@@ -74,5 +74,8 @@ test('control variable operands remain references for scalar and list conditions
 test('Top-N resolves an integer row-number threshold as a variable reference',()=>{
  const c={field:{kind:'row_number'},type:'integer',operator:'<=',value:{kind:'variable',name:'TopN'}};
  assert.deepEqual(resolveFilterConditions({groups:[[c]]},[],[{name:'TopN',type:'integer',value:3,is_null:false}]),[[c]]);
+ assert.throws(()=>resolveFilterConditions({groups:[[c]]},[],[{name:'TopN',type:'integer',value:null,is_null:true}]),/type or NULL differs/);
+ assert.throws(()=>resolveFilterConditions({groups:[[c]]},[],[{name:'TopN',type:'string',value:'3',is_null:false}]),/type or NULL differs/);
+ assert.throws(()=>resolveFilterConditions({groups:[[c]]},[],[]),/Missing or ambiguous/);
  assert.throws(()=>validateFilterConditions({groups:[[{field:c.field,type:'integer',operator:'in',values:c.value}]]}),/Unsupported filter variable operand/);
 });
