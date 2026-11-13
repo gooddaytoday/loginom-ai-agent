@@ -70,7 +70,7 @@ test('JavaScript product read normalizes echo URL cells before the exact durable
   // Replace browser driver dependencies only; execute the actual product dispatch.
   const context={createRedactor,nodeOutputForJournal,readDeferredImportCounts,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
   for(const name of ['VariablesReplace','VariablesColumnUnion','VariablesCalculator','DataToVar','VariablesToTable','UserVariables','LgdImport','LgdExport','Quality','ColUnion','CoarseClasses','FactorAnalysis','TreeConversion','AssnRules','Enrich','Ungroup','Binning','AutoCorrelation','ExcelExport','Tree','ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
-   'Smoothing','DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator'])
+   'Smoothing','DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator','Python'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>assert.fail('Wrong driver')});
   const configureJavascript=()=>{};
   context.createJavascriptCodeNodeSupport=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>({configureJavascript,
@@ -105,7 +105,7 @@ test('shared ordinary product output is normalized before durable ACK without mu
   let returned=raw;
   const context={createRedactor,nodeOutputForJournal,readDeferredImportCounts,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
   for(const name of ['VariablesReplace','VariablesColumnUnion','VariablesCalculator','DataToVar','VariablesToTable','UserVariables','LgdImport','LgdExport','Quality','ColUnion','CoarseClasses','FactorAnalysis','TreeConversion','AssnRules','Enrich','Ungroup','Binning','AutoCorrelation','ExcelExport','Tree','ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','RestRequest','LinRegression','LogRegression','Clustering','CrossTable','Replacement','Duplicates',
-   'Smoothing','DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator','JavascriptCode'])
+   'Smoothing','DateTime','SlidingWindow','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator','JavascriptCode','Python'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>({readOutput:async()=>returned})});
   const support=vm.runInNewContext('('+createCandidateNodeSupport.toString()+')',context)({redactor});
   const drivers=support.nodeApplyDriverFactory({operation:{parameters:{target:{type:'transform.calculator'}}}});
