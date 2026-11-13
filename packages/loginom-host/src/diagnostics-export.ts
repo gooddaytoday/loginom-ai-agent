@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync } from "node:fs"
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readSync, readdirSync, statSync } from "node:fs"
 import { isIPv6 } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -541,7 +541,7 @@ export async function profileSecrets(input: {
       const path = join(input.data, file)
       if (!lstatSync(path, { throwIfNoEntry: false })) continue
       try {
-        collectStrings(JSON.parse(readBounded(path, 1024 * 1024).text), secrets)
+        collectStrings(JSON.parse(readStore(path)), secrets)
       } catch {
         status = "unavailable"
       }
@@ -553,7 +553,7 @@ export async function profileSecrets(input: {
       const path = join(input.dockHome, file)
       if (!lstatSync(path, { throwIfNoEntry: false })) continue
       try {
-        const key = JSON.parse(readBounded(path, 1024 * 1024).text)?.api_key
+        const key = JSON.parse(readStore(path))?.api_key
         if (typeof key === "string") secrets.push(key)
       } catch {
         status = "unavailable"
@@ -572,4 +572,12 @@ function collectStrings(value: unknown, out: string[], depth = 0) {
       if (credentialFields.has(key)) out.push(item)
     } else collectStrings(item, out, depth + 1)
   }
+}
+
+// Credential stores are read only to learn values for masking and are never
+// archived, so a store linked from elsewhere (shared OAuth) is followed.
+function readStore(path: string) {
+  const info = statSync(path)
+  if (!info.isFile() || info.size > 1024 * 1024) throw Error("store-unreadable")
+  return readFileSync(path, "utf8")
 }

@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite"
 import { afterEach, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { profilePaths } from "@loginom-ai-agent/product/cli-profile"
@@ -43,7 +43,10 @@ async function cliProfile() {
     password: "fixture-cli-loginom-pass",
   })
   await store.activate(1)
-  put(join(paths.data, "auth.json"), JSON.stringify({ openai: { type: "oauth", access: "a", refresh: "fixture-cli-oauth-refresh" } }))
+  // As in run-check: the profile links a shared OAuth store.
+  put(join(base, "shared", "auth.json"), JSON.stringify({ openai: { type: "oauth", access: "a", refresh: "fixture-cli-oauth-refresh" } }))
+  mkdirSync(paths.data, { recursive: true, mode: 0o700 })
+  symlinkSync(join(base, "shared", "auth.json"), join(paths.data, "auth.json"))
   put(join(base, "dock", "config.json"), JSON.stringify({ api_key: "fixture-cli-dock-key" }))
   const echo = planted.map((value) => `echo ${value} ${Buffer.from(value).toString("base64")}`).join(" ")
   const db = new Database(join(paths.data, "loginom-ai-agent.db"), { create: true })
