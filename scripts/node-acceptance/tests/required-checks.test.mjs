@@ -192,7 +192,7 @@ test('verify accepts NOT_RUN, CI, COVERED and APPROVED and prints an outcome sum
  const rest=checks.filter(x=>!/`(host-unit|acceptance-tests|main-chat-approval)`/.test(x)).map(x=>result(x));
  for(const [id,outcome] of [['host-unit','NOT_RUN; причина: docs-only этап'],['host-unit',ci],['host-unit',ci+'/job/456'],
   ['host-unit','COVERED; LAB-1533'],['main-chat-approval','APPROVED; решение LAB-1538'],['main-chat-approval','NOT_RUN; причина: этап 0'],
-  ['main-chat-approval','COVERED; LAB-1551']]){
+  ['main-chat-approval','COVERED; LAB-1551'],['main-chat-approval',ci]]){
   const other=['host-unit','acceptance-tests','main-chat-approval'].filter(x=>x!==id).map(x=>result(row(x),x==='main-chat-approval'?'APPROVED; решение 42':'exit 0'));
   const out=verify([result(row(id),outcome),...other,...rest]);
   assert.equal(out.status,0,outcome+'\n'+out.stdout);
@@ -201,7 +201,7 @@ test('verify accepts NOT_RUN, CI, COVERED and APPROVED and prints an outcome sum
   ['host-unit','CI'],['host-unit','CI; https://github.com/gooddaytoday/loginom-ai-agent/pull/1086'],
   ['host-unit','CI; https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/'],['host-unit','CI; https://example.com/actions/runs/1'],
   ['host-unit','COVERED'],['host-unit','COVERED; 1533'],['host-unit','APPROVED; решение LAB-1538'],
-  ['main-chat-approval','APPROVED'],['main-chat-approval','APPROVED; решение'],['main-chat-approval',ci],['main-chat-approval','exit 0']]){
+  ['main-chat-approval','APPROVED'],['main-chat-approval','APPROVED; решение'],['main-chat-approval','exit 0']]){
   const other=['host-unit','acceptance-tests','main-chat-approval'].filter(x=>x!==id).map(x=>result(row(x),x==='main-chat-approval'?'APPROVED; решение 42':'exit 0'));
   const out=verify([result(row(id),bad),...other,...rest]);
   assert.equal(out.status,1,bad);assert.match(out.stdout,new RegExp('Недостающие / неполные ID: .*'+id));

@@ -333,12 +333,9 @@ OUTCOMES = ('exit 0', 'FAIL', 'NOT_RUN', 'CI', 'COVERED', 'APPROVED')
 
 def outcome_of(outcome, command):
     patterns = (('FAIL', r'FAIL; журнал: \S+:[1-9][0-9]*'), ('NOT_RUN', r'NOT_RUN; причина: \S.*'),
+                ('CI', r'CI; https://github\.com/gooddaytoday/loginom-ai-agent/actions/runs/[1-9][0-9]*(?:/job/[1-9][0-9]*)?'),
                 ('COVERED', r'COVERED; LAB-[1-9][0-9]*'))
-    if command is not None:
-        patterns += (('exit 0', r'exit 0'), ('CI', r'CI; https://github\.com/gooddaytoday/loginom-ai-agent'
-                                                r'/actions/runs/[1-9][0-9]*(?:/job/[1-9][0-9]*)?'))
-    else:
-        patterns += (('APPROVED', r'APPROVED; решение \S+'),)
+    patterns += (('exit 0', r'exit 0'),) if command is not None else (('APPROVED', r'APPROVED; решение \S+'),)
     return next((name for name, pattern in patterns if re.fullmatch(pattern, outcome)), None)
 
 

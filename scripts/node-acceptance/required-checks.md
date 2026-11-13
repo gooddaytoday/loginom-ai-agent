@@ -38,6 +38,6 @@ python3 scripts/node-acceptance/required-checks.py verify --base origin/v038 --r
 `head-retest`: MERGED_HEAD_REPO должен указывать на checkout объединённой головы base+head.
 Если для пересечения нет известного набора, задайте HEAD_RETEST_COMMAND тестами этих файлов.
 Результат также: `NOT_RUN; причина: <текст>`, `CI; https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/<N>[/job/<M>]`, `COVERED; LAB-<N>`; `verify` печатает строку `Исходы:` с числом и ID по каждому исходу.
-`main-chat-approval` без команды: `FAIL; журнал: owner-decision.md:3`, `NOT_RUN`, `COVERED` или `APPROVED; решение <id>`; `exit 0` и `CI` — только для ID с командой.
+`main-chat-approval` без команды: `exit 0` не принимается; `APPROVED; решение <id>` — только для ID без команды.
 `verify` возвращает 1 при неполных ID, 2 при ошибке ввода/Git, 0 при полном учёте, включая FAIL.
 Это только сверка текста: она не запускает проверки и не подтверждает их успех или разрешение.
