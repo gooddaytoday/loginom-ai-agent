@@ -36,6 +36,11 @@ import { INTERACTIVE_INPUT_ERROR, readPromptStdin, resolveInteractiveStdin } fro
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
+let dashboardPart: string | undefined
+export function setRunDashboard(text?: string) {
+  dashboardPart = text
+}
+
 function pick(value: string | undefined): ModelInput | undefined {
   if (!value) return undefined
   const [providerID, ...rest] = value.split("/")
@@ -974,7 +979,11 @@ export const RunCommand = effectCmd({
               agent,
               model,
               variant: args.variant,
-              parts: [...files, { type: "text", text: message }],
+              parts: [
+                ...files,
+                { type: "text", text: message },
+                ...(dashboardPart ? [{ type: "text" as const, text: dashboardPart, synthetic: true }] : []),
+              ],
             })
             if (result.error) {
               if (!emit("error", { error: result.error })) UI.error(formatRunError(result.error))

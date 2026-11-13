@@ -86,14 +86,14 @@ export async function invoke(
   args: string[],
   onStart?: (interrupt: () => void) => void,
   environment?: NodeJS.ProcessEnv,
+  directory = true,
 ) {
   const child = Bun.spawn(
     [
       ...(fixture.binary ? [fixture.binary] : [process.execPath, "run", "./src/standalone.ts"]),
       "run",
       "--format=json",
-      "--dir",
-      fixture.directory,
+      ...(directory ? ["--dir", fixture.directory] : []),
       "--model",
       "test/test-model",
       ...args,
