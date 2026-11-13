@@ -401,3 +401,28 @@ test("provider cancellation waits for its credential command to exit", async () 
     server.stop(true)
   }
 }, 30_000)
+
+test("diagnostics export runs while a run holds the profile, with or without --headless", async () => {
+  const root = await temporary()
+  for (const [index, flags] of [[], ["--headless"], ["--no-headless"]].entries()) {
+    const output = path.join(root, `diagnostics-${index}.zip`)
+    const result = await run(
+      root,
+      `import { standalone } from './src/cli/standalone.ts';
+      import { acquireProfile } from './src/cli/profile.ts';
+      await acquireProfile(${JSON.stringify(path.join(root, "profile"))}, 'dev').catch(() => {});
+      await standalone([...${JSON.stringify(flags)}, 'diagnostics', 'export', '--no-chat', '--output', ${JSON.stringify(output)}],
+        async () => { throw new Error('profile acquired') });`,
+      { LOGINOM_DOCK_HOME: path.join(root, "dock") },
+    )
+    expect({ flags, code: result.code, out: result.out, error: result.error.includes("PROFILE_BUSY") }).toEqual({
+      flags,
+      code: 0,
+      out: output + "\n",
+      error: false,
+    })
+    expect((await fs.stat(output)).size).toBeGreaterThan(0)
+    // The running writer's guard stays untouched.
+    expect(await fs.readdir(path.join(root, "profile", ".writer"))).toEqual(["owner"])
+  }
+}, 60_000)

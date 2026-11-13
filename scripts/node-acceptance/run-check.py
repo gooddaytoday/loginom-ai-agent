@@ -100,7 +100,14 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-import.md', data=src / 'fixtures', base=None,
                     input_files=['import-a.csv', 'import-b.csv'], export_count=3, import_initial='import/expected-initial.json',
-                    expected_name='import/expected.json', oracle=src / 'acceptance/oracle.py')
+                    expected_name='import/expected.json', oracle=src / 'acceptance/oracle.py',
+                    import_binding=('imports.text', '/settings/source/source_path', 'CsvPath'))
+    if name == 'excel-import-binding':
+        src = REPO / 'docs/node-development/nodes/imports-excel/acceptance'
+        return dict(source=src, prompt=src / name / 'task.md', data=src / name / 'data', base=None,
+                    input_files=['sales-a.xlsx', 'sales-b.xlsx'], export_count=3, import_initial=name + '/expected-initial.json',
+                    expected_name=name + '/expected.json', oracle=src / name / 'oracle.py',
+                    import_binding=('imports.excel', '/excel/source_path', 'ExcelPath'))
     if name == 'filter-bindings':
         src = REPO / 'docs/node-development/variables/bindings'
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
@@ -2090,10 +2097,11 @@ class Runner:
         if spec.get('lgd_case') == 'variable':
             expected['lgd']['initial_destination'] = lgd_initial_destination
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = lgd_destination
-        if case == 'import-bindings':
+        if spec.get('import_binding'):
+            bound_type, bound_parameter, bound_variable = spec['import_binding']
             for output in expected['outputs']: output['column_order'] = 'exact'
-            expected['binding_inventory'] = [dict(node=dict(type='imports.text'), parameter='/settings/source/source_path',
-                mode='variable', variable=dict(kind='variables', input=0, name='CsvPath', type='string', is_null=False),
+            expected['binding_inventory'] = [dict(node=dict(type=bound_type), parameter=bound_parameter,
+                mode='variable', variable=dict(kind='variables', input=0, name=bound_variable, type='string', is_null=False),
                 source=dict(type='variables.user', output=4))]
         if spec.get('excel_mode') == 'replace':
             write(folder / 'seed-config.json', dict(login=login, books=[dict(fixture=str(spec['data'] / ('existing.'+b['format'])), destination=b['export_destination']) for b in expected['excel_books']]))
@@ -2207,12 +2215,12 @@ class Runner:
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs',
                 *([src / spec['quality_initial_name']] if spec.get('quality_initial_name') else ['--single']),
                 src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
-        if case == 'import-bindings':
+        if spec.get('import_binding'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             updates = [v['value'] for e in evidence if e.get('phase') == 'node_apply_prepared'
                        and e.get('request', {}).get('target', {}).get('type') == 'variables.user'
-                       for v in e['request'].get('parameters', {}).get('variables', []) if v.get('name') == 'CsvPath']
+                       for v in e['request'].get('parameters', {}).get('variables', []) if v.get('name') == spec['import_binding'][2]]
             assert updates, 'IMPORT_BINDING_SOURCE_UPDATE'
             expected['variable_inventory']['outputs'][0]['variables'][0]['value'] = updates[-1]
             write(folder / 'expected.json', expected)

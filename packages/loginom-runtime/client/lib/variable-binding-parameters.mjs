@@ -16,7 +16,7 @@ export function validateVariableBindings(bindings,type){
  for(const b of bindings){
   need(exact(b,['parameter','variable'])&&typeof b.parameter==='string','BINDING_PARAMETER_UNSUPPORTED');
   need(!seen.has(b.parameter),'BINDING_CONFLICT',b.parameter);seen.add(b.parameter);
-  const file=type==='imports.text'&&b.parameter==='/settings/source/source_path';
+  const file=type==='imports.text'&&b.parameter==='/settings/source/source_path'||type==='imports.excel'&&b.parameter==='/excel/source_path';
   const flag=b.parameter===booleanBindingParameter(type);
   need(file||flag||type==='transform.filter_data'&&/^\/groups\/(?:[0-9]|[1-5][0-9]|6[0-3])\/(?:[0-9]|[1-9][0-9]|1[01][0-9]|12[0-7])\/value$/.test(b.parameter),'BINDING_PARAMETER_UNSUPPORTED',b.parameter);
   need(exact(b.variable,['kind','input','name'])&&b.variable.kind===(file?'variables':'control')&&b.variable.input===0,'BINDING_PORT_MISMATCH',b.parameter);

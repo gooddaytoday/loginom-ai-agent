@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js"
@@ -164,6 +164,21 @@ test("profile secrets include every connection generation, not only the active o
   const partial = await profileSecrets({ loginom: p.loginom, codec: credentials("linux") })
   expect(partial.status).toBe("unavailable")
   expect(partial.secrets).toEqual(expect.arrayContaining(["fixture-pass-of-a", "fixture-pass-of-b"]))
+})
+
+test("a linked active connection without generations is reported, never silently skipped", async () => {
+  const p = profile()
+  const directory = join(p.loginom, "connection")
+  const store = connectionStore(directory, credentials("linux"))
+  await store.stage({ generation: 1, revision: 1, url: "https://app.loginom.ai", username: "fixture-linked", apiKey: "fixture-linked-key", password: "fixture-linked-pass" })
+  await store.activate(1)
+  // Only the active record remains, and it is a link to a copy elsewhere.
+  rmSync(join(directory, "generations", "1.json"))
+  mkdirSync(join(p.root, "elsewhere"), { mode: 0o700 })
+  renameSync(join(directory, "connection.json"), join(p.root, "elsewhere", "connection.json"))
+  symlinkSync(join(p.root, "elsewhere", "connection.json"), join(directory, "connection.json"))
+  const known = await profileSecrets({ loginom: p.loginom, codec: credentials("linux") })
+  expect(known.status).toBe("unavailable")
 })
 
 test("masks a login only as a whole token and keeps generic logins and chat roles", async () => {
