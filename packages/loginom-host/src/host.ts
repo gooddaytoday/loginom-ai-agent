@@ -382,8 +382,13 @@ export async function createLoginomHost(options: {
     journal,
   )
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
+  function beginClose() {
+    service.beginClose()
+    resourceController.abort()
+  }
   return {
     ...service,
+    beginClose,
     async updateWorkState() {
       if (lost.size || stale.size || startupCleanup.failed || shutdown.failed)
         throw Error("LOGINOM_RUNTIME_UNAVAILABLE")
@@ -416,8 +421,7 @@ export async function createLoginomHost(options: {
     browserRecovery: options.browserRecovery === true,
     references,
     async close() {
-      service.beginClose()
-      resourceController.abort()
+      beginClose()
       await verifiedResources
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
