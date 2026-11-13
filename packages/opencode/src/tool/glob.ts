@@ -25,15 +25,6 @@ export const GlobTool = Tool.define(
       execute: (params: { pattern: string; path?: string }, ctx: Tool.Context) =>
         Effect.gen(function* () {
           const ins = yield* InstanceState.context
-          yield* ctx.ask({
-            permission: "glob",
-            patterns: [params.pattern],
-            always: ["*"],
-            metadata: {
-              pattern: params.pattern,
-              path: params.path,
-            },
-          })
 
           let search = params.path ?? ins.directory
           search = path.isAbsolute(search) ? search : path.resolve(ins.directory, search)
@@ -44,6 +35,16 @@ export const GlobTool = Tool.define(
           yield* assertExternalDirectoryEffect(ctx, search, {
             bypass: false,
             kind: "directory",
+          })
+
+          yield* ctx.ask({
+            permission: "glob",
+            patterns: [params.pattern],
+            always: ["*"],
+            metadata: {
+              pattern: params.pattern,
+              path: params.path,
+            },
           })
 
           const limit = 100

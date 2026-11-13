@@ -36,6 +36,16 @@ export const GrepTool = Tool.define(
             throw new Error("pattern is required")
           }
 
+          const ins = yield* InstanceState.context
+          const requested = path.isAbsolute(params.path ?? ins.directory)
+            ? (params.path ?? ins.directory)
+            : path.join(ins.directory, params.path ?? ".")
+          const requestedInfo = yield* fs.stat(requested).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          yield* assertExternalDirectoryEffect(ctx, requested, {
+            bypass: false,
+            kind: requestedInfo?.type === "Directory" ? "directory" : "file",
+          })
+
           yield* ctx.ask({
             permission: "grep",
             patterns: [params.pattern],
@@ -45,16 +55,6 @@ export const GrepTool = Tool.define(
               path: params.path,
               include: params.include,
             },
-          })
-
-          const ins = yield* InstanceState.context
-          const requested = path.isAbsolute(params.path ?? ins.directory)
-            ? (params.path ?? ins.directory)
-            : path.join(ins.directory, params.path ?? ".")
-          const requestedInfo = yield* fs.stat(requested).pipe(Effect.catch(() => Effect.succeed(undefined)))
-          yield* assertExternalDirectoryEffect(ctx, requested, {
-            bypass: false,
-            kind: requestedInfo?.type === "Directory" ? "directory" : "file",
           })
 
           const search = FSUtil.resolve(requested)

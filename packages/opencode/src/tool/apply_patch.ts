@@ -71,7 +71,7 @@ export const ApplyPatchTool = Tool.define(
 
       for (const hunk of hunks) {
         const filePath = path.resolve(instance.directory, hunk.path)
-        yield* assertExternalDirectoryEffect(ctx, filePath)
+        yield* assertExternalDirectoryEffect(ctx, filePath, { write: true })
 
         switch (hunk.type) {
           case "add": {
@@ -140,7 +140,7 @@ export const ApplyPatchTool = Tool.define(
             }
 
             const movePath = hunk.move_path ? path.resolve(instance.directory, hunk.move_path) : undefined
-            yield* assertExternalDirectoryEffect(ctx, movePath)
+            yield* assertExternalDirectoryEffect(ctx, movePath, { write: true })
 
             fileChanges.push({
               filePath,

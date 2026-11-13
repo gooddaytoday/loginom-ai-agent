@@ -1,4 +1,6 @@
 import path from "path"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { DashboardSession } from "@/product/dashboard-session"
 import { Effect } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import type * as Tool from "./tool"
@@ -10,6 +12,7 @@ type Kind = "file" | "directory"
 type Options = {
   bypass?: boolean
   kind?: Kind
+  write?: boolean
 }
 
 export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirectory")(function* (
@@ -19,9 +22,19 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
 ) {
   if (!target) return false
 
-  if (options?.bypass) return false
-
   const ins = yield* InstanceState.context
+  const denied = DashboardSession.dashboardPathError(
+    ins.directory,
+    path.isAbsolute(target) ? target : `${ins.directory}${path.sep}${target}`,
+    options?.write,
+  )
+  if (denied)
+    return yield* Effect.die(
+      new PermissionV1.DeniedError({
+        ruleset: [{ permission: "dashboard_path", pattern: denied, action: "deny" }],
+      }),
+    )
+  if (options?.bypass || DashboardSession.isDashboardWork(ins.directory)) return false
   const full = process.platform === "win32" ? FSUtil.normalizePath(target) : target
   if (containsPath(full, ins)) return false
 

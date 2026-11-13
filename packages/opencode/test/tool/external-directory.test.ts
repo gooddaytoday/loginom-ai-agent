@@ -94,7 +94,7 @@ describe("tool.assertExternalDirectory", () => {
     }),
   )
 
-  it.live("skips prompting when bypass=true", () =>
+  it.instance("skips prompting when bypass=true", () =>
     Effect.gen(function* () {
       const { requests, ctx } = makeCtx()
 
