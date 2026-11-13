@@ -1,7 +1,7 @@
 # Подмодель: подплан для Multica
 
 Статус комплекта: `ready_for_development`, редакция 2 от 2026-11-13 (LAB-1543).
-**Допуск реализации: blocked до утверждения W1 и критериев.** Готовность
+**Этап 1: in_progress (LAB-1615).** NW1 и критерии 1–6 утверждены назначением; empty исключён. Готовность
 документов не является разрешением менять общий код или публичный контракт.
 Component ID: `component.control.SuperNode`, slug `control-supernode`.
 Предложены runtime type **`control.supernode`** и mode **`tabular_boundary`**.

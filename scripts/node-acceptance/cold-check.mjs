@@ -1,3 +1,4 @@
+import {observeSupernodeSaved} from './supernode-audit.mjs';
 import {verifyN18JavascriptStep} from './n18-cold.mjs';
 import {observeSortingSaved} from './sorting-modes.mjs';
 import {observeColUnionSavedSettings} from './col-union-settings.mjs';
@@ -197,6 +198,8 @@ page = context.pages()[0]
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
+  if(expected.nodes.some(n=>n.type==='control.supernode'))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
+   platform:compatibilityPlatform,makeWorkspacePrepareCode,record});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
   let coldChannelSequence=0;

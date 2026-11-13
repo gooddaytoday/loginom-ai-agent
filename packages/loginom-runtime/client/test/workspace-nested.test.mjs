@@ -141,9 +141,11 @@ for(const trialFail of ['throw','block'])test('NW1 a refused trial leaves the re
   assert.equal(replay.status,'READY',JSON.stringify(replay));assert.equal(f.clicks(),1);
 });
 
-test('NW1 a lost dispatch reply is reconciled without a gesture under the same ID',async()=>{
+test('NW1 a lost dispatch reply retains possible effect; same ID only observes until deadline',async()=>{
   const f=fixture({loseDispatchReply:true}),unknown=await f.navigate(f.ref);
   assert.equal(unknown.status,'NOT_READY');
+  assert.equal(unknown.effect_possible,true);
+  assert.equal(unknown.verification_required,true);
   assert.equal(f.preparation.receipts.get('enter').phase,'effect_possible');assert.equal(f.clicks(),0);
   const retried=await f.navigate(f.ref,'enter','enter',{timeoutMs:300});
   assert.equal(retried.status,'NOT_READY');assert.equal(retried.effect_possible,true);

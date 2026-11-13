@@ -90,7 +90,7 @@
 | Управление | `control-condition` | backlog | `nested_workflow`, `typed_variables` (по справке вложенного графа нет — см. подплан, раздел 2) |
 | Управление | `control-loop` | backlog | `nested_workflow`, `typed_variables` |
 | Управление | `control-execnode`, `control-referencenode` | backlog | `nested_workflow` |
-| Управление | `control-supernode` | backlog | `nested_workflow`, `tabular` |
+| Управление | `control-supernode` | in_progress (LAB-1615), `supernode-calc` | `nested_workflow`, `tabular` |
 | Data Mining | `datamining-arimax` | backlog | `tabular`, `ordered_fixture`, `training_contract`, `typed_variables` |
 | Data Mining | `datamining-clope` | backlog | `tabular`, `transactions_fixture`, `training_contract` |
 | Data Mining | `datamining-emclust`, `datamining-neuralnetclass`, `datamining-neuralnetreg`, `datamining-sonn` | backlog | `tabular`, `training_contract` |

@@ -477,7 +477,13 @@ async function navigatePreparedGraph(page, options) {
       if(options.recoverOnly)throw Error('RECEIPT_LOST');
       const before=await inspect('reserve');trace.push({event:'graph_navigation_prepared',direction:options.graphNavigation.direction,control_tid:before.control_tid});
       const control=page.locator('[data-tid='+JSON.stringify(before.control_tid)+']');
-      await control.click({trial:true,timeout:remaining()});remaining();await inspect('dispatch');
+      await control.click({trial:true,timeout:remaining()});remaining();
+      try{await inspect('dispatch');}
+      catch(error){
+        effectPossible=true;
+        try{effectPossible=(await inspect('lookup')).effect_possible===true;}catch{}
+        throw error;
+      }
       effectPossible=true;await control.click({timeout:remaining()});
       trace.push({event:'graph_navigation_clicked',control_tid:before.control_tid});
     }else if(old.phase==='reserved')throw Error('Navigation was reserved; no gesture is replayed');

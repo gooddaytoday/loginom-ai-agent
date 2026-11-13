@@ -45,6 +45,7 @@ class ExternalClient {
       await this.f.finishPreparation?.promise;
       value={status:'READY',authenticated:true,target_verified:true,
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),ownership_verified:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null,...(this.f.finishPreparation?{persisted:false}:{})}};
+      if(this.f.scenario.startsWith('draft-navigated'))value.package_ref={path:null,persisted:false};
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
       if(this.f.failedDraft)value={...value,reason:'NATIVE_MESSAGE_BOX_BLOCKED',created_draft:true};
@@ -689,7 +690,7 @@ for(const scenario of ['generated-id','reconciled-own','reconciled-older','recon
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
+for(const scenario of ['draft-clean','draft-navigated','draft-navigated-foreign','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
  test('normal shutdown of an unsaved draft without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-draft-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -706,6 +707,11 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     await client.callTool({name:'dock_prepare',arguments:{intent:'new_draft'}});
     const state=session.metadata.workspacePreparation.state;
     state.package_ref={path:null,persisted:scenario==='draft-persisted'};
+    if(scenario.startsWith('draft-navigated')){
+      session.metadata.workspacePreparation.identity=JSON.stringify({operation_id:'navigation',intent:'existing_workflow',workflow_ref:state.workflow_ref});
+      state.created_draft=false;
+      if(scenario==='draft-navigated-foreign')state.document_id='foreign-document';
+    }
     if(scenario==='draft-not-owned')state.created_draft=false;
     if(scenario.startsWith('draft-cancelled-')){
       session.metadata.workspaceReady=false;session.metadata.targetIdentity=null;
@@ -718,8 +724,8 @@ for(const scenario of ['draft-clean','draft-dirty','draft-busy','draft-unsettled
     f.busy=scenario==='draft-busy';f.unsettled=scenario==='draft-unsettled';
     const result=await bridge.close();
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
-    assert.equal(result.package_cleanup.status,scenario==='draft-clean'?'SUCCEEDED':'BLOCKED');
-    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-dirty'].includes(scenario));
+    assert.equal(result.package_cleanup.status,['draft-clean','draft-navigated'].includes(scenario)?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-navigated','draft-dirty'].includes(scenario));
     if(f.cleanupOptions){
       assert.equal(f.cleanupOptions.unsavedDraft,true);assert.equal(f.cleanupOptions.packagePath,null);
       assert.equal(f.cleanupOptions.diagnosticDiscard,false);

@@ -151,6 +151,7 @@ export async function createBridge(config, session, { browserTransport: managedB
   const saveAdmissions = new Map();
   let saveSequence=0;
   let lastSavedPackage = null;
+  let ownedUnsavedDraft = null;
   // Save As closes the package and reopens it in a new tab. Until a new
   // preparation, the original receipt no longer owns that tab for cleanup.
   let reopenedSave = null;
@@ -425,6 +426,9 @@ export async function createBridge(config, session, { browserTransport: managedB
               assertTarget: target => assertCatalogTarget(pinnedActions, target), record: recordExecution,
               save: () => session.save(catalog),
               });
+              if(state.status==='READY'&&preparationRequest.intent==='new_draft'&&state.created_draft===true
+                &&state.package_ref?.persisted===false&&state.package_ref.path===null)
+                ownedUnsavedDraft={document_id:state.document_id,tab_tid:state.workflow_ref?.tab_tid,account:state.loginom_account};
               if (userProfile && session.metadata.workspaceReady === true) userWorkflows.remember(state);
               return state;
             });
@@ -771,12 +775,16 @@ export async function createBridge(config, session, { browserTransport: managedB
           && prepared.state.effect_possible === true && prepared.state.operation_id === preparationRequest.operation_id
           && prepared.state.session_id === session.metadata.sessionId;
         const unsavedDraft = failedDraft || normalCleanup && !lastSavedPackage
-          && preparationRequest?.intent === 'new_draft'
+          && (preparationRequest?.intent === 'new_draft'&&prepared.state?.created_draft === true
+            || preparationRequest?.intent === 'existing_workflow'&&prepared.state?.status==='READY'
+              &&ownedUnsavedDraft&&ownedUnsavedDraft.document_id===prepared.state.document_id
+              &&ownedUnsavedDraft.tab_tid===prepared.state.workflow_ref?.tab_tid
+              &&ownedUnsavedDraft.account===prepared.state.loginom_account)
           && (session.metadata.workspaceReady === true && prepared.state?.status === 'READY'
             || prepared.state?.status === 'NOT_READY' && prepared.state.reason === 'CANCELLED'
               && prepared.state.target_verified === true && prepared.state.ownership_verified === true)
           && prepared.state?.document_id && prepared.state.workflow_ref?.tab_tid
-          && prepared.state.created_draft === true && prepared.state.package_ref?.persisted === false
+          && prepared.state.package_ref?.persisted === false
           && prepared.state.package_ref.path === null;
         const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage ?? (failedOpen ? preparationRequest.package_path : null) : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);

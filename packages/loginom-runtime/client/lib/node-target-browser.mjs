@@ -64,8 +64,8 @@ export async function readGraph(page, task) {
         && (labelElements.length !== 1 || graph.view.getState(nativeLabel.FCell)?.text?.node !== labelElements[0]
           || !containers[0].contains(labelElements[0]) || !visible(labelElements[0])))) fail('Node label is not bound to its rendered identity');
       const label = nativeLabel.FRawValue;
-      const type = nodeTypes.find(t => t.icon_class === n.FIconCls)?.type ?? n.FIconCls;
       const boundaryRole=diagram.FIsSubmodel===true&&(diagram.GenericInputNode===n?'input':diagram.GenericOutputNode===n?'output':null);
+      const type=boundaryRole==='output'?'control.supernode_output':nodeTypes.find(t=>t.type!=='control.supernode_output'&&t.icon_class===n.FIconCls)?.type??n.FIconCls;
       if(boundaryRole&&(n.FIconCls!=='bg-vendor-icon-nullvendor'||!n.data
         ||(n.FPorts??[]).flatMap(g=>g.FCollection??[]).some(p=>p.parent!==n||p.FCell?.parent!==n.FCell||p.FType!==(boundaryRole==='input'?1:0))))fail('Submodel boundary identity changed');
       const inputs = [], outputs = [], allPorts=[],variableInputs=[],variableOutputs=[];
