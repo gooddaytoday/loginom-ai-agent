@@ -140,10 +140,18 @@ export function createRestRequestNodeSupport(config){
     const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,{...request.parameters,...(request.target.kind==='existing'?{existing_target:request.target.ref}:{})},config);
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
-   beforeInput:(_,ctx)=>linkConnection(ctx),
+   beforeInput:async(_,ctx,{channel})=>{
+    await linkConnection(ctx);
+    if(request.parameters.headers?.some(h=>typeof h.value==='object')){
+     const explicit=request.mappings.some(m=>m.kind==='variables');
+     const mapped=await channel[explicit||request.target.kind==='existing'?'readVariablePortMapping':'mapVariablePort']({direction:'input',kind:'variables',port:0});
+     need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true,'header variable mapping was not verified');
+     options.operation.restHeaderVariables=mapped.mapping;
+    }
+   },
    configure:async(channel,p,{request})=>{
     const ctx={document_id:request.document_id,workflow_ref:request.workflow_ref,node:options.operation.nodeApply.node,deadline:options.operation.deadline};
-    const result=await runRestStep(options,ctx,'configure',makeRestRequestCode,{...p,new_node:request.target.kind==='new'},config);
+    const result=await runRestStep(options,ctx,'configure',makeRestRequestCode,{...p,new_node:request.target.kind==='new',...(options.operation.restHeaderVariables?{header_variables:options.operation.restHeaderVariables}:{})},config);
     return {...result,configuration:{...result.configuration,connection}};
    },
   }).nodeApplyDriverFactory(options);

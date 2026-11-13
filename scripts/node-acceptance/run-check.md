@@ -1,3 +1,12 @@
+`rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
+in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
+
+`rest-variables` uses the approved REST C4 `task-variables.md`, requests.csv and
+unchanged `acceptance/modes/variables/expected.json`. Cycle first → second must
+update the response on the same REST without reconfiguration. Full typed output,
+CSV, Save, cold reexecution and cleanup use stock checks. Only task and CSV reach
+the model; oracle/expected stay private.
+
 `text-file-info` uses the unchanged text-import `task-file-info.md` and original
 January/February inputs next to the saved package. Both complete typed tables
 and CSVs use frozen `expected-absolute-path.json` then `expected-relative-path.json`;
@@ -95,6 +104,14 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
+`fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
+`cases.boolean.stages` from LAB-1558. Native Boolean min/max/mode and integer
+unique/null counts, tie → False and all-NULL mode → False are checked as full
+typed rows with exact field order and `ordered:false`. The independent oracle
+stays private. CSV, Save, cold execution without configuration and cleanup use
+stock checks; only the business task and CSV reach the model.
+
 `group-real` uses grouping `acceptance/types/task-real.md` and only
 `fixtures/types/types.csv`. `expected-real.json` contains the unchanged
 `cases.real.stages` from the LAB-1558 proposal; its independent `oracle.py
@@ -103,6 +120,13 @@ all-NULL and the mode tie are checked as complete typed rows with exact field
 order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
 the existing node, cold execution without configuration and cleanup use stock
 checks. Only the business task and CSV reach the model.
+
+`row-filter-top-n` uses the approved row-filter `acceptance/typed/task-top-n.md`
+and only `fixtures/typed/rows.csv`. The private stdlib oracle checks TopN 3→5,
+both full ordered outputs and four CSVs. The source alone changes on the same
+Filter GUID; readback requires integer `row_number <= TopN`, not a literal.
+Stock Save, cold binding/field readback without configuration, both typed
+outputs and cleanup apply. Oracle/expected never reach the model.
 
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
@@ -873,6 +897,11 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-partition-sequential`: C6, Enter на partition.csv, первые 16 строк
+обучают, следующие 2 тестовые. Только task-partition-sequential.md и CSV
+передаются модели; неизменённые expected.json и oracle остаются в оснастке.
+Полные порты 0/1, прогнозы теста 6.5/9.5, CSV, Save, cold без настройки и cleanup.
+
 `linreg-coefficients`: C7, Enter с `linear_regression.statistics:"full"`,
 утверждённые task-coefficients.md, design.csv и expected/coefficients.json.
 Порт 1 — девять native-столбцов (Name…Y_upperBound), NULL сохраняются;
@@ -890,6 +919,12 @@ Save, cold без перенастройки и Teach, cleanup.
 2×10 ячеек с константой, SE/Wald/p/odds ratio и 95% границами. Утверждённый
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
+
+`logreg-lasso`: ручной L1, lambda_lasso=1, утверждённые task-lasso.md и train.csv
+из `datamining-logregression/acceptance/modes/lasso`. Неизменённый независимый
+oracle.py проверяет полный прогноз 32×8, типы, порядок и NULL. Повтор настройки
+и Teach — на том же узле. CSV, Save, cold без настройки/Teach и cleanup — штатные.
+Модель получает только задачу и CSV; expected и oracle остаются приватными.
 
 `logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
 повтор настройки и Teach того же узла; прогноз по независимому штрафному

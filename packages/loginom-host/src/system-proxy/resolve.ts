@@ -1,4 +1,5 @@
 import { hostname } from "node:os"
+import { WINDOWS_POWERSHELL_TIMEOUT_MS } from "../windows-powershell"
 
 import { proxyHostPort } from "./address"
 import { translateBypass } from "./bypass"
@@ -203,7 +204,7 @@ async function loadSettings(
   if (input.read) return loadRead(input.read, input)
   const read = await deadline(
     readSystemProxy({ platform: input.platform, environment: input.environment, timeoutMs: input.deadlineMs }),
-    input.deadlineMs ?? 8000,
+    input.deadlineMs ?? ((input.platform ?? process.platform) === "win32" ? WINDOWS_POWERSHELL_TIMEOUT_MS : 8000),
   )
   if (read.ok === false) return { ok: false, code: read.reason === "timeout" ? "timeout" : "read-failed" }
   if (!read.value.ok) return { ok: false, code: read.value.code }
@@ -217,7 +218,7 @@ async function loadRead(read: () => Promise<SystemProxySnapshot | undefined>, in
   } catch {
     return { ok: false as const, code: "read-failed" as const }
   }
-  const waited = await deadline(reading, input.deadlineMs ?? 8000)
+  const waited = await deadline(reading, input.deadlineMs ?? ((input.platform ?? process.platform) === "win32" ? WINDOWS_POWERSHELL_TIMEOUT_MS : 8000))
   if (waited.ok === false)
     return { ok: false as const, code: waited.reason === "timeout" ? ("timeout" as const) : ("read-failed" as const) }
   if (!waited.value) return { ok: true as const }

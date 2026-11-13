@@ -102,6 +102,11 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
  state=await observe('parameters','explicit logistic category readback');need(state.node_logregression.values.pedEventId===event.index,'event selection differs from the observed category');
  if(state.node_logregression.values.pedAutoMethod){await act('parameters','disable automatic logistic method','pedAutoMethod;ValueControl;DisplayEl',{verb:'set_checked',checked:false});state=await observe('parameters','manual logistic method');}
  const methods={enter:[0,'Enter (Принудительное включение)'],forward:[1,'Forward (Пошаговое включение)'],backward:[2,'Backward (Пошаговое исключение)'],stepwise:[3,'Stepwise (Пошаговое включение/исключение)'],ridge:[4,'Ridge (Гребневая регрессия)']};
+ if(mode==='lasso'){
+  const choices=state.node_logregression.method_choices?.filter(c=>/^LASSO\b/.test(c.label));
+  need(choices?.length===1&&Number.isInteger(choices[0].value),'one observed LASSO method is required');
+  methods.lasso=[choices[0].value,choices[0].label];
+ }
  need(methods[mode],'unsupported regression method');
  await choose('pedRegressionMethod',methods[mode][1],methods[mode][0]);
  if(!state.node_logregression.values.pedUseDetailedSettings){await act('parameters','show logistic details','pedUseDetailedSettings;ValueControl;DisplayEl',{verb:'set_checked',checked:true});state=await observe('parameters','logistic details enabled');}
@@ -119,6 +124,11 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   await choose('pedRidgeSetupMethod','Задать вручную',0,'details');
   need(state.node_logregression.disabled?.pedLambdaRidge===false&&state.node_logregression.values.pedRidgeSetupMethod===0,'manual Ridge lambda must be editable');
   cutoffs.push(['pedLambdaRidge',p.regularization.lambda_ridge,'lambda_ridge']);
+ }else if(mode==='lasso'){
+  need(state.node_logregression.disabled?.pedLassoSetupMethod===false,'manual LASSO setup must be editable');
+  await choose('pedLassoSetupMethod','Задать вручную',0,'details');
+  need(state.node_logregression.disabled?.pedLambdaLasso===false&&state.node_logregression.values.pedLassoSetupMethod===0,'manual LASSO lambda must be editable');
+  cutoffs.push(['pedLambdaLasso',p.regularization.lambda_lasso,'lambda_lasso']);
  }else if(mode!=='enter'){
   const criteria={deviance:[0,'Deviance'],aic:[1,'Информационный критерий Акаике'],aicc:[2,'Информационный критерий Акаике скорректированный'],bic:[3,'Информационный критерий Байеса'],hqic:[4,'Информационный критерий Ханнана-Куинна']};
   const wanted=p.selection??{criterion:'deviance',...(mode!=='backward'?{entry_significance:0.05}:{}),...(mode!=='forward'?{removal_significance:0.1}:{})};
@@ -158,6 +168,7 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   need(state.node_logregression.values[key]===value,'logistic numeric setting differs: '+key);
  }
  if(mode==='ridge')regularization={lambda_ridge:state.node_logregression.values.pedLambdaRidge};
+ if(mode==='lasso')regularization={lambda_lasso:state.node_logregression.values.pedLambdaLasso};
  if(selection)for(const [key,,name] of cutoffs)selection[name]=state.node_logregression.values[key];
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'logistic settings accepted',ready:s=>s.wizard?.stage==='done'});

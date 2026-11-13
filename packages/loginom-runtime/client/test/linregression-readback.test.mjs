@@ -4,6 +4,16 @@ import {linRegressionConfigurationReadback} from '../lib/linregression-readback.
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 const node={document_id:'doc',workflow_id:'workflow',node_id:'regression'};
+test('sequential partition readback retains observed row counts in the additive result schema',()=>{
+ const input=candidate(),partition={method:'sequential',train_count:16,test_count:2};
+ input.phases[1].value.configuration.partition=partition;
+ const result=linRegressionConfigurationReadback(input);
+ assert.deepEqual(result.partition,partition);
+ const validator=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ assert.equal(validator(result).valid,true);
+ partition.test_count=3;assert.equal(result.partition.test_count,2);
+ assert.equal(validator({...result,partition:{...result.partition,method:'random'}}).valid,false);
+});
 function candidate(){
  const values={input_mapping:{},configure:{configuration:{verified:true,node_context:node,fields:[{name:'RowID',usage_type:0},{name:'X',usage_type:3},{name:'Y',usage_type:4}],target_field:'Y',intercept:true},validation:{status:'accepted_by_loginom_next'}},node_finish:{settings_applied:true},output_mapping:{},finish:{settings_applied:true,mode:'execute',execution_id:'execute-2',training:{status:'trained',node,execution_id:'train-1',source:[{node:{...node,node_id:'import'},output:0,input:0}]}}};
  return {node,operation_id:'operation',phases:Object.entries(values).map(([phase,value])=>({phase,status:'verified',receipt_id:'operation:'+phase,value:{verified:true,cleanup_complete:true,...value}}))};

@@ -37,3 +37,13 @@ test('full coefficient statistics are an Enter-only choice and refuse elsewhere 
   assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{...extra,statistics:'full'}},mode),/statistics.*only in mode enter/);
  assert.deepEqual(resolveLinRegressionRoles({...p,linear_regression:{statistics:'full'}},fields).map(f=>f.usage_type),[0,3,4,0]);
 });
+
+test('Enter accepts explicit sequential train/test row counts without weakening other mode options',()=>{
+ const partition={method:'sequential',train_count:16,test_count:2};
+ for(const extra of [{},{statistics:'full'}])assert.doesNotThrow(()=>validateLinRegressionParameters({...p,linear_regression:{partition,...extra}},'enter'));
+ for(const change of [{method:'random'},{train_count:0},{train_count:1.5},{test_count:-1},{test_count:Infinity},{unused:0}])
+  assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{partition:{...partition,...change}}},'enter'),/partition/);
+ for(const mode of ['apply','forward','backward','stepwise','ridge','lasso','elastic'])
+  assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{partition}},mode),/linear_regression\.partition is supported only in mode enter/);
+ assert.throws(()=>validateLinRegressionParameters({...p,linear_regression:{}},'enter'));
+});
