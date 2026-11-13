@@ -168,6 +168,68 @@ test("an unreadable chat database leaves the chat unavailable and exports everyt
   }
 })
 
+test("a chat database locked for a moment by the running CLI is waited for, not reported unavailable", async () => {
+  const profile = await cliProfile()
+  const file = join(profile.paths.data, "loginom-ai-agent.db")
+  // A separate process holds an exclusive lock, as a writer of the running CLI
+  // may do briefly; bun:sqlite is synchronous, so the lock cannot live in this process.
+  const holder = Bun.spawn(
+    [
+      process.execPath,
+      "--eval",
+      `const { Database } = require("bun:sqlite");
+      const db = new Database(${JSON.stringify(file)});
+      db.run("BEGIN EXCLUSIVE");
+      console.log("locked");
+      setTimeout(() => { db.run("COMMIT"); db.close() }, 700);`,
+    ],
+    { stdout: "pipe", stderr: "inherit" },
+  )
+  const reader = holder.stdout.getReader()
+  expect(new TextDecoder().decode((await reader.read()).value)).toContain("locked")
+  reader.releaseLock()
+  const output = join(profile.base, "locked.zip")
+  const result = await run(["diagnostics", "export", "--output", output], profile)
+  expect(await holder.exited).toBe(0)
+  expect(result.code).toBe(0)
+  expect(result.stderr).toContain("chat: included")
+  expect(JSON.parse((await unpack(output)).files.get("chat/session.json")!).info.id).toBe("ses_new")
+})
+
+test("the chat is read as one snapshot: a message written meanwhile is not exported without its parts", async () => {
+  const profile = await cliProfile()
+  const file = join(profile.paths.data, "loginom-ai-agent.db")
+  const wal = new Database(file)
+  wal.run("PRAGMA journal_mode = WAL")
+  const writer = new Database(file)
+  // The running CLI appends a message with its part right after the parts were read.
+  const query = Database.prototype.query
+  Database.prototype.query = function (this: Database, sql: string) {
+    const statement = query.call(this, sql)
+    if (this === writer || !sql.startsWith("SELECT id, message_id, data FROM part")) return statement
+    const all = statement.all.bind(statement)
+    return Object.assign(Object.create(statement), {
+      all: (...args: unknown[]) => {
+        const rows = all(...(args as []))
+        writer.run("INSERT INTO message VALUES ('msg_late', 'ses_new', 2, ?)", [JSON.stringify({ role: "assistant" })])
+        writer.run("INSERT INTO part VALUES ('prt_late', 'msg_late', 'ses_new', ?)", [JSON.stringify({ type: "text", text: "late" })])
+        return rows
+      },
+    })
+  } as typeof query
+  try {
+    const output = join(profile.base, "snapshot.zip")
+    expect((await run(["diagnostics", "export", "--output", output], profile)).code).toBe(0)
+    const chat = JSON.parse((await unpack(output)).files.get("chat/session.json")!)
+    expect(writer.query("SELECT count(*) AS n FROM message WHERE id = 'msg_late'").get()).toEqual({ n: 1 })
+    expect(chat.messages.map((message: any) => [message.info.id, message.parts.length])).toEqual([["msg_ses_new", 1]])
+  } finally {
+    Database.prototype.query = query
+    writer.close()
+    wal.close()
+  }
+})
+
 test("credentials of an earlier connection are masked in an older chat after switching accounts", async () => {
   const profile = await cliProfile()
   const store = connectionStore(join(profile.paths.loginom, "connection"), cliCredentials("linux"))
@@ -206,6 +268,17 @@ test("the default output is loginom-diagnostics-<stamp>.zip in the working direc
   expect(readdirSync(cwd)).toEqual(["loginom-diagnostics-20261113T102030.zip"])
   const again = await run(["diagnostics", "export"], profile, cwd)
   expect(again).toEqual({ code: 1, stdout: "", stderr: "DIAGNOSTICS_OUTPUT_EXISTS\n" })
+})
+
+test("an output file created after the existence check is kept and reported as existing", async () => {
+  const profile = await cliProfile()
+  const output = join(profile.base, "raced.zip")
+  // The command checks the output synchronously before its first await; the
+  // file appears while the archive is being built and before it is written.
+  const pending = run(["diagnostics", "export", "--output", output], profile)
+  writeFileSync(output, "someone else's file")
+  expect(await pending).toEqual({ code: 1, stdout: "", stderr: "DIAGNOSTICS_OUTPUT_EXISTS\n" })
+  expect(readFileSync(output, "utf8")).toBe("someone else's file")
 })
 
 test("no planted value or internal address reaches the raw zip or any entry", async () => {
