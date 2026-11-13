@@ -114,7 +114,13 @@ export async function diagnosticsCommand(args: string[], paths: DiagnosticsProfi
         ...(chatReason ? { chatReason } : {}),
       },
     })
-    writeFileSync(target, zip, { mode: 0o600, flag: "wx" })
+    try {
+      writeFileSync(target, zip, { mode: 0o600, flag: "wx" })
+    } catch (error) {
+      // The file may appear after the check above; it is still never overwritten.
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw Error("DIAGNOSTICS_OUTPUT_EXISTS")
+      throw error
+    }
     const files = manifest.files as Array<{ status: string; reason?: string }>
     const reasons = new Map<string, number>()
     for (const file of files.filter((item) => item.status !== "included"))

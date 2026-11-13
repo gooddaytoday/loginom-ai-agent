@@ -208,6 +208,17 @@ test("the default output is loginom-diagnostics-<stamp>.zip in the working direc
   expect(again).toEqual({ code: 1, stdout: "", stderr: "DIAGNOSTICS_OUTPUT_EXISTS\n" })
 })
 
+test("an output file created after the existence check is kept and reported as existing", async () => {
+  const profile = await cliProfile()
+  const output = join(profile.base, "raced.zip")
+  // The command checks the output synchronously before its first await; the
+  // file appears while the archive is being built and before it is written.
+  const pending = run(["diagnostics", "export", "--output", output], profile)
+  writeFileSync(output, "someone else's file")
+  expect(await pending).toEqual({ code: 1, stdout: "", stderr: "DIAGNOSTICS_OUTPUT_EXISTS\n" })
+  expect(readFileSync(output, "utf8")).toBe("someone else's file")
+})
+
 test("no planted value or internal address reaches the raw zip or any entry", async () => {
   const profile = await cliProfile()
   const output = join(profile.base, "secrets.zip")
