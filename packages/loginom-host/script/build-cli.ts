@@ -1,6 +1,6 @@
 import { $ } from "bun"
 import { buildPhase } from "./build-phase"
-import { verifyBunBaselineArchive } from "./native-resource-candidates"
+import { useBunBaseline, verifyBunBaselineArchive } from "./native-resource-candidates"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
@@ -22,9 +22,8 @@ const repo = resolve(import.meta.dir, "../../..")
 const args = process.argv.slice(2)
 const destination = args[0]
 const noArchive = args.slice(1).includes("--no-archive")
-// Windows x64 clients can lack AVX2 even when the build runner supports it.
-// Ship Bun's baseline runtime there; Linux can opt in for older x64 CPUs.
-const baseline = process.platform === "win32" || args.slice(1).includes("--baseline")
+// Linux and Windows x64 clients can lack AVX2 even when the build runner supports it.
+const baseline = useBunBaseline(process.platform, process.arch, args.slice(1))
 if (args.slice(1).some((arg) => arg !== "--no-archive" && arg !== "--baseline")) throw new Error("Unknown build option")
 if (baseline && (!["linux", "win32"].includes(process.platform) || process.arch !== "x64"))
   throw new Error("Baseline builds require linux-x64 or win32-x64")
@@ -52,19 +51,21 @@ const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT
 if (process.platform === "win32" && (!systemRoot || !isAbsolute(systemRoot)))
   throw Error("LOGINOM_ARCHIVER_UNAVAILABLE")
 const archiver = process.platform === "win32" ? join(systemRoot!, "System32/tar.exe") : "/usr/bin/tar"
-// Bun 1.3.14 can fail to extract its downloaded Windows baseline target.
-// Build with the verified baseline executable itself so compile reuses it.
-if (process.platform === "win32" && process.env.LOGINOM_CLI_BASELINE_CHILD !== "1") {
+// Build with the verified baseline executable so compile reuses it instead of
+// downloading an unchecked target. This also avoids Bun's Windows extraction bug.
+if (baseline && process.env.LOGINOM_CLI_BASELINE_CHILD !== "1") {
   const runtime = await mkdtemp(join(tmpdir(), "loginom-cli-bun-"))
   try {
     const url = `https://github.com/oven-sh/bun/releases/download/bun-v${bunNotice.version}`
-    const response = await fetch(`${url}/bun-windows-x64-baseline.zip`)
+    const target = `bun-${process.platform === "win32" ? "windows" : "linux"}-x64-baseline`
+    const response = await fetch(`${url}/${target}.zip`)
     if (!response.ok) throw Error("LOGINOM_BUN_DOWNLOAD_FAILED")
     const archive = Buffer.from(await response.arrayBuffer())
-    verifyBunBaselineArchive(archive)
+    verifyBunBaselineArchive(archive, process.platform as "linux" | "win32")
     await Bun.write(join(runtime, "bun.zip"), archive)
-    await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
-    await $`${join(runtime, "bun-windows-x64-baseline/bun.exe")} ${import.meta.path} ${args}`.env({
+    if (process.platform === "win32") await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
+    if (process.platform === "linux") await $`/usr/bin/unzip -q ${join(runtime, "bun.zip")} -d ${runtime}`
+    await $`${join(runtime, target, process.platform === "win32" ? "bun.exe" : "bun")} ${import.meta.path} ${args}`.env({
       ...process.env,
       LOGINOM_CLI_BASELINE_CHILD: "1",
     })
