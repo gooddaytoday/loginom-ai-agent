@@ -175,9 +175,11 @@ export async function restRequestCapability(page,t,readContext){
        return {tid:e.getAttribute('data-tid'),value:field.getValue()};};
       return names.map((e,i)=>{
        const literal=field(values[i],false),base=literal.tid.slice(0,-';PropContainer;ValueContainer;ValueControl'.length);
-       const vs=[...exact(base+';PropContainer;VariableContainer;VariableControl')].filter(e=>e.getBoundingClientRect().width>0);
-       if(vs.length>1)throw Error('REST header variable control is ambiguous');
-       const value=vs.length?{tid:vs[0].getAttribute('data-tid'),variable_mode:true}:literal;
+       const switches=exact(base+';SwitchButton'),sw=switches.length===1&&Ext.getCmp(switches[0].id);
+       if(sw?.el?.dom!==switches[0]||typeof sw.pressed!=='boolean')throw Error('REST header mode switch is unavailable');
+       const vs=exact(base+';PropContainer;VariableContainer;VariableControl');
+       if(sw.pressed&&vs.length!==1)throw Error('REST header variable control is ambiguous');
+       const value=sw.pressed?{tid:vs[0].getAttribute('data-tid'),variable_mode:true}:field(values[i]);
        return {name:field(e),value,base,delete_tid:deletes[i].getAttribute('data-tid')};
       });
      },{root,headers});
@@ -219,7 +221,7 @@ export async function restRequestCapability(page,t,readContext){
       need(f.type===5&&f.source?.type===5&&Number.isSafeInteger(f.id)&&Number.isSafeInteger(f.source.id),'header variable must have a connected string source');
       if(!row.value.variable_mode){await click(row.base+';SwitchButton');row=await wait('header variable mode',async()=>{const r=(await readHeaders())[index];return r?.value.variable_mode?r:null;});}
       const select=vs=>{const matches=vs.filter(v=>v.name===f.name&&v.index===f.index);need(matches.length===1,'header variable name/index differs');const v=matches[0];
-       need(v.type===5&&!v.is_null&&typeof v.value==='string'&&v.value.length<=2048&&!/[\x00-\x1f\x7f]/.test(v.value),'header variable requires a bounded non-NULL string without control characters');return v;};
+       need(v.type===5&&!v.is_null&&typeof v.value==='string'&&v.value.length<=2048&&!/[\x00-\x1f\x7f]/.test(v.value),'header variable requires a bounded non-NULL string without control characters; execute its source, then retry the SAME REST with a NEW operation_id');return v;};
       let v=select(await readVariable(row));
       if(!v.selected){
        await click(row.value.tid+';trg_picker');

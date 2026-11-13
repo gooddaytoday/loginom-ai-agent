@@ -16,8 +16,12 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
    row[key+'Element']=element;headerFields[tid]={el:{dom:element},inputEl:{dom:input},getValue:()=>row[key]};
   }
   const base=row.valueElement.id.split(';PropContainer;')[0],tid=base+';PropContainer;VariableContainer;VariableControl';
-  const variableElement={id:tid,getAttribute:()=>tid,getBoundingClientRect:()=>({width:row.variableMode?100:0})};
+  // Ext hides inactive containers by offset: geometry can remain nonzero.
+  const variableElement={id:tid,getAttribute:()=>tid,getBoundingClientRect:()=>({width:100})};
   variableElements[tid]=variableElement;
+  const switchTid=base+';SwitchButton',switchElement={id:switchTid};
+  variableElements[switchTid]=switchElement;
+  headerFields[switchTid]={el:{dom:switchElement},get pressed(){return row.variableMode===true;}};
   const v={DisplayName:'Cycle',Index:7,DataType:options.variableType??5,IsNull:options.variableNull??false,Value:options.variableValue??'first'};
   const record={data:{field1:'cycle-id'},getFields:()=>[null,null,{getName:()=>"variable"}],get:()=>v};
   headerFields[tid]={el:{dom:variableElement},getStore:()=>({getData:()=>({items:[record]})}),getValue:()=>row.selected,
@@ -79,7 +83,7 @@ function fixture(foreign=null,manual=false,duplicate=null,options={}){
   if(lastSelector.includes(';btnAutoLink')){
    autoLinks++;if(options.stall!=='bindings')draw.FLinks=Object.fromEntries(columnRows.map((c,i)=>[i,[foreign==='column'?{data:{...c.data}}:c,foreign==='parameter'?{data:{...parameterRows[i].data}}:parameterRows[i]]]));
   }else if(lastSelector.includes(';SwitchButton')){const row=headerRows.find(r=>lastSelector==='[data-tid='+JSON.stringify(r.base+';SwitchButton')+']');row.variableMode=!row.variableMode;}
-  else if(lastSelector.includes(';VariableControl;trg_picker')){headerRows.find(r=>lastSelector.includes(r.variableTid)).picker=true;}
+  else if(lastSelector.includes(';VariableControl;trg_picker')){const row=headerRows.find(r=>lastSelector.includes(r.variableTid));assert.ok(row.variableMode,'inactive picker is offset and unreachable');row.picker=true;}
   else if(lastSelector.includes(';boundlist;Cycle_')){const row=headerRows.find(r=>lastSelector.includes(r.variableTid));row.selected='cycle-id';row.picker=false;}
   else if(lastSelector.includes(';btnAddHeader')){addHeader();}
   else if(lastSelector.includes(';colDelete_header')){const index=headerRows.findIndex(r=>lastSelector==='[data-tid='+JSON.stringify(r.deleteElement.getAttribute('data-tid'))+']');if(index>=0)headerRows.splice(index,1);}
