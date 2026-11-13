@@ -120,14 +120,14 @@ test('NW1 validates scoped enter and leave arguments before browser work',()=>{
 
 for(const role of ['input','output'])test('NW1 public workspace observation exposes the native '+role+' boundary role',async()=>{
   const page=new Page(),tid='MF;TF-1;Graph;Boundary',body=page.add('g',tid);
-  page.add('text',tid+';Label;Label','Boundary');
+  // Native GenericInputNode/GenericOutputNode captions can be hidden.
   page.add('g',tid+';'+(role==='input'?'Output':'Input')+'_Data-0');
   const f=page.graphModels.get(body.parentElement),node=f.byTid.get(tid),diagram=f.model.FDiagram;
   node.FGuid='da493381-d79a-3458-8192-b3fa1602118b';node.FIconCls='bg-vendor-icon-nullvendor';
   diagram.FIsSubmodel=true;diagram[role==='input'?'GenericInputNode':'GenericOutputNode']=node;
   assert.equal((await page.observe()).nodes.find(n=>n.node_id===node.FGuid).boundary_role,role);
   diagram.FIsSubmodel=false;
-  assert.equal((await page.observe()).nodes.find(n=>n.node_id===node.FGuid).boundary_role,undefined);
+  assert.equal((await page.observe()).nodes.find(n=>n.node_id===node.FGuid)?.boundary_role,undefined);
 });
 
 test('NW1 same operation never repeats a completed navigation; foreign/stale refs do not click',async()=>{

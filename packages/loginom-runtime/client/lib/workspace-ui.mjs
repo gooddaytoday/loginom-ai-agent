@@ -3734,7 +3734,7 @@ function readRenderedInputMapping(observation) {
     scanStage='data_views';
     // VariablesNode has no visible Label cell and cannot be selected like a
     // component. Issue its native identity without adding graph action rights.
-    const builtinLabels=graphElements.filter(e=>nativeGraphControl(e)?.icon==='bg-vendor-icon-modelvariables'&&nativeGraphControl(e).node_id)
+    const builtinLabels=graphElements.filter(e=>{const native=nativeGraphControl(e);return native?.node_id&&(native.icon==='bg-vendor-icon-modelvariables'||nativeBoundaryRoles.has(native.node_id));})
       .map(e=>getTid(e).slice(graphPrefix.length));
     const observedNodeLabels=[...new Set([...labels,...builtinLabels])].sort();
     const nodes = observedNodeLabels.slice(0, 200).map(label => {
