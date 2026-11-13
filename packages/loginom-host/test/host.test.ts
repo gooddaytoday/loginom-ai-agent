@@ -181,10 +181,13 @@ test("Host retains prewarm wait cancellation before any browser child starts", a
   await mkdir(join(resources, "runtime/src"), { recursive: true })
   await copyFile(node, join(resources, binary), constants.COPYFILE_FICLONE)
   await writeFile(join(resources, "browser"), "")
-  await truncate(join(resources, "browser"), 512 * 1024 * 1024)
+  // Keep verification pending while the real Help child starts, even on a
+  // warm fast filesystem. At 512 MiB the wait could finish before observation
+  // and this cancellation test would accidentally launch an absent runtime.
+  await truncate(join(resources, "browser"), 4 * 1024 * 1024 * 1024)
   const hash = createHash("sha256"),
     block = Buffer.alloc(1024 * 1024)
-  for (let i = 0; i < 512; i++) hash.update(block)
+  for (let i = 0; i < 4096; i++) hash.update(block)
   await writeFile(
     join(resources, "resource-manifest.json"),
     JSON.stringify({
