@@ -104,6 +104,14 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
+`fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
+`cases.boolean.stages` from LAB-1558. Native Boolean min/max/mode and integer
+unique/null counts, tie → False and all-NULL mode → False are checked as full
+typed rows with exact field order and `ordered:false`. The independent oracle
+stays private. CSV, Save, cold execution without configuration and cleanup use
+stock checks; only the business task and CSV reach the model.
+
 `group-real` uses grouping `acceptance/types/task-real.md` and only
 `fixtures/types/types.csv`. `expected-real.json` contains the unchanged
 `cases.real.stages` from the LAB-1558 proposal; its independent `oracle.py
