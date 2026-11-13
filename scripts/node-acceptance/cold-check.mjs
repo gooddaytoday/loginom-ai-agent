@@ -11,6 +11,7 @@ import {inspectSavedLgd} from './lgd-cold.mjs'
 import {observeImportBindingInventory} from './import-bindings.mjs';
 import {observeFilterBindingInventory} from './filter-bindings.mjs';
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
+import {inspectColdConditionBranches} from './control-condition.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings} from './exports-excel-cold.mjs'
 import {execFileSync} from 'node:child_process'
@@ -431,6 +432,12 @@ page = context.pages()[0]
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
+  if(target.type==='control.condition'){
+   // Only the branch whose port is read may have executed; its data alone does not prove blocking.
+   if(ports.length!==1)throw Error('CONDITION_COLD_PORTS');
+   const branch_activity=await inspectColdConditionBranches(channel,ports[0].port);
+   await record({phase:'cold_condition_branch_activity',node,execution_id:execution.execution_id,read_port:ports[0].port,branch_activity});
+  }
   const samplingMappings=new Map();
   if(sampling)for(const {port} of ports){
    const proof=await observeSamplingColdMapping({load,channel,node,port,expected});

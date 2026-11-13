@@ -2220,6 +2220,12 @@ class Runner:
             write(folder / 'excel-named-events.json', evidence)
             self.phase('excel-named-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/imports-excel-named.mjs',
                 src / spec['excel_named_initial'], folder / 'expected.json', folder / 'excel-named-events.json'], folder, timeout=60)
+        if spec.get('condition_initial'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'condition-events.json', evidence)
+            self.phase('condition-branches-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/control-condition.mjs',
+                src / spec['condition_initial'], folder / 'expected.json', folder / 'condition-events.json'], folder, timeout=60)
         if spec.get('variables_real_date'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
