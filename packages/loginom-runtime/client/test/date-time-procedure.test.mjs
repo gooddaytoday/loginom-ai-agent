@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureDateTime} from '../lib/date-time-procedure.mjs';
 const flags={DoDateTimeFirst:'first',DoDateTimeLast:'last',DoNumber:'number',DoString:'string'};
+test('parts patch keeps quarter and ISO week while adding ordinary week, day of year and milliseconds',async()=>{
+ const f=fixture(),before=structuredClone(f.matrices.B);
+ const fields=[{field:{kind:'input_field',name:'A'},transformations:['quarter','iso_week'].map(operation=>({operation,name:operation,label:operation}))}];
+ await configureDateTime(f.channel,{fields},{inputMapping:f.inputMapping});
+ fields[0].transformations.push(...['week','day_of_year','millisecond'].map(operation=>({operation,name:operation,label:operation})));
+ await configureDateTime(f.channel,{fields},{inputMapping:f.inputMapping});
+ assert.deepEqual(f.matrices.A.filter(r=>r.number).map(r=>[r.func,r.iso]),[[5,false],[7,false],[8,false],[15,false],[7,true]]);
+ assert.deepEqual(f.matrices.B,before);
+ fields[0].transformations=fields[0].transformations.filter(t=>t.operation!=='week');
+ await configureDateTime(f.channel,{fields},{inputMapping:f.inputMapping});
+ assert.equal(f.matrices.A.find(r=>r.func===7&&!r.iso).number,false);
+ assert.equal(f.matrices.A.find(r=>r.func===7&&r.iso).number,true);
+});
 test('minute and second use native numeric rows; removing minute preserves second and the other field',async()=>{
  const f=fixture();
  const fields=['A','B'].map(name=>({field:{kind:'input_field',name},transformations:['hour','minute','second'].map(operation=>({operation,name:name+'_'+operation,label:operation}))}));

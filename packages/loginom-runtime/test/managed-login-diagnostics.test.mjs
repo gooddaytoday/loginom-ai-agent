@@ -47,11 +47,17 @@ for (const writable of [true,false]) test("managed login retains sanitized navig
     connection:{url:`http://127.0.0.1:${server.address().port}/app/?opaque=public secret-query#secret-fragment`,
       username:"secret-user",password:"secret-password",apiKey:"secret-key"}}})
   const failure=await failed
+  const cause=failure.startupDiagnostics?.[0]?.error?.cause
+  assert.match(cause.code,/^net::ERR_/)
+  assert.match(cause.message,/page.goto/)
+  assert.ok(Number.isInteger(cause.duration_ms)&&cause.duration_ms>=0)
+  assert.ok(cause.elapsed_ms>=cause.duration_ms)
   // Startup evidence is part of the private IPC contract, including when the
   // sanitized file cannot be retained. Keep the complete response assertion.
   assert.deepEqual(failure,{id:"start",error:"LOGINOM_LOGIN_UNAVAILABLE",startupDiagnostics:[{
     phase:"runtime.start",retry:false,error:{name:"Error",code:"",message:"LOGINOM_LOGIN_UNAVAILABLE",
-      cause:{name:"Error",code:"",message:"[object Object]"}},
+      cause:{name:"Error",code:cause.code,message:cause.message,phase:"goto",duration_ms:cause.duration_ms,
+        elapsed_ms:cause.elapsed_ms,url:`http://127.0.0.1:${server.address().port}/app/`}},
   }]})
   for(const secret of ["secret-query","secret-fragment","secret-user","secret-password","secret-key","?"])
     assert.ok(!JSON.stringify(failure).includes(secret),secret)

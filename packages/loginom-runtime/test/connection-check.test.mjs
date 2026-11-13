@@ -1,6 +1,31 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { loginomAddress, loginPage } from "../src/connection-check.mjs"
+import { loginBrowser, loginomAddress, loginPage } from "../src/connection-check.mjs"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+test("browser launch retains a sanitized cause and phase before normalizing the error", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-launch-failure-"))
+  const phases = []
+  const secret = "PRIVATE-LAUNCH-PASSWORD"
+  try {
+    await assert.rejects(loginBrowser({ browserPath: join(directory, secret, "missing-browser"),
+      profile: join(directory, "profile"), candidate: { url: `https://example.test/?key=${secret}`,
+        username: "PRIVATE-LAUNCH-USER", password: secret }, onPhase: async event => { phases.push(event) },
+    }), error => {
+      assert.equal(error.message, "LOGINOM_BROWSER_START_FAILED")
+      assert.match(error.cause.message, /[Ee]xecutable doesn't exist/)
+      assert.equal(JSON.stringify(error.cause).includes(secret), false)
+      return true
+    })
+    assert.equal(phases[0].phase, "browser.launch")
+    assert.equal(phases.at(-1).status, "failed")
+    assert.ok(phases.at(-1).duration_ms >= 0)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
 
 test("public Loginom root bypasses the redirect that drops testable", () => {
   assert.equal(loginomAddress("https://app.loginom.ai"), "https://app.loginom.ai/app/?testable=true")

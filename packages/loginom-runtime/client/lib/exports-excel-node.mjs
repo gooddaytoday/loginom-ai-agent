@@ -6,7 +6,7 @@ import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {validateExcelExportParameters,excelExportParametersSchema,validateExcelWorkbookArtifact} from './exports-excel-parameters.mjs';
-import {configureExcelExport} from './exports-excel-procedure.mjs';
+import {configureExcelExport,requireExcelBindingSources} from './exports-excel-procedure.mjs';
 import {synchronizeTextExportInput} from './text-export-node.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
 import {exportContinuationSurface,verifyExportContinuation} from './text-export-continuation.mjs';
@@ -22,6 +22,29 @@ export function excelExportReadback({node,phases}){
   bindings:Object.fromEntries(Object.entries(c.configured.excel_export.values).filter(([,v])=>v.variable===true).map(([key,v])=>[key,{variable:v.variable_name}])),
   destination_check:c.configured.destination_check,
   input_mapping:{port:0,autosync:input.value.native_mapping.autosync,fields:input.value.native_mapping.target_fields.map(f=>({index:f.index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,source_name:f.source.name}))},package_persistence_verified:false};
+}
+// Retained or requested bindings need the connected variables layout. Only a
+// request that binds may save that input; otherwise it is read and closed.
+// Requested bindings are refused here, before the export wizard opens.
+export async function readExcelVariableMapping(channel,adapter,request,ctx,storageDirectories){
+ if(request.target.kind!=='existing'&&!request.variable_inputs?.length)return null;
+ const bindings=request.parameters?.excel_export?.bindings;
+ const g=await adapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
+ need(g.complete===true&&g.document_id===ctx.document_id&&g.workflow_ref.workflow_id===ctx.workflow_ref.workflow_id,'Complete Excel variable source graph required');
+ const links=(g.variable_links??[]).filter(e=>e.target===ctx.node.node_id&&e.kind==='variables'&&e.input===0);
+ need(links.length<=1,'Unique Excel variable source required');
+ let mapping=null;
+ if(links.length){
+  const port={direction:'input',kind:'variables',port:0};
+  const mapped=request.target.kind==='existing'&&!bindings?await channel.readVariablePortMapping(port):await channel.mapVariablePort(port);
+  need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true&&mapped.source_identity_verified===true,'Excel variable mapping readback unconfirmed');
+  mapping=mapped.mapping;
+ }
+ if(bindings)try{requireExcelBindingSources(bindings,mapping,storageDirectories);}
+ catch(error){
+  // Input Done (and variables Done when bound) were already pressed: the input is saved, settings are not unchanged.
+  error.nodePhaseRefusal={phase:'input_mapping',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:false,input_saved:true,verification:'excel_export_binding_refused'};throw error;}
+ return mapping;
 }
 export function createExcelExportNodeSupport({targetOrigin,targetBuild,storageDirectories=null}){
  let storageContinuation=null;
@@ -98,18 +121,7 @@ export function createExcelExportNodeSupport({targetOrigin,targetBuild,storageDi
     const definition=await readOutputDefinitionPages(channel,{expectedCount:inputMapping.target_fields.length});
     need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===inputMapping.target_fields[i][k])),'Export input definition differs');
     const completed=await finish('done',ctx,true,definition);
-    const request=operation.nodeApply.request;
-    if(request.target.kind==='existing'||request.variable_inputs?.length){
-     const g=await operation.nodeTargetAdapter.observe({document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},ctx.deadline,ctx.signal);
-     need(g.complete===true&&g.document_id===ctx.document_id&&g.workflow_ref.workflow_id===ctx.workflow_ref.workflow_id,'Complete Excel variable source graph required');
-     const links=(g.variable_links??[]).filter(e=>e.target===ctx.node.node_id&&e.kind==='variables'&&e.input===0);
-     need(links.length<=1,'Unique Excel variable source required');
-     if(links.length){
-      const mapped=await channel.mapVariablePort({direction:'input',kind:'variables',port:0});
-      need(mapped.verified===true&&mapped.cleanup_complete===true&&mapped.independent_readback===true&&mapped.source_identity_verified===true,'Excel variable mapping readback unconfirmed');
-      variableMapping=mapped.mapping;
-     }
-    }
+    variableMapping=await readExcelVariableMapping(channel,operation.nodeTargetAdapter,operation.nodeApply.request,ctx,storageDirectories);
     return verified({effect_possible:true,source_identity_verified:true,native_mapping:inputMapping,definition,finish:completed});
    },
    async openWizard(ctx){enter(ctx);if(operation.nodeApply.request.finish==='execute'){driver=createNodeExecutionProcedure(channel,ctx.node);await driver.prepare();}

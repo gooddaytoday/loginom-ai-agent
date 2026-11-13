@@ -1,15 +1,160 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { copyFile, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import {
+  copyFile,
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from "node:fs/promises"
 import { constants } from "node:fs"
 import { createHash } from "node:crypto"
-import { execFile } from "node:child_process"
-import { promisify } from "node:util"
+import { spawn } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-const execute = promisify(execFile)
+import { verifyResources } from "../src/resources.mjs"
 const verifier = new URL("../src/resources.mjs", import.meta.url).href
 const node = process.platform === "win32" ? "bin/node.exe" : "bin/node"
+
+test("profile resource cache rechecks changed metadata and invalidates across versions and installations", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-cache-"))
+  const root = join(directory, "resources"),
+    cachePath = join(directory, "profile", "resources.json")
+  try {
+    await mkdir(root)
+    await copyFile(process.execPath, join(root, "node"), constants.COPYFILE_FICLONE)
+    await writeFile(join(root, "browser"), "original")
+    const manifest = {
+      protocol: 1,
+      nodeVersion: process.versions.node,
+      node: "node",
+      browser: "browser",
+      files: await Promise.all(
+        ["node", "browser"].map(async (path) => ({
+          path,
+          sha256: createHash("sha256")
+            .update(await readFile(join(root, path)))
+            .digest("hex"),
+        })),
+      ),
+    }
+    await writeFile(join(root, "resource-manifest.json"), JSON.stringify(manifest))
+    const options = { nodePath: join(root, "node"), cachePath, cacheVersion: "v1" }
+    assert.deepEqual((await verifyResources(root, options)).verification, {
+      mode: "full",
+      hashedFiles: 2,
+      cachedFiles: 0,
+    })
+    assert.deepEqual((await verifyResources(root, options)).verification, {
+      mode: "metadata",
+      hashedFiles: 0,
+      cachedFiles: 2,
+    })
+    const cache = JSON.parse(await readFile(cachePath, "utf8"))
+    assert.ok(cache.files.browser.ino && cache.files.browser.size && cache.files.browser.mtime)
+    await writeFile(join(root, "browser"), "original")
+    assert.deepEqual((await verifyResources(root, options)).verification, {
+      mode: "partial",
+      hashedFiles: 1,
+      cachedFiles: 1,
+    })
+    assert.equal((await verifyResources(root, { ...options, cacheVersion: "v2" })).verification.hashedFiles, 2)
+    assert.equal((await verifyResources(root, { ...options, cacheVersion: "v2" })).verification.hashedFiles, 0)
+    // Reinstall with identical manifest bytes still invalidates the installation binding.
+    await writeFile(join(root, "new-manifest"), JSON.stringify(manifest))
+    await rename(join(root, "new-manifest"), join(root, "resource-manifest.json"))
+    assert.equal((await verifyResources(root, { ...options, cacheVersion: "v2" })).verification.hashedFiles, 2)
+    // Replacing a same-sized file and restoring its mtime must not reuse its old file ID.
+    const previous = await stat(join(root, "browser"))
+    await writeFile(join(root, "replacement"), "tampered")
+    await utimes(join(root, "replacement"), previous.atime, previous.mtime)
+    await rename(join(root, "replacement"), join(root, "browser"))
+    await assert.rejects(verifyResources(root, { ...options, cacheVersion: "v2" }), /LOGINOM_RESOURCE_HASH_MISMATCH/)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test("a cached file whose only changed metadata is its file ID is hashed again", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-cache-ino-"))
+  const root = join(directory, "resources"),
+    cachePath = join(directory, "profile", "resources.json")
+  try {
+    await mkdir(root)
+    await copyFile(process.execPath, join(root, "node"), constants.COPYFILE_FICLONE)
+    await writeFile(join(root, "browser"), "original")
+    const files = await Promise.all(
+      ["node", "browser"].map(async (path) => ({
+        path,
+        sha256: createHash("sha256")
+          .update(await readFile(join(root, path)))
+          .digest("hex"),
+      })),
+    )
+    await writeFile(
+      join(root, "resource-manifest.json"),
+      JSON.stringify({ protocol: 1, nodeVersion: process.versions.node, node: "node", browser: "browser", files }),
+    )
+    const options = { nodePath: join(root, "node"), cachePath, cacheVersion: "v1" }
+    await verifyResources(root, options)
+    const cache = JSON.parse(await readFile(cachePath, "utf8"))
+    // Every other field still matches the file on disk; only the file ID differs.
+    cache.files.browser.ino = String(BigInt(cache.files.browser.ino) + 1n)
+    await writeFile(cachePath, JSON.stringify(cache))
+    assert.deepEqual((await verifyResources(root, options)).verification, {
+      mode: "partial",
+      hashedFiles: 1,
+      cachedFiles: 1,
+    })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test("a later runtime start rechecks prewarmed resources and rejects a file changed in place", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "loginom-cache-session-"))
+  const root = join(directory, "resources"),
+    cachePath = join(directory, "profile", "resources.json")
+  try {
+    await mkdir(root)
+    await copyFile(process.execPath, join(root, "node"), constants.COPYFILE_FICLONE)
+    await writeFile(join(root, "browser"), "original")
+    const files = await Promise.all(
+      ["node", "browser"].map(async (path) => ({
+        path,
+        sha256: createHash("sha256")
+          .update(await readFile(join(root, path)))
+          .digest("hex"),
+      })),
+    )
+    await writeFile(
+      join(root, "resource-manifest.json"),
+      JSON.stringify({ protocol: 1, nodeVersion: process.versions.node, node: "node", browser: "browser", files }),
+    )
+    const options = { nodePath: join(root, "node"), cachePath, cacheVersion: "v1" }
+    // Host prewarm, then a runtime start with the Host's manifest proof.
+    const { manifestHash } = await verifyResources(root, options)
+    assert.deepEqual((await verifyResources(root, { ...options, manifestHash })).verification, {
+      mode: "metadata",
+      hashedFiles: 0,
+      cachedFiles: 2,
+    })
+    await writeFile(join(root, "browser"), "tampered")
+    await assert.rejects(verifyResources(root, { ...options, manifestHash }), /LOGINOM_RESOURCE_HASH_MISMATCH/)
+    await assert.rejects(
+      verifyResources(root, { nodePath: join(root, "node"), manifestHash }),
+      /LOGINOM_RESOURCE_HASH_MISMATCH/,
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
 
 for (const variant of [
   "valid",
@@ -20,8 +165,9 @@ for (const variant of [
   "missing-browser",
   "wrong-node-version",
 ]) {
-  test(`bundled resource validation: ${variant}`, async () => {
+  test(`bundled resource validation: ${variant}`, async (t) => {
     const root = await mkdtemp(join(tmpdir(), "Loginom ресурсы "))
+    const running = { child: undefined, closed: Promise.resolve() }
     try {
       await mkdir(join(root, "bin"))
       await copyFile(process.execPath, join(root, node), constants.COPYFILE_FICLONE)
@@ -46,16 +192,76 @@ for (const variant of [
       if (variant === "wrong-node-version") manifest.nodeVersion = "0.0.0"
       await writeFile(join(root, "resource-manifest.json"), JSON.stringify(manifest))
       const program = `import {verifyResources} from ${JSON.stringify(verifier)}; await verifyResources(process.argv[1]); console.log('VERIFIED');`
-      const outcome = await execute(join(root, node), ["--input-type=module", "-e", program, root], {
+      const child = spawn(join(root, node), ["--input-type=module", "-e", program, root], {
+        stdio: ["ignore", "pipe", "pipe"],
+        signal: t.signal,
         env: { PATH: "", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot } : {}) },
-      }).then(
-        (result) => result.stdout.trim(),
-        (error) => error.stderr,
-      )
+      })
+      running.child = child
+      const stdout = [],
+        stderr = []
+      child.stdout.setEncoding("utf8").on("data", (chunk) => stdout.push(chunk))
+      child.stderr.setEncoding("utf8").on("data", (chunk) => stderr.push(chunk))
+      const exited = new Promise((resolve) => {
+        child.once("error", (error) => resolve({ error }))
+        child.once("exit", (code, signal) => resolve({ code, signal }))
+      })
+      running.closed = new Promise((resolve) => child.once("close", resolve))
+      const status = await exited
+      await running.closed
+      assert.ifError(status.error)
+      assert.equal(status.signal, null)
+      assert.equal(status.code, variant === "valid" ? 0 : 1)
+      const outcome = (variant === "valid" ? stdout : stderr).join("").trim()
       if (variant === "valid") assert.equal(outcome, "VERIFIED")
       if (variant !== "valid") assert.match(outcome, /LOGINOM_RESOURCE(S_INVALID|_HASH_MISMATCH)/)
+      if (variant === "traversal") assert.match(outcome, /LOGINOM_RESOURCES_INVALID/)
     } finally {
-      await rm(root, { recursive: true, force: true })
+      // Never unlink an executable while its child or stdio is still alive,
+      // including cancellation/error paths. Do not let cleanup hide a live child.
+      if (running.child && running.child.exitCode === null && running.child.signalCode === null) running.child.kill()
+      await running.closed
+      // Only after close: bounded fallback for the observed Windows EBUSY.
+      await rm(root, {
+        recursive: true,
+        force: true,
+        ...(process.platform === "win32" ? { maxRetries: 5, retryDelay: 100 } : {}),
+      })
     }
   })
 }
+
+test("host verification uses its pinned Node identity and binds the session proof to the manifest", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-resource-session-"))
+  try {
+    await copyFile(process.execPath, join(root, "node"), constants.COPYFILE_FICLONE)
+    await writeFile(join(root, "browser"), "original")
+    const files = await Promise.all(
+      ["node", "browser"].map(async (path) => ({
+        path,
+        sha256: createHash("sha256")
+          .update(await readFile(join(root, path)))
+          .digest("hex"),
+      })),
+    )
+    const manifest = { protocol: 1, nodeVersion: process.versions.node, node: "node", browser: "browser", files }
+    await writeFile(join(root, "resource-manifest.json"), JSON.stringify(manifest))
+    const identity = { nodePath: join(root, "node"), nodeVersion: process.versions.node }
+    const verified = await verifyResources(root, identity)
+    assert.match(verified.manifestHash, /^[a-f0-9]{64}$/)
+    assert.equal(
+      (await verifyResources(root, { ...identity, manifestHash: verified.manifestHash })).browserPath,
+      join(await realpath(root), "browser"),
+    )
+    await assert.rejects(verifyResources(root, { ...identity, nodeVersion: "0.0.0" }), /LOGINOM_RESOURCES_INVALID/)
+    await writeFile(join(root, "browser"), "tampered")
+    await assert.rejects(verifyResources(root, identity), /LOGINOM_RESOURCE_HASH_MISMATCH/)
+    await writeFile(join(root, "resource-manifest.json"), JSON.stringify({ ...manifest, browser: "node" }))
+    await assert.rejects(
+      verifyResources(root, { ...identity, manifestHash: verified.manifestHash }),
+      /LOGINOM_RESOURCE_HASH_MISMATCH/,
+    )
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

@@ -3,6 +3,8 @@
 export const DATE_TIME_OPERATIONS=Object.freeze(Object.fromEntries([
  ['year',4,'DoNumber','Год','Y','integer'],['quarter',5,'DoNumber','Квартал','Q','integer'],
  ['month',6,'DoNumber','Месяц','M','integer'],['day_of_month',10,'DoNumber','День месяца','DM','integer'],
+ ['week',7,'DoNumber','Неделя','WY','integer'],['day_of_year',8,'DoNumber','День года','DY','integer'],
+ ['millisecond',15,'DoNumber','Миллисекунды','MSEC','integer'],
  ['hour',12,'DoNumber','Часы','HRS','integer'],
  ['minute',13,'DoNumber','Минуты','MIN','integer'],['second',14,'DoNumber','Секунды','SEC','integer'],
  ['year_start',4,'DoDateTimeFirst','Год','Y','datetime'],['year_end',4,'DoDateTimeLast','Год','Y','datetime'],

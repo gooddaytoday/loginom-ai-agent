@@ -27,7 +27,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
-D76_SCENARIOS = ('types300', 'date-time-formats')
+D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -796,7 +796,7 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers']:
+    if name in ['rest-post-body', 'rest-put-body', 'rest-patch-body', 'rest-delete', 'rest-headers', 'rest-variables']:
         src = REPO / 'docs/node-development/nodes/integration-restrequest'
         case = name.removeprefix('rest-')
         return dict(source=src / 'acceptance/modes' / case,
@@ -844,6 +844,12 @@ def scenario(name, case_root=None, *, cases=None):
         variant = name == 'collapse-variant'
         return dict(source=src, prompt=src / ('task-variant.md' if variant else 'task-mixed.md'), data=src / 'fixtures',
                     base=None, input_files=['mixed.csv'], expected_name='expected-variant.json' if variant else 'expected.json')
+    if name in ['date-time-parts', 'date-time-parts-week']:
+        src = REPO / 'docs/node-development/nodes/date-time/acceptance/parts'
+        week = name.endswith('-week')
+        return dict(source=src, prompt=src / ('task-week.md' if week else 'task.md'),
+                    data=src / 'data', base=None, input_files=['parts.csv'],
+                    expected_name='expected-week.json' if week else 'expected.json')
     if name == 'date-time-minsec':
         src = REPO / 'docs/node-development/nodes/date-time/acceptance/minsec'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -1120,8 +1126,21 @@ for(const stage of JSON.parse(readFileSync(0,'utf8')))
     assert result.returncode == 0, 'TEXT_UPDATE_PORT_VALUES: ' + result.stderr[:2000]
 
 
+def rest_query_expected(case, package, initial=False):
+    expected = read(case['source'] / (case['rest_query_initial'] if initial else case['expected_name']))
+    fixture = read(case['source'].parent / 'fixtures/rest-variables.json')
+    values = next(v for v in fixture['cases'] if v['name'] == ('initial' if initial else 'updated'))
+    expected['package_path'] = package
+    expected['variable_inventory'] = dict(outputs=[dict(node=dict(type='variables.user'), port=4,
+        variables=[dict(v, value=values[v['name']], label_any=True) for v in fixture['variables']])],
+        links=[dict(source=dict(type='variables.user'), output=4, target=dict(type='variables.to_table'), input=0, kind='variables')])
+    return expected
+
+
 def expected_for(case, package, cold=False):
     src = case['source']
+    if case.get('rest_query_initial'):
+        return rest_query_expected(case, package)
     if case.get('tree_only'):
         expected = read(src / 'expected.json')['cases'][case['tree_case']]
         return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
@@ -1443,7 +1462,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
 
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned: both for types300; midnight_date
-        # also for date-time-formats (LAB-1101: port read keeps the exact value).
+        # also for date-time-formats (LAB-1101) and date-time-parts/week
+        # (owner decision d76-date-time-parts; port/cold retain exact values).
         # LAB-1153: CrossTable permits only omission of exactly zero time.
         if scenario_name not in D76_SCENARIOS + ('crosstable-datetime',): return None
         if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
@@ -2094,6 +2114,12 @@ class Runner:
             if spec.get('excel_mode'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
+        if spec.get('rest_query_initial'):
+            assert len(destinations) == 2, 'REST_QUERY_TWO_EXPORTS_REQUIRED'
+            initial = rest_query_expected(spec, package, initial=True)
+            initial['outputs'][0]['export_destination'] = destinations[0]
+            write(folder / 'expected-initial.json', initial)
+            self.phase('fixture-oracle', [sys.executable, '-B', spec['oracle'], '--check'], folder, timeout=60)
         if spec.get('excel_mode'):
             expected['excel_books'] = expected['outputs']
         if spec.get('lgd') == 'roundtrip': expected['lgd']['destination'] = lgd_destination
@@ -2217,6 +2243,13 @@ class Runner:
             self.phase('quality-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/quality.mjs',
                 *([src / spec['quality_initial_name']] if spec.get('quality_initial_name') else ['--single']),
                 src / spec['expected_name'], folder / 'quality-events.json'], folder, timeout=60)
+        if case == 'rest-query-variables':
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'rest-query-events.json', evidence)
+            self.phase('rest-query-variables-oracle', [build / 'resources/loginom/bin/node',
+                REPO / 'scripts/node-acceptance/expected-outputs.mjs', 'rest-query-variables',
+                folder / 'expected-initial.json', folder / 'expected.json', folder / 'rest-query-events.json'], folder, timeout=60)
         if spec.get('import_binding'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -2744,6 +2777,8 @@ class Runner:
             counts = {}
             csv_expected = (read(src / spec['initial_table'])['outputs'][0] if spec.get('initial_table') and index == 0
                             else expected['outputs'][0] if spec.get('initial_table')
+                            else read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
+                            else expected['outputs'][0] if spec.get('rest_query_initial')
                             else read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
                             else expected['outputs'][0] if spec.get('binding_initial')
                             else expected['outputs'][0] if spec.get('grouping_case')

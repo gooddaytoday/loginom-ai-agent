@@ -1,3 +1,12 @@
+`rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
+in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
+
+`rest-variables` uses the approved REST C4 `task-variables.md`, requests.csv and
+unchanged `acceptance/modes/variables/expected.json`. Cycle first → second must
+update the response on the same REST without reconfiguration. Full typed output,
+CSV, Save, cold reexecution and cleanup use stock checks. Only task and CSV reach
+the model; oracle/expected stay private.
+
 `text-file-info` uses the unchanged text-import `task-file-info.md` and original
 January/February inputs next to the saved package. Both complete typed tables
 and CSVs use frozen `expected-absolute-path.json` then `expected-relative-path.json`;
@@ -205,6 +214,12 @@ BGDATA/LZ4 файл и новый обратный импорт. Независ�
 `lgd-export-empty-variant` сохраняет схему пустого набора и Variant
 (integer/string/NULL), требует два настоящих обратных LGD-импорта, полный
 CSV/native oracle, Save, cold и cleanup. Отказ Variant-импорта не считается PASS.
+
+`date-time-parts` and `date-time-parts-week` use the approved `date-time/acceptance/parts`
+fixture and independent oracle (native-confirmed h1 weeks). The first adds day of
+year and milliseconds to the same executed quarter node; the second replaces ISO
+week with ordinary week on the same node. Full typed tables, CSV, Save, cold and
+cleanup use stock checks; only task and parts.csv reach the model.
 
 `date-time-minsec` uses the independent fixture under
 `docs/node-development/nodes/date-time/acceptance/minsec/`: integer hours,
