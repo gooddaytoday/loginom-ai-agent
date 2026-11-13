@@ -27,13 +27,27 @@ def files(case, execution=1):
     if case == 'effects':
         return {'source.bin': bytes([0, 1, 127, 128, 255]), 'clone-force.bin': b'',
                 'ledger.txt': b'run\n' * execution}
+    if case == 'errors':
+        return {'keep.txt': b'KEEP'}
     raise ValueError(case)
 
 
 def expected(case):
+    if case == 'paths':
+        return {'nodes': [{'type': 'programming.javascript'}, {'type': 'exports.text'}], 'outputs': [
+            {'output_node_type': 'export_input', 'export_destination': 'paths-' + stage + '.csv', 'ordered': True,
+             'columns': [{'name': 'Exists', 'label_any': True, 'type': 'boolean'},
+                         {'name': 'Text', 'label_any': True, 'type': 'string'}],
+             'rows': [{'Exists': present, 'Text': 'LAB1549_SIDE' if present else None}]}
+            for stage, present in [('unsaved', False), ('saved', True), ('missing', False), ('sidecar', True)]]}
     data = files(case)
     names = sorted(data) if case == 'write' else list(data)
-    if case == 'effects':
+    if case == 'errors':
+        columns = [('Case', 'string'), ('Outcome', 'string'), ('Text', 'string')]
+        rows = [{'Case': 'exclusive', 'Outcome': 'exists', 'Text': 'KEEP'},
+                {'Case': 'missing', 'Outcome': 'missing', 'Text': None},
+                {'Case': 'permission', 'Outcome': 'denied', 'Text': None}]
+    elif case == 'effects':
         columns = [('Case', 'string'), ('Outcome', 'string'), ('DestinationBytes', 'integer')]
         rows = [{'Case': 'clone_force', 'Outcome': 'failed', 'DestinationBytes': 0}]
     elif case == 'read':
@@ -70,19 +84,60 @@ def verify_archive(case, archive, folder, execution=1):
         assert {e.filename for e in entries if e.is_dir()} == directories, 'Directory inventory differs'
 
 
+def verify_paths_archive(archive, folder, phase, sidecar):
+    assert sidecar.endswith('-sidecar.txt') and '/' not in sidecar
+    with ZipFile(archive) as zipped:
+        entries = zipped.infolist()
+        assert len({e.filename for e in entries}) == len(entries), 'Duplicate path archive entries'
+        assert all(not e.filename.startswith('/') and '..' not in e.filename.split('/') for e in entries)
+        assert not any((e.external_attr >> 16) & 0o170000 == 0o120000 for e in entries), 'Archive symlink'
+        prefix = folder + '/'
+        assert all(e.filename.startswith(prefix) for e in entries), 'Foreign archive root'
+        actual = {e.filename.removeprefix(prefix): zipped.read(e) for e in entries if not e.is_dir()}
+        wanted = {'original/' + sidecar: b'LAB1549_SIDE'}
+        if phase in ['sidecar', 'warm', 'cold']:
+            wanted['moved/' + sidecar] = b'LAB1549_SIDE'
+        package = None if phase == 'fixtures' else ('original/' if phase == 'saved' else 'moved/') + 'paths.lgp'
+        allowed = {'original/paths.~lgp', 'moved/paths.~lgp'}
+        if package:
+            assert actual.get(package), 'Saved or moved package missing/empty'
+            allowed.add(package)
+        assert {name: data for name, data in actual.items() if name not in allowed} == wanted, 'Paths/sidecar inventory or bytes differ'
+        assert {e.filename for e in entries if e.is_dir()} == {prefix, prefix + 'original/', prefix + 'moved/'}, 'Path directories differ'
+
+
+def verify_error_files(keep, inventory):
+    assert keep.read_bytes() == b'KEEP', 'Exclusive create overwrote the protected file'
+    entries = json.loads(inventory.read_text())
+    assert len(entries) == 2, 'Error fixture inventory changed'
+    assert {(e['name'], e['kind'], e['bytes']) for e in entries} == {
+        ('keep.txt', 'file', 4), ('denied.txt', 'file', 6)}, 'Error fixture metadata changed'
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--case', choices=['read', 'write', 'operations', 'effects'], required=True)
+    parser.add_argument('--case', choices=['read', 'write', 'operations', 'effects', 'paths', 'errors'], required=True)
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--folder')
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--execution', type=int, choices=[1, 2], default=1)
+    parser.add_argument('--phase', choices=['fixtures', 'saved', 'moved', 'sidecar', 'warm', 'cold'], default='warm')
+    parser.add_argument('--sidecar')
+    parser.add_argument('--keep-file', type=Path)
+    parser.add_argument('--inventory', type=Path)
     args = parser.parse_args()
     if args.check:
         assert json.loads((HERE / ('js-fs-' + args.case) / 'expected.json').read_text()) == expected(args.case)
-    if args.archive:
+    if args.keep_file:
+        assert args.case == 'errors' and args.inventory
+        verify_error_files(args.keep_file, args.inventory)
+        print('PASS independent protected-file bytes and complete native inventory')
+    elif args.archive:
         assert args.folder
-        verify_archive(args.case, args.archive, args.folder, args.execution)
+        if args.case == 'paths':
+            verify_paths_archive(args.archive, args.folder, args.phase, args.sidecar)
+        else:
+            verify_archive(args.case, args.archive, args.folder, args.execution)
         print('PASS independent downloaded bytes and complete directory inventory')
     elif not args.check:
         print(json.dumps(expected(args.case), ensure_ascii=False, indent=2))

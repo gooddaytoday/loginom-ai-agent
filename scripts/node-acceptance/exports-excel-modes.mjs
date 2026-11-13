@@ -82,11 +82,31 @@ try{
  const actions=JSON.parse(await readFile(root+'/runtime/executor/catalog/actions.json','utf8')).actions;
  const selectors=JSON.parse(await readFile(root+'/runtime/executor/catalog/selectors.json','utf8')).selectors;
  const artifactStore=await createArtifactStore({directory:output+'/artifacts',sessionId});
- const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},execute,onRecord:record,artifactStore,allowCandidate:true,targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2',getStorageBinding:()=>binding});
+ const nodeSupport=config.fs_error_seed?(await load('client/lib/node-support.mjs')).createCandidateNodeSupport({targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2'}):{};
+ const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},...nodeSupport,execute,onRecord:record,artifactStore,allowCandidate:true,targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2',getStorageBinding:()=>binding});
+ if(config.fs_error_seed){
+  // Trusted stage-zero fixture preparation through the production JS node
+  // lifecycle. Its source/expected bytes never enter the model conversation.
+  if(config.fs_error_seed!==directory+'/errors'||folders?.children.join(',')!=='errors')throw Error('FS_ERROR_SEED_SCOPE');
+  const dir=JSON.stringify(config.fs_error_seed);
+  const source='import * as fs from "builtIn/FS";\nimport {OutputTable,DataType} from "builtIn/Data";\n'
+   +'fs.writeFileSync('+dir+'+"/keep.txt","KEEP",{encoding:"utf8",flag:"wx"});\n'
+   +'fs.writeFileSync('+dir+'+"/denied.txt","DENIED",{encoding:"utf8",flag:"wx",mode:0});\n'
+   +'OutputTable.AssignColumns([{Name:"Seed",DataType:DataType.Integer}]);\nOutputTable.Append();OutputTable.Set("Seed",1);\n';
+  const result=await runtime.runNodeApply({operation_id:'fs-error-seed',contract_revision:'1.0.0',document_id:identity.document_id,
+   workflow_ref:identity.workflow_ref,target:{kind:'new',type:'programming.javascript',label:'Private FS fixture',position:{x:240,y:80}},
+   inputs:[],mode:'script',parameters:{input_state:'unconnected',schema_mode:'code',source_text:source},mappings:[],finish:'execute',
+   read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:120000,execute_ms:30000,total_ms:180000}});
+  if(result.status!=='SUCCEEDED'||result.output?.execution?.status!=='completed'||result.cleanup_complete!==true)throw Error('FS_ERROR_SEED_FAILED:'+JSON.stringify(result));
+ }
  const delivered=[];
  for(const [index,book]of config.books.entries()){
   const target=book.destination.slice(0,book.destination.lastIndexOf('/'));
-  if(folders?!folders.children.some(c=>target===directory+'/'+c):target!==directory)throw Error('SEED_DIRECTORY');
+  const scoped=config.fs_fixture===true&&typeof config.fs_scope==='string'
+   &&config.fs_scope.startsWith(config.login.package_directory+'/')
+   &&/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/.test(config.fs_scope)
+   &&['original','moved'].some(child=>target===config.fs_scope+'/'+child);
+  if(!scoped&&(folders?!folders.children.some(c=>target===directory+'/'+c):target!==directory))throw Error('SEED_DIRECTORY');
   const bytes=await readFile(book.fixture),artifact=await artifactStore.admit({sourcePath:book.fixture,name:book.destination.split('/').at(-1),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),upload:{directory:target,overwrite:config.overwrite??'replace'}});
   if(config.fs_fixture===true){
    // Private binary fixtures use the same native upload. Their completion and
@@ -108,10 +128,44 @@ try{
   if(result.outcome?.status!=='SUCCEEDED'||result.outcome.destination!==book.destination||result.outcome.upload_completion_verified!==true||result.outcome.cleanup_complete!==true)throw Error('SEED_UPLOAD:'+JSON.stringify(result));
   delivered.push(result.outcome);
  }
+ if(config.fs_move){
+  const {from,to}=config.fs_move,scope=config.fs_scope;
+  if(typeof scope!=='string'||!scope.startsWith(config.login.package_directory+'/')
+    ||!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/.test(scope)
+    ||from!==scope+'/original/paths.lgp'||to!==scope+'/moved/paths.lgp')throw Error('FS_MOVE_SCOPE');
+  let {prefix,at}=await storageDirectory(scope+'/moved');
+  const tid=prefix+';FileStorageForm;colName_paths.lgp';
+  if(await at(tid).count())throw Error('FS_MOVE_DESTINATION_EXISTS');
+  ({prefix,at}=await storageDirectory(scope+'/original'));
+  const source=at(prefix+';FileStorageForm;colName_paths.lgp');
+  await source.waitFor({state:'visible'});if(await source.count()!==1)throw Error('FS_MOVE_SOURCE_AMBIGUOUS');
+  await record({phase:'fs_package_move_prepared',from,to,
+   observation:await execute(makeWorkspaceUiCode({mode:'observe',expected_origin:new URL(config.login.url).origin,expected_build:'7.4.2'}))});
+  await source.click();await at(prefix+';FileStorageForm;btnCut').click();
+  ({prefix,at}=await storageDirectory(scope+'/moved'));
+  if(await at(prefix+';FileStorageForm;colName_paths.lgp').count())throw Error('FS_MOVE_DESTINATION_CHANGED');
+  await at(prefix+';FileStorageForm;btnPaste').click();
+  await at(prefix+';FileStorageForm;colName_paths.lgp').waitFor({state:'visible'});
+  ({prefix,at}=await storageDirectory(scope+'/original'));
+  if(await at(prefix+';FileStorageForm;colName_paths.lgp').count())throw Error('FS_MOVE_SOURCE_REMAINS');
+  await record({phase:'fs_package_move_completed',from,to});
+ }
  if(config.fs_audit){
   const target=config.fs_audit;
   if(typeof target!=='string'||!target.startsWith(config.login.package_directory+'/')
     ||!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/.test(target))throw Error('FS_AUDIT_SCOPE');
+  if(config.fs_error_audit===true){
+   const listed=await runtime.serverDownload({operation_id:'fs-error-inventory',path:target},'dock_storage_list');
+   if(listed.status!=='SUCCEEDED'||listed.output?.complete!==true||listed.output.truncated!==false)throw Error('FS_ERROR_INVENTORY_INCOMPLETE');
+   await writeFile(output+'/inventory.json',JSON.stringify(listed.output.entries));
+   const {prefix,at}=await storageDirectory(target);
+   const row=at(prefix+';FileStorageForm;colName_keep.txt');await row.waitFor({state:'visible'});
+   await row.click();
+   const pending=page.waitForEvent('download',{timeout:60000});await at(prefix+';FileStorageForm;btnDownload').click();
+   const download=await pending;await download.saveAs(output+'/keep.txt');
+   if(await download.failure())throw Error('FS_ERROR_KEEP_DOWNLOAD_FAILED');
+   await download.delete();
+  }else{
   const {prefix,at}=await storageDirectory(target.slice(0,target.lastIndexOf('/')));
   const name=target.split('/').at(-1),row=at(prefix+';FileStorageForm;colName_'+name);
   await row.waitFor({state:'visible'});if(await row.count()!==1)throw Error('FS_AUDIT_ROW_AMBIGUOUS');
@@ -123,6 +177,7 @@ try{
   const download=await pending;await download.saveAs(output+'/files.zip');
   if(await download.failure())throw Error('FS_AUDIT_DOWNLOAD_FAILED');
   await download.delete();
+  }
  }
  const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
  await record({phase:'excel_seed_cleanup',cleanup});await writeFile(output+'/result.json',JSON.stringify({delivered,cleanup}));
