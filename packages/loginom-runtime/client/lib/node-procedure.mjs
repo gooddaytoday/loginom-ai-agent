@@ -13,6 +13,7 @@ import {makeLogRegressionContextCode} from './log-regression-context.mjs';
 import {makeLinRegressionContextCode} from './linregression-context.mjs';
 import {makeAutoCorrelationContextCode} from './auto-correlation-context.mjs';
 import {makeCorrAnalysisContextCode} from './corr-analysis-context.mjs';
+import {makePythonContextCode} from './python-context.mjs';
 import {makeElimOutlierContextCode} from './elim-outlier-context.mjs';
 import {makeFactorAnalysisContextCode} from './factor-analysis-context.mjs';
 import {makeClusteringContextCode} from './clustering-context.mjs';
@@ -454,7 +455,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesColumnUnion = false, readVariablesCalculator = false, readCalculator = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readVariablesToTable = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readPython = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesColumnUnion = false, readVariablesCalculator = false, readCalculator = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readVariablesToTable = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -748,6 +749,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readAutoCorrelation){
           result.output.node_auto_correlation=await read(makeAutoCorrelationContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_auto_correlation.node_context&&JSON.stringify(canonical(result.output.node_auto_correlation.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Autocorrelation native owner changed during observation');
+        }
+        if(readPython){
+          result.output.node_python=await read(makePythonContextCode(preparedNodeContext),{timeout:readTimeout()});
+          if(result.output.node_python.node_context&&JSON.stringify(canonical(result.output.node_python.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Python native owner changed during observation');
         }
         if(readCorrAnalysis){
           result.output.node_corr_analysis=await read(makeCorrAnalysisContextCode(preparedNodeContext),{timeout:readTimeout()});
@@ -1313,6 +1318,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readClustering:initialObservation?.node_clustering!==undefined,
           readAutoCorrelation:initialObservation?.node_auto_correlation!==undefined,
           readCorrAnalysis:initialObservation?.node_corr_analysis!==undefined,
+          readPython:initialObservation?.node_python!==undefined,
           readTraining:initialObservation?.node_training_read===true,
           readCalculator:initialObservation?.node_calculator!==undefined,
           readJavascript:initialObservation?.node_javascript_schema!==undefined,

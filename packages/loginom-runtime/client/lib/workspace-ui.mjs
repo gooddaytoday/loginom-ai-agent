@@ -36,7 +36,7 @@ export const uiActionSchema = {
   type: 'object', additionalProperties: false, required: ['verb'],
   properties: {
     verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'deactivate_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
-    expected_stage: { oneOf:[{type:'string',enum:['datatovar','lgd_import','lgd_export','coarse_classes','coarse_classes_model','coarse_classes_mapping_1','coarse_classes_mapping_2','factor_analysis','table_tree','tree_json','assn_rules','assn_rules_auxiliary','binning','binning_ranges_mapping','auto_correlation','json_tree','tree_table','tree_input_mapping','tree_output_mapping','corr_analysis','excel_import_file','excel_import_columns','learn_partition','lin_regression','lin_regression_details','ungroup_seasonal','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','excel_export','input_mapping','output_mapping','variables_to_table','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','smoothing','sliding_window','date_time','field_parameters','row_filter','ungroup','join','union','enrich','col_union','done']},{const:['output_mapping','done']},{const:['tree_output_mapping','done']}],
+    expected_stage: { oneOf:[{type:'string',enum:['python_columns','python_code','datatovar','lgd_import','lgd_export','coarse_classes','coarse_classes_model','coarse_classes_mapping_1','coarse_classes_mapping_2','factor_analysis','table_tree','tree_json','assn_rules','assn_rules_auxiliary','binning','binning_ranges_mapping','auto_correlation','json_tree','tree_table','tree_input_mapping','tree_output_mapping','corr_analysis','excel_import_file','excel_import_columns','learn_partition','lin_regression','lin_regression_details','ungroup_seasonal','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','excel_export','input_mapping','output_mapping','variables_to_table','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','sampling','data_partition','smoothing','sliding_window','date_time','field_parameters','row_filter','ungroup','join','union','enrich','col_union','done']},{const:['output_mapping','done']},{const:['tree_output_mapping','done']}],
       description: 'Required only for wizard_step: destination after the observed next/previous control, not the current stage. For delimited Text Import, next follows text_import_file → text_import_format → output_mapping → done; previous reverses this order. input_mapping means a separate INPUT PORT mapping wizard, never Text Import output columns. Calculator, Grouping and Sorting validation may use [output_mapping, done] for its conditional output page; JSON-to-tree may use [tree_output_mapping, done]. Other wizard families may have different paths; inspect their current UI and sources instead of guessing. Do not pass this field to open_wizard or finish_wizard.' },
     checked: { type: 'boolean' },
     delta_y: { type: 'integer', minimum: -1000, maximum: 1000 },
@@ -228,7 +228,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const target=record.target;
           if(record.type==='attributes' && record.attributeName==='style' && target?.isConnected
             && target.classList?.contains('CodeMirror-cursors')) {
-            const editor=target.closest('[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"],[data-tid$=";WizrdMCF;CalcVariablesWizard;cmpExpression"]');
+            const editor=target.closest('[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"],[data-tid$=";WizrdMCF;CalcVariablesWizard;cmpExpression"],[data-tid$=";WizrdMCF;PythonCodeWizard;cmpCodeCM"]');
             const wrapper=target.closest('.CodeMirror');
             const visibilityOnly=value=>value===null || typeof value==='string' && /^\s*(?:visibility\s*:\s*hidden\s*;?\s*)?$/.test(value);
             if(editor && wrapper && editor.contains(wrapper) && wrapper.CodeMirror?.getWrapperElement?.()===wrapper
@@ -344,7 +344,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const detailElements=dom.length;
     // E2E bg/selectors.ts wizard lifecycle and P3 wizard selectors. These
     // fixed markers expose the current page without scanning its whole tree.
-    const wizardMarkers={variables_column_union:';DerivedVariablesMappingEngineOutputPortWizard;btnAutoSyncThroughColumns',col_union:';ColUnionDataWizard;pedRowsPaddingType',variables_to_table:';VariablesToDataWizard',lgd_import:';ImportNativePreviewWizard;edtFileName',lgd_export:';ExportNativeParamsWizard;edtFileName',coarse_classes:';CoarseClassesWizard-1',coarse_classes_model:';CoarseClassesWizard-2',coarse_classes_mapping_2:';DerivedDataSourceMappingEngineOutputPortWizard-2;btnAddMappingColumn',factor_analysis:';FactorAnalysisWizard;pedNFactors',table_tree:';DataToTreeWizard;trpDataTree',tree_json:';TreeToJSONWizard;pedRootExcluded',assn_rules:';AssnRulesWizard;pedMinSupport',assn_rules_auxiliary:';TuneDataSourceInputPortWizard-1;grdTargetColumns',binning:';MethodSettingsWizard-1;grdColumns',binning_ranges_mapping:';DerivedDataSourceMappingEngineOutputPortWizard-1;btnAddMappingColumn',auto_correlation:';AutoCorrelationWizard;pedLagCount',json_tree:';JSONToTreeWizard;pedSourceColumn',tree_table:';TreeToDataWizard;trpDataTree',tree_input_mapping:';TuneDataTreeInputPortWizard',tree_output_mapping:';DataTreeNodesMappingEngineOutputPortWizard',corr_analysis:';CorrAnalysisWizard;cbCorrTypeLinear',sampling:';SamplingComponentWizard;pedSamplingMethod',data_partition:';PartitionComponentWizard;pedSamplingMethod',excel_import_file:';ImportExcelFilePreviewWizard;edtFileName',excel_import_columns:';ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode',learn_partition:';LearnPartitionWizard;SizeGridForm;grdDataSet',lin_regression:[';LinRegressionWizard;pedRegressionMethod',';LogRegressionWizard;pedRegressionMethod'],lin_regression_details:[';LinRegressionWizard-1;pedEpsilon',';LogRegressionWizard-1;pedEpsilon'],normalization:';NormTuneWizard',clustering:';ClusterizationWizard;pedClusters',text_import_file:';ImportTextFilePreviewWizard;edtFileName',
+    const wizardMarkers={python_columns:';PythonColumnsWizard;BooleanPropEdit;ValueControl',python_code:';PythonCodeWizard;cmpCodeCM',variables_column_union:';DerivedVariablesMappingEngineOutputPortWizard;btnAutoSyncThroughColumns',col_union:';ColUnionDataWizard;pedRowsPaddingType',variables_to_table:';VariablesToDataWizard',lgd_import:';ImportNativePreviewWizard;edtFileName',lgd_export:';ExportNativeParamsWizard;edtFileName',coarse_classes:';CoarseClassesWizard-1',coarse_classes_model:';CoarseClassesWizard-2',coarse_classes_mapping_2:';DerivedDataSourceMappingEngineOutputPortWizard-2;btnAddMappingColumn',factor_analysis:';FactorAnalysisWizard;pedNFactors',table_tree:';DataToTreeWizard;trpDataTree',tree_json:';TreeToJSONWizard;pedRootExcluded',assn_rules:';AssnRulesWizard;pedMinSupport',assn_rules_auxiliary:';TuneDataSourceInputPortWizard-1;grdTargetColumns',binning:';MethodSettingsWizard-1;grdColumns',binning_ranges_mapping:';DerivedDataSourceMappingEngineOutputPortWizard-1;btnAddMappingColumn',auto_correlation:';AutoCorrelationWizard;pedLagCount',json_tree:';JSONToTreeWizard;pedSourceColumn',tree_table:';TreeToDataWizard;trpDataTree',tree_input_mapping:';TuneDataTreeInputPortWizard',tree_output_mapping:';DataTreeNodesMappingEngineOutputPortWizard',corr_analysis:';CorrAnalysisWizard;cbCorrTypeLinear',sampling:';SamplingComponentWizard;pedSamplingMethod',data_partition:';PartitionComponentWizard;pedSamplingMethod',excel_import_file:';ImportExcelFilePreviewWizard;edtFileName',excel_import_columns:';ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode',learn_partition:';LearnPartitionWizard;SizeGridForm;grdDataSet',lin_regression:[';LinRegressionWizard;pedRegressionMethod',';LogRegressionWizard;pedRegressionMethod'],lin_regression_details:[';LinRegressionWizard-1;pedEpsilon',';LogRegressionWizard-1;pedEpsilon'],normalization:';NormTuneWizard',clustering:';ClusterizationWizard;pedClusters',text_import_file:';ImportTextFilePreviewWizard;edtFileName',
       text_import_format:';ImportTextFileParamsWizard;edtValueNull',
       excel_export:';ExportExcelFilePreviewWizard;edtFileName',
       text_export_params:';ExportTextFileParamsWizard;edtFileName',
@@ -356,7 +356,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=['[data-tid*=";WizrdMCF;ColUnionDataWizard;"]','[data-tid*=";WizrdMCF;VariablesToDataWizard;"]','[data-tid*=";WizrdMCF;CoarseClassesWizard-1;"]','[data-tid*=";WizrdMCF;CoarseClassesWizard-2;"]','[data-tid="EditDataTreeNodeDefForm"] input','[data-tid*=";WizrdMCF;DataToTreeWizard;"]','[data-tid*=";WizrdMCF;TreeToJSONWizard;"]','[data-tid^="EditDataTreeNodeDefForm"]','[data-tid*=";WizrdMCF;AssnRulesWizard;"]','[data-tid*=";WizrdMCF;UngroupDataWizard;"]','[data-tid*=";WizrdMCF;UngroupDataWizard-1;"]','[data-tid*=";WizrdMCF;SmoothingWizard;"]','[data-tid*=";WizrdMCF;MethodSettingsWizard-1;"]','[data-tid^="MethodSettingFrame;"]','[data-tid*=";WizrdMCF;AutoCorrelationWizard;"]','[data-tid*=";WizrdMCF;JSONToTreeWizard;"]','[data-tid*=";WizrdMCF;TreeToDataWizard;"]','[data-tid*=";WizrdMCF;SlidingWindowWizard;"]','[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']','[data-tid='+JSON.stringify(definitionPrefix+';up')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=['[data-tid*=";WizrdMCF;PythonColumnsWizard;BooleanPropEdit;"]','[data-tid$=";WizrdMCF;PythonCodeWizard;cmpCodeCM"]','[data-tid*=";WizrdMCF;ColUnionDataWizard;"]','[data-tid*=";WizrdMCF;VariablesToDataWizard;"]','[data-tid*=";WizrdMCF;CoarseClassesWizard-1;"]','[data-tid*=";WizrdMCF;CoarseClassesWizard-2;"]','[data-tid="EditDataTreeNodeDefForm"] input','[data-tid*=";WizrdMCF;DataToTreeWizard;"]','[data-tid*=";WizrdMCF;TreeToJSONWizard;"]','[data-tid^="EditDataTreeNodeDefForm"]','[data-tid*=";WizrdMCF;AssnRulesWizard;"]','[data-tid*=";WizrdMCF;UngroupDataWizard;"]','[data-tid*=";WizrdMCF;UngroupDataWizard-1;"]','[data-tid*=";WizrdMCF;SmoothingWizard;"]','[data-tid*=";WizrdMCF;MethodSettingsWizard-1;"]','[data-tid^="MethodSettingFrame;"]','[data-tid*=";WizrdMCF;AutoCorrelationWizard;"]','[data-tid*=";WizrdMCF;JSONToTreeWizard;"]','[data-tid*=";WizrdMCF;TreeToDataWizard;"]','[data-tid*=";WizrdMCF;SlidingWindowWizard;"]','[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']','[data-tid='+JSON.stringify(definitionPrefix+';up')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       '[data-tid$=";WizrdMCF;ReplaceColumnsWizard;btnTypeChange"]','[data-tid$=";WizrdMCF;ReplaceColumnsWizard;grdDataList"]',
       // Its grid identifies the stage; this separate guard identifies the
@@ -3327,6 +3327,7 @@ function readRenderedInputMapping(observation) {
       // settings affordance can be SVG without a button role.
       || /;Graph;[^;]+;(?:Setting|Visualizers)$/.test(getTid(element) ?? '')
       || (getTid(element) ?? '')===workflow?.prefix+';WizrdMCF;CalcDataWizard;cmpExpression'
+      || (getTid(element) ?? '')===workflow?.prefix+';WizrdMCF;PythonCodeWizard;cmpCodeCM'
       || (getTid(element) ?? '').startsWith(workflow?.prefix+';WizrdMCF;CalcDataWizard;colExpressionName_')
       // E2E bg/selectors.ts:970: context-menu item wrappers carry stable
       // mn;mni* tids even when their inner ARIA menuitem has no test ID.
@@ -3385,7 +3386,7 @@ function readRenderedInputMapping(observation) {
       if(importColumnCellRefs.has(state.ids.get(element)))return /_2$/.test(tid)?-12:-11;
       if(wizardButtons.some(name=>tid===base+name))return -10;
       if(['btnCalcMode','btnAddExpr','btnExprEdit'].some(name=>tid===base+'CalcDataWizard;'+name))return -9;
-      if(tid===base+'CalcDataWizard;cmpExpression')return -8;
+      if(tid===base+'CalcDataWizard;cmpExpression'||tid===base+'PythonCodeWizard;cmpCodeCM')return -8;
       if(tid.startsWith(base+'CalcDataWizard;colExpressionName_'))return -7;
       if((getTid(element.closest('[data-tid]'))??'').startsWith(base) && !dangerous(element)
         && element.matches('input,textarea,select,[contenteditable="true"]'))return -6;
@@ -3469,10 +3470,13 @@ function readRenderedInputMapping(observation) {
     // helper itself warns about empty/multiline checks). Never grant generic
     // gestures or claim a complete formula from this representation.
     const calculatorEditorOf = element => {
+      // Python keeps one whole-script CodeMirror document; the same exact
+      // document read and replace_expression gesture apply (mode python).
+      const python=getTid(element)===workflow?.prefix+';WizrdMCF;PythonCodeWizard;cmpCodeCM';
       const base=workflow?.prefix+';WizrdMCF;CalcDataWizard;';
-      if(getTid(element)!==base+'cmpExpression')return null;
-      const peers=tids.get(base+'cmpExpression')??[];
-      const buttons=(tids.get(base+'btnCalcMode')??[]).filter(visible);
+      if(!python&&getTid(element)!==base+'cmpExpression')return null;
+      const peers=python?tids.get(getTid(element))??[]:tids.get(base+'cmpExpression')??[];
+      const buttons=python?[]:(tids.get(base+'btnCalcMode')??[]).filter(visible);
       const icons=buttons.length===1 ? dom.filter(item=>{charge();return buttons[0].contains(item) &&
         item.matches('span') && visible(item) && !sensitive(item);}) : [];
       const modes=['Expression','JavaScript'].filter(mode=>icons.some(item=>item.classList.contains('bg-TBGCalcMode-cm'+mode)));
@@ -3494,9 +3498,9 @@ function readRenderedInputMapping(observation) {
         }
         lines.push(text);if(truncated)break;
       }
-      const selected=all.filter(item=>{charge();return (getTid(item)??'').startsWith(base+'colExpressionName_') &&
+      const selected=python?[]:all.filter(item=>{charge();return (getTid(item)??'').startsWith(base+'colExpressionName_') &&
         visible(item) && !sensitive(item) && item.closest('table')?.classList.contains('x-grid-item-selected');});
-      const selectedExpression=selected.length===1?{ref:refOf(selected[0]),tid:getTid(selected[0]),label:textOf(selected[0])}:null;
+      const selectedExpression=python?{ref:refOf(element),tid:getTid(element),label:'Python'}:selected.length===1?{ref:refOf(selected[0]),tid:getTid(selected[0]),label:textOf(selected[0])}:null;
       let documentRead={status:'unavailable',full_text_verified:false};
       const wrappers=dom.filter(item=>{charge();return element.contains(item) && item.matches('.CodeMirror') && visible(item);});
       // CodeMirror 5 public read APIs, scoped to the exact editor wrapper. No
@@ -3522,8 +3526,8 @@ function readRenderedInputMapping(observation) {
         }
       } catch(error) {if(error?.code==='UI_SCAN_LIMIT')throw error;documentRead={status:'read_failed',full_text_verified:false};}
       return {kind:'calculator',status:peers.filter(visible).length===1?'observed':'ambiguous',
-        mode:modes.length===1?modes[0]==='Expression'?'expression':'javascript':null,
-        mode_status:buttons.length>1 || modes.length>1?'ambiguous':modes.length===1?'observed':'unobserved',
+        mode:python?'python':modes.length===1?modes[0]==='Expression'?'expression':'javascript':null,
+        mode_status:python?'observed':buttons.length>1 || modes.length>1?'ambiguous':modes.length===1?'observed':'unobserved',
         selected_expression:selectedExpression,document:documentRead,
         rendered_lines:documentRead.full_text_verified || redacted?[]:lines,rendering_truncated:truncated,redacted,
         full_text_verified:documentRead.full_text_verified,syntax_validity:'unverified'};
@@ -3656,7 +3660,7 @@ function readRenderedInputMapping(observation) {
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression}:null;
       const expressionCancel=tid===wizard.root_tid+';ExprDataEditForm;btnCancel' && expressionParametersReady
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression,original_row:wizard.expression_selection}:null;
-      const expressionWritable=identity && isEnabled && calculatorEditor?.status==='observed' && ['expression','javascript'].includes(calculatorEditor.mode)
+      const expressionWritable=identity && isEnabled && calculatorEditor?.status==='observed' && ['expression','javascript','python'].includes(calculatorEditor.mode)
         && calculatorEditor.selected_expression && calculatorEditor.document.full_text_verified && calculatorEditor.document.writable;
       const fullValue = editable && !sensitive(element) ? String(element.value ?? (element.isContentEditable ? element.textContent : '') ?? '') : undefined;
       const value = fullValue?.slice(0, 2048), valueTruncated = fullValue !== undefined && fullValue.length > 2048;
@@ -4647,7 +4651,7 @@ function readRenderedInputMapping(observation) {
             const fresh=await readUi(),found=fresh.ui.elements.find(item=>item.ref===task.action.ref)?.calculator_editor;
             if(!fresh.authenticated || fresh.origin!==current.origin || !same(fresh.workflow_ref,current.workflow_ref)
               || !same(fresh.ui.masks,current.ui.masks) || !same(fresh.ui.dialogs,current.ui.dialogs)
-              || !found || !['expression','javascript'].includes(found.mode) || found.document.text!==expectedText || !same(found.selected_expression,before.selected_expression)
+              || !found || !['expression','javascript','python'].includes(found.mode) || found.document.text!==expectedText || !same(found.selected_expression,before.selected_expression)
               || !found.document.full_text_verified || !found.document.writable)return false;
             return first.evaluate((element,expected)=>{
             const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
@@ -5441,7 +5445,7 @@ function readRenderedInputMapping(observation) {
           const before=current.ui.elements.find(item=>item.ref===task.action.ref);
           const after=observed.ui.elements.filter(item=>same(item.identity,before.identity));
           const editor=after.length===1?after[0].calculator_editor:null;
-          if(!editor || !['expression','javascript'].includes(editor.mode) || !same(editor.selected_expression,before.calculator_editor.selected_expression)
+          if(!editor || !['expression','javascript','python'].includes(editor.mode) || !same(editor.selected_expression,before.calculator_editor.selected_expression)
             || !editor.document.full_text_verified || editor.document.text!==task.action.text
             || ['wrapper_ref','input_ref','document_ref'].some(key=>editor.document[key]!==before.calculator_editor.document[key]))
             fail('EXPRESSION_TEXT_NOT_CONFIRMED','Replacement text was not confirmed in the same selected expression; inspect before retry');

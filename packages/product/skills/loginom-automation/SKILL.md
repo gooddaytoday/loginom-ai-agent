@@ -215,6 +215,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Дополнение данных | `transform.enrich_data` / left | [читать](references/nodes/transform.enrich_data.md) |
 | Соединение по позиции | `transform.col_union_data` / positional | [читать](references/nodes/transform.col_union_data.md) |
 | Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
+| Узел «Python», код `.py` | `programming.python` / script | [читать](references/nodes/programming.python.md) |
 
 Новый CSV/TXT: сначала нативное автоопределение Loginom через серверный preview
 по [справке импорта](references/nodes/imports.text.md), затем сверка типов и
