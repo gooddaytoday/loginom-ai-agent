@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** задачи 1–10 выполнены и независимо проверены по поведению; задачи 11–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** задачи 1–11 выполнены и независимо проверены по поведению; задачи 12–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -1240,8 +1240,8 @@ export function dashboardResolver(root = process.cwd()) // Vite plugin, enforce:
 ### Task 11: Самопроверка страницы
 
 **Files:**
-- Create: `P/src/draft/selfcheck.mjs`, `P/src/agent/check.ts`, `P/test/browser/selfcheck.test.mjs`, `P/test/browser/apps/throws/index.html`, `P/test/browser/apps/csp/index.html`
-- Modify: `P/src/agent/draft.ts`, `P/test/agent/draft.test.mjs`, `P/tsconfig.web.json` (уже покрывает `src/agent`)
+- Create: `P/src/draft/selfcheck.mjs`, `P/src/agent/check.ts`, `P/test/browser/selfcheck.test.mjs`, `P/test/browser/apps/throws/index.html`, `P/test/browser/apps/throws/assets/throws.js`, `P/test/browser/apps/csp/index.html`, `P/test/browser/apps/csp/assets/csp.js`
+- Modify: `P/src/agent/draft.ts`, `P/src/draft/server.ts` (пустая data-иконка убирает штатный favicon 404), `P/test/agent/draft.test.mjs`, `P/tsconfig.web.json` (уже покрывает `src/agent`)
 
 **Interfaces:**
 - Produces:
