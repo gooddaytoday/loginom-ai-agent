@@ -54,6 +54,11 @@ type Deps = {
   showUpdater: () => Promise<void> | void
   setBackgroundColor: (color: string) => void
   exportDebugLogs: () => Promise<string>
+  diagnostics: {
+    prepare: (request: unknown) => Promise<unknown>
+    preview: (id: unknown, name: unknown) => Promise<unknown>
+    save: (id: unknown, window?: BrowserWindow) => Promise<string | undefined>
+  }
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   setNativeTranslations: (bundle: DesktopNativeBundle) => void
   systemProxyEnabled: () => boolean
@@ -108,6 +113,13 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("updater-set-channel", (_event, channel: "stable" | "unstable") => deps.updater.setChannel(channel))
   ipcMain.handle("set-background-color", (_event: IpcMainInvokeEvent, color: string) => deps.setBackgroundColor(color))
   ipcMain.handle("export-debug-logs", () => deps.exportDebugLogs())
+  ipcMain.handle("diagnostics-prepare", (_event: IpcMainInvokeEvent, request: unknown) => deps.diagnostics.prepare(request))
+  ipcMain.handle("diagnostics-preview", (_event: IpcMainInvokeEvent, id: unknown, name: unknown) =>
+    deps.diagnostics.preview(id, name),
+  )
+  ipcMain.handle("diagnostics-save", (event: IpcMainInvokeEvent, id: unknown) =>
+    deps.diagnostics.save(id, BrowserWindow.fromWebContents(event.sender) ?? undefined),
+  )
   ipcMain.handle("set-force-focus", (event: IpcMainInvokeEvent, enabled: boolean) =>
     setForceFocus(event.sender, enabled),
   )

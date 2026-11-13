@@ -244,7 +244,7 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.menu.settings": "Settings",
   "desktop.menu.reloadWebview": "Reload Webview",
   "desktop.menu.restart": "Restart",
-  "desktop.menu.exportLogs": "Export Logs...",
+  "desktop.menu.exportLogs": "Collect Diagnostics…",
   "desktop.menu.newSession": "New Session",
   "desktop.menu.openProject": "Open Project...",
   "desktop.menu.newWindow": "New Window",
