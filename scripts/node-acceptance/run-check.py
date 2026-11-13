@@ -592,7 +592,7 @@ def scenario(name, case_root=None, *, cases=None):
         src = node / 'acceptance/modes/partition-sequential'
         return dict(source=src, prompt=src / 'task-partition-sequential.md',
                     data=node / 'fixtures/modes', input_files=['partition.csv'], base=None,
-                    oracle=node / 'acceptance/modes/oracle.py', linreg_forward=True)
+                    expected_name='expected.json', oracle=node / 'acceptance/modes/oracle.py', linreg_forward=True)
     if name == 'linreg-coefficients':
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         return dict(source=node / 'acceptance/modes', prompt=node / 'acceptance/modes/task-coefficients.md',
