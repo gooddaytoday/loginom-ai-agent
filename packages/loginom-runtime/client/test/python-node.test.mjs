@@ -71,7 +71,7 @@ function fakeWizard({generation=false,columns=[],source='import builtin_data\n',
   :stage==='python_code'?{verified:true,page:'code',source,separate_process:true,separate_process_disabled:true,writable:editable}:undefined;
  const snapshot=()=>({wizard:{stage,root_tid:root},prepared_node_context:owner,node_python:page(),ui:{elements:[
   {tid:root+';btnNext',ref:'next',allowed_actions:['wizard_step']},
-  {tid:root+';PythonColumnsWizard;BooleanPropEdit;ValueControl;InputEl',ref:'generation',allowed_actions:['set_checked']},
+  {tid:root+';PythonColumnsWizard;BooleanPropEdit;ValueControl;DisplayEl',ref:'generation',allowed_actions:['set_checked']},
   {tid:root+';PythonCodeWizard;cmpCodeCM',ref:'code',allowed_actions:['replace_expression']}]}});
  const channel={async observe(o){const s=snapshot();assert.ok(o.ready(s),o.condition);return s;},async perform(o){
   const s=snapshot();assert.ok(o.ready(s),o.condition);const a=o.resolve(s);actions.push(a);

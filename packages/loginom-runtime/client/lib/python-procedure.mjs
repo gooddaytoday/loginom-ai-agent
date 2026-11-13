@@ -22,7 +22,7 @@ export async function configurePython(channel,p,{request}){
  const wantedGeneration=p.schema_mode===undefined?columnsBefore.generation:p.schema_mode==='code';
  if(columnsBefore.generation!==wantedGeneration){
   need(columnsBefore.generation_disabled!==true,'output column generation flag is disabled');
-  const tid=state.wizard.root_tid+';PythonColumnsWizard;BooleanPropEdit;ValueControl;InputEl';
+  const tid=state.wizard.root_tid+';PythonColumnsWizard;BooleanPropEdit;ValueControl;DisplayEl';
   await channel.perform({condition:'set python column generation',initialObservation:state,ready:ready('python_columns'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'set_checked',ref:one(s,tid,'set_checked').ref,checked:wantedGeneration})});
   state=await observe('python_columns','python generation readback');edits++;
