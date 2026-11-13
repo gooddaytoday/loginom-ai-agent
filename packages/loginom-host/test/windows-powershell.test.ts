@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { win32 } from "node:path"
+import { join, win32 } from "node:path"
 import { WINDOWS_POWERSHELL_TIMEOUT_MS, windowsPowerShellArguments } from "../src/windows-powershell"
 
 test("DPAPI gives cold PowerShell a bounded startup allowance and sanitizes failures", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
-  const built = await Bun.build({ entrypoints: [new URL("../src/connection/cli-dpapi.ts", import.meta.url).pathname], target: "node" })
+  const built = await Bun.build({ entrypoints: [join(import.meta.dir, "../src/connection/cli-dpapi.ts")], target: "node" })
   expect(built.success).toBe(true)
   const module = "data:text/javascript;base64," + Buffer.from(await built.outputs[0].text()).toString("base64")
   const child = Bun.spawn([node, "--input-type=module"], { stdin: "pipe", stdout: "pipe", stderr: "pipe" })
