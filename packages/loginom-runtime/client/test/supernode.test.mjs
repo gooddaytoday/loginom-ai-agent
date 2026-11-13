@@ -6,11 +6,21 @@ import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import vm from 'node:vm';
 import {readSupernodeBrowser} from '../lib/supernode-context.mjs';
+import {nodeApiTools} from '../lib/node-api.mjs';
+import {validateActionParameters} from '../lib/action-catalog.mjs';
 
 const boundary={input:{kind:'table',name:'Input',label:'Исходные данные',requirement:'required'},output:{kind:'table',name:'Output',label:'Результат'}};
 const ref={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const request={operation_id:'new',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},
  target:{kind:'new',type:'control.supernode'},inputs:[],mode:'tabular_boundary',parameters:{boundary},mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:true},budgets:{configure_ms:60000,execute_ms:60000,total_ms:180000}};
+
+test('Supernode boundary crosses the complete public apply schema and installed handler',()=>{
+ const schema=nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema;
+ const {nodeApplyHandlers}=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+ assert.doesNotThrow(()=>validateActionParameters(schema,request));
+ assert.doesNotThrow(()=>validateNodeApplyRequest(request,nodeApplyHandlers));
+ assert.throws(()=>validateNodeApplyRequest({...request,target:{kind:'new',type:'transform.calculator'},mode:'expression'},nodeApplyHandlers));
+});
 
 test('supernode handler is registered with the approved table boundary mode',()=>{
  const {nodeApplyHandlers}=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
