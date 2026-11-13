@@ -369,6 +369,23 @@ test("only crash dumps are taken from the crash directory", async () => {
   }
 })
 
+test("the file list shows manifest.json with its archived size and opens it", async () => {
+  const fixture = sessionFixture()
+  const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat })
+  const target = join(profile, "chosen", "manifest.zip")
+  mkdirSync(dirname(target), { recursive: true })
+  saveChoice = { canceled: false, filePath: target }
+  const listed = ready.files.find((file) => file.name === "manifest.json")
+  const preview = await previewDiagnosticsFile(ready.id, "manifest.json")
+  expect(await saveDiagnostics(ready.id)).toBe(target)
+  const archive = new ZipReader(new BlobReader(new Blob([readFileSync(target)])))
+  const entry = (await archive.getEntries()).find((item) => item.filename === "manifest.json")!
+  const text = await entry.getData!(new TextWriter())
+  await archive.close()
+  expect(listed).toEqual({ name: "manifest.json", group: "logs", status: "included", size: Buffer.byteLength(text) })
+  expect(preview).toEqual({ text, truncated: false })
+})
+
 test("Save as offers Downloads, writes the previewed archive privately and honours cancel", async () => {
   const fixture = sessionFixture()
   const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat })
