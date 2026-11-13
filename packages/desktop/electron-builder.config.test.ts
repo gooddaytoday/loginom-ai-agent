@@ -11,7 +11,7 @@ import { pathToFileURL } from "node:url"
 import { bundledLanguages, lcid } from "app-builder-lib/out/util/langs"
 
 test("installer verification messages cover every bundled NSIS language", async () => {
-  const include = await Bun.file(join(import.meta.dir, "resources/uninstall-uri.nsh")).text()
+  const include = (await Bun.file(join(import.meta.dir, "resources/uninstall-uri.nsh")).text()).replaceAll("\r\n", "\n")
   for (const language of bundledLanguages) {
     const id = lcid[language]
     expect(
