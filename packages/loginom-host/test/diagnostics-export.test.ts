@@ -250,3 +250,87 @@ test("attaches crash dumps unchanged only on explicit request", async () => {
     sha256: sha(dump),
   })
 })
+
+// Review #1075 (LAB-1553): every check reads the raw bytes of the archive.
+async function archiveBytes(input: { lines: string[]; knownSecrets?: string[] }) {
+  const p = profile()
+  put(join(p.logs, "run", "main.log"), input.lines.join("\n") + "\n")
+  put(
+    join(attemptDir(p.runtime, "ses_review", "a1"), "execution-events.jsonl"),
+    input.lines.map((text) => JSON.stringify({ phase: "node_step_completed", text })).join("\n") + "\n",
+  )
+  const { zip } = await buildDiagnosticsArchive({
+    runtime: p.runtime,
+    sessionID: "ses_review",
+    logs: [{ dir: p.logs, prefix: "desktop" }],
+    knownSecrets: input.knownSecrets,
+  })
+  const archive = await unpack(zip)
+  return Buffer.concat([Buffer.from(zip), ...[...archive.files].flatMap(([name, data]) => [Buffer.from(name), Buffer.from(data)])])
+}
+const expectAbsent = (bytes: Buffer, values: string[]) => {
+  for (const value of values) expect({ value, found: bytes.includes(Buffer.from(value)) }).toEqual({ value, found: false })
+}
+
+test("P1: bare proxy authorities, public IPv4 and global IPv6 are masked", async () => {
+  const bytes = await archiveBytes({
+    lines: [
+      "system proxy: applied proxy.corp.example:3128",
+      JSON.stringify({ proxy: "proxy.company.ru:3128" }),
+      "connect 203.0.113.5:8080",
+      "connect [2001:db8:85a3::8a2e:370:7334]:443 and 2001:db8::7",
+      "trace at logging.ts:42:5, time 12:30:45, mac aa:bb:cc:dd:ee:ff, loopback 127.0.0.1:3000 and [::1]:9",
+      "stand app.loginom.ai:443",
+    ],
+  })
+  expectAbsent(bytes, ["proxy.corp.example", "proxy.company.ru", "203.0.113.5", "2001:db8:85a3", "2001:db8::7"])
+  const text = bytes.toString("utf8")
+  for (const kept of ["logging.ts:42:5", "12:30:45", "aa:bb:cc:dd:ee:ff", "127.0.0.1:3000", "[::1]:9", "app.loginom.ai:443"])
+    expect(text).toContain(kept)
+  expect(text).toMatch(/applied host-[0-9a-f]{8}:3128/)
+})
+
+test("P2.1: known values are masked in base64, base64url, double JSON and form encodings", async () => {
+  const values = ["S3cretPw!", 'a"b\\c9x', "p ss!word", "url?safe>>key~"]
+  const bytes = await archiveBytes({
+    knownSecrets: values,
+    lines: values.flatMap((value) => {
+      const json = JSON.stringify(value).slice(1, -1)
+      return [
+        `b64 ${Buffer.from(value).toString("base64")}`,
+        `b64url ${Buffer.from(value).toString("base64url")}`,
+        `json2 ${JSON.stringify(json).slice(1, -1)}`,
+        `form ${new URLSearchParams({ v: value }).toString().slice(2)}`,
+      ]
+    }),
+  })
+  expectAbsent(bytes, ["UzNjcmV0UHch", 'a\\\\\\"b\\\\\\\\c9x', "p+ss%21word"])
+  for (const value of values)
+    expectAbsent(bytes, [
+      Buffer.from(value).toString("base64").replace(/=+$/, ""),
+      Buffer.from(value).toString("base64url"),
+      JSON.stringify(JSON.stringify(value).slice(1, -1)).slice(1, -1),
+      new URLSearchParams({ v: value }).toString().slice(2),
+    ])
+})
+
+test("P2.2: URL user info is removed for every scheme and the host is masked", async () => {
+  const bytes = await archiveBytes({
+    lines: ["proxy socks5://alice:S3cretPw@proxy.company.ru:1080", "db postgres://svc:Pg-Pass-77@10.9.8.7:5432/app"],
+  })
+  expectAbsent(bytes, ["alice", "S3cretPw", "proxy.company.ru", "svc:", "Pg-Pass-77", "10.9.8.7"])
+  expect(bytes.toString("utf8")).toMatch(/socks5:\/\/\[redacted\]@host-[0-9a-f]{8}:1080/)
+})
+
+test("P2.3: the Dock configuration api_key is a known value", async () => {
+  const p = profile()
+  put(join(p.root, "dock", "config.json"), JSON.stringify({ api_key: "fixture-dock-api-value", account: "loginom-dock" }))
+  put(join(p.root, "dock", "profiles", "hermes-user.json"), JSON.stringify({ api_key: "fixture-hermes-api-value" }))
+  const known = await profileSecrets({ dockHome: join(p.root, "dock") })
+  expect(known.secrets).toEqual(expect.arrayContaining(["fixture-dock-api-value", "fixture-hermes-api-value"]))
+  const bytes = await archiveBytes({
+    knownSecrets: known.secrets,
+    lines: ["echo fixture-dock-api-value", "echo fixture-hermes-api-value"],
+  })
+  expectAbsent(bytes, ["fixture-dock-api-value", "fixture-hermes-api-value"])
+})

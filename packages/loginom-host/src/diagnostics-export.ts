@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync } from "node:fs"
+import { isIPv6 } from "node:net"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { BlobReader, BlobWriter, ZipWriter } from "@zip.js/zip.js"
@@ -192,8 +193,22 @@ export function exportHome(text: string, home = homedir()) {
     .replace(/[A-Za-z]:(?:\\+|\/)Users(?:\\+|\/)[^\\/\s"']+/gi, "~")
 }
 
+// Spellings in which a known value reaches journals: raw, URL and form
+// encoding, single and double JSON escaping, standard and URL-safe base64.
 function variants(value: string) {
-  return new Set([value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1)])
+  const json = JSON.stringify(value).slice(1, -1)
+  const base64 = Buffer.from(value).toString("base64")
+  const base64url = Buffer.from(value).toString("base64url")
+  return new Set([
+    value,
+    encodeURIComponent(value),
+    new URLSearchParams({ v: value }).toString().slice(2),
+    json,
+    JSON.stringify(json).slice(1, -1),
+    base64,
+    base64.replace(/=+$/, ""),
+    base64url,
+  ])
 }
 
 export function maskValues(text: string, values: string[], marker: string) {
@@ -215,12 +230,19 @@ export function maskLogins(text: string, logins: string[]) {
   return text
 }
 
-function privateIPv4(host: string) {
+// Every IPv4 address identifies a network except loopback and the unspecified one.
+function identifyingIPv4(host: string) {
   const parts = host.split(".").map(Number)
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false
-  const [a, b] = parts
-  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127)
+  return parts[0] !== 127 && host !== "0.0.0.0"
 }
+
+// Names that look like `file.ts:42` in stack traces are not hosts.
+const FILE_EXTENSIONS = new Set(
+  "js mjs cjs ts mts cts tsx jsx json jsonl map log txt md csv xml yml yaml html htm css py go rs java cs cpp c h sh ps1 bat exe dll so node wasm lgp zip dmp".split(
+    " ",
+  ),
+)
 
 function publicHost(host: string, allowed: readonly string[]) {
   const name = host.toLowerCase().replace(/^\[|\]$/g, "")
@@ -233,26 +255,41 @@ function publicHost(host: string, allowed: readonly string[]) {
 
 const hostLabel = (host: string) => "host-" + sha256(host.toLowerCase()).slice(0, 8)
 
-// Internal server addresses: every URL host outside the public list, private
-// IPv4/IPv6 literals and intranet-only names. Scheme and port remain readable.
+// Internal server addresses: URL hosts and bare `name:port` outside the public
+// list, IPv4/IPv6 literals except loopback and intranet-only names. URL user
+// info is always removed. Scheme and port remain readable.
 export function maskHosts(text: string, allowed: readonly string[] = PUBLIC_HOSTS) {
   text = text.replace(
-    /\b([a-z][a-z0-9+.-]*:\/\/)(\[[0-9a-f:.]+\]|[^\s/?#:"'<>\\`@[\]]+)/gi,
-    (match, scheme: string, host: string) => (publicHost(host, allowed) ? match : scheme + hostLabel(host)),
+    /\b([a-z][a-z0-9+.-]*:\/\/)(?:([^\s/?#@"'<>\\`[\]]*)@)?(\[[0-9a-f:.%\w]+\]|[^\s/?#:"'<>\\`@[\]]+)/gi,
+    (_match, scheme: string, userinfo: string | undefined, host: string) =>
+      scheme + (userinfo === undefined ? "" : "[redacted]@") + (publicHost(host, allowed) ? host : hostLabel(host)),
   )
-  // Journals hold megabytes of long tokens: test whole tokens with anchored
-  // patterns instead of scanning every offset with a backtracking expression.
-  if (/\d\.\d{1,3}\.\d{1,3}\.\d|\.(?:local|lan|corp|internal|intranet|arpa)(?![\w-])/i.test(text))
-    text = text.replace(/[\w.-]+/g, (token) => {
-      const host = token.replace(/\.+$/, "")
-      if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return privateIPv4(host) ? hostLabel(host) + token.slice(host.length) : token
-      if (/^(?:[a-z0-9-]+\.)+(?:local|lan|corp|internal|intranet|home\.arpa)$/i.test(host) && !host.startsWith("-"))
-        return hostLabel(host) + token.slice(host.length)
-      return token
-    })
-  if (/f[cd][0-9a-f]{2}:/i.test(text))
-    text = text.replace(/(?<![\w-])\[?(f[cd][0-9a-f]{2}(?::[0-9a-f]{0,4}){2,7})\]?/gi, (_match, host: string) => hostLabel(host))
-  return text
+  // Journals hold megabytes of long tokens: one linear pass over whole tokens
+  // with anchored checks instead of scanning every offset per pattern.
+  if (
+    !/\d\.\d{1,3}\.\d{1,3}\.\d|\.(?:local|lan|corp|internal|intranet|arpa)(?![\w-])|[a-z0-9-]\.[a-z][a-z0-9-]*:\d|::|(?:[0-9a-f]{1,4}:){7}/i.test(
+      text,
+    )
+  )
+    return text
+  return text.replace(/[\w.:%-]+/g, (token: string, offset: number, source: string) => {
+    const body = token.replace(/[.:]+$/, "")
+    const tail = token.slice(body.length)
+    // IPv6 literals are validated, so times and MAC addresses stay intact.
+    if (body.includes(":") && isIPv6(body.split("%")[0])) return body === "::1" ? token : hostLabel(body) + tail
+    const [host, port, extra] = body.split(":")
+    if (extra !== undefined || (port !== undefined && !/^\d{1,5}$/.test(port))) return token
+    const suffix = (port === undefined ? "" : ":" + port) + tail
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return identifyingIPv4(host) ? hostLabel(host) + suffix : token
+    if (/^(?:[a-z0-9-]+\.)+(?:local|lan|corp|internal|intranet|home\.arpa)$/i.test(host) && !host.startsWith("-"))
+      return hostLabel(host) + suffix
+    // Bare `name.with.dots:port`, as Desktop logs a proxy authority; not paths or user info.
+    if (port === undefined || Number(port) > 65535 || "@/\\".includes(source[offset - 1] ?? "")) return token
+    if (!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(host) || host.startsWith("host-")) return token
+    const tld = host.slice(host.lastIndexOf(".") + 1).toLowerCase()
+    if (!/^[a-z][a-z0-9-]*$/.test(tld) || FILE_EXTENSIONS.has(tld) || publicHost(host, allowed)) return token
+    return hostLabel(host) + suffix
+  })
 }
 
 function readBounded(path: string, limit = DIAGNOSTICS_LIMITS.fileBytes) {
@@ -476,6 +513,8 @@ export async function profileSecrets(input: {
   /** opencode data directory (contains `auth.json`, `mcp-auth.json`). */
   data?: string
   codec?: CredentialCodec
+  /** Dock home `${LOGINOM_DOCK_HOME:-~/.loginom-dock}` with `config.json` (client/bin/dispatch.mjs). */
+  dockHome?: string
   extra?: string[]
 }) {
   const secrets: string[] = [...(input.extra ?? [])]
@@ -503,6 +542,19 @@ export async function profileSecrets(input: {
       if (!lstatSync(path, { throwIfNoEntry: false })) continue
       try {
         collectStrings(JSON.parse(readBounded(path, 1024 * 1024).text), secrets)
+      } catch {
+        status = "unavailable"
+      }
+    }
+  }
+  if (input.dockHome) {
+    // Dock client key `api_key` (loginom-runtime/client/lib/config.mjs).
+    for (const file of ["config.json", join("profiles", "hermes-user.json")]) {
+      const path = join(input.dockHome, file)
+      if (!lstatSync(path, { throwIfNoEntry: false })) continue
+      try {
+        const key = JSON.parse(readBounded(path, 1024 * 1024).text)?.api_key
+        if (typeof key === "string") secrets.push(key)
       } catch {
         status = "unavailable"
       }

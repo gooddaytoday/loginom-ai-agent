@@ -196,7 +196,13 @@ async function buildDesktopArchive(request: Partial<DiagnosticsRequest>) {
   }
   try {
     const loginom = join(app.getPath("userData"), "loginom")
-    const known = await profileSecrets({ loginom, data: dataRoot(), codec: exportCodec, extra: [...exportValues] })
+    const known = await profileSecrets({
+      loginom,
+      data: dataRoot(),
+      codec: exportCodec,
+      dockHome: process.env.LOGINOM_DOCK_HOME || join(homedir(), ".loginom-dock"),
+      extra: [...exportValues],
+    })
     return await buildDiagnosticsArchive({
       runtime: include.runtime ? join(loginom, "runtime") : undefined,
       sessionID: request.sessionID,

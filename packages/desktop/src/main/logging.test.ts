@@ -19,6 +19,8 @@ import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js"
 const profile = mkdtempSync(join(tmpdir(), "loginom-log-export-"))
 const previousDataHome = process.env.XDG_DATA_HOME
 process.env.XDG_DATA_HOME = join(profile, "data")
+const previousDockHome = process.env.LOGINOM_DOCK_HOME
+process.env.LOGINOM_DOCK_HOME = join(profile, "dock")
 const sourceSHA = process.env.LOGINOM_AI_AGENT_TEST_SOURCE_SHA ?? "a".repeat(40)
 const paths = {
   userData: join(profile, "desktop"),
@@ -91,7 +93,17 @@ afterAll(() => {
   mock.restore()
   if (previousDataHome === undefined) delete process.env.XDG_DATA_HOME
   else process.env.XDG_DATA_HOME = previousDataHome
+  if (previousDockHome === undefined) delete process.env.LOGINOM_DOCK_HOME
+  else process.env.LOGINOM_DOCK_HOME = previousDockHome
   rmSync(profile, { recursive: true, force: true })
+})
+
+test("the Desktop export masks the Dock configuration api_key", async () => {
+  put(join(profile, "dock", "config.json"), JSON.stringify({ api_key: "fixture-dock-desktop-value" }))
+  put(runtime(attempt), JSON.stringify({ event: "echo", text: "fixture-dock-desktop-value" }) + "\n")
+  const { files } = await exported()
+  expect(files.has(`runtime/${attempt}`)).toBe(true)
+  expect([...files.values()].join("\n")).not.toContain("fixture-dock-desktop-value")
 })
 
 test("the existing Desktop export includes runtime, diagnostics and build provenance with verifiable hashes", async () => {
