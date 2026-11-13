@@ -38,10 +38,18 @@ test('strict envelope rejects duplicate, unsupported type, port, extra propertie
 test('only canonical scalar pointers and integer/string comparisons are registered',()=>{
  for(const parameter of ['/groups/00/0/value','/groups/0/0/lower','/groups/64/0/value','/groups/0/128/value','/groups/0/0/value/x'])
   assert.throws(()=>resolveFilterBindings(parameters,[{...binding,parameter}]),/BINDING_PARAMETER_UNSUPPORTED/);
- for(const patch of [{type:'real'},{operator:'between'},{field:{kind:'row_number'}}]){
+ for(const patch of [{type:'real'},{operator:'between'}]){
   const p=structuredClone(parameters);Object.assign(p.groups[0][0],patch);
   assert.throws(()=>resolveFilterBindings(p,[binding]),/BINDING_PARAMETER_UNSUPPORTED/);
  }
+});
+test('Top-N binding resolves new and saved row-number conditions without a literal',()=>{
+ const p={groups:[[{field:{kind:'row_number'},type:'integer',operator:'<='}]]};
+ const b={...binding,variable:{...binding.variable,name:'TopN'}};
+ const resolved=resolveFilterBindings(p,[b]);
+ assert.deepEqual(resolved.groups[0][0],{...p.groups[0][0],value:{kind:'variable',name:'TopN'}});
+ assert.deepEqual(resolveFilterBindings({},[b],resolved),resolved);
+ assert.equal(Object.hasOwn(p.groups[0][0],'value'),false);
 });
 test('omitted groups resolve against saved row identity while omitted bindings preserve the patch',()=>{
  const saved=structuredClone(parameters);saved.groups[0][0].value=5;

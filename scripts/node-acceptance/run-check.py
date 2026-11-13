@@ -113,6 +113,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
                     input_files=['filter.csv'], export_count=6, filter_initial='filter/expected-initial.json',
                     expected_name='filter/expected.json', oracle=src / 'acceptance/oracle.py')
+    if name == 'row-filter-top-n':
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        return dict(source=node / 'acceptance/typed', prompt=node / 'acceptance/typed/task-top-n.md',
+                    data=node / 'fixtures/typed', base=None, input_files=['rows.csv'], export_count=4,
+                    expected_name='expected-top-final.json', filter_initial='expected-top-initial.json',
+                    oracle=node / 'acceptance/typed/oracle.py', filter_top_n=True)
     if name == 'graph-large-execute':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/graph-large-execute'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
@@ -2147,11 +2153,12 @@ class Runner:
         if spec.get('excel_mode') == 'replace':
             write(folder / 'seed-config.json', dict(login=login, books=[dict(fixture=str(spec['data'] / ('existing.'+b['format'])), destination=b['export_destination']) for b in expected['excel_books']]))
             self.phase('excel-seeds', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs', build / 'resources/loginom', folder / 'seed-config.json', folder / 'seeds'], folder, timeout=300)
-        if case == 'filter-bindings':
+        if case in ['filter-bindings', 'row-filter-top-n']:
             for output in expected['outputs']: output['column_order'] = 'any'
             expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter='/groups/0/0/value',
-                mode='variable', variable=dict(kind='control', input=0, name='Limit', type='integer', is_null=False),
+                mode='variable', variable=dict(kind='control', input=0, name='TopN' if spec.get('filter_top_n') else 'Limit', type='integer', is_null=False),
                 source=dict(type='variables.user', output=4))]
+            if spec.get('filter_top_n'): expected['binding_inventory'][0]['field'] = dict(kind='row_number')
         if spec.get('boolean_binding'):
             grouping = spec['boolean_binding'] == 'grouping'
             for output in expected['outputs']: output['column_order'] = 'exact'
@@ -2292,7 +2299,7 @@ class Runner:
             write(folder / 'binding-events.json', evidence)
             self.phase('boolean-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/bindings-grouping-sort.mjs',
                 src / spec['binding_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
-        if case == 'filter-bindings':
+        if case in ['filter-bindings', 'row-filter-top-n']:
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'binding-events.json', evidence)

@@ -131,3 +131,12 @@ test('filter variable binding matches complete cached identity without stripping
   f.data[nativeKey]=name;f.controller.FVariablesData.FVariables.push({...f.controller.FVariablesData.FVariables[0],Index:3});assert.equal(f.read().verified,false);
  }
 });
+
+test('native row-number scalar binding survives formatted saved readback',()=>{
+ const f=fixture();Object.assign(f.data,{Name:'',RowNumberer:1,UseVariables:1,RelationType:1,CompareValue:'TopN ( 3 )'});
+ f.controller.FVariablesData={FVariables:[{Index:0,DisplayName:'TopN',DataType:4,Value:3,ValueAsString:'3',IsNull:false}]};
+ const r=f.read();assert.equal(r.verified,true);
+ assert.deepEqual(r.rows[0].field,{kind:'row_number'});assert.deepEqual(r.rows[0].value,{kind:'variable',name:'TopN'});
+ Object.assign(f.data,{UseVariables:128,RelationType:10,CompareValueListAsString:'TopN'});
+ assert.equal(f.read().verified,false,'row-number list bindings remain unsupported');
+});

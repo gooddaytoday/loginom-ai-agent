@@ -121,6 +121,13 @@ order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
 the existing node, cold execution without configuration and cleanup use stock
 checks. Only the business task and CSV reach the model.
 
+`row-filter-top-n` uses the approved row-filter `acceptance/typed/task-top-n.md`
+and only `fixtures/typed/rows.csv`. The private stdlib oracle checks TopN 3→5,
+both full ordered outputs and four CSVs. The source alone changes on the same
+Filter GUID; readback requires integer `row_number <= TopN`, not a literal.
+Stock Save, cold binding/field readback without configuration, both typed
+outputs and cleanup apply. Oracle/expected never reach the model.
+
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
 `{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",

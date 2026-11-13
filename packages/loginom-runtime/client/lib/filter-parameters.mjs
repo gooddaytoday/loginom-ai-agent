@@ -50,8 +50,9 @@ export function validateFilterConditions(p){
    need(['value','lower','upper','values'].every(k=>keys.includes(k)?Object.hasOwn(c,k):!Object.hasOwn(c,k)),'Filter operator operands differ');
    const variable=keys.find(k=>isFilterVariable(c[k]));
    if(variable){
-    need((variable==='value'&&['<','<=','>','>=','=','<>'].includes(c.operator)||variable==='values'&&arity==='list')
-     &&c.field.kind==='input_field'&&['integer','string'].includes(c.type),'Unsupported filter variable operand');
+    need((variable==='value'&&['<','<=','>','>=','=','<>'].includes(c.operator)
+     &&(c.field.kind==='input_field'||c.field.kind==='row_number'&&c.type==='integer')
+     ||variable==='values'&&arity==='list'&&c.field.kind==='input_field')&&['integer','string'].includes(c.type),'Unsupported filter variable operand');
     need(object(c[variable],['kind','name'])&&c[variable].kind==='variable'&&name(c[variable].name),'Exact mapped filter variable name required');
     continue;
    }
@@ -69,11 +70,16 @@ export function resolveFilterConditions(p,fields,variables){
  validateFilterConditions(p);
  need(Array.isArray(fields)&&fields.length<=1000&&fields.every(f=>name(f.name))&&new Set(fields.map(f=>f.name)).size===fields.length,'Complete unique filter input schema required');
  return p.groups.map(group=>group.map(c=>{
+  validateFilterOperand(c,variables);
   if(c.field.kind==='row_number')return {...c};
   const found=fields.filter(f=>f.name===c.field.name);need(found.length===1,'Unknown filter input field: '+c.field.name);
   need(found[0].type===c.type,'Filter scalar type differs from input: '+c.field.name);
-  const operand=c.value??c.values;
-  if(isFilterVariable(operand)&&variables!==undefined){
+  return {...c,field:{...c.field}};
+ }));
+}
+function validateFilterOperand(c,variables){
+ const operand=c.value??c.values;
+ if(isFilterVariable(operand)&&variables!==undefined){
    const matches=variables.filter(v=>v.name===operand.name);need(matches.length===1,'Missing or ambiguous mapped filter variable: '+operand.name);
    const v=matches[0];need(v.type===(c.values?'string':c.type)&&v.is_null===false,'Filter variable type or NULL differs: '+operand.name);
    if(c.values){
@@ -81,9 +87,7 @@ export function resolveFilterConditions(p,fields,variables){
     const list=v.value.split(',');need(list.length>0&&list.length<=128&&list.every(x=>x.length>0&&!/[\"\r\n]/.test(x)),'Simple nonempty comma-separated variable list required');
     if(c.type==='integer')need(list.every(x=>/^-?\d+$/.test(x)&&Number.isSafeInteger(Number(x))),'Integer variable list required');
    }else validateFilterValue(v.value,c.type);
-  }
-  return {...c,field:{...c.field}};
- }));
+ }
 }
 
 // Reconstruct only the supported persisted native conditions. Omitting groups

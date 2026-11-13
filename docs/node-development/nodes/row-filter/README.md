@@ -8,6 +8,13 @@
 
 Зарегистрирован `transform.filter_data` / `conditions`, `row_number`. conditions и row_number; выходы подходящих/неподходящих строк.
 
+Top-N (LAB-1575): integer-порог `row_number <= TopN` из control input 0.
+Номер строки 1-based, порядок исходный; после изменения только TopN
+выполняется тот же Фильтр. Сценарий `row-filter-top-n` проверяет 3→5,
+оба полных выхода и CSV, Save, сохранённую ссылку после cold и cleanup.
+Native-наблюдения — [discovery](discovery-variables.md); комплект Top-N —
+[готов](acceptance/typed/README.md). Real/datetime/NULL — следующий цикл.
+
 Ограничения: Scalar-условия, integer/string переменные (scalar/list), row_number; Variant не поддержан. Для строк явный case_sensitive. Execute допускает чтение хотя бы одного выбранного выхода 0/1; при приёмке обоих заявленных выходов проверить оба. Исторический новый узел на 1000 полях встречал UI_SCAN_LIMIT; текущая максимальная live-ширина этой инвентаризацией не подтверждена.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [filter-node.mjs](../../../../packages/loginom-runtime/client/lib/filter-node.mjs):1–88; [filter-parameters.mjs](../../../../packages/loginom-runtime/client/lib/filter-parameters.mjs):1–106; [transform.filter_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.filter_data.md):1–31. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.

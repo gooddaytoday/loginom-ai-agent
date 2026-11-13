@@ -3,6 +3,26 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 
+test('Top-N registers the approved task, two private ordered phases and builtin control source',()=>{
+ const code=`import importlib.util
+s=importlib.util.spec_from_file_location('r','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('row-filter-top-n')
+assert c['prompt'].name=='task-top-n.md' and c['input_files']==['rows.csv']
+assert c['export_count']==4 and c['filter_top_n'] is True and c['base'] is None
+assert c['filter_initial']=='expected-top-initial.json' and c['expected_name']=='expected-top-final.json'
+`;
+ execFileSync('python3',['-B','-c',code],{cwd:new URL('../../../',import.meta.url)});
+ const root=new URL('../../../docs/node-development/nodes/row-filter/acceptance/typed/',import.meta.url);
+ for(const [phase,n] of [['initial',3],['final',5]]){
+  const e=JSON.parse(readFileSync(new URL('expected-top-'+phase+'.json',root)));
+  assert.equal(e.row_filter_top_n,true);assert.ok(e.outputs.every(o=>o.ordered));
+  assert.deepEqual(e.outputs[0].rows.map(r=>r.RowID),Array.from({length:n},(_,i)=>i+1));
+  assert.equal(e.variable_inventory.outputs[0].variables[0].value,n);
+  assert.equal(e.variable_inventory.links[0].kind,'control');
+ }
+ execFileSync('python3',['-B',new URL('oracle.py',root).pathname,'--check']);
+});
+
 test('row-filter scenarios use approved tasks, exact fixtures and stock typed control cold',()=>{
  const code=`import importlib.util,json
 s=importlib.util.spec_from_file_location('run_check','scripts/node-acceptance/run-check.py')

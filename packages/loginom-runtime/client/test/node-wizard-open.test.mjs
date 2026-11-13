@@ -4,6 +4,9 @@ import {wizardOpenBinding,boundWizardDeactivationConfirmation,openPreparedWizard
 import {makeWorkspaceUiCode} from '../lib/workspace-ui.mjs';
 import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
 import vm from 'node:vm';
+import {runInContext} from 'node:vm';
+import {createNodeProcedure} from '../lib/node-procedure.mjs';
+import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {scriptGraphFixture,clone,build,origin} from './support/workspace-ui-fixture.mjs';
 
 // A long source caption overflows into a hidden native pending breadcrumb.
@@ -223,3 +226,60 @@ for(const fault of ['same-body','foreign-guid','foreign-document','foreign-workf
   const f=lateBodyReplacement(fault);await assert.rejects(openPreparedWizard(f.channel));
   assert.deepEqual(f.gestures,fault==='second-replacement'?[{verb:'click',ref:'old-body'},{verb:'click',ref:'fresh-body'}]:[{verb:'click',ref:'old-body'}]);
  });
+
+// LAB-1619: #1095 cold :33-:35. A cancelled wizard leaves Loginom redrawing the
+// graph; the prepared body is replaced between observation and the selection
+// click. Only the strict no-gesture refusal may rebind the same native body once.
+for(const fault of [null,'twice','effect'])test('reopen selects a body replaced before its click and opens settings once: '+(fault??'none'),async()=>{
+ const f=scriptGraphFixture('Import','bg-vendor-icon-importtextfile'),{page}=f;f.node.FGuid='node';Object.assign(page.context,{innerWidth:1000,innerHeight:800});
+ const base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');const path=[];let chain='',mode='graph';
+ for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']){
+  chain+=(chain?'>':'')+label;const tid=base+'cnrNaviMode;b.s_'+chain;path.push({tid,label});const e=page.add('a',tid,label,undefined,panel);
+  if(label==='Сценарий')page.add('span',null,'',undefined,e).attrs.class='maptree-icon-workflow';
+ }
+ class ModelNodeTreeNode{};page.app.ModelNodeTreeNode=ModelNodeTreeNode;const native=new ModelNodeTreeNode(),workflow={};native.FGuid='node';native.ParentNode=workflow;
+ page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>({Controller:{FController:f.model,Node:{data:{node:mode==='wizard'?native:workflow}}}});
+ page.context.readOwnedContext=async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',surface:mode,tid:base+(mode==='wizard'?'WizrdMCF':'Graph;Import'),locked:false});
+ // A closed wizard clears the native selection: settings appear only after a body click.
+ const settingBox=f.setting.box,container=f.body.parentElement;f.setting.remove();
+ let body=f.body,replacements=0;const clicks=[],click=page.mouse.click;
+ page.mouse.click=async(x,y,options)=>{
+  const target=page.document.elementFromPoint(x,y)?.getAttribute('data-tid');await click(x,y,options);clicks.push(target);
+  if(target===f.tid)page.add('g',f.tid+';Setting','',settingBox,container);
+  else if(target===f.tid+';Setting'){
+   mode='wizard';container.remove();
+   const wizard=page.add('div',base+'WizrdMCF');page.add('button',base+'WizrdMCF;ImportTextFilePreviewWizard;edtFileName','',undefined,wizard);
+   for(const [tid,label,icon] of [[path.at(-1).tid+'>Import','Import','bg-vendor-icon-importtextfile'],[path.at(-1).tid+'>Import>Настройка','Настройка','maptree-icon-wizard']])
+    page.add('span',null,'',undefined,page.add('a',tid,label,undefined,panel)).attrs.class=icon;
+  }
+ };
+ const binding={document_id:'doc',node:{document_id:'doc',workflow_id:'flow',node_id:'node'},
+  workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:page.tab.getAttribute('data-tid'),navigation_path:path}};
+ const operation={id:'cold-bindings',deadline:540000,action:{action_key:'acceptance.cold_read',revision:'1'}},records=[];
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:origin,targetBuild:build,
+  now:()=>page.clock.Date.now()+1,wait:async ms=>page.clock.advance(ms??100),
+  record:async e=>{records.push(structuredClone(e));return structuredClone(e);},wrapMutation:code=>code,
+  execute:async code=>{
+   const select=code.includes('"mode":"act"')&&code.includes('"verb":"click"');
+   if(select&&replacements<(fault==='twice'?2:1)){
+    // Loginom redraws the graph after the observation: same native body, new SVG element.
+    replacements++;const box=body.box;body.remove();body=page.add('g',f.tid,'',box,container);
+   }
+   const result=await runInContext('('+code.replaceAll(readPreparedNodeContext.toString(),'readOwnedContext')+')',page.context)(page);
+   if(select&&fault==='effect'&&result.status==='NOT_APPLIED')result.effect_possible=true;
+   return result;
+  }});
+ const refresh=()=>records.filter(e=>e.phase==='node_step_refresh_authorized');
+ const stale=()=>records.filter(e=>e.phase==='node_step_completed'&&e.outcome.status==='NOT_APPLIED'&&e.outcome.error?.code==='UI_REFERENCE_STALE');
+ if(fault){
+  await assert.rejects(openPreparedWizard(channel),/did not confirm completion/);
+  assert.deepEqual(clicks,[]);assert.equal(mode,'graph');
+  assert.equal(refresh().length,fault==='twice'?1:0);assert.equal(stale().length,fault==='twice'?2:1);
+  return;
+ }
+ const opened=await openPreparedWizard(channel);
+ assert.equal(opened.verified,true);assert.equal(opened.node_context.surface,'wizard');
+ assert.deepEqual(clicks,[f.tid,f.tid+';Setting'],'one body selection click, then one settings click');
+ assert.equal(refresh().length,1);assert.equal(refresh()[0].reason,'prepared_graph_body_replaced');
+ assert.equal(stale().length,1);assert.equal(stale()[0].outcome.effect_possible,false);assert.equal(stale()[0].outcome.phase,'preconditions');
+});
