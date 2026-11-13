@@ -225,3 +225,28 @@ test("drops lower-priority sources first when the archive budget is short", asyn
   )
   for (const file of omitted) expect(file.reason).toBe("archive-budget")
 })
+
+test("attaches crash dumps unchanged only on explicit request", async () => {
+  const p = profile()
+  const dump = Buffer.concat([Buffer.from("MDMP"), Buffer.from([0, 1, 2, 255]), Buffer.from("raw-memory")])
+  put(join(p.root, "crash", "pending", "a.dmp"), "")
+  writeFileSync(join(p.root, "crash", "pending", "a.dmp"), dump)
+  const sources = { runtime: p.runtime, logs: [{ dir: join(p.root, "crash"), prefix: "crashpad" }] }
+  const off = await buildDiagnosticsArchive(sources)
+  expect((await unpack(off.zip)).files.has("crashpad/pending/a.dmp")).toBe(false)
+  expect(off.manifest.attachDumps).toBe(false)
+  expect(off.manifest.files.find((file: any) => file.name === "crashpad/pending/a.dmp")).toMatchObject({
+    status: "omitted",
+    reason: "unreadable-or-not-redactable",
+  })
+  const on = await buildDiagnosticsArchive({ ...sources, attachDumps: true })
+  const archive = await unpack(on.zip)
+  expect(Buffer.from(archive.files.get("crashpad/pending/a.dmp")!)).toEqual(dump)
+  expect(on.manifest.attachDumps).toBe(true)
+  expect(on.manifest.files.find((file: any) => file.name === "crashpad/pending/a.dmp")).toMatchObject({
+    status: "included",
+    kind: "crash-dump",
+    redacted: false,
+    sha256: sha(dump),
+  })
+})

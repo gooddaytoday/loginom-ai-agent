@@ -7,6 +7,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   symlinkSync,
   utimesSync,
   writeFileSync,
@@ -25,6 +26,8 @@ const paths = {
   crashDumps: join(profile, "crash"),
 }
 const scoped = { info() {}, warn() {}, error() {} }
+const saveDialogs: Array<{ defaultPath: string }> = []
+let saveChoice: { canceled: boolean; filePath?: string } = { canceled: true }
 mock.module("electron", () => ({
   // electron-store also imports Electron's CJS default while loading the full
   // Desktop suite. In Bun it is a binary path, with no main-process members.
@@ -38,6 +41,12 @@ mock.module("electron", () => ({
   netLog: { currentlyLogging: false },
   shell: { showItemInFolder() {} },
   crashReporter: {},
+  dialog: {
+    showSaveDialog: async (options: { defaultPath: string }) => {
+      saveDialogs.push(options)
+      return saveChoice
+    },
+  },
 }))
 mock.module("electron-log/main.js", () => ({
   default: {
@@ -48,7 +57,8 @@ mock.module("electron-log/main.js", () => ({
   },
 }))
 mock.module("./constants", () => ({ CHANNEL: "prod", BUILD_SOURCE: { sourceSHA, sourceDirty: false } }))
-const { exportDebugLogs, initLogging } = await import("./logging")
+const { exportDebugLogs, initLogging, parseDiagnosticsRequest, prepareDiagnostics, previewDiagnosticsFile, saveDiagnostics } =
+  await import("./logging")
 
 const attempt = "generations/1/chats/chat-hash/attempts/last/execution-events.jsonl"
 const diagnostic = "diagnostics/session-hash/events.jsonl"
@@ -266,3 +276,79 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_RUNTIME)(
     )
   },
 )
+
+const sessionHash = createHash("sha256").update("ses_desktop").digest("hex")
+function sessionFixture() {
+  const attempt = `generations/1/chats/${sessionHash}/attempts/a1`
+  put(runtime(`${attempt}/execution-events.jsonl`), JSON.stringify({ phase: "node_step_completed", text: "target-attempt" }) + "\n")
+  put(runtime(`${attempt}/session.json`), JSON.stringify({ sessionId: "dock-desktop" }))
+  put(runtime("generations/1/chats/other/attempts/b1/execution-events.jsonl"), '{"text":"other-session-attempt"}\n')
+  put(join(paths.userData, "logs/current/main.log"), "main log line\n")
+  put(join(paths.crashDumps, "pending/a.dmp"), "MDMP\0raw-memory")
+  return {
+    attempt: `runtime/${attempt}/execution-events.jsonl`,
+    chat: { info: { id: "ses_desktop" }, messages: [{ info: { id: "m1", role: "user" }, parts: [{ type: "text", text: "chat-request" }] }] },
+  }
+}
+
+test("IPC input keeps only a valid session, its chat and boolean groups with owner defaults", () => {
+  expect(parseDiagnosticsRequest(undefined)).toEqual({
+    sessionID: undefined,
+    chat: undefined,
+    include: { chat: true, runtime: true, logs: true, dumps: false },
+  })
+  expect(
+    parseDiagnosticsRequest({ sessionID: "../../etc", chat: { info: {} }, include: { dumps: "yes", chat: false } }),
+  ).toEqual({ sessionID: undefined, chat: undefined, include: { chat: false, runtime: true, logs: true, dumps: false } })
+  expect(parseDiagnosticsRequest({ sessionID: "ses_desktop", chat: { info: {} }, include: { dumps: true } })).toMatchObject({
+    sessionID: "ses_desktop",
+    chat: { info: {} },
+    include: { dumps: true },
+  })
+})
+
+test("the Desktop archive follows the selected session, its chat and the chosen groups", async () => {
+  const fixture = sessionFixture()
+  const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat })
+  const status = (name: string) => ready.files.find((file) => file.name === name)
+  expect(ready.selection).toBe("session")
+  expect(status(fixture.attempt)).toMatchObject({ group: "runtime", status: "included" })
+  expect(status("chat/session.json")).toMatchObject({ group: "chat", status: "included" })
+  expect(status("desktop/current/main.log")).toMatchObject({ group: "logs", status: "included" })
+  expect(status("crashpad/pending/a.dmp")).toMatchObject({ group: "dumps", status: "omitted" })
+  expect(ready.files.some((file) => file.name.includes("/other/"))).toBe(false)
+  // The preview reads the redacted bytes that Save writes.
+  expect((await previewDiagnosticsFile(ready.id, "chat/session.json"))?.text).toContain("chat-request")
+  expect(await previewDiagnosticsFile(ready.id, "crashpad/pending/a.dmp")).toBeUndefined()
+  expect(await previewDiagnosticsFile("stale", "chat/session.json")).toBeUndefined()
+
+  const narrowed = await prepareDiagnostics({
+    sessionID: "ses_desktop",
+    chat: fixture.chat,
+    include: { chat: false, logs: false, dumps: true },
+  })
+  expect(narrowed.files.some((file) => file.group === "chat" || file.name.startsWith("desktop/"))).toBe(false)
+  expect(narrowed.files.find((file) => file.name === "crashpad/pending/a.dmp")).toMatchObject({ status: "included" })
+  expect(await previewDiagnosticsFile(ready.id, "chat/session.json")).toBeUndefined()
+})
+
+test("Save as offers Downloads, writes the previewed archive privately and honours cancel", async () => {
+  const fixture = sessionFixture()
+  const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat })
+  saveDialogs.length = 0
+  saveChoice = { canceled: true }
+  expect(await saveDiagnostics(ready.id)).toBeUndefined()
+  expect(saveDialogs[0].defaultPath.startsWith(join(paths.downloads, "loginom-diagnostics-"))).toBe(true)
+  expect(saveDialogs[0].defaultPath.endsWith(".zip")).toBe(true)
+  const target = join(profile, "chosen", "diagnostics.zip")
+  mkdirSync(dirname(target), { recursive: true })
+  saveChoice = { canceled: false, filePath: target }
+  expect(await saveDiagnostics(ready.id)).toBe(target)
+  const archive = new ZipReader(new BlobReader(new Blob([readFileSync(target)])))
+  const names = (await archive.getEntries()).map((entry) => entry.filename)
+  await archive.close()
+  expect(names).toContain("chat/session.json")
+  expect(names).toContain(fixture.attempt)
+  if (process.platform !== "win32") expect(statSync(target).mode & 0o777).toBe(0o600)
+  await expect(saveDiagnostics(ready.id)).rejects.toThrow("DIAGNOSTICS_NOT_PREPARED")
+})
