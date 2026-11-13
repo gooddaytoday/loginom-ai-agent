@@ -136,6 +136,18 @@ test("secrets planted in the real profile stores never reach any archived byte",
     expect(file).toMatchObject({ size: archive.files.get(file.name)!.length, sha256: sha(archive.files.get(file.name)!) })
 })
 
+test("masks a login only as a whole token and keeps generic logins and chat roles", async () => {
+  const p = profile()
+  const chat = {
+    info: { id: "ses_login" },
+    messages: [{ info: { id: "m1", role: "user" }, parts: [{ type: "text", text: "upload /ivan/input.csv by ivan for ivanov, users list" }] }],
+  }
+  const { zip } = await buildDiagnosticsArchive({ runtime: p.runtime, sessionID: "ses_login", chat, users: ["ivan", "user"] })
+  const text = (await unpack(zip)).text("chat/session.json")
+  expect(text).toContain('"role":"user"')
+  expect(text).toContain("upload /[user]/input.csv by [user] for ivanov, users list")
+})
+
 test("reading profile secrets creates nothing in a missing profile", async () => {
   const p = profile()
   const known = await profileSecrets({ loginom: p.loginom, data: p.data, codec: credentials("linux") })

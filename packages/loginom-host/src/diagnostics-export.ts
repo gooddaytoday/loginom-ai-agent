@@ -176,6 +176,19 @@ export function maskValues(text: string, values: string[], marker: string) {
   return text
 }
 
+// Product defaults and role words are not personal and must keep chat roles intact.
+const GENERIC_LOGINS = new Set(["user", "users", "admin", "administrator", "guest", "test", "demo", "root"])
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+// A login is masked only as a whole token, so `ivan` does not damage `ivanov`.
+export function maskLogins(text: string, logins: string[]) {
+  const names = [...new Set(logins)].filter((item) => item.length >= 3 && !GENERIC_LOGINS.has(item.toLowerCase()))
+  for (const name of names.sort((a, b) => b.length - a.length))
+    for (const variant of variants(name))
+      text = text.replace(new RegExp(`(?<![\\p{L}\\p{N}_.@%-])${escapeRegExp(variant)}(?![\\p{L}\\p{N}_@%-]|\\.[\\p{L}\\p{N}])`, "giu"), "[user]")
+  return text
+}
+
 function privateIPv4(host: string) {
   const parts = host.split(".").map(Number)
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false
@@ -260,10 +273,10 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
   const limits = { ...DIAGNOSTICS_LIMITS, ...input.limits }
   const allowed = [...PUBLIC_HOSTS, ...(input.publicHosts ?? [])]
   const secrets = (input.knownSecrets ?? []).filter((value) => typeof value === "string" && value.length >= 4)
-  const users = (input.users ?? []).filter((value) => typeof value === "string" && value.length >= 4)
+  const users = (input.users ?? []).filter((value) => typeof value === "string" && value.length >= 3)
   const redactor = createRedactor(secrets)
   const scrub = (text: string) =>
-    maskHosts(exportHome(maskValues(maskValues(text, secrets, "[redacted]"), users, "[user]")), allowed)
+    maskHosts(exportHome(maskLogins(maskValues(text, secrets, "[redacted]"), users)), allowed)
 
   // Priority order decides what is dropped first when the archive budget is short.
   const [attempts, attemptMeta, diagnostics, startup] = input.runtime
