@@ -147,6 +147,8 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 ## Loginom tools and ChatGPT compatibility
 
+В профиле `loginom-dashboard` инструмент `dashboard_publish` всегда запрашивает разовое подтверждение с именем узла и путём пакета. Правило профиля применяется последним в `SessionTools.resolve`. Автоответ сессии и папки на публикацию не действует.
+
 - `src/session/tools.ts` admits host-owned `loginom_` tools. Keep host credentials/context tokens out of model parameters and preserve original-user attachment admission; see [host contracts](../loginom-host/AGENTS.md).
 - `src/provider/transform.ts` adapts provider-facing JSON Schema. OpenAI rejects structured array/object values inside enums: retain usable types/items and describe allowed structured values while leaving original Dock execution validation intact. Do not infer every nonnumeric const as string.
 - Run `bun test test/provider/transform.test.ts` and `bun typecheck` here after schema changes. Real installed ChatGPT acceptance uses desktop `test/loginom/chatgpt-schema.mjs`, all actual Dock tools and an isolated profile; do not expose OAuth data.

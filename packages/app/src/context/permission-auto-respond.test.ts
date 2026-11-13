@@ -123,3 +123,15 @@ describe("isDirectoryAutoAccepting", () => {
     expect(isDirectoryAutoAccepting(autoAccept, directory)).toBe(false)
   })
 })
+
+test("dashboard publication always requires an explicit response despite session and folder auto-accept", () => {
+  const directory = "/fixture/dashboard"
+  const sessions = [session({ id: "root" })]
+  const publish = { sessionID: "root", permission: "dashboard_publish" }
+  const edit = { ...publish, permission: "edit" }
+  for (const autoAccept of [{ root: true }, { [base64Encode(directory) + "/*"]: true }]) {
+    expect(autoRespondsPermission(autoAccept, sessions, publish, directory)).toBe(false)
+    expect(sessionAutoAccept(autoAccept, sessions, publish, directory)).toBe(false)
+    expect(autoRespondsPermission(autoAccept, sessions, edit, directory)).toBe(true)
+  }
+})

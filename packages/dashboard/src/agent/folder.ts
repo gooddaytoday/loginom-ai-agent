@@ -115,3 +115,11 @@ export function readDashboardSnapshot(work: string) {
     return { sample, snapshot, control: binding }
   })
 }
+
+export function removePublishedSample(work: string, snapshotId: string) {
+  withSnapshot(work, (directory, control) => {
+    const binding = JSON.parse(readFileSync(join(control, "binding.json"), "utf8")) as ControlBinding
+    const file = join(directory, "sample.json")
+    if (binding.snapshotId === snapshotId && existsSync(file)) unlinkSync(file)
+  })
+}

@@ -73,14 +73,14 @@ test("shows a pending question dock", async ({ page }) => {
   expect((await reply).postDataJSON()).toEqual({ answers: [["Minimal"]] })
 })
 
-test("shows a pending permission dock", async ({ page }) => {
+test("asks once to publish the named dashboard and package", async ({ page }) => {
   await mockServer(page, {
     permissions: [
       {
         id: "permission-request",
         sessionID,
-        permission: "bash",
-        patterns: ["git status", "git diff"],
+        permission: "dashboard_publish",
+        patterns: ["Orders", "/fixture/orders.lgp"],
         metadata: {},
         always: [],
       },
@@ -92,9 +92,10 @@ test("shows a pending permission dock", async ({ page }) => {
 
   const permission = page.locator('[data-component="dock-prompt"][data-kind="permission"]')
   await expect(permission).toBeVisible()
-  await expect(permission.getByText("git status")).toBeVisible()
-  await expect(permission.getByText("git diff")).toBeVisible()
-  await expect(permission.locator('[data-slot="permission-footer-actions"] button')).toHaveCount(3)
+  await expect(permission.getByText("Orders", { exact: true })).toBeVisible()
+  await expect(permission.getByText("/fixture/orders.lgp", { exact: true })).toBeVisible()
+  await expect(permission.getByRole("button")).toHaveCount(2)
+  await expect(permission.getByText("Publish the dashboard to the stand. Check the node and package below")).toBeVisible()
   await expect(page.locator('[data-component="session-composer"]')).toHaveCount(0)
 
   const reply = page.waitForRequest((request) => request.method() === "POST")

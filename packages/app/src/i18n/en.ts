@@ -1185,6 +1185,7 @@ export const dict = {
 
   "settings.permissions.tool.read.title": "Read",
   "settings.permissions.tool.read.description": "Reading a file (matches the file path)",
+  "settings.permissions.tool.dashboard_publish.description": "Publish the dashboard to the stand. Check the node and package below",
   "settings.permissions.tool.edit.title": "Edit",
   "settings.permissions.tool.edit.description": "Modify files, including edits, writes, and patches",
   "settings.permissions.tool.glob.title": "Glob",

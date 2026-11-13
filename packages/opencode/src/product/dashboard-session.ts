@@ -2,7 +2,11 @@ import { existsSync, lstatSync, realpathSync, statSync } from "node:fs"
 import { basename, dirname, join, parse, relative, resolve, sep } from "node:path"
 import { DASHBOARD_SESSION_MARKER } from "@loginom-ai-agent/product/dashboard-root"
 import { Global } from "@opencode-ai/core/global"
+import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { TaskScope } from "@/session/task-scope"
+
+export const dashboardRules = (profile: TaskScope.Profile): PermissionV1.Rule[] =>
+  profile === "loginom-dashboard" ? [{ permission: "dashboard_publish", pattern: "*", action: "ask" }] : []
 
 export const dashboardRoot = () => join(Global.Path.data, "dashboards")
 

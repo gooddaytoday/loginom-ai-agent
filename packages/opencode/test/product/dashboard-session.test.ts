@@ -4,6 +4,7 @@ import { join, resolve } from "node:path"
 import { tmpdir } from "../fixture/fixture"
 import { Global } from "@opencode-ai/core/global"
 import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
+import { Permission } from "@/permission"
 import { DashboardSession } from "../../src/product/dashboard-session"
 
 async function dashboardFolder() {
@@ -124,4 +125,10 @@ test("dashboard paths stay within work for reading and src for writing, includin
   } finally {
     await rm(git, { recursive: true, force: true })
   }
+})
+
+test("dashboard publication requires confirmation after user rules are merged", () => {
+  expect(DashboardSession.dashboardRules("default")).toEqual([])
+  const rules = Permission.merge(Permission.fromConfig({ "*": "allow" }), DashboardSession.dashboardRules("loginom-dashboard"))
+  expect(Permission.evaluate("dashboard_publish", "orders", rules).action).toBe("ask")
 })

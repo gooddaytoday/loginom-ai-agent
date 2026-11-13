@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, unlink, writeFile } from "node:fs/promises"
 import { dirname, extname, join, relative, sep } from "node:path"
+import type { TableSample } from "../contract/snapshot.ts"
 
 export const PLATFORM_FILES = ["index.html", "tsconfig.json", "env.d.ts", "vite.config.mjs", "resolver.mjs", "scan.mjs"]
 let commits = Promise.resolve()
@@ -38,7 +39,15 @@ export async function sourceFiles(work: string): Promise<{ files: string[] } | {
   return { files }
 }
 
-export async function buildDashboard(input: { work: string; template: string; node: string; out: string; timeoutMs?: number; signal?: AbortSignal }): Promise<Build> {
+export async function buildDashboard(input: {
+  work: string
+  template: string
+  node: string
+  out: string
+  timeoutMs?: number
+  signal?: AbortSignal
+  publication?: { operation: string; sample: Pick<typeof TableSample.Type, "rows"> }
+}): Promise<Build> {
   const work = await realpath(input.work)
   const listed = await sourceFiles(work)
   if ("error" in listed) return { ok: false, output: listed.error }
@@ -52,6 +61,14 @@ export async function buildDashboard(input: { work: string; template: string; no
     await cp(join(work, "src"), join(staging, "src"), { recursive: true })
     const copied = await sourceFiles(staging)
     if ("error" in copied) return { ok: false, output: copied.error }
+    if (input.publication) {
+      const files = await Promise.all(copied.files.map(file => readFile(join(staging, file))))
+      const found = embeddedValues(input.publication.sample, files)
+      if (found.length) return {
+        ok: false,
+        output: outputText(Buffer.from("Опубликованная сборка будет публичной. Удалите из src/ данные образца: " + found.slice(0, 5).join(", "))),
+      }
+    }
     let output = Buffer.alloc(0)
     const add = (chunk: string) => {
       if (output.length === OUTPUT) return
@@ -72,6 +89,8 @@ export async function buildDashboard(input: { work: string; template: string; no
       }
     }
     const hash = await treeHash(join(staging, "dist"))
+    const retained = input.publication && join(input.publication.operation, "dist")
+    if (retained) await cp(join(staging, "dist"), retained, { recursive: true })
     const installed = commits.then(async () => {
       const dir = join(input.out, hash)
       if (!existsSync(dir)) await rename(join(staging, "dist"), dir)
@@ -87,7 +106,7 @@ export async function buildDashboard(input: { work: string; template: string; no
       if (previous !== hash) await Promise.all((await readdir(input.out))
         .filter(name => /^[a-f0-9]{64}$/.test(name) && name !== hash && name !== previous)
         .map(name => rm(join(input.out, name), { recursive: true, force: true })))
-      return { ok: true as const, hash, dir, output: outputText(output) }
+      return { ok: true as const, hash, dir: retained ?? dir, output: outputText(output) }
     })
     commits = installed.then(() => undefined, () => undefined)
     return await installed
@@ -123,4 +142,9 @@ async function treeHash(dir: string) {
     sha.update(file).update("\0").update(String(bytes.length)).update("\0").update(bytes)
   }
   return sha.digest("hex")
+}
+
+export function embeddedValues(sample: { rows: readonly (readonly unknown[])[] }, files: Buffer[]) {
+  const values = new Set(sample.rows.flat().filter(cell => cell != null).map(String))
+  return [...values].filter(value => value.length >= 6 && files.some(file => file.includes(value)))
 }

@@ -705,6 +705,7 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
       }
       const { tools, user, history } = yield* resolveProfile(profile, loginom)
       expect(tools.dashboard_draft).toBeUndefined()
+      expect(tools.dashboard_publish).toBeUndefined()
       expect(scopes).toEqual([{ mode: "bind", scope: { taskMessageID: user, profile } }])
       expect(tools.loginom_find).toBeDefined()
       expect(tools.loginom_dock_diagnostics).toBeDefined()
@@ -949,7 +950,7 @@ codeMode.instance("a dashboard directory selects its real builtin whitelist befo
       )
       expect(result.session.directory).toBe(work)
       const ids = Object.keys(result.tools)
-      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft"].includes(id))).toBe(
+      expect(ids.every((id) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish"].includes(id))).toBe(
         true,
       )
       for (const id of ["read", "glob", "grep", "skill", "dashboard_draft"]) expect(ids).toContain(id)
@@ -998,6 +999,6 @@ codeMode.instance("a folder prepared by Desktop resolves dashboard tools without
     const result = yield* resolveProfile("default").pipe(provideInstance(prepared.directory))
     expect(result.tools.dashboard_draft).toBeDefined()
     expect(result.tools.bash).toBeUndefined()
-    expect(result.tools.dashboard_publish).toBeUndefined()
+    expect(result.tools.dashboard_publish?.execute).toBeDefined()
   }),
 )

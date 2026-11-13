@@ -1193,6 +1193,7 @@ export const dict = {
 
   "settings.permissions.tool.read.title": "Чтение",
   "settings.permissions.tool.read.description": "Чтение файла (по совпадению пути)",
+  "settings.permissions.tool.dashboard_publish.description": "Опубликовать dashboard на стенд. Проверьте узел и пакет ниже",
   "settings.permissions.tool.edit.title": "Редактирование",
   "settings.permissions.tool.edit.description":
     "Изменение файлов, включая редактирование, запись, патчи и множественное редактирование",
