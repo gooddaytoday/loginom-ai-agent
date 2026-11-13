@@ -8484,3 +8484,20 @@ test('date string-format cell is clicked away from its checkbox image, never on 
   assert.deepEqual(page.clickedPoints,[{...point,clickCount:1}]);
  }
 });
+
+test('native-bound Python node body, label and settings are not code editors; other icons keep the code-name guard',async()=>{
+ for(const icon of ['bg-vendor-icon-python','bg-vendor-icon-calcdata']){
+  const page=new Page({clock:fixtureClock().Date}),prefix='MF;TF-1',guid='66650dc9-06b1-4f01-92f7-c199c08017ec';
+  const body=page.add('g',prefix+';Graph;Python','',{x:100,y:200,width:60,height:60});
+  page.add('span',body.attrs['data-tid']+';Label;Label','Python',{x:90,y:170,width:100,height:20},body);
+  page.add('g',body.attrs['data-tid']+';Setting','',{x:130,y:205,width:20,height:20},body.parentElement);
+  const model=page.graphModels.get(body.parentElement),native=model.byTid.get(body.attrs['data-tid']);native.FGuid=guid;native.FIconCls=icon;
+  const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,mode:'observe'},
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:guid,surface:'graph',tid:body.attrs['data-tid']})));
+  const allowed=suffix=>result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+suffix)?.allowed_actions??[];
+  const python=icon==='bg-vendor-icon-python';
+  assert.equal(allowed('').includes('click'),python,icon+' body');
+  assert.equal(allowed(';Label;Label').includes('click'),python,icon+' label');
+  assert.equal(allowed(';Setting').includes('click'),python,icon+' settings');
+ }
+});

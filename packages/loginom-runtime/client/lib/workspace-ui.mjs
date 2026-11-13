@@ -744,7 +744,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       || !!element.closest('[data-tid$=";FileStorageForm;btnUpload"]')
       || element.matches('input[type="url"],input[type="file"],input[type="hidden"]')
       || nativeGraphControl(element)?.status!=='non_script' && nativeGraphControl(element)!==null
+      // A native-bound Python node body/label/settings control is named
+      // "Python" by Loginom; its code editor stays behind the owned wizard.
       || /(?:^|[;_ -])(?:script|javascript|python|codeeditor)(?:[;_ -]|$)/i.test(controlCodeIdentity(element))
+        && nativeGraphControl(element)?.icon!=='bg-vendor-icon-python'
       || !!element.closest('.monaco-editor,.CodeMirror,.ace_editor,[data-tid$=";WizrdMCF;CalcDataWizard;cmpExpression"]');
     const dialogElements = select('[role="dialog"],.x-window,.bg-dialog').filter(visible)
       .filter((element, index, items) => !items.some((other, i) => i !== index && other.contains(element)));
