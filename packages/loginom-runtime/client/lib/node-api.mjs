@@ -63,7 +63,7 @@ export const crossTableParametersSchema={...object({
 },[]),description:'Role/category changes require complete row_keys, column or columns, facts, category_mode and one explicit table input zero, including existing nodes. fixed also requires explicit include_null/include_other. Existing parameters={} preserves supported settings. Done deactivates the generated output: before downstream nodes, execute/read the SAME CrossTable again with dock_node_read using source_operation_id from its latest successful execute configuration. Inspect settings in the completed configuration.readback. Explicit category lists are unsupported. Output mappings require execute and exact configured_field names: rename, label, order and autosync are supported; own output fields are mandatory. Exclusion requires a separate downstream Field Parameters node.'};
 // Prepared schema for the JavaScript handler. It is not exposed in the node
 // catalog until the owned editor/execute/read driver is registered.
-export const javascriptParametersSchema=object({source_text:{type:'string',maxLength:32768,
+export const javascriptParametersSchema=object({input_state:{const:'unconnected',description:'Source only: inputs:[]; runtime verifies no incoming links. Omit for existing tabular Data behavior.'},source_text:{type:'string',maxLength:32768,
  description:'LF source: new required; existing omit=keep, empty=replace. <=32768 UTF-8 bytes/1024 lines; no CR/NUL (local check).'},
  expected_source_sha256:{...text(64),minLength:64,pattern:'^[a-f0-9]{64}$',description:'Replacing saved source: complete owned read digest.'},
  schema_mode:choice('declared','code'),

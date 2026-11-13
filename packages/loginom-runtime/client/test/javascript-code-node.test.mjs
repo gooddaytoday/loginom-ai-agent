@@ -20,6 +20,41 @@ const request={target:{kind:'new',type:'programming.javascript',position:{x:256,
   inputs:[{source,output:0,input:0}],parameters:{source_text:'import {OutputTable} from "builtIn/Data";\n',schema_mode:'code'},
   mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'}};
 
+test('unconnected source opt-in admits zero inputs without changing the existing Data branch',()=>{
+ const r={...structuredClone(request),inputs:[],parameters:{...request.parameters,input_state:'unconnected'}};
+ assert.doesNotThrow(()=>validateJavascriptCodeRequest(r.parameters,'script',r));
+ for(const change of [r=>delete r.parameters.input_state,r=>r.inputs=request.inputs,
+  r=>r.parameters.input_state='materialized']){
+  const invalid=structuredClone(r);change(invalid);
+  assert.throws(()=>validateJavascriptCodeRequest(invalid.parameters,'script',invalid));
+ }
+ assert.doesNotThrow(()=>validateJavascriptCodeRequest(request.parameters,'script',request));
+});
+
+test('unconnected executed readback retains the sole completed execution and rejects replay',()=>{
+ const p=phases();
+ p.find(r=>r.phase==='input_mapping').value.native_mapping={verified:true,source_identity_verified:true,
+  input_state:'unconnected',no_incoming_links_verified:true,autosync:true,source_fields:[],target_fields:[]};
+ p.find(r=>r.phase==='execute').value.execution_id='materialization_execute';
+ const readback=javascriptCodeReadback({node,phases:p});
+ assert.equal(readback.input_state,'unconnected');
+ assert.equal(readback.input_mapping.no_incoming_links_verified,true);
+ assert.deepEqual(readback.input_mapping.fields,[]);
+ const result={operation_id:'op',status:'SUCCEEDED',node,effect_possible:true,cleanup_complete:true,
+  phases:p.map(({value,...phase})=>phase),execution:{status:'completed',execution_id:'materialization_execute'},
+  output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false,warnings:[],
+  configuration:{status:'applied',readback},persisted_package_verified:false,checkpoint_kind:'local_node_checkpoint'};
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
+ assert.equal(validate(result).valid,true,JSON.stringify(validate(result)));
+ for(const change of [r=>delete r.configuration.readback.input_state,
+  r=>r.configuration.readback.input_mapping.no_incoming_links_verified=false,
+  r=>r.configuration.readback.input_mapping.fields=[{}]]){
+  const invalid=structuredClone(result);change(invalid);assert.equal(validate(invalid).valid,false);
+ }
+ p.find(r=>r.phase==='execute').value.execution_id='replayed';
+ assert.throws(()=>javascriptCodeReadback({node,phases:p}),/readback incomplete/);
+});
+
 for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-configure-cancel.mjs',import.meta.url)),point],{encoding:'utf8',timeout:10000});

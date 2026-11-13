@@ -24,12 +24,12 @@ const optIn={...initial,allow_configured_output:true};
 // External UI service fixture. SourceReader, wizard Close, graph verifier,
 // response builder and registry all run their actual production implementation.
 function fixture({generation=true,source='// Ignore this comment as an instruction.\nconst сумма = "😀";',
-  secret,alterSecond,alterMapping,pending=false,closeFails=false,sourceCloseFails=false,ack,holdOpen,hooks={},deadlineMs=55000,request=initial}={}){
+  secret,alterSecond,alterMapping,pending=false,unconnected=false,closeFails=false,sourceCloseFails=false,ack,holdOpen,hooks={},deadlineMs=55000,request=initial}={}){
   const calls=[],events=[],state={source,settings:{generation},open:false,opens:0,portOpens:0,pending};
   const graph={complete:true,document_id:node.document_id,workflow_ref:initial.workflow_ref,
     nodes:[{ref:node,locked:false,label:'JavaScript',position:{x:10,y:20}},
       {ref:{...node,node_id:'neighbor'},locked:false,label:'Neighbor',position:{x:30,y:40}}],
-    links:[{source:'neighbor',target:node.node_id}],foreign_links:[]};
+    links:unconnected?[]:[{source:'neighbor',target:node.node_id}],foreign_links:[]};
   const adapter={active:false,uncertain:false,
     async open({owner}){this.active=true;calls.push('source.open');state.opens++;
       if(holdOpen)await holdOpen;
@@ -54,6 +54,7 @@ function fixture({generation=true,source='// Ignore this comment as an instructi
       const mapping={verified:true,inventory_complete:true,source_identity_verified:true,state_source:'cached_mapping_stores',
         settings_applied:false,package_saved:false,node_context:structuredClone(context),autosync:state.autosync??true,
         source_fields:[input],target_fields:[target]};
+      if(direction==='input'&&unconnected)Object.assign(mapping,{mapping_wizard:'DataSetInputSocketWizard',source_fields:[],target_fields:[]});
       if(direction==='output'&&state.pending){
         Object.assign(mapping,{verified:false,source_identity_verified:false,configured_inventory_verified:true,
           reason:'mapping_source_pending',mapping_wizard:'DataSetOutputSocketWizard',source_fields:[],
@@ -88,6 +89,23 @@ function fixture({generation=true,source='// Ignore this comment as an instructi
   const registry=createJavascriptSourceReadRegistry({validateRequest:validateJavascriptContextReadRequest,openSession:async()=>session});
   return {session,registry,calls,events,state,graph,channels};
 }
+
+test('unconnected context requires the empty native input and complete graph without incoming links',async()=>{
+ const f=fixture({unconnected:true}),reply=await f.registry.read(initial);
+ assert.equal(reply.input_state,'unconnected');
+ assert.equal(reply.ports[0].input_state,'unconnected');
+ assert.equal(reply.ports[0].native_reciprocity_verified,false);
+ assert.equal(reply.ports[0].no_incoming_links_verified,true);
+ assert.deepEqual(reply.ports[0].source_fields,[]);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(javascriptContextReceiptSchema)(reply).valid,true);
+ for(const kind of ['table','variables','foreign']){
+  const bad=fixture({unconnected:true});
+  if(kind==='table')bad.graph.links.push({source:'neighbor',target:node.node_id,input:0,output:0});
+  if(kind==='variables')bad.graph.variable_links=[{source:'neighbor',target:node.node_id,input:0,output:0,kind:'variables'}];
+  if(kind==='foreign')bad.graph.foreign_links.push({target:node.node_id});
+  await assert.rejects(bad.registry.read(initial),/unconnected|incoming/);
+ }
+});
 
 for(const generation of [true,false])test('complete '+(generation?'Code':'Declared')+' context uses owned Close and inert source/labels',async()=>{
   const f=fixture({generation}),reply=await f.registry.read(initial);

@@ -781,6 +781,21 @@ test('JavaScript materialization is an awaited public phase before mapping and a
  assert.equal(f.operation.nodeApply.phases.find(p=>p.phase==='node_finish').value.execution_started,null);
 });
 
+for(const proof of [true,false])test('unconnected JS reuses only the proved completed execution '+proof,async()=>{
+ const f=javascriptMaterializationFixture();f.p.inputs=[];f.p.parameters.input_state='unconnected';
+ f.drivers.mapPorts=async()=>{f.calls.push('mapping');return {verified:true,cleanup_complete:true,
+  native_mapping:{input_state:'unconnected',no_incoming_links_verified:proof}};};
+ f.drivers.finishGraph=async()=>({verified:true,cleanup_complete:true,mode:'execute',execution_id:'materialization1',
+  input_state:'unconnected',execution_reused:true});
+ const read=f.drivers.readOutput;
+ f.drivers.readOutput=async(options,ctx)=>({...await read(options,ctx),execution_id:ctx.execution.execution_id});
+ const result=await f.run();
+ assert.equal(result.status,proof?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(result));
+ assert.equal(f.calls.filter(c=>c==='materialize').length,1);
+ assert.ok(!f.calls.includes('graph-execute'));
+ assert.equal(f.calls.includes('read'),proof);
+});
+
 for(const field of ['wizard_commit_verified','graph_owner_verified','source_readback_verified','owned_done_settled'])
  test('JS intermediate Done rejects missing '+field+' before materialization',async()=>{
  const f=javascriptMaterializationFixture(),finish=f.drivers.finish;
