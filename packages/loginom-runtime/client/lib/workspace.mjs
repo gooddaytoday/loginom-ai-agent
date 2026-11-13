@@ -382,6 +382,7 @@ async function navigatePreparedGraph(page, options) {
     if(existing&&mode==='lookup')return {exists:true,phase:existing.phase,effect_possible:existing.navigationStarted===true,deadline_at:existing.navigationDeadline};
     const source=existing?.navigationSource??[...p.receipts.values()].find(r=>r.phase==='verified'&&r.workflowId===ref.workflow_id);
     if(!source?.packageNode||!source.tab)fail('Prepared workflow changed');
+    if(JSON.stringify(source.crumbs)!==JSON.stringify(ref.navigation_path))fail('Prepared workflow reference changed');
     const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
     const visible=e=>e.isConnected!==false&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
     const tabs=exact(ref.tab_tid);
@@ -416,7 +417,7 @@ async function navigatePreparedGraph(page, options) {
         ||direction==='leave'&&workflow!==source.navigationParentWorkflow)fail('Navigation reached a foreign workflow');
       if(direction==='enter'&&!ancestors.some(n=>n.FGuid===existing.navigationOwnerGuid&&n.FModelNode===existing.navigationOwnerData))fail('Navigation entered a different submodel');
       if(direction==='enter'&&source.navigationParentWorkflow===workflow)fail('Navigation direction changed');
-      if(!crumbs.length||samePath)fail('Navigation breadcrumbs did not change');
+      if(!crumbs.length||crumbs.length>32||samePath)fail('Navigation breadcrumbs did not change or exceeded the bound');
       // Invalidate every receipt for the departed scope, including an earlier
       // prepare of that same workflow. Returning always receives a fresh ID.
       for(const r of p.receipts.values())if(r!==existing&&r.workflowId===source.workflowId)r.phase='superseded';
