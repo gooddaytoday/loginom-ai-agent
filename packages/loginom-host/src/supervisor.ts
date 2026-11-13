@@ -28,6 +28,8 @@ export type Launch = {
   browserRecovery?: boolean
   startupDeadline?: number
   resourceManifestHash?: string
+  resourceCachePath?: string
+  resourceCacheVersion?: string
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }

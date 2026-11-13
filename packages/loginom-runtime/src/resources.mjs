@@ -4,7 +4,8 @@ import { createReadStream } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 
 // The Host may verify with its bundled Node identity (Electron/Bun is not that
-// Node). A manifestHash is a private, in-memory proof from this Host session;
+// Node). A manifestHash binds a runtime to the manifest its Host verified; it
+// never replaces the per-start file metadata check below.
 // lab1548-resource-cache: the profile cache is explicitly authorized to trust
 // unchanged metadata. It is not protection against an attacker forging that metadata.
 export async function verifyResources(root, { nodeVersion = process.versions.node, nodePath = process.execPath,
@@ -34,19 +35,19 @@ export async function verifyResources(root, { nodeVersion = process.versions.nod
   const localCache = cachePath && relative(directory, cachePath);
   if (cachePath && (!isAbsolute(cachePath) || (!isAbsolute(localCache) && !localCache.startsWith('..' + sep))))
     throw Error('LOGINOM_RESOURCES_INVALID');
-  const stored = cachePath && manifestHash === undefined
+  const stored = cachePath
     ? await readFile(cachePath, 'utf8').then(text => { try { return JSON.parse(text); } catch { return undefined; } }, () => undefined) : undefined;
   const cached = stored?.protocol === 1 && stored.root === directory && stored.manifestHash === digest
     && stored.version === cacheVersion && same(stored.installation, installation) && stored.files && typeof stored.files === 'object'
       ? stored.files : undefined;
   const files = Object.create(null);
-  const verification = { mode: manifestHash === undefined ? 'full' : 'session', hashedFiles: 0, cachedFiles: 0 };
-  let next = 0, failure;
+  const verification = { mode: 'full', hashedFiles: 0, cachedFiles: 0 };
+  let next = 0, failure, hashing = Promise.resolve();
   // Bound memory and disk pressure, including on first-run antivirus scans.
   // Drain every active stream before returning a failure to the owner.
-  // Serialize the first Windows hash pass: four concurrent reads previously
-  // coincided with severe disk/antivirus pressure. Metadata checks remain bounded.
-  if (manifestHash === undefined) await Promise.all(Array.from({ length: Math.min(process.platform === 'win32' && !cached ? 1 : 4, manifest.files.length) }, async () => {
+  // Serialize Windows hashing: four concurrent reads previously coincided with
+  // severe disk/antivirus pressure. Metadata checks remain bounded and parallel.
+  await Promise.all(Array.from({ length: Math.min(4, manifest.files.length) }, async () => {
     while (!failure && next < manifest.files.length) {
       const item = manifest.files[next++];
       try {
@@ -66,12 +67,16 @@ export async function verifyResources(root, { nodeVersion = process.versions.nod
         if (fingerprint.ino !== '0' && !Object.values(fingerprint).includes('undefined')
           && previous?.sha256 === item.sha256 && same(previous, fingerprint)) verification.cachedFiles++;
         else {
-          const hash = createHash('sha256');
-          if (item.directory === true) hash.update(item.link);
-          else for await (const chunk of createReadStream(file, { highWaterMark: 256 * 1024, signal })) hash.update(chunk);
-          if (hash.digest('hex') !== item.sha256 || !same(fingerprint, metadata(await stat(file, { bigint: true }))))
-            throw Error('LOGINOM_RESOURCE_HASH_MISMATCH');
-          verification.hashedFiles++;
+          const read = async () => {
+            if (failure) return;
+            const hash = createHash('sha256');
+            if (item.directory === true) hash.update(item.link);
+            else for await (const chunk of createReadStream(file, { highWaterMark: 256 * 1024, signal })) hash.update(chunk);
+            if (hash.digest('hex') !== item.sha256 || !same(fingerprint, metadata(await stat(file, { bigint: true }))))
+              throw Error('LOGINOM_RESOURCE_HASH_MISMATCH');
+            verification.hashedFiles++;
+          };
+          if (process.platform === 'win32') await (hashing = hashing.then(read, read)); else await read();
         }
         files[item.path] = { ...fingerprint, sha256: item.sha256 };
       } catch (error) { failure ??= error; }
@@ -80,9 +85,9 @@ export async function verifyResources(root, { nodeVersion = process.versions.nod
   if (failure) throw failure;
   signal?.throwIfAborted();
   if (!same(installation, metadata(await stat(manifestPath, { bigint: true })))) throw Error('LOGINOM_RESOURCE_HASH_MISMATCH');
-  if (manifestHash === undefined) verification.mode = verification.cachedFiles === manifest.files.length ? 'metadata'
+  verification.mode = verification.cachedFiles === manifest.files.length ? 'metadata'
     : verification.cachedFiles ? 'partial' : 'full';
-  if (cachePath && manifestHash === undefined) {
+  if (cachePath) {
     const temporary = cachePath + '.' + randomUUID() + '.tmp';
     try {
       await mkdir(dirname(cachePath), { recursive: true, mode: 0o700 });

@@ -64,6 +64,7 @@ export async function createLoginomHost(options: {
       .catch(() => ""))
   // Start before the settings click. No browser is admitted until this pass
   // drains; unchanged installations use the owner-authorized profile cache.
+  const resourceCachePath = join(root, "resource-verification.json")
   const verifiedResources = appendFile(
     join(root, "startup-phases.jsonl"),
     JSON.stringify({
@@ -81,7 +82,7 @@ export async function createLoginomHost(options: {
         nodePath: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
         nodeVersion: release.nodeVersion,
         signal: resourceController.signal,
-        cachePath: join(root, "resource-verification.json"),
+        cachePath: resourceCachePath,
         cacheVersion: resourceVersion,
       }),
     )
@@ -258,6 +259,8 @@ export async function createLoginomHost(options: {
         actionManifestSha256: manifest.actionManifestSha256,
         startupDeadline,
         resourceManifestHash,
+        resourceCachePath,
+        resourceCacheVersion: resourceVersion,
       },
       signal,
     ).catch(startupFailure)

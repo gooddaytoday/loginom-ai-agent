@@ -29,7 +29,7 @@ test("shared host can manage an unconfigured profile without Electron or startin
   }
 })
 
-test("Host prewarms one full resource verification and reuses its manifest proof across checks", async () => {
+test("Host prewarms one full resource verification and hands every runtime start its manifest proof and metadata cache", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-prewarm-"))
@@ -53,7 +53,7 @@ test("Host prewarms one full resource verification and reuses its manifest proof
     `import {appendFileSync} from 'node:fs';
     process.on('message', m => {
       if (m.operation === 'start') {
-        appendFileSync(${JSON.stringify(join(directory, "proofs.jsonl"))},JSON.stringify(m.input.resourceManifestHash)+'\\n');
+        appendFileSync(${JSON.stringify(join(directory, "proofs.jsonl"))},JSON.stringify({hash:m.input.resourceManifestHash,cachePath:m.input.resourceCachePath,cacheVersion:m.input.resourceCacheVersion})+'\\n');
         process.send({id:m.id,result:{protocol:1,generation:m.input.generation,checked:true}});
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
@@ -104,8 +104,11 @@ test("Host prewarms one full resource verification and reuses its manifest proof
       .split("\n")
       .map((line) => JSON.parse(line))
     expect(proofs).toHaveLength(2)
-    expect(proofs[0]).toMatch(/^[a-f0-9]{64}$/)
-    expect(proofs[1]).toBe(proofs[0])
+    expect(proofs[0].hash).toMatch(/^[a-f0-9]{64}$/)
+    // Each start rechecks file metadata against the profile cache the prewarm wrote.
+    for (const proof of proofs)
+      expect(proof).toEqual({ hash: proofs[0].hash, cachePath: join(root, "resource-verification.json"), cacheVersion: "" })
+    expect(await Bun.file(join(root, "resource-verification.json")).exists()).toBe(true)
     expect(
       (await Bun.file(join(root, "startup-phases.jsonl")).text())
         .trim()

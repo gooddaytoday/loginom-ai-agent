@@ -151,10 +151,13 @@ async function handle(message) {
       // Match the existing supervisor allowance; retries never restart it.
       const deadline = Math.min(Date.now() + (input.validation === true ? 210_000 : 120_000), input.startupDeadline ?? Infinity)
       await startupPhase({ phase: "resources.verify", status: "starting" })
+      // Every start rechecks file metadata against the Host's profile cache;
+      // a changed file is hashed again and a mismatch refuses the start.
       const resources = await verifyResources(input.resources, { manifestHash: input.resourceManifestHash,
+        cachePath: input.resourceCachePath, cacheVersion: input.resourceCacheVersion,
         signal: state.startupController.signal })
       await startupPhase({ phase: "resources.verify", status: "ready",
-        duration_ms: Math.round(performance.now() - state.startupStarted), reused: input.resourceManifestHash !== undefined })
+        duration_ms: Math.round(performance.now() - state.startupStarted), ...resources.verification })
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
         input.stateDir,
