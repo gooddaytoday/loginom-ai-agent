@@ -6,10 +6,12 @@ const need=(ok,message)=>{if(!ok)throw Error(message);};
 const verified=value=>({verified:true,effect_possible:false,cleanup_complete:true,...value});
 // Every branch passes the table unchanged; the native output schema is the
 // evidence. An inactive branch port refuses the stock read as not active.
+// Exactly one branch runs per execution: wait until one port icon is active.
+const oneActive=o=>o?.verified===true&&o.surface==='graph'&&o.ports?.length===2&&o.ports.filter(p=>p.active===true).length===1;
 export async function readConditionOutputs(channel,read,ctx){
- const observed=await channel.observe({condition:'Condition branch ports after execution',readOutputs:true,ready:s=>s.node_outputs?.verified===true&&s.node_outputs.surface==='graph'});
+ const observed=await channel.observe({condition:'Condition branch ports after execution: exactly one active',readOutputs:true,ready:s=>oneActive(s.node_outputs)});
+ need(oneActive(observed.node_outputs),'Condition must expose exactly two branch table outputs with exactly one executed branch');
  const branch_activity=observed.node_outputs.ports.map(p=>({port:p.index,label:p.label,executed:p.active===true}));
- need(branch_activity.length===2,'Condition must expose exactly two branch table outputs');
  const ports=[];
  for(const port of read.ports){
   need(branch_activity.find(b=>b.port===port)?.executed===true,'Condition output '+port+' did not execute: its branch was not selected (blocked). branch_activity shows which branch ran; read only that port.');

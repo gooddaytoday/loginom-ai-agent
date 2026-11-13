@@ -90,7 +90,8 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
   const s=await state(s=>s.page===expected||s.error!==null,'page '+expected);
   need(s.error===null,'Loginom refused the page: '+s.error);return s;};
  try{
-  let s=await state(s=>s.page==='ports','ports page');
+  // A new node has no ports; an existing one is read only after its port store is non-empty.
+  let s=await state(s=>s.page==='ports'&&(task.mode==='ports'||s.ports.length>0),'ports page');
   phase='ports';
   if(task.mode==='ports'){
    need(s.ports.length===0,'new node already has ports');
@@ -123,10 +124,23 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
    phase='saved_condition';
    s=await state(x=>x.conditions.length>0,'saved condition');
    need(s.conditions.length===1,'supports one condition row; found '+s.conditions.length);
-   // Read-only check: a table field has DataType 0 and a row-count aggregation (1).
-   const c=s.conditions[0];
-   need((c.field?c.field.variable===true:c.data_type!==0&&c.aggregation!==1)&&c.relation==='='&&c.value!==null&&!c.or&&!c.case_sensitive,
+   const row=x=>JSON.stringify({...x.conditions[0],field:null});
+   const saved=row(s);let c=s.conditions[0];
+   need(c.relation==='='&&c.value!==null&&c.value!=='unsupported'&&c.aggregation!==1&&!c.or&&!c.case_sensitive,
     'saved Condition is not one variable = value branch; reconfigure it with branches');
+   if(!c.field){
+    // The field is resolved only through the cell editor's list: open it,
+    // read the list, and cancel without choosing anything.
+    const before=effect;
+    await click(cv+'colField_0');await focused(cv+'tbl;celleditor');await click(cv+'tbl;celleditor;cbx;trg_picker');
+    s=await state(x=>x.field_options?.length>0&&x.conditions[0]?.field!==null,'saved condition field list');
+    c=s.conditions[0];
+    await page.keyboard.press('Escape');await page.keyboard.press('Escape');
+    s=await state(x=>x.page==='branches'&&x.conditions.length===1&&row(x)===saved,'saved condition unchanged');
+    effect=before;
+   }
+   need(c.field?.variable===true,'saved Condition field '+JSON.stringify(c.field?.name??null)+' is not an input variable; reconfigure it with branches');
+   s.conditions=[c];
   }else if(task.mode==='variable_branch'){
    const want=task.parameters.branches[0];
    if(s.branches[0].name!==want.name){
@@ -138,8 +152,8 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
    phase='condition';
    if(s.conditions.length===0){await click(cv+'btnAdd');s=await state(x=>x.conditions.length===1,'condition row');}
    need(s.conditions.length===1,'supports one condition row; found '+s.conditions.length);
-   await click(cv+'colField_0');await click(cv+'tbl;celleditor;cbx;trg_picker');
-   s=await state(x=>Array.isArray(x.field_options),'field list');
+   await click(cv+'colField_0');await focused(cv+'tbl;celleditor');await click(cv+'tbl;celleditor;cbx;trg_picker');
+   s=await state(x=>x.field_options?.length>0,'field list');
    const options=s.field_options.filter(f=>f.variable&&f.name===want.variable);
    need(options.length===1,'variable '+JSON.stringify(want.variable)+' is not an input variable; link variables to input 0 and use its exact name. Available: '
     +JSON.stringify(s.field_options.filter(f=>f.variable).map(f=>f.name)));
@@ -150,8 +164,9 @@ export async function configureCondition(page,task,readNode=readPreparedNodeCont
    need(s.conditions[0].aggregation!==1&&s.conditions[0].relation==='=','variable condition must have no aggregation and relation =');
    await click(cv+'colCompareValue_0');await focused(cv+'tbl;celleditor');
    await typeValue(String(want.value));
-   s=await state(x=>x.conditions[0]?.value===want.value,'compare value').catch(async()=>page.evaluate(readWizard,prefix));
-   need(s.conditions?.[0]?.value===want.value,'Loginom stored value '+JSON.stringify(s.conditions[0].value)+' instead of '+JSON.stringify(want.value)+'; use a value of the variable type');
+   s=await state(x=>x.conditions[0]?.value===want.value,'compare value').catch(async error=>{
+    if(!/did not settle/.test(error.message))throw error;return page.evaluate(readWizard,prefix);});
+   need(s.conditions?.[0]?.value===want.value,'Loginom stored value '+JSON.stringify(s.conditions?.[0]?.value)+' instead of '+JSON.stringify(want.value)+'; use a value of the variable type');
    need(!s.conditions[0].or&&!s.conditions[0].case_sensitive,'OR and case-sensitive conditions are not supported');
   }
   const branches=s.branches.map(({index,name})=>({index,name}));

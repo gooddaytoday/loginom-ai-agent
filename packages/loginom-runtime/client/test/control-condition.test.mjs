@@ -6,6 +6,7 @@ import {isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
 import {validateConditionParameters} from '../lib/control-condition-parameters.mjs';
 import {conditionConfigurationReadback} from '../lib/control-condition-readback.mjs';
 import {readConditionOutputs} from '../lib/control-condition-node.mjs';
+import {configureCondition} from '../lib/control-condition-procedure.mjs';
 
 const ref=node=>({document_id:'d',workflow_id:'w',node_id:node});
 const workflow_ref={workflow_id:'w',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'x',label:'Сценарий'}]};
@@ -89,4 +90,65 @@ test('reports which branch executed and refuses to read the blocked branch port'
  assert.deepEqual(out.branch_activity,[{port:0,label:'Detailed - Порт1',executed:false},{port:1,label:'Иначе - Порт1',executed:true}]);
  await assert.rejects(readConditionOutputs(channel,{ports:[0],sample_rows:10,require_exact_numbers:false},ctx),/did not execute/);
  assert.deepEqual(reads,[1]);
+});
+
+test('reads branch ports only when exactly one of the two branches executed',async()=>{
+ const states=active=>({node_outputs:{verified:true,surface:'graph',ports:active.map((a,index)=>({index,label:'P'+index,active:a}))}});
+ const channel=sequence=>({observe:async({ready})=>{const s=sequence.find(s=>ready(s));if(!s)throw Error('observation timed out');return s;},
+  readOutputPort:async({port})=>({output:{port,port_guid:'g'+port,sample_complete:true,schema:[{name:'OrderID',type:'integer'}]}})});
+ const ctx={execution:{execution_id:'e'},receipt_id:'r',portExecution:{}},read={ports:[1],sample_rows:10,require_exact_numbers:false};
+ // Icons may still be inactive right after Execute: wait for the one active branch.
+ const out=await readConditionOutputs(channel([states([false,false]),states([false,true])]),read,ctx);
+ assert.deepEqual(out.branch_activity.map(b=>b.executed),[false,true]);
+ for(const bad of [[true,true],[false,false],[false,true,false]])
+  await assert.rejects(readConditionOutputs(channel([states(bad)]),read,ctx),/timed out/);
+});
+
+// configureCondition with a scripted wizard: native stores load after the page
+// is shown, and the saved field is resolved only through the cell editor list.
+function wizard({field={name:'Mode',variable:true},value=1,emptyReads=2}={}){
+ const log=[],ui={page:'ports',editor:false,reads:0,editorReads:0};
+ const option={record_id:'f1',name:field.name,variable:field.variable,socket_guid:'s',data_type:1};
+ const read=()=>{
+  ui.reads++;
+  if(ui.page==='ports')return {verified:true,page:'ports',error:null,ports:ui.reads<=emptyReads?[]:[
+   {index:0,record_id:'1',kind:'table',name:'',label:'Порт1',pass_to_output:true},{index:1,record_id:'2',kind:'variables',name:'',label:'Порт2',pass_to_output:true}]};
+  if(ui.page==='done')return {verified:true,page:'done',error:null};
+  if(ui.editor)ui.editorReads++;
+  const loaded=ui.editor&&ui.editorReads>emptyReads;
+  return {verified:true,page:'branches',error:null,branches:[{index:0,record_id:'b',name:'Detailed',active_in_debug:false}],selected_branch:0,debug_mode:false,
+   conditions:ui.reads<=emptyReads+3?[]:[{index:0,record_id:'c',field:ui.editor&&!loaded?null:ui.editorReads>emptyReads?{name:field.name,variable:field.variable,socket_guid:'s',data_type:1}:null,
+    data_type:1,aggregation:0,relation:'=',value,or:false,case_sensitive:false}],
+   field_options:ui.editor?(loaded?[option]:[]):null};
+ };
+ const locator=selector=>({click:async()=>{log.push(['click',selector]);
+   if(selector.includes(';btnNext'))ui.page=ui.page==='ports'?'branches':'done';
+   if(selector.includes('colField_0'))ui.editor=true;},
+  dblclick:async()=>log.push(['dblclick',selector]),count:async()=>1,first(){return this;},waitFor:async()=>{}});
+ const page={locator,waitForTimeout:async()=>{},evaluate:async(fn,arg)=>fn===read?read(arg):true,
+  keyboard:{press:async key=>{log.push(['press',key]);if(key==='Escape')ui.editor=false;},type:async text=>log.push(['type',text])}};
+ const readNode=async()=>({verified:true,surface:'wizard',document_id:'d',workflow_id:'w',node_id:'c'});
+ return {log,run:()=>configureCondition(page,{mode:'variable_branch',parameters:{},binding:{workflow_ref:{prefix:'MF;TF-1'}},deadline:Date.now()+60000},readNode,read)};
+}
+
+test('re-execution {} waits for loaded stores and resolves the saved field read-only',async()=>{
+ const w=wizard(),r=await w.run();
+ assert.equal(r.status,'SUCCEEDED',r.error);
+ assert.deepEqual(r.configuration.conditions,[{index:0,variable:'Mode',relation:'=',value:1}]);
+ assert.deepEqual(r.configuration.ports.map(p=>p.kind),['table','variables']);
+ // Opened the editor list, chose nothing, cancelled with Escape.
+ assert.ok(w.log.some(([a,s])=>a==='click'&&s.includes('celleditor;cbx;trg_picker')));
+ assert.equal(w.log.some(([a,s])=>a==='click'&&s.includes('boundlist')),false);
+ assert.deepEqual(w.log.filter(([a])=>a==='press'||a==='type'),[['press','Escape'],['press','Escape']]);
+});
+
+for(const [name,options,message] of [
+ ['a table field',{field:{name:'Amount',variable:false}},/"Amount" is not an input variable/],
+ ['an unsupported stored value',{value:'unsupported'},/not one variable = value branch/],
+])test('re-execution {} refuses '+name+' without changing the node',async()=>{
+ const w=wizard(options),r=await w.run();
+ // Refused on the branches page: nothing typed or chosen, Done never reached.
+ assert.equal(r.verified,false);assert.match(r.error,message);
+ assert.equal(w.log.some(([a,s])=>a==='type'||s?.includes('boundlist')),false);
+ assert.equal(w.log.filter(([,s])=>s?.includes(';btnNext')).length,1);
 });
