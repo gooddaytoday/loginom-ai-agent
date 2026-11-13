@@ -1,16 +1,28 @@
 # Управляемый HTTP fixture для Fetch/FS
 
 Предложение LAB-1549 для полного [GitHub #69](https://github.com/gooddaytoday/loginom-ai-agent/issues/69).
-Разворачивает владелец. Этот документ не запускает сервис.
+Реализация: `scripts/node-acceptance/fixtures/http_fixture.py`, развёртывание —
+`scripts/node-acceptance/fixtures/README-http-fixture.md`. Разворачивает оркестратор.
 Источник запросов — сервер Loginom, а не браузер или CLI. Исходный LAN
 origin `http://10.200.13.132:18080` недоступен по подтверждённой пробе.
-Решение от 13.11: предварительно внутри VM сервера Loginom на localhost;
-доступ к VM ещё не выдан. Origin и HTTPS-порт назначает владелец.
-`FIXTURE_BASE_URL` — полный data prefix, например `http://localhost:18080/runs/example-run`,
-а `FIXTURE_TLS_BASE_URL` — соответствующий HTTPS data prefix.
-Для каждого прогона выделяется уникальный `run_id`. Все пути данных начинаются
-с `/runs/{run_id}`. Данные искусственные, авторизация пользовательских сервисов
-не используется. До приёмки подтвердить доступность обоих портов из JS-узла.
+Fixture работает на VM сервера Loginom (`loginom-app`) в контейнере
+`loginom-http-fixture` (образ `python:3.12-slim`) в сети Docker
+`loginom-app-private`, общей с `loginom-app-server`:
+
+- data: `http://loginom-http-fixture:18080`, наружу не публикуется;
+  `FIXTURE_BASE_URL` — `http://loginom-http-fixture:18080/runs/{run_id}`;
+- TLS: отдельный listener на прогон на внутреннем порту контейнера из
+  диапазона 18443–18462, наружу не публикуется; `FIXTURE_TLS_BASE_URL` —
+  `https://loginom-http-fixture:{port}/runs/{run_id}` из ответа admin
+  `POST /admin/runs/{run_id}/tls-listener`;
+- admin: отдельный listener 18090, опубликован на LAN-адресе VM для проверяющих
+  с mas/mas2/mas3; каждый запрос требует `Authorization: Bearer <FIXTURE_ADMIN_TOKEN>`,
+  без него — 401. Data-порт admin-маршрутов не обслуживает (404, вне ledger).
+
+Для каждого прогона выделяется уникальный `run_id` (`[A-Za-z0-9][A-Za-z0-9._-]{0,63}`).
+Все пути данных начинаются с `/runs/{run_id}`. Данные искусственные, авторизация
+пользовательских сервисов не используется. До приёмки подтвердить доступность
+обоих портов из JS-узла.
 
 ## Ответы и эффекты
 
@@ -39,7 +51,7 @@ origin `http://10.200.13.132:18080` недоступен по подтвержд
 | HEAD `/text` | 200, заголовки GET | пустое тело |
 | POST `/redirect/301` или `/302` | соответствующий redirect на `/echo` того же run | пустое тело; ledger устанавливает фактический метод следующего запроса, его нельзя предполагать |
 | POST `/redirect/307` | 307 на `/echo` того же run | пустое тело; ожидается сохранение метода и тела, подтвердить нативной пробой |
-| GET или POST `/echo` | 200 JSON | `{"method":"POST","body_hex":"7b7d"}` для тела `{}`; заголовки только из разрешённого списка |
+| GET или POST `/echo` | 200 JSON | `{"method":"POST","body_hex":"7b7d","headers":{"content-type":"application/json"}}` для тела `{}`; `headers` — только разрешённый список ledger |
 | GET HTTPS `/tls` | TLS handshake с самоподписанным сертификатом | HTTP-ответа нет; проверку сертификата не отключать |
 
 Для TLS-проверки нужны журнал handshake на fixture и отдельная удачная HTTP
@@ -49,7 +61,15 @@ TLS завершается до HTTP path: связывать handshake с run_i
 Для отрицательной TLS-пробы выделить отдельный listener/порт данному run
 и вернуть его в FIXTURE_TLS_BASE_URL. Админ GET
 `/admin/runs/{run_id}/tls-handshakes` возвращает записи вида
-`{"run_id":"example-run","listener_id":"tls-example-run","failed":true,"at":"2026-11-13T12:00:00.000Z"}`.
+`{"run_id":"example-run","listener_id":"tls-example-run","failed":true,"at":"2026-11-13T12:00:00.000Z","error":"TLSV1_ALERT_UNKNOWN_CA"}`
+(`error` — причина OpenSSL на стороне fixture, `null` при удачном handshake).
+TCP-подключение без ClientHello handshake не считается и не записывается.
+Listener выделяет admin `POST /admin/runs/{run_id}/tls-listener`: 201 с
+`{"run_id","listener_id","port","tls_base_url"}`, повторный вызов того же run —
+200 с тем же listener, исчерпание диапазона — 503 `{"error":"no_tls_port"}`.
+Listener никогда не отвечает HTTP. Для положительной контрольной пробы admin
+`GET /admin/tls-certificate` отдаёт PEM самоподписанного сертификата (создаётся
+при старте процесса, SAN `loginom-http-fixture`, `localhost`, `127.0.0.1`).
 Не смешивать два одновременных прогона на одном TLS listener. Reset очищает
 также этот журнал после завершения listener. Oracle отдельно требует одну
 failed handshake и табличный tls_error; HTTP ledger остаётся без `/tls`.
@@ -82,6 +102,12 @@ redirect hops и запросы, соединение которых оборв�
 }
 ```
 
+Если тело оборвано (EOF, таймаут чтения) или клиент закрыл соединение во время
+`/slow`, запись получает `"response_status":null`, `"client_closed":true`, размер
+и SHA-256 фактически полученных байтов; эффект (`sequence` регистрации, draft)
+при оборванном теле не применяется. Запросы вне `/runs/{run_id}` (включая
+`/healthz` готовности) в ledger не попадают; неизвестный suffix — 404
+`{"error":"not_found"}`, неподдерживаемый метод — 405 с `Allow`, обе записи в ledger.
 Нулевой digest — заглушка примера; сервис вычисляет настоящий SHA-256 по
 сырым полученным байтам. Ledger append-only, с атомарным sequence; commit
 записи выполняется до ответа. Хранить только allowlist заголовков
@@ -93,7 +119,10 @@ Cookie, Set-Cookie, proxy credentials или произвольные загол
 
 Админ DELETE `/admin/runs/{run_id}` возвращает `{"reset":true}` и удаляет
 ledger, sequence, draft/receipt state исключительно данного run, когда его
-обработчики уже завершены. Повторный GET ledger должен вернуть `[]`.
+обработчики уже завершены (ожидание до `FIXTURE_RESET_TIMEOUT`, затем 409
+`{"error":"run_busy"}`), закрывает его TLS-listener и освобождает порт. Админ
+GET `/admin/runs/{run_id}/state` показывает `registrations`, `draft_hex`,
+`inflight`, `tls_listener`; GET `/admin/health` — готовность admin-порта. Повторный GET ledger должен вернуть `[]`.
 Выполнить reset перед новым прогоном, после завершения сохранить ledger как
 артефакт проверки, затем reset и подтвердить пустоту. Не сбрасывать общий журнал.
 
