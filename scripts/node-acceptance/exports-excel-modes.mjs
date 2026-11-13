@@ -80,6 +80,11 @@ try{
  }
  const binding=createStorageBinding({sessionId,origin:new URL(config.login.url).origin,build:'7.4.2',documentId:identity.document_id,account:identity.loginom_account,directories:{inputs:directory,packages:directory,exports:directory}});
  const actions=JSON.parse(await readFile(root+'/runtime/executor/catalog/actions.json','utf8')).actions;
+ if(config.fs_error_seed){
+  const save=actions.find(a=>a.action_key==='package.save_checkpoint');
+  // Scope this private fixture's Save to its newly created directory only.
+  save.effect={...save.effect,allowed_roots:[directory]};
+ }
  const selectors=JSON.parse(await readFile(root+'/runtime/executor/catalog/selectors.json','utf8')).selectors;
  const artifactStore=await createArtifactStore({directory:output+'/artifacts',sessionId});
  const nodeSupport=config.fs_error_seed?(await load('client/lib/node-support.mjs')).createCandidateNodeSupport({targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2'}):{};
@@ -99,6 +104,8 @@ try{
    inputs:[],mode:'script',parameters:{input_state:'unconnected',schema_mode:'code',source_text:source},mappings:[],finish:'execute',
    read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:120000,execute_ms:30000,total_ms:180000}});
   if(result.status!=='SUCCEEDED'||result.output?.execution?.status!=='completed'||result.cleanup_complete!==true)throw Error('FS_ERROR_SEED_FAILED:'+JSON.stringify(result));
+  const saved=await runtime.run({operation_id:'fs-error-seed-save',action_key:'package.save_checkpoint',parameters:{path:directory+'/fixture.lgp',conflict_policy:'fail'}});
+  if(saved.status!=='SUCCEEDED'||saved.output?.package_ref?.path!==directory+'/fixture.lgp')throw Error('FS_ERROR_SEED_SAVE_UNCONFIRMED');
  }
  const delivered=[];
  for(const [index,book]of config.books.entries()){
@@ -159,13 +166,15 @@ try{
    const listed=await runtime.serverDownload({operation_id:'fs-error-inventory',path:target},'dock_storage_list');
    if(listed.status!=='SUCCEEDED'||listed.output?.complete!==true||listed.output.truncated!==false)throw Error('FS_ERROR_INVENTORY_INCOMPLETE');
    await writeFile(output+'/inventory.json',JSON.stringify(listed.output.entries));
-   const {prefix,at}=await storageDirectory(target);
-   const row=at(prefix+';FileStorageForm;colName_keep.txt');await row.waitFor({state:'visible'});
-   await row.click();
-   const pending=page.waitForEvent('download',{timeout:60000});await at(prefix+';FileStorageForm;btnDownload').click();
-   const download=await pending;await download.saveAs(output+'/keep.txt');
-   if(await download.failure())throw Error('FS_ERROR_KEEP_DOWNLOAD_FAILED');
-   await download.delete();
+   const located=await runtime.serverDownload({operation_id:'fs-error-keep-source',path:target+'/keep.txt'},'dock_storage_source');
+   if(located.status!=='SUCCEEDED'||!located.output?.source?.server_source_ref)throw Error('FS_ERROR_KEEP_SOURCE_UNCONFIRMED');
+   const request={operation_id:'fs-error-keep-download',server_source_ref:located.output.source.server_source_ref};
+   let download=await runtime.serverDownload(request,'dock_storage_download_start');
+   while(download.state!=='settled')download=await runtime.serverDownload({operation_id:request.operation_id,timeout_ms:60000},'dock_storage_download_wait');
+   await record({phase:'fs_error_keep_download',receipt:download});
+   if(download.status!=='SUCCEEDED'||download.cleanup_complete!==true||download.output?.coverage!=='downloaded_copy')throw Error('FS_ERROR_KEEP_DOWNLOAD_FAILED');
+   await writeFile(output+'/keep.txt',await readFile(download.output.path));
+   await runtime.cleanupServerCache();
   }else{
   const {prefix,at}=await storageDirectory(target.slice(0,target.lastIndexOf('/')));
   const name=target.split('/').at(-1),row=at(prefix+';FileStorageForm;colName_'+name);
@@ -181,7 +190,7 @@ try{
   }
  }
  const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,
-  packagePath:null,unsavedDraft:true,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
+  packagePath:config.fs_error_seed?directory+'/fixture.lgp':null,unsavedDraft:!config.fs_error_seed,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
  await record({phase:'excel_seed_cleanup',cleanup});await writeFile(output+'/result.json',JSON.stringify({delivered,cleanup}));
  if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('SEED_CLEANUP');
 }finally{await context.close();}
