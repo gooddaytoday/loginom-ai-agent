@@ -154,7 +154,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       &&(error_stage==='done'?closed.draft_discarded===null&&closed.settings_applied===null&&closed.execution_started===null
         :closed.draft_discarded===true&&closed.settings_applied===false&&closed.execution_started===false),
     'Managed JavaScript rejected draft discard unconfirmed');
-    const {prepared:ignoredPrepared,allowDeactivation:ignoredDeactivation,...selectionTask}=handle.task;
+    const {prepared:ignoredPrepared,allowDeactivation:ignoredDeactivation,inputPage:ignoredInputPage,...selectionTask}=handle.task;
     await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask,mode:'dispose'}));
     await journalManagedJavascriptError({record,deadline:handle.task.deadline},{phase:error_stage==='done'?'javascript_managed_rejected_done_closed':'javascript_managed_rejected_draft_discarded',
       operation_id:handle.task.operation_id,owner:handle.task.owner,source_sha256:handle.draftSha256,
@@ -200,9 +200,14 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         need(next?.status==='SUCCEEDED'&&next.output?.next_gesture_returned===true,
           'Managed JavaScript empty input Next refused');
         for(;;){
-          const page=await execute(driver.makeJavascriptManagedPageCode(task));
-          if(page.page?.tid===task.workflow_ref.prefix+';WizrdMCF;JavaScriptColumnsWizard'
+          const page=await execute(driver.makeJavascriptManagedPageCode(task)).catch(error=>{
+            if(error?.message==='Managed JavaScript page not ready')return null;
+            throw error;
+          });
+          if(page?.page?.tid===task.workflow_ref.prefix+';WizrdMCF;JavaScriptColumnsWizard'
             &&page.page.index===1&&page.page.indicator_count===5)break;
+          if(page)need(page.page?.tid===task.workflow_ref.prefix+';WizrdMCF;TuneDataSourceInputPortWizard'
+            &&page.page.index===0&&page.page.indicator_count===5,'Managed JavaScript empty input Next page changed');
           need(Date.now()<task.deadline,'Managed JavaScript empty input Next deadline');
           await wait(100);
         }
@@ -314,7 +319,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       need(graph?.prepared_node_context?.verified===true&&graph.prepared_node_context.surface==='graph'
         &&graph.wizard?.status==='absent'&&['document_id','workflow_id','node_id'].every(key=>graph.prepared_node_context[key]===node[key]),
       'Managed JavaScript Done graph owner unconfirmed');
-      const {prepared: ignoredPrepared, allowDeactivation: ignoredDeactivation, ...selectionTask} = handle.task;
+      const {prepared: ignoredPrepared, allowDeactivation: ignoredDeactivation, inputPage:ignoredInputPage, ...selectionTask} = handle.task;
       await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask, mode: 'dispose'}));
       active = null;
       uncertain = false;
@@ -333,7 +338,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
         execute, record, receiptOptions});
       need(closed?.verified === true && closed.closed === true && closed.node_id === node.node_id,
         'Managed JavaScript source discard unconfirmed');
-      const {prepared: ignoredPrepared, allowDeactivation: ignoredDeactivation, ...selectionTask} = handle.task;
+      const {prepared: ignoredPrepared, allowDeactivation: ignoredDeactivation, inputPage:ignoredInputPage, ...selectionTask} = handle.task;
       await execute(driver.makeJavascriptManagedSelectionReadCode({...selectionTask, mode: 'dispose'}));
       active = null;
       uncertain = false;

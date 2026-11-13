@@ -6,6 +6,7 @@ import {createJavascriptSourceAdmission, javascriptSourceSettingsDigest} from '.
 import {waitManagedJavascriptCodeSettlement} from '../lib/javascript-managed-code-settlement.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {openManagedJavascriptExistingWizard} from '../lib/javascript-managed-existing.mjs';
+import {makeJavascriptManagedSelectionReadCode} from '../lib/javascript-managed-selection.mjs';
 
 const deadline = Date.now() + 60000;
 const prepared = {document_id: 'document', workflow_ref: {workflow_id: 'workflow', prefix: 'MF;TF-1',
@@ -119,17 +120,17 @@ test('source boundary journals only the failed predicate: '+fault,async()=>{
 });
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
-  schemaOverride,openingFault,
+  schemaOverride,openingFault,fivePage=false,inputTransitionOnce=false,
   settingsAckChanged = false,
   nativeRefusal=false,doneRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
   graphTransientOnce = false, graphTransientDetail = false, graphEffectPossible = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
-  let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft;
+  let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft,inputNextSent=false,columnsNextSent=false,inputTransitionRead=false;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node);
       if(openingFault){const error=Error('opening failed');if(openingFault==='capture')error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
-      return {task};},
+      return {task:structuredClone(task)};},
     dispatchManagedJavascriptGeneration: async () => {calls.push('generation');
       if (generationFails) throw Error('lost generation reply');
       return {status: 'SUCCEEDED', output: {generation_readback_verified: true, schema: {verified: true,
@@ -139,7 +140,9 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       return {verified:true,generation:false,columns:structuredClone(columns),schema:{verified:true,
         generation:{checked:false},grids:[{tid:'grid',fields:[{record_id:'volatile',Name:columns[0].name}]}]}};
     },
-    dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
+    dispatchManagedJavascriptNext: async ({input=false}) => {calls.push(input?'input-next':'next');
+      if(input)inputNextSent=true;else columnsNextSent=true;
+      return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
     dispatchManagedJavascriptCodeNext: async () => {calls.push('code-next');codeNextSent = true;
       return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
     dispatchManagedJavascriptDone: async () => {calls.push('done');doneSent=true;if(doneFails)throw Error('lost Done reply');
@@ -155,7 +158,9 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     captureManagedJavascriptWizardError:async({error_stage})=>{calls.push('capture-error');if(captureFails)throw Error('lost error dialog reply');
       return {error_stage,owner:node,source_sha256:handleDraft,dialog_closed:true,native_owner_verified:true};},
     makeJavascriptManagedSourceCode: () => 'source',
-    makeJavascriptManagedSelectionReadCode: () => 'dispose',
+    makeJavascriptManagedSelectionReadCode: task => {
+      if(fivePage)makeJavascriptManagedSelectionReadCode(task);
+      return 'dispose';},
     makeJavascriptExistingGraphTypeCode: () => 'type',
     replaceManagedJavascriptSource: async ({markUncertain,source_text}) => {calls.push('replace');
       if (closeFails) {markUncertain(true); throw Error('lost source write reply');}
@@ -172,6 +177,12 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       pending:false,preview_visible:false,boundary_refusal:null,dialog_diagnostic:{visible_count:0,foreign_count:0,roots:[]},mask_diagnostic:{foreign_count:0},
       wizard_error:{visible:codeNextSent&&nativeRefusal||doneSent&&doneRefusal,exact_count:1,tooltip:'SyntaxError: Syntax error at code (:4:33)',
         tid:'MF;TF-1;WizrdMCF;btnError',tooltip_truncated:false},page_tid:codeNextSent&&!nativeRefusal?'MF;TF-1;WizrdMCF;DoneWizard':'MF;TF-1;WizrdMCF;JavaScriptCodeWizard'};
+    if(code==='page'&&fivePage&&inputTransitionOnce&&inputNextSent&&!columnsNextSent&&!inputTransitionRead){
+      inputTransitionRead=true;throw Error('Managed JavaScript page not ready');}
+    if(code==='page'&&fivePage)return {ready:true,node_guid:'node',page:{
+      tid:'MF;TF-1;WizrdMCF;'+(!inputNextSent?'TuneDataSourceInputPortWizard':!columnsNextSent?'JavaScriptColumnsWizard':codeNextSent?'DoneWizard':'JavaScriptCodeWizard'),
+      index:!inputNextSent?0:!columnsNextSent?1:codeNextSent?4:2,indicator_count:5,
+      visible_editors:columnsNextSent&&!codeNextSent?1:0}};
     if (code === 'page') return {ready: true, node_guid: 'node',
       page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
         : pageTransientOnce && pageReads++ === 0
@@ -215,6 +226,18 @@ test('managed source adapter admits full source after owned open/schema/Next/thr
   assert.deepEqual(f.calls, ['type', 'open', 'page', 'schema', 'next', 'page', 'source', 'source', 'source', 'close', 'dispose']);
   assert.equal(f.events.filter(event => event.phase === 'source_delivery_verified').length, 1);
   assert.equal(f.events.filter(event => event.phase === 'source_discard_settled').length, 1);
+});
+
+test('five-page source read discards its owned draft and disposes the original selection lease',async()=>{
+ const f=fixture({fivePage:true,inputTransitionOnce:true});
+ const admission=createJavascriptSourceAdmission({kind:'existing',owner,deadline,
+  sourceAdapter:f.sourceAdapter,redactor:createRedactor(),record:f.record});
+ const receipt=await admission.admit({});
+ assert.equal(receipt.intent,'preserve');
+ assert.equal(f.calls.filter(c=>c==='input-next').length,1);
+ assert.equal(f.calls.filter(c=>c==='next').length,1);
+ assert.equal(f.calls.filter(c=>c==='dispose').length,1);
+ assert.equal(f.calls.includes('code-next'),false);
 });
 
 test('managed source adapter refuses owner drift before any UI action', async () => {
