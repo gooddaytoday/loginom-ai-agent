@@ -7,6 +7,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   symlinkSync,
   utimesSync,
   writeFileSync,
@@ -27,6 +28,16 @@ const paths = {
   crashDumps: join(profile, "crash"),
 }
 const scoped = { info() {}, warn() {}, error() {} }
+const saveDialogs: Array<{ defaultPath: string }> = []
+let saveChoice: { canceled: boolean; filePath?: string } = { canceled: true }
+// Runs while the native Save as dialog is open.
+let duringSaveDialog: (() => Promise<void>) | undefined
+// The net log pauses export; a test can hold that pause to order overlapping prepares.
+const netLog: {
+  currentlyLogging: boolean
+  stopLogging?: () => Promise<void>
+  startLogging?: () => Promise<void>
+} = { currentlyLogging: false }
 mock.module("electron", () => ({
   // electron-store also imports Electron's CJS default while loading the full
   // Desktop suite. In Bun it is a binary path, with no main-process members.
@@ -37,9 +48,16 @@ mock.module("electron", () => ({
     getName: () => "Loginom AI Agent",
     isPackaged: true,
   },
-  netLog: { currentlyLogging: false },
+  netLog,
   shell: { showItemInFolder() {} },
   crashReporter: {},
+  dialog: {
+    showSaveDialog: async (options: { defaultPath: string }) => {
+      saveDialogs.push(options)
+      await duringSaveDialog?.()
+      return saveChoice
+    },
+  },
 }))
 mock.module("electron-log/main.js", () => ({
   default: {
@@ -50,7 +68,8 @@ mock.module("electron-log/main.js", () => ({
   },
 }))
 mock.module("./constants", () => ({ CHANNEL: "prod", BUILD_SOURCE: { sourceSHA, sourceDirty: false } }))
-const { exportDebugLogs, initLogging } = await import("./logging")
+const { exportDebugLogs, initLogging, parseDiagnosticsRequest, prepareDiagnostics, previewDiagnosticsFile, saveDiagnostics } =
+  await import("./logging")
 
 const attempt = "generations/1/chats/chat-hash/attempts/last/execution-events.jsonl"
 const diagnostic = "diagnostics/session-hash/events.jsonl"
@@ -75,6 +94,10 @@ async function exported() {
   }
 }
 beforeEach(() => {
+  duringSaveDialog = undefined
+  netLog.currentlyLogging = false
+  delete netLog.stopLogging
+  delete netLog.startLogging
   rmSync(profile, { recursive: true, force: true })
   for (const dir of Object.values(paths)) mkdirSync(dir, { recursive: true })
   initLogging()
@@ -278,3 +301,136 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_RUNTIME)(
     )
   },
 )
+
+const sessionHash = createHash("sha256").update("ses_desktop").digest("hex")
+function sessionFixture() {
+  const attempt = `generations/1/chats/${sessionHash}/attempts/a1`
+  put(runtime(`${attempt}/execution-events.jsonl`), JSON.stringify({ phase: "node_step_completed", text: "target-attempt" }) + "\n")
+  put(runtime(`${attempt}/session.json`), JSON.stringify({ sessionId: "dock-desktop" }))
+  put(runtime("generations/1/chats/other/attempts/b1/execution-events.jsonl"), '{"text":"other-session-attempt"}\n')
+  put(join(paths.userData, "logs/current/main.log"), "main log line\n")
+  put(join(paths.crashDumps, "pending/a.dmp"), "MDMP\0raw-memory")
+  return {
+    attempt: `runtime/${attempt}/execution-events.jsonl`,
+    chat: { info: { id: "ses_desktop" }, messages: [{ info: { id: "m1", role: "user" }, parts: [{ type: "text", text: "chat-request" }] }] },
+  }
+}
+
+test("IPC input keeps only a valid session, its chat and boolean groups with owner defaults", () => {
+  expect(parseDiagnosticsRequest(undefined)).toEqual({
+    sessionID: undefined,
+    chat: undefined,
+    include: { chat: true, runtime: true, logs: true, dumps: false },
+  })
+  expect(
+    parseDiagnosticsRequest({ sessionID: "../../etc", chat: { info: {} }, include: { dumps: "yes", chat: false } }),
+  ).toEqual({ sessionID: undefined, chat: undefined, include: { chat: false, runtime: true, logs: true, dumps: false } })
+  expect(parseDiagnosticsRequest({ sessionID: "ses_desktop", chat: { info: {} }, include: { dumps: true } })).toMatchObject({
+    sessionID: "ses_desktop",
+    chat: { info: {} },
+    include: { dumps: true },
+  })
+})
+
+test("the Desktop archive follows the selected session, its chat and the chosen groups", async () => {
+  const fixture = sessionFixture()
+  const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat })
+  const status = (name: string) => ready.files.find((file) => file.name === name)
+  expect(ready.selection).toBe("session")
+  expect(status(fixture.attempt)).toMatchObject({ group: "runtime", status: "included" })
+  expect(status("chat/session.json")).toMatchObject({ group: "chat", status: "included" })
+  expect(status("desktop/current/main.log")).toMatchObject({ group: "logs", status: "included" })
+  expect(status("crashpad/pending/a.dmp")).toMatchObject({ group: "dumps", status: "omitted" })
+  expect(ready.files.some((file) => file.name.includes("/other/"))).toBe(false)
+  // The preview reads the redacted bytes that Save writes.
+  expect((await previewDiagnosticsFile(ready.id, "chat/session.json"))?.text).toContain("chat-request")
+  expect(await previewDiagnosticsFile(ready.id, "crashpad/pending/a.dmp")).toBeUndefined()
+  expect(await previewDiagnosticsFile("stale", "chat/session.json")).toBeUndefined()
+
+  const narrowed = await prepareDiagnostics({
+    sessionID: "ses_desktop",
+    chat: fixture.chat,
+    include: { chat: false, logs: false, dumps: true },
+  })
+  expect(narrowed.files.some((file) => file.group === "chat" || file.name.startsWith("desktop/"))).toBe(false)
+  expect(narrowed.files.find((file) => file.name === "crashpad/pending/a.dmp")).toMatchObject({ status: "included" })
+  expect(await previewDiagnosticsFile(ready.id, "chat/session.json")).toBeUndefined()
+})
+
+test("Save as offers Downloads, writes the previewed archive privately and honours cancel", async () => {
+  const fixture = sessionFixture()
+  const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat })
+  saveDialogs.length = 0
+  saveChoice = { canceled: true }
+  expect(await saveDiagnostics(ready.id)).toBeUndefined()
+  expect(saveDialogs[0].defaultPath.startsWith(join(paths.downloads, "loginom-diagnostics-"))).toBe(true)
+  expect(saveDialogs[0].defaultPath.endsWith(".zip")).toBe(true)
+  const target = join(profile, "chosen", "diagnostics.zip")
+  mkdirSync(dirname(target), { recursive: true })
+  saveChoice = { canceled: false, filePath: target }
+  expect(await saveDiagnostics(ready.id)).toBe(target)
+  const archive = new ZipReader(new BlobReader(new Blob([readFileSync(target)])))
+  const names = (await archive.getEntries()).map((entry) => entry.filename)
+  await archive.close()
+  expect(names).toContain("chat/session.json")
+  expect(names).toContain(fixture.attempt)
+  if (process.platform !== "win32") expect(statSync(target).mode & 0o777).toBe(0o600)
+  await expect(saveDiagnostics(ready.id)).rejects.toThrow("DIAGNOSTICS_NOT_PREPARED")
+})
+
+async function zipNames(path: string) {
+  const archive = new ZipReader(new BlobReader(new Blob([readFileSync(path)])))
+  try {
+    return (await archive.getEntries()).map((entry) => entry.filename)
+  } finally {
+    await archive.close()
+  }
+}
+
+test("Save writes the archive checked before Save as even if another window prepares meanwhile", async () => {
+  const fixture = sessionFixture()
+  const ready = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat, include: { chat: false } })
+  const target = join(profile, "chosen", "first.zip")
+  mkdirSync(dirname(target), { recursive: true })
+  saveChoice = { canceled: false, filePath: target }
+  let other: Awaited<ReturnType<typeof prepareDiagnostics>> | undefined
+  duringSaveDialog = async () => {
+    other = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat, include: { chat: true } })
+  }
+  expect(await saveDiagnostics(ready.id)).toBe(target)
+  expect(other!.files.some((file) => file.name === "chat/session.json" && file.status === "included")).toBe(true)
+  expect(readFileSync(target).length).toBe(ready.size)
+  expect(await zipNames(target)).not.toContain("chat/session.json")
+  // The other window's archive stays prepared for its own Save.
+  duringSaveDialog = undefined
+  const second = join(profile, "chosen", "second.zip")
+  saveChoice = { canceled: false, filePath: second }
+  expect(await saveDiagnostics(other!.id)).toBe(second)
+  expect(await zipNames(second)).toContain("chat/session.json")
+})
+
+test("an older prepare that finishes last does not replace the newer archive", async () => {
+  const fixture = sessionFixture()
+  let release!: () => void
+  const held = new Promise<void>((resolve) => (release = resolve))
+  netLog.currentlyLogging = true
+  netLog.stopLogging = async () => {
+    // Only the first prepare finds the net log running and waits here.
+    netLog.currentlyLogging = false
+    await held
+  }
+  netLog.startLogging = async () => {
+    netLog.currentlyLogging = true
+  }
+  const older = prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat, include: { chat: false } })
+  const newer = await prepareDiagnostics({ sessionID: "ses_desktop", chat: fixture.chat, include: { chat: true } })
+  release()
+  const stale = await older
+  expect(await previewDiagnosticsFile(newer.id, "chat/session.json")).toBeDefined()
+  expect(await previewDiagnosticsFile(stale.id, fixture.attempt)).toBeUndefined()
+  const target = join(profile, "chosen", "newer.zip")
+  mkdirSync(dirname(target), { recursive: true })
+  saveChoice = { canceled: false, filePath: target }
+  expect(await saveDiagnostics(newer.id)).toBe(target)
+  expect(await zipNames(target)).toContain("chat/session.json")
+})
