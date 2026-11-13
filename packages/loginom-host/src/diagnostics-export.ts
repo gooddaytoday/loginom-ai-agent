@@ -231,12 +231,13 @@ function publicHost(host: string, allowed: readonly string[]) {
 const hostLabel = (host: string) => "host-" + sha256(host.toLowerCase()).slice(0, 8)
 
 // Internal server addresses: URL hosts and bare `name:port` outside the public
-// list, IPv4/IPv6 literals except loopback and intranet-only names. Scheme and
-// port remain readable.
+// list, IPv4/IPv6 literals except loopback and intranet-only names. URL user
+// info is always removed. Scheme and port remain readable.
 export function maskHosts(text: string, allowed: readonly string[] = PUBLIC_HOSTS) {
   text = text.replace(
-    /\b([a-z][a-z0-9+.-]*:\/\/)(\[[0-9a-f:.]+\]|[^\s/?#:"'<>\\`@[\]]+)/gi,
-    (match, scheme: string, host: string) => (publicHost(host, allowed) ? match : scheme + hostLabel(host)),
+    /\b([a-z][a-z0-9+.-]*:\/\/)(?:([^\s/?#@"'<>\\`[\]]*)@)?(\[[0-9a-f:.%\w]+\]|[^\s/?#:"'<>\\`@[\]]+)/gi,
+    (_match, scheme: string, userinfo: string | undefined, host: string) =>
+      scheme + (userinfo === undefined ? "" : "[redacted]@") + (publicHost(host, allowed) ? host : hostLabel(host)),
   )
   // Journals hold megabytes of long tokens: test whole tokens with anchored
   // patterns instead of scanning every offset with a backtracking expression.

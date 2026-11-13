@@ -288,3 +288,11 @@ test("P2.1: known values are masked in base64, base64url, double JSON and form e
       new URLSearchParams({ v: value }).toString().slice(2),
     ])
 })
+
+test("P2.2: URL user info is removed for every scheme and the host is masked", async () => {
+  const bytes = await archiveBytes({
+    lines: ["proxy socks5://alice:S3cretPw@proxy.company.ru:1080", "db postgres://svc:Pg-Pass-77@10.9.8.7:5432/app"],
+  })
+  expectAbsent(bytes, ["alice", "S3cretPw", "proxy.company.ru", "svc:", "Pg-Pass-77", "10.9.8.7"])
+  expect(bytes.toString("utf8")).toMatch(/socks5:\/\/\[redacted\]@host-[0-9a-f]{8}:1080/)
+})
