@@ -38,7 +38,7 @@ for(const [source,reason] of [
 });
 
 test('policy ignores forbidden words inside comments and plain strings',()=>{
- assert.equal(inspectPythonSourcePolicy('# import os; open(x)\nlabel = "open eval __import__"\nx = \'\'\'\nimport socket\n\'\'\'\n').status,'ADMITTED');
+ assert.equal(inspectPythonSourcePolicy('# import os; open(x)\nlabel = "open eval import"\nx = \'\'\'\nimport socket\n\'\'\'\n').status,'ADMITTED');
  assert.equal(pythonCodeSkeleton('a = "x#y" # c\n').code,'a = "   " \n');
 });
 
@@ -159,4 +159,40 @@ test('existing node saved code is checked by python-module-v1 before Execute, no
 test('declared columns refuse a usage role the Python columns step does not set',()=>{
  validatePythonParameters({source_text:stdlib,schema_mode:'declared',columns:declared.map(c=>({...c,usage:'Не задано'}))},'script',request());
  assert.throws(()=>validatePythonParameters({source_text:stdlib,schema_mode:'declared',columns:declared.map((c,i)=>({...c,usage:i?'Не задано':'Активное'}))},'script',request()),/usage Не задано/);
+});
+
+// Independent review of #1107: each source below was ADMITTED by python-module-v1.
+for(const [source,reason] of [
+ ['from pandas import read_csv\nframe = read_csv("http://h/x.csv")\n','attribute:read_csv'],
+ ['from numpy import savetxt, load\n','attribute:savetxt'],
+ ['import pandas as pd\nframe = (pd.\n    read_csv("/etc/passwd"))\n','attribute:read_csv'],
+ ['frame.to_string("/tmp/x")\n','attribute:to_string'],
+ ['import numpy as np\nnp.zeros(1).dump("/tmp/x")\n','attribute:dump'],
+ ['import numpy as np\nnp.lib.format.open_memmap("/tmp/x", mode="w+", shape=(1,))\n','attribute:lib'],
+ ['import pandas as pd\npd.io.common.urlopen("http://h")\n','attribute:io'],
+ ['import numpy as np\nnp.testing\n','attribute:testing'],
+ ['import numpy as np\nnp.f2py\n','attribute:f2py'],
+ ['import numpy as np\nnp.ctypeslib\n','attribute:ctypeslib'],
+ ['from numpy.lib.format import open_memmap\n','attribute:lib'],['from numpy import open_memmap\n','attribute:open_memmap'],
+ ['ｅｖａｌ("1")\n','non_ascii'],
+ ['x = ｏｐｅｎ("/etc/passwd").read()\n','non_ascii'],
+ ['x = f"{"}" + str(__import__) + "{"}"\n','fstring_braces'],
+ ['import operator\nf = operator.attrgetter("__globals__")\n','module:operator'],
+ ['import string\nstring.Formatter().get_field("0.__globals__", (f,), {})\n','module:string'],
+ ['import typing\ntyping.get_type_hints(f)\n','module:typing'],
+ ['y = "{0.__globals__}".format(f)\n','string:__globals__'],
+ ['y = f"{x!r} __class__"\n','string:__class__'],
+ ['y = "{0.\\x5f_globals__}".format(f)\n','string:__globals__'],['y = "{0._" "_globals__}".format(f)\n','string:__globals__'],
+ ['y = "{0.\\N{LOW LINE}_globals__}".format(f)\n','string:__globals__'],['y = f"{{0.\\x5f_globals__}}".format(f)\n','string:__globals__'],
+ ['y = f"{{0.\\N{LOW LINE}_globals__}}".format(f)\n','string:__globals__'],
+])test('review bypass refused: '+reason+' '+JSON.stringify(source.slice(0,40)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('f-string literal text, escaped braces and nested specs stay admitted; only their expressions are code',()=>{
+ for(const source of ['label = f"Сумма {amount:.2f} руб."\n','x = f"{{literal}} {value}"\n','x = f"{value:{width}}"\n','x = rf"\\d{{2}} {n}"\n','x = f"""\n{a}\n"""\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
+ assert.equal(inspectPythonSourcePolicy('x = f"{open(1)}"\n').reason,'name:open');
+ assert.equal(inspectPythonSourcePolicy('x = f"{1}}"\n').reason,'fstring_braces');
 });

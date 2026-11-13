@@ -19,8 +19,8 @@ Python 3.13 на сервере, в отдельном процессе (`execut
   до первой строки; `columns` не передавай;
 - `schema_mode:"declared"` — столбцы выхода заданы в мастере: `columns` в
   порядке выхода, у каждого `name`, `label`, `type` (`integer`, `real`,
-  `string`, `boolean`, `datetime`), `data_kind` и `usage` по схеме карточки;
-  код только `OutputTable.Append()` и `Set(имя, значение)`.
+  `string`, `boolean`, `datetime`), `data_kind` по схеме карточки и `usage`
+  только «Не задано»; код только `OutputTable.Append()` и `Set(имя, значение)`.
 
 `Set` в поле другого типа не падает, а приводит значение (в строковое поле
 пишет `'1'`, `'True'`), поэтому тип каждого объявленного поля задавай явно.
@@ -43,9 +43,12 @@ None/NA/NaT/NaN как пропуск.
 Не поддержано: установка пакетов, сеть, файлы, подпроцессы, окружения (PY_ENV,
 venv), входные переменные, дополнительные порты, `read.coverage:"full"`.
 Импорт — только builtin_data, builtin_pandas_utils, pandas, numpy и
-вычислительные модули стандартной библиотеки (math, datetime, decimal,
-statistics, re, json, itertools, functools, collections). Запрещены `open`,
-`eval`, `exec`, `__import__`, dunder-имена, `read_*`/`to_csv` и подобные
-чтение и запись файлов. Такой код отклоняется до изменения узла: сообщи
+вычислительные модули стандартной библиотеки (math, cmath, datetime, decimal,
+fractions, statistics, re, json, itertools, functools, collections, random).
+Отклоняются известные опасные имена в любом месте кода, в том числе после
+`from … import`: `open`, `eval`, `exec`, `__import__`, `read_*`, `to_csv`,
+`to_string`, `load`, `dump`, `io`, `lib` и подобные; dunder-имена — и внутри
+строк; не-ASCII символы вне строк и комментариев. Это список известных
+запретов, не песочница. Такой код отклоняется до изменения узла: сообщи
 пользователю, что этот режим пока не поддерживается.
 <!-- /mode -->
