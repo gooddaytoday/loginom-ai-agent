@@ -68,7 +68,7 @@
 
 | # | Файл в архиве | Источник | Desktop | CLI |
 |---|---|---|---|---|
-| 1 | `chat/session.json` | экспорт сессии `{info, messages:[{info, parts}]}`, формат `opencode export` | renderer: `app/src/utils/session-export.ts:19` `fetchSessionExport` → IPC | in-process `Session.Service` (как `opencode/src/cli/cmd/export.ts:284–285`) |
+| 1 | `chat/session.json` | экспорт сессии `{info, messages:[{info, parts}]}`, формат `opencode export` | renderer: `app/src/utils/session-export.ts:19` `fetchSessionExport` → IPC | соединение SQLite только для чтения, те же запросы, что `Session.Service` в `opencode/src/cli/cmd/export.ts:284–285` (раздел 3) |
 | 2 | `runtime/attempts/<n>/execution-events.jsonl` | все попытки этой сессии, новые первыми | да | да |
 | 3 | `runtime/attempts/<n>/session.json` | метаданные попытки: dock id, ревизия клиента (`client/lib/session.mjs:102`) | да | да |
 | 4 | `runtime/diagnostics/<n>/events.jsonl` | по dock id из №3 | да | да |
@@ -128,7 +128,7 @@
 ### Чего не хватает → что добавляем
 
 1. **Известные секреты профиля.** До redact сборщик читает в память, только чтобы передать в `createRedactor(knownValues)`; в архив эти значения не пишутся:
-   - активное подключение Loginom: `apiKey`, `password` и `username` через `connectionStore(<root>/connection, codec).read()` (`loginom-host/src/connection/connection-store.ts:32`, `:221`). Тот же набор host уже считает диагностическими секретами (`loginom-host/src/supervisor.ts:110`). Codec — штатный: Desktop — `credentials(process.platform)`, CLI — `cliCredentials(...)` (`loginom-host/src/node-entry.ts:108`);
+   - активное подключение Loginom: `apiKey`, `password` и `username` через `connectionStore(<root>/connection, codec).read()` (`loginom-host/src/connection/connection-store.ts:32`, `:221`). Тот же набор host уже считает диагностическими секретами (`loginom-host/src/supervisor.ts:110`). Codec — штатный, без нового доступа к связке ключей: Desktop — `credentials(process.platform, safeStorage)` (`desktop/src/main/loginom/desktop-service.ts:16`; host работает в процессе main, поэтому значения можно взять и у запущенного host), CLI — `cliCredentials(...)` (`loginom-host/src/node-entry.ts:108`);
    - ключи и OAuth провайдеров (`access`, `refresh`, `key`) из `<data>/auth.json` (`opencode/src/auth/index.ts:10`);
    - токены MCP из `<data>/mcp-auth.json` (`opencode/src/mcp/auth.ts:37`);
    - пароль sidecar `LOGINOM_AI_AGENT_SERVER_PASSWORD` (`desktop/src/main/sidecar.ts:105`), только для Desktop;
@@ -185,7 +185,7 @@
   3. Кнопка «Показать файлы» раскрывает список из manifest: имя, размер, статус. Строка «Открыть» показывает обезличенный текст файла только для чтения, первые 64 KiB.
   4. Предупреждение о данных из раздела 2, п. 4.
   5. Кнопки «Сохранить…» и «Отмена».
-- **Подготовка до показа.** Сборщик строит архив в памяти (≤ 20 MiB). Предпросмотр показывает ровно те байты, что будут сохранены, — повторной сборки нет.
+- **Подготовка до показа.** Сборщик строит архив в памяти (≤ 20 MiB). Предпросмотр показывает ровно те байты, что будут сохранены. Снятая галочка группы пересобирает архив без неё, и предпросмотр обновляется по результату пересборки; «Сохранить» пишет последний показанный архив.
 - **Куда.** `dialog.showSaveDialog`: по умолчанию `Downloads/loginom-diagnostics-<stamp>.zip`. После сохранения — `shell.showItemInFolder` и тост с путём. Файл создаётся с правами `0600`. Диалог зависшего окна сохраняет сразу в Downloads без предпросмотра: renderer может не отвечать.
 - **Сеть.** Не используется. Вызов renderer → main — IPC, без сокетов.
 
@@ -195,21 +195,21 @@
 loginom-ai-agent-cli diagnostics export [--session <id>] [--output <path>] [--no-chat]
 ```
 
-- По умолчанию сессия — последняя обновлённая в профиле: `Session.Service`, как в `opencode/src/cli/cmd/export.ts`.
+- По умолчанию сессия — последняя обновлённая в профиле.
 - `--output` по умолчанию: `./loginom-diagnostics-<stamp>.zip`. Существующий файл не перезаписывается: код `DIAGNOSTICS_OUTPUT_EXISTS`, выход 1.
 - Вывод:
   - stdout — одна строка, абсолютный путь архива;
   - stderr — сводка: включено N файлов, пропущено M, причины.
-- Коды выхода: 0 — успех; 1 — ошибка; 2 — неверные аргументы (`CLI_ARGUMENT_INVALID`, как в `standalone.ts:26`); 3 — `PROFILE_BUSY`. Сам экспорт профиль не блокирует, но читает его.
+- Коды выхода: 0 — успех; 1 — ошибка; 2 — неверные аргументы (`CLI_ARGUMENT_INVALID`, как в `opencode/src/standalone.ts:26`).
+- Профиль не захватывается: команда нужна именно тогда, когда зависший `run` держит профиль. Поэтому ветка `diagnostics` разбирается в `opencode/src/cli/standalone.ts` до `executeProfile` (как `--version`, `:26–29`), а не в колбэке `opencode/src/standalone.ts:9`, который выполняется уже под блокировкой профиля (`PROFILE_BUSY`). Чат читается из `<data>/loginom-ai-agent.db` отдельным соединением SQLite только для чтения, теми же запросами, что `Session.Service`. Если база недоступна, архив собирается без чата, в manifest — `reason: "chat-unavailable"`.
 - Host не запускается.
-- Регистрация: ветка `diagnostics` в `opencode/src/standalone.ts:9`, рядом с `loginom`, и строка в справке `opencode/src/cli/standalone.ts:18`. Сама команда — новый файл `opencode/src/cli/standalone-diagnostics.ts`.
+- Регистрация: ветка в `opencode/src/cli/standalone.ts` и строка справки там же (`:18`). Сама команда — новый файл `opencode/src/cli/standalone-diagnostics.ts`.
 
 ## 4. Границы
 
 - **Код opencode.** Не трогаем, кроме:
   - своих `loginom-*`/`standalone*`-файлов;
-  - двух строк регистрации в `opencode/src/standalone.ts` (тоже наш файл: точка входа standalone-сборки, `opencode/script/build.ts:209`);
-  - строки справки в `cli/standalone.ts`.
+  - ветки и строки справки в `opencode/src/cli/standalone.ts`. Файл наш (добавлен в `a7d812e4a9 feat(cli): implement standalone Loginom CLI`), но имя не `loginom-*` — см. открытый вопрос 4.
 
   `cli/cmd/export.ts` и `index.ts` не меняются.
 - **Пути профиля** не меняются. Сборщик только читает и не создаёт каталогов в профиле. Индекс «сессия → попытки» не вводим: попытки ищутся по `sha256(sessionID)`.
@@ -251,3 +251,4 @@ loginom-ai-agent-cli diagnostics export [--session <id>] [--output <path>] [--no
 1. Чат включать по умолчанию (галочка стоит) или выключать? Проект предлагает включать: без чата не видно просьбы пользователя (#297: минимум №1 + №3 + №6).
 2. Minidump: только запись в manifest (проект) или отдельная галочка «приложить дамп памяти» с предупреждением?
 3. Список «публичных» хостов, которые не маскируются: достаточно `*.loginom.ai` + localhost + хосты провайдеров из каталога моделей?
+4. Регистрация CLI-команды требует правки `opencode/src/cli/standalone.ts` (наш файл standalone-сборки, но без префикса `loginom-*`). Допустимо?
