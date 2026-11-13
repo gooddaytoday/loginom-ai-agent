@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { appendFileSync } from "node:fs"
 import { createHook } from "node:async_hooks"
 import { verifyResources } from "./resources.mjs"
@@ -11,9 +11,7 @@ import { closeManagedResources } from "./managed-resources-close.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
-import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
-import { createBridge } from "../client/lib/bridge.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
@@ -23,6 +21,9 @@ const state = {
   startupController: new AbortController(),
   startupCleanupFailed: false,
   startupDiagnostics: [],
+  startupPhase: "runtime.start",
+  startupStarted: performance.now(),
+  startupStateDir: undefined,
   closing: undefined,
   bridge: undefined,
   client: undefined,
@@ -49,6 +50,13 @@ createHook({
   destroy(id) { state.timers.delete(id) },
 }).enable()
 const requests = new Set()
+async function startupPhase(event) {
+  state.startupPhase = event.phase
+  await appendFile(join(state.startupStateDir, "startup-phases.jsonl"), JSON.stringify({ version: 1,
+    recorded_at: new Date().toISOString(), generation: state.owner.generation, chat: state.owner.chat,
+    elapsed_ms: Math.round(performance.now() - state.startupStarted), ...event,
+  }) + "\n", { mode: 0o600 }).catch(() => undefined)
+}
 const terminalTrace = (stage) => {
   if (!state.session?.directory) return
   try {
@@ -137,10 +145,19 @@ async function handle(message) {
       const input = message.input
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
+      state.startupStateDir = input.stateDir
+      state.startupStarted = performance.now()
       state.uploadDirectory = `/${input.connection.username}`
       // Match the existing supervisor allowance; retries never restart it.
       const deadline = Math.min(Date.now() + (input.validation === true ? 210_000 : 120_000), input.startupDeadline ?? Infinity)
-      const resources = await verifyResources(input.resources)
+      await startupPhase({ phase: "resources.verify", status: "starting" })
+      // Every start rechecks file metadata against the Host's profile cache;
+      // a changed file is hashed again and a mismatch refuses the start.
+      const resources = await verifyResources(input.resources, { manifestHash: input.resourceManifestHash,
+        cachePath: input.resourceCachePath, cacheVersion: input.resourceCacheVersion,
+        signal: state.startupController.signal })
+      await startupPhase({ phase: "resources.verify", status: "ready",
+        duration_ms: Math.round(performance.now() - state.startupStarted), ...resources.verification })
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
         input.stateDir,
@@ -165,6 +182,7 @@ async function handle(message) {
         headless: input.headless === true,
         signal: state.startupController.signal,
         deadline,
+        onPhase: startupPhase,
         onRetry: createExecutionJournal({ directory, metadata: { sessionId: input.chat,
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
@@ -173,6 +191,9 @@ async function handle(message) {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
+      // Connection validation never needs the executor's large dependency tree.
+      const { createSession } = await import("../client/lib/session.mjs")
+      const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:join(directory,'browser-downloads'),
         onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
@@ -328,6 +349,14 @@ async function handle(message) {
       state.controller = undefined
     }
   } catch (error) {
+    if (message.operation === "start" && state.startupStateDir) {
+      await appendFile(join(state.startupStateDir, "startup-failures.jsonl"), JSON.stringify({ version: 1,
+        recorded_at: new Date().toISOString(), generation: state.owner.generation, chat: state.owner.chat,
+        phase: state.startupPhase, elapsed_ms: Math.round(performance.now() - state.startupStarted),
+        error: startupDiagnostic(error, [message.input?.connection?.apiKey, message.input?.connection?.password,
+          message.input?.connection?.username]),
+      }) + "\n", { mode: 0o600 }).catch(() => undefined)
+    }
     if (message.operation === "start" && !state.startupDiagnostics.length)
       state.startupDiagnostics.push({ phase: "runtime.start", retry: false,
         error: startupDiagnostic(error, [message.input?.connection?.apiKey, message.input?.connection?.password,
