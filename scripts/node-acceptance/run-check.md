@@ -859,6 +859,12 @@ Save, cold без перенастройки и Teach, cleanup.
 `modes/coefficients/task-coefficients.md` и независимый `modes/oracle.py`;
 точные имена, типы, NULL и порядок, CSV/Save/cold без перенастройки.
 
+`logreg-lasso`: ручной L1, lambda_lasso=1, утверждённые task-lasso.md и train.csv
+из `datamining-logregression/acceptance/modes/lasso`. Неизменённый независимый
+oracle.py проверяет полный прогноз 32×8, типы, порядок и NULL. Повтор настройки
+и Teach — на том же узле. CSV, Save, cold без настройки/Teach и cleanup — штатные.
+Модель получает только задачу и CSV; expected и oracle остаются приватными.
+
 `logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
 повтор настройки и Teach того же узла; прогноз по независимому штрафному
 score из `datamining-logregression/acceptance/modes/ridge`, CSV/Save/cold.
