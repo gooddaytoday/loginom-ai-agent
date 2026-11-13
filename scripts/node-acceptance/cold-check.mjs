@@ -68,6 +68,7 @@ const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-br
 const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
 const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
 const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
+const { makeSavedPackageStateCode } = await load("client/lib/package-persistence.mjs")
 const { withBrowserReceipt } = await load("client/lib/executor.mjs")
 const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
 const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
@@ -192,11 +193,15 @@ page = context.pages()[0]
   }
 
   const origin = new URL(config.loginom_url).origin
+  const modifiedOptions={sessionId:session,documentId:prepared.document_id,account:config.workflow_profile.loginom_user,
+   packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'};
+  await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_open'});
   const adapter = createNodeTargetBrowserAdapter({ execute, origin, build: "7.4.2" })
   let graph = await adapter.observe(
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
+  await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
   let coldChannelSequence=0;
@@ -727,4 +732,14 @@ async function loadSaved(value) {
   if (typeof parsed === "string" && parsed.endsWith(".lgp")) return { path: parsed }
   if (parsed && typeof parsed.path === "string") return { path: parsed.path, node: parsed.node }
   throw Error("SAVED_SHAPE_INVALID")
+}
+
+async function recordColdPackageModified({execute,record,makeSavedPackageStateCode,options,stage}) {
+ let modified=null;
+ try {
+  const state=await execute(makeSavedPackageStateCode(options));
+  if(typeof state?.modified==='boolean'&&state.read_only===true&&state.package_path===options.packagePath)modified=state.modified;
+ } catch { /* Diagnostic failure must not replace an existing scenario outcome. */ }
+ await record({phase:'cold_package_modified_observed',stage,package_path:options.packagePath,
+  modified,available:modified!==null,read_only:true,settings_applied:false});
 }
