@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {readFileSync} from 'node:fs';
+import {parseExpectedOutputs} from '../expected-outputs.mjs';
+
+test('Grouping type expectations satisfy the stock cold-check contract',()=>{
+ for(const kind of ['real','boolean']){
+  const expected=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/grouping/acceptance/types/expected-'+kind+'.json',import.meta.url)));
+  expected.package_path='/own/types.lgp';
+  assert.equal(parseExpectedOutputs(expected).outputs.length,1);
+  assert.deepEqual(expected.nodes.map(n=>n.type),['imports.text','transform.group_data','exports.text']);
+ }
+});
 
 test('Grouping Real and Boolean use unchanged proposal stages as separate stock expected',()=>{
  const result=spawnSync('python3',['-B','-c',`
