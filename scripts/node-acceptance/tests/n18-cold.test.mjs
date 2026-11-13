@@ -12,13 +12,15 @@ const check=new AsyncFunction('graph','expected','load','channelFor','record','v
 const node={document_id:'doc',workflow_id:'flow',node_id:'calc'};
 const graph=(...types)=>({nodes:types.map(type=>({type,ref:{...node,node_id:type==='transform.calculator'?'calc':type}}))});
 const expected=(alternative=true)=>({n18_javascript_step:true,nodes:[{type:'imports.text'},{type:'programming.javascript',...(alternative?{alternative_types:['transform.calculator'],alternative_syntax:'javascript'}:{})},{type:'exports.text'}]});
-function fixture({syntax='javascript',change=()=>{},closed={}}={}){
+function fixture({syntax='javascript',stage='calculator',change=()=>{},closed={},nextError}={}){
  const calls=[],records=[];
  const selected={prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}};
- const state={prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{stage:'calculator'},node_calculator:{verified:true,inventory_complete:true,mode:'expression',syntax,node_context:{...node,verified:true}}};
+ const state={prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{stage,root_tid:'wizard'},ui:{elements:[{tid:'wizard;btnNext',ref:'next',enabled:true,allowed_actions:['wizard_step']}]},node_calculator:{verified:true,inventory_complete:true,mode:'expression',syntax,node_context:{...node,verified:true}}};
  change(state);
  const baseline=structuredClone(state);
- const channel={async observe(spec){calls.push(spec.readCalculator?'read':'graph');const s=spec.readCalculator?state:selected;if(!spec.ready(s))throw Error('NOT_READY');return s;}};
+ const channel={async observe(spec){const graph=spec.condition==='cold n18 Calculator graph';calls.push(graph?'graph':spec.readCalculator?'read':'wizard');const s=graph?selected:state;if(!spec.ready(s))throw Error('NodeReadinessTimeout: NOT_READY');return s;},
+  async perform(spec){assert.ok(spec.ready(state));assert.deepEqual(spec.identity(state),state.prepared_node_context);
+   const action=spec.resolve(state);assert.deepEqual(action,{verb:'wizard_step',ref:'next',expected_stage:'calculator'});calls.push('next');if(nextError)throw Error(nextError);state.wizard.stage=action.expected_stage;}};
  const modules={
   'client/lib/node-graph-selection.mjs':{async selectPreparedGraphNode(){calls.push('select');}},
   'client/lib/node-wizard-open.mjs':{async openPreparedWizard(){calls.push('open');}},
@@ -34,9 +36,37 @@ test('observed Calculator route still fails without approved opt-in',async()=>{
  await assert.rejects(fixture().run(observed(),expected(false)),/COLD_NODE_TYPE_MISSING:programming.javascript/);
 });
 test('n18 accepts the observed Calculator only after owned saved JavaScript read and Cancel',async()=>{
- const f=fixture();await f.run(observed());assert.deepEqual(f.calls,['graph','select','open','read','cancel']);
+ const f=fixture();await f.run(observed());assert.deepEqual(f.calls,['graph','select','open','wizard','read','cancel']);
  assert.equal(f.records[0].phase,'n18_saved_javascript_step');assert.equal(f.records[0].syntax,'javascript');assert.equal(f.records[0].settings_applied,false);
  assert.deepEqual(f.state,f.baseline);
+});
+test('n18 advances an owned saved Calculator from input_mapping once without editing settings',async()=>{
+ const f=fixture({stage:'input_mapping'});await f.run(observed());
+ assert.deepEqual(f.calls,['graph','select','open','wizard','next','read','cancel']);
+ assert.deepEqual(f.state,{...f.baseline,wizard:{...f.baseline.wizard,stage:'calculator'}});
+ assert.equal(f.records[0].settings_applied,false);
+});
+test('input_mapping still requires independent JavaScript readback after Next',async()=>{
+ const f=fixture({stage:'input_mapping',syntax:'expression'});
+ await assert.rejects(f.run(observed()),/COLD_N18_CALCULATOR_JAVASCRIPT_REQUIRED/);
+ assert.deepEqual(f.calls,['graph','select','open','wizard','next','read','cancel']);assert.deepEqual(f.records,[]);
+});
+test('input_mapping of a foreign node cannot authorize Next',async()=>{
+ const f=fixture({stage:'input_mapping',change:s=>s.prepared_node_context.node_id='foreign'});
+ await assert.rejects(f.run(observed()),/NOT_READY/);assert.ok(!f.calls.includes('next'));assert.equal(f.calls.at(-1),'cancel');
+});
+for(const [name,change] of [
+ ['disabled',s=>s.ui.elements[0].enabled=false],
+ ['unpermitted',s=>s.ui.elements[0].allowed_actions=[]],
+ ['ambiguous',s=>s.ui.elements.push({...s.ui.elements[0]})]
+])test('input_mapping refuses '+name+' Next and cancels',async()=>{
+ const f=fixture({stage:'input_mapping',change});await assert.rejects(f.run(observed()),/COLD_N18_CALCULATOR_NEXT_UNCONFIRMED/);
+ assert.ok(!f.calls.includes('next'));assert.equal(f.calls.at(-1),'cancel');assert.deepEqual(f.records,[]);
+});
+test('an unconfirmed Next such as a lost-links question is not retried or resolved by deletion',async()=>{
+ const f=fixture({stage:'input_mapping',nextError:'lost-links question'});
+ await assert.rejects(f.run(observed()),/lost-links question/);
+ assert.deepEqual(f.calls,['graph','select','open','wizard','next','cancel']);assert.deepEqual(f.records,[]);
 });
 test('approved Calculator alternative refuses expression syntax and cancels',async()=>{
  const f=fixture({syntax:'expression'});await assert.rejects(f.run(observed()),/COLD_N18_CALCULATOR_JAVASCRIPT_REQUIRED/);
