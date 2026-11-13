@@ -52,7 +52,7 @@ function fixture({loseReply=false,foreignOwner=false,block=false}={}) {
   const preparation={id:'doc',document,receipts:new Map([['initial',receipt]])};
   const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm};
   const workspace={getActiveTab:()=>({Controller:{Node:{data:{get node(){return current;}}},FController:model}})};
-  app.Application={FInstance:{FMainForm:{Items:{Workspace:workspace}}}};
+  app.Application={FInstance:{FMainForm:{Items:{Workspace:workspace},FMapTree:{FServerConnection:{UserName:'worker'}}}}};
   const context=vm.createContext({document,location:{origin:'https://app.loginom.ai'},getComputedStyle:()=>({visibility:'visible'}),
     __loginomDockPreparationV1:preparation,bg:{app}});
   const page={evaluate:(fn,args)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(args)+')',context),
@@ -73,6 +73,7 @@ test('NW1 real adapter enters, reads nested Calculator, leaves and issues fresh 
   const f=fixture(),before=await f.read(f.ref);
   const entered=await f.navigate(f.ref);
   assert.equal(entered.status,'READY',JSON.stringify(entered));
+  assert.equal(entered.loginom_account,'worker');
   assert.notEqual(entered.workflow_ref.workflow_id,f.ref.workflow_id);
   assert.equal(entered.workflow_ref.prefix,f.ref.prefix);
   const inside=await f.read(entered.workflow_ref);

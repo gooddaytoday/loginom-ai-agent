@@ -426,7 +426,8 @@ async function navigatePreparedGraph(page, options) {
       existing.navigationParentWorkflow=direction==='enter'?source.nodeTargetWorkflowNode:source.navigationParentReceipt?.navigationParentWorkflow;
       existing.navigationParentReceipt=direction==='enter'?source:source.navigationParentReceipt?.navigationParentReceipt;
       const path=typeof packageNode.PackageFileName==='string'&&packageNode.PackageFileName?'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, ''):null;
-      existing.navigationResult={document_id:p.id,workflow_ref:{workflow_id:existing.workflowId,tab_tid:ref.tab_tid,prefix:ref.prefix,navigation_path:crumbs},
+      existing.navigationResult={document_id:p.id,loginom_account:app.Application.FInstance.FMainForm.FMapTree?.FServerConnection?.UserName??null,
+        workflow_ref:{workflow_id:existing.workflowId,tab_tid:ref.tab_tid,prefix:ref.prefix,navigation_path:crumbs},
         package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null},target_verified:true,ownership_verified:false,preserved_workflows:[]};
       return existing.navigationResult;
     }
