@@ -225,3 +225,42 @@ test("drops lower-priority sources first when the archive budget is short", asyn
   )
   for (const file of omitted) expect(file.reason).toBe("archive-budget")
 })
+
+// Review #1075 (LAB-1553): every check reads the raw bytes of the archive.
+async function archiveBytes(input: { lines: string[]; knownSecrets?: string[] }) {
+  const p = profile()
+  put(join(p.logs, "run", "main.log"), input.lines.join("\n") + "\n")
+  put(
+    join(attemptDir(p.runtime, "ses_review", "a1"), "execution-events.jsonl"),
+    input.lines.map((text) => JSON.stringify({ phase: "node_step_completed", text })).join("\n") + "\n",
+  )
+  const { zip } = await buildDiagnosticsArchive({
+    runtime: p.runtime,
+    sessionID: "ses_review",
+    logs: [{ dir: p.logs, prefix: "desktop" }],
+    knownSecrets: input.knownSecrets,
+  })
+  const archive = await unpack(zip)
+  return Buffer.concat([Buffer.from(zip), ...[...archive.files].flatMap(([name, data]) => [Buffer.from(name), Buffer.from(data)])])
+}
+const expectAbsent = (bytes: Buffer, values: string[]) => {
+  for (const value of values) expect({ value, found: bytes.includes(Buffer.from(value)) }).toEqual({ value, found: false })
+}
+
+test("P1: bare proxy authorities, public IPv4 and global IPv6 are masked", async () => {
+  const bytes = await archiveBytes({
+    lines: [
+      "system proxy: applied proxy.corp.example:3128",
+      JSON.stringify({ proxy: "proxy.company.ru:3128" }),
+      "connect 203.0.113.5:8080",
+      "connect [2001:db8:85a3::8a2e:370:7334]:443 and 2001:db8::7",
+      "trace at logging.ts:42:5, time 12:30:45, mac aa:bb:cc:dd:ee:ff, loopback 127.0.0.1:3000 and [::1]:9",
+      "stand app.loginom.ai:443",
+    ],
+  })
+  expectAbsent(bytes, ["proxy.corp.example", "proxy.company.ru", "203.0.113.5", "2001:db8:85a3", "2001:db8::7"])
+  const text = bytes.toString("utf8")
+  for (const kept of ["logging.ts:42:5", "12:30:45", "aa:bb:cc:dd:ee:ff", "127.0.0.1:3000", "[::1]:9", "app.loginom.ai:443"])
+    expect(text).toContain(kept)
+  expect(text).toMatch(/applied host-[0-9a-f]{8}:3128/)
+})
