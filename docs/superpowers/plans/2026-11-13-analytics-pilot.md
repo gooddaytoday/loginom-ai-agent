@@ -43,4 +43,5 @@
 - Пользователь обновил sudo-доступ. Отдельный scoped judge launcher установлен после независимого review, root ownership/mode/sudoers и `--version` проверены.
 - Проектный Multica-токен получил 403 для приватного runtime. Владелец явно подтвердил продолжение через штатный вход владельца runtime.
 - Blind-B A05 выполнен в чистом контексте: ответ зафиксирован до сравнения, полный CSV совпал с oracle штатным compareCsv. Канон — [аналитический пилот](../../testing/loginom-ai-agent/analytics-pilot.md).
-- Полный путь A01 разрешён отдельным комментарием; проверен фактический running run AnalyticsAuthor. До first-pair review остальные четыре пары удержаны. Контрольных модельных попыток 0.
+- A01 attempt1 завершилась CLI1 без LGP/CSV; фактическая sol/xhigh подтверждена, 1/3 бюджета использована. Экспорт остановился до drag, unconfirmed cleanup удерживает старый writer; старый контекст сохранён.
+- [Точечный repair](2026-11-13-export-palette-redraw.md) получил independent APPROVE и 106 PASS/4 browser-gated SKIP. Кандидат CLI собран от принятой базы с reviewed patch; отдельный Authoring-контекст подготовлен, ожидается его штатный вход. До установленной проверки и явного допуска A2 контрольных попыток 0, A02–A05 удержаны.

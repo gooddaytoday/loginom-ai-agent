@@ -6,10 +6,10 @@
 
 ## Проверяемые шаги
 
-- [ ] В существующем VM fixture TextExport воспроизвести перерисовку SVG существующего узла при прокрутке палитры: исходный `mutateGraph` должен отказать до drag.
-- [ ] После reveal сравнить граф существующим `sameGraph`, разрешив только изменение node drawing epochs, и обновить `gestureBefore`. Сохранить строгую следующую проверку drag, document/root/native graph, owner scroll, canvas bounds и hit-test.
-- [ ] До drag сверить текущие scale/translate/scroll с исходным `placementNavigation.view`: изменение transform при том же canvas rect должно отказать. Семантическое изменение узла, root/document или links также отказывает до drag.
-- [ ] Выполнить focused Node tests `text-export-create`, `text-export-palette`, `node-target-viewport`, `node-placement` закреплённым Node. Проверить код независимым SPEC+QUALITY review.
+- [x] В существующем VM fixture TextExport воспроизвести перерисовку SVG существующего узла при прокрутке палитры: исходный `mutateGraph` должен отказать до drag.
+- [x] После reveal сравнить граф существующим `sameGraph`, разрешив только изменение node drawing epochs, и обновить `gestureBefore`. Сохранить строгую следующую проверку drag, document/root/native graph, owner scroll, canvas bounds и hit-test.
+- [x] До drag сверить текущие scale/translate/scroll с исходным `placementNavigation.view`: изменение transform при том же canvas rect должно отказать. Семантическое изменение узла, root/document или links также отказывает до drag.
+- [x] Выполнить focused Node tests `text-export-create`, `text-export-palette`, `node-target-viewport`, `node-placement` закреплённым Node. Проверить код независимым SPEC+QUALITY review.
 - [ ] Собрать и установить отдельную квалифицированную CLI-поставку штатными build/staging/install средствами от фактически принятой source-базы `29ea34e27b8f96ed27b744f639c9f48933f52443` и только reviewed palette patch, сохранить actual source/runtime/manifest pins. Исходная принятая поставка остаётся отдельной.
 - [ ] Использовать чистый отдельный Authoring-контекст с новыми собственными Server/Studio/storage/user/profile и проектным аккаунтом, сохранив старый заблокированный контекст целиком. Провести подготовку/verify штатными средствами, затем A01 attempt2 в исходном общем бюджете. До контрольных запусков закрепить одинаковую исправленную CLI-поставку для D/B Benchmark.
 
