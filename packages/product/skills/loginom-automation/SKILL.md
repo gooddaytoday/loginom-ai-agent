@@ -204,6 +204,8 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Параметры полей: переименование и обмен имён, метка, смена типа, кэширование | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
 | Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Ветвь по переменной, «Иначе» | `control.condition` / ports, variable_branch | [читать](references/nodes/control.condition.md) |
+| Подмодель: табличная граница и внутренний граф | `control.supernode` / tabular_boundary | [читать](references/nodes/control.supernode.md) |
+| Выходной узел внутри Подмодели: только локальная связь | `control.supernode_output` / tabular_boundary | [читать](references/nodes/control.supernode_output.md) |
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
 |Доли итогов, веса, сезонная разгруппировка|`transform.ungroup_data` / shares, computed, seasonal|[читать](references/nodes/transform.ungroup_data.md)|
@@ -300,4 +302,3 @@ Playwright, raw UI, clipboard, DOM/JavaScript или прямые методы �
 завершения текущей операции. Для документации требуется локальный .lgp:
 автоматического скачивания сохранённого серверного пакета в этом workflow нет.
 
-`control.supernode` → `references/nodes/control.supernode.md`: один табличный вход/выход, внутренний граф, вход/выход из Подмодели.
