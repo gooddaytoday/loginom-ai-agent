@@ -1,0 +1,123 @@
+{
+  "sources": {
+    "SPEC.md": "ff71658d4d10b53bda077f882eb01d0da32f0a29a0a80480f36a080ba1cb3be0",
+    "acceptance.json": "f51cdf07f0c8c714011c7803d0e0de7455c3954d38ad1e42a3ea849c5be1cb88",
+    "data/did_outcomes.csv": "b78cb974a8a0d20ef16cab48619256b30700cc362db30c95cdc6eefdcb46b564",
+    "data/did_units.csv": "e14805ba353496ea3dec2e240c03193d29f6cb5e1471b4a9a4e9e849c7e810ae",
+    "oracle.csv": "9c31a7c1fbacd9def7edd39a8085e56aaf6fcbe11965a38f9044e7e35e6c01c1",
+    "oracle.py": "33d7c11ac8807a62e4f67e833c75420885e1bcb8f43a70556e0d86af41b56640",
+    "provenance.json": "5dba5ffd19ec370bdce464ec10bdc20b75f126da699e85dc4ef1d42aa918f37e",
+    "reference.lgp": "2c7cae11107f9f28190913fecb0d047db0799cb1901ff988d121c090d2998c9e",
+    "task.json": "427f4b5af5775757e28d8d842d72aea2c10aa4943477f5c7559facc45eb9869e"
+  },
+  "cases": [
+    {
+      "id": "treated-only",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"treated_change-control_change\"",
+          "to": "Expression=\"treated_change\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "control",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "treated-only.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('treated-only')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "post-gap",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"treated_change-control_change\"",
+          "to": "Expression=\"t_post-c_post\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "control",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "post-gap.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('post-gap')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "wrong-preperiod",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(t_pre1-t_pre2)-(c_pre1-c_pre2)\"",
+          "to": "Expression=\"treated_change-control_change\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "pretrend",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "wrong-preperiod.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('wrong-preperiod')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "strict-boundary",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IFF(Abs(pretrend_gap)&lt;=1,1,0)\"",
+          "to": "Expression=\"IFF(Abs(pretrend_gap)&lt;1,1,0)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "pretrend",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "strict-boundary.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('strict-boundary')",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}
