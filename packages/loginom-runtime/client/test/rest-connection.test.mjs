@@ -265,3 +265,37 @@ async function verifyPublicRelease(connection,graph,task){
  assert.match(release.output.original_outcome.output.warnings[0],/saved REST connection.*Echo.*remains/);
  assert.equal(runtime.hasUnsettledWork(),false);runtime.assertPreparationAllowed();assert.equal(calls,1);
 }
+
+// LAB-1611: a saved REST connection is labelled by its name or URL. A long
+// label renders a palette TreeText wider than the clipping panel (x=108…715.81,
+// panel ends at x=318); its full-element centre lies over the graph SVG and
+// only the visible part hits, so the drag source must come from that part.
+const wideLabel=async({visible=true}={})=>{
+ const tid='module',root={},svg={},panel={},wrap={},calls=[];
+ const el={getBoundingClientRect:()=>({x:108,y:226,left:108,top:226,right:715.81,bottom:244,width:607.81,height:18}),parentElement:wrap,
+  closest:s=>s==='[data-tid]'?el:null,getAttribute:()=>tid,contains:n=>n===el};
+ wrap.parentElement=panel;panel.parentElement=svg.parentElement=root;
+ panel.getBoundingClientRect=()=>({x:0,y:100,left:0,top:100,right:318,bottom:700,width:318,height:600});
+ const styles=new Map([[wrap,{overflowX:'visible',overflowY:'visible'}],[panel,{overflowX:'hidden',overflowY:'auto'}]]);
+ const saved={document:globalThis.document,innerWidth:globalThis.innerWidth,innerHeight:globalThis.innerHeight,getComputedStyle:globalThis.getComputedStyle};
+ Object.assign(globalThis,{document:{documentElement:root,elementFromPoint:(x,y)=>visible&&x>=108&&x<318&&y>=226&&y<244?el:svg},innerWidth:1280,innerHeight:800,getComputedStyle:a=>styles.get(a)});
+ const locator=sel=>({count:async()=>sel.includes('x-mask')?0:1,evaluate:async fn=>fn(el),evaluateAll:async()=>[],isVisible:async()=>false,locator});
+ const page={evaluateHandle:async()=>({dispose(){}}),evaluate:async()=>true,locator,waitForTimeout:ms=>new Promise(r=>setTimeout(r,Math.min(ms,5))),
+  mouse:{click:async(x,y)=>{calls.push({x,y});throw Error('stop after first click');}}};
+ const flow={workflow_id:'flow',tab_tid:'tab',prefix:'MF;TF-1',navigation_path:[{tid,label:'Module'},{tid:'flow',label:'Flow'}]};
+ try{return {calls,result:await restConnectionCapability(page,{deadline:Date.now()+300,document_id:'doc',workflow_ref:flow,connection:{name:'https://example.test/a/very/long/rest/service/name',base_url:'https://example.test/'}})};}
+ finally{for(const [key,value]of Object.entries(saved))if(value===undefined)delete globalThis[key];else globalThis[key]=value;}
+};
+test('REST clicks a control wider than its clipping panel inside its visible part',async()=>{
+ const {calls,result}=await wideLabel();
+ assert.equal(calls.length,1,JSON.stringify(result));
+ assert.ok(calls[0].x>=108&&calls[0].x<318&&calls[0].y===235,JSON.stringify(calls[0]));
+ assert.match(result.error,/stop after first click/);
+});
+
+test('REST times out on an unreachable control naming the wait it was in, without a click',async()=>{
+ const {calls,result}=await wideLabel({visible:false});
+ assert.deepEqual(calls,[]);
+ assert.equal(result.verified,false);
+ assert.match(result.error,/^REST connection: operation deadline exceeded while waiting for reachable module$/);
+});
