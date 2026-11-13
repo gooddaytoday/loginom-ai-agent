@@ -82,6 +82,12 @@ keep.txt, содержимое закрытого denied.txt не требует
 `{"path":"archive/final.bin","kind":"file"}`; он учитывает также denied.txt
 и пустые/лишние папки. Наличие локальных скачанных файлов не доказывает
 отсутствия серверного мусора: inventory и cleanup нужны отдельно.
+Для path-present отдельно скачивается и сверяется sidecar.txt. В path-сценариях
+inventory требует paths.lgp и допускает только явно перечисленные служебные
+paths.~lgp/paths.csv помимо sidecar: их байты/исходник проверяет существующий
+Save/cold путь, а не фиксированный file-byte oracle. Любой иной файл, ссылка,
+повтор имени или отсутствие сохранённого пакета — отказ. В прочих FS-сценариях
+пакет/экспорт размещаются вне проверяемых input/output/operations/errors.
 
 LEDGER.json — полный admin ledger данного run в порядке sequence. Oracle
 проверяет число, метод, path/query, SHA-256 и длину сырых тел, Content-Type и

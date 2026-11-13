@@ -50,6 +50,8 @@ def files(case):
         return {"keep.txt": b"KEEP"}
     if case == "combined":
         return {"summary.csv": report()}
+    if case == "fs-path-present":
+        return {"sidecar.txt": b"LAB1549_SIDE"}
     return {}
 
 
@@ -144,8 +146,12 @@ def external(case):
     inventory += [{"path": name, "kind": "directory"} for name in dirs]
     if case == "fs-errors":
         inventory += [{"path": "denied.txt", "kind": "file"}]
+    path_case = case in ("fs-path-present", "fs-path-missing")
     return {"http": http(case), "files": {name: value.hex() for name, value in data.items()},
-            "inventory": inventory, "tls_failed_handshakes": 1 if case == "fetch-errors" else 0,
+            "inventory": inventory,
+            "reserved_artifacts": ["paths.lgp", "paths.~lgp", "paths.csv"] if path_case else [],
+            "required_artifacts": ["paths.lgp"] if path_case else [],
+            "tls_failed_handshakes": 1 if case == "fetch-errors" else 0,
             "scope": "one explicit execution; configure/read must have an empty effect delta"}
 
 
@@ -166,8 +172,17 @@ def verify_files(case, directory):
 
 def verify_inventory(case, rows):
     projected = [{"path": r["path"], "kind": r["kind"]} for r in rows]
+    contract = external(case)
+    if len({r["path"] for r in projected}) != len(projected):
+        raise ValueError("Duplicate server inventory entry")
+    reserved = set(contract["reserved_artifacts"])
+    if any(r["kind"] != "file" for r in projected if r["path"] in reserved):
+        raise ValueError("Reserved package artifact has the wrong type")
+    if not set(contract["required_artifacts"]) <= {r["path"] for r in projected}:
+        raise ValueError("Saved package artifact missing")
+    projected = [r for r in projected if r["path"] not in reserved]
     key = lambda r: (r["path"], r["kind"])
-    if sorted(projected, key=key) != sorted(external(case)["inventory"], key=key):
+    if sorted(projected, key=key) != sorted(contract["inventory"], key=key):
         raise ValueError("Server inventory differs (including duplicates)")
 
 
@@ -258,9 +273,16 @@ def self_check():
         verify_table("fs-path-missing", dict(exp, rows=[{"Exists": 0, "Text": ""}]))
     except ValueError:
         failures += 1
-    if failures != 5:
+    inventory = [{"path": "paths.lgp", "kind": "file"}, {"path": "sidecar.txt", "kind": "file"}]
+    verify_inventory("fs-path-present", inventory)
+    for broken in (inventory[1:], inventory + [{"path": "unexpected", "kind": "file"}]):
+        try:
+            verify_inventory("fs-path-present", broken)
+        except ValueError:
+            failures += 1
+    if failures != 7:
         raise ValueError("Oracle failed a negative control")
-    print("Oracle rejects duplicate/missing/wrong-body HTTP, corrupt bytes, and NULL/type substitution")
+    print("Oracle rejects duplicate/missing/wrong-body HTTP, corrupt bytes, NULL/type substitution, and missing/extra inventory")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,14 @@
   "http": [],
   "files": {},
   "inventory": [],
+  "reserved_artifacts": [
+    "paths.lgp",
+    "paths.~lgp",
+    "paths.csv"
+  ],
+  "required_artifacts": [
+    "paths.lgp"
+  ],
   "tls_failed_handshakes": 0,
   "scope": "one explicit execution; configure/read must have an empty effect delta"
 }

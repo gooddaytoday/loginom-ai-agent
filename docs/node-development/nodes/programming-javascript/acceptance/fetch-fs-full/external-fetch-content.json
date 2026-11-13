@@ -15,6 +15,8 @@
   ],
   "files": {},
   "inventory": [],
+  "reserved_artifacts": [],
+  "required_artifacts": [],
   "tls_failed_handshakes": 0,
   "scope": "one explicit execution; configure/read must have an empty effect delta"
 }
