@@ -8,7 +8,7 @@
 
 Зарегистрирован `transform.join_data` / `inner`, `left`, `right`, `full`, `difference`. inner/left/right/full/difference; одинаковые типы ключей; явные пары ключей, регистр и включение ключей справа.
 
-Ограничения: Cross join и неявное приведение типов ключей не поддержаны; конфликты имён — явными mappings. Приведение типов ключей — ограничение Loginom 7.4.2, цикл не планируется (решение владельца `v040-scope-expansion`, 12.11.2026).
+Ограничения: неявное приведение типов ключей не поддержано (полное слияние без ключей — #832); конфликты имён — явными mappings. Приведение типов ключей — ограничение Loginom 7.4.2, цикл не планируется (решение владельца `v040-scope-expansion`, 12.11.2026).
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [join-node.mjs](../../../../packages/loginom-runtime/client/lib/join-node.mjs):1–65; [join-parameters.mjs](../../../../packages/loginom-runtime/client/lib/join-parameters.mjs):1–48; [transform.join_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.join_data.md):1–25. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

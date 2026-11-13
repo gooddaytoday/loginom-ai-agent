@@ -8,7 +8,7 @@
 
 Зарегистрирован `variables.column_union` / `append_variables`. Два разных набора переменных, automatic mapping, integer/real/string/boolean и typed NULL, максимум 128; сначала вход 0, затем 1; native имена коллизий.
 
-Ограничения: Без ручных mappings, преобразований типов, управляющего и третьего входов; читать фактические имена результата.
+Ограничения: Без преобразований типов и управляющего входа (ручное соответствие — #875, третий вход — #888); читать фактические имена результата.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [variables-coluniondatavar-node.mjs](../../../../packages/loginom-runtime/client/lib/variables-coluniondatavar-node.mjs):1–35; [variables-coluniondatavar-parameters.mjs](../../../../packages/loginom-runtime/client/lib/variables-coluniondatavar-parameters.mjs):1–50; [variables.column_union.md](../../../../packages/product/skills/loginom-automation/references/nodes/variables.column_union.md):1–32. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

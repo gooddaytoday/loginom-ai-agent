@@ -8,7 +8,7 @@
 
 Зарегистрирован `variables.to_table` / `columns`, `rows`. Непустой набор integer/real/boolean/string/datetime и typed NULL в таблицу: columns — одна строка; rows — Name/DisplayName/Value variant; порядок источника сохраняется.
 
-Ограничения: Без переключения режима existing, изменения набора переменных, Variant на входе и пустых наборов; гражданское datetime сохраняет миллисекунды.
+Ограничения: Переключение columns↔rows на том же узле — #881; без изменения набора переменных, Variant на входе и пустых наборов; гражданское datetime сохраняет миллисекунды.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [variables-vartodata-node.mjs](../../../../packages/loginom-runtime/client/lib/variables-vartodata-node.mjs):1–19; [variables-vartodata-parameters.mjs](../../../../packages/loginom-runtime/client/lib/variables-vartodata-parameters.mjs):1–28; [variables.to_table.md](../../../../packages/product/skills/loginom-automation/references/nodes/variables.to_table.md):1–47. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

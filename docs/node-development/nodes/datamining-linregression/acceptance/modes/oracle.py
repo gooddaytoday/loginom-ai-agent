@@ -20,8 +20,10 @@ TOL = {'abs': 1e-8, 'rel': 1e-10}
 # Shared expected documents keep this packet small. The matrix in README maps
 # each cycle/variant to one of these; --case can materialize any named variant.
 MATERIALIZED = ['forward-f', 'forward-r2', 'ridge', 'lasso', 'elastic',
-                'normalization-minmax', 'partition-sequential',
-                'coefficients', 'summary', 'auto-method', 'categorical', 'no-intercept', 'bindings-updated']
+                'coefficients', 'auto-method', 'bindings-updated']
+# LAB-1559 cycle kits: one directory per cycle, <dir>/expected.json.
+CYCLES = ['partition-sequential', 'partition-column', 'summary', 'categorical',
+          'standardization', 'no-intercept']
 
 
 def read(name):
@@ -114,11 +116,13 @@ def statistics(rows, fields):
     values = dict(TotalSamples=n, TotalSelectedSamples=n, TrainSamples=n,
                   LogLikelihood=logl, R2=float(r2), AdjustedR2=float(1-(1-r2)*(n-1)/df),
                   StdDev=math.sqrt(float(rss/df)), DFE=df, ModelDF=k-1,
-                  FStatistic=f, ModelPValue=ibeta(df/2, (k-1)/2, df/(df+(k-1)*f)),
+                  FStatistic=f,
                   AIC=(-2*logl+2*k)/n,
                   AICc=(-2*logl+2*k+2*k*(k+1)/(n-k-1))/n,
                   BIC=(-2*logl+k*math.log(n))/n,
-                  HQC=(-2*logl+2*k*math.log(math.log(n)))/n)
+                  HQC=(-2*logl+2*k*math.log(math.log(n)))/n,
+                  # Order of the native preview list in modes-discovery.md.
+                  ModelPValue=ibeta(df/2, (k-1)/2, df/(df+(k-1)*f)))
     coeff = []
     for i, (name, value) in enumerate(zip(['<Константа>']+fields, b)):
         se = math.sqrt(float(rss/df*inv[i][i]))
@@ -226,31 +230,74 @@ def expected(rows, b, fields, *, full_statistics=False, summary=False, train_row
              rows=coeff, ordered=True)])
     if summary:
         result['variable_inventory'] = dict(outputs=[dict(node=dict(type='datamining.lin_regression'),
-            port=2, variables=[dict(name=k, type='integer' if isinstance(v, int) else 'real', value=v,
+            port=2, ordered=True, variables=[dict(name=k, type='integer' if isinstance(v, int) else 'real', value=v,
             **({} if isinstance(v, int) else {'tolerance': TOL})) for k, v in values.items()])], links=[])
     return result
 
 
 def categorical():
+    """C11: indicator coding [1, X, I(B), I(C)], reference A = first value.
+
+    Port 1 uses the existing nine-column shape of statistics:"full" (C7).
+    The reference row is shown (pedShowRefCoeffs) with coefficient 0; its
+    statistics are not defined by OLS and are NULL here: native-probe item.
+    """
     rows = read('categorical.csv')
     encoded = [dict(r, B=int(r['Category'] == 'B'), C=int(r['Category'] == 'C')) for r in rows]
     b, _, _ = ols(encoded, ['X', 'B', 'C'])
-    result = expected(encoded, b, ['X', 'B', 'C'])
+    _, stats = statistics(encoded, ['X', 'B', 'C'])
+    result = expected(encoded, b, ['X', 'B', 'C'], full_statistics=True)
     output = result['outputs'][0]
     output['columns'] = [c for c in output['columns'] if c['name'] not in ['B', 'C']]
     for r in output['rows']:
         r.pop('B')
         r.pop('C')
-    # Native Name repeats; UniqueValues is a string, confirmed in its column
-    # editor. Dummy coding is independently solved; no invented Category_A names.
-    result['outputs'][1]['columns'] = [dict(name=k, type='string') for k in
-        ['Name', 'DisplayName', 'UniqueValues']] + [dict(name='Y_coefficients', type='real', tolerance=TOL)]
-    result['outputs'][1]['rows'] = [
-        dict(Name='<Константа>', DisplayName=None, UniqueValues=None, Y_coefficients=float(b[0])),
-        dict(Name='X', DisplayName='X', UniqueValues=None, Y_coefficients=float(b[1])),
-        *[dict(Name='Category', DisplayName='Category', UniqueValues=c, Y_coefficients=v)
-          for c, v in zip(['A', 'B', 'C'], [0.0, float(b[2]), float(b[3])])]]
+    reference = dict.fromkeys(stats[0], None)
+    reference.update(Name='Category', DisplayName='Category', UniqueValues='A', Y_coefficients=0.0)
+    for row, value in zip(stats[2:], ['B', 'C']):
+        row.update(Name='Category', DisplayName='Category', UniqueValues=value)
+    result['outputs'][1]['rows'] = stats[:2] + [reference] + stats[2:]
     return result
+
+
+def standardization():
+    """C5: standardization of all predictors, coefficients NOT denormalized.
+
+    z=(x-mean)/SD with the sample SD (LogReg native fact, decision
+    v040-native-semantics-0711). Port 1: beta_j*SD_j and the constant
+    beta_0+sum(beta_j*mean_j)=mean(Y). Predictions equal the raw OLS.
+    """
+    fields = ['Price', 'Distance', 'Promo']
+    rows = read('units.csv')
+    b, _, _ = ols(rows, fields)
+    n = len(rows)
+    mean = {k: sum(Q(r[k]) for r in rows)/n for k in fields}
+    sd = {k: math.sqrt(float(sum((Q(r[k])-mean[k])**2 for r in rows)/(n-1))) for k in fields}
+    result = expected(rows, b, fields)
+    result['outputs'][1]['rows'] = [
+        dict(Name='<Константа>', Y_coefficients=float(b[0]+sum(v*mean[k] for v, k in zip(b[1:], fields))))] + [
+        dict(Name=k, Y_coefficients=float(v)*sd[k]) for k, v in zip(fields, b[1:])]
+    return result
+
+
+def cycles():
+    fields = ['X1', 'X2', 'X3']
+    design, partition = read('design.csv'), read('partition.csv')
+    full, _, _ = ols(design, fields)
+    kits = {}
+    # C6: first 16 rows (IsTest=false) train; the Y=+-999 test rows only get
+    # predictions. Training on all 18 rows changes every number.
+    for split in ['sequential', 'column']:
+        kits[f'partition-{split}'] = expected(partition, ols(partition[:16], fields)[0], fields)
+    # C8: Enter on design.csv, tables as in Enter plus port 2 inventory.
+    kits['summary'] = expected(design, full, fields, summary=True)
+    kits['categorical'] = categorical()
+    kits['standardization'] = standardization()
+    # C12: predictor sums are zero, so no constant keeps the slopes and
+    # shifts every fitted value by -3. This detects a no-op toggle.
+    kits['no-intercept'] = expected(design, [Q(0)]+full[1:], fields)
+    kits['no-intercept']['outputs'][1]['rows'] = kits['no-intercept']['outputs'][1]['rows'][1:]
+    return kits
 
 
 def proposals():
@@ -275,21 +322,9 @@ def proposals():
                                reason='LAB-972 penalty/intercept assumptions are invalid; not an acceptance oracle.',
                                replacement='../../penalty/expected.json: cases[shifted-' + ('lasso' if mode == 'lasso' else 'elastic') + '].expected',
                                **cases[mode])
-    # Positive affine normalization, denormalized coefficients: identical OLS.
-    for norm in ['minmax', 'minus-one', 'zero-one', 'absolute', 'standard', 'ratio']:
-        cases[f'normalization-{norm}'] = expected(design, full, fields)
-    train = read('partition.csv')[:16]
-    for split in ['sequential', 'column']:
-        cases[f'partition-{split}'] = expected(read('partition.csv'), ols(train, fields)[0], fields)
     cases['coefficients'] = expected(design, full, fields, full_statistics=True)
-    cases['summary'] = expected(design, full, fields, summary=True)
-    # All predictor sums are zero, so omitting the constant leaves the same
-    # slopes but shifts every fitted value by -3. This detects a no-op toggle.
-    cases['no-intercept'] = expected(design, [Q(0)]+full[1:], fields)
-    cases['no-intercept']['outputs'][1]['rows'] = cases['no-intercept']['outputs'][1]['rows'][1:]
     cases['bindings'] = cases['ridge']
     cases['bindings-updated'] = expected(centered, [b[0]]+[v/(1+Q(2, 16)) for v in b[1:]], fields)
-    cases['categorical'] = categorical()
     # Smoke proposals only: all automatic choices have the same optimum when
     # Y=0. These do NOT establish hyperparameter/model-selection quality.
     for auto in ['lambda-ridge', 'lambda-lasso', 'lambda-elastic', 'method', 'kfold', 'monte-carlo', 'random-partition']:
@@ -311,6 +346,14 @@ def check_math():
         assert select(read('selection.csv'), method, 'r2') == ['X1', 'X2', 'X3']
     stats, _ = statistics(read('design.csv'), ['X1', 'X2'])
     assert stats['DFE'] == 13 and stats['FStatistic'] == 442
+    # Rounded native preview of Forward on design.csv (modes-discovery.md):
+    # information criteria are divided by n.
+    assert [round(stats[k], 2) for k in ['AIC', 'AICc', 'BIC', 'HQC']] == [.44, .57, .59, .45]
+    units, _, _ = ols(read('units.csv'), ['Price', 'Distance', 'Promo'])
+    assert units == [Q(-7, 4), Q(1, 50), Q(1, 4), 0]
+    coded = [dict(r, B=int(r['Category'] == 'B'), C=int(r['Category'] == 'C')) for r in read('categorical.csv')]
+    # Rounded native preview on categorical.csv: 2.99; 2.02; A=0, B=3, C=1.
+    assert [round(float(v), 2) for v in ols(coded, ['X', 'B', 'C'])[0]] == [2.99, 2.02, 3.0, 1.0]
 
 
 if __name__ == '__main__':
@@ -321,16 +364,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     check_math()
     cases = proposals()
+    kits = cycles()
     if args.write or args.check:
-        for name in MATERIALIZED:
-            value = cases[name]
-            path = HERE / 'expected' / (name+'.json')
+        targets = [(HERE / 'expected' / (name+'.json'), cases[name]) for name in MATERIALIZED]
+        targets += [(HERE / name / 'expected.json', kits[name]) for name in CYCLES]
+        for path, value in targets:
             body = json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False)+'\n'
             if args.write:
                 path.parent.mkdir(exist_ok=True)
                 path.write_text(body, encoding='utf-8')
             if args.check:
                 assert path.read_text(encoding='utf-8') == body, path.name
-        print(f'{len(cases)} variants, {len(MATERIALIZED)} shared documents; independent algebra and statistics OK')
+        print(f'{len(cases)} variants, {len(MATERIALIZED)} shared documents, {len(CYCLES)} cycle kits; independent algebra and statistics OK')
     else:
-        print(json.dumps(cases[args.case or 'ridge'], ensure_ascii=False, indent=2, allow_nan=False))
+        print(json.dumps({**cases, **kits}[args.case or 'ridge'], ensure_ascii=False, indent=2, allow_nan=False))

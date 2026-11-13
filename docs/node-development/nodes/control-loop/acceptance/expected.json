@@ -1,0 +1,48 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "control.supernode"
+    },
+    {
+      "type": "control.loop"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "control.loop",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RequestID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Response",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "Response": "{\n  \"Content-Length\": \"98\",\n  \"Content-Type\": \"application/json\",\n  \"limit\": \"2\",\n  \"skip\": \"0\"\n}\n"
+        },
+        {
+          "RequestID": 0,
+          "Response": "{\n  \"Content-Length\": \"98\",\n  \"Content-Type\": \"application/json\",\n  \"limit\": \"2\",\n  \"skip\": \"2\"\n}\n"
+        },
+        {
+          "RequestID": 0,
+          "Response": "{\n  \"Content-Length\": \"98\",\n  \"Content-Type\": \"application/json\",\n  \"limit\": \"2\",\n  \"skip\": \"4\"\n}\n"
+        }
+      ]
+    }
+  ]
+}

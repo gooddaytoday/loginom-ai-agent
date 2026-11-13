@@ -5,6 +5,7 @@ import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
 import type { UpdaterState } from "@opencode-ai/app/updater"
 import type { DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 import type { SystemProxyStatus } from "@opencode-ai/app/system-proxy"
+import type { DiagnosticsApi } from "@opencode-ai/app/diagnostics"
 export type {
   WslDistroProbe,
   WslInstalledDistro,
@@ -127,6 +128,7 @@ export type ElectronAPI = {
   runDesktopMenuAction: (action: DesktopMenuAction) => Promise<void>
   setBackgroundColor: (color: string) => Promise<void>
   exportDebugLogs: () => Promise<string>
+  diagnostics: DiagnosticsApi
   setForceFocus: (enabled: boolean) => Promise<void>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   setNativeTranslations: (bundle: DesktopNativeBundle) => Promise<void>
