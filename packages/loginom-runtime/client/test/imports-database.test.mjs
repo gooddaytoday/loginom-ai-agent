@@ -106,7 +106,7 @@ test('sql readback has no output mapping: its schema materializes on Execute',as
 // that source after the configure step, before node_finish and Execute.
 async function configureExisting(saved,mode){
  const calls=[];
- const req={...request({target:{kind:'existing',type:'imports.database',ref:{}}}),document_id:'d',workflow_ref:{prefix:'p',workflow_id:'w'},parameters:{},mode};
+ const req={...request({target:{kind:'existing',type:'imports.database',ref:{}}}),document_id:'d',workflow_ref:{workflow_id:'w',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]},parameters:{},mode};
  const node={document_id:'d',workflow_id:'w',node_id:'n'};
  const operation={id:'op',parameters:req,deadline:Date.now()+60000,nodeApply:{request:req,node,phases:[]}};
  const execute=async code=>{calls.push(code);
