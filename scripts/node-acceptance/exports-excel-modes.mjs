@@ -163,6 +163,11 @@ try{
   if(typeof target!=='string'||!target.startsWith(config.login.package_directory+'/')
     ||!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/.test(target))throw Error('FS_AUDIT_SCOPE');
   if(config.fs_error_audit===true){
+   // Position this private audit with the existing Files fixture navigation;
+   // the managed read/download need not traverse the large personal root.
+   await storageDirectory(target);
+   await record({phase:'fs_error_audit_directory_ready',directory:target,
+    observation:await execute(makeWorkspaceUiCode({mode:'observe',expected_origin:new URL(config.login.url).origin,expected_build:'7.4.2'}))});
    const listed=await runtime.serverDownload({operation_id:'fs-error-inventory',path:target},'dock_storage_list');
    if(listed.status!=='SUCCEEDED'||listed.output?.complete!==true||listed.output.truncated!==false)throw Error('FS_ERROR_INVENTORY_INCOMPLETE');
    await writeFile(output+'/inventory.json',JSON.stringify(listed.output.entries));
