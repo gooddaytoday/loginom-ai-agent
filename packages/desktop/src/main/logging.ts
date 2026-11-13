@@ -1,7 +1,9 @@
 import { productSlug } from "@loginom-ai-agent/product"
 import { MainLogger } from "electron-log"
 import log from "electron-log/main.js"
-import { app, crashReporter, netLog, shell } from "electron"
+import { app, crashReporter, dialog, netLog, shell, type BrowserWindow } from "electron"
+import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js"
+import { randomUUID } from "node:crypto"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
@@ -85,15 +87,119 @@ export async function startNetLog() {
   write("network", "net log started", { path: netLogPath })
 }
 
+// Direct export without preview: recovery dialog and the fatal error page,
+// where the renderer may not respond.
 export async function exportDebugLogs() {
+  const output = join(app.getPath("downloads"), `loginom-ai-agent-debug-${stamp()}.zip`)
+  write("main", "exporting debug logs", { output })
+  const { zip } = await buildDesktopArchive({})
+  writeFileSync(output, zip, { mode: 0o600 })
+  shell.showItemInFolder(output)
+  return output
+}
+
+export type DiagnosticsGroup = "chat" | "runtime" | "logs" | "dumps"
+export type DiagnosticsRequest = {
+  sessionID?: string
+  chat?: unknown
+  include: Record<DiagnosticsGroup, boolean>
+}
+export type DiagnosticsFile = { name: string; group: DiagnosticsGroup; status: string; size?: number; reason?: string }
+export type DiagnosticsPrepared = { id: string; size: number; selection: string; files: DiagnosticsFile[] }
+
+// Chat on, crash dump off by default (owner decision diagnostics-export, 13.11).
+export const DIAGNOSTICS_DEFAULTS: Record<DiagnosticsGroup, boolean> = { chat: true, runtime: true, logs: true, dumps: false }
+const PREVIEW_BYTES = 64 * 1024
+
+// IPC input comes from the renderer: accept only the documented shape.
+export function parseDiagnosticsRequest(value: unknown): DiagnosticsRequest {
+  const input = value && typeof value === "object" ? (value as Record<string, unknown>) : {}
+  const include = input.include && typeof input.include === "object" ? (input.include as Record<string, unknown>) : {}
+  const sessionID =
+    typeof input.sessionID === "string" && /^[A-Za-z0-9_-]{1,200}$/.test(input.sessionID) ? input.sessionID : undefined
+  return {
+    sessionID,
+    chat: sessionID && input.chat && typeof input.chat === "object" ? input.chat : undefined,
+    include: Object.fromEntries(
+      Object.entries(DIAGNOSTICS_DEFAULTS).map(([key, fallback]) => [
+        key,
+        typeof include[key] === "boolean" ? include[key] : fallback,
+      ]),
+    ) as Record<DiagnosticsGroup, boolean>,
+  }
+}
+
+export function diagnosticsGroup(name: string): DiagnosticsGroup {
+  if (name.startsWith("chat/")) return "chat"
+  if (name.startsWith("runtime/")) return "runtime"
+  if (name.startsWith("crashpad/") && /\.dmp$/i.test(name)) return "dumps"
+  return "logs"
+}
+
+let prepared: { id: string; zip: Uint8Array; order: number } | undefined
+let prepares = 0
+
+// Builds the archive in memory; the preview shows exactly the bytes that Save writes.
+// Overlapping prepares keep the one started last, whatever order they finish in.
+export async function prepareDiagnostics(value: unknown): Promise<DiagnosticsPrepared> {
+  const order = ++prepares
+  const request = parseDiagnosticsRequest(value)
+  write("main", "preparing diagnostics", { session: !!request.sessionID, include: request.include })
+  const { zip, manifest } = await buildDesktopArchive(request)
+  const id = randomUUID()
+  if (!prepared || order > prepared.order) prepared = { id, zip, order }
+  return {
+    id,
+    size: zip.length,
+    selection: manifest.selection,
+    files: (manifest.files as Array<Record<string, unknown>>).map((file) => ({
+      name: String(file.name),
+      group: diagnosticsGroup(String(file.name)),
+      status: String(file.status),
+      ...(typeof file.size === "number" ? { size: file.size } : {}),
+      ...(typeof file.reason === "string" ? { reason: file.reason } : {}),
+    })),
+  }
+}
+
+export async function previewDiagnosticsFile(id: unknown, name: unknown) {
+  if (!prepared || id !== prepared.id || typeof name !== "string") return
+  if (diagnosticsGroup(name) === "dumps") return
+  const reader = new ZipReader(new Uint8ArrayReader(prepared.zip))
+  try {
+    const entry = (await reader.getEntries()).find((item) => item.filename === name && !item.directory)
+    if (!entry?.getData) return
+    const data = await entry.getData(new Uint8ArrayWriter())
+    return { text: new TextDecoder().decode(data.subarray(0, PREVIEW_BYTES)), truncated: data.length > PREVIEW_BYTES }
+  } finally {
+    await reader.close()
+  }
+}
+
+export async function saveDiagnostics(id: unknown, window?: BrowserWindow) {
+  if (!prepared || id !== prepared.id) throw new Error("DIAGNOSTICS_NOT_PREPARED")
+  // Take the checked archive now: another prepare may replace the slot while Save as is open.
+  const zip = prepared.zip
+  const options = {
+    defaultPath: join(app.getPath("downloads"), `loginom-diagnostics-${stamp()}.zip`),
+    filters: [{ name: "ZIP", extensions: ["zip"] }],
+  }
+  const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options)
+  if (result.canceled || !result.filePath) return
+  writeFileSync(result.filePath, zip, { mode: 0o600 })
+  if (prepared?.id === id) prepared = undefined
+  write("main", "diagnostics saved", { output: result.filePath })
+  shell.showItemInFolder(result.filePath)
+  return result.filePath
+}
+
+async function buildDesktopArchive(request: Partial<DiagnosticsRequest>) {
+  const include = { ...DIAGNOSTICS_DEFAULTS, ...request.include }
   const restartNetLog = netLog.currentlyLogging
   if (restartNetLog) {
     await netLog.stopLogging().catch((error) => write("network", "failed to stop net log", { error }))
   }
-
-  const output = join(app.getPath("downloads"), `loginom-ai-agent-debug-${stamp()}.zip`)
   try {
-    write("main", "exporting debug logs", { output })
     const loginom = join(app.getPath("userData"), "loginom")
     const known = await profileSecrets({
       loginom,
@@ -102,20 +208,21 @@ export async function exportDebugLogs() {
       dockHome: process.env.LOGINOM_DOCK_HOME || join(homedir(), ".loginom-dock"),
       extra: [...exportValues],
     })
-    const { zip } = await buildDiagnosticsArchive({
-      runtime: join(loginom, "runtime"),
+    return await buildDiagnosticsArchive({
+      runtime: include.runtime ? join(loginom, "runtime") : undefined,
+      sessionID: request.sessionID,
+      chat: include.chat ? request.chat : undefined,
       logs: [
-        { dir: root, prefix: "desktop" },
-        ...serverLogRoots().map((dir, i) => ({ dir, prefix: `server-${i + 1}` })),
-        { dir: app.getPath("crashDumps"), prefix: "crashpad" },
+        ...(include.logs
+          ? [{ dir: root, prefix: "desktop" }, ...serverLogRoots().map((dir, i) => ({ dir, prefix: `server-${i + 1}` }))]
+          : []),
+        ...(include.logs || include.dumps ? [{ dir: app.getPath("crashDumps"), prefix: "crashpad" }] : []),
       ],
+      attachDumps: include.dumps,
       knownSecrets: known.secrets,
       users: known.users,
       manifest: { ...manifest(), knownSecrets: known.status },
     })
-    writeFileSync(output, zip, { mode: 0o600 })
-    shell.showItemInFolder(output)
-    return output
   } finally {
     if (restartNetLog) {
       await startNetLog().catch((error) => write("network", "failed to restart net log", { error }))
