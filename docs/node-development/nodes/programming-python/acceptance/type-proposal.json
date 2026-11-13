@@ -1,0 +1,58 @@
+{
+  "type": "programming.python",
+  "title": "Python",
+  "palette_group": "Программирование",
+  "tabular_inputs": 1,
+  "tabular_outputs": 1,
+  "additional_tabular_inputs": false,
+  "modes": ["script"],
+  "execution_mode": "external_process",
+  "semantics": "Run user Python 3.13 code on the Loginom server in a separate process (Linux: the only mode; the wizard checkbox is forced on). One optional tabular input (port 0) read with InputTable.Get/IsNull or builtin_pandas_utils.to_data_frame, one tabular output (port 0) written with OutputTable.Append/Set or prepare_compatible_table/fill_table. Output schema is either declared in the wizard (schema_mode=declared) or created by the code (schema_mode=code). Only the standard library, pandas 2.2.3 and numpy 2.2.4 installed on the server; no package installation, network, files, environments (PY_ENV) or input variables in this slice. Loginom executes the code; the handler never computes values. Preview runs the whole script and is not a configuration check.",
+  "parameter_schema": {
+    "type": "object",
+    "description": "New node requires source_text and schema_mode (and columns for declared). Existing node: {} keeps saved code and schema; send expected_source_sha256 from readback to replace code.",
+    "properties": {
+      "source_text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Complete Python source saved in the node exactly as given. Read input via InputTable (None when the port is not linked), write rows via OutputTable.Append() then Set(name_or_index, value). Values: bool, int, float, str, datetime.datetime, None."
+      },
+      "expected_source_sha256": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$",
+        "description": "Existing node only: SHA-256 of the saved source from readback; the replacement is refused if the node code changed."
+      },
+      "schema_mode": {
+        "type": "string",
+        "enum": ["declared", "code"],
+        "description": "declared: output columns fixed in the wizard by columns; code: «Разрешить формировать выходные столбцы из кода» on, the script creates columns (AddColumn/AssignColumns/prepare_compatible_table) before the first Append."
+      },
+      "columns": {
+        "type": "array",
+        "minItems": 1,
+        "description": "schema_mode=declared only: output columns in order. Forbidden for schema_mode=code.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "minLength": 1, "description": "Column name used by OutputTable.Set."},
+            "label": {"type": "string", "description": "Column label; defaults to name."},
+            "type": {"type": "string", "enum": ["integer", "real", "string", "boolean", "datetime"], "description": "Loginom data type of the column."}
+          },
+          "required": ["name", "type"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "readback": {
+    "description": "Compact: no source text, only identity and schema.",
+    "fields": {
+      "source_sha256": "SHA-256 of saved code", "source_utf8_bytes": "size", "source_lf_lines": "line count",
+      "schema_mode": "declared | code", "columns": "declared columns [{name,label,type}] (declared only)",
+      "separate_process": "true (forced on Linux)", "input_linked": "bool", "output_ports": 1,
+      "freshness": "not_executed | executed | failed (+ exact Loginom error text)"
+    }
+  },
+  "cache_key": "0000000000000000000000000000000000000000000000000000000000000000"
+}
