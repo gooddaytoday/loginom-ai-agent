@@ -8,6 +8,18 @@ import release from "../product/loginom-release.json"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { pathToFileURL } from "node:url"
+import { bundledLanguages, lcid } from "app-builder-lib/out/util/langs"
+
+test("installer verification messages cover every bundled NSIS language", async () => {
+  const include = await Bun.file(join(import.meta.dir, "resources/uninstall-uri.nsh")).text()
+  for (const language of bundledLanguages) {
+    const id = lcid[language]
+    expect(
+      include.includes(`!insertmacro VerifyResourcesEnglish ${id}\n`) ||
+        ["VerifyResourcesStatus", "VerifyResourcesError"].every((key) => include.includes(`LangString ${key} ${id} `)),
+    ).toBe(true)
+  }
+})
 
 for (const channel of ["dev", "beta", "prod"] as const) {
   test(`isolates the ${channel} package and cannot publish upstream`, async () => {
