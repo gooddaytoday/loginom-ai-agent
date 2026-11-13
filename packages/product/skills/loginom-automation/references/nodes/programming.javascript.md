@@ -1,6 +1,27 @@
 # JavaScript (`programming.javascript`)
 
 <!-- mode: script -->
+## Код и схема (Loginom 7.4.2)
+
+Только синхронный табличный Data API, вход/выход 0. Иной build — отказ.
+Статический импорт: `import {InputTable,OutputTable,DataType} from "builtIn/Data";`.
+Внешние модули, FS, Fetch, Calc и dynamic import/require пока запрещены.
+`InputTable.RowCount`, `InputTable.Get(row, technicalName)` читают вход.
+Для каждой строки выхода: `OutputTable.Append()`, затем `OutputTable.Set(name,value)`.
+В `schema_mode:code` сначала `OutputTable.AssignColumns([{Name:"Value",DataType:DataType.Float}])`;
+в `declared` задай 1–64 columns в мастере, без AssignColumns в коде.
+Каждое объявление содержит name,label,type,data_kind,usage; стандартный вид:
+integer/real/datetime — Непрерывный, string/boolean — Дискретный;
+usage «Не задано» сохраняет стандартную роль.
+Типы кода: Integer, Float, String, Boolean, DateTime. `DataType.Real` отсутствует;
+строковый `columns.type:"real"` относится к параметрам мастера.
+Name предпочитай ASCII, Unicode-метку задавай через DisplayName; после Execute
+читай фактические имена/типы из schema/readback. Наблюдались Сумма→Summa,
+`Value Total`→`Value_Total`, `1Value`→`_1Value`; это не общий алгоритм AddColumn
+или коллизий. Не считай отсутствие ошибки редактора успешным Execute.
+Не полагайся на globals между запусками; ограничения Number важны для больших
+Integer. Имена из примеров не заменяют свежего наблюдения входа и mappings.
+
 ## Допуск
 
 JS разрешён только по явной просьбе пользователя об этом узле или при конкретной

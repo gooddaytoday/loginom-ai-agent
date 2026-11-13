@@ -112,20 +112,18 @@ function catalog(types) {
    {...pins,skillRevision:'e'.repeat(64),loginomProfile:pins.compatibilityProfile},new Map(),handlers,'7.4.2'),session_manifest:pins});
 }
 
-test('actual factory descriptions retain complete JS knowledge/schema/pins and refuse a full batch',()=>{
+test('model descriptions retain JS schema/pins and route detailed knowledge to the prepared reference',()=>{
  for(const types of [['programming.javascript'],['imports.text','programming.javascript']]){
   const value=reply(catalog(types)),before=JSON.stringify(value);
   assert.equal(boundedUserToolReply(value,{tool:'dock_action_describe'}),value);
   assert.equal(JSON.stringify(value),before);assert.ok(bytes(value)<=46000);
   const card=JSON.parse(value.content[0].text).node_types.find(node=>node.type==='programming.javascript');
-  assert.equal(card.javascript_knowledge.validated_for.loginom_build,'7.4.2');
-  assert.equal(card.javascript_knowledge.version,'1.3.0');
-  assert.equal(card.javascript_knowledge.column_names.observed_pairs.length,5);
+  assert.equal(card.javascript_knowledge,undefined);
+  assert.equal(card.knowledge_reference,'references/nodes/programming.javascript.md');
   assert.ok(card.parameter_schema.properties.source_text);assert.ok(card.session_manifest.skillRevision);
   assert.equal(card.knowledge_sha256.length,64);
-  assert.deepEqual(card.validated_for,card.javascript_knowledge.validated_for);
-  assert.ok(card.javascript_knowledge.limitations.length>0);
-  assert.equal(card.limitations,undefined,'duplicate facts remain intact in javascript_knowledge');
+  assert.equal(card.validated_for.loginom_build,'7.4.2');
+  assert.equal(card.limitations,undefined,'guidance is delivered from the verified reference');
  }
  const all=reply(catalog()),before=JSON.stringify(all);assert.equal(JSON.parse(all.content[0].text).node_types.length,32);
  assert.ok(bytes(all)>46000);
@@ -160,12 +158,12 @@ test('consumer line boundary measures joined text including inter-block LF',()=>
 
 test('JS card has an independent 20000-byte envelope budget even when the whole batch fits',()=>{
  const value=catalog(['programming.javascript']);
- value.node_types[0].session_manifest.skillRevision='"'.repeat(3000);
+ value.node_types[0].session_manifest.skillRevision='"'.repeat(5000);
  const large=reply(value);assert.ok(bytes(large)<46000);assert.ok(bytes(large)>20000);
  const refused=boundedUserToolReply(large,{tool:'dock_action_describe'});
  assert.equal(refused.isError,true);assert.equal(JSON.parse(refused.content[0].text).error.scope,'javascript_description');
  assert.equal(JSON.parse(refused.content[0].text).next_step.tool,undefined);
- assert.equal(value.node_types[0].session_manifest.skillRevision,'"'.repeat(3000));
+ assert.equal(value.node_types[0].session_manifest.skillRevision,'"'.repeat(5000));
 });
 
 test('whole structured output overflow preserves the actual operation ID and makes no effect claims',()=>{
