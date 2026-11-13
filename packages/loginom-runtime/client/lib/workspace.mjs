@@ -138,7 +138,7 @@ async function prepareWorkspace(page, options) {
     if(mode==='identity')return {document_id:state.id,blocked:blockers.length>0,
       loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName??null};
     const request = JSON.stringify({session:options.sessionId,intent:options.intent,packagePath:options.packagePath,workflowRef:options.workflowRef});
-    const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab) : null;
+    const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab && r.phase==='verified') : null;
     const receipt = state.receipts.get(options.operationId);
     if (receipt && receipt.request !== request) return {error:'OPERATION_CONFLICT'};
     if (mode==='reserve' && receipt?.preserved.some(item=>!tabs.includes(item.tab)
@@ -253,6 +253,11 @@ async function prepareWorkspace(page, options) {
       if (options.intent==='open_package' && path!==options.packagePath) return null;
       if (!current) return {error:'RECEIPT_MISSING'};
       current.tab=tab;current.packageNode=packageNode;current.crumbs=crumbs;current.phase='verified';
+      if(knownWorkflow){
+        current.nodeTargetWorkflowNode=knownWorkflow.nodeTargetWorkflowNode;
+        current.navigationParentWorkflow=knownWorkflow.navigationParentWorkflow;
+        current.navigationParentReceipt=knownWorkflow.navigationParentReceipt;
+      }
       current.workflowId ??= knownWorkflow?.workflowId ?? state.id+'-'+(state.sequence=(state.sequence??0)+1);
       return {document_id:state.id,loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
         workflow_ref:{tab_tid:tabTid,prefix,navigation_path:crumbs,workflow_id:current.workflowId},
@@ -360,7 +365,125 @@ async function prepareWorkspace(page, options) {
   }
 }
 
-export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, timeoutMs = 120000, recoverOnly = false, identityOnly = false, storageBinding = null, bindOpenOnly = false }) {
+// Explicit preparation is the only place that changes the graph scope. A lost
+// gesture reply retains its browser receipt; recovery observes, never clicks.
+async function navigatePreparedGraph(page, options) {
+  let deadline=Date.now()+options.timeoutMs;
+  const trace=[];
+  let effectPossible=options.recoverOnly===true;
+  const remaining=()=>{const ms=deadline-Date.now();if(ms<=0)throw Error('DEADLINE');return ms;};
+  const inspect=mode=>page.evaluate(({options,mode,deadline})=>{
+    const fail=message=>{throw Error(message);};
+    const p=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app,ref=options.workflowRef;
+    if(location.origin!==options.origin||app?.Version!==options.expectedBuild||p?.document!==document||p.id!==ref.document_id)fail('Prepared graph document changed');
+    const request=JSON.stringify({session:options.sessionId,ref,navigation:options.graphNavigation});
+    const existing=p.receipts.get(options.operationId);
+    if(existing&&existing.request!==request)fail('OPERATION_CONFLICT');
+    if(existing&&mode==='lookup')return {exists:true,phase:existing.phase,effect_possible:existing.navigationStarted===true,deadline_at:existing.navigationDeadline};
+    const source=existing?.navigationSource??[...p.receipts.values()].find(r=>r.phase==='verified'&&r.workflowId===ref.workflow_id);
+    if(!source?.packageNode||!source.tab)fail('Prepared workflow changed');
+    const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+    const visible=e=>e.isConnected!==false&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
+    const tabs=exact(ref.tab_tid);
+    if(tabs.length!==1||tabs[0]!==source.tab||!source.tab.classList.contains('x-tab-active'))fail('Prepared workflow tab changed');
+    const blockers=[...document.querySelectorAll('[role="dialog"],.bg-mask-message,.x-mask-msg')].filter(visible);
+    if(blockers.length){
+      if(mode==='settle'&&existing?.navigationStarted&&blockers.every(e=>e.matches('.bg-mask-message,.x-mask-msg'))&&Date.now()<deadline)return {pending:true};
+      fail('Graph is blocked');
+    }
+    const card=app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card.Controller.FController;
+    const roots=exact(ref.prefix+';ModelForm;cmpDiagram'),graph=model?.FDiagram?.FmxGraph;
+    if(!(model instanceof app.ModelForm)||roots.length!==1||graph?.container!==roots[0]||!visible(roots[0]))fail('Graph model/DOM binding unavailable');
+    const ancestors=[];let workflow,packageNode;
+    for(let n=card.Controller.Node?.data?.node;n&&ancestors.length<32&&!ancestors.includes(n);n=n.ParentNode){
+      ancestors.push(n);
+      if(!workflow&&app.WorkFlowTreeNode&&n instanceof app.WorkFlowTreeNode)workflow=n;
+      if(n instanceof app.PackageTreeNode){packageNode=n;break;}
+    }
+    if(!workflow||packageNode!==source.packageNode)fail('Prepared package/workflow identity changed');
+    const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(ref.prefix+';cnrNaviMode;b.s_')+']')].map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
+    const samePath=JSON.stringify(crumbs)===JSON.stringify(ref.navigation_path);
+    if(mode==='replay'){
+      if(existing?.phase!=='verified'||existing.nodeTargetWorkflowNode!==workflow||JSON.stringify(existing.crumbs)!==JSON.stringify(crumbs))fail('Navigation receipt is no longer current');
+      return existing.navigationResult;
+    }
+    if(mode==='settle'){
+      if(!existing?.navigationStarted)fail('Navigation receipt missing');
+      if(Date.now()>=existing.navigationDeadline)fail('DEADLINE');
+      if(workflow===source.nodeTargetWorkflowNode)return {pending:true};
+      const direction=options.graphNavigation.direction;
+      if(direction==='enter'&&!ancestors.includes(source.nodeTargetWorkflowNode)
+        ||direction==='leave'&&workflow!==source.navigationParentWorkflow)fail('Navigation reached a foreign workflow');
+      if(direction==='enter'&&!ancestors.some(n=>n.FGuid===existing.navigationOwnerGuid&&n.FModelNode===existing.navigationOwnerData))fail('Navigation entered a different submodel');
+      if(direction==='enter'&&source.navigationParentWorkflow===workflow)fail('Navigation direction changed');
+      if(!crumbs.length||samePath)fail('Navigation breadcrumbs did not change');
+      // Invalidate every receipt for the departed scope, including an earlier
+      // prepare of that same workflow. Returning always receives a fresh ID.
+      for(const r of p.receipts.values())if(r!==existing&&r.workflowId===source.workflowId)r.phase='superseded';
+      existing.phase='verified';existing.workflowId=p.id+'-'+(p.sequence=(p.sequence??0)+1);
+      existing.tab=source.tab;existing.packageNode=packageNode;existing.crumbs=crumbs;existing.nodeTargetWorkflowNode=workflow;
+      existing.navigationParentWorkflow=direction==='enter'?source.nodeTargetWorkflowNode:source.navigationParentReceipt?.navigationParentWorkflow;
+      existing.navigationParentReceipt=direction==='enter'?source:source.navigationParentReceipt?.navigationParentReceipt;
+      const path=typeof packageNode.PackageFileName==='string'&&packageNode.PackageFileName?'/'+packageNode.PackageFileName.replaceAll('\\','/').replace(/^\/+/, ''):null;
+      existing.navigationResult={document_id:p.id,workflow_ref:{workflow_id:existing.workflowId,tab_tid:ref.tab_tid,prefix:ref.prefix,navigation_path:crumbs},
+        package_ref:{path,name:packageNode.PackageName??null,persisted:path!==null},target_verified:true,ownership_verified:false,preserved_workflows:[]};
+      return existing.navigationResult;
+    }
+    if(source.phase!=='verified'||!samePath||source.nodeTargetWorkflowNode&&source.nodeTargetWorkflowNode!==workflow)fail('Prepared workflow navigation changed');
+    const direction=options.graphNavigation.direction,nodes=model.FDiagram.FNodes?.FCollection;
+    if(!Array.isArray(nodes)||nodes.length>200)fail('Graph node bound exceeded');
+    let controlTid,owner=null,nativeControl=null;
+    if(direction==='enter'){
+      const matches=nodes.filter(n=>n.FGuid===options.graphNavigation.node_ref.node_id);owner=matches[0];
+      const body=owner&&graph.view.getState(owner.FCell)?.shape?.node,tid=body?.getAttribute('data-tid');
+      if(matches.length!==1||owner.FIconCls!=='bg-vendor-icon-modelgeneric'||!tid||!roots[0].contains(body))fail('Submodel node identity changed');
+      controlTid=tid+';GenericEnterLabel;Label';
+      nativeControl=owner.FEnterLabel;
+      if(nativeControl?.parent!==owner||nativeControl.FCell?.parent!==owner.FCell)fail('Submodel entry label owner changed');
+    }else{
+      if(!source.navigationParentWorkflow)fail('Prepared graph has no bound parent');
+      controlTid=ref.prefix+';Graph;LeaveSubmodelLabel;Label';
+    }
+    const controls=exact(controlTid);
+    if(controls.length!==1||!visible(controls[0]))fail('Graph navigation control unavailable');
+    if(direction==='enter'&&graph.view.getState(nativeControl.FCell)?.text?.node!==controls[0])fail('Submodel entry label DOM changed');
+    if(Date.now()>=deadline)fail('DEADLINE');
+    if(mode==='reserve'){
+      if(existing)fail('OPERATION_CONFLICT');
+      source.nodeTargetWorkflowNode=workflow;
+      p.receipts.set(options.operationId,{request,phase:'reserved',navigationSource:source,navigationOwner:owner,navigationOwnerGuid:owner?.FGuid,navigationOwnerData:owner?.data,navigationControl:nativeControl??controls[0],navigationGraph:graph,navigationDeadline:deadline});
+    }
+    if(mode==='dispatch'){
+      // Hover redraws GenericEnterLabel's DOM. The unchanged native label and
+      // its freshly bound rendered text remain the authority after trial.
+      if(existing?.phase!=='reserved'||existing.navigationOwner!==owner||existing.navigationControl!==(nativeControl??controls[0])||existing.navigationGraph!==graph)fail('Navigation owner changed before gesture');
+      existing.navigationStarted=true;existing.phase='effect_possible';
+    }
+    return {control_tid:controlTid,exists:false};
+  },{options,mode,deadline});
+  const result=(status,reason,extra={})=>({status,reason,phase:'graph_navigation',target:{profile_id:options.profileId,loginom_build:options.expectedBuild,platform:options.platform,browser:'chromium'},
+    authenticated:true,created_draft:false,effect_possible:effectPossible,operation_id:options.operationId,session_id:options.sessionId,trace,...extra});
+  try{
+    remaining();const old=await inspect('lookup');effectPossible=old.effect_possible===true;
+    if(old.exists&&old.phase==='verified')return result('READY',null,{...await inspect('replay'),replayed:true});
+    if(old.exists)deadline=Math.min(deadline,old.deadline_at);
+    if(!old.exists){
+      if(options.recoverOnly)throw Error('RECEIPT_LOST');
+      const before=await inspect('reserve');trace.push({event:'graph_navigation_prepared',direction:options.graphNavigation.direction,control_tid:before.control_tid});
+      const control=page.locator('[data-tid='+JSON.stringify(before.control_tid)+']');
+      await control.click({trial:true,timeout:remaining()});remaining();await inspect('dispatch');
+      effectPossible=true;await control.click({timeout:remaining()});
+      trace.push({event:'graph_navigation_clicked',control_tid:before.control_tid});
+    }else if(old.phase==='reserved')throw Error('Navigation was reserved; no gesture is replayed');
+    while(remaining()){
+      const state=await inspect('settle');
+      if(!state.pending){trace.push({event:'graph_navigation_verified',workflow_ref:state.workflow_ref});return result('READY',null,state);}
+      await page.waitForTimeout(Math.min(100,remaining()));
+    }
+  }catch(error){return result('NOT_READY',String(error.message).slice(0,500),{verification_required:effectPossible});}
+}
+
+export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestLogin = false, testLoginUser = null, platform = process.platform, sessionId = "standalone", operationId = "prepare", intent = "new_draft", packagePath = null, workflowRef = null, graphNavigation = null, timeoutMs = 120000, recoverOnly = false, identityOnly = false, storageBinding = null, bindOpenOnly = false }) {
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash
       || [...url.searchParams.keys()].some(key => /token|password|secret|auth|api.?key/i.test(key))) {
@@ -384,16 +507,24 @@ export function makeWorkspacePrepareCode({ loginomUrl, compatibility, allowTestL
         || !Array.isArray(workflowRef.navigation_path) || !workflowRef.navigation_path.length || workflowRef.navigation_path.length>32
         || workflowRef.navigation_path.some(p=>!p || typeof p.tid!=='string' || p.tid.length>2048 || typeof p.label!=='string' || p.label.length>240)) throw new Error('An exact document-bound workflow reference is required');
   } else if (workflowRef !== null) throw new Error('Workflow reference requires existing_workflow intent');
+  if(graphNavigation!==null){
+    const n=graphNavigation,r=n?.node_ref;
+    if(intent!=='existing_workflow'||identityOnly||bindOpenOnly||!n||!['enter','leave'].includes(n.direction)
+      ||Object.keys(n).some(k=>!['direction','node_ref'].includes(k))
+      ||n.direction==='leave'&&r!==undefined
+      ||n.direction==='enter'&&(!r||Object.keys(r).some(k=>!['document_id','workflow_id','node_id'].includes(k))
+        ||r.document_id!==workflowRef.document_id||r.workflow_id!==workflowRef.workflow_id||typeof r.node_id!=='string'||!r.node_id||r.node_id.length>160))throw Error('Graph navigation requires an exact scoped node ref for enter, or leave without a node ref');
+  }
   if (!compatibility?.loginom_build) throw new Error('An exact Loginom build pin is required');
   const options = { url: url.href, origin: url.origin, pathname: url.pathname,
-    sessionId, operationId, intent, packagePath, workflowRef, timeoutMs, recoverOnly, identityOnly, storageBinding, bindOpenOnly,
+    sessionId, operationId, intent, packagePath, workflowRef, graphNavigation, timeoutMs, recoverOnly, identityOnly, storageBinding, bindOpenOnly,
     expectedBuild: compatibility?.loginom_build ?? null, profileId: compatibility?.profile_id,
     platform: ({ darwin: 'macos', linux: 'linux', win32: 'windows' })[platform] ?? platform,
     allowTestLogin: allowTestLogin === true, testLoginUser: allowTestLogin ? testLoginUser : null };
   if (compatibility?.platform !== options.platform || compatibility?.browser !== 'chromium') {
     throw new Error('The pinned Loginom compatibility profile does not support this platform/browser');
   }
-  return `async (page) => (${prepareWorkspace.toString()})(page, ${JSON.stringify(options)})`;
+  return `async (page) => (${(graphNavigation?navigatePreparedGraph:prepareWorkspace).toString()})(page, ${JSON.stringify(options)})`;
 }
 
 export function parseWorkspacePreparation(response) {
