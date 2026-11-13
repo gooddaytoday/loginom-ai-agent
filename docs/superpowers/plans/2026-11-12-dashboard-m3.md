@@ -1207,7 +1207,6 @@ if (containsPath(full, ins)) return false
 // template/resolver.mjs
 export function checkSpecifier(specifier, importer, src) // → error text | undefined
 export function checkCss(css, file, src) // → error text | undefined
-export function checkSource(code) // → error text | undefined
 export function dashboardResolver(root = process.cwd()) // Vite plugin, enforce: "pre"
 ```
 
@@ -1215,129 +1214,25 @@ export function dashboardResolver(root = process.cwd()) // Vite plugin, enforce:
   - разрешено: `./a`, `./a/b.ts`, `./data.json`, `../src/x` (внутри `src`), `react`, `react/jsx-runtime`, `react/jsx-dev-runtime`, `react-dom`, `react-dom/client`, `recharts`;
   - отклонено с текстом: `../x`, `../../etc/hostname`, `/etc/hostname`, `C:/x`, `file:///etc/hostname`, `http://h/x`, `./a?raw`, `./a?url`, `./a#x`, `lodash`, `@scope/pkg`, `node:fs`, `recharts/../../../../etc/hostname` (у `recharts` нет `exports`, такой путь разрешился бы), `react/../x`, `recharts/es6/index.js`;
   - `checkCss`: `url(font.woff2)`, `url("./font.woff2")`, `@import "./a.css"` в `/w/src/a/style.css` (файлы внутри `src`) → `undefined`; `url(../../../etc/hostname)`, `url(/etc/hostname)`, `url(data:font/woff2;base64,AA)`, `url(http://h/f)`, `@import url("https://h/a.css")`, `url(./f.woff2?x)`, `image-set("../../../etc/hostname" 1x)` → текст;
-  - `checkSource`: `import.meta.glob("/**")` и `new URL("/etc/hostname", import.meta.url)` → текст; обычный `new URL(location.href)` → `undefined`.
+  - проверка JS-конструкций выполняется по AST до tsc и проверяется через публичную сборку: реальные import.meta.glob и new URL(…, import.meta.url) отклоняются; обычный new URL(location.href), комментарии и строки документации с этим текстом проходят.
 - [ ] **Step 2: Тесты сборки.** В `build.test.mjs` каждый случай → `ok: false` с понятным текстом и без результата: `import x from "/etc/hostname?raw"`; `import x from "./logo.png?url"`; `import.meta.glob("/**")`; `new URL("/etc/hostname", import.meta.url)`; CSS `url(../../../etc/hostname)`; CSS `@import "/etc/hostname"`; `/// <reference path="/etc/hostname" />` — вывод содержит «reference» и не содержит `error TS` (отказ до `tsc`); `import type { X } from "/tmp/x"`; `/// <reference types="node" />`; `import x from "lodash"`; `import x from "recharts/../../../../package.json"`; `src/a.css` с `@import "./b.css"`, где `src/b.css` содержит `url(../../../etc/hostname)` (вложенный CSS Vite читает сам, мимо `transform`, — ловит проверка до сборки). Положительный: `src/font.woff2` (16 байт) и `@font-face { src: url(./font.woff2) }` → `ok: true`. Те же тесты идут в задаче CI на Windows (задача 15): пути модулей Vite там с `/`, а проверки сравнивают пути после `path.resolve`.
 - [ ] **Step 3: Тесты падают.** `"$LOGINOM_AI_AGENT_TEST_NODE" --test test/build/resolver.test.mjs test/build/build.test.mjs` → FAIL.
-- [ ] **Step 4: Резолвер.**
+- [ ] **Step 4: Резолвер и фактические цели.**
+  - checkSpecifier допускает только действительные относительные пути внутри src и шесть точных входов react, react/jsx-runtime, react/jsx-dev-runtime, react-dom, react-dom/client, recharts. Query/fragment, абсолютные пути и схемы запрещены. Первая точка сама по себе не делает имя относительным.
+  - Один общий extractor CSS различает @import и asset URL; quoted URL может содержать закрывающую скобку внутри кавычек. Проверять ту же декодированную запись, что использует закреплённый Vite, не запрещая percent encoding как класс.
+  - До компиляции scanner разрешает каждую ссылку установленным Vite resolver, с configFile:false, envFile:false, inline PostCSS и явным server.fs.allow:[root]. Использовать режимы самого Vite для asset URL и CSS @import; сохранить extensionless @import, вложенные CSS и локальные шрифты. Отсутствующая цель отклоняется; canonical regular file должен находиться внутри canonical captured src.
+  - dashboardResolver остаётся enforce:pre. Для импортов из src после lexical проверки вызвать this.resolve с skipSelf:true, проверить canonical returned id внутри src/kit до load и вернуть именно проверенный result. Trusted kit/virtual imports сохраняются. generateBundle дополнительно проверяет module ids и originalFileNames assets; он не заменяет запрет внешнего чтения во время resolution.
+  - Конфигурация Vite сохраняет cacheDir в сборке, inline css.postcss.plugins=[] и добавляет явный server.fs.allow:[process.cwd()]. Последнее убирает ненужный поиск workspace у предков; само по себе оно не ограничивает build filesystem.
 
-```js
-import { realpathSync } from "node:fs"
-import { dirname, isAbsolute, resolve, sep } from "node:path"
+- [ ] **Step 5: Проверки до tsc и файловая граница процессов.**
+  - PLATFORM_FILES дополняется resolver.mjs и scan.mjs; первым шагом запускается scan.mjs, затем прежний tsc CLI с --noEmit --pretty false, затем Vite. Штатные compiler options, include/rootNames, диагностика и бюджет вывода сохраняются; собственного CompilerHost, второго TS resolver и списка запрещённых metadata-полей нет.
+  - Каждый TS/TSX по-прежнему проходит ts.preProcessFile для imports/type imports/reference path/types. Активные import.meta.glob и new URL с import.meta.url определяются узлами TypeScript AST. Строки/комментарии не считаются конструкциями; вложенный первый аргумент URL не обходит запрет. Внутренний checkSource удаляется вместе с дублирующим текстовым transform; поведение проверяется публичной сборкой. Новых parser dependencies нет.
+  - Для scanner, tsc и Vite включаются файловые разрешения закреплённого Node: чтение только staging и canonical installed kit, запись только staging. Не расширять read roots на предков и не считать внешние metadata доверенными. Граница применяется и во время native resolution, до получения конечного файла.
+  - Разрешения native addon/дочернего процесса выдаются лишь там, где они нужны существующим доверенным Rollup parser/esbuild service с текстом и options. tsc их не получает; worker grant без подтверждённой нужды не добавляется. Не допускать пользовательские конфигурации, плагины или исполняемые entry points.
+  - Путь выбран после независимой проверки: Node FS permissions совместно с явным server.fs.allow дали scan/tsc/Vite успешную сборку обычного шаблона. Это обосновывает сохранение CLI вместо нового host; отрицательные сценарии и диагностику проверить в реализации.
+  - Ограничение относится к фактически прочитанным файлам и выбранным модулям. Безопасный локальный fallback самого bounded compiler не вводится как новый запрет; прямые запрещённые specifiers по-прежнему отклоняются. Metadata redirect без допустимой цели, encoded CSS за src и documentation false positive остаются обязательными regression cases.
+  - Сначала проверить один нормальный шаблон, затем по одному сохранённые RED и positives: extensionless TS/CSS, local directory, bare kit module, encoded local asset, missing CSS asset, quoted URL, nested CSS, обычная документационная строка. Только затем полный набор. Не менять trusted config/source после scan ради искусственного RED.
 
-// Exact entry points only: recharts has no "exports", so "recharts/../.." would resolve outside the package.
-const MODULES = new Set(["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "recharts"])
-const inside = (root, path) => path === root || path.startsWith(root + sep)
-const scheme = /^[a-z][a-z0-9+.-]*:/i
-
-export function checkSpecifier(specifier, importer, src) {
-  if (/[?#]/.test(specifier)) return `Импорт «${specifier}» с параметрами запрещён`
-  if (specifier.startsWith("."))
-    return inside(src, resolve(dirname(importer), specifier)) ? undefined : `Импорт «${specifier}» выходит за пределы src/`
-  if (isAbsolute(specifier) || scheme.test(specifier)) return `Импорт «${specifier}» по абсолютному пути или адресу запрещён`
-  return MODULES.has(specifier) ? undefined : `Модуль «${specifier}» не входит в шаблон dashboard`
-}
-
-export function checkCss(css, file, src) {
-  const references = [
-    ...[...css.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g)].map((match) => match[2].trim()),
-    ...[...css.matchAll(/@import\s+(['"])([^'"]*)\1/g)].map((match) => match[2].trim()),
-    ...[...css.matchAll(/image-set\(([^)]*)\)/g)].flatMap((match) => [...match[1].matchAll(/(['"])([^'"]*)\1/g)].map((item) => item[2].trim())),
-  ]
-  for (const reference of references) {
-    if (/[?#]/.test(reference) || isAbsolute(reference) || scheme.test(reference) || !inside(src, resolve(dirname(file), reference)))
-      return `Ссылка «${reference}» в CSS разрешена только на файл внутри src/`
-  }
-}
-
-export function checkSource(code) {
-  if (/import\.meta\.glob/.test(code)) return "import.meta.glob запрещён"
-  if (/new\s+URL\s*\([^)]*import\.meta\.url/.test(code)) return "new URL(…, import.meta.url) запрещён"
-}
-
-export function dashboardResolver(root = process.cwd()) {
-  const src = resolve(root, "src")
-  // Vite ids use "/" even on Windows; path.resolve gives the native form used by inside().
-  const file = (id) => resolve(id.split("?")[0])
-  const fromSrc = (id) => typeof id === "string" && !id.startsWith("\0") && inside(src, file(id))
-  return {
-    name: "loginom-dashboard-resolver",
-    enforce: "pre",
-    resolveId(source, importer) {
-      // Vite's own virtual modules start with \0; imports from the kit are trusted.
-      if (source.startsWith("\0") || !fromSrc(importer)) return null
-      const error = checkSpecifier(source, file(importer), src)
-      if (error) this.error(error)
-      return null
-    },
-    transform(code, id) {
-      if (!fromSrc(id)) return null
-      const path = file(id)
-      const error = path.endsWith(".css") ? checkCss(code, path, src) : /\.[jt]sx?$/.test(path) ? checkSource(code) : undefined
-      if (error) this.error(error)
-      return null
-    },
-    // The last line of defence: whatever path Vite took, the bundle may only contain src/ and the kit.
-    generateBundle(_options, bundle) {
-      const kit = realpathSync(resolve(root, "node_modules"))
-      const allowed = (path) => inside(src, path) || inside(kit, path) || path === resolve(root, "index.html")
-      for (const id of this.getModuleIds()) if (!id.startsWith("\0") && !allowed(file(id))) this.error(`Модуль вне src/ и шаблона: ${id}`)
-      for (const item of Object.values(bundle))
-        for (const name of item.type === "asset" ? (item.originalFileNames ?? []) : [])
-          if (!allowed(resolve(root, name))) this.error(`Файл вне src/ и шаблона: ${name}`)
-    },
-  }
-}
-```
-
-  `vite.config.mjs`:
-
-```js
-import { dashboardResolver } from "./resolver.mjs"
-
-// Keep caches local and disable discovery of PostCSS configuration outside the build.
-export default { cacheDir: ".vite-cache", css: { postcss: { plugins: [] } }, plugins: [dashboardResolver()] }
-```
-
-- [ ] **Step 5: Проверка до `tsc`.** `template/scan.mjs`:
-
-```js
-import { readdirSync, readFileSync } from "node:fs"
-import { dirname, join, resolve, sep } from "node:path"
-import ts from "typescript"
-import { checkCss, checkSource, checkSpecifier } from "./resolver.mjs"
-
-// tsc reads type-only imports and references that Vite never sees, and Vite inlines nested CSS
-// without the transform hook; check every source file before either tool runs.
-const src = resolve("src")
-const errors = []
-for (const entry of readdirSync(src, { recursive: true, withFileTypes: true })) {
-  const file = join(entry.parentPath, entry.name)
-  if (entry.isFile() && entry.name.endsWith(".css")) {
-    const error = checkCss(readFileSync(file, "utf8"), file, src)
-    if (error) errors.push(`${file}: ${error}`)
-  }
-  if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) continue
-  const code = readFileSync(file, "utf8")
-  const info = ts.preProcessFile(code, true, true)
-  for (const reference of info.referencedFiles) {
-    const target = resolve(dirname(file), reference.fileName)
-    if (target !== src && !target.startsWith(src + sep)) errors.push(`${file}: /// <reference path="${reference.fileName}"> выходит за пределы src/`)
-  }
-  for (const reference of info.typeReferenceDirectives) errors.push(`${file}: /// <reference types="${reference.fileName}"> запрещён`)
-  for (const imported of info.importedFiles) {
-    const error = checkSpecifier(imported.fileName, file, src)
-    if (error) errors.push(`${file}: ${error}`)
-  }
-  const error = checkSource(code)
-  if (error) errors.push(`${file}: ${error}`)
-}
-if (errors.length) {
-  console.error(errors.join("\n"))
-  process.exit(1)
-}
-```
-
-  В `build.ts`: `PLATFORM_FILES` + `"resolver.mjs"`, `"scan.mjs"`; первым шагом `steps()` — `["scan.mjs"]`.
 - [ ] **Step 6: Скрипт.** В `test` добавить `test/build/resolver.test.mjs` (без зависимостей шаблона).
 - [ ] **Step 7: Прогон.** `bun run test && bun run test:browser` → PASS; примеры и ROI по-прежнему собираются.
 - [ ] **Step 8: Коммит.** `git commit -m "feat(dashboard): reject unsafe imports in dashboard builds"`.
