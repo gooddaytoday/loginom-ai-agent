@@ -1,0 +1,85 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "FlagMin",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "FlagMax",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "FlagMode",
+          "type": "boolean",
+          "label_any": true
+        },
+        {
+          "name": "FlagValues",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "FlagMissing",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": "A",
+          "FlagMin": false,
+          "FlagMax": true,
+          "FlagMode": true,
+          "FlagValues": 2,
+          "FlagMissing": 1
+        },
+        {
+          "Region": "B",
+          "FlagMin": true,
+          "FlagMax": true,
+          "FlagMode": true,
+          "FlagValues": 1,
+          "FlagMissing": 1
+        },
+        {
+          "Region": "C",
+          "FlagMin": null,
+          "FlagMax": null,
+          "FlagMode": false,
+          "FlagValues": 0,
+          "FlagMissing": 2
+        },
+        {
+          "Region": "D",
+          "FlagMin": false,
+          "FlagMax": false,
+          "FlagMode": false,
+          "FlagValues": 1,
+          "FlagMissing": 0
+        },
+        {
+          "Region": "E",
+          "FlagMin": false,
+          "FlagMax": true,
+          "FlagMode": false,
+          "FlagValues": 2,
+          "FlagMissing": 0
+        }
+      ]
+    }
+  ]
+}

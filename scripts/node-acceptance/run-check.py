@@ -323,10 +323,11 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
                     expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
                     text_update=update, export_count=2 if update else 1)
-    if name == 'group-real':
+    if name in ['group-real', 'group-boolean']:
         root = REPO / 'docs/node-development/nodes/grouping'
-        return dict(source=root / 'acceptance/types', prompt=root / 'acceptance/types/task-real.md',
-                    data=root / 'fixtures/types', input_files=['types.csv'], base=None, expected_name='expected-real.json')
+        kind = name.removeprefix('group-')
+        return dict(source=root / 'acceptance/types', prompt=root / ('acceptance/types/task-' + kind + '.md'),
+                    data=root / 'fixtures/types', input_files=['types.csv'], base=None, expected_name='expected-' + kind + '.json')
     if name in ['grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result']:
         root = REPO / 'docs/node-development/nodes/grouping'
         return dict(source=root / 'acceptance/modes', prompt=root / ('acceptance/modes/task-' + name.removeprefix('grouping-') + '.md'),
