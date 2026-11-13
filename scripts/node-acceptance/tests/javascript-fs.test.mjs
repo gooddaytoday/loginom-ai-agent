@@ -10,6 +10,7 @@ from zipfile import ZipFile
 import json, runpy, warnings
 root=Path('docs/node-development/nodes/programming-javascript/acceptance/fs')
 oracle=runpy.run_path(str(root/'oracle.py'))
+runner=runpy.run_path('scripts/node-acceptance/run-check.py')
 warnings.simplefilter('ignore', UserWarning)
 with TemporaryDirectory() as temp:
  archive=Path(temp)/'files.zip'
@@ -23,6 +24,8 @@ with TemporaryDirectory() as temp:
    assert not valid
   else: assert valid
  for case in ['read','write','operations','effects']:
+  spec=runner['scenario']('js-fs-'+case)
+  assert spec['oracle'].is_file() and spec['oracle'].resolve()==(root/'oracle.py').resolve()
   assert json.loads((root/('js-fs-'+case)/'expected.json').read_text())==oracle['expected'](case)
   entries=list(oracle['files'](case).items())
   check(case,entries,valid=True)
