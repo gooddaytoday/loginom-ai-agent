@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""List path-based acceptance obligations; verify report text without running checks."""
+"""List path-based acceptance obligations; verify report text without running checks.
+
+verify outcomes: exit 0 | FAIL; журнал: path:N | NOT_RUN; причина: text | CI; <actions run URL>
+| COVERED; LAB-N | APPROVED; решение id (ID without command only); prints a per-outcome summary.
+"""
 import argparse
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -29,6 +33,7 @@ RULES = (
      ('live-ui',), ('calculator-vars', 'calculator-vars-update', 'calculator-expression-options', 'calculator-javascript')),
     ((C + 'sorting-*.mjs', 'scripts/node-acceptance/sorting-modes.mjs'), ('live-ui',), ('sorting-case', 'sorting-threads', 'sorting-auto')),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
+    ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/types/**'), ('live-ui',), ('group-real',)),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/modes/**'), ('live-ui',), ('grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result')),
     ((C + 'filter-*.mjs', 'docs/node-development/nodes/row-filter/acceptance/**'), ('live-ui',), ('row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none', 'row-filter-value-list')),
     ((C + 'variable-binding-*.mjs', 'scripts/node-acceptance/bindings-grouping-sort.mjs', 'docs/node-development/variables/bindings/acceptance/cycle3/**'), ('live-ui',), ('bindings-grouping-sort', 'bindings-sorting-locale')),
@@ -121,7 +126,7 @@ RULES = (
      ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat', 'trees-to-table-indices',
       'tree-null-leaves', 'tree-nested-records', 'tree-empty-containers')),
     ((C + 'exports-excel-*.mjs', 'scripts/node-acceptance/exports-excel*.mjs'), ('live-ui',), ('exports-excel', 'excel-export-xls', 'excel-export-numeric', 'excel-export-replace')),
-    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named')),
+    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named', 'excel-import-binding')),
     ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',
       'docs/node-development/nodes/exports-lgd/acceptance/**'), ('live-ui', 'cold-export'),
      ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),
@@ -324,10 +329,21 @@ def obligations(base, head):
     return head, base, ancestor, [(key, *specs[key], sorted(checks[key])) for key in sorted(checks)]
 
 
+OUTCOMES = ('exit 0', 'FAIL', 'NOT_RUN', 'CI', 'COVERED', 'APPROVED')
+
+
+def outcome_of(outcome, command):
+    patterns = (('FAIL', r'FAIL; журнал: \S+:[1-9][0-9]*'), ('NOT_RUN', r'NOT_RUN; причина: \S.*'),
+                ('CI', r'CI; https://github\.com/gooddaytoday/loginom-ai-agent/actions/runs/[1-9][0-9]*(?:/job/[1-9][0-9]*)?'),
+                ('COVERED', r'COVERED; LAB-[1-9][0-9]*'))
+    patterns += (('exit 0', r'exit 0'),) if command is not None else (('APPROVED', r'APPROVED; решение \S+'),)
+    return next((name for name, pattern in patterns if re.fullmatch(pattern, outcome)), None)
+
+
 def verify(checks, report):
-    missing = []
+    missing, summary = [], {name: [] for name in OUTCOMES}
     for key, command, _, _ in checks:
-        valid = False
+        found = []
         for line in report.splitlines():
             fields = [field.strip() for field in line.strip().strip('|').split('|')]
             # One Markdown table row per ID, command, reason and result.
@@ -335,12 +351,18 @@ def verify(checks, report):
                 continue
             if fields[1] != ('`' + command + '`' if command else '—'):
                 continue
-            outcome = fields[3]
-            failed = re.fullmatch(r'FAIL; журнал: \S+:[1-9][0-9]*', outcome) is not None
-            valid = valid or failed or (command is not None and outcome == 'exit 0')
-        if not valid:
+            name = outcome_of(fields[3], command)
+            if name and name not in found: found.append(name)
+        if not found:
             missing.append(key)
-    return missing
+        for name in found:
+            summary[name].append(key)
+    return missing, summary
+
+
+def summary_line(summary):
+    return 'Исходы: ' + '; '.join(name + ': ' + str(len(keys)) + (' (' + ', '.join(keys) + ')' if keys else '')
+                                  for name, keys in summary.items())
 
 
 def main():
@@ -356,9 +378,10 @@ def main():
     try:
         head, base, ancestor, checks = obligations(args.base, args.head)
         if args.action == 'verify':
-            missing = verify(checks, args.report.read_text(encoding='utf-8'))
+            missing, summary = verify(checks, args.report.read_text(encoding='utf-8'))
+            print(summary_line(summary))
             print('Недостающие / неполные ID: ' + ', '.join(missing) if missing
-                  else 'Все ID отражены (только сверка текста; FAIL не означает приёмку).')
+                  else 'Все ID отражены (только сверка текста; FAIL и NOT_RUN не означают приёмку).')
             return 1 if missing else 0
         print(f'head: {head}; base: {base}; merge-base: {ancestor}\n')
         print('Команды из корня репозитория. $PAIR — каталог тестовой пары. Проверки здесь не запускаются.\n')

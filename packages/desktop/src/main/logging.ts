@@ -1,41 +1,34 @@
 import { productSlug } from "@loginom-ai-agent/product"
 import { MainLogger } from "electron-log"
 import log from "electron-log/main.js"
-import { app, crashReporter, netLog, shell } from "electron"
-import {
-  closeSync,
-  constants,
-  fstatSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  readdirSync,
-  readSync,
-  writeFileSync,
-} from "node:fs"
-import { createHash } from "node:crypto"
-import { ZipWriter, BlobWriter, BlobReader } from "@zip.js/zip.js"
+import { app, crashReporter, dialog, netLog, shell, type BrowserWindow } from "electron"
+import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js"
+import { randomUUID } from "node:crypto"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
+import type { CredentialCodec } from "@loginom-ai-agent/loginom-host/connection/credentials"
+import { buildDiagnosticsArchive, profileSecrets } from "@loginom-ai-agent/loginom-host/diagnostics-export"
 import { BUILD_SOURCE, CHANNEL } from "./constants"
 import { logRetention } from "./log-retention"
-import { createRedactor } from "../../../loginom-runtime/client/lib/redact.mjs"
 
 const MAX_LOG_AGE_DAYS = 7
 const MAX_LOG_BYTES = 100 * 1024 * 1024
 const TAIL_LINES = 1000
-const EXPORT_WINDOW = 24 * 60 * 60 * 1000
-const MAX_EXPORT_FILE_SIZE = 2 * 1024 * 1024
-const MAX_EXPORT_BYTES = 20 * 1024 * 1024
-const MAX_EXPORT_FILES = 200
-const RECENT_ATTEMPTS = 5
 const NET_LOG_SIZE = 20 * 1024 * 1024
 
 let root = ""
 let run = ""
 let netLogPath: string | undefined
 let retention: ReturnType<typeof logRetention> | undefined
+let exportCodec: CredentialCodec | undefined
+const exportValues = new Set<string>()
+
+// Values used only to prime export redaction; never written anywhere.
+export function configureDiagnosticsExport(input: { codec?: CredentialCodec; value?: string }) {
+  if (input.codec) exportCodec = input.codec
+  if (input.value) exportValues.add(input.value)
+}
 
 let logger: MainLogger
 export const getLogger = () => logger
@@ -94,29 +87,156 @@ export async function startNetLog() {
   write("network", "net log started", { path: netLogPath })
 }
 
+// Direct export without preview: recovery dialog and the fatal error page,
+// where the renderer may not respond.
 export async function exportDebugLogs() {
+  const output = join(app.getPath("downloads"), `loginom-ai-agent-debug-${stamp()}.zip`)
+  write("main", "exporting debug logs", { output })
+  const { zip } = await buildDesktopArchive({})
+  writeFileSync(output, zip, { mode: 0o600 })
+  shell.showItemInFolder(output)
+  return output
+}
+
+export type DiagnosticsGroup = "chat" | "runtime" | "logs" | "dumps"
+export type DiagnosticsRequest = {
+  sessionID?: string
+  chat?: unknown
+  include: Record<DiagnosticsGroup, boolean>
+}
+export type DiagnosticsFile = { name: string; group: DiagnosticsGroup; status: string; size?: number; reason?: string }
+export type DiagnosticsPrepared = { id: string; size: number; selection: string; files: DiagnosticsFile[] }
+
+// Chat on, crash dump off by default (owner decision diagnostics-export, 13.11).
+export const DIAGNOSTICS_DEFAULTS: Record<DiagnosticsGroup, boolean> = { chat: true, runtime: true, logs: true, dumps: false }
+const PREVIEW_BYTES = 64 * 1024
+
+// IPC input comes from the renderer: accept only the documented shape.
+export function parseDiagnosticsRequest(value: unknown): DiagnosticsRequest {
+  const input = value && typeof value === "object" ? (value as Record<string, unknown>) : {}
+  const include = input.include && typeof input.include === "object" ? (input.include as Record<string, unknown>) : {}
+  const sessionID =
+    typeof input.sessionID === "string" && /^[A-Za-z0-9_-]{1,200}$/.test(input.sessionID) ? input.sessionID : undefined
+  return {
+    sessionID,
+    chat: sessionID && input.chat && typeof input.chat === "object" ? input.chat : undefined,
+    include: Object.fromEntries(
+      Object.entries(DIAGNOSTICS_DEFAULTS).map(([key, fallback]) => [
+        key,
+        typeof include[key] === "boolean" ? include[key] : fallback,
+      ]),
+    ) as Record<DiagnosticsGroup, boolean>,
+  }
+}
+
+export function diagnosticsGroup(name: string): DiagnosticsGroup {
+  if (name.startsWith("chat/")) return "chat"
+  if (name.startsWith("runtime/")) return "runtime"
+  if (name.startsWith("crashpad/") && /\.dmp$/i.test(name)) return "dumps"
+  return "logs"
+}
+
+let prepared: { id: string; zip: Uint8Array; order: number } | undefined
+let prepares = 0
+
+// Builds the archive in memory; the preview shows exactly the bytes that Save writes.
+// Overlapping prepares keep the one started last, whatever order they finish in.
+export async function prepareDiagnostics(value: unknown): Promise<DiagnosticsPrepared> {
+  const order = ++prepares
+  const request = parseDiagnosticsRequest(value)
+  write("main", "preparing diagnostics", { session: !!request.sessionID, include: request.include })
+  const { zip, manifest } = await buildDesktopArchive(request)
+  const id = randomUUID()
+  if (!prepared || order > prepared.order) prepared = { id, zip, order }
+  return {
+    id,
+    size: zip.length,
+    selection: manifest.selection,
+    files: [
+      ...(manifest.files as Array<Record<string, unknown>>).map((file) => ({
+        name: String(file.name),
+        group: diagnosticsGroup(String(file.name)),
+        status: String(file.status),
+        ...(typeof file.size === "number" ? { size: file.size } : {}),
+        ...(typeof file.reason === "string" ? { reason: file.reason } : {}),
+      })),
+      // The manifest describes the other files and is archived too: list it so it can be opened.
+      { name: "manifest.json", group: diagnosticsGroup("manifest.json"), status: "included", size: await entrySize(zip, "manifest.json") },
+    ],
+  }
+}
+
+async function entrySize(zip: Uint8Array, name: string) {
+  const reader = new ZipReader(new Uint8ArrayReader(zip))
+  try {
+    return (await reader.getEntries()).find((item) => item.filename === name && !item.directory)?.uncompressedSize ?? 0
+  } finally {
+    await reader.close()
+  }
+}
+
+export async function previewDiagnosticsFile(id: unknown, name: unknown) {
+  if (!prepared || id !== prepared.id || typeof name !== "string") return
+  if (diagnosticsGroup(name) === "dumps") return
+  const reader = new ZipReader(new Uint8ArrayReader(prepared.zip))
+  try {
+    const entry = (await reader.getEntries()).find((item) => item.filename === name && !item.directory)
+    if (!entry?.getData) return
+    const data = await entry.getData(new Uint8ArrayWriter())
+    return { text: new TextDecoder().decode(data.subarray(0, PREVIEW_BYTES)), truncated: data.length > PREVIEW_BYTES }
+  } finally {
+    await reader.close()
+  }
+}
+
+export async function saveDiagnostics(id: unknown, window?: BrowserWindow) {
+  if (!prepared || id !== prepared.id) throw new Error("DIAGNOSTICS_NOT_PREPARED")
+  // Take the checked archive now: another prepare may replace the slot while Save as is open.
+  const zip = prepared.zip
+  const options = {
+    defaultPath: join(app.getPath("downloads"), `loginom-diagnostics-${stamp()}.zip`),
+    filters: [{ name: "ZIP", extensions: ["zip"] }],
+  }
+  const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options)
+  if (result.canceled || !result.filePath) return
+  writeFileSync(result.filePath, zip, { mode: 0o600 })
+  if (prepared?.id === id) prepared = undefined
+  write("main", "diagnostics saved", { output: result.filePath })
+  shell.showItemInFolder(result.filePath)
+  return result.filePath
+}
+
+async function buildDesktopArchive(request: Partial<DiagnosticsRequest>) {
+  const include = { ...DIAGNOSTICS_DEFAULTS, ...request.include }
   const restartNetLog = netLog.currentlyLogging
   if (restartNetLog) {
     await netLog.stopLogging().catch((error) => write("network", "failed to stop net log", { error }))
   }
-
-  const output = join(app.getPath("downloads"), `loginom-ai-agent-debug-${stamp()}.zip`)
   try {
-    write("main", "exporting debug logs", { output })
-    const runtime = join(app.getPath("userData"), "loginom", "runtime")
-    await writeZip(output, [
-      ...collect(
-        runtime,
-        "runtime",
-        /^generations\/[^/]+\/chats\/[^/]+\/attempts\/[^/]+\/execution-events\.jsonl$/,
-      ).slice(0, RECENT_ATTEMPTS),
-      ...collect(runtime, "runtime", /^diagnostics\/[^/]+\/events\.jsonl$/).slice(0, RECENT_ATTEMPTS),
-      ...collect(root, "desktop"),
-      ...serverLogRoots().flatMap((dir, i) => collect(dir, `server-${i + 1}`)),
-      ...collect(app.getPath("crashDumps"), "crashpad"),
-    ])
-    shell.showItemInFolder(output)
-    return output
+    const loginom = join(app.getPath("userData"), "loginom")
+    const known = await profileSecrets({
+      loginom,
+      data: dataRoot(),
+      codec: exportCodec,
+      dockHome: process.env.LOGINOM_DOCK_HOME || join(homedir(), ".loginom-dock"),
+      extra: [...exportValues],
+    })
+    return await buildDiagnosticsArchive({
+      runtime: include.runtime ? join(loginom, "runtime") : undefined,
+      sessionID: request.sessionID,
+      chat: include.chat ? request.chat : undefined,
+      logs: [
+        ...(include.logs
+          ? [{ dir: root, prefix: "desktop" }, ...serverLogRoots().map((dir, i) => ({ dir, prefix: `server-${i + 1}` }))]
+          : []),
+        // Crashpad keeps settings and report metadata beside the dumps; only dumps are diagnostics.
+        ...(include.logs || include.dumps ? [{ dir: app.getPath("crashDumps"), prefix: "crashpad", match: /\.dmp$/i }] : []),
+      ],
+      attachDumps: include.dumps,
+      knownSecrets: known.secrets,
+      users: known.users,
+      manifest: { ...manifest(), knownSecrets: known.status },
+    })
   } finally {
     if (restartNetLog) {
       await startNetLog().catch((error) => write("network", "failed to restart net log", { error }))
@@ -189,205 +309,13 @@ function manifest() {
   }
 }
 
-function serverLogRoots() {
+function dataRoot() {
   const xdgData = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
-  return [join(xdgData, productSlug(CHANNEL), "log")]
+  return join(xdgData, productSlug(CHANNEL))
 }
 
-type Entry = { name: string; path: string; size: number; mtime: number }
-
-function collect(dir: string, prefix: string, pattern?: RegExp): Entry[] {
-  const cutoff = Date.now() - EXPORT_WINDOW
-  const result: Entry[] = []
-  const walk = (current: string) => {
-    // Do not follow links into credentials, browser profiles or other users' data.
-    if (!lstatSync(current, { throwIfNoEntry: false })?.isDirectory()) return
-    for (const entry of readdirSync(current)) {
-      const file = join(current, entry)
-      const info = lstatSync(file, { throwIfNoEntry: false })
-      if (!info || info.isSymbolicLink()) continue
-      if (info.isDirectory()) {
-        walk(file)
-        continue
-      }
-      if (!info.isFile()) continue
-      const relative = file.slice(dir.length + 1).replace(/\\/g, "/")
-      if (pattern ? !pattern.test(relative) : info.mtimeMs < cutoff) continue
-      result.push({ name: `${prefix}/${relative}`, path: file, size: info.size, mtime: info.mtimeMs })
-    }
-  }
-  try {
-    walk(dir)
-  } catch {
-    /* Logs may rotate during collection. Other sources remain exportable. */
-  }
-  return result.sort((a, b) => b.mtime - a.mtime || a.name.localeCompare(b.name))
-}
-
-// This scan is deliberately independent of redact.mjs. Unknown JWTs and any
-// credential assignment that survives masking make the whole file ineligible.
-function hasExportSecret(text: string) {
-  if (
-    /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----|\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{12,}|eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b/.test(text) ||
-    /\b(?:bearer|basic)\s+(?!\[redacted\])[A-Za-z0-9+/_=.-]+/i.test(text)
-  )
-    return true
-  const fields =
-    /\b(?:api[_-]?key|authorization|password|passwd|cookie|set-cookie|access[_-]?token|refresh[_-]?token)\b["']?\s*[:=]\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}&]+)/gi
-  for (const match of text.matchAll(fields)) {
-    const value = match[1].replace(/^["']|["']$/g, "")
-    if (value !== "[redacted]" && value !== "") return true
-  }
-  return false
-}
-
-function exportHome(text: string) {
-  // Cover literal paths and their JSON-escaped Windows spelling, including paths
-  // from journals copied between platforms.
-  for (const home of new Set([homedir(), homedir().replace(/\\/g, "/")])) {
-    for (const variant of new Set([home, JSON.stringify(home).slice(1, -1)])) text = text.replaceAll(variant, "~")
-  }
-  return text
-    .replace(/(?:\/Users\/|\/home\/)[^/\s"'\\]+/g, "~")
-    .replace(/[A-Za-z]:(?:\\+|\/)Users(?:\\+|\/)[^\\/\s"']+/gi, "~")
-}
-
-function readExportTail(entry: Entry) {
-  const fd = openSync(entry.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
-  try {
-    const info = fstatSync(fd)
-    if (!info.isFile()) throw Error("not-a-file")
-    const start = Math.max(0, info.size - MAX_EXPORT_FILE_SIZE)
-    const data = Buffer.alloc(Math.min(info.size, MAX_EXPORT_FILE_SIZE))
-    let length = 0
-    while (length < data.length) {
-      const read = readSync(fd, data, length, data.length - length, start + length)
-      if (!read) break
-      length += read
-    }
-    let bytes = data.subarray(0, length)
-    if (start) {
-      const newline = bytes.indexOf(10)
-      if (newline < 0) throw Error("no-complete-lines")
-      bytes = bytes.subarray(newline + 1)
-    }
-    if (/\.(?:dmp|heapsnapshot)$/i.test(entry.path) || bytes.includes(0)) throw Error("binary-not-redactable")
-    return {
-      text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-      truncated: start > 0,
-      originalSize: info.size,
-    }
-  } finally {
-    closeSync(fd)
-  }
-}
-
-async function writeZip(output: string, entries: Entry[]) {
-  const writer = new ZipWriter(new BlobWriter("application/zip"))
-  const redactor = createRedactor()
-  const files: Array<Record<string, unknown>> = []
-  const prepared: Array<{
-    entry: Entry
-    record: Record<string, unknown>
-    text: string
-    rows?: unknown[]
-    json?: unknown
-  }> = []
-  let selectedBytes = 0
-  for (const entry of entries.slice(0, MAX_EXPORT_FILES)) {
-    const name = exportHome(redactor.text(entry.name))
-    const record: Record<string, unknown> = {
-      name: hasExportSecret(name) ? `omitted-${files.length + 1}` : name,
-      originalSize: entry.size,
-      mtime: new Date(entry.mtime).toISOString(),
-      status: "omitted",
-    }
-    files.push(record)
-    if (hasExportSecret(name)) {
-      record.reason = "secret-in-path"
-      continue
-    }
-    if (selectedBytes + Math.min(entry.size, MAX_EXPORT_FILE_SIZE) > MAX_EXPORT_BYTES - 1024 * 1024) {
-      record.reason = "archive-budget"
-      continue
-    }
-    try {
-      const { text, truncated, originalSize } = readExportTail(entry)
-      record.originalSize = originalSize
-      record.truncated = truncated
-      if (entry.path.endsWith(".jsonl")) {
-        const rows = text
-          .split(/\r?\n/)
-          .filter((line) => line.trim())
-          .map((line) => JSON.parse(line))
-        for (const row of rows) redactor.prime(row)
-        prepared.push({ entry, record, text, rows })
-      } else if (/\.(?:json|netlog)$/i.test(entry.path)) {
-        const json: unknown = JSON.parse(text)
-        redactor.prime(json)
-        prepared.push({ entry, record, text, json })
-      } else {
-        prepared.push({ entry, record, text })
-      }
-      selectedBytes += Buffer.byteLength(text)
-    } catch {
-      // Never expose filesystem errors: they may embed raw paths or log content.
-      record.reason = "unreadable-or-not-redactable"
-    }
-  }
-  let total = 0
-  // Learn credentials across all selected sources before exporting earlier echoes.
-  for (const { entry, record, text, rows, json } of prepared) {
-    try {
-      let cleaned = rows
-        ? rows.map((row) => JSON.stringify(redactor.redact(row))).join("\n") + "\n"
-        : json !== undefined
-          ? JSON.stringify(redactor.redact(json))
-          : redactor.text(text)
-      cleaned = exportHome(cleaned)
-      if (hasExportSecret(cleaned)) {
-        record.reason = "secret-after-redaction"
-        continue
-      }
-      if (cleaned.includes('"type":"redaction_failure"')) {
-        record.reason = "redaction-failed"
-        continue
-      }
-      const data = Buffer.from(cleaned)
-      if (total + data.length > MAX_EXPORT_BYTES - 1024 * 1024) {
-        record.reason = "archive-budget"
-        continue
-      }
-      const name = exportHome(redactor.text(entry.name))
-      record.name = name
-      await writer.add(name, new BlobReader(new Blob([new Uint8Array(data)])))
-      total += data.length
-      Object.assign(record, {
-        status: "included",
-        size: data.length,
-        sha256: createHash("sha256").update(data).digest("hex"),
-      })
-    } catch {
-      record.reason = "unreadable-or-not-redactable"
-    }
-  }
-  const summary = exportHome(
-    JSON.stringify(
-      redactor.redact({
-        ...manifest(),
-        limits: { archiveBytes: MAX_EXPORT_BYTES, fileBytes: MAX_EXPORT_FILE_SIZE, recentAttempts: RECENT_ATTEMPTS },
-        selectionOmitted: Math.max(0, entries.length - MAX_EXPORT_FILES),
-        files,
-      }),
-      null,
-      2,
-    ),
-  )
-  if (hasExportSecret(summary)) throw Error("LOG_EXPORT_MANIFEST_REDACTION_FAILED")
-  await writer.add("manifest.json", new BlobReader(new Blob([summary])))
-  const zip = await writer.close()
-  if (zip.size > MAX_EXPORT_BYTES) throw Error("LOG_EXPORT_BUDGET_EXCEEDED")
-  writeFileSync(output, Buffer.from(await zip.arrayBuffer()), { mode: 0o600 })
+function serverLogRoots() {
+  return [join(dataRoot(), "log")]
 }
 
 function initConsoleTransport() {

@@ -33,7 +33,7 @@
       "parameter": "/excel_export/destination",
       "mode": "variable",
       "variable": {
-        "kind": "control",
+        "kind": "variables",
         "input": 0,
         "name": "ExcelPath",
         "type": "string",
@@ -51,7 +51,7 @@
       "parameter": "/excel_export/sheet_name",
       "mode": "variable",
       "variable": {
-        "kind": "control",
+        "kind": "variables",
         "input": 0,
         "name": "SheetName",
         "type": "string",

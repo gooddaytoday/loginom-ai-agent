@@ -104,7 +104,7 @@ for(const value of [null,''])test('explicit new string binding refuses '+(value=
  await assert.rejects(f.driver().beforeTarget(f.ctx),value===null?/BINDING_NULL_UNSUPPORTED/:/BINDING_VALUE_INVALID/);
  assert.equal(f.witnesses(),0);assert.ok(!f.actions.includes('begin_wizard'));
 });
-for(const type of ['imports.excel','transform.filter_data','transform.sorting','integration.rest_request'])test('private Import capability adds no beforeTarget to another type: '+type,()=>{
+for(const type of ['transform.filter_data','transform.sorting','integration.rest_request'])test('private Import capability adds no beforeTarget to another type: '+type,()=>{
  const f=savedImport();f.r.target.type=type;f.r.mode='read_existing_output';
  f.options.isBoundFileInput=()=>assert.fail('Foreign type must not use Import scope');
  assert.equal(f.driver().beforeTarget,undefined);assert.deepEqual(f.actions,[]);

@@ -95,6 +95,15 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-real` uses grouping `acceptance/types/task-real.md` and only
+`fixtures/types/types.csv`. `expected-real.json` contains the unchanged
+`cases.real.stages` from the LAB-1558 proposal; its independent `oracle.py
+--check` stays outside the model workspace. Native Real median/mode/stddev,
+all-NULL and the mode tie are checked as complete typed rows with exact field
+order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
+the existing node, cold execution without configuration and cleanup use stock
+checks. Only the business task and CSV reach the model.
+
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
 `{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",
@@ -120,6 +129,12 @@ update on the same Import, and saved-package reopen. The private oracle verifies
 fresh typed rows, field order, variable identities and retained Sentinel; cold
 independently reads the filename binding and W1 mapping before execution.
 Only the business task and the two input files reach the model.
+
+`excel-import-binding` (Excel C7) uses `imports-excel/acceptance/excel-import-binding`:
+task.md, sales-a/b.xlsx and a stdlib OOXML oracle (2 rows → 1 row). The same audit
+checks an ExcelPath-only update on the same Excel node, `/excel/source_path` in
+`configuration.bindings`, re-execution only via `{excel:{}}` or a reread, and cold
+reads the Excel W1 variable caption and mapping before execution.
 
 `acf-nonzero` uses the approved LAB-1144 edge task and
 fixtures under `research-autocorrelation/acceptance/edges`. Count12 on N8 must
@@ -580,6 +595,7 @@ first column of the array branch), CSV, Save, cold.
    `start --head <SHA> --scenarios <name> --pair "$PAIR" --cold` and foreground `wait`.
    Add its file patterns/scenario hint to `required-checks.py`; for an additive
    contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
+   `required-checks.py verify` results: `exit 0`, `FAIL`, `NOT_RUN`, `CI`, `COVERED`, `APPROVED` (formats and summary in `required-checks.md`).
 
 Offline tests: from `scripts/node-acceptance/tests`, run
 `python3 -m unittest test_run_check test_run_check_build test_catalog_delta -v`.
