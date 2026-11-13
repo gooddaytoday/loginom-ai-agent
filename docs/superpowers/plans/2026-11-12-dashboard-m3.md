@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** база принятой M2 — `c9dd858ae1`; независимое предварительное ревью всех 18 задач выполнено. Задачи 1–2 выполнены; задачи 3–18 ожидают. Задача 1 — `57e59d1992`; задача 2 прошла итоговое независимое ревью и полный browser 132/132. Подробные проверки, решения и checkpoint — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** база принятой M2 — `c9dd858ae1`; независимое предварительное ревью всех 18 задач выполнено. Задачи 1–2 выполнены (`57e59d1992`, `97379569c9`); задача 3 выполнена с чистым ревью и 46 проверками, задачи 4–18 ожидают. Итоговый browser задачи 2 — 132/132, ревью чистое. Подробные проверки, решения и checkpoint — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -268,6 +268,8 @@ cli.onclick = async () => {
 - Create: `P/src/agent/folder.ts`, `P/src/contract/prompt.ts`, `P/test/agent/folder.test.mjs`
 - Modify: `P/package.json` (`exports`, `test`), `P/tsconfig.web.json` (`include` + `src/agent/**/*.ts`)
 
+**Уточнение по предварительному ревью:** короткая очередь внутри модуля сериализует файловую часть подготовки, включая проверку полного ключа, `fresh` и копирование `src/`. GET и проверка DTO идут до очереди. Ошибка возвращается своему вызывающему коду и не ломает следующие операции. При существующем control проверяется полный ключ и его соответствие binding; каталог чужой привязки не перезаписывается. Отдельная блокировка на диске для этих вызовов не требуется: Desktop имеет один main-процесс, CLI уже удерживает guard своего отдельного профиля. Новая папка появляется по итоговому имени только после полной подготовки и одного rename; для восстановления отсутствующего src в уже удостоверенной папке копия тоже завершается до rename. Папка без проверяемого control не присваивается снимку. Локальный поиск пропускает повреждённые записи и проверяет полный ключ, имя папки и существующий work. Ограничение имени считается в кодовых точках Unicode. Очередь не объявляется транзакцией для backend: согласованное чтение и условное удаление sample закрываются в задачах 7/12 до их приёмки.
+
 **Interfaces:**
 - Consumes: `Snapshot`, `bindingKey` (задача 1).
 - Produces:
@@ -290,7 +292,7 @@ export function dashboardPrompt(action: "create" | "edit", fresh: boolean): stri
 
 `package.json`: `"exports": { "./*": "./src/*.ts" }` — как у `packages/loginom-host`; импорт — `@loginom-ai-agent/dashboard/agent/folder`, `.../contract/prompt`.
 
-- [ ] **Step 1: Тест.** `test/agent/folder.test.mjs` (`node:test`): настоящий `dashboardServer` на `127.0.0.1:0`, снимок создаётся `POST`, `dashboards` — `<временный каталог>/dashboards`, `template` — `packages/dashboard/template`. Проверки:
+- [x] **Step 1: Тест.** `test/agent/folder.test.mjs` (`node:test`): настоящий `dashboardServer` на `127.0.0.1:0`, снимок создаётся `POST`, `dashboards` — `<временный каталог>/dashboards`, `template` — `packages/dashboard/template`. Проверки:
   - первый вызов: `directory` = `<dashboards>/campaign-<8 символов ключа>/work`; в `work/src` — копия `template/src`; `fresh: true`; `action: "create"` (`published: false`); `work/snapshot.json` — `{nodeName, schema, parameters, created}`; `work/sample.json` — разбирается `JSON.parse` в `{schema, rows}`, каждая строка образца на своей строке файла (`text.split("\n").length` ≥ число строк); `control/binding.json` — `{snapshotId, binding, nodeName, origin, key}`; права каталогов `0o700` (не Windows);
   - второй вызов с новым снимком той же привязки и `published: true`: тот же `directory`, `fresh: false`, `action: "edit"`, файл, добавленный в `work/src`, на месте, `snapshotId` новый;
   - повторное чтение того же ID → ошибка `DASHBOARD_SNAPSHOT_UNAVAILABLE`, папка не создана; неверный ID (`"x"`) → та же ошибка без запроса (счётчик запросов сервера 0); ответ сервера с лишним полем или чужим `id` (подменённый `fetch`) → `DASHBOARD_SNAPSHOT_INVALID`;
@@ -298,8 +300,8 @@ export function dashboardPrompt(action: "create" | "edit", fresh: boolean): stri
   - `folderName("/user/a b/Отчёт <1>.lgp", key)` → `Отчёт-1-<8>`; имя из 60 букв обрезается до 40; имя из одних знаков → `dashboard-<8>`;
   - `findDashboard(dashboards, snapshotId)` → путь `work`; неизвестный ID → `undefined`; каталога `dashboards` нет → `undefined`;
   - `dashboardPrompt("create", true)` и `("edit", false)` — дословно тексты из дизайна; `("edit", true)` дополнительно содержит «Исходников опубликованной версии на этом компьютере нет: в `src/` заготовка шаблона. Скажи об этом пользователю».
-- [ ] **Step 2: Тест падает.** `"$LOGINOM_AI_AGENT_TEST_NODE" --test test/agent/folder.test.mjs` → FAIL: модуля нет.
-- [ ] **Step 3: `prompt.ts`.**
+- [x] **Step 2: Тест падает.** `"$LOGINOM_AI_AGENT_TEST_NODE" --test test/agent/folder.test.mjs` → FAIL: модуля нет.
+- [x] **Step 3: `prompt.ts`.**
 
 ```ts
 export function dashboardPrompt(action: "create" | "edit", fresh: boolean) {
@@ -316,7 +318,7 @@ export function dashboardPrompt(action: "create" | "edit", fresh: boolean) {
 }
 ```
 
-- [ ] **Step 4: `folder.ts`.**
+- [x] **Step 4: `folder.ts`.**
 
 ```ts
 import { existsSync } from "node:fs"
@@ -378,9 +380,9 @@ export type ControlBinding = { snapshotId: string; binding: typeof Binding.Type;
 ```
 
   `Binding` экспортируется из `snapshot.ts` как значение-схема; тип — `typeof Binding.Type`.
-- [ ] **Step 5: Скрипты.** В `test` после `shell-contract.test.mjs` добавить `test/agent/folder.test.mjs`. `tsconfig.web.json`: `include` + `"src/agent/**/*.ts"`.
-- [ ] **Step 6: Прогон.** `bun typecheck && bun run test` → PASS.
-- [ ] **Step 7: Коммит.** `git commit -m "feat(dashboard): create dashboard folders from snapshots"`.
+- [x] **Step 5: Скрипты.** В `test` после `shell-contract.test.mjs` добавить `test/agent/folder.test.mjs`. `tsconfig.web.json`: `include` + `"src/agent/**/*.ts"`.
+- [x] **Step 6: Прогон.** `bun typecheck && bun run test` → PASS.
+- [x] **Step 7: Коммит.** `git commit -m "feat(dashboard): create dashboard folders from snapshots"`.
 
 ### Task 4: Сборка черновика и примеры
 
