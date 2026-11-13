@@ -480,6 +480,54 @@ export function auditUserVariableHistory(events,initial,final){
  need(!requests.some(e=>e.index>updated[0].index&&e.index<reread.index&&e.request.mode==='values'),'USER_REREAD_RECONFIGURED');
  return {status:'PASS',snapshots:updated.length+1,node:first.result.node,initial_read_id:first.output.read_id,updated_read_ids:updated.map(s=>s.output.read_id)};
 }
+export function auditRestQueryVariables(events,initial,final){
+ const checkpoints=events.flatMap((e,index)=>e.phase==='node_checkpoint'&&e.result?.status==='SUCCEEDED'&&e.result.cleanup_complete===true?[{index,result:e.result}]:[]);
+ const requests=events.flatMap((e,index)=>e.phase==='node_apply_prepared'?[{index,request:e.request,operation_id:e.operation_id}]:[]);
+ const same=(a,b)=>['document_id','workflow_id','node_id'].every(k=>a?.[k]===b?.[k]);
+ const echo=(c,want)=>{
+  const r=c.result,p=r.output?.ports?.find(p=>p.port===0),column=p?.schema?.findIndex(f=>f.name==='Response');
+  if(r.execution?.status!=='completed'||p?.fresh!==true||p.sample_complete!==true||p.row_count!==1||!Number.isInteger(column)||column<0)return false;
+  try{const response=JSON.parse(p.sample[0][column].value),w=want.outputs[0].rows[0];return response.args.limit===w.limit&&response.args.skip===w.skip&&response.url===w.url;}catch{return false;}
+ };
+ const configured=checkpoints.filter(c=>c.result.configuration?.readback?.kind==='rest_request');
+ const first=checkpoints.find(c=>configured.some(v=>v.index<=c.index&&same(v.result.node,c.result.node))&&echo(c,initial));need(first,'REST_QUERY_INITIAL_RESPONSE');
+ const snapshot=(c,want)=>c.result.output?.variable_ports?.some(p=>{try{return matchVariableInventoryOutput(p,want);}catch{return false;}});
+ const before=checkpoints.filter(c=>c.index<first.index&&snapshot(c,parseExpectedVariableInventory(initial).outputs[0])).at(-1);
+ need(before,'REST_QUERY_INITIAL_INTEGER_VARIABLES');
+ const patches=requests.filter(e=>e.index>first.index&&e.request.target?.type==='variables.user'&&e.request.mode==='values');
+ need(patches.length>0,'REST_QUERY_SOURCE_UPDATE');
+ const values=Object.fromEntries(final.variable_inventory.outputs[0].variables.map(v=>[v.name,v.value])),changed=new Set();
+ for(const {request} of patches){
+  need(request.target.kind==='existing'&&same(request.target.ref,before.result.node),'REST_QUERY_SOURCE_CHANGED');
+  for(const v of request.parameters.variables){need(v.type==='integer'&&Object.hasOwn(values,v.name)&&v.value===values[v.name],'REST_QUERY_VALUES_ONLY_UPDATE');changed.add(v.name);}
+ }
+ need(changed.size===2,'REST_QUERY_BOTH_VARIABLES_UPDATED');
+ const after=checkpoints.find(c=>c.index>patches[0].index&&same(c.result.node,before.result.node)&&snapshot(c,final.variable_inventory.outputs[0]));
+ need(after,'REST_QUERY_UPDATED_INTEGER_VARIABLES');
+ const ids=c=>c.result.output.variable_ports.find(p=>p.port===4).variables.map(v=>[v.id,v.index,v.name,v.type]);
+ need(JSON.stringify(ids(before))===JSON.stringify(ids(after)),'REST_QUERY_VARIABLE_IDENTITIES_CHANGED');
+ const second=checkpoints.find(c=>c.index>after.index&&same(c.result.node,first.result.node)&&echo(c,final)&&c.result.execution.execution_id!==first.result.execution.execution_id);
+ need(second,'REST_QUERY_UPDATED_SAME_REST');
+ const a=configured.find(c=>c.index<=first.index&&same(c.result.node,first.result.node)&&c.result.configuration.readback.connection)?.result.configuration.readback,b=second.result.configuration?.readback;
+ need(a,'REST_QUERY_INITIAL_CONNECTION_READBACK');
+ need(a.method==='GET'&&(!b||b.method==='GET')&&a.connection?.base_url==='https://httpbin.org/anything','REST_QUERY_CONNECTION');
+ need(JSON.stringify(a.query_parameters.map(p=>p.name))==='["limit","skip"]'&&(!b||JSON.stringify(a.query_parameters)===JSON.stringify(b.query_parameters)),'REST_QUERY_BINDINGS_CHANGED');
+ for(const e of requests.filter(e=>e.index>first.index&&e.index<second.index)){
+  const r=e.request;if(['variables.user','exports.text'].includes(r.target.type))continue;
+  need(r.target.kind==='existing'&&(!r.mappings?.length)&&(r.mode==='read_existing_output'||Object.keys(r.parameters??{}).length===0),'REST_QUERY_RECONFIGURED');
+  if(r.target.type==='integration.rest_request')need(same(r.target.ref,first.result.node)&&!r.inputs?.length&&!r.variable_inputs?.length,'REST_QUERY_REPLACED');
+ }
+ const completed=requests.flatMap(q=>{const c=checkpoints.find(c=>c.result.operation_id===q.operation_id);return c?[{...q,node:c.result.node}]:[];});
+ const tables=completed.filter(q=>q.request.target.type==='variables.to_table'&&q.request.variable_inputs?.some(i=>i.kind==='variables'&&i.input===0&&i.output===4&&same(i.source,before.result.node)));
+ const edges=completed.flatMap(q=>(q.request.inputs??[]).map(i=>({source:i.source.node_id,target:q.node.node_id})));
+ const path=(id,target,seen=new Set())=>id===target?[id]:seen.has(id)?null:(seen.add(id),edges.filter(e=>e.source===id).map(e=>path(e.target,target,new Set(seen))).find(Boolean)?.toSpliced(0,0,id));
+ need(tables.some(q=>path(q.node.node_id,first.result.node.node_id)?.some(id=>completed.some(c=>c.node.node_id===id&&c.request.target.type==='transform.calculator'))),'REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION');
+ return {status:'PASS',source:before.result.node,rest:first.result.node,initial_execution_id:first.result.execution.execution_id,updated_execution_id:second.result.execution.execution_id};
+}
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='rest-query-variables'){
+ const {readFileSync}=await import('node:fs');
+ console.log(JSON.stringify(auditRestQueryVariables(JSON.parse(readFileSync(process.argv[5],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')),JSON.parse(readFileSync(process.argv[4],'utf8')))));
+}
 if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='variables-user'){
  const {readFileSync}=await import('node:fs');
  console.log(JSON.stringify(auditUserVariableHistory(JSON.parse(readFileSync(process.argv[5],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')),JSON.parse(readFileSync(process.argv[4],'utf8')))));

@@ -32,9 +32,8 @@ Cycle: `variables.user` или `variables.calculator`.
 После изменения только Cycle выполни тот же REST с `parameters:{}`, `inputs:[]`,
 `variable_inputs:[]`, `mappings:[]`, `finish:"execute"`: сохранённая привязка
 прочитает новое значение без редактирования запроса. Не подставляй литерал.
-Чтобы поменять только значение на `second`, используй тот же существующий
-REST-узел, прежние connection, query_parameters, body_field и источник inputs,
-новый headers и `finish:"execute"`.
+Литерал меняй на том же REST: прежние connection/query_parameters/body_field/inputs,
+новые headers и `finish:"execute"`.
 Echo httpbin: `Response.headers["X-Lab-Cycle"]`, тело `Response.data`.
 RequestID на обоих портах — индекс исходной строки с нуля; по нему соедини
 ответ, исходный RequestId и HttpStatusCode порта 1. Выгрузи второй результат
@@ -48,6 +47,9 @@ HttpStatusCode, ErrorCode и ErrorDesc находятся на порту 1. П�
 
 GET по полному URL без query-параметров допустим: `query_parameters:[]`, `inputs:[]`,
 `finish:"execute"`; входная таблица и URL-кодировщик не нужны.
+
+Query из переменных: после `variables.to_table` преобразуй integer→string
+табличным Калькулятором; исходные limit/skip оставь integer.
 
 Ограничивай ответы через `select`, `limit/skip` по контракту API, без gzip.
 HTTP 200 не доказывает получение тела. При пустом Response проверь порт 1.

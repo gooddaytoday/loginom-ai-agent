@@ -1,3 +1,11 @@
+`rest-query-variables` uses LAB-820 `variables/acceptance/task-rest-variables.md`
+without input files. The frozen initial/updated tables are checked separately
+against both downloaded CSVs. Existing W1 snapshots prove integer limit/skip,
+stable source IDs, the variables → table → string conversion → same REST path,
+and unchanged request bindings. Cold uses only the updated expectation and its
+actual CSV, including saved integer variables and their native link. Oracle,
+fixture, manifest and expectations never reach the model.
+
 `rest-variables` uses the approved REST C4 `task-variables.md`, requests.csv and
 unchanged `acceptance/modes/variables/expected.json`. Cycle first → second must
 update the response on the same REST without reconfiguration. Full typed output,
