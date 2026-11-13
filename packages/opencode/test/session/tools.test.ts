@@ -24,6 +24,7 @@ import { testEffect } from "../lib/effect"
 
 const callID = "call-test"
 const sessionID = SessionID.make("ses_test")
+const session = { id: sessionID, permission: [] } as unknown as Session.Info
 const messageID = MessageID.ascending()
 const partID = PartID.ascending()
 
@@ -78,7 +79,10 @@ const fakeTruncate = Truncate.Service.of({
 const layer = Layer.mergeAll(
   LayerNode.compile(FSUtil.node),
   Layer.mock(AppProcess.Service, {}),
-  Layer.mock(Session.Service, {}),
+  Layer.mock(Session.Service, {
+    get: () => Effect.succeed(session),
+    getForExecution: () => Effect.succeed(session),
+  }),
   Layer.mock(Agent.Service, {}),
   Layer.succeed(Plugin.Service, fakePlugin),
   Layer.succeed(Permission.Service, fakePermission),
@@ -333,7 +337,7 @@ for (const failure of [
         loginomStatus,
         agent,
         model,
-        session: { id: sessionID, permission: [] } as unknown as Session.Info,
+        session,
         processor: {
           message: assistant,
           updateToolCall: () => Effect.die("Unexpected metadata write"),
