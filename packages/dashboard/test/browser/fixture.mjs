@@ -68,6 +68,12 @@ export async function fixture(
   await mkdir(join(root, "a".repeat(64)))
   await cp(isAbsolute(app) ? app : resolve(import.meta.dirname, "apps", app), dir, { recursive: true })
   if (app === "recorder") await writeFile(join(dir, "assets/loginom.js"), sdk)
+  if (app === "malicious") {
+    const sibling = join(root, "c".repeat(64), "b".repeat(64))
+    await mkdir(join(root, "c".repeat(64)))
+    await cp(resolve(import.meta.dirname, "apps/recorder"), sibling, { recursive: true })
+    await writeFile(join(sibling, "assets/loginom.js"), sdk)
+  }
   const reservation = createServer().listen(0, "127.0.0.1")
   await once(reservation, "listening")
   const port = reservation.address().port
@@ -202,6 +208,7 @@ export async function fixture(
           };
         }
       </script><script src="/shell.js"></script>`
+  let clientHits = 0
   const studio = createServer((request, response) => {
     if (["/desktop-link", "/ordinary"].includes(request.url)) {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" })
@@ -209,6 +216,10 @@ export async function fixture(
     }
     response.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-security-policy": csp })
     response.end(html)
+  })
+  studio.on("upgrade", (_request, socket) => {
+    clientHits++
+    socket.destroy()
   })
   studio.listen(0, "127.0.0.1")
   await once(studio, "listening")
@@ -219,7 +230,6 @@ export async function fixture(
   host.listen(port, "127.0.0.1")
   await once(host, "listening")
   t.after(() => new Promise(resolve => host.close(resolve)))
-  let clientHits = 0
   const shell = await readFile(new URL("../../dist/shell.js", import.meta.url), "utf8")
   const snapshots = []
   const page = await context.newPage()
@@ -304,5 +314,28 @@ export async function fixture(
     publish: () => {
       published = true
     },
+  }
+}
+
+export async function attacker(t) {
+  let connections = 0
+  let requests = 0
+  const server = createServer((request, response) => {
+    requests++
+    const src = new URL(request.url, "http://attacker.localhost").searchParams.get("src")
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" })
+    response.end(src ? `<!doctype html><iframe src="${src.replaceAll('"', "&quot;")}"></iframe>` : "<!doctype html>Attacker")
+  })
+  server.on("connection", () => connections++)
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  t.after(() => {
+    server.closeAllConnections()
+    return new Promise(resolve => server.close(resolve))
+  })
+  return {
+    origin: `http://attacker.localhost:${server.address().port}`,
+    connections: () => connections,
+    requests: () => requests,
   }
 }

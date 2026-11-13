@@ -883,6 +883,7 @@ async function table(node: Node, maxRows = limits.rows) {
   - адрес сборки во вкладке: `document.cookie` бросает исключение, `origin === "null"`;
   - `<attacker>/embed?src=<адрес сборки>`: дочерний фрейм не содержит приложения — его `location.href` начинается с `chrome-error://`;
   - `dns-prefetch` автотестом не проверяется (дизайн, раздел «Проверки»).
+- **Дополнение владельца (2026-11-13).** Решение владельца от 2026-11-13: только при собственной навигации iframe на внешний тестовый сервер без `Connection-Allowlist` разрешён максимум один TCP-контакт. HTTP-запросов должно быть 0; обязательны новое событие `frame-src` для адреса цели, закрытый iframe, неизменный URL Studio и ровно один канал. Для остальных попыток и прогона с заголовком сохраняется TCP=0.
 - [ ] **Step 3: Прогон.** `bun run build && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser/isolation.test.mjs`. Ожидается PASS. Если тест выявил дыру, её чинят в оболочке или в заголовках с тестом, а не ослабляют ожидание. Исключение — правило `preconnect` выше.
 - [ ] **Step 4: План изоляции.** В разделе «Проверки» записать: `dns-prefetch` вне автотестов, потому что Chromium сам разрешает `*.localhost` и запрос к DNS снаружи не виден, а канал закрывают `Connection-Allowlist` и `X-DNS-Prefetch-Control: off`. Записать и итог по `preconnect`. В M2 не входят пункты про сборку и publisher — это M4.
 - [ ] **Step 5: Коммит.** `git commit -m "test(dashboard): cover malicious dashboards"`.
