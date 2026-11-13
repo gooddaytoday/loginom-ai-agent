@@ -20,6 +20,20 @@ afterAll(async () => {
 const bundledNode =
   process.env.LOGINOM_AI_AGENT_TEST_NODE ?? resolve(import.meta.dir, "../../../desktop/resources/loginom/bin/node")
 
+test("help says what status shows and where readiness is checked", async () => {
+  const child = Bun.spawn([process.execPath, "run", "./src/standalone.ts", "--help"], {
+    cwd: resolve(import.meta.dir, "../.."),
+    env: { ...process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const out = new Response(child.stdout).text()
+  expect(await child.exited).toBe(0)
+  expect(await out).toContain(
+    "loginom setup/check/status (saved connection and pending recovery; readiness: check)/cancel-pending/recover\n",
+  )
+})
+
 test("status prints the saved connection and recovery work instead of a new Host's starting phase", async () => {
   const { statusText, statusView } = await import("../../src/cli/loginom-management")
   const base = {
