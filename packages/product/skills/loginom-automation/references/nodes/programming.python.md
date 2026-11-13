@@ -33,7 +33,9 @@ API: `from builtin_data import InputTable, OutputTable`; `InputTable` — None �
 pandas 2.2.3 и numpy 2.2.4 установлены: `from builtin_pandas_utils import
 to_data_frame, prepare_compatible_table, fill_table`. Для целых и логических с
 пропусками используй `to_data_frame(InputTable, True)`, иначе они станут
-вещественными. `fill_table` пишет None/NA/NaT/NaN как пропуск.
+вещественными; логический столбец без пропусков `to_data_frame` отдаёт как
+int8, и выход станет целым — приведи его `astype("boolean")`. `fill_table` пишет
+None/NA/NaT/NaN как пропуск.
 
 Существующий узел: `parameters:{}` с `finish:"execute"` выполняет сохранённый
 код; замена кода — `source_text` и `expected_source_sha256` из readback.
