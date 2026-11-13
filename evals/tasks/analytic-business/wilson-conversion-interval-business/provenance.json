@@ -1,0 +1,85 @@
+{
+  "task_id": "wilson-conversion-interval-business",
+  "dataset_sha256": {
+    "wilson_batches.csv": "aaed4bbf75cfbb0847f6c7b595b1f02f9f11f591f243134436f625466d57a45b",
+    "wilson_cohorts.csv": "e633a55710e1b637611957112beecd45241aa125381a340aadd1a1124155fc3c"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a3a3ffaa2fd2d9997f696c2116533f0213cd2035a6982e1eb5487b89869d25fc"
+  },
+  "reference_sha256": "fb3fc22b7793d96a9e31710e6ce1900b01836b43bebb54d167eae6bf605d9095",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/wilson_cohorts.csv",
+        "storage": "PRIVATE_AUTHORING_STORAGE/dff05a63fab0176db06e0d1602484adde2dd399e7aa374e21d66b3c5546b2569-0-wilson_cohorts.csv",
+        "matches": true
+      },
+      {
+        "input": "data/wilson_batches.csv",
+        "storage": "PRIVATE_AUTHORING_STORAGE/dff05a63fab0176db06e0d1602484adde2dd399e7aa374e21d66b3c5546b2569-1-wilson_batches.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e28f53650ffernCMq2B06tHSZK",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-13T22:32:48+00:00",
+    "duration_s": 609,
+    "tokens": {
+      "input": 115134,
+      "output": 6636,
+      "reasoning": 1016
+    },
+    "tool_calls": 40,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL",
+  "build_provenance": {
+    "base_commit": "29ea34e27b8f96ed27b744f639c9f48933f52443",
+    "reviewed_palette_patch": "54d5afd358",
+    "qualified_source_tree_sha256": "8960de91493f645f21010fccead6e5d41b7fdf9f6d08ebcda3ee7f32b280e59b",
+    "dirty_reviewed_palette_only": true
+  },
+  "authoring_budget": {
+    "global_started": 1,
+    "global_remaining": 2,
+    "attempt1": "unassisted shared detailed reference",
+    "business_authoring_attempts": 0
+  },
+  "cold": {
+    "accepted": "cold1 all10 native nodes; new fullCSV check-rerun PASS; actual server LGP SHA unchanged; NoSave/NoSettings; cleanup confirmed; unchanged accepted wide helper"
+  },
+  "source_task": "wilson-conversion-interval-detailed",
+  "shared_reference": true,
+  "authoring_form": "detailed"
+}
