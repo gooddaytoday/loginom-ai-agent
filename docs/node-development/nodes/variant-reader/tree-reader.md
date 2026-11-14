@@ -2,7 +2,8 @@
 
 Назначение LAB-1558. База `origin/v040@864fad6efe`, 13.11.2026, только
 документы. Runtime, оснастка и навык не менялись, native-пробы не было —
-её делает разработчик первым шагом цикла. Основание: решение владельца
+её делает разработчик первым шагом цикла. Результат этого шага для LAB-1601
+приведён ниже; описание отказов далее относится к исходной базе. Основание: решение владельца
 `v040-open-scope` и строка «Деревья» решения `v040-scope-expansion`
 («даты, Variant, scalar arrays в typed tree reader — после W1»). W1 влит
 (#1032). Комплект на один узел —
@@ -104,6 +105,53 @@ civil `YYYY-MM-DDTHH:MM:SS.mmm`. Это аддитивная строка осн
 следующего узла дерева — +1 цикл на валидатор и регистрацию. Ориентир:
 40–120 строк production, большая часть — в R3; адресные тесты
 `tree-*.test.mjs`, `node-port-output` и `run-check` tests.
+
+## Native-проба LAB-1601, 13.11.2026
+
+Loginom 7.4.2, `app.loginom.ai`, собственная пара mas3. Исходные три
+JSON-столбца `fixtures/typed/documents.csv` импортированы как строки;
+дополнительно исследована отдельная строка только с датой. Настройки прочитаны
+по `MF;TF-1;WizrdMCF;JSONToTreeWizard;pedDateTimeFormat;ValueControl`
+(`YYYY-MM-DDThh:mm:ss`), `pedBuildTreeAuto;ValueControl;DisplayEl` и
+`pedStrictMode;ValueControl;DisplayEl`. Native-объекты привязаны к своему
+GUID узла и его активному tree output 0; все полученные proxy освобождены.
+Проба сохранила пакет, закрыла его и вышла из аккаунта.
+
+1. **Даты.** Автоструктура даёт `/items/when` DataType **2**, id — 4.
+   Strict on и off дают одну схему и значения. Отдельный JSON
+   `{"items":[{"id":1,"when":"2026-01-15"}]}` тоже даёт DataType 2
+   и полночь; отдельный формат даты не задавался.
+2. **AsVariant даты.** Возвращается JS Date. Civil-поля равны
+   `2026-01-15T12:00:00.000` и `2026-07-01T12:30:15.000`; NULL — null.
+   Browser zone `America/New_York`, offsets 300/240 минут; соответствующие
+   UTC ISO — `17:00:00Z`/`16:30:15Z`. Сдвига civil-времени нет, UTC-строка
+   не является значением дерева. Существующий DateTime decoder подходит R1.
+3. **Variant.** `/items/value` DataType **6**; AsVariant возвращает для
+   7/семь/false/NULL/2.5/9007199254740993 соответственно
+   `number/string/boolean/null/number/Int64`. Последний `toString()` точен.
+   Малое целое и real имеют одинаковый JS-тип, поэтому ветка R3(а) недостаточна.
+4. **Reader и RPC.** `source.GetReader(definitions)` возвращает interface
+   **166**, с `$FHelper` кеширующего reader. Сам `AsVariant` — вызов helper,
+   а не прямой getter с табличным method 321. Наблюдённый `$GetAsType` для
+   обычного листа использует пакетный GetValues; для scalar array — GetAsVariant.
+   Загруженный `bg/js/bg.customconnectors.rpc.js` регистрирует internal interface
+   **2178**: GetMetadata **7228**, GetValues **7229**, GetAsVariant **7230**.
+   Для 7230: request static size 32, int32 NodeInfoID offset 0 и IntPtr Row
+   offset 4; response static size 12, затем ReadVariant. R3 требует отдельной
+   привязки этого канала и проверки типов, а не подстановки interface 116.
+   Прямая read-only проба 7230 дала теги int16 LE **20/8/11/1/5/20**
+   для шести значений Variant; существующий `decodeVariantFrame` читает их
+   без изменения формата. Отличается привязка getter, не формат Variant.
+5. **Scalar arrays.** `/items/tags`: Array=true, Container=false, DataType=5;
+   `/items/scores`: true/false/3. GetRowRange для родителей 0/1/2 даёт
+   start/size `0/2`, `2/0`, `2/1` для обоих массивов. Пустая вторая запись
+   сохраняет определения схемы и не создаёт экземпляров.
+
+Исходные случаи oracle не расходятся с наблюдениями. R1 разрешает DateTime
+только в `trees.from_json`: снят preflight-отказ, расширен output validator,
+зарегистрирован `tree-dates` с отдельным `expected-dates.json`; общий reader
+и валидаторы `trees.to_table`/`trees.to_json` не меняются. Вопросы 6–7 ниже
+не входят в эту пробу и остаются not_checked.
 
 ## Вопросы native-пробы
 

@@ -54,7 +54,7 @@ export function validateTreeJsonScope(text){
  const walk=(value,depth,path='')=>{
   if(++nodes>256||depth>16)throw Error('Tree JSON exceeds 256 nodes or depth 16');
   if(value===null||numbers.has(value)||['string','boolean'].includes(typeof value)){
-   if(typeof value==='string'&&/^\d{4}-\d\d-\d\d(?:T|$)/.test(value))throw Error('Tree stage 1 does not support inferred dates');return;
+   return;
   }
   if(Array.isArray(value)){
    if(value.some(v=>!v||typeof v!=='object'||Array.isArray(v)||numbers.has(v)))throw Error('Tree stage 1 requires one nonempty repeated object branch');
@@ -91,7 +91,7 @@ export function validateJsonTreeSchema(schema){
  validateJsonArrayPaths(arrays.map(n=>n.path));
  const leaves=schema.filter(n=>!n.is_container);
  if(arrays.some(n=>!n.is_container)||new Set(leaves.map(n=>n.name)).size!==leaves.length
-  ||leaves.some(n=>!['integer','real','string','boolean'].includes(n.type)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
+  ||leaves.some(n=>!['integer','real','string','boolean','datetime'].includes(n.type)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
  return true;
 }
 

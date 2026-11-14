@@ -218,7 +218,7 @@ export function validateInitialExistingImportSettings(parameters,verifiedSourceP
     requireValue((Object.hasOwn(parameters.source,'source_mask')?textImportSourceMask(parameters.source):textImportSourcePaths(parameters.source).join('｜'))===verifiedSourcePath,'Existing source does not match the verified upload');
     requireValue(parameters.columns===undefined||parameters.columns.some(c=>c.used),'Import output requires at least one used field');
   } catch(error) {
-    throw new ImportInitialSettingsError(error.message);
+    throw new ImportInitialSettingsError(error.message+'; verified source path(s): '+verifiedSourcePath);
   }
 }
 
@@ -524,6 +524,14 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
   // is no retained schema to inspect until complete source settings are applied.
   if(patch&&!boundSource&&sourceBaseline.fields.source_path.value==='') {
     requireValue(!patch.preserveSchema,'LOGINOM_IMPORT_SCHEMA_CHANGED: source switch requires a saved configured import');
+    // Preview closes without saving its source. The current operation's receipt
+    // can supply one exact file, but never choose a list or invent a mask.
+    if(!['source_path','source_paths','source_mask'].some(k=>Object.hasOwn(requested.source,k))
+      &&typeof patch.verifiedSourcePath==='string'&&!/[｜*]/.test(patch.verifiedSourcePath))
+      requested.source.source_path=patch.verifiedSourcePath;
+    // Existing patches permit omitted usage. A first configuration has no
+    // saved exclusions to preserve; explicitly disabled fields stay disabled.
+    if(Array.isArray(requested.columns))requested.columns=requested.columns.map(c=>({used:true,...c}));
     validateInitialExistingImportSettings(requested,patch.verifiedSourcePath);
     return configureImport(channel,requested,owner,true);
   }
