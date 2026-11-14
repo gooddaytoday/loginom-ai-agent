@@ -153,6 +153,16 @@ Filter GUID; readback requires integer `row_number <= TopN`, not a literal.
 Stock Save, cold binding/field readback without configuration, both typed
 outputs and cleanup apply. Oracle/expected never reach the model.
 
+`row-filter-typed` and `row-filter-null` use the unchanged approved
+`acceptance/typed/task-variable-{typed,null}.md` and `fixtures/typed/rows.csv`.
+The private stdlib oracle checks initial RowID 2,8 → final 2,3,7,8 for typed,
+and empty output 0 / all eight rows in output 1 for real NULL, as confirmed
+by the LAB-1661 native probe before registration. Typed changes only MinScore
+and Since on the same builtin source, retaining both scalar bindings and the
+Filter GUID. Full typed outputs, four/two CSVs, Save, cold native `>=` predicates
+and binding identities without reconfiguration, and cleanup use stock checks.
+Only task and CSV reach the model; oracle and expected remain private.
+
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
 `{is_null:false,value:null,non_finite:"NaN"|"Infinity"|"-Infinity",

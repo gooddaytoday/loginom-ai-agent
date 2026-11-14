@@ -1,3 +1,4 @@
+import {validateFilterValue} from './filter-parameters.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {advanceSortingInputColumns} from './sorting-procedure.mjs';
@@ -56,12 +57,17 @@ export function filterBindingVariables(native,mapping,proof,names){
   if(!names.includes(v.name))return v;
   const fields=mapping?.fields?.filter(f=>f.name===v.name&&f.index===v.index)??[];need(fields.length===1&&fields[0].source,'mapped connected identity');
   const f=fields[0],sources=proof.variables.filter(x=>x.id===f.source.id&&x.name===f.source.name);need(sources.length===1,'source variable identity');
-  const source=sources[0],cell=source.cell;need(source.type===v.type&&cell?.type===v.type&&({integer:4,string:5})[v.type]===f.type,'BINDING_TYPE_MISMATCH: source scalar type');
-  need(cell.is_null===false,'BINDING_NULL_UNSUPPORTED: NULL is unsupported');
-  const value=v.type==='integer'?Number(cell.value):cell.value;
-  need(v.type==='integer'?cell.precision==='exact_integer'&&Number.isSafeInteger(value)&&String(value)===cell.value:typeof value==='string','exact source scalar');
-  need(v.is_null===true||v.is_null===false&&v.value===value,'source/cache race');
-  return {...v,value,is_null:false};
+  const source=sources[0],cell=source.cell;need(source.type===v.type&&cell?.type===v.type&&({integer:4,real:3,datetime:2,string:5})[v.type]===f.type,'BINDING_TYPE_MISMATCH: source scalar type');
+  need(cell.is_null===false||v.type==='real'&&cell.is_null===true&&cell.value===null&&cell.precision==='exact_null','BINDING_NULL_UNSUPPORTED: NULL is unsupported');
+  const value=cell.is_null?null:v.type==='integer'?Number(cell.value):cell.value;
+  if(!cell.is_null){
+   validateFilterValue(value,v.type);
+   need(v.type==='integer'?cell.precision==='exact_integer'&&String(value)===cell.value
+    :v.type==='real'?cell.precision==='17_significant_digits'&&cell.representation==='binary64'
+    :v.type==='datetime'?cell.precision==='millisecond'&&cell.representation==='local_datetime':typeof value==='string','exact source scalar');
+  }
+  need(v.is_null===true||v.is_null===false&&v.value===value&&cell.is_null===false,'source/cache race');
+  return {...v,value,is_null:cell.is_null};
  });
 }
 export function filterBindingInventory(native,mapping,graph,node,sourceProof){
@@ -75,15 +81,15 @@ export function filterBindingInventory(native,mapping,graph,node,sourceProof){
   if(row.kind==='or'){group++;condition=0;continue;}
   const parameter=`/groups/${group}/${condition++}/value`;
   if(row.variable_mode===0)continue;
-  need(row.variable_mode===1&&row.value?.kind==='variable'&&['integer','string'].includes(row.type),'unsupported active binding');
+  need(row.variable_mode===1&&row.value?.kind==='variable'&&['integer','real','datetime','string'].includes(row.type),'unsupported active binding');
   const variables=controlVariables.filter(v=>v.name===row.value.name),fields=mapping.fields.filter(f=>f.name===row.value.name);
   need(variables.length===1&&fields.length===1,'unique mapped name');
-  const v=variables[0],f=fields[0],types={4:'integer',5:'string'};
+  const v=variables[0],f=fields[0],types={2:'datetime',3:'real',4:'integer',5:'string'};
   need(v.index===f.index&&v.type===row.type&&types[f.type]===v.type,'BINDING_TYPE_MISMATCH: mapped type/index');
-  need(v.is_null===false&&(f.is_null===false||sourceProof),'BINDING_NULL_UNSUPPORTED: NULL is unsupported');
+  need(v.is_null===false&&(f.is_null===false||sourceProof)||v.type==='real'&&v.is_null===true&&(sourceProof||f.is_null===true),'BINDING_NULL_UNSUPPORTED: NULL is unsupported');
   need(Number.isSafeInteger(f.id)&&f.source&&Number.isSafeInteger(f.source.id)&&f.source.type===f.type&&links.length===1&&links[0].target_port_guid===mapping.port_guid,'connected source identity');
   const sources=graph.nodes.filter(n=>n.ref.node_id===links[0].source);need(sources.length===1,'source owner');
-  inventory.push({parameter,mode:'variable',row_id:row.record_id,variable:{kind:'control',input:0,id:f.id,name:f.name,type:v.type,is_null:false},
+  inventory.push({parameter,mode:'variable',row_id:row.record_id,variable:{kind:'control',input:0,id:f.id,name:f.name,type:v.type,is_null:v.is_null},
    source:{ref:sources[0].ref,type:sources[0].type,output:links[0].output,variable_id:f.source.id},input_port_guid:mapping.port_guid,connected:true,verified:true});
  }
  need(inventory.length<=32,'bounded inventory');return inventory;
