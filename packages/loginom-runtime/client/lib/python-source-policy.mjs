@@ -9,13 +9,16 @@ export const PYTHON_MODULE_POLICY='python-module-v1';
 export const PYTHON_SOURCE_LIMITS=Object.freeze({utf16:2048,lines:128});
 export const PYTHON_ALLOWED_MODULES=Object.freeze(['builtin_data','builtin_pandas_utils','pandas','numpy','math','cmath','datetime','decimal','fractions',
   'statistics','re','json','itertools','functools','collections','random']);
+// Admitted modules re-export os/sys (random._os, statistics.sys, re.enum.sys):
+// those names, sys.modules and process calls are refused as any identifier, as
+// is DataFrame.query (engine='python' evaluates @-names from its string).
 const FORBIDDEN_NAMES=new Set(['open','exec','eval','compile','__import__','importlib','globals','locals','vars','getattr','setattr','delattr',
-  'breakpoint','input','help','exit','quit','memoryview','__builtins__']);
+  'breakpoint','input','help','exit','quit','memoryview','__builtins__','os','sys','modules','subprocess','pickle','builtins','system','popen','query']);
 // pandas/numpy readers, writers and submodules reach files, URLs, the clipboard
 // and native code. Refused as any identifier: `from x import name` and a line
 // break after the dot bind them without a preceding dot.
 const FORBIDDEN_ATTRIBUTE=/^(?:read_\w+|to_(?:csv|excel|json|parquet|pickle|sql|html|hdf|feather|stata|xml|clipboard|latex|markdown|orc|gbq|string)|load|loadtxt|save|savez\w*|savetxt|genfromtxt|fromfile|tofile|memmap|open_memmap|dump|urlopen|DataSource|ExcelWriter|HDFStore|io|lib|f2py|testing|ctypeslib)$/;
-const DUNDER=/__\w+__/;
+const DUNDER=/(?<![A-Za-z0-9])__\w+__/;
 
 const refusal=(reason,line=null)=>Object.freeze({status:'REFUSED',policy:PYTHON_MODULE_POLICY,reason,...(line?{line}:{})});
 
@@ -47,12 +50,14 @@ export function pythonCodeSkeleton(source){
     const c=source[i];
     if(c==='#'){while(i<source.length&&source[i]!=='\n')i++;continue;}
     if(c==='"'||c==="'"){
-      let prefix='';for(let j=out.length-1;j>=0&&/[A-Za-z]/.test(out[j])&&out.length-j<=2;j--)prefix=out[j]+prefix;
+      // A prefix is the whole word before the quote (`or"…"` has none).
+      const word=/\w*$/.exec(out)[0],prefix=/^(?:[rRuUbBfF]|[rR][bBfF]|[bBfF][rR])$/.test(word)?word:'';
       const formatted=/f/i.test(prefix),raw=/r/i.test(prefix),triple=source.startsWith(c.repeat(3),i),quote=triple?c.repeat(3):c;
       let j=i+quote.length,body='';
       for(;;){
         if(j>=source.length)return {error:'unterminated_string'};
-        if(!raw&&source[j]==='\\'){body+=source.slice(j,j+2);j+=2;continue;}
+        // A backslash never lets its next character end the literal, raw or not.
+        if(source[j]==='\\'){body+=source.slice(j,j+2);j+=2;continue;}
         if(source.startsWith(quote,j))break;
         if(!triple&&source[j]==='\n')return {error:'unterminated_string'};
         body+=source[j++];
@@ -98,7 +103,8 @@ export function inspectPythonSourcePolicy(source){
     if(/[^\x00-\x7f]/.test(line))return refusal('non_ascii',at);
     for(const match of line.matchAll(/\b([A-Za-z_]\w*)\b/g)){
       const name=match[1];
-      if(/^__\w*__$/.test(name)||FORBIDDEN_NAMES.has(name))return refusal('name:'+name,at);
+      // Leading underscore: private module members (random._os); `_` alone is a plain variable.
+      if(/^__\w*__$/.test(name)||FORBIDDEN_NAMES.has(name)||name.startsWith('_')&&name!=='_')return refusal('name:'+name,at);
       if(FORBIDDEN_ATTRIBUTE.test(name))return refusal('attribute:'+name,at);
     }
   }

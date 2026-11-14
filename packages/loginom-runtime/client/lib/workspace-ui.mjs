@@ -3665,8 +3665,9 @@ function readRenderedInputMapping(observation) {
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression}:null;
       const expressionCancel=tid===wizard.root_tid+';ExprDataEditForm;btnCancel' && expressionParametersReady
         ? {root_ref:params.root_ref,wizard_root_ref:wizard.root_ref,selected_expression:params.selected_expression,original_row:wizard.expression_selection}:null;
-      // Python code runs on the shared server: only the Python handler (its
-      // prepared node context) may write it, after python-module-v1 admission.
+      // Python code runs on the shared server: written only under a prepared
+      // node context of this workflow tab (the node type is not checked here);
+      // the Python handler admits the code by python-module-v1 before writing.
       const expressionWritable=identity && isEnabled && calculatorEditor?.status==='observed' && ['expression','javascript','python'].includes(calculatorEditor.mode)
         && (calculatorEditor.mode!=='python' || !!definitionPrefix && definitionPrefix===workflow?.prefix)
         && calculatorEditor.selected_expression && calculatorEditor.document.full_text_verified && calculatorEditor.document.writable;

@@ -191,6 +191,41 @@ for(const [source,reason] of [
  assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
 });
 
+// LAB-1641 re-review: raw-string skeleton desync and modules reached through
+// attributes of admitted modules (each line ran os.system before the fix).
+for(const [source,reason] of [
+ ['x = r"\\" # " ; import os; os.system("id")\n','module:os'],
+ ['y = 0 or"\\" # " ; import os\n','module:os'],
+ ['import random\nrandom._os.system("id")\n','name:_os'],
+ ['from random import _os\n','name:_os'],
+ ['import random\nx = (random.\n    _os)\n','name:_os'],
+ ['import collections\ncollections._sys.modules["os"].popen("id")\n','name:_sys'],
+ ['import statistics\nstatistics.sys.modules["os"].system("id")\n','name:sys'],
+ ['import re\nre.enum.sys.modules["os"].system("id")\n','name:sys'],
+ ['import json\njson.codecs.sys.modules["os"].system("id")\n','name:sys'],
+ ['import collections\ncollections._sys.modules["importlib"].import_module("subprocess")\n','name:_sys'],
+ ['import collections\ncollections._sys.modules["io"].FileIO("/etc/passwd")\n','name:_sys'],
+ ['import collections\ncollections._sys.modules["pickle"].loads(b"x")\n','name:_sys'],
+ ['x = pickle.loads(b"x")\n','name:pickle'],
+ ['m = modules["os"]\n','name:modules'],
+ ['x = builtins\n','name:builtins'],
+ ['x = popen\n','name:popen'],
+ ['x = subprocess\n','name:subprocess'],
+ ['x = os\n','name:os'],
+ ['x = system\n','name:system'],
+ ['df.query(\'@random._os.system("id") == 0\', engine=\'python\')\n','name:query'],
+ ['y = ("{0._" + "_globals__}").format(f)\n','string:__globals__'],
+])test('LAB-1641 bypass refused: '+reason+' '+JSON.stringify(source.slice(0,48)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('legitimate code stays admitted: double underscores inside names, raw/f strings, Cyrillic text, _ loop variable, json.loads',()=>{
+ for(const source of ['df.columns = ["value__sum", "value__mean"]\n','x = "a__b__c"\n','label = "Сумма заказа"\n','label = f"{v:,.2f} руб."\n',
+  'x = rf"\\d+ {n}"\n','x = r"C:\\dir\\\\"\n','for _ in range(3):\n    pass\n','import json\nrows = json.loads("[1, 2]")\n','x = rb"\\x00"\ny = Rb"a" + bR"b" + U"c"\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
+});
+
 test('f-string literal text, escaped braces and nested specs stay admitted; only their expressions are code',()=>{
  for(const source of ['label = f"Сумма {amount:.2f} руб."\n','x = f"{{literal}} {value}"\n','x = f"{value:{width}}"\n','x = rf"\\d{{2}} {n}"\n','x = f"""\n{a}\n"""\n'])
   assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
