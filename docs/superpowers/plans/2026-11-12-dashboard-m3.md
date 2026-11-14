@@ -1494,7 +1494,7 @@ import { onState, close, type DashboardState } from "./loginom"
 ### Task 15: Набор шаблона в поставке и CI
 
 **Files:**
-- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
+- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml`, `P/test/build/build.test.mjs` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
 
 **Interfaces:**
 - Produces: в ресурсах `dashboard/template/` (файлы шаблона, `src/`, `node_modules` без `.bin`), `dashboard/draft.js`, `dashboard/selfcheck.mjs`; все в `resource-manifest.json`.
@@ -1519,7 +1519,9 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
 ```
 
   `npm` — та же переменная, что для `runtime/client` (≈127); если она объявлена ниже, перенести её объявление выше этого блока. `dashboard` (каталог пакета) добавить в список проверки пересечений входов и выхода (≈69–87). Набор ставится на той же системе, что и сборка поставки, поэтому нативные пакеты esbuild и Rollup соответствуют платформе.
-- [ ] **Step 4: Задача CI.** В `.github/workflows/test.yml` после `chromium-direct`:
+- [ ] **Step 4: Задача CI.** В существующем `test/build/build.test.mjs` добавить отдельные сборки исходников `examples/roi/src`, `examples/campaign-summary/src`, `examples/channel-summary/src` через `buildDashboard`; исходный test fixture может принимать источник src. Это обязательные три положительных проверки сборки, без браузера. Прежние build/resolver-тесты сами по себе этих примеров не содержали.
+
+ В `.github/workflows/test.yml` после `chromium-direct`:
 
 ```yaml
   dashboard-template:
