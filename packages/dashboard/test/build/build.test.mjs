@@ -9,11 +9,11 @@ import { buildDashboard, PLATFORM_FILES, sourceFiles } from "../../src/agent/bui
 const template = resolve(import.meta.dirname, "../../template")
 const node = process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath
 
-async function fixture(t) {
+async function fixture(t, src = join(template, "src")) {
   const root = await mkdtemp(join(tmpdir(), "dashboard-build-"))
   t.after(() => rm(root, { recursive: true, force: true }))
   const work = join(root, "work")
-  await cp(join(template, "src"), join(work, "src"), { recursive: true })
+  await cp(src, join(work, "src"), { recursive: true })
   return { work, out: join(root, "control/draft"), node, template }
 }
 
@@ -30,6 +30,12 @@ test("the platform template builds from project sources to an immutable hash", a
   assert.equal(repeated.ok, true, repeated.output)
   assert.equal(repeated.hash, build.hash)
   assert.deepEqual((await readdir(input.out)).filter(name => /^[a-f0-9]{64}$/.test(name)), [build.hash])
+})
+
+for (const key of ["roi", "campaign-summary", "channel-summary"]) test(`SDK example typechecks/builds: ${key}`, async t => {
+  const input = await fixture(t, resolve(import.meta.dirname, "../../examples", key, "src"))
+  const build = await buildDashboard(input)
+  assert.equal(build.ok, true, build.output)
 })
 
 test("a symbolic src root is refused before invoking the compiler", async t => {
