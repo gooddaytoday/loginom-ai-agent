@@ -172,7 +172,7 @@ test('discarded initial configuration applies full source before inspecting a re
 });
 test('unconfigured existing import requires complete settings and verified source before mutation',async()=>{
  const f=fixture({unconfigured:true});
- await assert.rejects(configureTextImportPatch(f.channel,{source:f.parameters.source},f.owner,'/test/new.csv'),/Format parameters are incomplete/);
+ await assert.rejects(configureTextImportPatch(f.channel,{source:f.parameters.source},f.owner,'/test/new.csv'),/explicitly configured columns/);
  await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/foreign.csv'),/verified upload/);
  assert.equal(f.refreshes,0);
 });
@@ -222,7 +222,7 @@ test('bound existing patches reject a literal conflict or an unobserved variable
   assert.deepEqual(f.parameters,before);
  });
  test('unconfigured patch with incomplete settings refuses before any settings gesture and leaves request intact',async()=>{
-  for(const change of [p=>delete p.source,p=>delete p.format,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
+  for(const change of [p=>delete p.source,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
    const f=fixture({unconfigured:true});change(f.parameters);const before=structuredClone(f.parameters);
    await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'),e=>e instanceof ImportInitialSettingsError&&/complete settings.source.*explicit source_path/.test(e.message));
    assert.deepEqual(f.gestures,[]);assert.deepEqual(f.parameters,before);
