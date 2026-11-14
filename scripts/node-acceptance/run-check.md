@@ -680,6 +680,16 @@ The existing generated-source storage/disk cleanup runs afterwards. External
 Проверяет точное равенство числовых ключей, общий 0/−0, отдельный NULL,
 близкие разные real, все суммы/количества, порядок строк, CSV/Save/cold.
 
+Python node scenarios (`programming.python`, `external_process`): `py-stdlib`
+(declared Id/Amount/AmountScaled/Text/Flag/Date, `InputTable.Get`/`OutputTable.Set`,
+AmountScaled = Amount×3, NULL and `''` kept) and `py-pandas` (schema from code,
+`to_data_frame(InputTable, True)` → Flag=true rows → `fill_table`). Fixtures and
+expected tables are in `docs/node-development/nodes/programming-python/acceptance/<case>`;
+the model receives `values.csv` and the case `.py` file, and the saved code must
+equal that file (readback `source_sha256`). The names avoid a standalone
+`python` token: the saved package name appears in breadcrumbs, where the UI
+code-name guard denies it and the cold return to the scenario cannot click.
+
 Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 `corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
 age/pressure business task). Fixtures and independent expected tables are in

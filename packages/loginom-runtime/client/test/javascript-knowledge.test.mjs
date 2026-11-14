@@ -140,7 +140,7 @@ test('full node envelope admits JavaScript fields and discriminated import sourc
     assert.deepEqual(nodeApplyInputSchema.properties.parameters.properties[key],javascriptParametersSchema.properties[key]);
   assert.deepEqual(nodeApplyInputSchema.properties.parameters.properties.columns.anyOf,
     [crossTableParametersSchema.properties.columns,javascriptParametersSchema.properties.columns]);
-  const javascript=nodeApplyInputSchema.allOf.find(rule=>rule.if?.properties?.target?.properties?.type?.const==='programming.javascript');
+  const javascript=nodeApplyInputSchema.allOf.find(rule=>rule.if?.properties?.target?.properties?.type?.enum?.includes('programming.javascript'));
   assert.deepEqual(javascript.then.properties.parameters,javascriptParametersSchema);
   assert.deepEqual(nodeApplyInputSchema.properties.parameters.properties.source.oneOf[1].required,['artifact_id','upload_operation_id']);
   assert.deepEqual(nodeApplyInputSchema.properties.parameters.properties.source.oneOf[0].required,['kind','server_source_ref']);
