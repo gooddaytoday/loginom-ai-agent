@@ -131,10 +131,12 @@ if __name__ == '__main__':
     if '--check' in sys.argv:
         committed = json.loads((ROOT / 'expected.json').read_text(encoding='utf-8'))
         assert result == committed, 'expected.json differs from the independent calculation'
-        dates = dict(package_path='{{PACKAGE_PATH}}',
-                     nodes=[dict(type='imports.text', label_any=True), dict(type='trees.from_json', label_any=True)],
-                     outputs=[], tree_outputs=result['cases']['dates']['tree_outputs'])
-        assert dates == json.loads((ROOT / 'expected-dates.json').read_text(encoding='utf-8')), 'expected-dates.json differs from the independent dates case'
+        for name in ['dates', 'scalar_arrays']:
+            projection = dict(package_path='{{PACKAGE_PATH}}',
+                              nodes=[dict(type='imports.text', label_any=True), dict(type='trees.from_json', label_any=True)],
+                              outputs=[], tree_outputs=result['cases'][name]['tree_outputs'])
+            filename = 'expected-' + name.replace('_', '-') + '.json'
+            assert projection == json.loads((ROOT / filename).read_text(encoding='utf-8')), filename + ' differs from the independent case'
         print('trees.from_json typed proposal: independent expected matches (%d cases)' % len(result['cases']))
     else:
         print(json.dumps(result, ensure_ascii=False, indent=2))

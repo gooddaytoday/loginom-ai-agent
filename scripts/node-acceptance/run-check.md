@@ -112,6 +112,14 @@ settings changes and cleanup are required. No export/CSV is requested or passed
 to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
 the model; oracle and expected remain private.
 
+`tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
+`fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
+projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema
+types `string_array`/`real_array`, ordered values, parent row ranges and both
+empty arrays in the second record are checked directly. Full tree read, Save,
+cold reexecution without configuration and cleanup are required; no CSV export.
+Only the business task and original CSV reach the model.
+
 Run live acceptance without repeatedly reading live logs:
 
 `group-date` uses grouping `acceptance/types/task-date.md` and only
@@ -1162,3 +1170,12 @@ lift 0, max_items=3, max_consequents=2, исключение поддержки 
 не сверяется (решение владельца 12.11). Остальные сценарии сохраняют строгий cold.
 Save/cleanup обязательны; expected-exclude*.json генерируются oracle.py --write-exclude.
 Вспомогательный вход и отбор выбранных элементов не входят в сценарий.
+
+`supernode-calc` uses the approved control-supernode/acceptance/task.md and only
+input.csv/replacement.csv. Stock typed output and CSV matchers check the complete
+ordered external output 0 (5×6, then 3×6), exact field order/types and Real abs/rel=0.
+The node audit checks retained Import/container/Calculator/boundary GUIDs and a
+normal NW1 observation of InputNode → Calculator → OutputNode. Cold enters and
+leaves through the production NW1 adapter, observes that graph, then executes the
+saved parent with stock typed reads and cleanup. No settings are reapplied.
+Oracle and expected JSON remain private. Empty input is outside this scenario.

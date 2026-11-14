@@ -16,6 +16,9 @@ CONTRACTS = (C + 'node-contracts.*', C + 'effect-contracts.mjs',
              C + 'node-read-contract.mjs', C + 'node-result-schema.mjs')
 # The only path-rule table: glob(s), stable check IDs, suggested run-check cases.
 RULES = (
+    ((C + 'supernode-*.mjs', 'scripts/node-acceptance/supernode-*.mjs',
+      'docs/node-development/nodes/control-supernode/acceptance/**',
+      'docs/node-development/nodes/control-supernode/fixtures/**'), ('live-ui',), ('supernode-calc',)),
     (('packages/loginom-runtime/src/**',), ('host-unit',), ()),
     (('packages/loginom-runtime/client/**',), ('client-full',), ()),
     (('scripts/node-acceptance/**',), ('acceptance-tests',), ()),
@@ -131,7 +134,7 @@ RULES = (
       'scripts/node-acceptance/tests/trees.test.mjs', 'scripts/node-acceptance/tests/tree-dates.test.mjs',
       'docs/node-development/nodes/trees-jsontotree/fixtures/nested-records/**'), ('live-ui',),
      ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat', 'trees-to-table-indices',
-      'tree-null-leaves', 'tree-nested-records', 'tree-empty-containers', 'tree-dates')),
+      'tree-null-leaves', 'tree-nested-records', 'tree-empty-containers', 'tree-dates', 'tree-scalar-arrays')),
     ((C + 'exports-excel-*.mjs', 'scripts/node-acceptance/exports-excel*.mjs'), ('live-ui',), ('exports-excel', 'excel-export-xls', 'excel-export-numeric', 'excel-export-replace')),
     ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named', 'excel-import-binding')),
     ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',

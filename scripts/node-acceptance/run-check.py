@@ -82,6 +82,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'supernode-calc' and not cases and not case_root:
+        node = REPO / 'docs/node-development/nodes/control-supernode'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task.md', data=node / 'fixtures',
+                    base=None, input_files=['input.csv', 'replacement.csv'], export_count=2,
+                    supernode=True, initial_table='expected-initial.json')
     if name in ['bindings-grouping-sort', 'bindings-sorting-locale']:
         node = 'grouping' if name == 'bindings-grouping-sort' else 'sorting'
         src = REPO / 'docs/node-development/variables/bindings/acceptance/cycle3'
@@ -424,11 +429,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures',
                     input_files=['orders.csv' if name == 'table-tree-json' else 'documents.csv'], base=None, external=True, tree_conversion=True)
-    if name == 'tree-dates':
+    if name in ['tree-dates', 'tree-scalar-arrays']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         src = node / 'acceptance/typed'
-        return dict(source=src, prompt=src / 'task-dates.md', data=node / 'fixtures/typed',
-                    input_files=['documents.csv'], base=None, external=True, tree_only=True, expected_name='expected-dates.json')
+        kind = name.removeprefix('tree-')
+        return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=node / 'fixtures/typed',
+                    input_files=['documents.csv'], base=None, external=True, tree_only=True, expected_name='expected-' + kind + '.json')
     if name in ['tree-null-leaves', 'tree-nested-records', 'tree-empty-containers']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         return dict(source=node / 'acceptance/nested-records', prompt=node / ('acceptance/task-' + name[5:] + '.md'),
@@ -1772,7 +1778,7 @@ def check_tree(port, expected):
     assert branch['is_array'] and [schema[i]['name'] for i in branch['children']] == expected['item_field_order'], 'TREE_ITEM_ORDER'
     for path, kind in expected['schema_types'].items():
         actual = [n for n in schema if n['path'] == path]
-        assert len(actual) == 1 and ('object_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
+        assert len(actual) == 1 and (actual[0]['type'] + '_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
     for path, order in expected.get('nested_field_order', {}).items():
         parent = next(n for n in schema if n['path'] == path)
         assert [schema[i]['name'] for i in parent['children']] == order, 'TREE_NESTED_ORDER'
@@ -2788,6 +2794,9 @@ class Runner:
         header = spec.get('csv_header', 'names')
         if case == 'text-multi-file-list':
             check_text_multi_file_list(replies)
+        if spec.get('supernode'):
+            self.phase('supernode-audit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/supernode-audit.mjs',
+                       folder / 'model.stdout', src, folder / 'supernode-audit.json', *sorted(profile.rglob('execution-events.jsonl'))], folder, timeout=60)
         if spec.get('text_file_info'):
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_file_info(replies)
@@ -2832,7 +2841,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
+            csv_expected = (read(src / spec['initial_table'])['outputs'][0] if spec.get('initial_table') and index == 0
+                            else expected['outputs'][0] if spec.get('initial_table')
+                            else read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
                             else expected['outputs'][0] if spec.get('rest_query_initial')
                             else read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
                             else expected['outputs'][0] if spec.get('binding_initial')

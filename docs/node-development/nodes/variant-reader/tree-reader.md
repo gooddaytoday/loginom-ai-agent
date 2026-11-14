@@ -53,6 +53,11 @@
 civil `YYYY-MM-DDTHH:MM:SS.mmm`. Это аддитивная строка оснастки.
 
 **R2. Массивы скаляров — малая правка общего reader.**
+Реализация LAB-1647: reader допускает Array=true/Container=false для DataType
+1–5; JSON preflight/output принимают однородные scalar arrays с типизированным
+свидетелем по тому же пути. Соседние массивы скаляров разрешены; ограничения
+ветви массивов объектов, Variant и `trees.to_table` сохраняются. Сценарий
+`tree-scalar-arrays` использует отдельный `typed/expected-scalar-arrays.json`.
 - `node-port-output.mjs:207`: допустить `array && !container` для скалярного
   листа с DataType 1–5.
 - `instance()` (`:230-250`) уже обходит `is_array` через `GetRowRange` и
