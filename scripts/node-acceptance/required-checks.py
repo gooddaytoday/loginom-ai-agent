@@ -33,7 +33,7 @@ RULES = (
      ('live-ui',), ('calculator-vars', 'calculator-vars-update', 'calculator-expression-options', 'calculator-javascript')),
     ((C + 'sorting-*.mjs', 'scripts/node-acceptance/sorting-modes.mjs'), ('live-ui',), ('sorting-case', 'sorting-threads', 'sorting-auto')),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/unique/**'), ('live-ui',), ('grouping-unique',)),
-    ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/types/**'), ('live-ui',), ('group-real', 'group-boolean')),
+    ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/types/**'), ('live-ui',), ('group-real', 'group-boolean', 'group-date')),
     ((C + 'grouping-*.mjs', 'docs/node-development/nodes/grouping/acceptance/modes/**'), ('live-ui',), ('grouping-median', 'grouping-mode', 'grouping-stddev', 'grouping-null-count', 'grouping-first', 'grouping-last', 'grouping-only', 'grouping-concat', 'grouping-cache', 'grouping-sort-result')),
     ((C + 'filter-*.mjs', 'docs/node-development/nodes/row-filter/acceptance/**'), ('live-ui',), ('row-filter-variables', 'row-filter-list', 'row-filter-scalar', 'row-filter-empty', 'row-filter-none', 'row-filter-value-list', 'row-filter-top-n')),
     ((C + 'variable-binding-*.mjs', 'scripts/node-acceptance/bindings-grouping-sort.mjs', 'docs/node-development/variables/bindings/acceptance/cycle3/**'), ('live-ui',), ('bindings-grouping-sort', 'bindings-sorting-locale')),

@@ -10,6 +10,12 @@
 
 Ограничения: От 1 до 128 ключей, до 256 мер; одно поле не может быть ключом и мерой. Медиана, мода, СКО, First/Last/Only/Concat — #828, #866, #871; произвольных статистических тестов нет; SUM/AVG только integer/real.
 
+DateTime (LAB-1659): count/min/max/mode/unique_count/null_count/first/last/only
+по native-матрице; min/max/first/last/mode/only сохраняют datetime, счётчики —
+integer. `group-date` проверяет min/max/last/null_count на `types.csv` с
+`expected-date.json`, включая NULL, CSV, Save и cold Execute. Недоступные
+sum/avg/median/stddev/concat отклоняются до настройки.
+
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [grouping-node.mjs](../../../../packages/loginom-runtime/client/lib/grouping-node.mjs):1–48; [grouping-parameters.mjs](../../../../packages/loginom-runtime/client/lib/grouping-parameters.mjs):1–57; [transform.group_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.group_data.md):1–6. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
 ## Исторические материалы и план расширений

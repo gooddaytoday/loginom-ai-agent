@@ -114,6 +114,13 @@ the model; oracle and expected remain private.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-date` uses grouping `acceptance/types/task-date.md` and only
+`fixtures/types/types.csv`. `expected-date.json` preserves unchanged
+`cases.date.stages` from LAB-1558: DateTime min/max/last (including final NULL),
+integer null_count, full typed rows and exact field order with `ordered:false`.
+The independent oracle stays private. CSV, Save, cold Execute without
+configuration and cleanup use stock checks; only task and CSV reach the model.
+
 `group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
 `fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
 `cases.boolean.stages` from LAB-1558. Native Boolean min/max/mode and integer

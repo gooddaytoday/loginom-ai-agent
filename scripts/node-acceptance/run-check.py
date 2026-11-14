@@ -334,7 +334,7 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
                     expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
                     text_update=update, export_count=2 if update else 1)
-    if name in ['group-real', 'group-boolean']:
+    if name in ['group-real', 'group-boolean', 'group-date']:
         root = REPO / 'docs/node-development/nodes/grouping'
         kind = name.removeprefix('group-')
         return dict(source=root / 'acceptance/types', prompt=root / ('acceptance/types/task-' + kind + '.md'),
