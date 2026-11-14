@@ -16,6 +16,9 @@ CONTRACTS = (C + 'node-contracts.*', C + 'effect-contracts.mjs',
              C + 'node-read-contract.mjs', C + 'node-result-schema.mjs')
 # The only path-rule table: glob(s), stable check IDs, suggested run-check cases.
 RULES = (
+    ((C + 'loop-*.mjs', 'docs/node-development/nodes/control-loop/acceptance/**',
+      'packages/product/skills/loginom-automation/references/nodes/control.loop.md'),
+     ('live-ui',), ('loop-pages-offline', 'loop-pages-rest', 'supernode-calc', 'rest-get-plain')),
     ((C + 'supernode-*.mjs', 'scripts/node-acceptance/supernode-*.mjs',
       'docs/node-development/nodes/control-supernode/acceptance/**',
       'docs/node-development/nodes/control-supernode/fixtures/**'), ('live-ui',), ('supernode-calc',)),

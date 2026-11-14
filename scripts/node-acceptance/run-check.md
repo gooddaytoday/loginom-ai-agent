@@ -1189,3 +1189,12 @@ normal NW1 observation of InputNode → Calculator → OutputNode. Cold enters a
 leaves through the production NW1 adapter, observes that graph, then executes the
 saved parent with stock typed reads and cleanup. No settings are reapplied.
 Oracle and expected JSON remain private. Empty input is outside this scenario.
+
+`loop-pages-offline` and `loop-pages-rest` use the frozen control-loop kit and only
+fixtures/pages.csv. A same-workflow Supernode is the live body; one fixed-size
+group (one row) runs sequentially, all optional Loop flags off. Offline requires
+explicit Calculator output mappings in PageNo/Limit/Skip/LastIndex order; REST
+keeps RequestID=0 per iteration and the exact 98-byte httpbin response including
+its final LF. Both require full typed reads, CSV, Save, cold execution without
+configuration and confirmed cleanup. Only task and CSV reach the model; oracle
+and expected remain private. Regression: supernode-calc and rest-get-plain once.
