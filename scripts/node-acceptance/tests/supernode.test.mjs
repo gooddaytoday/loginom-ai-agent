@@ -20,6 +20,10 @@ test('supernode audit consumes an ordinary NW1 workspace observation',()=>{
  assert.equal(checkSupernodeGraph({nodes,links},'calc').calculator,'calc');
  assert.throws(()=>checkSupernodeGraph({nodes,links},'foreign-calc'));
 });
+test('supernode audit requires the requested Calculator even when a typed Calculator is present',()=>{
+ assert.throws(()=>checkSupernodeGraph(graph,'foreign-calc'),/BOUNDARIES_AND_CALCULATOR/);
+ assert.equal(checkSupernodeGraph({...graph,nodes:[...graph.nodes,{ref:{node_id:'other'},type:'transform.calculator'}]},'calc').calculator,'calc');
+});
 test('supernode-calc delivers only the two approved inputs and excludes empty',()=>{
  const result=JSON.parse(execFileSync('python3',['-c',`import runpy,json; from pathlib import Path
 m=runpy.run_path('scripts/node-acceptance/run-check.py'); s=m['scenario']('supernode-calc')
@@ -64,6 +68,15 @@ test('main audit takes topology from the private journal with no public nodes ar
  const f=await mainFixture(t),r=await checkSupernodeRun(f.events,expectedDirectory,[f.journal]);
  assert.equal(r.status,'PASS');assert.equal(r.topology[0].file,f.journal);assert.equal(r.topology[0].line,1);assert.equal(r.tables.length,2);
 });
+test('main audit permits construction observations before the first complete nested graph',async t=>{
+ // Live LAB-1664 execution-events.jsonl:554 (enter) and :579 (Calculator source link).
+ const f=await mainFixture(t),empty=structuredClone(f.observation),partial=structuredClone(f.observation);
+ empty.outcome.output.nodes.splice(1,1);empty.outcome.output.links=[];
+ partial.outcome.output.links.pop();
+ await writeFile(f.journal,[empty,partial,f.observation].map(x=>JSON.stringify(x)).join('\n'));
+ const result=await checkSupernodeRun(f.events,expectedDirectory,[f.journal]);
+ assert.equal(result.status,'PASS');assert.deepEqual(result.topology.map(t=>t.line),[3]);
+});
 test('main audit retains MAIN_NESTED_OBSERVATION when the private journal has no graph',async t=>{
  const f=await mainFixture(t);await writeFile(f.journal,JSON.stringify({phase:'completed',outcome:{status:'SUCCEEDED'}}));
  await assert.rejects(checkSupernodeRun(f.events,expectedDirectory,[f.journal]),/SUPERNODE_MAIN_NESTED_OBSERVATION/);
@@ -81,6 +94,16 @@ test('main audit retains boundary identity across journal observations',async t=
  other.outcome.output.nodes[0].ref.node_id='other-input';other.outcome.output.links[0].source='other-input';
  await writeFile(f.journal,[f.observation,other].map(x=>JSON.stringify(x)).join('\n'));
  await assert.rejects(checkSupernodeRun(f.events,expectedDirectory,[f.journal]),/SUPERNODE_BOUNDARY_IDENTITY/);
+});
+for(const fault of ['foreign-calculator','missing-link'])test('main audit refuses '+fault+' after a valid graph',async t=>{
+ const f=await mainFixture(t),other=structuredClone(f.observation);
+ if(fault==='missing-link')other.outcome.output.links.pop();
+ else{
+  other.outcome.output.nodes[1].ref.node_id='foreign-calc';
+  other.outcome.output.links[0].target='foreign-calc';other.outcome.output.links[1].source='foreign-calc';
+ }
+ await writeFile(f.journal,[f.observation,other].map(x=>JSON.stringify(x)).join('\n'));
+ await assert.rejects(checkSupernodeRun(f.events,expectedDirectory,[f.journal]),/SUPERNODE_(MAIN_NESTED_OBSERVATION|CALCULATOR_IDENTITY)/);
 });
 test('supernode frozen DateTime uses ISO civil representation checked by its independent oracle',async()=>{
  for(const [file,caseName] of [['expected-initial.json','initial'],['expected.json','final'],['expected-empty.json','empty']]){
