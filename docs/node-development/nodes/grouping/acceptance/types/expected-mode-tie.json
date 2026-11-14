@@ -1,0 +1,45 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "AmountMode",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "TextMode",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Region": "T1",
+          "AmountMode": 3,
+          "TextMode": "alpha"
+        },
+        {
+          "Region": "T2",
+          "AmountMode": 7,
+          "TextMode": "x"
+        },
+        {
+          "Region": "T3",
+          "AmountMode": 2,
+          "TextMode": "eta"
+        }
+      ]
+    }
+  ]
+}

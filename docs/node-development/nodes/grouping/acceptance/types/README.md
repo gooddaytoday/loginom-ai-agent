@@ -2,8 +2,10 @@
 `expected.json` остаётся неизменённым контейнером `cases`, **не вход stock
 run-check**. Для `group-real`, `group-boolean` и `group-date` его `cases.real.stages`,
 `cases.boolean.stages` и `cases.date.stages` без изменения чисел, типов и допусков выделены в
-`expected-real.json`, `expected-boolean.json` и `expected-date.json`; остальные случаи пока
-не зарегистрированы. Раздел цикла — [plan.md](../../plan.md), «Предложение
+`expected-real.json`, `expected-boolean.json` и `expected-date.json`.
+Для `group-mode-tie` и `group-empty` так же выделены `cases.mode_tie.stages`
+и `cases.empty.stages` в `expected-mode-tie.json` и `expected-empty.json`;
+Variant пока не зарегистрирован. Раздел цикла — [plan.md](../../plan.md), «Предложение
 LAB-1558».
 
 Модели передаются только выбранный `task-*.md` и его CSV из
@@ -22,8 +24,8 @@ runtime и не читает expected как источник чисел.
 | date | task-date.md | types.csv | min, max, last, null_count по DateTime | зарегистрирован `group-date`; DateTime открыт по native-матрице LAB-1581, выходы сохраняют datetime; null_count → integer |
 | boolean | task-boolean.md | types.csv | min, max, mode, unique_count, null_count по Boolean; ничья E → False | зарегистрирован `group-boolean`; Boolean открыт по native-матрице LAB-1581 |
 | variant | task-variant.md | variant.csv → Свёртка | count, null_count, first, last по Variant | `:6` закрывает null_count/first/last; Variant-выход Группировки не читается точно: `transform.group_data` нет в `typedVariants` (`node-procedure.mjs:269`) |
-| mode_tie | task-mode-tie.md | mode-tie.csv | ничья моды integer/string → наименьшее | наблюдено LAB-1581 (Q2); не зарегистрирован |
-| empty | task-empty.md | empty.csv (только заголовок) | пустой вход → пустой типизированный результат | наблюдено LAB-1581 (Q7); не зарегистрирован |
+| mode_tie | task-mode-tie.md | mode-tie.csv | ничья моды integer/string → наименьшее | зарегистрирован `group-mode-tie`; native LAB-1581 (Q2) |
+| empty | task-empty.md | empty.csv (только заголовок) | пустой вход → пустой типизированный результат | зарегистрирован `group-empty`; native LAB-1581 (Q7); CSV только с заголовком |
 
 Правила oracle сохранены; native-проба 13.11.2026 их подтвердила для
 проверенных случаев (подробности ниже):

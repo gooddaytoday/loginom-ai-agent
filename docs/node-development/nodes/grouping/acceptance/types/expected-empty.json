@@ -1,0 +1,39 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rows",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Total",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "FirstDay",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "AnyFlag",
+          "type": "boolean",
+          "label_any": true
+        }
+      ],
+      "rows": []
+    }
+  ]
+}
