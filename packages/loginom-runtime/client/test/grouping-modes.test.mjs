@@ -9,7 +9,7 @@ const field=name=>({kind:'input_field',name});
 const measure=(name,fn,output)=>({field:field(name),function:fn,name:output,label:output});
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0]},mappings:[],finish:'execute'};
 // LAB-998 native FactorEditDialog;grpFactors chb-6/7/9;DisplayEl.
-const cases=[['mode',64,'Mode','Мода',['integer','string','real','boolean']],['stddev',128,'Std','Стандартное откл.',['integer','real']],['null_count',512,'Null','Кол-во пропусков',['integer','string','real','boolean']],['first',1024,'First','Первый',['integer','string','real','boolean']],['last',2048,'Last','Последний',['integer','string','real','boolean']],['only',4096,'Only','Единственный',['integer','string','real','boolean']]];
+const cases=[['mode',64,'Mode','Мода',['integer','string','real','boolean','datetime']],['stddev',128,'Std','Стандартное откл.',['integer','real']],['null_count',512,'Null','Кол-во пропусков',['integer','string','real','boolean','datetime']],['first',1024,'First','Первый',['integer','string','real','boolean','datetime']],['last',2048,'Last','Последний',['integer','string','real','boolean','datetime']],['only',4096,'Only','Единственный',['integer','string','real','boolean','datetime']]];
 for(const [fn,bit,suffix,label,types] of cases){
  test(`Grouping ${fn} validates only observed input types and combines native masks`,()=>{
   assert.ok(groupingMeasureSchema.properties.function.enum.includes(fn));

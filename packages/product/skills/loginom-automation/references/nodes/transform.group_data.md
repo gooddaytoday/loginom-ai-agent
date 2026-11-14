@@ -8,16 +8,17 @@
 Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Прочитай карточку через `dock_action_describe`. Агрегаты выполняй Группировкой, не Калькулятором/JS.
 
 - `median`: integer/real → real; без NULL, полностью NULL → NULL.
-- `mode`: integer/string/real/boolean → тот же тип; без NULL, полностью NULL → 0/пустая строка/False. При ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).
+- `mode`: integer/string/real/boolean/datetime → тот же тип; без NULL, полностью NULL → 0/пустая строка/False/1899-12-30. При ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).
 - `stddev`: integer/real → real; выборочное без NULL, одно значение → 0, полностью NULL → NULL.
-- `null_count`: integer/string/real/boolean → integer; считает NULL, не пустые строки.
-- `unique_count`: integer/string/real/boolean → integer, без NULL; пустая строка считается один раз.
+- `null_count`: integer/string/real/boolean/datetime → integer; считает NULL, не пустые строки.
+- `unique_count`: integer/string/real/boolean/datetime → integer, без NULL; пустая строка считается один раз.
 - `min`/`max` для boolean → boolean (False < True), без NULL; полностью NULL → NULL.
+DateTime: count/min/max/mode/unique_count/null_count/first/last/only; даты сохраняют тип и время, счётчики → integer. Sum/avg/median/stddev/concat для DateTime недоступны.
 При нескольких функциях native-суффиксы: Mode, Std, Null.
 
 ## Первое, последнее, единственное, список
 
-В том же узле `first`/`last` — первое/последнее в исходном порядке, включая крайний NULL; `only` — единственное различное значение (повторы допустимы), иначе NULL; `concat` — список без NULL, пустой текст сохраняется, полностью NULL → пустая строка. Для first/last/only вход integer/string/real; тип сохраняется. Для concat — только integer/string → string. Вход перед first/last не сортируй.
+В том же узле `first`/`last` — первое/последнее в исходном порядке, включая крайний NULL; `only` — единственное различное значение (повторы допустимы), иначе NULL; `concat` — список без NULL, пустой текст сохраняется, полностью NULL → пустая строка. Для first/last/only вход integer/string/real/boolean/datetime; тип сохраняется. Для concat — только integer/string → string. Вход перед first/last не сортируй.
 
 Только `concat` требует `concat: {separator: "|", wrapper: "\"", unique: false, order: "none"}`. `wrapper`: пустая строка, двойная или одинарная кавычка; для чисел без ограничителя — пустая. `none` сохраняет порядок, `ASC`/`DESC` сортируют значения; `unique:true` удаляет повторы. Настройки одного поля. Для нескольких состояний перенастраивай тот же узел полными ключами, мерами, входом 0; после каждого Execute читай весь результат и отдельный CSV. Save сохраняет финальное состояние.
 

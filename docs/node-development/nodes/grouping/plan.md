@@ -131,6 +131,14 @@ unique_count/null_count, ничья False и all-NULL. Runtime разрешае�
 sum/avg/median/stddev/concat для DateTime/Boolean/Variant запрещены также
 в сохранённых масках. DateTime/Variant не расширяются в этом цикле.
 
+**Цикл DateTime LAB-1659:** `group-date` использует неизменённые
+`cases.date.stages` через `expected-date.json`: min/max/last по Day и
+integer null_count, включая крайний NULL. По native-матрице Q1 разрешены
+count/min/max/mode/unique_count/null_count/first/last/only; тип даты сохраняется,
+счётчики дают integer. Sum/avg/median/stddev/concat запрещены до мутации и
+в сохранённых масках. Значения mode для DateTime описаны в discovery;
+бизнес-приёмка этого цикла проверяет min/max/last/null_count, CSV, Save и cold.
+
 База `v040@864fad6efe`, 13.11.2026, только документы: runtime, навык и
 run-check не менялись, native-пробы не было (её делает разработчик первым
 шагом цикла). Решение владельца `v040-open-scope`. Комплект —
