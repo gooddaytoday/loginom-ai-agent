@@ -175,14 +175,13 @@ test('JSON preflight admits empty record containers only with an object-array wi
  for(const input of [
   {items:[{parts:[]},{parts:[]}]},
   {items:[{parts:[],other:[{qty:1}]}]},
-  {items:[{parts:[]},{parts:[0]}]},
  ])assert.throws(()=>validateTreeJsonScope(JSON.stringify(input)));
 });
 
-test('nested JSON keeps sibling/scalar arrays, mixed types and limits outside scope',async()=>{
+test('nested JSON keeps sibling object arrays, mixed types and limits outside scope',async()=>{
  for(const value of [
   {items:[{parts:[{sku:'a'}],other:[{name:'b'}]}]},
-  {items:[{parts:[1]}]}, {items:[{parts:[]}]},
+  {items:[{parts:[1,'x']}]}, {items:[{parts:[]}]},
   {items:[{details:{code:'A'}},{details:{code:1}}]},
   {items:[{details:{code:'A'}},{details:'A'}]},
   {items:Array.from({length:257},()=>({id:1}))},
@@ -193,6 +192,24 @@ test('nested JSON keeps sibling/scalar arrays, mixed types and limits outside sc
  const text=await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/fixtures/nested-records/nested.json',import.meta.url),'utf8');
  assert.equal(validateTreeJsonScope(text).verified,true);
  assert.equal(validateTreeJsonScope('{"items":[{"a/b~c":{"parts":[{"sku":"a"}]}}]}').verified,true);
+});
+
+test('JSON scalar arrays admit homogeneous siblings and empty records with a typed witness',()=>{
+ const document={items:[{id:1,tags:['a','b'],scores:[1.5,2.5]},{id:2,tags:[],scores:[]},{id:3,tags:['c'],scores:[.25]}]};
+ assert.equal(validateTreeJsonScope(JSON.stringify(document)).verified,true);
+ const schema=[{path:'',name:'Root',is_container:true,is_array:false},
+  {path:'/items',name:'items',is_container:true,is_array:true},
+  {path:'/items/id',name:'id',type:'integer',is_container:false,is_array:false},
+  ...['tags','scores'].map((name,i)=>({path:'/items/'+name,name,type:i?'real':'string',is_container:false,is_array:true}))];
+ assert.equal(validateJsonTreeSchema(schema),true);
+ assert.throws(()=>validateSelectedTreePaths(schema,['/items/tags']),/one object and one repeated branch/);
+ for(const items of [
+  [{tags:['a',1]}],[{tags:['a']},{tags:[true]}],[{tags:['a']},{tags:[{v:'a'}]}],
+  [{tags:[['a']]}],[{tags:[]}],[{tags:[null]}],
+ ])assert.throws(()=>validateTreeJsonScope(JSON.stringify({items})));
+ for(const tags of [['a',null,''],[false,true],[1,2.5]])
+  assert.equal(validateTreeJsonScope(JSON.stringify({items:[{tags:[]},{tags}]})).verified,true);
+ assert.throws(()=>validateJsonTreeSchema([...schema,{path:'/items/mixed',name:'mixed',type:'variant',is_container:false,is_array:true}]),/supported types/);
 });
 function tableState(indexed=false){
  const leaf=(path,name)=>({path,name,is_container:false,is_array:false,selected:true,checkbox_tid:name+';TreeCheckbox'});
