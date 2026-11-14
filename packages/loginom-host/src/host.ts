@@ -1,6 +1,6 @@
 import { inputStore, type InputFile } from "./inputs"
-import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { isAbsolute, join } from "node:path"
+import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
+import { basename, dirname, isAbsolute, join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { Schema } from "effect"
@@ -17,66 +17,155 @@ import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
-export function verifyInstallationResources(options: {
+export async function verifyInstallationResources(options: {
   root: string
   resources: string
   resourceVersion: string
   signal?: AbortSignal
+  forceHash?: boolean
 }) {
-  return verifyResources(options.resources, {
-    nodePath: join(options.resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-    nodeVersion: release.nodeVersion,
-    cachePath: join(options.root, "resource-verification.json"),
-    cacheVersion: options.resourceVersion,
-    forceHash: true,
-    requireCache: true,
-    signal: options.signal,
-  })
+  const started = performance.now()
+  const phase = async (status: string, detail: object = {}) => {
+    await mkdir(options.root, { recursive: true, mode: 0o700 }).catch(() => undefined)
+    await appendFile(
+      join(options.root, "startup-phases.jsonl"),
+      JSON.stringify({
+        version: 1,
+        recorded_at: new Date().toISOString(),
+        phase: "resources.verify",
+        scope: "installation",
+        status,
+        duration_ms: Math.round(performance.now() - started),
+        pid: process.pid,
+        ...detail,
+      }) + "\n",
+      { mode: 0o600 },
+    ).catch(() => undefined)
+  }
+  await phase("starting")
+  try {
+    const verified = await verifyResources(options.resources, {
+      nodePath: join(options.resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+      nodeVersion: release.nodeVersion,
+      cachePath: join(options.root, "resource-verification.json"),
+      cacheVersion: options.resourceVersion,
+      forceHash: options.forceHash !== false,
+      requireCache: true,
+      signal: options.signal,
+    })
+    await phase("ready", verified.verification)
+    return verified
+  } catch (error) {
+    const diagnostic = startupDiagnostic(error)
+    if (diagnostic && !diagnostic.code && /^LOGINOM_[A-Z_]+$/.test(diagnostic.message))
+      diagnostic.code = diagnostic.message
+    await phase("failed", { error: diagnostic })
+    throw error
+  }
 }
 
 export async function warmInstallationBrowser(options: {
   root: string
   resources: string
   verified: Awaited<ReturnType<typeof verifyInstallationResources>>
+  // Tests may shorten this private budget, never increase the production limit.
+  timeoutMs?: number
 }) {
   const started = performance.now()
-  // Keep Chromium's nested paths short on Windows, as in managed-entry.
-  const profile = await mkdtemp(join(tmpdir(), "lbw"))
-  const receipt = {
+  const budget = Math.max(1, Math.min(60_000, options.timeoutMs ?? 60_000))
+  const deadline = started + budget
+  const reserve = Math.min(10_000, budget / 3)
+  const remaining = () => {
+    const left = Math.floor(deadline - performance.now() - reserve)
+    if (left <= 0) throw Object.assign(Error("LOGINOM_BROWSER_WARMUP_TIMEOUT"), { code: "ETIMEDOUT" })
+    return left
+  }
+  const path = join(options.root, "browser-warmup.json")
+  let profile: string | undefined
+  let failure: unknown
+  const cleanup = { confirmed: true, exit: undefined as { code: number | null; signal: string | null } | undefined }
+  const receipt = () => ({
     protocol: 1,
     profile,
     manifestHash: options.verified.manifestHash,
     browserHash: options.verified.browserHash,
+  })
+  const removeProfile = async () => {
+    if (profile) await rm(profile, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 })
   }
-  const path = join(options.root, "browser-warmup.json")
-  const cleanup = { confirmed: true }
   try {
-    await writeFile(path, JSON.stringify({ ...receipt, status: "starting" }) + "\n", { mode: 0o600 })
+    const previous = await readFile(path, "utf8").then(
+      (text) => JSON.parse(text),
+      () => undefined,
+    )
+    if (previous?.profile) {
+      const parent = dirname(previous.profile)
+      const temporary = tmpdir()
+      if (
+        previous.protocol !== 1 ||
+        !/^lbw[A-Za-z0-9]{6}$/.test(basename(previous.profile)) ||
+        (process.platform === "win32" ? parent.toLowerCase() !== temporary.toLowerCase() : parent !== temporary)
+      )
+        throw Object.assign(Error("LOGINOM_BROWSER_WARMUP_PROFILE_INVALID"), {
+          code: "LOGINOM_BROWSER_WARMUP_PROFILE_INVALID",
+        })
+      profile = previous.profile
+      await removeProfile()
+    }
+    profile = undefined
+    remaining()
+    profile = await mkdtemp(join(tmpdir(), "lbw"))
+    await writeFile(path, JSON.stringify({ ...receipt(), status: "starting" }) + "\n", { mode: 0o600 })
+    const phases = join(options.root, "browser-warmup-phases.jsonl")
+    if (
+      await stat(phases).then(
+        (s) => s.size > 1024 * 1024,
+        () => false,
+      )
+    ) {
+      await rm(phases + ".1", { force: true }).catch(() => undefined)
+      await rename(phases, phases + ".1").catch(() => undefined)
+    }
     cleanup.confirmed = false
-    const worker = await launchNodeHost({
-      node: options.verified.nodePath,
-      entry: join(options.resources, "runtime/src/browser-warmup-entry.mjs"),
-      root: options.root,
-      resources: options.resources,
-      headless: true,
-    })
+    const worker = await launchNodeHost(
+      {
+        node: options.verified.nodePath,
+        entry: join(options.resources, "runtime/src/browser-warmup-entry.mjs"),
+        root: options.root,
+        resources: options.resources,
+        headless: true,
+      },
+      {
+        start: Math.min(15_000, remaining()),
+        close: Math.min(5000, reserve / 2),
+        terminate: Math.min(2000, reserve / 4),
+        teardown: reserve,
+      },
+    )
     try {
-      const result = await worker.request("warm", { browserPath: options.verified.browserPath, profile }, 45_000)
-      if (!result || typeof result !== "object" || !("warmed" in result) || result.warmed !== true)
+      const timeout = Math.min(30_000, remaining())
+      const result = await worker.request(
+        "warm",
+        { browserPath: options.verified.browserPath, profile, timeout_ms: timeout },
+        timeout,
+      )
+      if (!result || typeof result !== "object" || !("warmed" in result) || result.warmed !== true) {
+        if (result && typeof result === "object" && "reason" in result) failure = result.reason
         throw Error("LOGINOM_BROWSER_WARMUP_FAILED")
+      }
     } finally {
       await worker.close()
       cleanup.confirmed = true
+      cleanup.exit = await worker.exited
     }
-    const exit = await worker.exited
-    await rm(profile, { recursive: true, force: true })
+    await removeProfile()
     await writeFile(
       path,
       JSON.stringify({
-        ...receipt,
+        ...receipt(),
         status: "ready",
         closed_ack: true,
-        node_exit_code: exit.code,
+        node_exit_code: cleanup.exit.code,
         duration_ms: Math.round(performance.now() - started),
         completed_at: new Date().toISOString(),
       }) + "\n",
@@ -84,14 +173,24 @@ export async function warmInstallationBrowser(options: {
     )
   } catch (error) {
     if (error instanceof NodeHostStartupError) cleanup.confirmed = error.cleanupConfirmed
-    if (cleanup.confirmed) await rm(profile, { recursive: true, force: true })
+    const removal = await removeProfile().then(
+      () => undefined,
+      (error: unknown) => startupDiagnostic(error),
+    )
+    const reason = startupDiagnostic(failure ?? error)
+    if (reason && !reason.code)
+      reason.code = /^LOGINOM_[A-Z_]+$/.test(reason.message) ? reason.message : "LOGINOM_BROWSER_WARMUP_FAILED"
     await writeFile(
       path,
       JSON.stringify({
-        ...receipt,
+        ...receipt(),
         status: "failed",
+        reason,
         closed_ack: cleanup.confirmed,
+        node_exit_code: cleanup.exit?.code,
+        ...(removal ? { cleanup_error: removal } : {}),
         duration_ms: Math.round(performance.now() - started),
+        completed_at: new Date().toISOString(),
       }) + "\n",
       { mode: 0o600 },
     ).catch(() => undefined)
@@ -150,6 +249,7 @@ export async function createLoginomHost(options: {
   // Start before the settings click. No browser is admitted until this pass
   // drains; unchanged installations use the owner-authorized profile cache.
   const resourceCachePath = join(root, "resource-verification.json")
+  let prewarmHashedAll = false
   const verifiedResources = appendFile(
     join(root, "startup-phases.jsonl"),
     JSON.stringify({
@@ -173,6 +273,7 @@ export async function createLoginomHost(options: {
     )
     .then(
       async (result) => {
+        prewarmHashedAll = result.verification.hashedFiles === result.manifest.files.length
         await appendFile(
           join(root, "startup-phases.jsonl"),
           JSON.stringify({
@@ -504,11 +605,19 @@ export async function createLoginomHost(options: {
         return view
       },
     },
-    async verifyInstallationResources() {
+    async verifyInstallationResources(settings: { reusePrewarm?: boolean } = {}) {
       // Drain prewarming before replacing its cache; setup must finish the full
       // pass even if an unconfigured profile's Host is closed immediately after.
       await verifiedResources
-      return verifyInstallationResources({ root, resources, resourceVersion, signal: resourceController.signal })
+      return verifyInstallationResources({
+        root,
+        resources,
+        resourceVersion,
+        signal: resourceController.signal,
+        // A fresh CLI already hashed every resource in this invocation. Revalidate
+        // metadata and require the durable cache, rather than hash the tree twice.
+        forceHash: !(settings.reusePrewarm && prewarmHashedAll),
+      })
     },
     journal,
     recoveries,

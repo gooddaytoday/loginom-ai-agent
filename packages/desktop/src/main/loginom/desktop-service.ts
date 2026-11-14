@@ -35,6 +35,10 @@ export async function verifyDesktopResources() {
     resources,
     resourceVersion: app.getVersion(),
   })
-  if (process.platform === "win32") await warmInstallationBrowser({ root, resources, verified })
+  if (process.platform === "win32") {
+    // Warmup is advisory. Full integrity/cache failures above and below remain fatal.
+    await warmInstallationBrowser({ root, resources, verified }).catch(() => undefined)
+    return verifyInstallationResources({ root, resources, resourceVersion: app.getVersion(), forceHash: false })
+  }
   return verified
 }

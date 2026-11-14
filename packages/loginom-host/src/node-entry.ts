@@ -18,7 +18,8 @@ const state: {
   port?: ReturnType<typeof loginomHostPort>
   stopping?: Promise<void>
   closed: boolean
-} = { closed: false }
+  setupVerified: boolean
+} = { closed: false, setupVerified: false }
 const port: HostPort = {
   postMessage: (value) => reply(value),
   on: (event, listener) => {
@@ -45,15 +46,16 @@ process.on("disconnect", () => {
     process.exitCode = 1
   })
 })
-for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => {
-  void stop()
-    .finally(() => {
-      if (process.connected) process.disconnect()
-    })
-    .catch(() => {
-      process.exitCode = 1
-    })
-})
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"])
+  process.on(signal, () => {
+    void stop()
+      .finally(() => {
+        if (process.connected) process.disconnect()
+      })
+      .catch(() => {
+        process.exitCode = 1
+      })
+  })
 
 async function dispatch(message: unknown) {
   if (
@@ -103,7 +105,8 @@ async function dispatch(message: unknown) {
         headless: input.headless,
         preflightHeadless: input.headless,
         strictRecovery: "strictRecovery" in input && input.strictRecovery === true,
-        closeSavedPackageOnShutdown: "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
+        closeSavedPackageOnShutdown:
+          "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
         codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
         environment: process.env,
@@ -148,6 +151,14 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
       throw new Error("LOGINOM_CONNECTION_NOT_READY")
     return after
   }
+  if (method === "connection.verify-resources") {
+    state.setupVerified = false
+    await host.verifyInstallationResources({ reusePrewarm: true }).catch(() => {
+      throw new Error("LOGINOM_RUNTIME_START_FAILED")
+    })
+    state.setupVerified = true
+    return { verified: true }
+  }
   if (method === "connection.check") {
     const value = candidate(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
@@ -156,11 +167,10 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   if (method === "connection.save") {
     const value = save(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_SAVE_INVALID")
-    // Only setup saves a connection. Ordinary check/status keep the fast cache
-    // path, including when they run after a fresh CLI process is started.
-    await host.verifyInstallationResources().catch(() => {
-      throw new Error("LOGINOM_RUNTIME_START_FAILED")
-    })
+    // Setup prepares resources before check mints its five-minute token.
+    // No hashing may consume that validation lifetime between check and save.
+    if (!state.setupVerified) throw new Error("LOGINOM_RUNTIME_START_FAILED")
+    state.setupVerified = false
     await host.api.save(value.value)
     await host.settled()
     return host.api.status()

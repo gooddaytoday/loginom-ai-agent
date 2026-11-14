@@ -45,7 +45,12 @@ LangString VerifyResourcesError 1049 "Не удалось проверить р�
     StrCpy $0 1
   ${endif}
   ${if} $0 != 0
-    MessageBox MB_OK|MB_ICONSTOP "$(VerifyResourcesError)" /SD IDOK
+    ${if} ${isUpdated}
+      # Updates are silent; an integrity failure must still explain why the app did not relaunch.
+      MessageBox MB_OK|MB_ICONSTOP "$(VerifyResourcesError)"
+    ${else}
+      MessageBox MB_OK|MB_ICONSTOP "$(VerifyResourcesError)" /SD IDOK
+    ${endif}
     SetErrorLevel 1
     Abort
   ${endif}
