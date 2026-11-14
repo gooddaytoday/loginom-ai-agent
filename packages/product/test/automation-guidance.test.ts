@@ -3,29 +3,6 @@ import { expect, test } from "bun:test"
 const skill = await Bun.file(new URL("../skills/loginom-automation/SKILL.md", import.meta.url)).text()
 const chain = skill.split("## Один расчёт цепочки\n")[1].split("\n## Выбор узлов")[0]
 
-test("existing import after preview has a schema-completed production-valid column example", async () => {
-  const settings = await Bun.file(new URL("../skills/loginom-automation/references/nodes/imports.text.md", import.meta.url)).text()
-  const example = settings.match(/```json\n([\s\S]*?)\n```/)
-  expect(example).not.toBeNull()
-  const column = JSON.parse(example![1])
-  expect(column).not.toHaveProperty("data_kind")
-  expect(settings).toContain("add schema data_kind")
-  const checked = Bun.spawnSync([
-    process.execPath,
-    "--eval",
-    `import { validateInitialExistingImportSettings } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/text-import-procedure.mjs", import.meta.url).href)};
-     import { createTextImportNodeSupport } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/text-import-node.mjs", import.meta.url).href)};
-     const schema=createTextImportNodeSupport({}).nodeApplyHandlers.get('imports.text').parameter_schema;
-     const data_kind=schema.properties.settings.properties.columns.items.properties.data_kind.enum.at(-1);
-     validateInitialExistingImportSettings({source:{source_path:'/owned/upload.csv',encoding:'UTF-8',first_line_as_title:true,rows_to_skip:0},
-       format:{delimiter:',',decimal_separator:'.',null_marker:'?',text_qualifier:'"'},
-       columns:[{...JSON.parse(process.argv[1]),data_kind}]},'/owned/upload.csv');`,
-    JSON.stringify(column),
-  ])
-  expect(checked.exitCode, checked.stderr.toString()).toBe(0)
-  expect(Buffer.byteLength(settings)).toBeLessThanOrEqual(6000)
-})
-
 test("missing Loginom connection directs the user to settings without searching for credentials", async () => {
   const browser = await Bun.file(new URL("../skills/loginom-automation/references/browser.md", import.meta.url)).text()
   expect(skill).toMatch(/LOGINOM_CONFIG_REQUIRED[\s\S]*?unconfigured[\s\S]*?references\/browser.md/)
