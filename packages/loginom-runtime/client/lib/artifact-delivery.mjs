@@ -294,7 +294,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
    await finish(job,artifact,final);
   } catch(error) {
-   if(!(error instanceof Error))error=Object.assign(Error(String(error?.message??error?.code??error)),{code:error?.code});
+   if(!(error instanceof Error))error=Object.assign(Error(String(error?.message??error?.code
+     ??(typeof error==='string'&&error?error:'Artifact delivery failed without an error message'))),{code:error?.code});
    if(job.largeUpload){
     try{await acknowledge(job,'large_upload_failed',{failed_phase:job.phase,upload_started:job.uploadStarted===true,
      cause:operationFailureDiagnostic(error)});}catch{ /* Diagnostics cannot prevent native cleanup. */ }
@@ -331,7 +332,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     ? {code:'ARTIFACT_DESTINATION_UNAVAILABLE',message:String(error.message).slice(0,1000),
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
-    : {code:error.code??'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
+    : {code:String(error.code??'ARTIFACT_DELIVERY_INCOMPLETE'),message:String(error.message).slice(0,1000)};
    // Known navigation effects remain recorded, but an undelivered attachment
    // with no unknown child is a settled refusal, not an ambiguous transfer.
    job.outcome={status:navigationResumable?'NOT_APPLIED':effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,

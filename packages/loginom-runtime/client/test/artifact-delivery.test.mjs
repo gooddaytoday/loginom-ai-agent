@@ -79,7 +79,8 @@ test('a failed completion acknowledgement resumes from committed proof without a
  assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.service.unsettled,false);
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
 });
-for(const error of ['Request timed out',{code:'RECEIPT_READ_FAILED',message:'Original receipt temporarily unavailable'},null])test('post-verification failure exposes an executable inspection-only resume: '+JSON.stringify(error),async()=>{
+for(const error of ['Request timed out',{code:'RECEIPT_READ_FAILED',message:'Original receipt temporarily unavailable'},
+ {code:-32001,message:'Request timed out'},null,undefined])test('post-verification failure exposes an executable inspection-only resume: '+JSON.stringify(error),async()=>{
  let clock=0,failed=false;
  const f=fixture(undefined,'/',{now:()=>clock}),inspect=f.runtime.inspect;
  f.runtime.inspect=async options=>{
@@ -91,8 +92,8 @@ for(const error of ['Request timed out',{code:'RECEIPT_READ_FAILED',message:'Ori
  };
  const first=await f.service.deliver(request);
  assert.equal(first.outcome.status,'AMBIGUOUS');assert.equal(f.service.unsettled,true);
- assert.equal(first.error.message,error?.message??String(error));
- if(error?.code)assert.equal(first.error.code,error.code);
+ assert.equal(first.error.message,error?.message??error??'Artifact delivery failed without an error message');
+ if(error?.code)assert.equal(first.error.code,String(error.code));
  assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
  assert.equal(first.outcome.next_step.original_operation_id,request.operation_id);
  clock=200000;
