@@ -147,3 +147,31 @@ sibling arrays (zip/Cartesian); mixed arrays; duplicate keys; Variant;
 повторяющаяся ветвь и её scalar ancestors; оба режима повторения родителей,
 leaf names/labels. Остальные запросы отклоняются до мутации. Точный контракт,
 общие изменения, оценка и критерии — [contract.md](contract.md).
+
+## R3 / LAB-1668: Variant reader (ветка б)
+
+База `a8ce4186d40da08b0ee5c98ebfac3724a21df824`, Loginom 7.4.2, mas3.
+Базовый живой `tree-variant`: `execution-events.jsonl:437` —
+`NODE_APPLY_STOPPED: Mixed Variant fields are outside tree stage 1`.
+Native-проба R1 в `variant-reader/tree-reader.md` различает теги
+20/8/11/1/5/20, тогда как AsVariant даёт один JS number для integer и real.
+
+Закреплённая цепь: tree source interface 141, `GetReader` method 425 →
+reader interface 166 с `$FHelper.FBaseProxy === reader`; internal interface
+2178, `GetAsVariant` method 7230. Request static size 32: int32 NodeInfoID
+по offset 0 (`WriteParameter$a`), IntPtr Row по offset 4 (`WriteParameter`);
+response static size 12, int16 LE tag и существующий decodeVariantFrame.
+Никакой подмены Loginom JS. Допускаются только теги 1/5/7/8/11/20;
+прочие отвергает существующий adaptCell. Числа не выводятся из JS typeof.
+
+SHA-256 Function.prototype.toString (сверяются на загруженных функциях):
+- `source.GetReader`: `ca82cebf714d2854aeb1adc60dfc0678e7d19844348760303937e4a6d41cd730`;
+- `bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant`:
+  `29323b4c72312231cd0781a87aafba588ada0fa952f84770fc376617f37db36e`.
+
+Прежние nativeRuntimePins транспорта и civil DateTime остаются обязательными;
+reader identity, session, getter, владение пакетом, портом и выполнением
+проверяются до и после RPC. При unsettled native request прокси сохраняются
+до закрытия браузера; частичное дерево не публикуется.
+Сценарий `tree-variant` использует неизменные task/CSV и отдельную
+oracle-проекцию expected-variant.json; Save/cold/cleanup — штатные.

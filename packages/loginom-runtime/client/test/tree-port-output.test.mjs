@@ -5,6 +5,7 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeTreeOutputPortSchema} from '../lib/node-result-schema.mjs';
 import {readFile} from 'node:fs/promises';
+import {adaptCell} from '../lib/variant-native-values.mjs';
 import {validateTreeJsonScope} from '../lib/tree-parameters.mjs';
 
 function fixture({count=4,depth=0,precision=false,duplicate=false,nativeContainers=false,absentContainer=false,rows=1,noteType=5}={}){
@@ -102,7 +103,7 @@ for(const [type,value,decoded] of [[1,false,false],[2,new Date(2026,0,15,12),'20
   AsVariant:async(index,row)=>{assert.equal(index,1);assert.ok([9,10].includes(row));return row===9?value:null;}})};
  const read=()=>readTreePortSource(source,async fn=>fn(),p=>p,(raw,kind)=>kind==='datetime'&&raw!==null
   ?{cell:{type:kind,is_null:false,value:decoded,precision:'millisecond',representation:'local_datetime'},limitations:[]}:decodePortCell(raw,kind));
- if(type===6){await assert.rejects(read(),/tree_scalar_type/);return;}
+ if(type===6){await assert.rejects(read(),/tree_variant_reader_required/);return;}
  const tree=await read();assert.equal(tree.instances[2].value,decoded);assert.equal(tree.instances[3].is_null,true);
 });
 test('tree_io still refuses a genuinely absent ordinary object container',async()=>{
@@ -128,7 +129,7 @@ test('tree_io public schema and compaction preserve the complete schema and inst
  assert.deepEqual(result.output.ports,[port]);
  const bad=structuredClone(port);bad.tree.complete=false;assert.equal(validate(bad).valid,false);
 });
-test('tree_io reads datetime leaves as civil milliseconds and still refuses Variant leaves',async()=>{
+test('tree_io reads datetime leaves as civil milliseconds and requires the native capability for Variant leaves',async()=>{
  // Temporal-based datetime decoding is covered in the browser integration test;
  // here the tree reader must admit the type and keep the decoded civil cell.
  const f=fixture({noteType:2}),civil=(raw,type)=>type==='datetime'&&raw instanceof Date
@@ -139,7 +140,7 @@ test('tree_io reads datetime leaves as civil milliseconds and still refuses Vari
  assert.equal(note.value,'2024-02-29T13:45:06.789');assert.equal(note.precision,'millisecond');
  const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
  assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree:result,sample_complete:true}).valid,true);
- await assert.rejects(read({noteType:6}),/tree_scalar_type/);
+ await assert.rejects(read({noteType:6}),/tree_variant_reader_required/);
 });
 test('tree_io still reads exactly one native document: several root rows and an empty tree refuse',async()=>{
  await assert.rejects(read({rows:2,count:2}),/tree_document_count/);
@@ -185,4 +186,33 @@ test('nested records use native parent row ranges and object existence, matching
  }
  // The production admission path must accept the same document the native reader proves.
  assert.equal(validateTreeJsonScope(await readFile(new URL('fixtures/nested-records/nested.json',base),'utf8')).verified,true);
+});
+
+test('tree Variant leaves use the tagged reader exclusively and preserve exact subtypes through the public schema',async()=>{
+ const f=fixture({noteType:6,count:6});
+ const payloads=[
+  [20,0,7,0,0,0,0,0,0,0],
+  [8,0,0,0,0,0,0,0,0,0,8,0,0,0,233,253,209,129,208,181,208,188,209,140],
+  [11,0,0,0,0,0,0,0,0,0],
+  [1,0,0,0,0,0,0,0,0,0],
+  [5,0,0,0,0,0,0,0,4,64],
+  [20,0,1,0,0,0,0,0,32,0],
+ ];
+ const original=f.source.GetReader;let acquired=0;
+ f.source.GetReader=async definitions=>{const reader=await original(definitions),asVariant=reader.AsVariant;
+  reader.AsVariant=async(index,row)=>{assert.notEqual(definitions[index].type,6);return asVariant(index,row);};return reader;};
+ const tree=await readTreePortSource(f.source,f.call,f.track,decodePortCell,async reader=>{
+  acquired++;assert.equal(reader.definitions[7].name,'note');
+  return async(row,index)=>{assert.equal(index,7);const payload=payloads[row];
+   return adaptCell({tag:payload[0],payload,frame_size:60},{type:'variant'});};
+ });
+ assert.equal(acquired,1);
+ const leaves=tree.instances.filter(n=>n.path.endsWith('/note'));
+ assert.deepEqual(leaves.map(n=>n.cell_type),['integer','string','boolean','null','real','integer']);
+ assert.deepEqual(leaves.map(n=>n.value),['7','семь',false,null,'2.5','9007199254740993']);
+ assert.ok(leaves.every(n=>n.precision==='exact_native'));
+ const port={port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree,sample_complete:true};
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
+ assert.equal(validate(port).valid,true);
+ assert.deepEqual(compactNodeResult({operation_id:'op',state:'settled',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{output:{status:'complete',execution_id:'exec',evidence_ref:'receipt',ports:[port]}}}}).output.ports,[port]);
 });
