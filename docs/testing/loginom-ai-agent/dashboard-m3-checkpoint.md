@@ -1,20 +1,13 @@
-# M3: контрольная точка продолжения
+# Dashboard M3 — checkpoint
 
-- Ветка `dashboard-m3`; канон — [план](../../superpowers/plans/2026-11-12-dashboard-m3.md) и [дизайн](../../superpowers/specs/2026-11-12-dashboard-m3-design.md).
-- Задачи 1–14 завершены по поведению; последний срез кода — `9056f91493`. Задачи 15–18 ожидают.
-- Профиль dashboard сохраняет ограничение при потере каталога через защищённый серверный флаг; исполнение загружает `Session.getForExecution`, публичный путь/ссылки сохраняются.
-- `dashboard_draft` собирает src реальными tsc/Vite, читает согласованный снимок и возвращает общий loopback URL. SQLite-исключение короткое, sample устанавливается последним; Node/Bun, crash и восстановление проверены; sibling control вычисляется после realpath work.
-- Задачи 8–9 приняты: Desktop создаёт новый чат в work, прежние чат/src сохраняются; файловый guard проверяет raw path до нормализации и запрещает отмену ссылки через .., обычный .. и alias работают.
-- Задача 10: scoped 69, package 26+36, browser 213, typecheck — PASS; ревью без открытых замечаний. FS permissions Node ограничивают compiler children staging/kit, tsc CLI сохранён; AST и единый PostCSS scanner проверяют конструкции/реальные цели до сборки. POSIX capture PASS; только этот race-тест пропускается на Windows.
-- Задача 11: реальный sandboxed Chromium проверяет ready/errors/CSP и закрывается до удаления HOME; отмена ждёт child close. Typecheck/build/browser 222 — PASS; независимое ревью без замечаний. Короткий persistent TMPDIR в environment.sh устраняет Unix socket limit тестового окружения.
-- Строгая историческая последовательность TDD для helper задачи 7 не соблюдена полностью; расширенные тесты добавлены после skeleton. Искусственный RED не выдаётся за test-first; дальше первый настоящий RED проверяет controller до production-правки.
-- Задача 6: полный Host 435 PASS/6 SKIP; полный backend 4093 PASS/25 SKIP/1 TODO/10 ошибок старой фикстуры, затем изменённый файл 10 PASS/139 assertions. Это совокупное подтверждение, не новый полный GREEN.
-- Backend проверять штатным `bun run test` (30 секунд). Полный зелёный финальный CI перед приёмкой M3 обязателен.
-- Задача 12 принята после одного раунда исправлений: retained bytes, настоящий ask/reject/once, key lock, snapshotId, cancel и UI проверены; final publication 14/tool 6/typechecks PASS.
-- Задача 14: навык/реестр/ожидания обновлены; backend 27, Host staging 1, Product 36, typechecks — PASS. Оба ревью Approved; legacy guard проверяет package.json, CAT-02 учитывает .gitleaksignore. Следующая — 15 (ресурсы/CI).
-- Задача 13: CLI snapshot→новая work-сессия/синтетическая часть проверены, ревью Approved; full CLI 482 PASS/8 SKIP до headless-фикса, после него affected 9/typecheck/native build PASS.
-- Подробный журнал, отчёты, diff и логи — `.superpowers/sdd/2026-11-12-dashboard-m3/`; окружение — `environment.sh`.
-- Установленная поставка, настоящая модель, стенд, публикация на настоящем стенде и задачи 15–18 ещё не приняты. Установка DEB и слияние требуют команды владельца по плану; Windows runtime здесь не проверялся.
-- Дополнение Task18 о сохранении Server, исходной Studio и прежнего web независимо одобрено после исправлений; перед исполнением повторно проверить состояние. Стенд и удалённый рабочий компьютер не изменялись.
+- Рабочая ветка `dashboard-m3`; задачи 1–16 выполнены и независимо проверены. Номер следующей задачи и актуальный план — [план M3](../../superpowers/plans/2026-11-12-dashboard-m3.md).
+- [CI4](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43547781495) полностью зелёный: 11 jobs, включая unit, generated client, HttpApi gates, template Ubuntu/Windows/macOS, browser, Desktop, E2E и evals. SHA проверенной ревизии — в CI.
+- Task15: набор шаблона действительно staged и собирается; три примера и CSS/font проходят на всех трёх ОС. Все три замечания исправлены без расширения Node permissions; нативный Windows runtime установленной поставки ещё не проверялся.
+- Task12: публикация retained bytes, разовый ask/reject/once, key lock, snapshotId, cancel и UI проверены. Два новых unit-сбоя интеграции исправлены существующим общим английским словарём и актуальным provider assertion; оба ревью Approved.
+- Task13: CLI snapshot→новая work-сессия/синтетическая часть проверены; Task14: третий навык/реестр и все потребители обновлены. CI4 подтверждает состояние задач 1–15; окончательная ревизия после документов потребует финального CI.
+- Task7: строгая историческая последовательность TDD для helper соблюдена не полностью; дополнительные тесты добавлены после skeleton. Это отклонение не объявляется устранённым.
+- Task16 принята: флаг/привязка/снимки реализованы, аргументы RED→GREEN, фактический CI-шаг, Bash/ShellCheck/YAML PASS; независимое ревью Approved. Реальный запуск установщика — в Task18. Следующая Task17, её plan-review Approved.
+- Подробный журнал, rulings, отчёты, diff и логи — `.superpowers/sdd/2026-11-12-dashboard-m3/`; закреплённое окружение — `environment.sh`. Backend проверять штатным `bun run test` из пакета.
+- Установленная поставка, настоящая модель, стенд, публикация на настоящем стенде и задачи 17–18 ещё не приняты. Перед DEB-установкой требуется команда владельца по плану; слияние и выпуск — отдельно.
+- Дополнение Task18 о сохранении Server, исходной Studio и прежнего web независимо одобрено; перед исполнением повторно проверить состояние. Стенд и удалённый рабочий компьютер не изменялись.
 - Для итогового ревью остаются P3 Copilot `_noop` и Host else-if Minor; Product catalog-check исправлен, secret scanning не менялся.
-- Задача 15: [CI3](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43542247918) — 10 jobs PASS, два unit-сбоя Task7/12 исправлены: parity 5/provider 1/profile 23/typechecks PASS, независимое ревью Approved. Требуется свежий полный CI; прежние три замечания Task15 устранены. Task16 plan Approved, production не начата.

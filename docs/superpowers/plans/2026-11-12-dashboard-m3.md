@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** задачи 1–14 выполнены и независимо проверены по поведению; задачи 15–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** задачи 1–16 выполнены и независимо проверены по поведению; задачи 17–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -1501,9 +1501,9 @@ import { onState, close, type DashboardState } from "./loginom"
 **Interfaces:**
 - Produces: в ресурсах `dashboard/template/` (файлы шаблона, `src/`, `node_modules` без `.bin`), `dashboard/draft.js`, `dashboard/selfcheck.mjs`; все в `resource-manifest.json`.
 
-- [ ] **Step 1: Тест.** Полный тест сборки ресурсов (`stage-resources.test.ts`, ≈131, пропускается без `LOGINOM_AI_AGENT_TEST_NODE`/`LOGINOM_AI_AGENT_TEST_BROWSERS`) дополнить: есть `dashboard/template/node_modules/typescript/bin/tsc`, `dashboard/template/node_modules/vite/bin/vite.js`, `dashboard/template/{index.html,tsconfig.json,env.d.ts,vite.config.mjs,resolver.mjs,scan.mjs,src/main.tsx,src/loginom.ts}`, `dashboard/draft.js`, `dashboard/selfcheck.mjs`; нет `dashboard/template/node_modules/.bin`; в манифесте есть `dashboard/template/src/main.tsx` и `dashboard/draft.js`; `dashboardResources(destination)` (задача 7) не бросает. Затем сборка шаблона из поставки: `buildDashboard` с `template` и `node` из `destination` → `ok: true`.
-- [ ] **Step 2: Тест падает.** `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=… LOGINOM_AI_AGENT_TEST_BROWSERS=… bun test test/stage-resources.test.ts` → FAIL.
-- [ ] **Step 3: Сборка ресурсов.** В `stageResources` после копирования навыков (≈107):
+- [x] **Step 1: Тест.** Полный тест сборки ресурсов (`stage-resources.test.ts`, ≈131, пропускается без `LOGINOM_AI_AGENT_TEST_NODE`/`LOGINOM_AI_AGENT_TEST_BROWSERS`) дополнить: есть `dashboard/template/node_modules/typescript/bin/tsc`, `dashboard/template/node_modules/vite/bin/vite.js`, `dashboard/template/{index.html,tsconfig.json,env.d.ts,vite.config.mjs,resolver.mjs,scan.mjs,src/main.tsx,src/loginom.ts}`, `dashboard/draft.js`, `dashboard/selfcheck.mjs`; нет `dashboard/template/node_modules/.bin`; в манифесте есть `dashboard/template/src/main.tsx` и `dashboard/draft.js`; `dashboardResources(destination)` (задача 7) не бросает. Затем сборка шаблона из поставки: `buildDashboard` с `template` и `node` из `destination` → `ok: true`.
+- [x] **Step 2: Тест падает.** `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=… LOGINOM_AI_AGENT_TEST_BROWSERS=… bun test test/stage-resources.test.ts` → FAIL.
+- [x] **Step 3: Сборка ресурсов.** В `stageResources` после копирования навыков (≈107):
 
 ```ts
 const dashboard = resolve(import.meta.dirname, "../../dashboard")
@@ -1521,7 +1521,7 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
 ```
 
   `npm` — та же переменная, что для `runtime/client` (≈127); если она объявлена ниже, перенести её объявление выше этого блока. `dashboard` (каталог пакета) добавить в список проверки пересечений входов и выхода (≈69–87). Набор ставится на той же системе, что и сборка поставки, поэтому нативные пакеты esbuild и Rollup соответствуют платформе.
-- [ ] **Step 4: Задача CI.** В существующем `test/build/build.test.mjs` добавить отдельные сборки исходников `examples/roi/src`, `examples/campaign-summary/src`, `examples/channel-summary/src` через `buildDashboard`; исходный test fixture может принимать источник src. Это обязательные три положительных проверки сборки, без браузера. Прежние build/resolver-тесты сами по себе этих примеров не содержали.
+- [x] **Step 4: Задача CI.** В существующем `test/build/build.test.mjs` добавить отдельные сборки исходников `examples/roi/src`, `examples/campaign-summary/src`, `examples/channel-summary/src` через `buildDashboard`; исходный test fixture может принимать источник src. Это обязательные три положительных проверки сборки, без браузера. Прежние build/resolver-тесты сами по себе этих примеров не содержали.
 
  В `.github/workflows/test.yml` после `chromium-direct`:
 
@@ -1563,8 +1563,8 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
   Проверка `toJSON(inputs.macos)` различает явно переданный boolean false и отсутствие input обычного push; два прежних job вне этой задачи не меняются. После первого CI отказа Windows процессы scanner/tsc/Vite запускать из уже вычисленного canonical `root`, которому выданы прежние FS permissions: это устраняет расхождение cwd с разрешённым путём без расширения корней. Второй CI подтвердил сборки шаблона и трёх примеров на Windows после canonical-cwd. Для CSS-сканера в существующий resolveConfig добавить resolve.preserveSymlinks: true: Vite обходит ненужный вызов net use для сетевых дисков, а собственные проверки возвращённого и канонического пути, типа файла и запрет ссылок в captured src сохраняются. Новых разрешений Node не добавлять; нативный CI обязан подтвердить шесть CSS-проверок.
 
   Если `setup-loginom-inputs` на Windows отдаёт путь Node в формате, с которым `dirname` в Git Bash не работает, привести через `cygpath -u` — проверкой на первом прогоне CI, а не заранее.
-- [ ] **Step 5: Прогон.** Полный тест шага 1 → PASS; `bun typecheck` в `packages/loginom-host`; push ветки — задачи `unit`, `dashboard-browser`, `dashboard-template` (все три системы) зелёные. Если macOS-раннер недоступен, это ограничение записывается в отчёт и в roadmap (S6), а не скрывается.
-- [ ] **Step 6: Коммит.** `git commit -m "chore(dashboard): ship the template kit with Desktop and CLI"`.
+- [x] **Step 5: Прогон.** Полный тест шага 1 → PASS; `bun typecheck` в `packages/loginom-host`; push ветки — задачи `unit`, `dashboard-browser`, `dashboard-template` (все три системы) зелёные. Если macOS-раннер недоступен, это ограничение записывается в отчёт и в roadmap (S6), а не скрывается.
+- [x] **Step 6: Коммит.** `git commit -m "chore(dashboard): ship the template kit with Desktop and CLI"`.
 
 ### Task 16: `dev-master.sh` для M3
 
@@ -1575,7 +1575,7 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
 - Consumes: `bindingKey` из `dist/server.mjs` (задача 1), `DASHBOARD_CLI_BUTTON`.
 - Produces: `./packages/dashboard/deploy/dev-master.sh install [--strict] [--cli-button] [--web NAME] | check [--web NAME] | uninstall [--web NAME]`.
 
-- [ ] **Step 0: Поведенческий RED до скрипта.** В существующий CI-шаг проверки установщика добавить и локально выполнить один assertion:
+- [x] **Step 0: Поведенческий RED до скрипта.** В существующий CI-шаг проверки установщика добавить и локально выполнить один assertion:
 
 ```bash
 if output=$(bash packages/dashboard/deploy/dev-master.sh install --cli-button --web invalid/name 2>&1); then
@@ -1586,8 +1586,8 @@ fi
 ```
 
   До production-правки он падает на прежнем Usage; после неё достигает существующей проверки имени. Этот путь завершается до Docker и не требует моков, нового файла тестов или package script. Отдельно проверить отказ `check`/`uninstall` с `--cli-button`, также используя invalid/name как предохранитель до Docker. Реальная установка остаётся только в задаче 18.
-- [ ] **Step 1: Аргументы и запуск web.** `--cli-button` допустим только с `install`, задаёт `cli_button=1` (по умолчанию `0`). В `docker run` контейнера web: убрать `-e DASHBOARD_PROJECT_ROOT=…` и `-e DASHBOARD_ALLOW_CURRENT=0`, добавить `-e DASHBOARD_CLI_BUTTON="$cli_button"`. `builds=$state/builds` без переопределения через `DASHBOARD_BUILDS`: туда пишет `dashboard_publish`. Удалить блоки M1 про `dashboard/template` (ссылку `legacy`) и `npm ci` шаблона, если они остались: стенду они больше не нужны. Подсказка в конце `install`: «Создайте и опубликуйте ROI через Desktop (Создать dashboard → Опубликовать), затем выполните check».
-- [ ] **Step 2: `check`.** Общая привязка ROI — три поля и используется также завершающим readiness lookup установки, без server/port. Ключ вычислять только внутри check после наличия установленных Node/server.mjs: свежий install этих файлов заранее не требует и не зависит от опубликованной ROI. Ключ:
+- [x] **Step 1: Аргументы и запуск web.** `--cli-button` допустим только с `install`, задаёт `cli_button=1` (по умолчанию `0`). В `docker run` контейнера web: убрать `-e DASHBOARD_PROJECT_ROOT=…` и `-e DASHBOARD_ALLOW_CURRENT=0`, добавить `-e DASHBOARD_CLI_BUTTON="$cli_button"`. `builds=$state/builds` без переопределения через `DASHBOARD_BUILDS`: туда пишет `dashboard_publish`. Удалить блоки M1 про `dashboard/template` (ссылку `legacy`) и `npm ci` шаблона, если они остались: стенду они больше не нужны. Подсказка в конце `install`: «Создайте и опубликуйте ROI через Desktop (Создать dashboard → Опубликовать), затем выполните check».
+- [x] **Step 2: `check`.** Общая привязка ROI — три поля и используется также завершающим readiness lookup установки, без server/port. Ключ вычислять только внутри check после наличия установленных Node/server.mjs: свежий install этих файлов заранее не требует и не зависит от опубликованной ROI. Ключ:
 
 ```bash
 binding='{"packagePath":"/user/dashboard-roi/campaign.lgp","workflowGuid":"27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7","nodeGuid":"77c145b1-6ce3-458f-aa36-e6afdab2a930"}'
@@ -1604,8 +1604,8 @@ roi=$("$state/node" --input-type=module -e '
   - `cliButton` в `lookup` равен `DASHBOARD_CLI_BUTTON` контейнера (`docker inspect`);
   - монтирование `/builds` — источник `$state/builds`.
   Проверки M2 (заголовки хоста приложений, CSP страницы Studio, `hash` ROI равен `builds/$roi/current`, «Не проверено: опубликуйте ROI» без сборки) остаются с новым `$roi`.
-- [ ] **Step 3: Статические проверки.** `bash -n packages/dashboard/deploy/dev-master.sh && shellcheck packages/dashboard/deploy/dev-master.sh` → без замечаний.
-- [ ] **Step 4: Коммит.** `git commit -m "feat(dashboard): check one-time snapshots on the dev stand"`.
+- [x] **Step 3: Статические проверки.** `bash -n packages/dashboard/deploy/dev-master.sh && shellcheck packages/dashboard/deploy/dev-master.sh` → без замечаний.
+- [x] **Step 4: Коммит.** `git commit -m "feat(dashboard): check one-time snapshots on the dev stand"`.
 
 ### Task 17: Документы
 
