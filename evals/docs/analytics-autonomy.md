@@ -42,6 +42,13 @@ admissions всей истории и проверенного release server/pr
 начатые FAIL/NULL не повторять. Код 1 означает running/hold, а не разрешение
 нового запуска; читать точный stderr и unit/native evidence.
 
+Преджурнальный budget refusal допускает отдельную post-exit classification
+`jobs/<id>/budget-refusal.json`: точная сохранённая terminal invocation, полный
+authoritative journal, исходная metadata и SHA budget, закреплённая execution
+revision, пустой canonical resultsDir и ноль native journals. Это не native journal.
+Те же source hashes, повторная проверка всей истории и release gate обязательны
+в controller и worker; generic error или очищенная InvocationID сохраняют HOLD.
+
 Для cold использовать `node script/analytics-cold-rerun.mjs <private-input.json>`.
 Вход: `resources`, `connection` (url/username/password), `packagePath`,
 `output` (новый каталог), `skillEnv`, `caseDir`, `attemptDir`. Команда проверяет

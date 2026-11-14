@@ -1,6 +1,6 @@
 import path from "node:path"
 import { constants } from "node:fs"
-import { open } from "node:fs/promises"
+import { open, readFile, realpath, readdir, lstat } from "node:fs/promises"
 
 export async function exclusiveFact(file: string, value: unknown) {
   const handle = await open(file, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
@@ -189,6 +189,95 @@ export async function measurementRetrySources(job: MeasurementJob, unit: Record<
   if (measurementState(job, unit, native) !== "zero-admissions" || entry.manifestHash !== manifestHash || entry.job !== job.id ||
     entry.binding?.manager !== "system" || JSON.stringify(entry.binding) !== JSON.stringify(native.unitBinding)) throw Error("RETRY_SOURCE_UNCONFIRMED")
   return Promise.all([nativeFile, entryFile].map(async file => ({ file, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") })))
+}
+
+type FilePin = { file: string; sha256: string }
+export async function prejournalBudgetRetrySources(input: {
+  job: MeasurementJob; unit: Record<string, string>; stateDir: string; manifestHash: string; generation: number
+  budgetFile: string; budgetSha256: string; entryFile: string; intentFile: string; proofFile: string
+  authoritativeJournal: Record<string, string>[]
+}) {
+  const { readLeaseReceipt } = await import("./lease")
+  const hash = (bytes: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
+  const fail = () => { throw Error("PREJOURNAL_BUDGET_REFUSAL_UNCONFIRMED") }
+  const sources: FilePin[] = []
+  const pinned = async (ref: FilePin) => {
+    if (!ref || !path.isAbsolute(ref.file) || !/^[a-f0-9]{64}$/.test(ref.sha256) || await realpath(ref.file) !== ref.file) return fail()
+    const info = await lstat(ref.file)
+    if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || ![0o400, 0o600].includes(info.mode & 0o777)) return fail()
+    const bytes = await readFile(ref.file)
+    if (hash(bytes) !== ref.sha256) throw Error("RETRY_EVIDENCE_CHANGED")
+    sources.push(ref)
+    return bytes.toString()
+  }
+  const proof = await Bun.file(input.proofFile).json()
+  if (proof.version !== 1 || proof.kind !== "post-exit-budget-refusal" || proof.manifestHash !== input.manifestHash ||
+    proof.job !== input.job.id || proof.generation !== input.generation || !Number.isInteger(input.generation) || input.generation < 0 || input.generation > 3) return fail()
+  await pinned({ file: input.proofFile, sha256: hash(await readFile(input.proofFile)) })
+  const entry = await readLeaseReceipt(input.entryFile) as { manifestHash: string; job: string; binding: import("./process-supervisor").UnitBinding }
+  const intent = await readLeaseReceipt(input.intentFile) as { manifestHash: string; job: string; unit: string; resultsDir: string }
+  const binding = entry.binding, unit = input.unit
+  if (entry.manifestHash !== input.manifestHash || entry.job !== input.job.id || intent.manifestHash !== input.manifestHash ||
+    intent.job !== input.job.id || intent.unit !== input.job.unit || intent.resultsDir !== input.job.resultsDir ||
+    !binding || binding.manager !== "system" || binding.unit !== input.job.unit || unit.Id !== input.job.unit ||
+    !/^[a-f0-9]{32}$/.test(binding.invocation) || unit.InvocationID !== binding.invocation ||
+    !["failed", "inactive"].includes(unit.ActiveState ?? "") || unit.MainPID !== "0" || unit.ControlGroup !== "" ||
+    unit.Restart !== "no" || unit.Delegate !== "no" || unit.ExecMainStatus !== "1" ||
+    binding.cgroup !== "/system.slice/" + input.job.unit || !binding.producer || binding.producer.uid !== process.getuid?.() ||
+    !Number.isSafeInteger(binding.producer.pid) || binding.producer.pid < 1 || !/^\d+$/.test(binding.producer.starttime) ||
+    binding.bootId !== (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim()) return fail()
+  if (await lstat("/sys/fs/cgroup" + binding.cgroup).catch(error => { if (error.code === "ENOENT") return; throw error })) return fail()
+  const producer = await readFile("/proc/" + binding.producer.pid + "/stat", "utf8").catch(error => { if (error.code === "ENOENT") return; throw error })
+  if (producer && producer.slice(producer.lastIndexOf(")") + 2).split(" ")[19] === binding.producer.starttime) return fail()
+  const results = await lstat(input.job.resultsDir)
+  if (!results.isDirectory() || results.uid !== process.getuid?.() || (results.mode & 0o777) !== 0o700 ||
+    await realpath(input.job.resultsDir) !== input.job.resultsDir || (await readdir(input.job.resultsDir)).length) return fail()
+  for (const file of await readdir(input.stateDir)) {
+    if (!/^run-command-.*\.json$/.test(file)) continue
+    const native = await Bun.file(path.join(input.stateDir, file)).json()
+    if (native.version !== 2 || native.kind !== "unactivated-preparation" || typeof native.runDir !== "string" ||
+      !Array.isArray(native.attempts) || native.runDir.startsWith(input.job.resultsDir + path.sep))
+      throw Error("PREJOURNAL_NATIVE_PRESENT")
+  }
+  const source = JSON.parse(await pinned(proof.sourcePins))
+  const metadata = JSON.parse(await pinned(proof.budgetMetadata))
+  const journal = (await pinned(proof.journal)).trim().split("\n").map(line => JSON.parse(line) as Record<string, string>)
+  if (source.sourceRevision !== proof.sourceRevision || !/^[a-f0-9]{40}$/.test(proof.sourceRevision) ||
+    source.manifestSha256 !== input.manifestHash || source.pins?.resourceBudgetSha256 !== input.budgetSha256 ||
+    metadata.resourceBudgetSha256 !== input.budgetSha256 || !/^0o[0-7]{3}$/.test(metadata.mode) || metadata.mode === "0o600" ||
+    metadata.uid !== binding.producer.uid || metadata.nlink !== 1 || metadata.originalWorkerInvocation !== binding.invocation ||
+    metadata.resultsDirectoryEmpty !== true) return fail()
+  await readLeaseReceipt(input.budgetFile)
+  await pinned({ file: input.budgetFile, sha256: input.budgetSha256 })
+  const normalized = (rows: Record<string, string>[]) => rows.map(row => JSON.stringify(Object.entries(row).sort())).sort()
+  if (!journal.length || JSON.stringify(normalized(journal)) !== JSON.stringify(normalized(input.authoritativeJournal)) ||
+    new Set(journal.map(row => row.__CURSOR)).size !== journal.length ||
+    journal.some(row => !row.__CURSOR || row._BOOT_ID !== binding.bootId.replaceAll("-", "") ||
+      (row._SYSTEMD_INVOCATION_ID || row.INVOCATION_ID) !== binding.invocation ||
+      (row.UNIT || row._SYSTEMD_UNIT) !== binding.unit)) return fail()
+  const refusals = journal.filter(row => row.MESSAGE === "LEASE_FILE_PRIVATE")
+  if (refusals.length !== 1 || refusals[0]!._PID !== String(binding.producer.pid) ||
+    refusals[0]!._UID !== String(binding.producer.uid) || refusals[0]!._SYSTEMD_UNIT !== binding.unit ||
+    refusals[0]!._SYSTEMD_CGROUP !== binding.cgroup ||
+    !journal.some(row => row._PID === "1" && row._UID === "0" && row.UNIT === binding.unit && row.EXIT_CODE === "exited" && row.EXIT_STATUS === "1")) return fail()
+  // Only the reviewed source boundary that reads the private budget before native admission.
+  const boundaries: Record<string, string> = {
+    "evals/src/prepared-run.ts": "7ca3634462b0c4522bc18cba8006e881c547ca5f751a5cad13869fcce7c6d329",
+    "evals/src/lease.ts": "ca5344f927acdfd140718bbc5ac006eb1291081414891116caf5c6d8715a81a8",
+  }
+  const executionSources = proof.executionSources as (FilePin & { repositoryPath: string })[]
+  if (!Array.isArray(executionSources) || executionSources.length !== 2 || new Set(executionSources.map(ref => ref.repositoryPath)).size !== 2) return fail()
+  for (const ref of executionSources) {
+    if (boundaries[ref.repositoryPath] !== ref.sha256) return fail()
+    const blob = Bun.spawn(["git", "show", proof.sourceRevision + ":" + ref.repositoryPath], {
+      cwd: path.resolve(import.meta.dir, "../.."), stdout: "pipe", stderr: "ignore", timeout: 10000,
+    })
+    const [code, bytes] = await Promise.all([blob.exited, new Response(blob.stdout).arrayBuffer()])
+    if (code || hash(new Uint8Array(bytes)) !== ref.sha256) return fail()
+    await pinned(ref)
+  }
+  for (const file of [input.entryFile, input.intentFile]) await pinned({ file, sha256: hash(await readFile(file)) })
+  return sources
 }
 
 export async function verifyMeasurementRetryProof(file: string, manifestHash: string, job: string, generation: number) {
