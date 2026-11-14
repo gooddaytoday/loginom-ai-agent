@@ -1,6 +1,6 @@
 import { app, safeStorage } from "electron"
 import { join, resolve } from "node:path"
-import { createLoginomHost } from "@loginom-ai-agent/loginom-host/host"
+import { createLoginomHost, verifyInstallationResources } from "@loginom-ai-agent/loginom-host/host"
 import { credentials } from "./credentials"
 
 export function loginomResources() {
@@ -13,11 +13,20 @@ export function desktopLoginom() {
   return createLoginomHost({
     root: join(app.getPath("userData"), "loginom"),
     resources: loginomResources(),
+    resourceVersion: app.getVersion(),
     codec: credentials(process.platform, safeStorage),
     environment: process.env,
     headless:
       process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1" && process.env.LOGINOM_AI_AGENT_TEST_HEADLESS === "1",
     // Only the packaged app with its own resources may carry the baked capability.
     browserRecovery: import.meta.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === true && app.isPackaged,
+  })
+}
+
+export function verifyDesktopResources() {
+  return verifyInstallationResources({
+    root: join(app.getPath("userData"), "loginom"),
+    resources: loginomResources(),
+    resourceVersion: app.getVersion(),
   })
 }

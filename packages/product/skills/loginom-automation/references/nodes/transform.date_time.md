@@ -13,6 +13,9 @@ ISO-год — `iso_year`, номер ISO-недели — `iso_week`, её по
 `day_of_month`, `hour`, `minute`, `second`, `year_start`, `year_end`, `quarter_start`, `quarter_end`,
 `month_start`, `month_end`, `date`. На поле допускается до 12 преобразований.
 `minute` и `second` извлекают целые значения 0…59; пропуски остаются NULL.
+`day_of_year` — день года 1…366, `millisecond` — миллисекунды 0…999.
+`week` — обычная неделя с понедельника; неделя 1 содержит 1 января
+(в отличие от `iso_week`). Все три дают integer, NULL остаётся NULL.
 Строковые представления datetime: `string_year` (`%Y`), `string_date` (`%Y-%m-%d`),
 `string_time` (`%H:%i:%s`) — без `format`. Свой шаблон — `string_custom` с обязательным
 `format` (допустим только у него; один на поле), например

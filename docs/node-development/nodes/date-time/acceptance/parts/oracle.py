@@ -1,9 +1,8 @@
 """Independent civil-calendar expectations for date parts; never supplied to the model.
 
 Python stdlib only. Day of year, quarter and milliseconds are convention-free.
-The ordinary (non-ISO) Loginom week is NOT documented (help syntax.html: %W
-"номер недели в году" only), so two hypotheses are encoded and the native
-probe must pick one BEFORE any model run:
+Native probe LAB-1560 confirmed h1 before model runs. Both hypotheses remain
+encoded to document the discrimination (help syntax.html only names %W):
   h1 - weeks start on Monday, week 1 contains January 1;
   h2 - strftime %W: weeks start on Monday, days before the first Monday are week 0.
 """
@@ -85,6 +84,6 @@ if __name__ == '__main__':
         stale = [name for name, text in files.items() if (ROOT / name).read_text(encoding='utf-8') != text]
         if stale:
             raise SystemExit('Stale date-part expectations: ' + ', '.join(stale))
-        print('OK: independent date parts; week convention ' + args.week_convention + ' (NOT_CHECKED natively)')
+        print('OK: independent date parts; week convention ' + args.week_convention)
     else:
         print(files['expected.json'], end='')

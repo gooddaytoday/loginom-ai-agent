@@ -140,3 +140,29 @@ integer, real/datetime/boolean/variant, интервалы, quoted lists и пр
 Новой native-пробы нет (пара карточке не выдана). Первые N — через native
 номер строки; последние N и boolean-переменная — огр. 7.4.2; предложенный
 комплект — [acceptance/typed](acceptance/typed/README.md).
+
+## Top-N: native-проба LAB-1575, 13.11.2026
+
+Loginom 7.4.2, mas3, pinned Node 24.19.0 / Chromium 1246, worker назначенной
+пары. Собственный пакет `lab1575-native-bound.lgp`; исходный вспомогательный
+JavaScript выдаёт RowID `[8,2,7,4,1,6,3,5]`, фильтрация выполняется только
+штатным Фильтром. Это native discovery, не модельная приёмка CSV.
+
+При `Номер строки <= TopN` есть `VariantPropEdit;SwitchButton`, затем
+`VariableControl;trg_picker` и integer-переменная. Native-строка:
+`RowNumberer=1, DataType=4, RelationType=1, UseVariables=1`.
+У переменной техническое имя TopN, метка в ручной пробе TopNTopN; picker
+и `CompareValue` используют метку. Обработчик требует совпадения имени и метки.
+
+При значении 3 выход 0 — `[8,2,7]`: номер строки **1-based**, порядок исходный.
+После Save, закрытия и открытия пакета сохранены `RowNumberer=1`,
+`UseVariables=1`, `CompareValue="TopNTopN"`; при переоткрытии одного мастера
+видно `TopNTopN ( 3 )`. Это ссылка, не материализованное число.
+
+Наблюдения вне Git: `native-probe/ui.jsonl:2–4` (редактор/picker/binding),
+`:5` (полный видимый результат 3 строк), `:7` (Save As), `:27` (пакет после
+Close/Open), `:42` (package_closed/logged_out=true, без discard изменений).
+Первый черновик после закрытия браузера без logout открылся read-only;
+дальнейшая проба сохранена под отдельным именем, затем штатно закрыта.
+Изменение 3→5 и независимый cold проверяются сценарием `row-filter-top-n`.
+Real/datetime/NULL-переменные этой пробой не проверялись.

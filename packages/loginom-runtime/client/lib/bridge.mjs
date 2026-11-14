@@ -344,7 +344,8 @@ export async function createBridge(config, session, { browserTransport: managedB
           if (userProfile) args = userWorkflows.normalizePreparation(args);
           await admitHostArtifacts(args.host_context_token, codexInputIdentity(request.params));
           let preparationRequest = { operation_id: args.operation_id ?? 'prepare', intent: args.intent ?? 'new_draft',
-            package_path: privatePackage?.upload.destination??args.package_path??null, workflow_ref: args.workflow_ref ?? null };
+            package_path: privatePackage?.upload.destination??args.package_path??null, workflow_ref: args.workflow_ref ?? null,
+            ...(args.graph_navigation?{graph_navigation:args.graph_navigation}:{}) };
           // The refused reply never issued this draft. A new_draft retry under
           // another ID reconciles it with the original receipt, not a second package.
           if (undeliveredDraft && undeliveredDraft === session.metadata.workspacePreparation?.identity
@@ -355,7 +356,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           const workspaceOptions = actionRuntime ? { loginomUrl: config.loginomUrl,
             compatibility: pinnedActions.compatibility, sessionId: session.metadata.sessionId,
             operationId: preparationRequest.operation_id, intent: preparationRequest.intent,
-            packagePath: preparationRequest.package_path, workflowRef: preparationRequest.workflow_ref, timeoutMs: args.timeout_ms ?? 120000,
+            packagePath: preparationRequest.package_path, workflowRef: preparationRequest.workflow_ref, graphNavigation: preparationRequest.graph_navigation, timeoutMs: args.timeout_ms ?? 120000,
             allowTestLogin: config.mode === 'executor-replay' && config.replayBootstrap, testLoginUser: config.replayLoginUser } : null;
           if (workspaceOptions) makeWorkspacePrepareCode(workspaceOptions);
           const prepared = await skill.prepare();

@@ -18,12 +18,9 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
  // verify the actual prediction/coefficient schemas after native Execute.
  if(configuration.mode==='apply')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
   ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)})),saved_full_schema:linRegressionOutputColumns({...configuration,statistics:'full'},1)};
- // A fresh Enter node exposes all nine native coefficient columns; keep them.
- if(configuration.statistics==='full')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
-  ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
  // Native autosync regenerates pass-through fields in role order after cold
- // activation. Pin the approved LASSO/Elastic Net prediction layout before training.
- if(['lasso','elastic'].includes(configuration.mode)){
+ // activation. Pin the approved regularized/holdout layout before training.
+ if(['lasso','elastic'].includes(configuration.mode)||configuration.partition?.method==='sequential'){
   await channel.openOutputPort(0);
   const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
   let state=await observe('complete LASSO prediction mapping');const expected=linRegressionOutputColumns(configuration,0);
@@ -38,6 +35,9 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
   need(definition.fields.every((f,i)=>['name','label','type'].every(k=>f[k]===expected[i][k])),'rendered prediction order differs');
   await finishWizard('done',true,definition);
  }
+ // A fresh Enter node exposes all nine native coefficient columns; keep them.
+ if(configuration.statistics==='full')return {verified:true,cleanup_complete:true,effect_possible:false,deferred_schema:true,
+  ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
  await channel.openOutputPort(1);
  const ready=s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
  const observe=condition=>channel.observe({condition,readMappings:true,ready});

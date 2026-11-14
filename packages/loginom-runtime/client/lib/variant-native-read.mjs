@@ -88,7 +88,7 @@ export async function readNativeVariant(page,b,decode,options={}) {
   need(receipt&&receipt.tab===document.querySelector('[data-tid='+JSON.stringify(b.tab_tid)+']')&&receipt.tab.classList.contains('x-tab-active'),'workflow receipt');
   const snapshot=()=>{
    const card=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab(),model=card.Controller.FController;
-   let treeNode=card.Controller.Node?.data?.node,workflow,packageNode;for(let i=0;treeNode&&i<32;i++,treeNode=treeNode.ParentNode){if(treeNode instanceof bg.app.WorkFlowTreeNode)workflow=treeNode;if(treeNode instanceof bg.app.PackageTreeNode){packageNode=treeNode;break;}}
+   let treeNode=card.Controller.Node?.data?.node,workflow,packageNode;for(let i=0;treeNode&&i<32;i++,treeNode=treeNode.ParentNode){if(!workflow&&treeNode instanceof bg.app.WorkFlowTreeNode)workflow=treeNode;if(treeNode instanceof bg.app.PackageTreeNode){packageNode=treeNode;break;}}
    need(workflow===receipt.nodeTargetWorkflowNode&&packageNode===receipt.packageNode,'workflow/package owner');
    const manager=v(model,'FPreviewManager'),form=v(manager,'FPreviewForm'),node=v(form,'FCurrentPreviewNode'),port=v(form,'FCurrentPreviewPort');
    need(v(manager,'FPreviewVisible')===true&&node?.FGuid===b.node_id&&port?.parent===node&&port.FGuid===b.port_guid&&port.FType===1&&port.FSubType===1&&port.FParam===0,'preview owner/port');

@@ -22,6 +22,14 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_rest_query_variables_is_deferred_while_c4_remains_registered(self):
+        with self.assertRaisesRegex(ValueError, 'Unknown scenario: rest-query-variables'):
+            runner.scenario('rest-query-variables')
+        self.assertEqual(runner.scenario('rest-variables')['prompt'].name, 'task-variables.md')
+        kit = runner.REPO / 'docs/node-development/variables/acceptance'
+        for name in ('task-rest-variables.md', 'oracle.py', 'expected-initial.json', 'expected.json'):
+            self.assertTrue((kit / name).is_file(), name)
+
     def test_excel_destinations_reach_seed_and_oracle_books(self):
         for name in ['excel-export-numeric', 'excel-export-replace']:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
