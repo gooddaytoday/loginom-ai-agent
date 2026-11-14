@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
-import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -8,17 +8,25 @@ import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { stageHeldKnowledge } from "./fixtures/knowledge"
+import { constants } from "node:fs"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
 beforeAll(async () => {
   if (!fixture.node) throw new Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   fixture.directory = await mkdtemp(join(tmpdir(), "loginom-node-host-"))
   // Match connection-validation: isolate Bun's build cache from this test runner.
-  const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), fixture.directory], {
-    stdout: "pipe", stderr: "pipe",
-  })
-  const [code, output, errors] = await Promise.all([builder.exited,
-    new Response(builder.stdout).text(), new Response(builder.stderr).text()])
+  const builder = Bun.spawn(
+    [process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), fixture.directory],
+    {
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  )
+  const [code, output, errors] = await Promise.all([
+    builder.exited,
+    new Response(builder.stdout).text(),
+    new Response(builder.stderr).text(),
+  ])
   expect({ code, output, errors }).toEqual({ code: 0, output: "", errors: "" })
   fixture.entry = join(fixture.directory, "node-host.mjs")
 })
@@ -143,6 +151,99 @@ test("host startup permits readiness after 30 seconds and still closes completel
   }
   expect(await host.exited).toEqual({ code: 0, signal: null })
 }, 40_000)
+
+test("CLI setup writes the Host cache before saving; check and the next process use metadata", async () => {
+  const resources = join(fixture.directory, "setup-resources")
+  const root = join(fixture.directory, "setup-profile")
+  const binary = process.platform === "win32" ? "bin/node.exe" : "bin/node"
+  await mkdir(join(resources, "bin"), { recursive: true })
+  await mkdir(join(resources, "runtime/src"), { recursive: true })
+  await copyFile(fixture.node, join(resources, binary), constants.COPYFILE_FICLONE)
+  await writeFile(join(resources, "browser"), "controlled browser payload")
+  await writeFile(
+    join(resources, "runtime/src/knowledge-entry.mjs"),
+    `process.on('message', m => {
+    if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,started:true}});
+    if (m.operation === 'list') process.send({id:m.id,result:{tools:[]}});
+    if (m.operation === 'interrupt') process.send({id:m.id,result:{interrupted:true}});
+    if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+  });`,
+  )
+  await writeFile(
+    join(resources, "runtime/src/managed-entry.mjs"),
+    `process.on('message', m => {
+    if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,checked:true}});
+    if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+  });`,
+  )
+  await writeFile(
+    join(resources, "resource-manifest.json"),
+    JSON.stringify({
+      protocol: 1,
+      nodeVersion: "24.19.0",
+      node: binary,
+      browser: "browser",
+      files: await Promise.all(
+        [binary, "browser"].map(async (path) => ({
+          path,
+          sha256: createHash("sha256")
+            .update(await readFile(join(resources, path)))
+            .digest("hex"),
+        })),
+      ),
+    }),
+  )
+  const input = { node: fixture.node, entry: fixture.entry, root, resources, headless: true }
+  const candidate = {
+    revision: 0,
+    url: "https://app.loginom.ai/app/",
+    username: "fixture",
+    password: { operation: "empty" },
+  }
+  const host = await launchNodeHost(input)
+  try {
+    const checked = (await host.request("connection.check", candidate)) as { validationId: string }
+    const cachePath = join(root, "resource-verification.json")
+    await rm(cachePath)
+    expect(await host.request("connection.save", { revision: 0, validationId: checked.validationId })).toMatchObject({
+      generation: 1,
+    })
+    expect(JSON.parse(await readFile(cachePath, "utf8"))).toMatchObject({ protocol: 1, version: "" })
+    // A damaged resource must refuse setup even if browser validation succeeded.
+    const current = (await host.request("connection.status", {})) as { revision: number }
+    const again = (await host.request("connection.check", { ...candidate, revision: current.revision })) as {
+      validationId: string
+    }
+    await writeFile(join(resources, "browser"), "tampered browser payload")
+    await expect(
+      host.request("connection.save", { revision: current.revision, validationId: again.validationId }),
+    ).rejects.toThrow("LOGINOM_RUNTIME_START_FAILED")
+    await writeFile(join(resources, "browser"), "controlled browser payload")
+    const retry = (await host.request("connection.check", { ...candidate, revision: current.revision })) as {
+      validationId: string
+    }
+    await host.request("connection.save", { revision: current.revision, validationId: retry.validationId })
+  } catch (error) {
+    await host.close().catch(() => undefined)
+    throw error
+  }
+  await host.close()
+  const restored = await launchNodeHost(input)
+  try {
+    await restored.request("connection.check", {
+      ...candidate,
+      revision: ((await restored.request("connection.status", {})) as { revision: number }).revision,
+    })
+    const events = (await readFile(join(root, "startup-phases.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.phase === "resources.verify" && event.status === "ready")
+    expect(events.at(-1)).toMatchObject({ mode: "metadata", hashedFiles: 0, cachedFiles: 2 })
+  } finally {
+    await restored.close()
+  }
+}, 30_000)
 
 test("a non-boolean recovery mode is rejected before the host starts", async () => {
   const failure = await launchNodeHost({
