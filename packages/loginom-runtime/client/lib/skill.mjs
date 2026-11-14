@@ -25,10 +25,11 @@ export function createSkillLoader({ resources }) {
       throw Error('Select distinct supported modes for the selected node types');
     const prepared=await this.prepare();
     return Promise.all(cards.map(async card=>{
-      const path=`skills/loginom-automation/references/nodes/${card.type}.md`;
+      const type=card.type==='control.supernode_output'?'control.supernode':card.type;
+      const path=`skills/loginom-automation/references/nodes/${type}.md`;
       const file=prepared.detail.files.find(file=>file.path===path);
       if(!file)throw Error('LOGINOM_SKILL_REQUIRED_RESOURCE_MISSING: '+path);
-      const text=await readFile(join(prepared.directory,'references/nodes',card.type+'.md'),'utf8');
+      const text=await readFile(join(prepared.directory,'references/nodes',type+'.md'),'utf8');
       if(createHash('sha256').update(text).digest('hex')!==file.sha256)throw Error('LOGINOM_SKILL_HASH_MISMATCH: '+path);
       const pattern=/^<!-- mode: ([a-z0-9_]+(?: [a-z0-9_]+)*) -->\r?\n([\s\S]*?)^<!-- \/mode -->\r?$/gm;
       const sections=[...text.matchAll(pattern)];
