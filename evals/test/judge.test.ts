@@ -565,6 +565,11 @@ test("ordinary exec: known browser helper stays fatal after adoption and natural
     expect(path.basename(parent.executable)).toBe("chrome")
     await Bun.write(file("parent-end"), "1")
     await wait(async () => !await active("native.pid"))
+    await wait(async () => {
+      const fields = (await Bun.file(`/proc/${pid}/stat`).text()).split(") ")[1]!.split(" ")
+      expect(fields[19]).toBe(before.starttime)
+      return Number(fields[1]) === scope()!.launcher.pid
+    })
     expect(Number((await Bun.file(`/proc/${pid}/stat`).text()).split(") ")[1]!.split(" ")[1])).toBe(scope()!.launcher.pid)
     await Bun.write(file("helper-exec"), "1")
     await wait(() => Bun.file(file("helper-image")).exists())
