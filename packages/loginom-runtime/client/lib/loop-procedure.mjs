@@ -59,11 +59,22 @@ export async function configureLoopBrowser(page,t,readNode=readPreparedNodeConte
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']:visible');
  const remaining=()=>{const n=t.deadline-Date.now();need(n>0,'original deadline expired');return n;};
  const guard=async()=>{
-  remaining();const n=await readNode(page,b);need(n.verified&&n.surface==='wizard'&&!n.input_port&&!n.output_port,'owned node wizard required');
-  need(!owner||same(n,owner),'wizard owner changed');owner??=n;
-  need(await page.evaluate(({origin,build,root})=>location.origin===origin&&bg.app.Version===build
-   &&document.querySelectorAll('[data-tid='+JSON.stringify(root)+']').length===1
-   &&![...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>e.checkVisibility({checkVisibilityCSS:true})),{origin:t.origin,build:t.build,root}),'origin/build, mask or dialog changed');
+  for(;;){
+   remaining();const n=await readNode(page,b);need(n.verified&&n.surface==='wizard'&&!n.input_port&&!n.output_port,'owned node wizard required');
+   need(!owner||same(n,owner),'wizard owner changed');owner??=n;
+   const s=await page.evaluate(({origin,build,root})=>{
+    const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+    return {compatible:location.origin===origin&&bg.app.Version===build
+     &&document.querySelectorAll('[data-tid='+JSON.stringify(root)+']').length===1,
+     dialog:[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].some(visible),
+     masked:[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].some(visible)};
+   },{origin:t.origin,build:t.build,root});
+   need(s.compatible,'origin/build or root changed');need(!s.dialog,'dialog changed');
+   if(!s.masked)return;
+   // Body selection builds the derived component asynchronously. While masked,
+   // only reread the pinned owner; no gesture is authorized until it is quiet.
+   await page.waitForTimeout(Math.min(100,remaining()));
+  }
  };
  const bodyRow=async()=>{
   await guard();const rows=await page.evaluate(({b,t,first})=>{

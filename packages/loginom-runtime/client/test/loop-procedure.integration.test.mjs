@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import {configureLoopBrowser,selectLoopBodyRecord,loopSettingsSupported} from '../lib/loop-procedure.mjs';
 
 const root='MF;TF-1;WizrdMCF',first=root+';LoopNodeWizard',params=root+';LoopParamsWizard';
-async function fixture(t,{loading=false,unrendered=false}={}){
+async function fixture(t,{loading=false,unrendered=false,mask=false,dialog=false}={}){
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
  t.after(()=>browser.close());const page=await browser.newPage();
  await page.route('http://loop.test/**',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><meta charset="utf-8">
@@ -20,9 +20,11 @@ async function fixture(t,{loading=false,unrendered=false}={}){
  ${['pedParallelProcessing','pedAppendIterationIdentifiers','pedIgnoreErrors'].map(k=>`<div data-tid="${params};${k};ValueControl">off</div>`).join('')}
  <div data-tid="${params};cbxLoopVariable"><input value=""></div></div>
  <div id="done" data-tid="${root};DoneWizard" style="display:none">Done</div>
- <button id="next" data-tid="${root};btnNext">Next</button></div>`}));
+ <button id="next" data-tid="${root};btnNext">Next</button></div>
+ <div id="mask" class="x-mask" style="display:none">loading</div>
+ ${dialog?'<div role="dialog">foreign dialog</div>':''}` }));
  await page.goto('http://loop.test/');
- await page.evaluate(({loading,unrendered})=>{
+ await page.evaluate(({loading,unrendered,mask})=>{
   const proxy={__ObjectId:{Module:'module',Instance:1}},workflow={FSubNodes:{FItems:[]}};
   workflow.FSubNodes.FItems.push({FGuid:'body',FModelNode:proxy});
   const row={data:{target:proxy,nodeType:4,iconCls:'bg-vendor-icon-modelgeneric',checked:false,text:'Same'},internalId:'body-id'};
@@ -41,7 +43,10 @@ async function fixture(t,{loading=false,unrendered=false}={}){
   globalThis.bg={app:{Version:'7.4.2',WorkFlowTreeNode:Object,Application:{FInstance:{FMainForm:{Items:{Workspace}}}}}};
   globalThis.gestures=[];globalThis.bufferCommittedAt=null;
   document.getElementById('foreign').onclick=()=>gestures.push('foreign');
-  document.getElementById('body').onclick=()=>{gestures.push('body');setTimeout(()=>row.data.checked=true,100);};
+  document.getElementById('body').onclick=()=>{
+   gestures.push('body');setTimeout(()=>row.data.checked=true,100);
+   if(mask){document.getElementById('mask').style.display='block';setTimeout(()=>document.getElementById('mask').style.display='none',350);}
+  };
   document.getElementById('group').onclick=()=>{
    gestures.push('group');document.getElementById('group').classList.add('x-form-cb-checked');
    setTimeout(()=>{document.getElementById('size').value='1';bufferCommittedAt=Date.now();},350);
@@ -52,7 +57,7 @@ async function fixture(t,{loading=false,unrendered=false}={}){
     document.getElementById('tree').parentElement.style.display='none';document.getElementById('params').style.display='block';
    }else{document.getElementById('params').style.display='none';document.getElementById('done').style.display='block';}
   };
- },{loading,unrendered});
+ },{loading,unrendered,mask});
  const owner={verified:true,document_id:'doc',workflow_id:'wf',node_id:'loop',surface:'wizard',tid:root};
  // The actual MCP sandbox has no Node timers. Keep that production boundary.
  const run=()=>vm.runInNewContext('('+configureLoopBrowser.toString()+')')(page,{origin:'http://loop.test',build:'7.4.2',deadline:Date.now()+10000,
@@ -61,11 +66,11 @@ async function fixture(t,{loading=false,unrendered=false}={}){
  return {page,run};
 }
 test('production Loop selects native identity among duplicate labels and awaits buffered group size',async t=>{
- const f=await fixture(t),out=await f.run();assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));
+ const f=await fixture(t,{mask:true}),out=await f.run();assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));
  const events=await f.page.evaluate(()=>gestures);assert.deepEqual(events.slice(0,3),['body','first-next','group']);
  assert.ok(events[3].next_after_commit>=200,JSON.stringify(events));assert.equal(out.configuration.settings.group_size,'1');
 });
-for(const fault of ['loading','unrendered'])test('production Loop refuses '+fault+' tree before a gesture',async t=>{
+for(const fault of ['loading','unrendered','dialog'])test('production Loop refuses '+fault+' before a gesture',async t=>{
  const f=await fixture(t,{[fault]:true}),out=await f.run();assert.equal(out.status,'NOT_APPLIED');
  assert.deepEqual(await f.page.evaluate(()=>gestures),[]);assert.equal(out.effect_possible,false);
 });
