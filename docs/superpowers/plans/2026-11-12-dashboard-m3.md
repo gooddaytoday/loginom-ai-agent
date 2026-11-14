@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** задачи 1–13 выполнены и независимо проверены по поведению; задачи 14–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** задачи 1–14 выполнены и независимо проверены по поведению; задачи 15–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -1431,12 +1431,12 @@ parts: [...files, { type: "text", text: message }, ...(dashboardPart ? [{ type: 
 
 **Files:**
 - Create: `packages/product/skills/loginom-dashboard/SKILL.md`
-- Modify: `packages/product/src/skills.ts`, `O/test/skill/bundled-skills.test.ts` (если упорядоченные списки требуют), `O/test/cli/bundled-skills.test.ts` (≈158, ≈191), `packages/loginom-host/test/stage-resources.test.ts` (≈145), `packages/desktop/test/loginom/product-skills-smoke.mjs` (≈136, ≈208)
+- Modify: `packages/product/src/skills.ts`, `O/test/skill/bundled-skills.test.ts` (если упорядоченные списки требуют), `O/test/cli/bundled-skills.test.ts` (≈158, ≈191), `packages/loginom-host/test/stage-resources.test.ts` (≈145), `packages/desktop/test/loginom/product-skills-smoke.mjs` (≈136, ≈208), `packages/product/test/repo-paths.test.ts`, `docs/upstream-sync/catalog.json`
 
-- [ ] **Step 1: Тесты.** Сначала в одном тесте каталога задать ожидаемые три имени и получить RED до изменения production-реестра/создания навыка. После его GREEN обновлять остальные жёсткие списки по одному на `["loginom-automation", "loginom-dashboard", "package-docs"]` (отсортировано). Тест каталога `bundled-skills.test.ts` (строки 29–35, 90–103) идёт по `reservedSkillNames` и после шага 3 требует новый каталог. В Desktop smoke вместе с фильтром трёх имён обновить ожидаемый `productCommands.length` с 2 до 3; повреждённая поставка по-прежнему даёт 0.
-- [ ] **Step 2: Тест падает.** В `packages/opencode`: `bun run test test/skill/bundled-skills.test.ts -t "one canonical directory"` → FAIL: ожидается `loginom-dashboard`, которого ещё нет в поставке. Production-реестр и файлы навыка до этого не меняются.
-- [ ] **Step 3: Имя.** `reservedSkillNames = ["loginom-automation", "package-docs", "loginom-dashboard"] as const`.
-- [ ] **Step 4: Навык.** `SKILL.md` (frontmatter — только разрешённые ключи; ссылок за пределы каталога навыка нет):
+- [x] **Step 1: Тесты.** Сначала в одном тесте каталога задать ожидаемые три имени и получить RED до изменения production-реестра/создания навыка. После его GREEN обновлять остальные жёсткие списки по одному на `["loginom-automation", "loginom-dashboard", "package-docs"]` (отсортировано). Тест каталога `bundled-skills.test.ts` (строки 29–35, 90–103) идёт по `reservedSkillNames` и после шага 3 требует новый каталог. В Desktop smoke вместе с фильтром трёх имён обновить ожидаемый `productCommands.length` с 2 до 3; повреждённая поставка по-прежнему даёт 0.
+- [x] **Step 2: Тест падает.** В `packages/opencode`: `bun run test test/skill/bundled-skills.test.ts -t "one canonical directory"` → FAIL: ожидается `loginom-dashboard`, которого ещё нет в поставке. Production-реестр и файлы навыка до этого не меняются.
+- [x] **Step 3: Имя.** `reservedSkillNames = ["loginom-automation", "package-docs", "loginom-dashboard"] as const`.
+- [x] **Step 4: Навык.** `SKILL.md` (frontmatter — только разрешённые ключи; ссылок за пределы каталога навыка нет):
 
 ```markdown
 ---
@@ -1488,13 +1488,13 @@ import { onState, close, type DashboardState } from "./loginom"
 Правки пакета и сценария, технические команды, пути на диске, установку пакетов. Изменить сценарий пользователь может в обычном чате.
 ```
 
-- [ ] **Step 5: Прогон.** `bun test test/skill/bundled-skills.test.ts test/cli/bundled-skills.test.ts` в `packages/opencode`; `bun test` в `packages/product` → PASS.
-- [ ] **Step 6: Коммит.** `git commit -m "feat(product): add the loginom-dashboard skill"`.
+- [x] **Step 5: Прогон.** `bun test test/skill/bundled-skills.test.ts test/cli/bundled-skills.test.ts` в `packages/opencode`; `bun test` в `packages/product` → PASS. Для двух воспроизведённых прежних ошибок этого обязательного прогона: существующая проверка прежнего `packages/agent` должна отвергать наличие его `package.json`, а не игнорируемых кэшей в каталоге; в существующий CAT-02 добавить точный путь `.gitleaksignore`, не меняя файл или secret scanning. Исправления независимо проверены как сохранение исходных гарантий; кэши и чужие файлы не удалять.
+- [x] **Step 6: Коммит.** `git commit -m "feat(product): add the loginom-dashboard skill"`.
 
 ### Task 15: Набор шаблона в поставке и CI
 
 **Files:**
-- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml`, `P/package.json` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
+- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
 
 **Interfaces:**
 - Produces: в ресурсах `dashboard/template/` (файлы шаблона, `src/`, `node_modules` без `.bin`), `dashboard/draft.js`, `dashboard/selfcheck.mjs`; все в `resource-manifest.json`.
@@ -1558,7 +1558,7 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
 
   Если `setup-loginom-inputs` на Windows отдаёт путь Node в формате, с которым `dirname` в Git Bash не работает, привести через `cygpath -u` — проверкой на первом прогоне CI, а не заранее.
 - [ ] **Step 5: Прогон.** Полный тест шага 1 → PASS; `bun typecheck` в `packages/loginom-host`; push ветки — задачи `unit`, `dashboard-browser`, `dashboard-template` (все три системы) зелёные. Если macOS-раннер недоступен, это ограничение записывается в отчёт и в roadmap (S6), а не скрывается.
-- [ ] **Step 6: Коммит.** `git commit -m "build(dashboard): ship the template kit with Desktop and CLI"`.
+- [ ] **Step 6: Коммит.** `git commit -m "chore(dashboard): ship the template kit with Desktop and CLI"`.
 
 ### Task 16: `dev-master.sh` для M3
 
