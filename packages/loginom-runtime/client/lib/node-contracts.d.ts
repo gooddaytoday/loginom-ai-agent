@@ -13,7 +13,10 @@ export interface VariableInputLink extends InputLink { kind: 'variables' | 'cont
 export interface VariableBinding { parameter: string; variable: {kind: 'variables' | 'control'; input: number; name: string} }
 export interface VariableBindingReadback extends VariableBinding {
   mode: 'variable'; row_id: string;
-  variable: VariableBinding['variable'] & {id: number; type: 'integer' | 'string' | 'boolean'; is_null: false};
+  variable: VariableBinding['variable'] & {id: number} & (
+    {type: 'integer' | 'string' | 'boolean'; is_null: false}
+    | {kind: 'control'; input: 0; type: 'real'; is_null: boolean}
+    | {kind: 'control'; input: 0; type: 'datetime'; is_null: false});
   source: {ref: NodeRef; type: NodeType; output: number; variable_id: number};
   input_port_guid: string; connected: true; verified: true;
 }

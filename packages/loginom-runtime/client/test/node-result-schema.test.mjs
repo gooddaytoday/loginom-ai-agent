@@ -6,6 +6,16 @@ const provider=new AjvJsonSchemaValidator(),validate=provider.getValidator(nodeA
 const result=()=>({operation_id:'op',status:'AMBIGUOUS',effect_possible:true,phases:[],node:null,
  execution:{status:'pending',execution_id:'process'},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
  package_saved:false,cleanup_complete:false,warnings:[],pending_phase:'execute',error:{code:'UNKNOWN',message:'Await original receipt'}});
+test('binding result admits real and civil datetime thresholds and real NULL additively',()=>{
+ const node={document_id:'d',workflow_id:'w',node_id:'n'};
+ for(const [type,is_null] of [['integer',false],['string',false],['boolean',false],['real',false],['real',true],['datetime',false]]){
+  const r=result();r.configuration={status:'applied',bindings:[{parameter:'/groups/0/0/value',mode:'variable',row_id:'row',
+   variable:{kind:'control',input:0,id:1,name:'Threshold',type,is_null},source:{ref:node,type:'variables.user',output:4,variable_id:1},
+   input_port_guid:'port',connected:true,verified:true}]};
+  assert.equal(validate(r).valid,true,type+' '+is_null);
+  if(type!=='real'){r.configuration.bindings[0].variable.is_null=true;assert.equal(validate(r).valid,false);}
+ }
+});
 test('uniform readback publishes observed group sizes and native test priority',()=>{
  const r=result();r.configuration={status:'applied',readback:{kind:'data_partition',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node:{document_id:'d',workflow_id:'w',node_id:'n'},receipt_ids:['i','c','s','m','f'],mode:'uniform',counts:[6,4],groups:[],seed:42,group_size_rows:[1,1],strata_fields:[],bias_field:null,bias_factors:[],test_priority:true,test_priority_position:'beginning',output_mappings:[],package_persistence_verified:false}};
  assert.equal(validate(r).valid,true);
