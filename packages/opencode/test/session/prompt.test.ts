@@ -1705,9 +1705,9 @@ withMcpInstructions.instance("the first dashboard prompt advertises only dashboa
           )
         : []
       expect(
-        names.every((name) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch"].includes(name)),
+        names.every((name) => ["read", "glob", "grep", "skill", "edit", "write", "apply_patch", "dashboard_draft", "dashboard_publish"].includes(name)),
       ).toBe(true)
-      for (const name of ["read", "glob", "grep", "skill", "edit", "write"]) expect(names).toContain(name)
+      for (const name of ["read", "glob", "grep", "skill", "edit", "write", "dashboard_draft", "dashboard_publish"]) expect(names).toContain(name)
     }),
   ),
 )
