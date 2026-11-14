@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateLoopParameters} from '../lib/loop-parameters.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
-import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {validateNodeApplyRequest,applyNode} from '../lib/node-apply.mjs';
+import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {nodeApiTools} from '../lib/node-api.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {selectLoopBodyRecord,loopSettingsSupported,readLoopSourceBrowser} from '../lib/loop-procedure.mjs';
@@ -69,4 +70,25 @@ test('Finish cannot certify a replaced body after its selection',()=>{
  const p=sourceFixture();p.task.source=p.run();
  p.source.FPorts[0].FCollection[0].FGuid='new';p.loop.FPorts[0].FCollection[0].FGuid='new';
  assert.throws(p.run,/changed since selection/);
+});
+test('Loop reread rejects the old active execution and accepts only the new completed one',async()=>{
+ const node={...body,node_id:'loop'},handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
+ const phases=['configure','node_finish','output_mapping','finish'].map(phase=>({phase,receipt_id:'created:'+phase,status:'verified'}));
+ const s={parameters:request,outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,phases,
+  execution:{status:'completed',execution_id:'old'},configuration:{status:'applied',readback:{kind:'loop',mode:'group_rows',group_size:1,
+   parallel:false,iteration_identifiers:false,ignore_errors:false,save_configuration:false,body:{ref:body},node,
+   scope:'observed_before_verified_finish',values_are:'observed_ui_values',receipt_ids:phases.map(p=>p.receipt_id)}},
+  output:{ports:[{port:0,schema:[{index:0,name:'PageNo',label:'PageNo',type:'integer'}]}]}}}};
+ const r=buildNodeReadRequest({operation_id:'read-loop',source_operation_id:'created',read:{sample_rows:100,require_exact_numbers:true}},s);
+ assert.equal(r.finish,'execute');assert.equal(r.mode,'read_existing_output');
+ for(const outputExecution of ['old','fresh']){
+  let launches=0;const ok=v=>({verified:true,cleanup_complete:true,...v});
+  const drivers={verifySource:async()=>ok({}),prepareTarget:async()=>ok({node}),
+   finishGraph:async()=>{launches++;return ok({mode:'execute',settings_applied:false,execution_id:'fresh'});},
+   waitExecution:async()=>ok({status:'completed',execution_id:'fresh'}),
+   readOutput:async()=>ok({execution_id:outputExecution,status:'complete',evidence_ref:'read-loop:read',ports:[{port:0,fresh:true}]}),
+   verifyContinuation:async()=>false};
+  const out=await applyNode({request:r,operation:{id:r.operation_id},handlers,drivers,record:async e=>structuredClone(e)});
+  assert.equal(out.status==='SUCCEEDED',outputExecution==='fresh');assert.equal(launches,1);
+ }
 });
