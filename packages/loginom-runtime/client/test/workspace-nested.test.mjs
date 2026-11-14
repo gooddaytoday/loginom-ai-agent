@@ -13,7 +13,7 @@ function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,
   class PackageTreeNode {}; class WorkFlowTreeNode {}; class ModelForm {};
   const prefix='MF;TF-1',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
   const element=(tid,text='')=>({tid,textContent:text,isConnected:true,getAttribute:()=>tid,
-    getBoundingClientRect:()=>({width:20,height:20}),classList:{contains:()=>true}});
+    getBoundingClientRect:()=>({width:20,height:20}),classList:{contains:()=>true},querySelectorAll:s=>s==='.maptree-icon-workflow'&&text==='Scenario'?[{}]:[]});
   const tab=element(tabTid),root=element(prefix+';ModelForm;cmpDiagram');
   const pkg=new PackageTreeNode();pkg.PackageFileName='/worker/nested.lgp';
   const outer=Object.assign(new WorkFlowTreeNode(),{ParentNode:pkg});
@@ -58,7 +58,7 @@ function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,
   const receipt={phase:'verified',workflowId:'outer',packageNode:pkg,tab,nodeTargetWorkflowNode:outer,crumbs:ref.navigation_path};
   const preparation={id:'doc',document,receipts:new Map([['initial',receipt]])};
   const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm};
-  const workspace={getActiveTab:()=>({Controller:{Node:{data:{get node(){return current;}}},FController:model}})};
+  const workspace={getActiveTab:()=>({Controller:{Node:{data:{get node(){return current===outer&&crumbs.length===6?owner:current;}}},FController:model}})};
   app.Application={FInstance:{FMainForm:{Items:{Workspace:workspace},FMapTree:{FServerConnection:{UserName:'worker'}}}}};
   const context=vm.createContext({document,location:{origin:'https://app.loginom.ai'},getComputedStyle:()=>({visibility:'visible'}),
     __loginomDockPreparationV1:preparation,bg:{app}});
@@ -75,7 +75,7 @@ function fixture({loseReply=false,foreignOwner=false,block=false,trialFail=null,
       if(failure==='throw')throw Error('locator.click: Timeout exceeded (trial)');
       if(failure==='block')masked=true;
       return;
-    }clicks++;if(selector.includes('GenericEnterLabel')){current=inner;crumbs.push('Подмодель','Модуль','Сценарий');if(foreignOwner)owner.FGuid='foreign';}else if(selector.includes('LeaveSubmodelLabel')){current=outer;crumbs=crumbs.slice(0,5).concat('Подмодель');}else throw Error('Unexpected click');masked=true;if(loseReply){loseReply=false;throw Error('lost click reply');}}}),
+    }clicks++;if(selector.includes('GenericEnterLabel')){current=inner;crumbs.push('Подмодель','Модуль','Сценарий');if(foreignOwner)owner.FGuid='foreign';}else if(selector.includes('LeaveSubmodelLabel')){current=outer;crumbs=crumbs.slice(0,5).concat('Подмодель');}else if(selector.includes('cnrNaviMode'))crumbs=crumbs.slice(0,5);else throw Error('Unexpected click');masked=true;if(loseReply){loseReply=false;throw Error('lost click reply');}}}),
     waitForTimeout:async()=>{masked=false;},mouse:{up:async()=>{}}};
   const adapter=createNodeTargetBrowserAdapter({origin:'https://app.loginom.ai',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')')(page)});
   const navigate=(wf,direction='enter',operationId='enter',{timeoutMs=120000,recoverOnly=false}={})=>vm.runInNewContext('('+makeWorkspacePrepareCode({
@@ -130,7 +130,7 @@ test('NW1 real adapter enters, reads nested Calculator, leaves and issues fresh 
   assert.ok((await f.read(left.workflow_ref)).nodes.some(n=>n.ref.node_id==='supernode'));
   await assert.rejects(f.read(entered.workflow_ref));
   await assert.rejects(f.read(f.ref));
-  assert.equal(f.clicks(),2);
+  assert.equal(f.clicks(),3);
 });
 
 test('NW1 uncertain click is reconciled read-only under the same operation ID',async()=>{
