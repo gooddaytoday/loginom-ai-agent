@@ -142,7 +142,7 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       expect(await readFile(join(destination, "knowledge-key"), "utf8")).toBe("UNIT-NONSECRET")
       expect(await readFile(join(destination, "resource-manifest.json"), "utf8")).not.toContain("UNIT-NONSECRET")
       const skills = await verifyBundledSkills(destination)
-      expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs"])
+      expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "loginom-dashboard", "package-docs"])
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(true)
