@@ -165,19 +165,23 @@ export async function runMeasurements(manifestFile: string, jobId?: string, gene
       }
       const intent = await json(intentFile)
       if (intent.manifestHash !== manifestHash || intent.job !== current.id || intent.unit !== current.unit || intent.resultsDir !== current.resultsDir) throw Error("INTENT_MISMATCH")
-      const evidence = await nativeEvidence(current.resultsDir, slots.controller.stateDir), state = measurementState(current, unit, evidence.native)
+      if (measurementState(current, unit, undefined) === "running") return 1
+      const entry = await json(path.join(dir, "worker-entry.json"))
+      if (entry.manifestHash !== manifestHash || entry.job !== current.id) throw Error("WORKER_IDENTITY")
+      const evidence = await nativeEvidence(current.resultsDir, slots.controller.stateDir), state = measurementState(current, unit, evidence.native, entry)
+      const invocation = evidence.native.unitBinding?.invocation
       if (state === "running") return 1
       if (state !== "consumed") throw Error(state === "zero-admissions" ? "ZERO_ADMISSIONS_REQUIRES_EXPLICIT_REPAIR" : "NATIVE_ADMISSION_UNKNOWN")
       const completionFile = path.join(dir, "completion.json"), nativeHash = hash(await Bun.file(evidence.file).bytes())
       if (await Bun.file(completionFile).exists()) {
         const completed = await json(completionFile)
-        if (completed.manifestHash !== manifestHash || completed.nativeHash !== nativeHash || completed.invocation !== unit.InvocationID || completed.audit?.status !== "PASS") throw Error("COMPLETION_EVIDENCE_CHANGED")
+        if (completed.manifestHash !== manifestHash || completed.nativeHash !== nativeHash || completed.invocation !== invocation || completed.audit?.status !== "PASS") throw Error("COMPLETION_EVIDENCE_CHANGED")
         continue
       }
       const audit = await auditMeasurement(current, evidence.file, slots)
       await exclusiveFact(path.join(dir, `audit-${crypto.randomUUID()}.json`), audit)
       if (audit.status !== "PASS") throw Error("AUDIT_INCOMPLETE")
-      await exclusiveFact(completionFile, { manifestHash, nativeHash, invocation: unit.InvocationID, audit })
+      await exclusiveFact(completionFile, { manifestHash, nativeHash, invocation, audit })
     }
     const after = await snapshot()
     await exclusiveFact(path.join(manifest.stateDir, `memory-after-${crypto.randomUUID()}.json`), after)

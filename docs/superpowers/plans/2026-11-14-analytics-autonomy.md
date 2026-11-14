@@ -30,12 +30,12 @@ evals Loginom» на runner2 самостоятельно создаёт пят�
 
 ## Шаги и проверяемые результаты
 
-- [ ] **1. Подготовка и восстановление.** До management-процесса prepare/verify
+- [x] **1. Подготовка и восстановление.** До management-процесса prepare/verify
   сохранить подтверждённый UnitBinding. Использовать существующий post-exit
   observeUnitExit; не изменять глобальный terminalCensus. Проверить известный
   cleanup denial при живой посторонней unit, отказ живой своей unit/неверной
   invocation и старого журнала без binding. Результат: адресное восстановление.
-- [ ] **2. Авторинг и публикационные артефакты.** Атомарно резервировать каталог
+- [x] **2. Авторинг и публикационные артефакты.** Атомарно резервировать каталог
   авторской попытки; конкурентный запуск не перезаписывает evidence. Финализатор
   сохраняет полный provenance приватно, публичный формирует безопасным сразу.
   Результат: поведенческие тесты конкуренции и приватности проходят.
@@ -92,16 +92,17 @@ evals: около 140 файлов / 5000 строк + LGP. При удвоен�
 
 ## Checkpoint
 
-- Ветка `analytics-autonomy`; установка, live-роли и готовая карточка ещё не выполнены.
-- Prepare/verify сохраняют UnitBinding до management; legacy recovery guards сохранены.
-- Atomic author reservation и private/public provenance проверены; started budget не считает подготовки.
-- Cold caller перенесён; measurement CLI/memory/audit реализованы частично, source-only.
-- Проверено: 37 PASS, 8 systemd/live SKIP, package typecheck, syntax и staged secret scan.
-- Review: обязательные замечания к готовому коду закрыты; readiness не принята.
-- Explicit zero-admission retry реализован/review APPROVE, 12 tests PASS + typecheck.
-- На runner2: четыре systemd tests PASS/41 assertions; scoped judge --version PASS.
-- Осталось: восстановить начальную preparation по сохранённым receipts, installed measurement units и репетиция.
-- Сеть восстановлена владельцем; online runtime подтверждён. Новые выделенные pairs созданы.
-- Shared daemon не перезапускался, чужие ресурсы не изменялись; готовая Backlog-карточка не создана.
-- Текущий этап: own prepare/verify; исходные отказы/история сохраняются, готовность не заявлена.
+- Ветка `analytics-autonomy`; инфраструктура установлена, основная карточка ещё не передана.
+- Prepare/verify собственных Authoring и Benchmark дали READY; исходные отказы сохранены.
+- Адресное recovery проверено при живой посторонней unit: 4 PASS / 41 assertions.
+- Собственные units, noninteractive права, judge, hooks и Gitleaks установлены и reviewed.
+- Live-инструкции Author/Reviewer/squad обновлены и прочитаны обратно; runtime online.
+- Atomic author reservation, приватность provenance, zero-admission retry и actor snapshots проверены source tests/typecheck.
+- Снимок покрывает закреплённые operator User/Peer roots; runtime MCP Peer isolation не доказана.
+- Отсутствующий текущий Peer учитывается только по точному NOT_FOUND; чужие Peer не обходятся.
+- Репетиция LAB-1676 запущена штатным In progress; новые пять пар ещё не запускаются.
+- Текущий ремонт: принимать подтверждённый consumed результат после GC InvocationID с полным native audit.
+- Осталось: полный author/cold/calibration/D/B/review/delivery из Multica, затем основная Backlog-карточка.
+- Основные wakeups включаются только после её In progress, чтобы Backlog не запускался periodic событием.
+- Readiness не объявлена; чужие ресурсы и shared daemon не изменялись.
 - Push/PR выполняет владелец здесь после карточки; GitHub credential runner2 исключён.

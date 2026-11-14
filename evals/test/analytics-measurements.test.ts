@@ -210,3 +210,27 @@ test("exact missing current peer is a complete empty scope and later peer creati
     await expect(snapshotActor(memory, server.url.href, "fake-key")).rejects.toThrow("MEMORY_INCOMPLETE_LIST")
   } finally { server.stop(true) }
 })
+
+test("garbage collected unit invocation consumes only exact historical worker admissions and still requires full audit", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "measurement-gc-"))
+  try {
+    const job = { id: "one", taskId: "sample", form: "business", tasksDir: root, unit: "example.service", resultsDir: root }
+    const unit = { Id: job.unit, Delegate: "no", ActiveState: "inactive", MainPID: "0", ControlGroup: "", InvocationID: "" }
+    const binding = { unit: job.unit, invocation: "saved", manager: "system" }
+    const entry = { job: job.id, binding }, native = { version: 2, kind: "unactivated-preparation", phase: "cli_admitted", runDir: root + "/run", unitBinding: binding, attempts: [{ purpose: "measurement", taskId: job.taskId, slotId: "example", attempt: 1 }] }
+    expect(measurementState(job, unit, native, entry)).toBe("consumed")
+    expect(measurementState(job, { ...unit, InvocationID: "new" }, native, entry)).toBe("hold")
+    expect(measurementState(job, unit, native)).toBe("hold")
+    expect(measurementState(job, unit, { ...native, attempts: [] }, entry)).toBe("hold")
+    expect(measurementState(job, unit, { ...native, attempts: undefined }, entry)).toBe("hold")
+    expect(measurementState(job, unit, native, { ...entry, binding: { ...binding, invocation: "foreign" } })).toBe("hold")
+    expect(measurementState(job, { ...unit, ActiveState: "active" }, undefined)).toBe("running")
+    const journal = path.join(root, "journal.json")
+    await Bun.write(journal, JSON.stringify(native))
+    const slots = { slots: [{ id: "example", username: "example", profileDir: path.join(root, "profile"), historyDir: path.join(root, "history"), workspaceRoot: path.join(root, "workspace") }], judge: { codexHome: path.join(root, "judge") } }
+    const audit = await auditMeasurement(job, journal, slots)
+    expect(audit.status).toBe("INCOMPLETE")
+    expect(audit.checks.some(check => !check.passed)).toBe(true)
+    expect(await Bun.file(journal).json()).toEqual(native)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

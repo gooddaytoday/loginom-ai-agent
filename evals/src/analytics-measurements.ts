@@ -81,15 +81,17 @@ export async function freezeMeasurementInputs(file: string, manifestHash: string
   const frozen = await Bun.file(file).json()
   if (frozen.manifestHash !== manifestHash || JSON.stringify(frozen.pins) !== JSON.stringify(pins)) throw Error("TASK_PINS_CHANGED")
 }
-type NativeJournal = { version: number; kind: string; commandId: string; runDir: string; identity: { serverEpoch: string; containerId: string }; unitBinding?: { unit: string; invocation: string }; slotIds: string[]; attempts: { purpose: string; taskId: string; slotId: string; attempt: number }[] }
-export function measurementState(job: MeasurementJob, unit: Record<string, string>, value: unknown) {
+type NativeJournal = { version: number; kind: string; commandId: string; runDir: string; identity: { serverEpoch: string; containerId: string }; unitBinding?: { unit: string; invocation: string; manager?: string }; slotIds: string[]; attempts: { purpose: string; taskId: string; slotId: string; attempt: number }[] }
+export function measurementState(job: MeasurementJob, unit: Record<string, string>, value: unknown, entry?: { job: string; binding?: NativeJournal["unitBinding"] }) {
+  if (unit.Id !== job.unit || unit.Delegate !== "no") return "hold"
+  if (["active", "activating", "deactivating", "reloading"].includes(unit.ActiveState ?? "")) return "running"
   const journal = value as Partial<NativeJournal> | undefined
   if (unit.Id !== job.unit || unit.Delegate !== "no" || !journal || journal.version !== 2 || journal.kind !== "unactivated-preparation" ||
     !journal.runDir?.startsWith(job.resultsDir + path.sep) || journal.unitBinding?.unit !== job.unit ||
-    !unit.InvocationID || journal.unitBinding.invocation !== unit.InvocationID || !Array.isArray(journal.attempts) || journal.attempts.some(item => !item || !["measurement", "preflight"].includes(item.purpose) || typeof item.taskId !== "string" || typeof item.slotId !== "string" || item.attempt !== 1)) return "hold"
-  if (["active", "activating", "deactivating", "reloading"].includes(unit.ActiveState ?? "")) return "running"
+    typeof unit.InvocationID !== "string" || !journal.unitBinding.invocation || (unit.InvocationID && journal.unitBinding.invocation !== unit.InvocationID) || !Array.isArray(journal.attempts) || journal.attempts.some(item => !item || !["measurement", "preflight"].includes(item.purpose) || typeof item.taskId !== "string" || typeof item.slotId !== "string" || item.attempt !== 1)) return "hold"
   if (!["inactive", "failed"].includes(unit.ActiveState ?? "") || unit.MainPID !== "0" || unit.ControlGroup !== "") return "hold"
   const measured = journal.attempts.filter(item => item.purpose === "measurement")
+  if (!unit.InvocationID && (entry?.job !== job.id || entry.binding?.manager !== "system" || JSON.stringify(entry.binding) !== JSON.stringify(journal.unitBinding) || !measured.length)) return "hold"
   if (!measured.length) return "zero-admissions"
   return measured.length === 1 && measured[0]?.taskId === job.taskId && measured[0].attempt === 1 ? "consumed" : "hold"
 }
