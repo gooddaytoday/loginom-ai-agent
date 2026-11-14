@@ -68,6 +68,15 @@ test('main audit takes topology from the private journal with no public nodes ar
  const f=await mainFixture(t),r=await checkSupernodeRun(f.events,expectedDirectory,[f.journal]);
  assert.equal(r.status,'PASS');assert.equal(r.topology[0].file,f.journal);assert.equal(r.topology[0].line,1);assert.equal(r.tables.length,2);
 });
+test('main audit permits construction observations before the first complete nested graph',async t=>{
+ // Live LAB-1664 execution-events.jsonl:554 (enter) and :579 (Calculator source link).
+ const f=await mainFixture(t),empty=structuredClone(f.observation),partial=structuredClone(f.observation);
+ empty.outcome.output.nodes.splice(1,1);empty.outcome.output.links=[];
+ partial.outcome.output.links.pop();
+ await writeFile(f.journal,[empty,partial,f.observation].map(x=>JSON.stringify(x)).join('\n'));
+ const result=await checkSupernodeRun(f.events,expectedDirectory,[f.journal]);
+ assert.equal(result.status,'PASS');assert.deepEqual(result.topology.map(t=>t.line),[3]);
+});
 test('main audit retains MAIN_NESTED_OBSERVATION when the private journal has no graph',async t=>{
  const f=await mainFixture(t);await writeFile(f.journal,JSON.stringify({phase:'completed',outcome:{status:'SUCCEEDED'}}));
  await assert.rejects(checkSupernodeRun(f.events,expectedDirectory,[f.journal]),/SUPERNODE_MAIN_NESTED_OBSERVATION/);

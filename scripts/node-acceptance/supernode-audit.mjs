@@ -59,8 +59,15 @@ export async function checkSupernodeRun(eventsFile,expectedDirectory,journalFile
   const value=event.outcome.output;
   if(Array.isArray(value?.nodes)&&value.nodes.some(n=>n.boundary_role==='input'))graphs.push({file,line:index+1,value});
  }
- const topology=graphs.map(r=>{try{return {file:r.file,line:r.line,...checkSupernodeGraph(r.value,calculator)};}
-  catch(error){throw Error('SUPERNODE_MAIN_NESTED_OBSERVATION: '+r.file+':'+r.line+': '+error.message);}});
+ const topology=[];
+ for(const r of graphs){
+  try{topology.push({file:r.file,line:r.line,...checkSupernodeGraph(r.value,calculator)});}
+  catch(error){
+   // Enter and construction observe incomplete graphs. Once the local chain
+   // is complete, every subsequent observation must retain that topology.
+   if(topology.length)throw Error('SUPERNODE_MAIN_NESTED_OBSERVATION: '+r.file+':'+r.line+': '+error.message);
+  }
+ }
  need(topology.length>0,'MAIN_NESTED_OBSERVATION');
  need(topology.every(t=>t.calculator===calculator),'CALCULATOR_IDENTITY');
  need(new Set(topology.map(t=>JSON.stringify([t.input,t.calculator,t.output]))).size===1,'BOUNDARY_IDENTITY');
