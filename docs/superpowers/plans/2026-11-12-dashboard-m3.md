@@ -1494,7 +1494,7 @@ import { onState, close, type DashboardState } from "./loginom"
 ### Task 15: Набор шаблона в поставке и CI
 
 **Files:**
-- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml`, `P/test/build/build.test.mjs`, `P/src/agent/build.ts` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
+- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml`, `P/test/build/build.test.mjs`, `P/src/agent/build.ts`, `P/template/scan.mjs` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
 
 **Interfaces:**
 - Produces: в ресурсах `dashboard/template/` (файлы шаблона, `src/`, `node_modules` без `.bin`), `dashboard/draft.js`, `dashboard/selfcheck.mjs`; все в `resource-manifest.json`.
@@ -1558,7 +1558,7 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
         run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/build/build.test.mjs test/build/resolver.test.mjs'
 ```
 
-  Проверка `toJSON(inputs.macos)` различает явно переданный boolean false и отсутствие input обычного push; два прежних job вне этой задачи не меняются. После первого CI отказа Windows процессы scanner/tsc/Vite запускать из уже вычисленного canonical `root`, которому выданы прежние FS permissions: это устраняет расхождение cwd с разрешённым путём без расширения корней. Гипотезу написания 8.3 пути подтвердит только следующий нативный CI.
+  Проверка `toJSON(inputs.macos)` различает явно переданный boolean false и отсутствие input обычного push; два прежних job вне этой задачи не меняются. После первого CI отказа Windows процессы scanner/tsc/Vite запускать из уже вычисленного canonical `root`, которому выданы прежние FS permissions: это устраняет расхождение cwd с разрешённым путём без расширения корней. Второй CI подтвердил сборки шаблона и трёх примеров на Windows после canonical-cwd. Для CSS-сканера в существующий resolveConfig добавить resolve.preserveSymlinks: true: Vite обходит ненужный вызов net use для сетевых дисков, а собственные проверки возвращённого и канонического пути, типа файла и запрет ссылок в captured src сохраняются. Новых разрешений Node не добавлять; нативный CI обязан подтвердить шесть CSS-проверок.
 
   Если `setup-loginom-inputs` на Windows отдаёт путь Node в формате, с которым `dirname` в Git Bash не работает, привести через `cygpath -u` — проверкой на первом прогоне CI, а не заранее.
 - [ ] **Step 5: Прогон.** Полный тест шага 1 → PASS; `bun typecheck` в `packages/loginom-host`; push ветки — задачи `unit`, `dashboard-browser`, `dashboard-template` (все три системы) зелёные. Если macOS-раннер недоступен, это ограничение записывается в отчёт и в roadmap (S6), а не скрывается.
