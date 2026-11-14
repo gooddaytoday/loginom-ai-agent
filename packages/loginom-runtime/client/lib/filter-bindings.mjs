@@ -1,10 +1,10 @@
 import {variableBindingsSchema,validateVariableBindings} from './variable-binding-parameters.mjs';
-import {validateFilterConditions,filterGroupsFromNative,resolveFilterConditions} from './filter-parameters.mjs';
+import {validateFilterConditions,filterGroupsFromNative,resolveFilterConditions,validateFilterValue} from './filter-parameters.mjs';
 import {configureVariableBinding} from './variable-binding-procedure.mjs';
 import {filterConditionMatches} from './filter-procedure.mjs';
 const need=(ok,code,p)=>{if(!ok)throw Error(code+': '+p);};
 export const filterBindingSchema=structuredClone(variableBindingsSchema);
-filterBindingSchema.description='Scalar integer/string input-field or integer row_number comparisons: /groups/i/j/value; kind control, input 0; exact mapped type, non-NULL, no conversion. Omit value at that condition. Existing omitted groups address saved rows; [] preserves bindings.';
+filterBindingSchema.description='Scalar integer/real/datetime/string input-field or integer row_number comparisons: /groups/i/j/value; kind control, input 0; exact mapped type, no conversion; real NULL threshold matches no rows. Omit value at that condition. Existing omitted groups address saved rows; [] preserves bindings.';
 filterBindingSchema.items.properties.parameter.pattern='^/groups/([0-9]|[1-5][0-9]|6[0-3])/([0-9]|[1-9][0-9]|1[01][0-9]|12[0-7])/value$';
 filterBindingSchema.items.properties.variable.properties.kind={const:'control'};
 filterBindingSchema.items.properties.variable.properties.input={const:0};
@@ -14,7 +14,7 @@ export function resolveFilterBindings(parameters,bindings,saved){
  const result=structuredClone(parameters.groups===undefined?saved:parameters);
  for(const b of bindings){
   const [, ,g,c]=b.parameter.split('/'),condition=result?.groups?.[Number(g)]?.[Number(c)];
-  need(condition&&(condition.field?.kind==='input_field'||condition.field?.kind==='row_number'&&condition.type==='integer')&&['integer','string'].includes(condition.type)&&['<','<=','>','>=','=','<>'].includes(condition.operator),'BINDING_PARAMETER_UNSUPPORTED',b.parameter);
+  need(condition&&(condition.field?.kind==='input_field'||condition.field?.kind==='row_number'&&condition.type==='integer')&&['integer','real','datetime','string'].includes(condition.type)&&['<','<=','>','>=','=','<>'].includes(condition.operator),'BINDING_PARAMETER_UNSUPPORTED',b.parameter);
   need(parameters.groups===undefined||!Object.hasOwn(condition,'value'),'BINDING_CONFLICT',b.parameter);
   condition.value={kind:'variable',name:b.variable.name};
  }
@@ -65,7 +65,7 @@ export function validateFilterBindingValues(parameters,bindings,native,variables
   need(condition,'BINDING_PARAMETER_UNSUPPORTED',b.parameter);
   const matches=variables.filter(v=>v.name===b.variable.name);need(matches.length===1,'BINDING_VARIABLE_MISSING',b.parameter);
   const v=matches[0];need(v.type===condition.type,'BINDING_TYPE_MISMATCH',b.parameter);
-  need(v.is_null===false,'BINDING_NULL_UNSUPPORTED',b.parameter);
-  need(v.type==='integer'?Number.isSafeInteger(v.value):v.type==='string'&&typeof v.value==='string','BINDING_TYPE_MISMATCH',b.parameter);
+  need(v.is_null===false||v.type==='real'&&v.is_null===true&&v.value===null,'BINDING_NULL_UNSUPPORTED',b.parameter);
+  if(!v.is_null)validateFilterValue(v.value,v.type);
  }
 }

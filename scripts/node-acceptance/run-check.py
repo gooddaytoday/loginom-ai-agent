@@ -118,6 +118,14 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
                     input_files=['filter.csv'], export_count=6, filter_initial='filter/expected-initial.json',
                     expected_name='filter/expected.json', oracle=src / 'acceptance/oracle.py')
+    if name in ['row-filter-typed', 'row-filter-null']:
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        typed = name == 'row-filter-typed'
+        return dict(source=node / 'acceptance/typed', prompt=node / ('acceptance/typed/task-variable-typed.md' if typed else 'acceptance/typed/task-variable-null.md'),
+                    data=node / 'fixtures/typed', base=None, input_files=['rows.csv'], export_count=4 if typed else 2,
+                    expected_name='expected-typed-final.json' if typed else 'expected-null.json',
+                    filter_initial='expected-typed-initial.json' if typed else None,
+                    oracle=node / 'acceptance/typed/oracle.py', filter_variable_case='typed' if typed else 'null')
     if name == 'row-filter-top-n':
         node = REPO / 'docs/node-development/nodes/row-filter'
         return dict(source=node / 'acceptance/typed', prompt=node / 'acceptance/typed/task-top-n.md',
@@ -2188,6 +2196,15 @@ class Runner:
                 mode='variable', variable=dict(kind='control', input=0, name='TopN' if spec.get('filter_top_n') else 'Limit', type='integer', is_null=False),
                 source=dict(type='variables.user', output=4))]
             if spec.get('filter_top_n'): expected['binding_inventory'][0]['field'] = dict(kind='row_number')
+        if spec.get('filter_variable_case'):
+            typed = spec['filter_variable_case'] == 'typed'
+            expected['row_filter_typed' if typed else 'row_filter_null'] = True
+            variables = [('MinScore', 'real', not typed), *([('Since', 'datetime', False)] if typed else [])]
+            expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter=f'/groups/0/{i}/value',
+                mode='variable', variable=dict(kind='control', input=0, name=name, type=kind, is_null=is_null),
+                source=dict(type='variables.user', output=4),
+                condition=dict(field=dict(kind='input_field', name='Score' if i == 0 else 'Seen'), type=kind, operator_code=3))
+                for i, (name, kind, is_null) in enumerate(variables)]
         if spec.get('boolean_binding'):
             grouping = spec['boolean_binding'] == 'grouping'
             for output in expected['outputs']: output['column_order'] = 'exact'
@@ -2328,12 +2345,12 @@ class Runner:
             write(folder / 'binding-events.json', evidence)
             self.phase('boolean-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/bindings-grouping-sort.mjs',
                 src / spec['binding_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
-        if case in ['filter-bindings', 'row-filter-top-n']:
+        if case in ['filter-bindings', 'row-filter-top-n'] or spec.get('filter_variable_case'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'binding-events.json', evidence)
             self.phase('filter-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/filter-bindings.mjs',
-                src / spec['filter_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
+                src / (spec.get('filter_initial') or spec['expected_name']), folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
         if spec.get('excel_named_initial'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))

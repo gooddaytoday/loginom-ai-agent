@@ -690,7 +690,7 @@ for(const scenario of ['generated-id','reconciled-own','reconciled-older','recon
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const scenario of ['draft-clean','draft-navigated','draft-navigated-foreign','draft-nav-refused','draft-nav-refused-effect','draft-nav-refused-foreign','draft-nav-refused-dirty','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
+for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary','draft-navigated-foreign','draft-nav-refused','draft-nav-refused-effect','draft-nav-refused-foreign','draft-nav-refused-dirty','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
  test('normal shutdown of an unsaved draft without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-draft-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -708,7 +708,8 @@ for(const scenario of ['draft-clean','draft-navigated','draft-navigated-foreign'
     const state=session.metadata.workspacePreparation.state;
     state.package_ref={path:null,persisted:scenario==='draft-persisted'};
     if(scenario.startsWith('draft-navigated')){
-      session.metadata.workspacePreparation.identity=JSON.stringify({operation_id:'navigation',intent:'existing_workflow',workflow_ref:state.workflow_ref});
+      session.metadata.workspacePreparation.identity=JSON.stringify({operation_id:'navigation',intent:'existing_workflow',workflow_ref:state.workflow_ref,
+        ...(scenario==='draft-navigated-ordinary'?{}:{graph_navigation:{direction:'leave'}})});
       state.created_draft=false;
       if(scenario==='draft-navigated-foreign')state.document_id='foreign-document';
     }
@@ -735,6 +736,7 @@ for(const scenario of ['draft-clean','draft-navigated','draft-navigated-foreign'
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
     assert.equal(result.package_cleanup.status,['draft-clean','draft-navigated','draft-nav-refused'].includes(scenario)?'SUCCEEDED':'BLOCKED');
     assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-navigated','draft-dirty','draft-nav-refused','draft-nav-refused-dirty'].includes(scenario));
+    if(scenario==='draft-navigated-ordinary')assert.equal(result.package_cleanup.reason,'CONFIRMED_SAVE_REQUIRED');
     if(f.cleanupOptions){
       assert.equal(f.cleanupOptions.unsavedDraft,true);assert.equal(f.cleanupOptions.packagePath,null);
       assert.equal(f.cleanupOptions.diagnosticDiscard,false);

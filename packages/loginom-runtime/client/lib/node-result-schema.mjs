@@ -134,7 +134,9 @@ const reformConfigurationReadback=object({kind:values('field_parameters'),scope:
  output_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(object({...readbackMappingField.properties,excluded:bool}))}),
  package_persistence_verified:{type:'boolean',const:false}});
 const parameterBindingReadback=object({parameter:str,mode:values('variable'),row_id:str,
- variable:object({kind:values('control','variables'),input:integer,id:integer,name:str,type:values('integer','string','boolean'),is_null:{const:false}}),
+ variable:{anyOf:[object({kind:values('control','variables'),input:integer,id:integer,name:str,type:values('integer','string','boolean'),is_null:{const:false}}),
+  object({kind:values('control'),input:{const:0},id:integer,name:str,type:values('real'),is_null:bool}),
+  object({kind:values('control'),input:{const:0},id:integer,name:str,type:values('datetime'),is_null:{const:false}})]},
  source:object({ref,type:str,output:integer,variable_id:integer}),input_port_guid:str,connected:{const:true},verified:{const:true}});
 const filterConfigurationReadback=object({kind:values('row_filter'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{...array(str),minItems:5,maxItems:5},values_are:values('observed_ui_values'),groups:{type:'array',minItems:1,maxItems:64,items:{type:'array',minItems:1,maxItems:128,items:{type:'object'}}},
