@@ -93,16 +93,21 @@ evals: около 140 файлов / 5000 строк + LGP. При удвоен�
 ## Checkpoint
 
 - Ветка `analytics-autonomy`; инфраструктура установлена, основная карточка ещё не передана.
-- Prepare/verify собственных Authoring и Benchmark дали READY; исходные отказы сохранены.
-- Адресное recovery проверено при живой посторонней unit: 4 PASS / 41 assertions.
+- Prepare/verify собственных Authoring и Benchmark: READY/code0/released; прежние отказы сохранены.
+- Адресное recovery при живой посторонней unit: 4 PASS / 41 assertions.
 - Собственные units, noninteractive права, judge, hooks и Gitleaks установлены и reviewed.
-- Live-инструкции Author/Reviewer/squad обновлены и прочитаны обратно; runtime online.
-- Atomic author reservation, приватность provenance, zero-admission retry и actor snapshots проверены source tests/typecheck.
+- Live-инструкции Author/Reviewer/squad обновлены и прочитаны обратно.
+- Atomic reservation, приватность provenance, zero-admission retry и actor snapshots проверены.
+- GC InvocationID repair установлен: 14 PASS / 62 assertions; typecheck и независимое review APPROVE.
+- Финальное review всего инфраструктурного diff: APPROVE; полная репетиция ещё не принята.
 - Снимок покрывает закреплённые operator User/Peer roots; runtime MCP Peer isolation не доказана.
-- Отсутствующий текущий Peer учитывается только по точному NOT_FOUND; чужие Peer не обходятся.
-- Репетиция LAB-1676 запущена штатным In progress; новые пять пар ещё не запускаются.
-- Текущий ремонт: принимать подтверждённый consumed результат после GC InvocationID с полным native audit.
-- Осталось: полный author/cold/calibration/D/B/review/delivery из Multica, затем основная Backlog-карточка.
-- Основные wakeups включаются только после её In progress, чтобы Backlog не запускался periodic событием.
-- Readiness не объявлена; чужие ресурсы и shared daemon не изменялись.
-- Push/PR выполняет владелец здесь после карточки; GitHub credential runner2 исключён.
+- Отсутствие текущего Peer принимается только по точному NOT_FOUND; чужие Peer не обходятся.
+- LAB-1676 штатно запущена In progress; входной Reviewer APPROVE, scoped wakeups включены.
+- Author attempt-1: ProviderModelNotFound, модельных токенов нет; evidence сохранены.
+- Последнее прямое наблюдение: attempt-2 active с вызовами Loginom; её текущий исход неизвестен.
+- Сейчас SSH недоступен, MAS status-запросы нестабильны; online/running повторно не подтверждены.
+- Возобновление: восстановить наблюдение, сверить активные runs/units и усвоить attempt-2 без replay.
+- Затем завершить cold/calibration/D/B/review/delivery LAB-1676; только после принять основную Backlog-карточку.
+- Private draft основной карточки reviewed; история legacy/P/R/A достижима в checkout; новые пять пар не запускались.
+- Основные wakeups включаются только после её In progress; Backlog не должен запускаться periodic событием.
+- Push/PR выполняет владелец здесь после карточки; shared daemon и чужие ресурсы не изменялись.
