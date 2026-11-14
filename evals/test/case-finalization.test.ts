@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { evalsRoot } from "../src/config"
@@ -8,6 +8,7 @@ async function attempt(confirmed: boolean) {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-finalize-"))
   const caseDir = path.join(root, "case")
   const attemptDir = path.join(root, "attempt-1")
+  await mkdir(path.join(root, "attempt-2"), { recursive: true })
   await Bun.write(path.join(caseDir, "reference.lgp"), "previous reference")
   await Bun.write(path.join(caseDir, "provenance.json"), '{"retained":true}\n')
   await Bun.write(path.join(attemptDir, "package.lgp"), await Bun.file(path.join(evalsRoot, "fixtures/calibration/sales-by-category/reference.lgp")).bytes())
@@ -16,10 +17,12 @@ async function attempt(confirmed: boolean) {
   await Bun.write(path.join(attemptDir, "started-at"), "2026-01-01T00:00:00Z")
   await Bun.write(path.join(attemptDir, "finished-at"), "2026-01-01T00:00:01Z")
   await Bun.write(path.join(attemptDir, "exit-code"), "0")
+  await Bun.write(path.join(attemptDir, "hint.txt"), "private fixture assistance")
   await Bun.write(path.join(attemptDir, "summary.json"), JSON.stringify({
     modelConfirmed: confirmed,
     models: [{ providerID: "provider-a", modelID: "model-a", variant: "high" }],
     expectedModel: { providerID: "provider-a", modelID: "model-a", variant: "high" },
+    errors: ["private fixture diagnostic"],
   }))
   await Bun.write(path.join(attemptDir, "storage.json"), JSON.stringify({ input_matches_dataset: true, package: "case.lgp", origin: "receipt", inputs: [] }))
   for (const file of ["check.json", "check-rerun.json"]) await Bun.write(path.join(attemptDir, file), '{"pass":true}')
@@ -43,6 +46,7 @@ test("finalization records the confirmed attempt model after settings change", a
     expect({ code: result.code, errors: result.errors }).toEqual({ code: 0, errors: "" })
     const provenance = await Bun.file(path.join(result.caseDir, "provenance.json")).json()
     expect(provenance.model).toEqual({ id: "provider-a/model-a", variant: "high", confirmed_in_session_db: true })
+    expect(provenance.attempt.total).toBe(1)
   } finally { await rm(result.root, { recursive: true, force: true }) }
 })
 
@@ -53,5 +57,22 @@ test("finalization refuses an unconfirmed model before changing the case", async
     expect(result.errors).toContain("model_confirmed")
     expect(await Bun.file(path.join(result.caseDir, "reference.lgp")).text()).toBe("previous reference")
     expect(await Bun.file(path.join(result.caseDir, "provenance.json")).json()).toEqual({ retained: true })
+  } finally { await rm(result.root, { recursive: true, force: true }) }
+})
+
+test("finalization keeps environment and raw diagnostics only in private provenance", async () => {
+  const result = await attempt(true)
+  try {
+    expect(result.code).toBe(0)
+    const published = await Bun.file(path.join(result.caseDir, "provenance.json")).text()
+    const provenance = JSON.parse(published)
+    expect(provenance.attempt.assisted).toBe(true)
+    for (const value of [result.root, "loginom.example.invalid", "private fixture assistance", "private fixture diagnostic"])
+      expect(published).not.toContain(value)
+    const privateFile = path.join(result.root, "attempt-1", "provenance.private.json")
+    const privateProvenance = await Bun.file(privateFile).json()
+    expect(privateProvenance.attempt.hint).toBe("private fixture assistance")
+    expect(privateProvenance.attempt.errors).toEqual(["private fixture diagnostic"])
+    expect((await Bun.file(privateFile).stat()).mode & 0o777).toBe(0o600)
   } finally { await rm(result.root, { recursive: true, force: true }) }
 })
