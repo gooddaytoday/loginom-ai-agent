@@ -1494,7 +1494,7 @@ import { onState, close, type DashboardState } from "./loginom"
 ### Task 15: Набор шаблона в поставке и CI
 
 **Files:**
-- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml`, `P/test/build/build.test.mjs` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
+- Modify: `packages/loginom-host/script/stage-resources.ts`, `packages/loginom-host/test/stage-resources.test.ts`, `.github/workflows/test.yml`, `P/test/build/build.test.mjs`, `P/src/agent/build.ts` (скрипт `test:template` не нужен — задача CI вызывает Node напрямую)
 
 **Interfaces:**
 - Produces: в ресурсах `dashboard/template/` (файлы шаблона, `src/`, `node_modules` без `.bin`), `dashboard/draft.js`, `dashboard/selfcheck.mjs`; все в `resource-manifest.json`.
@@ -1529,7 +1529,7 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-15"]') }}
+        os: ${{ fromJSON(toJSON(inputs.macos) == 'false' && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -1557,6 +1557,8 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
         working-directory: packages/dashboard
         run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/build/build.test.mjs test/build/resolver.test.mjs'
 ```
+
+  Проверка `toJSON(inputs.macos)` различает явно переданный boolean false и отсутствие input обычного push; два прежних job вне этой задачи не меняются. После первого CI отказа Windows процессы scanner/tsc/Vite запускать из уже вычисленного canonical `root`, которому выданы прежние FS permissions: это устраняет расхождение cwd с разрешённым путём без расширения корней. Гипотезу написания 8.3 пути подтвердит только следующий нативный CI.
 
   Если `setup-loginom-inputs` на Windows отдаёт путь Node в формате, с которым `dirname` в Git Bash не работает, привести через `cygpath -u` — проверкой на первом прогоне CI, а не заранее.
 - [ ] **Step 5: Прогон.** Полный тест шага 1 → PASS; `bun typecheck` в `packages/loginom-host`; push ветки — задачи `unit`, `dashboard-browser`, `dashboard-template` (все три системы) зелёные. Если macOS-раннер недоступен, это ограничение записывается в отчёт и в roadmap (S6), а не скрывается.
