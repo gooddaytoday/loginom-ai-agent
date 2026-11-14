@@ -52,6 +52,56 @@ function fixture(fault,initialDirectory='/',options={}) {
  const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;},...options});
  return {service,artifact,calls,events,runtime};
 }
+for(const interruption of ['cancel','deadline','both'])test('confirmed verification completes despite '+interruption,async()=>{
+ let clock=0;
+ const f=fixture(undefined,'/',{now:()=>clock}),verify=f.runtime.verifyDeliveredArtifact,controller=new AbortController();
+ f.runtime.verifyDeliveredArtifact=async options=>{
+  const result=await verify(options);
+  if(interruption!=='deadline')controller.abort('Request timed out');if(interruption!=='cancel')clock=200000;
+  return result;
+ };
+ const result=await f.service.deliver(request,{signal:controller.signal});
+ assert.equal(result.outcome.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(f.events.at(-1).phase,'artifact_delivery_completed');assert.equal(f.service.unsettled,false);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+test('a failed completion acknowledgement resumes from committed proof without another transfer',async()=>{
+ let failed=false;
+ const f=fixture(undefined,'/',{record:async event=>{
+  if(event.phase==='artifact_delivery_completed'&&!failed){failed=true;throw Object.assign(Error('Disk unavailable'),{code:'EIO'});}
+  return event;
+ }}),inspect=f.runtime.inspect;
+ f.runtime.inspect=async options=>{const result=await inspect(options);result.output.operation_id='delivery:upload';result.output.outcome.operation_id='delivery:upload';return result;};
+ const first=await f.service.deliver(request);
+ assert.equal(first.error.code,'EIO');assert.equal(first.error.message,'Disk unavailable');
+ assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
+ const result=await f.service.resume({operation_id:'delivery',resume_id:'ack-completed',budget_ms:1000});
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.service.unsettled,false);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+for(const error of ['Request timed out',{code:'RECEIPT_READ_FAILED',message:'Original receipt temporarily unavailable'},null])test('post-verification failure exposes an executable inspection-only resume: '+JSON.stringify(error),async()=>{
+ let clock=0,failed=false;
+ const f=fixture(undefined,'/',{now:()=>clock}),inspect=f.runtime.inspect;
+ f.runtime.inspect=async options=>{
+  assert.equal(options.operationId,'delivery:upload');
+  if(f.calls.includes('verify')&&!failed){failed=true;throw error;}
+  const result=await inspect(options);
+  result.output.operation_id='delivery:upload';result.output.outcome.operation_id='delivery:upload';
+  return result;
+ };
+ const first=await f.service.deliver(request);
+ assert.equal(first.outcome.status,'AMBIGUOUS');assert.equal(f.service.unsettled,true);
+ assert.equal(first.error.message,error?.message??String(error));
+ if(error?.code)assert.equal(first.error.code,error.code);
+ assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
+ assert.equal(first.outcome.next_step.original_operation_id,request.operation_id);
+ clock=200000;
+ const retry={operation_id:request.operation_id,resume_id:'inspect-completed',budget_ms:1000};
+ const promise=f.service.resume(retry),result=await promise;
+ assert.equal(f.service.resume(retry),promise);assert.equal(result.outcome.status,'SUCCEEDED');
+ assert.equal(f.service.unsettled,false);assert.equal(f.events.at(-1).phase,'artifact_delivery_completed');
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
 test('a 1000 ms request still delivers a small attachment after slower navigation',async()=>{
  let clock=0;
  const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe;
@@ -411,9 +461,11 @@ for(const fault of ['document','tab','missing_receipt','changed_artifact'])test(
 });
 
 test('an unresolved started download is never dispatched again on resume',async()=>{
- const f=fixture('verify'),inspect=f.runtime.inspect;
+ let clock=0;
+ const f=fixture('verify','/',{now:()=>clock}),inspect=f.runtime.inspect;
  f.runtime.inspect=async()=>{const r=await inspect();r.output.operation_id='delivery:upload';r.output.outcome.operation_id='delivery:upload';return r;};
  await f.service.deliver(request);
+ clock=200000;
  const result=await f.service.resume({operation_id:'delivery',resume_id:'resume-pending',budget_ms:120000});
  assert.equal(result.outcome.status,'AMBIGUOUS');assert.match(result.error.message,/no repeated download/);
  assert.equal(f.calls.filter(c=>c==='verify').length,1);assert.equal(f.calls.filter(c=>c==='upload').length,1);

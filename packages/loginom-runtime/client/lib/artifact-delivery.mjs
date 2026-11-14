@@ -127,13 +127,13 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   };
   try {
    let upload,inspected;
-   check();job.phase='preflight';
+   if(!resumeId||preUploadResume)check();job.phase='preflight';
    if(job.packageUpload)requireValue(/\.lgp$/i.test(artifact.name)&&artifact.upload.overwrite==='reject','Private package upload requires an admitted .lgp with reject policy');
    else runtime.preflightDeliveredArtifact(artifact);
    if(resumeId&&!preUploadResume) {
     await acknowledge(job,'artifact_delivery_resume_started',{resume_id:resumeId,upload_operation_id:job.uploadId,
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
-    check();inspected=await runtime.inspect({operationId:job.uploadId});
+    inspected=await runtime.inspect({operationId:job.uploadId});
     await acknowledge(job,'artifact_delivery_resume_inspected',{resume_id:resumeId,inspection:inspected});
     requireValue(inspected.output?.operation_id===job.uploadId&&inspected.output?.cleanup_confirmed===true
       &&inspected.output?.outcome?.operation_id===job.uploadId,'Original delivery receipt remains uncertain');
@@ -288,10 +288,13 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
    const lostVerification=verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
-   check();const final=await runtime.inspect({operationId:job.uploadId});
+   // Verification owns its dispatched work through cleanup. Cancellation or
+   // deadline expiry cannot discard its committed proof; only inspect it here.
+   const final=await runtime.inspect({operationId:job.uploadId});
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
    await finish(job,artifact,final);
   } catch(error) {
+   if(!(error instanceof Error))error=Object.assign(Error(String(error?.message??error?.code??error)),{code:error?.code});
    if(job.largeUpload){
     try{await acknowledge(job,'large_upload_failed',{failed_phase:job.phase,upload_started:job.uploadStarted===true,
      cause:operationFailureDiagnostic(error)});}catch{ /* Diagnostics cannot prevent native cleanup. */ }
@@ -328,13 +331,15 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     ? {code:'ARTIFACT_DESTINATION_UNAVAILABLE',message:String(error.message).slice(0,1000),
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
-    : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
+    : {code:error.code??'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
    // Known navigation effects remain recorded, but an undelivered attachment
    // with no unknown child is a settled refusal, not an ambiguous transfer.
    job.outcome={status:navigationResumable?'NOT_APPLIED':effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
     ...(!submitted&&!effectPossible?{cleanup_complete:true}:{}),
-    ...(submitted&&!job.verificationStarted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
-      instruction:'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
+    ...(submitted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
+      instruction:job.verificationStarted
+       ? 'Inspect and finalize the original upload with its original operation_id, a new resume_id and budget_ms; do not upload or download again.'
+       : 'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
     ...(navigationResumable?{cleanup_complete:true,next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
      instruction:'Continue this delivery with its original operation_id, a new resume_id and budget_ms. The admitted attachment is retained; no upload has started.'}}:{})};
   } finally {job.state='settled';active=null;}
@@ -381,7 +386,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    requireValue(JSON.stringify(artifact)===JSON.stringify(job.artifact),'Admitted artifact changed');
    const renew=!job.packageUpload&&job.preUploadResume===true&&job.uploadStarted===undefined
      &&job.outcome?.cleanup_complete===true&&job.outcome.inspection_required===false&&!job.deadlineRenewed;
-   requireValue(renew||now()<job.deadline,'Artifact delivery deadline elapsed');
+   // An expired dispatched verification can only reconcile its original receipt.
+   requireValue(renew||job.verificationStarted||now()<job.deadline,'Artifact delivery deadline elapsed');
    admitResume(job.uploadId,request.resume_id,signature,{preUpload:job.preUploadResume===true,deliveryId:job.id});
    const deadline=now()+(job.packageUpload?request.budget_ms:Math.max(request.budget_ms,referenceUploadBudget(artifact.bytes)));
    job.deadline=renew?Math.max(job.deadline,deadline):Math.min(job.deadline,deadline);
