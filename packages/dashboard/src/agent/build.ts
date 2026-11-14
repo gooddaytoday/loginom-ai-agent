@@ -82,7 +82,7 @@ export async function buildDashboard(input: {
       [...permissions, "node_modules/typescript/bin/tsc", "--noEmit", "--pretty", "false", "-p", "tsconfig.json"],
       [...permissions, "--allow-addons", "--allow-child-process", "--disable-warning=SecurityWarning", "node_modules/vite/bin/vite.js", "build", "--configLoader", "native", "--base", "./", "--outDir", "dist", "--emptyOutDir", "--logLevel", "warn"],
     ]) {
-      const code = await execute(input.node, args, staging, signal, add)
+      const code = await execute(input.node, args, root, signal, add)
       if (code !== 0) {
         const reason = input.signal?.aborted ? "Сборка отменена.\n" : signal.aborted ? "Сборка прервана: превышено время 90 секунд.\n" : ""
         return { ok: false, output: outputText(Buffer.concat([Buffer.from(reason), output])) }
