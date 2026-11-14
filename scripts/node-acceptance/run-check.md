@@ -122,6 +122,23 @@ Only the business task and original CSV reach the model.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-mode-tie` and `group-empty` use grouping `acceptance/types/task-mode-tie.md`
+and `task-empty.md`, respectively, with only `fixtures/types/mode-tie.csv` or
+`empty.csv`. Separate `expected-mode-tie.json` and `expected-empty.json` preserve
+unchanged `cases.mode_tie.stages` and `cases.empty.stages` from LAB-1558.
+Native observations LAB-1581 Q2/Q7 confirm integer/string mode ties select the
+smallest value and header-only input produces zero rows with the complete
+string/integer/real/datetime/boolean schema. Stock full typed matching, exact
+field order, CSV (header only for empty), Save, cold Execute without configuration
+and cleanup apply. Only task and CSV reach the model; oracle/expected stay private.
+
+`group-date` uses grouping `acceptance/types/task-date.md` and only
+`fixtures/types/types.csv`. `expected-date.json` preserves unchanged
+`cases.date.stages` from LAB-1558: DateTime min/max/last (including final NULL),
+integer null_count, full typed rows and exact field order with `ordered:false`.
+The independent oracle stays private. CSV, Save, cold Execute without
+configuration and cleanup use stock checks; only task and CSV reach the model.
+
 `group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
 `fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
 `cases.boolean.stages` from LAB-1558. Native Boolean min/max/mode and integer

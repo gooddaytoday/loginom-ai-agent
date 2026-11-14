@@ -1,9 +1,11 @@
 Комплект LAB-1558; native-проба выполнена в LAB-1581 до изменения кода.
 `expected.json` остаётся неизменённым контейнером `cases`, **не вход stock
-run-check**. Для `group-real` и `group-boolean` его `cases.real.stages` и
-`cases.boolean.stages` без изменения чисел, типов и допусков выделены в
-`expected-real.json` и `expected-boolean.json`; остальные случаи пока
-не зарегистрированы. Раздел цикла — [plan.md](../../plan.md), «Предложение
+run-check**. Для `group-real`, `group-boolean` и `group-date` его `cases.real.stages`,
+`cases.boolean.stages` и `cases.date.stages` без изменения чисел, типов и допусков выделены в
+`expected-real.json`, `expected-boolean.json` и `expected-date.json`.
+Для `group-mode-tie` и `group-empty` так же выделены `cases.mode_tie.stages`
+и `cases.empty.stages` в `expected-mode-tie.json` и `expected-empty.json`;
+Variant пока не зарегистрирован. Раздел цикла — [plan.md](../../plan.md), «Предложение
 LAB-1558».
 
 Модели передаются только выбранный `task-*.md` и его CSV из
@@ -19,11 +21,11 @@ runtime и не читает expected как источник чисел.
 | Случай | Task | Вход | Что проверяет | Что сейчас мешает |
 |---|---|---|---|---|
 | real | task-real.md | types.csv | median, mode, stddev по Real; ничья моды E → 0.5 | зарегистрирован `group-real`; Real открыт по native-матрице |
-| date | task-date.md | types.csv | min, max, last, null_count по DateTime | min/max проходят валидатор (`:6` их не ограничивает), тип выхода DateTime даёт `grouping-output.mjs:13`; last и null_count закрыты `:6` |
+| date | task-date.md | types.csv | min, max, last, null_count по DateTime | зарегистрирован `group-date`; DateTime открыт по native-матрице LAB-1581, выходы сохраняют datetime; null_count → integer |
 | boolean | task-boolean.md | types.csv | min, max, mode, unique_count, null_count по Boolean; ничья E → False | зарегистрирован `group-boolean`; Boolean открыт по native-матрице LAB-1581 |
 | variant | task-variant.md | variant.csv → Свёртка | count, null_count, first, last по Variant | `:6` закрывает null_count/first/last; Variant-выход Группировки не читается точно: `transform.group_data` нет в `typedVariants` (`node-procedure.mjs:269`) |
-| mode_tie | task-mode-tie.md | mode-tie.csv | ничья моды integer/string → наименьшее | наблюдено LAB-1581 (Q2); не зарегистрирован |
-| empty | task-empty.md | empty.csv (только заголовок) | пустой вход → пустой типизированный результат | наблюдено LAB-1581 (Q7); не зарегистрирован |
+| mode_tie | task-mode-tie.md | mode-tie.csv | ничья моды integer/string → наименьшее | зарегистрирован `group-mode-tie`; native LAB-1581 (Q2) |
+| empty | task-empty.md | empty.csv (только заголовок) | пустой вход → пустой типизированный результат | зарегистрирован `group-empty`; native LAB-1581 (Q7); CSV только с заголовком |
 
 Правила oracle сохранены; native-проба 13.11.2026 их подтвердила для
 проверенных случаев (подробности ниже):
@@ -52,7 +54,7 @@ Execute без настройки, cleanup. Порядок групп не пр�
 Native-проба LAB-1581: база `eb92f4f467ef05cc5c2205a0239891e14f3e553b`,
 7.4.2 / mas / Node 24.19.0 / Chromium 1246, свой пакет, UI по `data-tid`.
 Сведения относятся к native Loginom; runtime расширен на Real (LAB-1581)
-и Boolean (LAB-1616). Для DateTime/Boolean/Variant sum/avg/median/stddev/concat
+и Boolean (LAB-1616), DateTime (LAB-1659). Для DateTime/Boolean/Variant sum/avg/median/stddev/concat
 отклоняются и при настройке, и при чтении сохранённой маски функций.
 Полные наблюдения и границы — [discovery](../../discovery.md).
 
