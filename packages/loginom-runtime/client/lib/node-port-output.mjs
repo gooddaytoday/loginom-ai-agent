@@ -204,7 +204,7 @@ export async function readTreePortSource(source,call,track,decode) {
   const name=await rpc('schema_name',()=>def.get_Name()),label=await rpc('schema_label',()=>def.get_DisplayName());
   const container=await rpc('schema_container',()=>def.get_IsContainer()),array=await rpc('schema_array',()=>def.get_IsArray());
   need(typeof name==='string'&&name.length<=512&&typeof label==='string'&&label.length<=16384
-   &&typeof container==='boolean'&&typeof array==='boolean'&&(!array||container),'tree_schema_metadata');
+   &&typeof container==='boolean'&&typeof array==='boolean','tree_schema_metadata');
   const type=container?'object':types[await rpc('schema_type',()=>def.get_DataType())];
   need(type&&type!=='variant','tree_scalar_type');
   const item={index,parent,path,name,label,type,is_container:container,is_array:array,children:[]};
