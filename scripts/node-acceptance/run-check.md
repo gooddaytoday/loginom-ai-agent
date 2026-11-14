@@ -92,6 +92,16 @@ against the frozen `expected.json` (`oracle.py --check`), and Save. No CSV is
 exported; cold reexecutes the saved package without configuration and matches
 all six labelled outputs. Only task and folder paths reach the model.
 
+`tree-dates` uses the approved `trees-jsontotree/acceptance/typed/task-dates.md`
+and unchanged `fixtures/typed/documents.csv` (all three input columns are strings).
+Only task and CSV reach the model. `expected-dates.json` is the separate stock
+projection of `expected.json → cases.dates`, checked by the same independent oracle.
+Full ordered schema/instances, DateTime civil `YYYY-MM-DDTHH:MM:SS.mmm`,
+`precision:millisecond`, `representation:local_datetime` and typed NULL are required.
+Native default format is `YYYY-MM-DDThh:mm:ss`; winter and summer values must
+retain their civil time. Tree-only Save, a fresh cold profile executing without
+configuration, the same full typed matcher and cleanup apply; no CSV export.
+
 `tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
 `trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
 and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks
