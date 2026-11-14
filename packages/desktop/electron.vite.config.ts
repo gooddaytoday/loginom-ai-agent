@@ -79,7 +79,12 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       },
       externalizeDeps: {
         include: [nodePtyPkg],
-        exclude: ["@loginom-ai-agent/product", "@opencode-ai/schema", "@loginom-ai-agent/loginom-host"],
+        exclude: [
+          "@loginom-ai-agent/product",
+          "@opencode-ai/schema",
+          "@loginom-ai-agent/loginom-host",
+          "@loginom-ai-agent/dashboard",
+        ],
       },
     },
     plugins: [
