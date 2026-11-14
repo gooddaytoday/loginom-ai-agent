@@ -1,16 +1,15 @@
 # Dashboard M3 — checkpoint
 
-- Рабочая ветка `dashboard-m3`; задачи 1–17 выполнены и независимо проверены. Номер следующей задачи и актуальный план — [план M3](../../superpowers/plans/2026-11-12-dashboard-m3.md).
-- [CI4](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43547781495) полностью зелёный: 11 jobs, включая unit, generated client, HttpApi gates, template Ubuntu/Windows/macOS, browser, Desktop, E2E и evals. SHA проверенной ревизии — в CI.
-- Task15: набор шаблона действительно staged и собирается; три примера и CSS/font проходят на всех трёх ОС. Все три замечания исправлены без расширения Node permissions; нативный Windows runtime установленной поставки ещё не проверялся.
-- Task12: публикация retained bytes, разовый ask/reject/once, key lock, snapshotId, cancel и UI проверены. Два новых unit-сбоя интеграции исправлены существующим общим английским словарём и актуальным provider assertion; оба ревью Approved.
-- Task13: CLI snapshot→новая work-сессия/синтетическая часть проверены; Task14: третий навык/реестр и все потребители обновлены. CI4 подтверждает состояние задач 1–15; окончательная ревизия после документов потребует финального CI.
-- Task7: строгая историческая последовательность TDD для helper соблюдена не полностью; дополнительные тесты добавлены после skeleton. Это отклонение не объявляется устранённым.
-- Task16 принята: флаг/привязка/снимки реализованы, аргументы RED→GREEN, фактический CI-шаг, Bash/ShellCheck/YAML PASS; независимое ревью Approved. Реальный запуск установщика — в Task18. Task17 принята после устранения двух лишних критериев runbook; новое и повторное ревью Approved.
-- Подробный журнал, rulings, отчёты, diff и логи — `.superpowers/sdd/2026-11-12-dashboard-m3/`; закреплённое окружение — `environment.sh`. Backend проверять штатным `bun run test` из пакета.
-- Установленная поставка, настоящая модель, стенд, публикация на настоящем стенде и задача 18 ещё не приняты. Перед DEB-установкой требуется команда владельца по плану; слияние и выпуск — отдельно.
-- Дополнение Task18 о сохранении Server, исходной Studio и прежнего web независимо одобрено; перед исполнением повторно проверить состояние. Стенд и удалённый рабочий компьютер не изменялись.
-- Для итогового ревью остаются P3 Copilot `_noop` и Host else-if Minor; Product catalog-check исправлен, secret scanning не менялся.
-- Следующая Task18: входы/прежние отдельные Desktop и CLI проверены в `task-18-build-inputs.md`. Нужны финальный CI и сборка из отдельного чистого checkout окончательного SHA; чужие untracked сохраняются.
-- Итоговое Astra-ревью и один fix wave завершены: общий запрет auto formatter/LSP и конечный draft-output исправлены, scoped review Approved; 205 tests/types/native smoke PASS. Чистый build checkout с dependencies/Electron пока на прежнем SHA и требует обновления перед сборкой.
-- [CI5](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43553062512): 10 jobs PASS, evals FAIL на PPID assertion; исправлено ожидание фактической adoption с прежним birth/deadline, focused 1/types PASS, независимое ревью Approved. Нужен новый полный CI исправленного SHA. Сборка/замеры/установка/стенд ещё не начаты.
+- Рабочая ветка `dashboard-m3`; задачи 1–17 выполнены, итоговое Astra-ревью и адресное ревью исправлений Approved. Актуальный [план M3](../../superpowers/plans/2026-11-12-dashboard-m3.md).
+- [CI6](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43556714404) полностью зелёный: 11 jobs, backend 4138/evals 1342/HttpApi gates PASS; три ОС template, browser, Desktop и E2E PASS.
+- Task18 Step1 выполнен: DEB/AppImage/CLI с архивом `0.3.10-m3.20261114`, prod, одна чистая source-ревизия CI6; static/source/archive verification PASS. Текущие artifact paths/manifests — в локальном task-18-report.md, прежние кандидаты сохранены.
+- S6 OWNER_THRESHOLD: chat median прежнего CLI0.3.4 3617.268 мс, нового 6371.513 мс, прирост2754.245>2000 мс. Шесть корректных запусков, большой разброс; direct/no-system-proxy, fresh profiles, обычные OS caches. Полный [предустановочный итог](dashboard-m3.md#предустановочный-результат-2026-11-14).
+- Владелец должен выбрать продолжение по Task18 Step2; async вопрос задан. До ответа не повторять замеры/не оптимизировать/не строить новую M2 baseline/не устанавливать/не менять стенд. Автоматическое goal-продолжение не является ответом владельца.
+- Рекомендован контроль с непосредственной базой M2 при сохранении порога; это предложение, не полученное разрешение. Ни один дальнейший вариант ещё не выполнен.
+- `--version` замеры, установленная поставка, настоящая модель, стенд и публикация ещё не приняты. Перед DEB-установкой отдельно нужна команда владельца; слияние и выпуск — отдельно.
+- Подробные rulings/reports/diffs/logs — `.superpowers/sdd/2026-11-12-dashboard-m3/`; pinned environment.sh. SAME implement_dashboard_acceptance завершил OWNER_THRESHOLD; после решения продолжать followup, не повторять Tasks1–17.
+- Clean build worktree и артефакты сохранены; runtime исходники — ревизия CI6, последующая документация содержит результаты. Чужие untracked основного checkout сохранены.
+- Source финальные дефекты закрыты: общая граница auto formatter/LSP для dashboard и final draft-output cap; 205 focused tests/types/native smoke PASS. CI evals wait исправлен без runtime/deadline изменений, проверен review и CI6.
+- Task7: исторический строгий TDD helper соблюдён не полностью; это раскрыто и не объявляется исправленным задним числом. Прежние minor итоговое ревью признало неблокирующими.
+- Локальный стенд/удалённый эталон не менялись. Сохранение Server, исходной Studio и прежнего web перед обновлением независимо согласовано в плане; повторно проверить фактическое состояние до действий.
+- SDD workspace/Rulings/evidence не удалять до фактического завершения цели и полного отчёта владельцу. Первое появление blocker owner-threshold; goal остаётся active, audit blocked ещё не выполнен.
