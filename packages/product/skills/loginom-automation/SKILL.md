@@ -204,6 +204,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Параметры полей: переименование и обмен имён, метка, смена типа, кэширование | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
 | Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Ветвь по переменной, «Иначе» | `control.condition` / ports, variable_branch | [читать](references/nodes/control.condition.md) |
+|Цикл по строкам|`control.loop` /group_rows|[читать](references/nodes/control.loop.md)|
 |Подмодель|`control.supernode` /tabular_boundary|[читать](references/nodes/control.supernode.md)|
 |Выход Подмодели|`control.supernode_output`|[читать](references/nodes/control.supernode_output.md)|
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |

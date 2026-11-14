@@ -1,3 +1,4 @@
+import {makeLoopConfigureCode,makeLoopInspectCode} from './loop-procedure.mjs';
 import {makeVariablesReplaceConfigureCode} from './variables-replace-procedure.mjs';
 import {makeConditionConfigureCode} from './control-condition-procedure.mjs';
 import {makeVariablesColumnUnionContextCode} from './variables-coluniondatavar-context.mjs';
@@ -388,6 +389,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
     async configureCondition(settings){return crossTableOwnedStep('condition',settings,makeConditionConfigureCode);},
     async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
+    async configureLoop(parameters){return crossTableOwnedStep('loop_group_rows',{parameters,source:operation.loopSource},makeLoopConfigureCode);},
+    async inspectLoop(parameters){return crossTableOwnedStep('loop_ports',{parameters,source:operation.loopSource},makeLoopInspectCode);},
     async configureSupernode(parameters){return crossTableOwnedStep('supernode_boundary',{parameters},makeSupernodeConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
     async configurePythonColumns(columns) {return crossTableOwnedStep('python_columns',{columns},makePythonColumnsCode);},

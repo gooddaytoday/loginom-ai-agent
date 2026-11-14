@@ -6,6 +6,7 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
+  ['control.loop','Цикл','loop',1,1,false,['group_rows'],'processors/control/loop.md'],
   ['control.supernode','Подмодель','modelgeneric',1,1,false,['tabular_boundary'],'processors/control/supernode.md'],
   ['control.supernode_output','Выходной узел подмодели','nullvendor',1,0,false,['tabular_boundary'],'processors/control/supernode.md'],
   ['variables.replace','Замена (переменные)','replacevariables',0,0,false,['exact','rules'],'processors/variables/variables-replace.md'],
@@ -81,6 +82,7 @@ export const NODE_TYPES = freeze(Object.fromEntries(definitions.map(([type, titl
     : type === 'control.condition' ? 'Switch: first true branch runs, others are blocked; built-in Иначе runs when none is true. Ports exist only after mode ports (new node, finish done); then link table input 0 and variables input 0 and use mode variable_branch. Output 0 = branch, 1 = Иначе; reading a blocked branch port is refused as not active.'
     : type === 'transform.join_data' ? 'Join two tables by keys; not positional Соединение.'
     : type === 'transform.union_data' ? 'Append rows, preserving duplicates; not UNION DISTINCT.' : type === 'research.duplicates' ? 'Mark all copies and contradictions; retain all rows. Filtering Duplicate=false removes every member of a duplicate group. Unassigned fields are preserved and ignored. No automatic deduplication or conflict resolution.' : title,
+  ...(type==='control.loop'?{palette_group:'Управление',semantics:'group_rows; read guidance.'}:{}),
   graph_handler: 'node_target_v1', graph_handler_status: 'internal_candidate', configuration_handler: null,
   configuration_status: type==='programming.javascript'?'planned_in_subplan_javascript':type==='exports.text'?'candidate_in_subplan_17':'planned_in_subplans_03_to_10',
   sources: { e2e: ['bg/helpers/workflow/node.ts', 'bg/helpers/workflow/ports.ts', 'bg/helpers/workflow/links.ts'],
