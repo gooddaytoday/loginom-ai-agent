@@ -536,7 +536,16 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       requested.source.source_path=patch.verifiedSourcePath;
     // Existing patches permit omitted usage. A first configuration has no
     // saved exclusions to preserve; explicitly disabled fields stay disabled.
-    if(Array.isArray(requested.columns))requested.columns=requested.columns.map(c=>({used:true,...c}));
+    if(Array.isArray(requested.columns))requested.columns=requested.columns.map(c=>{
+      const column={used:true,...c};
+      if(!Object.hasOwn(column,'name')) {
+        if(typeof column.source_name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(column.source_name))
+          throw new ImportInitialSettingsError('Invalid parameters.parameters.settings.columns.name: supply an explicit ASCII technical name (^[A-Za-z_][A-Za-z0-9_]*$) for source_name '+JSON.stringify(column.source_name)+'; keep the original CSV header in source_name and display title in label');
+        column.name=column.source_name;
+      }
+      if(!Object.hasOwn(column,'label'))column.label=column.source_name;
+      return column;
+    });
     validateInitialExistingImportSettings(requested,patch.verifiedSourcePath,true);
     return configureImport(channel,requested,owner,true,undefined,false,patch.verifiedSourcePath);
   }
