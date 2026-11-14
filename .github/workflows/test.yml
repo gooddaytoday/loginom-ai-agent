@@ -203,6 +203,11 @@ jobs:
         run: |
           bash -n packages/dashboard/deploy/dev-master.sh
           shellcheck packages/dashboard/deploy/dev-master.sh
+          if output=$(bash packages/dashboard/deploy/dev-master.sh install --cli-button --web invalid/name 2>&1); then
+            echo "Expected invalid web name rejection" >&2
+            exit 1
+          fi
+          [[ $output == 'Некорректное имя контейнера web' ]]
 
       - name: Setup Bun
         uses: ./.github/actions/setup-bun

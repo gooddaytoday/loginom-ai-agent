@@ -2,7 +2,6 @@
 # Only the isolated dashboard master from dashboard/stand/README.md.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
-project=$(pwd -P)
 pkg=packages/dashboard
 studio=dashboard-master-20261109-studio
 server=dashboard-master-20261109-server
@@ -11,15 +10,17 @@ app=/workdir/dashboard-app
 storage=/workdir/UserStorage/user/dashboard-roi
 base=http://127.0.0.1:32768
 die() { echo "$*" >&2; exit 1; }
-usage="Usage: $0 install [--strict] [--web NAME] | check [--web NAME] | uninstall [--web NAME]"
+usage="Usage: $0 install [--strict] [--cli-button] [--web NAME] | check [--web NAME] | uninstall [--web NAME]"
 [[ $# -ge 1 ]] || die "$usage"
 action=$1
 shift
 mode=normal
+cli_button=0
 web=dashboard-master-20261109-web
 while [[ $# -gt 0 ]]; do
   case $1 in
     --strict) [[ $action == install ]] || die "$usage"; mode=strict; shift;;
+    --cli-button) [[ $action == install ]] || die "$usage"; cli_button=1; shift;;
     --web) [[ $# -ge 2 ]] || die "$usage"; web=$2; shift 2;;
     *) die "$usage";;
   esac
@@ -33,7 +34,7 @@ fi
 net=dashboard-master-20261109-net
 owner=io.loginom.dashboard.dev-master=20261109
 state=$HOME/loginom-dashboard
-builds=$(realpath -m "${DASHBOARD_BUILDS:-$state/builds}")
+builds=$state/builds
 app_origin=http://dashboards.localhost:32769
 client_origins=http://127.0.0.1:32768,http://localhost:32768
 image=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
@@ -121,10 +122,15 @@ if [[ $action == uninstall ]]; then
 fi
 
 # A fixed public fixture binding; compare lookup with the preserved on-disk publication.
-roi_sha256=f42521cdeb21bbc3a3b536da85dab3936a512c5228df34864fc060dc71d886be
-binding='{"server":"http://127.0.0.1:32768","packagePath":"/user/dashboard-roi/campaign.lgp","workflowGuid":"27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7","nodeGuid":"77c145b1-6ce3-458f-aa36-e6afdab2a930","port":0}'
+binding='{"packagePath":"/user/dashboard-roi/campaign.lgp","workflowGuid":"27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7","nodeGuid":"77c145b1-6ce3-458f-aa36-e6afdab2a930"}'
 if [[ $action == check ]]; then
   [[ -n $web_id ]] || die "Контейнер web не найден"
+  [[ -x $state/node && -s $state/server.mjs ]] || die "Не найдены установленные Node/server.mjs"
+  # The binding goes first: server.mjs as argv[1] would start the service on import.
+  roi=$("$state/node" --input-type=module -e '
+    const { bindingKey } = await import(process.argv[2])
+    console.log(await bindingKey(JSON.parse(process.argv[1])))
+  ' "$binding" "$state/server.mjs")
   mode=$(node -e '
     const v = JSON.parse(require("node:fs").readFileSync(process.argv[1]))[0]
     if (v.Config.User !== process.argv[2] || v.Config.User.split(":")[0] === "0") throw Error("web UID/GID mismatch")
@@ -136,7 +142,7 @@ if [[ $action == check ]]; then
     if (mode !== "normal" && mode !== "strict") throw Error("web mode mismatch")
     console.log(mode)
   ' "$tmp/web.json" "$(id -u):$(id -g)" "$builds")
-  current=$(cat "$builds/$roi_sha256/current" 2>/dev/null || true)
+  current=$(cat "$builds/$roi/current" 2>/dev/null || true)
   [[ -n $current ]] || die "Не проверено: опубликуйте ROI"
   code=$(curl --noproxy '*' -sS -D "$tmp/api.headers" -o "$tmp/lookup" -w '%{http_code}' -H 'Content-Type: application/json' -d "$binding" "$base/dashboard/lookup")
   [[ $code == 200 ]] || die "ROI lookup: HTTP $code (expected 200)"
@@ -144,10 +150,25 @@ if [[ $action == check ]]; then
     const res = JSON.parse(require("node:fs").readFileSync(process.argv[1]))
     if (res.key !== process.argv[2] || res.exists !== true || res.hash !== process.argv[3] ||
         res.appOrigin !== process.argv[4] || res.mode !== process.argv[5]) throw Error("ROI lookup mismatch")
-  ' "$tmp/lookup" "$roi_sha256" "$current" "$app_origin" "$mode"
+    const web = JSON.parse(require("node:fs").readFileSync(process.argv[6]))[0]
+    if (res.cliButton !== web.Config.Env.includes("DASHBOARD_CLI_BUTTON=1")) throw Error("CLI button mismatch")
+  ' "$tmp/lookup" "$roi" "$current" "$app_origin" "$mode" "$tmp/web.json"
   [[ $(header "$tmp/api.headers" Content-Security-Policy) == "sandbox; default-src 'none'" ]] || die "API CSP mismatch"
   [[ $(header "$tmp/api.headers" X-Content-Type-Options) == nosniff ]] || die "API nosniff missing"
-  for path in current "apps/$roi_sha256/" "apps/$roi_sha256/binding.json" "apps/$roi_sha256/sample.json"; do
+  snapshot="{\"binding\":$binding,\"nodeName\":\"ROI\",\"sample\":{\"schema\":[{\"name\":\"count\",\"type\":1}],\"rows\":[[42]]},\"parameters\":[],\"published\":false}"
+  code=$(curl --noproxy '*' -sS -o "$tmp/snapshot" -w '%{http_code}' -H 'Content-Type: application/json' -H "Origin: $base" -d "$snapshot" "$base/dashboard/snapshots")
+  [[ $code == 201 ]] || die "Snapshot: HTTP $code (expected 201)"
+  id=$(node -e '
+    const { id } = JSON.parse(require("node:fs").readFileSync(process.argv[1]))
+    if (typeof id !== "string" || !id) throw Error("Snapshot ID missing")
+    console.log(id)
+  ' "$tmp/snapshot")
+  for expected in 200 404; do
+    code=$(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' "$base/dashboard/snapshots/$id")
+    [[ $code == "$expected" ]] || die "Snapshot read: HTTP $code (expected $expected)"
+  done
+  [[ $(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -H 'Origin: http://evil.invalid' -d "$snapshot" "$base/dashboard/snapshots") == 403 ]] || die 'Snapshot origin: expected 403'
+  for path in current "targets/$id" "apps/$roi/" "apps/$roi/binding.json" "apps/$roi/sample.json"; do
     [[ $(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' "$base/dashboard/$path") == 404 ]] || die "Expected 404: $path"
   done
   [[ $(curl --noproxy '*' -sS -H 'Host: dashboard.invalid' -o /dev/null -w '%{http_code}' "$base/dashboard/current") == 403 ]] || die 'Host: expected 403'
@@ -163,12 +184,12 @@ if [[ $action == check ]]; then
     grep -iq '^cache-control:.*no-cache' "$tmp/headers" || die "$prefix: shell.js missing no-cache"
     cmp "$pkg/dist/shell.js" "$tmp/shell.js"
   done
-  asset=$(find "$builds/$roi_sha256/$current/assets" -maxdepth 1 -type f -printf '%f\n' -quit)
+  asset=$(find "$builds/$roi/$current/assets" -maxdepth 1 -type f -printf '%f\n' -quit)
   [[ -n $asset ]] || die "ROI assets отсутствуют"
-  for path in "/apps/$roi_sha256/$current/" "/apps/$roi_sha256/$current/assets/$asset" /apps/ "/apps/$roi_sha256/$current" "/apps/$roi_sha256/$current/binding.json" "/apps/$roi_sha256/$current/sample.json"; do
+  for path in "/apps/$roi/$current/" "/apps/$roi/$current/assets/$asset" /apps/ "/apps/$roi/$current" "/apps/$roi/$current/binding.json" "/apps/$roi/$current/sample.json"; do
     expected=404
     cache=no-store
-    if [[ $path == "/apps/$roi_sha256/$current/" ]]; then expected=200; fi
+    if [[ $path == "/apps/$roi/$current/" ]]; then expected=200; fi
     if [[ $path == */assets/* ]]; then expected=200; cache='public, max-age=31536000, immutable'; fi
     code=$(curl --noproxy '*' --resolve dashboards.localhost:32769:127.0.0.1 -sS -D "$tmp/headers" -o /dev/null -w '%{http_code}' "$app_origin$path")
     [[ $code == "$expected" ]] || die "App host $path: HTTP $code (expected $expected)"
@@ -190,20 +211,7 @@ for artifact in "$pkg/dist/server.mjs" "$pkg/dist/shell.js"; do
   [[ -s $artifact ]] || die "Отсутствует $artifact: выполните bun run build из $pkg"
   "$node_bin" --check "$artifact"
 done
-legacy=dashboard/template/node_modules
-if [[ -e $legacy || -L $legacy ]]; then
-  [[ -x $legacy/.bin/vite && -x $legacy/.bin/tsc ]] || die "Нерабочий $legacy оставлен без изменений"
-fi
 for file in campaign.lgp dataset.csv; do [[ -s dashboard/fixture/$file ]] || die "Нет dashboard/fixture/$file"; done
-if [[ ! -x $pkg/template/node_modules/.bin/vite || ! -x $pkg/template/node_modules/.bin/tsc ]]; then
-  [[ ! -L $pkg/template/node_modules && ( ! -e $pkg/template/node_modules || -d $pkg/template/node_modules ) ]] || die 'Не заменяю нестандартный node_modules нового шаблона'
-  (cd "$pkg/template" && npm ci --ignore-scripts --no-audit --no-fund)
-fi
-if [[ ! -e $legacy ]]; then
-  [[ ! -L dashboard/template ]] || die 'Не записываю в ссылку dashboard/template'
-  mkdir -p dashboard/template
-  ln -s "$project/$pkg/template/node_modules" "$legacy"
-fi
 docker network inspect "$net" >/dev/null
 install -d -m 700 "$state" "$builds"
 install -m 755 "$node_bin" "$state/node.new" && mv -f "$state/node.new" "$state/node"
@@ -226,8 +234,8 @@ docker run -d --name "$web" --label "$owner" --network "$net" --user "$(id -u):$
   -p 127.0.0.1:32769:8101 \
   -v "$state/node:/opt/dashboard/node:ro" -v "$state/server.mjs:/opt/dashboard/server.mjs:ro" -v "$builds:/builds:ro" \
   -e DASHBOARD_HOST=0.0.0.0 -e DASHBOARD_PORT=8100 -e DASHBOARD_APP_PORT=8101 -e DASHBOARD_BUILDS=/builds \
-  -e DASHBOARD_PROJECT_ROOT="$project" -e DASHBOARD_APP_ORIGIN="$app_origin" \
-  -e DASHBOARD_CLIENT_ORIGINS="$client_origins" -e DASHBOARD_MODE="$mode" -e DASHBOARD_ALLOW_CURRENT=0 \
+  -e DASHBOARD_APP_ORIGIN="$app_origin" -e DASHBOARD_CLI_BUTTON="$cli_button" \
+  -e DASHBOARD_CLIENT_ORIGINS="$client_origins" -e DASHBOARD_MODE="$mode" \
   "$image" /opt/dashboard/node /opt/dashboard/server.mjs >/dev/null
 
 docker exec "$studio" mkdir -p "$htdocs/dashboard-config"
@@ -269,4 +277,4 @@ fi
 docker exec "$studio" rm -f "$conf.bak"
 docker exec "$studio" apachectl -k graceful
 curl --noproxy '*' --retry 5 --retry-delay 1 -fsS -H 'Content-Type: application/json' -d "$binding" "$base/dashboard/lookup" >/dev/null
-echo "Dashboard установлен ($mode). Опубликуйте ROI по свежему снимку, затем выполните: $0 check --web $web"
+echo "Dashboard установлен ($mode). Создайте и опубликуйте ROI через Desktop (Создать dashboard → Опубликовать), затем выполните check: $0 check --web $web"
