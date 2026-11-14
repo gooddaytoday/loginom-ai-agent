@@ -49,11 +49,14 @@ export async function standaloneFixture(binary?: string) {
       await copyProductSkillsFixture(bundle)
       // A small shipped Help; tests that need it unavailable remove or change it.
       await writeHelp(join(bundle, "help"))
+      await writeFile(join(bundle, "browser"), "controlled browser payload")
       await writeFile(
         join(bundle, "resource-manifest.json"),
         JSON.stringify({
           protocol: 1,
+          nodeVersion: "24.19.0",
           node: "bin/node",
+          browser: "browser",
           files: await resourceInventory(bundle),
         }),
       )

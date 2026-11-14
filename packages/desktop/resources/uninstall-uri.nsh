@@ -1,3 +1,56 @@
+LangString VerifyResourcesStatus 1033 "Verifying application resources. This may take a few minutes..."
+LangString VerifyResourcesError 1033 "Application resources could not be verified or the verification cache could not be saved. Installation did not complete. Please run the installer again."
+LangString VerifyResourcesStatus 1049 "Проверка ресурсов приложения. Это может занять несколько минут..."
+LangString VerifyResourcesError 1049 "Не удалось проверить ресурсы приложения или сохранить результат проверки. Установка не завершена. Запустите установщик повторно."
+
+# Preserve electron-builder's full language set with the English source fallback.
+!macro VerifyResourcesEnglish LANG
+  LangString VerifyResourcesStatus ${LANG} "Verifying application resources. This may take a few minutes..."
+  LangString VerifyResourcesError ${LANG} "Application resources could not be verified or the verification cache could not be saved. Installation did not complete. Please run the installer again."
+!macroend
+!insertmacro VerifyResourcesEnglish 1031
+!insertmacro VerifyResourcesEnglish 1036
+!insertmacro VerifyResourcesEnglish 3082
+!insertmacro VerifyResourcesEnglish 2052
+!insertmacro VerifyResourcesEnglish 1028
+!insertmacro VerifyResourcesEnglish 1041
+!insertmacro VerifyResourcesEnglish 1042
+!insertmacro VerifyResourcesEnglish 1040
+!insertmacro VerifyResourcesEnglish 1043
+!insertmacro VerifyResourcesEnglish 1030
+!insertmacro VerifyResourcesEnglish 1053
+!insertmacro VerifyResourcesEnglish 1044
+!insertmacro VerifyResourcesEnglish 1035
+!insertmacro VerifyResourcesEnglish 2070
+!insertmacro VerifyResourcesEnglish 1046
+!insertmacro VerifyResourcesEnglish 1045
+!insertmacro VerifyResourcesEnglish 1058
+!insertmacro VerifyResourcesEnglish 1029
+!insertmacro VerifyResourcesEnglish 1051
+!insertmacro VerifyResourcesEnglish 1038
+!insertmacro VerifyResourcesEnglish 1025
+!insertmacro VerifyResourcesEnglish 1055
+!insertmacro VerifyResourcesEnglish 1054
+!insertmacro VerifyResourcesEnglish 1066
+
+!macro customInstall
+  # Never skip updates: the final installed bytes and current user's profile
+  # must be checked before NSIS can mark the installation successful or launch.
+  SetDetailsPrint textonly
+  DetailPrint "$(VerifyResourcesStatus)"
+  SetDetailsPrint both
+  ClearErrors
+  ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --verify-resources' $0
+  ${if} ${Errors}
+    StrCpy $0 1
+  ${endif}
+  ${if} $0 != 0
+    MessageBox MB_OK|MB_ICONSTOP "$(VerifyResourcesError)" /SD IDOK
+    SetErrorLevel 1
+    Abort
+  ${endif}
+!macroend
+
 !macro customUnInstall
   ${ifNot} ${isUpdated}
     ReadRegStr $0 HKCU "Software\Classes\loginom-ai-agent\shell\open\command" ""

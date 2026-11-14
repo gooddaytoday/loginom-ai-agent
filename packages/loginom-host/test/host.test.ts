@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
-import { access, copyFile, mkdir, mkdtemp, readdir, rm, stat, symlink, truncate, writeFile } from "node:fs/promises"
+import { access, copyFile, mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
-import { createLoginomHost } from "../src/host"
+import { createLoginomHost, verifyInstallationResources } from "../src/host"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
@@ -76,7 +76,21 @@ test("Host prewarms one full resource verification and hands every runtime start
       ),
     }),
   )
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+  const installed = await verifyInstallationResources({ root, resources, resourceVersion: "0.4.0" })
+  expect(installed.verification).toEqual({ mode: "full", hashedFiles: 2, cachedFiles: 0 })
+  // Reinstall/--updated cannot certify an old cache without a full pass.
+  expect((await verifyInstallationResources({ root, resources, resourceVersion: "0.4.0" })).verification).toEqual({
+    mode: "full",
+    hashedFiles: 2,
+    cachedFiles: 0,
+  })
+  const host = await createLoginomHost({
+    root,
+    resources,
+    resourceVersion: "0.4.0",
+    codec: credentials("linux"),
+    environment: {},
+  })
   try {
     // Verification happens with no connection or browser admission.
     for (
@@ -107,20 +121,29 @@ test("Host prewarms one full resource verification and hands every runtime start
     expect(proofs[0].hash).toMatch(/^[a-f0-9]{64}$/)
     // Each start rechecks file metadata against the profile cache the prewarm wrote.
     for (const proof of proofs)
-      expect(proof).toEqual({ hash: proofs[0].hash, cachePath: join(root, "resource-verification.json"), cacheVersion: "" })
+      expect(proof).toEqual({
+        hash: proofs[0].hash,
+        cachePath: join(root, "resource-verification.json"),
+        cacheVersion: "0.4.0",
+      })
     expect(await Bun.file(join(root, "resource-verification.json")).exists()).toBe(true)
-    expect(
-      (await Bun.file(join(root, "startup-phases.jsonl")).text())
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line))
-        .filter((event) => event.phase === "resources.verify" && event.status === "ready"),
-    ).toHaveLength(1)
+    const events = (await Bun.file(join(root, "startup-phases.jsonl")).text())
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.phase === "resources.verify" && event.status === "ready")
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ mode: "metadata", hashedFiles: 0, cachedFiles: 2 })
+    expect((await host.verifyInstallationResources()).verification).toEqual({
+      mode: "full",
+      hashedFiles: 2,
+      cachedFiles: 0,
+    })
     await host.close()
     const restored = await createLoginomHost({
       root,
       resources,
-      resourceVersion: "",
+      resourceVersion: "0.4.0",
       codec: credentials("linux"),
       environment: {},
     })
@@ -147,75 +170,68 @@ test("Host prewarms one full resource verification and hands every runtime start
   }
 }, 15_000)
 
-test("Host retains prewarm wait cancellation before any browser child starts", async () => {
-  const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
-  if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE")
-  const directory = await mkdtemp(join(tmpdir(), "loginom-prewarm-wait-")),
-    root = join(directory, "profile"),
-    resources = join(directory, "resources")
-  const binary = process.platform === "win32" ? "bin/node.exe" : "bin/node"
-  await mkdir(join(resources, "bin"), { recursive: true })
-  await mkdir(join(resources, "runtime/src"), { recursive: true })
-  await copyFile(node, join(resources, binary), constants.COPYFILE_FICLONE)
-  await writeFile(join(resources, "browser"), "")
-  await truncate(join(resources, "browser"), 512 * 1024 * 1024)
-  const hash = createHash("sha256"),
-    block = Buffer.alloc(1024 * 1024)
-  for (let i = 0; i < 512; i++) hash.update(block)
-  await writeFile(
-    join(resources, "resource-manifest.json"),
-    JSON.stringify({
-      protocol: 1,
-      nodeVersion: "24.19.0",
-      node: binary,
-      browser: "browser",
-      files: [
-        {
-          path: binary,
-          sha256: createHash("sha256")
-            .update(Buffer.from(await Bun.file(node).arrayBuffer()))
-            .digest("hex"),
-        },
-        { path: "browser", sha256: hash.digest("hex") },
-      ],
-    }),
-  )
-  await writeFile(
-    join(resources, "runtime/src/knowledge-entry.mjs"),
-    `process.on('message',m=>{
+test.each(["prewarm", "installation"])(
+  "Host cancels %s verification before close",
+  async (mode) => {
+    const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
+    if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE")
+    const directory = await mkdtemp(join(tmpdir(), "loginom-prewarm-wait-")),
+      root = join(directory, "profile"),
+      resources = join(directory, "resources")
+    const binary = process.platform === "win32" ? "bin/node.exe" : "bin/node"
+    await mkdir(join(resources, "bin"), { recursive: true })
+    await mkdir(join(resources, "runtime/src"), { recursive: true })
+    await copyFile(node, join(resources, binary), constants.COPYFILE_FICLONE)
+    await writeFile(join(resources, "browser"), "")
+    await writeFile(
+      join(resources, "resource-manifest.json"),
+      JSON.stringify({
+        protocol: 1,
+        nodeVersion: "24.19.0",
+        node: binary,
+        browser: "browser",
+        files: [
+          {
+            path: binary,
+            sha256: createHash("sha256")
+              .update(Buffer.from(await Bun.file(node).arrayBuffer()))
+              .digest("hex"),
+          },
+          { path: "browser", sha256: createHash("sha256").update("").digest("hex") },
+        ],
+      }),
+    )
+    await writeFile(
+      join(resources, "runtime/src/knowledge-entry.mjs"),
+      `process.on('message',m=>{
     if(m.operation==='start')process.send({id:m.id,result:{protocol:1,generation:m.input.generation,started:true}});
     if(m.operation==='list')process.send({id:m.id,result:{tools:[]}});
     if(m.operation==='close')process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
   });`,
-  )
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
-  try {
-    const checking = host.api
-      .check({ revision: 0, url: "https://example.test", username: "fixture", password: { operation: "empty" } })
-      .catch((error) => error)
-    for (let i = 0; i < 1000; i++) {
-      if (
-        (
-          await Bun.file(join(root, "startup-phases.jsonl"))
-            .text()
-            .catch(() => "")
-        ).includes('"phase":"resources.wait"')
-      )
-        break
-      if (i === 999) throw Error("PREWARM_WAIT_NOT_OBSERVED")
-      await Bun.sleep(5)
+    )
+    // Keep the verifier barrier in a separate process so its module fixture cannot
+    // replace resource verification for any other Host test.
+    const child = Bun.spawn(
+      [process.execPath, fileURLToPath(new URL("./fixtures/prewarm-wait.ts", import.meta.url)), root, resources, mode],
+      { stdout: "pipe", stderr: "pipe" },
+    )
+    const timer = setTimeout(() => child.kill(), 10_000)
+    try {
+      const [code, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ])
+      expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" })
+    } finally {
+      clearTimeout(timer)
+      if (child.exitCode === null) child.kill()
+      await child.exited
+      await rm(directory, { recursive: true, force: true })
     }
-    host.beginClose()
-    expect((await checking).message).toBe("LOGINOM_HOST_CLOSED")
-    const evidence = await Bun.file(join(root, "validation/startup-failures.jsonl")).text()
-    expect(evidence).toContain('"phase":"resources.wait"')
-    expect(evidence).toContain("LOGINOM_HOST_CLOSED")
-    expect(await readdir(join(root, "validation"))).not.toContain("generations")
-  } finally {
-    await host.close()
-    await rm(directory, { recursive: true, force: true })
-  }
-}, 15_000)
+  },
+  15_000,
+)
 
 test("real managed resource failure evidence survives validation profile removal", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE

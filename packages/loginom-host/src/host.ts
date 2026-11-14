@@ -14,6 +14,24 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 
+// Installer and CLI setup share the exact Host cache identity and verifier.
+export function verifyInstallationResources(options: {
+  root: string
+  resources: string
+  resourceVersion: string
+  signal?: AbortSignal
+}) {
+  return verifyResources(options.resources, {
+    nodePath: join(options.resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+    nodeVersion: release.nodeVersion,
+    cachePath: join(options.root, "resource-verification.json"),
+    cacheVersion: options.resourceVersion,
+    forceHash: true,
+    requireCache: true,
+    signal: options.signal,
+  })
+}
+
 export async function createLoginomHost(options: {
   root: string
   resources: string
@@ -364,8 +382,13 @@ export async function createLoginomHost(options: {
     journal,
   )
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
+  function beginClose() {
+    service.beginClose()
+    resourceController.abort()
+  }
   return {
     ...service,
+    beginClose,
     async updateWorkState() {
       if (lost.size || stale.size || startupCleanup.failed || shutdown.failed)
         throw Error("LOGINOM_RUNTIME_UNAVAILABLE")
@@ -398,8 +421,7 @@ export async function createLoginomHost(options: {
     browserRecovery: options.browserRecovery === true,
     references,
     async close() {
-      service.beginClose()
-      resourceController.abort()
+      beginClose()
       await verifiedResources
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
@@ -414,6 +436,12 @@ export async function createLoginomHost(options: {
         recoveries.clear()
         return view
       },
+    },
+    async verifyInstallationResources() {
+      // Drain prewarming before replacing its cache; setup must finish the full
+      // pass even if an unconfigured profile's Host is closed immediately after.
+      await verifiedResources
+      return verifyInstallationResources({ root, resources, resourceVersion, signal: resourceController.signal })
     },
     journal,
     recoveries,
