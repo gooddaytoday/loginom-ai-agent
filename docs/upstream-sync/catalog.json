@@ -8,7 +8,7 @@
       "title": "CI, build, release and repository hygiene",
       "paths": [
         ".github/**", "github/**", ".husky/**", "script/**", "nix/**", "infra/**", "patches/**", "perf/**",
-        "turbo.json", ".gitignore", ".gitattributes", ".dockerignore", "install",
+        "turbo.json", ".gitignore", ".gitleaksignore", ".gitattributes", ".dockerignore", "install",
         "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
         "packages/opencode/bin/**", "packages/cli/bin/**"
       ]
