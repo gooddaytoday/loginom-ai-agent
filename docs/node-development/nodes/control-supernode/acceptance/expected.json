@@ -60,7 +60,7 @@
           "Amount": 0.125,
           "Note": "replaced",
           "Flag": false,
-          "Moment": "2026-02-01 09:00:00",
+          "Moment": "2026-02-01T09:00:00.000",
           "Doubled": 0.25
         },
         {
@@ -76,7 +76,7 @@
           "Amount": -4.0,
           "Note": "last",
           "Flag": null,
-          "Moment": "2026-02-03 11:15:00",
+          "Moment": "2026-02-03T11:15:00.000",
           "Doubled": -8.0
         }
       ]

@@ -39,7 +39,7 @@ export async function observeSupernodeSaved({execute,adapter,prepared,origin,ses
  return returned;
 }
 
-export async function checkSupernodeRun(eventsFile,expectedDirectory){
+export async function checkSupernodeRun(eventsFile,expectedDirectory,journalFiles=[]){
  const replies=[];
  for(const [index,line] of (await readFile(eventsFile,'utf8')).split('\n').entries()){
   let event;try{event=JSON.parse(line);}catch{continue;}
@@ -52,8 +52,14 @@ export async function checkSupernodeRun(eventsFile,expectedDirectory){
  need(containers.length&&ids(containers).size===1,'CONTAINER_IDENTITY');
  need(calculators.length&&ids(calculators).size===1,'CALCULATOR_IDENTITY');
  const container=[...ids(containers)][0],calculator=[...ids(calculators)][0];
- const graphs=all.filter(r=>Array.isArray(r.value.nodes)&&r.value.nodes.some(n=>n.boundary_role==='input'));
- const topology=graphs.map(r=>{try{return {line:r.line,...checkSupernodeGraph(r.value,calculator)};}catch{return null;}}).filter(Boolean);
+ const graphs=[];
+ for(const file of journalFiles)for(const [index,line] of (await readFile(file,'utf8')).split('\n').entries()){
+  let event;try{event=JSON.parse(line);}catch{continue;}
+  if(!['observation_completed','node_observation_completed'].includes(event.phase)||event.outcome?.status!=='SUCCEEDED')continue;
+  const value=event.outcome.output;
+  if(Array.isArray(value?.nodes)&&value.nodes.some(n=>n.boundary_role==='input'))graphs.push({file,line:index+1,value});
+ }
+ const topology=graphs.map(r=>{try{return {file:r.file,line:r.line,...checkSupernodeGraph(r.value,calculator)};}catch{return null;}}).filter(Boolean);
  need(topology.length>0,'MAIN_NESTED_OBSERVATION');
  need(new Set(topology.map(t=>JSON.stringify([t.input,t.calculator,t.output]))).size===1,'BOUNDARY_IDENTITY');
  const imports=all.filter(r=>r.value.kind==='text_import');
@@ -76,6 +82,6 @@ export async function checkSupernodeRun(eventsFile,expectedDirectory){
  return {status:'PASS',container,calculator,topology,tables};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- const result=await checkSupernodeRun(process.argv[2],pathToFileURL(process.argv[3].replace(/\/$/,'')+'/'));
+ const result=await checkSupernodeRun(process.argv[2],pathToFileURL(process.argv[3].replace(/\/$/,'')+'/'),process.argv.slice(5));
  await writeFile(process.argv[4],JSON.stringify(result,null,2)+'\n');
 }

@@ -2772,7 +2772,7 @@ class Runner:
             check_text_multi_file_list(replies)
         if spec.get('supernode'):
             self.phase('supernode-audit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/supernode-audit.mjs',
-                       folder / 'model.stdout', src, folder / 'supernode-audit.json'], folder, timeout=60)
+                       folder / 'model.stdout', src, folder / 'supernode-audit.json', *sorted(profile.rglob('execution-events.jsonl'))], folder, timeout=60)
         if spec.get('text_file_info'):
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_file_info(replies)

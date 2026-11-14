@@ -2,6 +2,7 @@
 import argparse
 import csv
 from decimal import Decimal
+from datetime import datetime
 import json
 from pathlib import Path
 
@@ -19,7 +20,7 @@ def expected(case):
                 "Amount": None if amount is None else float(amount),
                 "Note": None if row["Note"] == "?" else row["Note"],
                 "Flag": None if row["Flag"] == "?" else {"true": True, "false": False}[row["Flag"]],
-                "Moment": None if row["Moment"] == "?" else row["Moment"],
+                "Moment": None if row["Moment"] == "?" else datetime.fromisoformat(row["Moment"]).isoformat(timespec="milliseconds"),
                 "Doubled": None if amount is None else float(amount * 2),
             })
     columns = [
