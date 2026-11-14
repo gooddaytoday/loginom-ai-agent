@@ -10,7 +10,7 @@
 
 **Spec:** [утверждённый дизайн M3](../specs/2026-11-12-dashboard-m3-design.md). Он опирается на [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md) («Черновик — по шагам», «Desktop и CLI», S6) и [план изоляции](../../security/dashboard-isolation.md) («Сервер черновика», «Проверки профиля агента»). Код M2 описан в [плане M2](2026-11-12-dashboard-m2.md); M3 меняет его имена, а не повторяет. Исполнитель читает дизайн целиком.
 
-**Ход выполнения:** задачи 1–16 выполнены и независимо проверены по поведению; задачи 17–18 ожидают. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
+**Ход выполнения:** задачи 1–17 выполнены и независимо проверены по поведению; задача 18 ожидает итогового ревью ветки, финального CI и приёмки поставки. В задаче 7 отмечено отклонение от строгого исторического TDD, оно не объявляется устранённым. Актуальные проверки, ограничения и следующий шаг — в [checkpoint M3](../../testing/loginom-ai-agent/dashboard-m3-checkpoint.md). Подробные доказательства и решения — в локальном журнале `.superpowers/sdd/2026-11-12-dashboard-m3/progress.md`.
 
 ## Global Constraints
 
@@ -1613,7 +1613,7 @@ roi=$("$state/node" --input-type=module -e '
 - Modify: `AGENTS.md` (корень, запись карты модулей), `P/AGENTS.md`, `O/AGENTS.md`, `packages/product/AGENTS.md`, `packages/loginom-host/AGENTS.md`, `packages/desktop/src/main/loginom/AGENTS.md`, `packages/app/AGENTS.md`, `packages/loginom-runtime/AGENTS.md`, `dashboard/AGENTS.md`, `dashboard/README.md`, `dashboard/HANDOFF.md`, `dashboard/stand/README.md`, `docs/superpowers/specs/2026-11-09-loginom-dashboard-design.md`, `docs/superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md`, `docs/security/dashboard-isolation.md`, `docs/testing/loginom-ai-agent/README.md`
 - Create: `docs/testing/loginom-ai-agent/dashboard-m3.md`
 
-- [ ] **Step 1: Инструкции модулей** (по разделу «Документы» дизайна, каждая запись описывает текущее состояние):
+- [x] **Step 1: Инструкции модулей** (по разделу «Документы» дизайна, каждая запись описывает текущее состояние):
   - `P/AGENTS.md`: части `agent`, `draft`, `examples`, файлы платформы шаблона; команды (`test`, `test:browser`, сборка `test/build`); что нельзя ослаблять без владельца — дополнительно резолвер и проверка до `tsc`, CSP и loopback сервера черновика, одноразовый снимок; строка про `publish.mjs` удаляется; исключение «`draft` использует `apps.ts` и `shell/frame.ts`».
   - `O/AGENTS.md`: профиль `loginom-dashboard` по каталогу сессии (`dashboard-session.ts`), девять инструментов, проверка пути в `assertExternalDirectoryEffect`, правило «спрашивать» для `dashboard_publish` в `SessionTools.resolve`, сессия dashboard не захватывает хост Loginom; `run --dashboard`.
   - `packages/product/AGENTS.md`: третий навык.
@@ -1621,9 +1621,9 @@ roi=$("$state/node" --input-type=module -e '
   - `packages/desktop/src/main/loginom/AGENTS.md` и `packages/app/AGENTS.md`: снимок только с настроенного стенда и один раз; папки создаёт Desktop в каталоге данных бэкенда; проверка при отправке — по папке; «Изменить в чате» открывает новый чат в папке.
   - `packages/loginom-runtime/AGENTS.md`: запрет второго браузера относится к сессии Loginom; страница черновика проверяется отдельным headless-браузером без неё.
   - `dashboard/AGENTS.md`: отладка из Codex — `loginom-ai-agent-cli run --dashboard <ID> "<текст>"` с кнопкой `install --cli-button`; `dashboard/apps` больше нет.
-- [ ] **Step 2: Описание и решения.** README, HANDOFF, дизайн 2026-11-09 и рецепт стенда: создание идёт через черновик в Desktop, `publish.mjs` нет, `install --cli-button`. Roadmap: в разделе M3 — отступления (удаление `publish.mjs` в M3, резолвер в M3, временный шаг публикации, уточнения 1–8 этого плана); S6 — после задачи 18. План изоляции: отметки M3.
-- [ ] **Step 3: Runbook.** `dashboard-m3.md` — десять шагов «Приёмки» дизайна с командами задачи 18, ожидаемым результатом и местом для итога (сборка, версии, дата, ограничения); без учётных данных и сырых журналов. Строка в `docs/testing/loginom-ai-agent/README.md`.
-- [ ] **Step 4: Коммит.** `git commit -m "docs(dashboard): describe the M3 draft flow"`.
+- [x] **Step 2: Описание и решения.** README, HANDOFF, дизайн 2026-11-09 и рецепт стенда: создание идёт через черновик в Desktop, `publish.mjs` нет, `install --cli-button`. Roadmap: в разделе M3 — отступления (удаление `publish.mjs` в M3, резолвер в M3, временный шаг публикации, уточнения 1–8 этого плана); S6 — после задачи 18. План изоляции: отметки M3.
+- [x] **Step 3: Runbook.** `dashboard-m3.md` — десять шагов «Приёмки» дизайна с командами задачи 18, ожидаемым результатом и местом для итога (сборка, версии, дата, ограничения); без учётных данных и сырых журналов. Строка в `docs/testing/loginom-ai-agent/README.md`.
+- [x] **Step 4: Коммит.** `git commit -m "docs(dashboard): describe the M3 draft flow"`.
 
 ### Task 18: Сборка поставки, обновление стенда и приёмка
 
