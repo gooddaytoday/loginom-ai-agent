@@ -15,7 +15,9 @@ const {createActionRuntime,makeArtifactUploadCode}=await load('client/lib/execut
 const {createArtifactStore}=await load('client/lib/artifacts.mjs');
 const {createExecutionJournal}=await load('client/lib/execution-journal.mjs');
 const {createStorageBinding}=await load('client/lib/storage-policy.mjs');
-const {context}=await loginBrowser({browserPath:resources.browserPath,profile:output+'/browser',candidate:config.login,keepOpen:true,headless:true});
+if(config.fs_error_audit===true)await mkdir(output+'/browser-downloads',{recursive:true,mode:0o700});
+const {context}=await loginBrowser({browserPath:resources.browserPath,profile:output+'/browser',candidate:config.login,keepOpen:true,headless:true,
+ ...(config.fs_error_audit===true?{downloadsPath:output+'/browser-downloads'}:{})});
 const page=context.pages()[0],sessionId=randomUUID(),record=createExecutionJournal({directory:output,metadata:{sessionId},knownSecrets:[config.login.password]});
 const execute=code=>new Function('page',`return (${code})(page)`)(page);
 try{
