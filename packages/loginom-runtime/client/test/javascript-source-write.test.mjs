@@ -52,7 +52,7 @@ test('wrong baseline digest refuses before any editor gesture',async()=>{
 });
 
 test('source bounds and module policy refuse before editor capture',async()=>{
- for(const source of ['x'.repeat(32769),'import {readFile} from "builtIn/FS";','import("builtIn/Data")']){
+ for(const source of ['x'.repeat(32769),'import {fetch} from "builtIn/Fetch";','import("builtIn/Data")']){
   const f=writerFixture();
   await assert.rejects(()=>f.replace(source),error=>error.code==='JAVASCRIPT_SOURCE_WRITE_REFUSED');
   assert.deepEqual(f.calls,[]);assert.equal(f.events.length,0);

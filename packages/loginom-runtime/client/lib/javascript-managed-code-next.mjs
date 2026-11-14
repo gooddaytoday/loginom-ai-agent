@@ -10,7 +10,7 @@ export function inspectManagedJavascriptCodeNextPoint({held, task}, inspect) {
   const prefix = task.workflow_ref.prefix;
   if (state.ready !== true || state.node_guid !== task.owner.node_id
     || state.page?.tid !== prefix + ';WizrdMCF;JavaScriptCodeWizard'
-    || state.page.index !== 1 || state.page.indicator_count !== 4
+    || state.page.index !== (task.inputPage?2:1) || state.page.indicator_count !== (task.inputPage?5:4)
     || state.page.visible_editors !== 1 || !held.wizard || !held.wizardRoot)
     throw Error('Managed JavaScript Code Next page changed');
   const tab = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
@@ -96,7 +96,7 @@ export function makeJavascriptManagedCodeNextGestureCode(task) {
   if (task.gesture_id !== task.operation_id + ':next-code-done'
     || task.point?.tid !== task.workflow_ref.prefix + ';WizrdMCF;btnNext'
     || task.point.page_tid !== task.workflow_ref.prefix + ';WizrdMCF;JavaScriptCodeWizard'
-    || task.point.page_index !== 1 || task.point.node_id !== task.owner.node_id
+    || task.point.page_index !== (task.inputPage?2:1) || task.point.node_id !== task.owner.node_id
     || !Number.isFinite(task.point.x) || !Number.isFinite(task.point.y))
     throw Error('Invalid managed JavaScript Code Next gesture');
   const inspect = `function inspect(args){const native=${wizardReadiness.toString()};`+

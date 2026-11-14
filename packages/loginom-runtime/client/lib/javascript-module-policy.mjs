@@ -22,20 +22,22 @@ export function inspectJavascriptModulePolicy(source) {
   let tree;
   try { tree = parse(source, {ecmaVersion: 2025, sourceType: 'module', locations: true}); }
   catch (error) { return refusal(error instanceof SyntaxError ? 'syntax' : 'unclassifiable', locationOf(error)); }
-  const pending = [tree]; let count = 0;
+  const pending = [tree]; let count = 0,filesystem=false;
   while (pending.length) {
     if (++count > 65536 || pending.length > 65536) return refusal('ast_bound');
     const node = pending.pop();
     if (node.type === 'ImportExpression') return refusal('dynamic_import', locationOf(node));
     if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'require')
       return refusal('direct_require', locationOf(node));
-    if (['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration'].includes(node.type) && node.source
-      && node.source.value !== 'builtIn/Data') return refusal('module_specifier', locationOf(node.source));
+    if (['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration'].includes(node.type) && node.source) {
+      if(!['builtIn/Data','builtIn/FS'].includes(node.source.value))return refusal('module_specifier', locationOf(node.source));
+      filesystem ||= node.source.value==='builtIn/FS';
+    }
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) {
         for (const child of value) if (child && typeof child.type === 'string') pending.push(child);
       } else if (value && typeof value === 'object' && typeof value.type === 'string') pending.push(value);
     }
   }
-  return Object.freeze({status: 'ADMITTED', policy: JAVASCRIPT_MODULE_POLICY, parser, ...identity});
+  return Object.freeze({status: 'ADMITTED', policy: JAVASCRIPT_MODULE_POLICY, parser, ...identity,...(filesystem?{filesystem:true}:{})});
 }

@@ -1,0 +1,65 @@
+{
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "fs-read.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "FileName",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "ByteCount",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Text",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Hex",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "FileName": "utf8.txt",
+          "ByteCount": 21,
+          "Text": "Привет, Ёж\n42",
+          "Hex": ""
+        },
+        {
+          "FileName": "utf16le.txt",
+          "ByteCount": 4,
+          "Text": "Ёж",
+          "Hex": ""
+        },
+        {
+          "FileName": "cp1251.txt",
+          "ByteCount": 2,
+          "Text": "Ёж",
+          "Hex": ""
+        },
+        {
+          "FileName": "bytes.bin",
+          "ByteCount": 5,
+          "Text": "",
+          "Hex": "00017f80ff"
+        }
+      ]
+    }
+  ]
+}

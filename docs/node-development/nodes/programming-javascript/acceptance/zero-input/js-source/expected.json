@@ -1,0 +1,43 @@
+{
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "source.csv",
+      "columns": [
+        {
+          "name": "N",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Square",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "N": 1,
+          "Square": 1
+        },
+        {
+          "N": 2,
+          "Square": 4
+        },
+        {
+          "N": 3,
+          "Square": 9
+        }
+      ],
+      "ordered": true
+    }
+  ]
+}

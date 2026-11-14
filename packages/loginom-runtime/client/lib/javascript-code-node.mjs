@@ -1,4 +1,4 @@
-import {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
+import {verifyJavascriptMappingGraph,verifyJavascriptUnconnectedInput,javascriptUnconnectedInputMapping} from './javascript-graph-preservation.mjs';
 import {retainedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 export {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
@@ -45,6 +45,10 @@ export function validateJavascriptCodeRequest(parameters,mode,request) {
 
 export function javascriptCodeReadback({node,phases}) {
   const configured=phases.find(phase=>phase.phase==='node_finish')?.value;
+  const input=phases.find(phase=>phase.phase==='input_mapping')?.value?.native_mapping;
+  const unconnected=input?.input_state==='unconnected';
+  if(unconnected)need(input.verified===true&&input.no_incoming_links_verified===true
+    &&input.source_fields?.length===0&&input.target_fields?.length===0,'JavaScript unconnected input readback incomplete');
   if(!phases.some(phase=>phase.phase==='execute')){
     const finish=phases.find(phase=>phase.phase==='finish')?.value;
     need(configured?.source_readback_verified===true&&configured.wizard_commit_verified===true
@@ -64,10 +68,10 @@ export function javascriptCodeReadback({node,phases}) {
       ...(finish.schema_mode==='declared'?{columns:finish.declared_columns}:{}),
       source:{sha256:finish.source_sha256,utf8_bytes:finish.source_utf8_bytes,lf_lines:finish.source_lf_lines},
       settings_preserved:true,wizard_commit_verified:true,
-      execution_effects:{explicit_execute_requested:false,internal_execution_started:null},package_persistence_verified:false};
+      execution_effects:{explicit_execute_requested:false,internal_execution_started:null},
+      ...(unconnected?{input_state:'unconnected'}:{}),package_persistence_verified:false};
   }
   const mapping=phases.find(phase=>phase.phase==='output_mapping')?.value?.native_mapping;
-  const input=phases.find(phase=>phase.phase==='input_mapping')?.value?.native_mapping;
   const first=phases.find(phase=>phase.phase==='materialization_execute')?.value;
   const final=phases.find(phase=>phase.phase==='execute')?.value;
   need(configured?.source_readback_verified===true&&configured.wizard_commit_verified===true
@@ -75,13 +79,15 @@ export function javascriptCodeReadback({node,phases}) {
     &&input?.verified===true&&input.source_identity_verified===true
     &&mapping?.verified===true&&mapping.source_identity_verified===true
     &&first?.owner_verified===true&&first.status==='completed'&&final?.owner_verified===true
-    &&final.status==='completed'&&first.execution_id!==final.execution_id,'JavaScript Code lifecycle readback incomplete');
+    &&final.status==='completed'&&first.execution_id!==final.execution_id,
+    'JavaScript Code lifecycle readback incomplete');
   return {kind:'javascript',scope:'observed_after_verified_finish',node,
     receipt_ids:phases.map(phase=>phase.receipt_id),values_are:'independent_owned_source_readback',schema_mode:configured.schema_mode??'code',
     ...(configured.schema_mode==='declared'?{columns:configured.declared_columns}:{}),
     source:{sha256:configured.source_sha256,utf8_bytes:configured.source_utf8_bytes,lf_lines:configured.source_lf_lines},
     settings_preserved:true,wizard_commit_verified:true,
     execution_effects:{explicit_execute_requested:true,internal_execution_started:null},
+    ...(unconnected?{input_state:'unconnected'}:{}),
     input_mapping:javascriptReadbackMapping(input,'input'),output_mapping:javascriptReadbackMapping(mapping,'output'),
     package_persistence_verified:false};
 }
@@ -140,6 +146,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       need(value?.complete===true&&value.document_id===ctx.document_id&&same(value.workflow_ref,ctx.workflow_ref)
         &&Array.isArray(value.nodes)&&Array.isArray(value.links)&&Array.isArray(value.foreign_links),
       'JavaScript complete graph owner changed');
+      if(request.parameters.input_state==='unconnected'&&ctx.node)verifyJavascriptUnconnectedInput(value,nodeRef(owner));
       return value;
     };
     const readMapping=async(direction,ctx)=>{
@@ -149,21 +156,25 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         ready:s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true
           &&s.node_mapping.source_identity_verified===true&&s.prepared_node_context?.verified===true});
       const mapping=state.node_mapping;
+      const unconnected=direction==='input'&&request.parameters.input_state==='unconnected';
+      if(unconnected)javascriptUnconnectedInputMapping(mapping,before,nodeRef(owner));
       need(mapping.state_source==='cached_mapping_stores'&&mapping.settings_applied===false&&mapping.package_saved===false
         &&typeof mapping.autosync==='boolean'&&mapping.node_context?.surface==='wizard'
         &&['document_id','workflow_id','node_id'].every(key=>mapping.node_context[key]===owner[key])
         &&mapping.node_context[direction+'_port']?.direction===direction
-        &&mapping.node_context[direction+'_port'].port===0&&mapping.source_fields.length>0
-        &&mapping.target_fields.length>0,'JavaScript materialized mapping unavailable');
+        &&mapping.node_context[direction+'_port'].port===0
+        &&(unconnected||mapping.source_fields.length>0&&mapping.target_fields.length>0),
+        'JavaScript materialized mapping unavailable');
       await closeJavascriptPortMapping({reader:channel,direction,reference:nodeRef(owner),record:onRecord,
         deadline:ctx.deadline,allowOwnedUnlock:true,verifyGraph:async()=>{
           const after=await graph(ctx);
           verifyJavascriptMappingGraph(before,after,nodeRef(owner));
           await onRecord({phase:'javascript_mapping_graph_verified',direction,node:nodeRef(owner),before,after});
         }});
-      return mapping;
+      return unconnected?javascriptUnconnectedInputMapping(mapping,before,nodeRef(owner)):mapping;
     };
     const launch=async ctx=>{
+      if(request.parameters.input_state==='unconnected')verifyJavascriptUnconnectedInput(await graph(ctx),nodeRef(owner));
       enter(ctx);need(committed?.owned_done_settled===true
         &&(configured?.phase==='configured'||configured?.phase==='admitted'
           &&configured.kind==='existing'&&configured.intent==='preserve'),
@@ -205,6 +216,8 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           ()=>admission.admit(request.parameters.source_text===undefined?{}:
           {source_text:request.parameters.source_text,
             ...(request.target.kind==='existing'?{expected_source_sha256:request.parameters.expected_source_sha256}:{})}));
+        need(admitted.effective_source.filesystem!==true||request.parameters.input_state==='unconnected',
+          'JavaScript FS requires input_state:unconnected before mutation or execution');
         if(request.target.kind==='existing'){
           existingBaseline=await admitJavascriptExistingSchema({receipt:admitted,snapshot:sourceSnapshot,
             parameters:request.parameters,owner,record:onRecord,deadline:ctx.deadline});
@@ -436,6 +449,8 @@ function nodeRef(owner){return {document_id:owner.document_id,workflow_id:owner.
 
 
 function javascriptReadbackMapping(mapping,direction){
+  if(direction==='input'&&mapping.input_state==='unconnected')return {port:0,autosync:mapping.autosync,fields:[],
+    input_state:'unconnected',no_incoming_links_verified:true};
   return {port:0,autosync:mapping.autosync,fields:mapping.target_fields.map(field=>({index:field.index,
     name:field.name,label:field.label,type:field.type,data_kind:field.data_kind,source_name:field.source.name,
     ...(direction==='output'?{excluded:field.excluded}:{})}))};

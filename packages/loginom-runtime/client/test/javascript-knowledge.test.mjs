@@ -102,7 +102,7 @@ test('JavaScript card delivers pinned compact rules and on-demand Data API only 
   assert.deepEqual(card.limitations,JAVASCRIPT_CARD_LIMITATIONS);
   assert.equal(card.javascript_knowledge.scalar_data_api.import,'import {InputTable,OutputTable,DataType} from "builtIn/Data";');
   assert.equal(card.javascript_knowledge.validated_for.loginom_build,'7.4.2');
-  assert.equal(card.javascript_knowledge.version,'1.3.0');
+  assert.equal(card.javascript_knowledge.version,'1.4.0');
   assert.equal(card.javascript_knowledge.column_names.method,'AssignColumns');
   const compact=compactKnowledgeBundle({session_manifest:{},actions:[],node_types:[card]}).node_types[0];
   assert.deepEqual(compact.limitations,JAVASCRIPT_CARD_LIMITATIONS);
@@ -129,7 +129,8 @@ test('code schema DataType guidance reaches compact preparation and full node de
   assert.equal(previous.knowledge_sha256,'86506db742980407b41de7c042edcd622d4809b339141b2065e936f5803049c0');
   assert.equal(previous.scalar_data_api.column_types,undefined);
   assert.deepEqual(card.javascript_knowledge.examples,previous.examples);
-  assert.deepEqual(card.limitations.slice(0,-1),previous.limitations);
+  assert.deepEqual(describeJavascriptKnowledge('7.4.2','1.3.0').limitations.slice(0,-1),previous.limitations);
+  assert.deepEqual(card.limitations.slice(2,-1),previous.limitations.slice(2));
   assert.notEqual(card.knowledge_sha256,previous.knowledge_sha256);
 });
 

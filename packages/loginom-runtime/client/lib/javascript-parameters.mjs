@@ -12,11 +12,12 @@ const shape=(value,keys,path)=>{
 // source of an existing node and recheck its digest/policy before every effect.
 export function validateJavascriptParameters(parameters,mode,request) {
   need(mode==='script','mode');
-  shape(parameters,['source_text','expected_source_sha256','schema_mode','columns'],'parameters');
+  shape(parameters,['source_text','expected_source_sha256','schema_mode','columns','input_state'],'parameters');
   need(request?.target?.kind==='new'||request?.target?.kind==='existing','target.kind');
   need(Array.isArray(request.inputs)&&request.inputs.length<=1
     &&request.inputs.every(input=>input?.input===0),'inputs');
-  if(request.target.kind==='new')need(request.inputs.length===1,'inputs');
+  if(Object.hasOwn(parameters,'input_state'))need(parameters.input_state==='unconnected'&&request.inputs.length===0,'input_state');
+  if(request.target.kind==='new')need(request.inputs.length===1||parameters.input_state==='unconnected','inputs');
   need(Array.isArray(request.mappings)&&request.mappings.length<=2
     &&request.mappings.every(mapping=>mapping?.port===0&&['input','output'].includes(mapping.direction))
     &&new Set(request.mappings.map(mapping=>mapping.direction)).size===request.mappings.length,'mappings');
@@ -34,6 +35,7 @@ export function validateJavascriptParameters(parameters,mode,request) {
     need(typeof parameters.source_text==='string','source_text');
     const policy=inspectJavascriptModulePolicy(parameters.source_text);
     need(policy.status==='ADMITTED','source_text');
+    need(policy.filesystem!==true||parameters.input_state==='unconnected','input_state: FS requires unconnected');
   }
 
   const hasMode=Object.hasOwn(parameters,'schema_mode');

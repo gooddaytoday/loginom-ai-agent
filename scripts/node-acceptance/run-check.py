@@ -19,6 +19,7 @@ import socket
 import subprocess
 import sys
 import time
+from zipfile import ZipFile
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
@@ -255,6 +256,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/datamining-clustering/acceptance/normalized'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     input_files=['normalized.csv'], export_count=2)
+    if name in ['js-fs-read', 'js-fs-write', 'js-fs-operations', 'js-fs-effects', 'js-fs-paths', 'js-fs-errors']:
+        src = REPO / 'docs/node-development/nodes/programming-javascript/acceptance/fs' / name
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    external=True, fs_case=name.removeprefix('js-fs-'), oracle=src.parent / 'oracle.py')
     # Operator fixtures (including private large-file oracles) stay outside Git.
     # They use this runner's unchanged model/CSV/Save/cold/cleanup checks.
     if cases and (name in SCENARIOS or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,79}', name)):
@@ -1108,7 +1113,7 @@ def check_text_auto_label(replies):
     assert index == len(stages), f'TEXT_AUTO_LABEL_STAGES_MISSING: {index}/{len(stages)}'
 
 
-def check_text_update_ports(replies, destinations, stages, node_binary='node', *, same_node_id=False):
+def check_text_update_ports(replies, destinations, stages, node_binary='node', *, same_node_id=False, kind='text_import'):
     assert len(destinations) == len(stages) == 2, 'TEXT_UPDATE_STAGE_COUNT'
     previous, node = -1, None
     tables = []
@@ -1119,7 +1124,8 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node', *
         assert exports and exports[-1] > previous, 'TEXT_UPDATE_EXPORT_MISSING_OR_ORDER'
         reads = [(n, owner, port) for n, reply in replies if previous < n < exports[-1]
                  for owner, port in ports(reply) if owner.get('status') == 'SUCCEEDED'
-                 and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'
+                 and (owner.get('configuration', {}).get('readback', {}).get('kind') == kind
+                      or kind == 'javascript' and owner.get('output', {}).get('javascript_source'))
                  and port.get('port') == 0]
         assert reads, 'TEXT_UPDATE_PORT_MISSING'
         _, owner, port = reads[-1]
@@ -1129,7 +1135,8 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node', *
         assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
         assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
             (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
-        tables.append(dict(actual=dict(node=identity, type='imports.text', label=owner['configuration']['readback'].get('node_title', {}).get('label'), output_port=0, data=port), expected=stage))
+        tables.append(dict(actual=dict(node=identity, type='programming.javascript' if kind == 'javascript' else 'imports.text',
+            label=owner.get('configuration', {}).get('readback', {}).get('node_title', {}).get('label'), output_port=0, data=port), expected=stage))
         previous = exports[-1]
     # Use the same typed full-table matcher as cold, including exact numeric and
     # datetime evidence. Each stage has its own snapshot of the same node.
@@ -2016,6 +2023,50 @@ class Runner:
     def text_mask_directory(self, login):
         return login['package_directory'].rstrip('/') + '/' + self.out.name + '-mask'
 
+    def fs_directory(self, case, login):
+        return login['package_directory'].rstrip('/') + '/' + self.out.name + '-js-fs-' + case
+
+    def fs_files(self, spec, folder, login, build, phase, prepare=False, path_action=None):
+        case = spec['fs_case']
+        child = {'read': 'input', 'write': 'output', 'operations': 'operations', 'effects': 'effects', 'paths': None, 'errors': 'errors'}[case]
+        parent = self.fs_directory(case, login)
+        oracle = spec['source'].parent / 'oracle.py'
+        self.phase('fs-expected', [sys.executable, '-B', oracle, '--case', case, '--check'], folder, timeout=60)
+        books = [dict(fixture=str(spec['source'].parent / 'fixtures' / name), destination=parent + '/input/' + name)
+                 for name in ['utf8.txt', 'utf16le.txt', 'cp1251.txt', 'bytes.bin']] if prepare and case == 'read' else []
+        if case == 'paths' and (prepare or path_action == 'sidecar'):
+            books = [dict(fixture=str(spec['source'].parent / 'fixtures/sidecar.txt'),
+                          destination=parent + ('/original/' if prepare else '/moved/') + self.out.name + '-sidecar.txt')]
+        config = dict(login=login, books=books, fs_fixture=True, overwrite='reject')
+        if case == 'errors':
+            config['fs_error_audit'] = True
+            if prepare: config['fs_error_seed'] = parent + '/errors'
+        if case == 'paths':
+            config['fs_scope'] = parent
+            if path_action == 'move':
+                config['fs_move'] = {'from': parent + '/original/paths.lgp', 'to': parent + '/moved/paths.lgp'}
+        if prepare:
+            config['text_folders'] = dict(parent=Path(parent).name, children=['original', 'moved'] if case == 'paths' else [child])
+        if not prepare or books or case == 'errors':
+            config['fs_audit'] = parent if case == 'paths' else parent + '/' + child
+        write(folder / (phase + '.json'), config)
+        self.phase(phase, [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
+                          build / 'resources/loginom', folder / (phase + '.json'), folder / phase], folder, timeout=300)
+        proof = read(folder / phase / 'result.json')
+        assert all(proof['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'FS_AUDIT_CLEANUP_MISSING'
+        if case == 'errors':
+            self.phase(phase + '-bytes', [sys.executable, '-B', oracle, '--case', case,
+                '--keep-file', folder / phase / 'keep.txt', '--inventory', folder / phase / 'inventory.json'], folder, timeout=60)
+        elif not prepare or books:
+            self.phase(phase + '-bytes', [sys.executable, '-B', oracle, '--case', case, '--archive',
+                       folder / phase / 'files.zip', '--folder', child,
+                       '--execution', '3' if phase == 'fs-cold' else '2'] if case != 'paths' else
+                       [sys.executable, '-B', oracle, '--case', case, '--archive', folder / phase / 'files.zip',
+                        '--folder', Path(parent).name, '--phase', phase.removeprefix('fs-'),
+                        '--sidecar', self.out.name + '-sidecar.txt'], folder, timeout=60)
+        self.current['fs-bytes'] = phase + ' PASS'
+        return folder / phase / 'files.zip'
+
     def source_dir(self, spec, login):
         # The one server directory whose paths the task receives for its sources.
         if spec.get('text_mask'): return self.text_mask_directory(login)
@@ -2046,6 +2097,10 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('fs_case'):
+            prompt = prompt.replace('{{FS_ROOT}}', self.fs_directory(spec['fs_case'], login))
+            prompt = prompt.replace('{{SIDECAR_NAME}}', self.out.name + '-sidecar.txt')
+            self.fs_files(spec, folder, login, build, 'fs-fixtures', prepare=True)
         if spec.get('excel_mode') == 'replace': prompt = prompt.replace('existing.xlsx либо\nexisting.xls', 'existing.xlsx')
         if spec.get('lgd') == 'roundtrip':
             lgd_destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-roundtrip.lgd'
@@ -2129,7 +2184,7 @@ class Runner:
             if not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for index, output in enumerate(expected['outputs']):
-            if spec.get('excel_mode'): output['export_destination'] = destinations[index]
+            if spec.get('excel_mode') or spec.get('fs_case') == 'paths': output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         if spec.get('rest_query_initial'):
@@ -2234,6 +2289,51 @@ class Runner:
         events = list(records(folder / 'model.stdout'))
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
         replies = model_replies(events)
+        if spec.get('fs_case') == 'paths':
+            assert any(save_confirmed(spec, reply, package) for _, reply in replies), 'FS_PATH_INITIAL_SAVE_MISSING'
+            cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
+            assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True
+                and not c.get('unsaved_changes_discarded') for c in cleanups), 'FS_PATH_INITIAL_CLEANUP_MISSING'
+            saved = self.fs_files(spec, folder, login, build, 'fs-saved')
+            moved = self.fs_files(spec, folder, login, build, 'fs-moved', path_action='move')
+            parent = self.fs_directory('paths', login)
+            with ZipFile(saved) as before, ZipFile(moved) as after:
+                assert before.read(Path(parent).name + '/original/paths.lgp') == after.read(Path(parent).name + '/moved/paths.lgp'), 'FS_MOVE_CHANGED_PACKAGE_BYTES'
+            package = parent + '/moved/paths.lgp'
+            self.current['package'] = package
+            for suffix, destination in [('missing', destinations[2]), ('sidecar', destinations[3])]:
+                if suffix == 'sidecar':
+                    self.fs_files(spec, folder, login, build, 'fs-sidecar', path_action='sidecar')
+                continuation = (f'Открой пакет {package} с диска. Выполни прежний JavaScript с прежним относительным '
+                    f'именем без изменения кода, настроек и узлов. Доставь полный CSV через прежний узел экспорта в {destination}. '
+                    f'Сохрани пакет как {package}. '
+                    + ('LGP физически перемещён; sidecar пока остался в original. Не ищи его и не копируй.' if suffix == 'missing'
+                       else 'Sidecar отдельно доставлен рядом с перемещённым LGP. Файлы не изменяй.'))
+                (folder / ('task-' + suffix + '.md')).write_text(continuation)
+                self.phase('model-' + suffix, command + ['--session', session, '--', continuation], folder, timeout=1800, env=env, cwd=workspace)
+                extra = list(records(folder / ('model-' + suffix + '.stdout')))
+                assert any(save_confirmed(spec, reply, package) for _, reply in model_replies(extra)), 'FS_PATH_CONTINUATION_SAVE_MISSING'
+                offset = events[-1][0] + 1
+                events += [(n + offset, event) for n, event in extra]
+            replies = model_replies(events)
+            expected['package_path'] = package
+            write(folder / 'expected.json', expected)
+            stages = [{**out, 'output_node_type': 'programming.javascript'} for out in expected['outputs']]
+            for stage in stages: stage.pop('export_destination', None)
+            for i in [0, 2]:
+                check_text_update_ports(replies, destinations[i:i + 2], stages[i:i + 2], build / 'resources/loginom/bin/node', same_node_id=True, kind='javascript')
+            identities, hashes = set(), set()
+            for _, reply in replies:
+                for owner, _ in ports(reply):
+                    config = owner.get('configuration', {}).get('readback', {})
+                    js = owner.get('output', {}).get('javascript_source', {})
+                    if config.get('kind') == 'javascript' or js:
+                        identities.add(owner['node']['node_id'])
+                        digest = config.get('source', {}).get('sha256') or js.get('source_sha256')
+                        assert digest, 'FS_PATH_SOURCE_IDENTITY_MISSING'
+                        hashes.add(digest)
+            assert len(identities) == len(hashes) == 1, 'FS_PATH_NODE_OR_SOURCE_CHANGED'
+            self.current['fs-paths'] = 'unsaved/saved/physical move/separate sidecar PASS'
         if spec.get('text_mask'):
             check_text_mask(replies, self.text_mask_directory(login) + '/sales_*.csv')
             assert any(save_confirmed(spec, reply, package) for _, reply in replies), 'TEXT_MASK_INITIAL_SAVE_MISSING'
@@ -2890,6 +2990,8 @@ class Runner:
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
                     spec = scenario(case, self.options.get('case_root'), cases=self.options.get('cases'))
+                    if spec.get('fs_case') == 'paths':
+                        r['package'] = self.fs_directory('paths', login) + '/original/paths.lgp'
                     if spec.get('source_package'):
                         write(folder / 'source-config.json', dict(login=login, package=r['package']))
                         self.phase('source-package', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/variables-column-union.mjs', 'prepare', build / 'resources/loginom', folder / 'source-config.json', spec['source_package'], folder / 'source'], folder, timeout=300)
@@ -2900,10 +3002,15 @@ class Runner:
                         stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, actual, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
+                    if spec.get('fs_case'):
+                        self.fs_files(spec, folder, login, build, 'fs-warm')
                     assert case != 'types300' or (self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection')), 'TYPES300_COLD_REQUIRED'
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
+                        if spec.get('fs_case') == 'paths':
+                            cold_expected = stage / 'expected-cold.json'
+                            write(cold_expected, {**expected, 'outputs': [expected['outputs'][-1]]})
                         if spec.get('cold_expected_name') or spec.get('grouping_mode') == 'concat':
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, bind_source_dir(expected_for(spec, r['package'], cold=True), self.source_dir(spec, login)))
@@ -2919,6 +3026,8 @@ class Runner:
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
                         r.update(cold='PASS', cleanup='both PASS')
+                        if spec.get('fs_case'):
+                            self.fs_files(spec, folder, login, build, 'fs-cold')
                     r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
                 except Exception as error:
                     if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):

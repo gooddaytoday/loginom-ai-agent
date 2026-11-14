@@ -8,6 +8,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {createArtifactStore} from '../../lib/artifacts.mjs';
 import {javascriptParametersSchema} from '../../lib/node-api.mjs';
+import {describeJavascriptKnowledge} from '../../lib/javascript-knowledge.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 import {userResultSchema} from '../../lib/user-results.mjs';
@@ -139,8 +140,10 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
     const described=parse(await call('dock_action_describe',{node_types:[node.type]})).node_types[0];
     assert.match(described.cache_key,/^[a-f0-9]{64}$/);
     for(const key of Object.keys(node)){
-     // describe delivers identical JavaScript limitations once, inside javascript_knowledge.
-     const expected=node.type==='programming.javascript'&&key==='limitations'&&described[key]===undefined?described.javascript_knowledge?.limitations:described[key];
+     // Prepare retains its compact limitations; describe routes details to the
+     // verified reference without duplicating the diagnostic knowledge asset.
+     const expected=node.type==='programming.javascript'&&key==='limitations'
+      ?describeJavascriptKnowledge('7.4.2').limitations:described[key];
      assert.deepEqual(node[key],expected,node.type+': '+key);
     }
    }
@@ -217,13 +220,15 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   const single=await call('dock_action_describe',{node_types:['programming.javascript']});
   assert.notEqual(single.isError,true);assert.ok(size(single)<=20000);
   const js=parse(single).node_types[0];assert.deepEqual(js.parameter_schema,javascriptParametersSchema);
-  assert.equal(js.javascript_knowledge.validated_for.loginom_build,'7.4.2');assert.equal(js.javascript_knowledge.examples.length,2);
-  assert.equal(js.javascript_knowledge.version,'1.3.0');
+  assert.equal(js.validated_for.loginom_build,'7.4.2');
+  assert.equal(js.javascript_knowledge,undefined);
+  assert.equal(js.knowledge_reference,'references/nodes/programming.javascript.md');
   assert.equal(js.knowledge_sha256,preparedJs.knowledge_sha256);
-  assert.deepEqual(js.javascript_knowledge.column_names.observed_pairs.map(pair=>[pair.requested_name,pair.actual_name,pair.display_name]),
-    [['Value','Value','Value'],['Сумма','Summa','Value'],['Value Total','Value_Total','Value'],['1Value','_1Value','Value'],['Value','Value','Сумма ё']]);
-  assert.equal(js.javascript_knowledge.column_names.normalization_algorithm_verified,false);
-  assert.equal(js.javascript_knowledge.column_names.add_column_verified,false);
+  const guided=parse(await call('dock_action_describe',{node_types:['programming.javascript'],modes:['script']})).node_types[0];
+  assert.ok(Buffer.byteLength(JSON.stringify(guided))<=12000);
+  assert.match(guided.guidance,/DataType\.Float/);
+  assert.match(guided.guidance,/OutputTable\.AssignColumns/);
+  assert.match(guided.guidance,/Сумма→Summa/);
   assert.equal(js.session_manifest.skillRevision,revision);assert.equal(js.knowledge_sha256.length,64);
   const waitTool=(await client.listTools()).tools.find(tool=>tool.name==='dock_node_wait');
   assert.deepEqual(waitTool.outputSchema,userResultSchema);

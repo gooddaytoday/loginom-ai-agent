@@ -105,8 +105,16 @@ export async function openPreparedOutputPort(page,task,readNode=readPreparedNode
     &&grid.length===1&&Ext.getCmp(grid[0].id).getStore().isLoading()===false;
    // Ext masks a disabled delete-all column even when the output wizard is ready.
    // This one native control mask is not a wizard loading overlay.
-   const columnTid=b.workflow_ref.prefix+';WizrdMCF;'+(variables?'VariablesEditValuesWizard':'DataSetOutputSocketWizard')+';colTargetDelete';
-   const ownDisabledOutputHeader=mode==='finish'&&!input&&e.classList?.contains('x-mask')
+   const emptyJavascriptInput=input&&task.port===0&&r?.node?.FIconCls==='bg-vendor-icon-javascript'
+    &&['grdSourceColumns;tbl','grdTargetColumns;tbl'].every(key=>{
+     const grids=exact(b.workflow_ref.prefix+';WizrdMCF;TuneDataSourceMappingWizard;'+key);
+     const view=grids.length===1&&globalThis.Ext?.getCmp?.(grids[0].id),store=view?.getStore?.();
+     return grids.length===1&&roots.length===1&&roots[0].contains(grids[0])&&view?.el?.dom===grids[0]
+      &&store?.$className==='Ext.data.Store'&&store.isLoading?.()===false&&store.getCount?.()===0
+      &&store.getTotalCount?.()===0&&Array.isArray(store.getData?.()?.items)&&store.getData().items.length===0;
+    });
+   const columnTid=b.workflow_ref.prefix+';WizrdMCF;'+(emptyJavascriptInput?'TuneDataSourceMappingWizard':variables?'VariablesEditValuesWizard':'DataSetOutputSocketWizard')+';colTargetDelete';
+   const ownDisabledOutputHeader=mode==='finish'&&(!input||emptyJavascriptInput)&&e.classList?.contains('x-mask')
     &&!e.classList.contains('x-mask-msg')&&!e.classList.contains('bg-mask-message')
     &&e.getAttribute('role')!=='dialog'&&!e.textContent.trim()
     &&parent?.getAttribute('data-tid')===columnTid&&exact(columnTid).length===1

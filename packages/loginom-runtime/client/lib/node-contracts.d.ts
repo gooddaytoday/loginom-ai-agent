@@ -96,6 +96,10 @@ export interface JavascriptConfigurationReadback {
     type: string; data_kind: string; source_name: string; excluded: boolean}>};
   package_persistence_verified: false;
 }
+export interface JavascriptUnconnectedConfigurationReadback extends JavascriptConfigurationReadback {
+  input_state: 'unconnected';
+  input_mapping?: {port: 0; autosync: boolean; fields: []; input_state: 'unconnected'; no_incoming_links_verified: true};
+}
 export interface CalculatorParameters {
   expressions: Array<{target: {kind: 'new'} | {kind: 'existing'; name: string};
     name?: string; label?: string; type?: 'integer' | 'real' | 'string' | 'boolean' | 'datetime';

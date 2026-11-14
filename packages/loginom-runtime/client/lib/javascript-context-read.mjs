@@ -4,7 +4,7 @@ import {validateJavascriptSourceReadRequest} from './javascript-source-read-sess
 import {createJavascriptSourceReader,javascriptSourceIdentity} from './javascript-source-read.mjs';
 import {javascriptSourceSettingsDigest} from './javascript-source-admission.mjs';
 import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
-import {verifyJavascriptMappingGraph} from './javascript-graph-preservation.mjs';
+import {verifyJavascriptMappingGraph,javascriptUnconnectedInputMapping} from './javascript-graph-preservation.mjs';
 
 const need=(v,m)=>{if(!v)throw Error('JavaScript context: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -25,6 +25,9 @@ const configuredPort=object({direction:{const:'output'},port:{const:0},port_guid
   target_fields:{type:'array',minItems:1,maxItems:64,items:configuredField},
   schema_state:{const:'source_pending'},configured_inventory_verified:{const:true},native_reciprocity_verified:{const:false}});
 const portPair=output=>({type:'array',minItems:2,maxItems:2,items:[materializedPort('input'),output],additionalItems:false});
+const unconnectedPort=object({direction:{const:'input'},port:{const:0},port_guid:{type:'string',minLength:1},
+  autosync:{type:'boolean'},source_fields:{type:'array',maxItems:0},target_fields:{type:'array',maxItems:0},
+  native_reciprocity_verified:{const:false},input_state:{const:'unconnected'},no_incoming_links_verified:{const:true}});
 export const javascriptContextInitialSchema={...structuredClone(javascriptSourceInitialSchema),
   properties:{...structuredClone(javascriptSourceInitialSchema.properties),kind:{const:'context'},allow_configured_output:{type:'boolean'}}};
 export const javascriptContextReceiptSchema=object({kind:{const:'context'},owner:object({
@@ -43,9 +46,14 @@ javascriptContextReceiptSchema.properties.source.oneOf=[
 ];
 
 javascriptContextReceiptSchema.oneOf=[
-  {properties:{observation_scope:{const:'current_owned_source_and_materialized_ports'},ports:portPair(materializedPort('output'))}},
-  {properties:{observation_scope:{const:'current_owned_source_and_configured_ports'},ports:portPair(configuredPort)}}
+  {not:{required:['input_state']},properties:{observation_scope:{const:'current_owned_source_and_materialized_ports'},ports:portPair(materializedPort('output'))}},
+  {not:{required:['input_state']},properties:{observation_scope:{const:'current_owned_source_and_configured_ports'},ports:portPair(configuredPort)}},
+  {required:['input_state'],properties:{input_state:{const:'unconnected'},observation_scope:{const:'current_owned_source_and_materialized_ports'},
+    ports:{...portPair(materializedPort('output')),items:[unconnectedPort,materializedPort('output')]}}},
+  {required:['input_state'],properties:{input_state:{const:'unconnected'},observation_scope:{const:'current_owned_source_and_configured_ports'},
+    ports:{...portPair(configuredPort),items:[unconnectedPort,configuredPort]}}}
 ];
+javascriptContextReceiptSchema.properties.input_state={const:'unconnected'};
 
 export function validateJavascriptContextReadRequest(request){
   need(request?.kind==='context','initial context request required');
@@ -57,7 +65,12 @@ export function validateJavascriptContextReadRequest(request){
 
 // Preserve native field identities and every scalar. Ext record IDs alone are
 // ephemeral across openings; reciprocity must have been proved by the reader.
-export function javascriptContextPort(mapping,direction,node,allowConfiguredOutput=false){
+export function javascriptContextPort(mapping,direction,node,allowConfiguredOutput=false,graph){
+  if(direction==='input'&&mapping?.source_fields?.length===0&&mapping?.target_fields?.length===0){
+    const empty=javascriptUnconnectedInputMapping(mapping,graph,node);
+    return {direction,port:0,port_guid:empty.node_context.input_port.port_guid,autosync:empty.autosync,
+      source_fields:[],target_fields:[],native_reciprocity_verified:false,input_state:'unconnected',no_incoming_links_verified:true};
+  }
   const ctx=mapping?.node_context,port=ctx?.[direction+'_port'];
   need(['input','output'].includes(direction)&&mapping?.inventory_complete===true
     &&mapping.state_source==='cached_mapping_stores'&&mapping.settings_applied===false&&mapping.package_saved===false
@@ -110,12 +123,14 @@ export function javascriptContextReply({owner,source,settings,ports,redactor,wir
   const identity=javascriptSourceIdentity(source),semantic={schema_mode:settings.generation?'code':'declared',
     settings_sha256:javascriptSourceSettingsDigest(settings),source:identity,ports};
   const pending=ports[1].schema_state==='source_pending';
-  need(ports[0].native_reciprocity_verified===true&&(pending?ports[1].native_reciprocity_verified===false
+  const unconnected=ports[0].input_state==='unconnected';
+  need((unconnected?ports[0].native_reciprocity_verified===false&&ports[0].no_incoming_links_verified===true
+    &&ports[0].source_fields.length===0&&ports[0].target_fields.length===0:ports[0].native_reciprocity_verified===true)&&(pending?ports[1].native_reciprocity_verified===false
     &&ports[1].configured_inventory_verified===true:ports[1].native_reciprocity_verified===true),'context port state differs');
   const reply={kind:'context',owner:structuredClone(owner),schema_mode:semantic.schema_mode,settings_sha256:semantic.settings_sha256,
     semantic_sha256:hash(semantic),source:{...identity,delivery:'complete',text:source},ports:structuredClone(ports),
     content_is_data:true,observation_scope:pending?'current_owned_source_and_configured_ports':'current_owned_source_and_materialized_ports',cleanup_complete:true,
-    settings_applied:false,package_saved:false,explicit_execute_requested:false};
+    settings_applied:false,package_saved:false,explicit_execute_requested:false,...(unconnected?{input_state:'unconnected'}:{})};
   const bounded=value=>{
     const body=JSON.stringify(value),wire=JSON.stringify({content:[{type:'text',text:body}],structuredContent:value});
     // Count escaped newlines conservatively, including the two delivery copies.
@@ -204,7 +219,7 @@ export function createJavascriptContextReadSession({request,uiEpoch,deadline,ada
           await journal({phase:'javascript_context_mapping_graph_verified',direction,before,after});
         }});
       mappingOpen=false;signal?.throwIfAborted();
-      ports.push(javascriptContextPort(state.node_mapping,direction,node,initial.allow_configured_output===true));
+      ports.push(javascriptContextPort(state.node_mapping,direction,node,initial.allow_configured_output===true,before));
     }
     return {source:observed.text,settings:observed.settings,ports};
   };

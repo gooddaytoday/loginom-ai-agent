@@ -65,7 +65,7 @@ test('existing empty patch preserves source and explicit replacement requires it
 });
 
 test('source policy, UTF-8 bytes, LF count and CR are checked before a browser effect',()=>{
-  for(const source_text of ['import "builtIn/FS";','require("builtIn/FS")','import("builtIn/Data")',
+  for(const source_text of ['import "builtIn/Fetch";','require("builtIn/FS")','import("builtIn/Data")',
     '😀'.repeat(8193),'\n'.repeat(1024),'const x=1;\r\n'])
     assert.throws(()=>validateJavascriptParameters({source_text,schema_mode:'code'},'script',request()),/Invalid parameters.source_text/);
   assert.equal(checked({source_text:'\n'.repeat(1023),schema_mode:'code'}).source_text.length,1023);

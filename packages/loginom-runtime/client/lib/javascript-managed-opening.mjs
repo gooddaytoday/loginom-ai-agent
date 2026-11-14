@@ -25,7 +25,8 @@ export async function runManagedJavascriptWizardSettlement(page,task,inspect) {
 }
 
 export function makeJavascriptManagedWizardSettlementCode(task) {
-  const {prepared,allowDeactivation,...base}=task??{};
+  const {prepared,allowDeactivation,inputPage,...base}=task??{};
+  if(inputPage!==undefined&&inputPage!==true)throw Error('Invalid managed JavaScript input page');
   makeJavascriptManagedSelectionReadCode({...base,mode:'inspect'});
   const workflow=prepared?.workflow_ref,path=workflow?.navigation_path;
   if(allowDeactivation!==true&&allowDeactivation!==false
