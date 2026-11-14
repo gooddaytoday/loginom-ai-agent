@@ -147,6 +147,10 @@ Plain async code should pass explicit context or stay inside an Effect fiber; do
 
 ## Loginom tools and ChatGPT compatibility
 
+Профиль `loginom-dashboard` задаётся на всю сессию её реальным каталогом `<Global.Path.data>/dashboards/*/work` в `src/product/dashboard-session.ts`, без переходов в другие профили. Девять инструментов: `read`, `glob`, `grep`, `edit`, `write`, `apply_patch`, `skill`, `dashboard_draft`, `dashboard_publish`. Нет `bash`, внешних MCP, субзадач и инструментов Loginom; сессия dashboard не захватывает Host Loginom. `assertExternalDirectoryEffect` проверяет реальные пути даже внутри git: чтение только в `work/`, запись только в `work/src/`, включая предка новой цели и назначение переноса; запись в символьную ссылку запрещена. `external_directory` отклоняется без вопроса.
+
+Standalone `loginom-ai-agent-cli run --dashboard <ID> "<текст>"` забирает снимок с настроенного стенда профиля CLI и запускает сессию в `work/`; несовместим с `--dir`, `--attach`, `--continue`, `--session`, `--fork`, `--command`. Без `--auto` запрос публикации отклоняется. [Порядок M3](../../docs/testing/loginom-ai-agent/dashboard-m3.md).
+
 В профиле `loginom-dashboard` инструмент `dashboard_publish` всегда запрашивает разовое подтверждение с именем узла и путём пакета. Правило профиля применяется последним в `SessionTools.resolve`. Автоответ сессии и папки на публикацию не действует.
 
 - `src/session/tools.ts` admits host-owned `loginom_` tools. Keep host credentials/context tokens out of model parameters and preserve original-user attachment admission; see [host contracts](../loginom-host/AGENTS.md).

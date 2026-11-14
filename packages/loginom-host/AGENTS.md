@@ -77,3 +77,6 @@
 ## Уточнение области ветки node-javascript (2026-10-14)
 
 Владелец разрешил восстановить ранее выполненные исправления Import, Join, Export, Calculator, Group и Sort, а также `javascript-output-preview.mjs` и его hook. Восстановление выполняется из проверенного `15e2f43c5d`; новые произвольные изменения остальных стандартных узлов не входят в разрешение. Variant-reader остаётся на базе `38ee045e79720d363a35666484f17804162b55a1`. Общие процедуры портов, мастеров и таблиц вывода, необходимые JavaScript, и eval-инфраструктура сохранены. Ошибка стандартного узла не разрешает обход через JS.
+
+- `src/task-scope.ts` includes `loginom-dashboard` and forbids transitions to/from it. Dashboard sessions never acquire the Loginom host.
+- Shared `script/stage-resources.ts` stages `dashboard/template` with dependencies installed by pinned Node (`npm ci --ignore-scripts`, without `.bin`), platform files, `draft.js` and `selfcheck.mjs`. All files enter the resource manifest. The larger inventory increases CLI startup verification cost; installed size and startup timings remain acceptance work in [M3](../../docs/testing/loginom-ai-agent/dashboard-m3.md), not a source-test result.

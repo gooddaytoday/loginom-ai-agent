@@ -9,3 +9,5 @@
 - Preserve explicit proxy environment and the loopback bypass for the Loginom runtime. System proxy for model and OAuth traffic is applied to the Desktop sidecar and CLI, not to runtime children. See `docs/superpowers/specs/2026-09-23-system-proxy-v2.md`.
 - Run `bun test src/main/loginom` and `bun typecheck` from `packages/desktop`. Real GUI tests use isolated profiles; never restart or overwrite the user's running session for debugging.
 - See [host boundary](../../../../loginom-host/AGENTS.md), [desktop release instructions](../../../AGENTS.md) and [acceptance runbooks](../../../../../docs/testing/loginom-ai-agent/README.md).
+
+- Dashboard M3: снимок читается только с настроенного стенда, без перенаправлений и один раз. Desktop создаёт `dashboards/*/{work,control}` в каталоге данных своего бэкенда; «Создать dashboard» и «Изменить в чате» всегда открывают новый чат в `work/`, сохраняя `src/`. При отправке проверяется ID метки по `control/binding.json`, без повторного HTTP-чтения. Нет подключения, чужой стенд, использованный или устаревший снимок дают понятное сообщение; привязку не передавать модели.
