@@ -1567,14 +1567,25 @@ await cp(join(dashboard, "src", "draft", "selfcheck.mjs"), join(staging, "dashbo
 ### Task 16: `dev-master.sh` для M3
 
 **Files:**
-- Modify: `P/deploy/dev-master.sh`
+- Modify: `P/deploy/dev-master.sh`, `.github/workflows/test.yml` (малый assertion в существующем шаге проверки установщика)
 
 **Interfaces:**
 - Consumes: `bindingKey` из `dist/server.mjs` (задача 1), `DASHBOARD_CLI_BUTTON`.
 - Produces: `./packages/dashboard/deploy/dev-master.sh install [--strict] [--cli-button] [--web NAME] | check [--web NAME] | uninstall [--web NAME]`.
 
+- [ ] **Step 0: Поведенческий RED до скрипта.** В существующий CI-шаг проверки установщика добавить и локально выполнить один assertion:
+
+```bash
+if output=$(bash packages/dashboard/deploy/dev-master.sh install --cli-button --web invalid/name 2>&1); then
+  echo "Expected invalid web name rejection" >&2
+  exit 1
+fi
+[[ $output == 'Некорректное имя контейнера web' ]]
+```
+
+  До production-правки он падает на прежнем Usage; после неё достигает существующей проверки имени. Этот путь завершается до Docker и не требует моков, нового файла тестов или package script. Отдельно проверить отказ `check`/`uninstall` с `--cli-button`, также используя invalid/name как предохранитель до Docker. Реальная установка остаётся только в задаче 18.
 - [ ] **Step 1: Аргументы и запуск web.** `--cli-button` допустим только с `install`, задаёт `cli_button=1` (по умолчанию `0`). В `docker run` контейнера web: убрать `-e DASHBOARD_PROJECT_ROOT=…` и `-e DASHBOARD_ALLOW_CURRENT=0`, добавить `-e DASHBOARD_CLI_BUTTON="$cli_button"`. `builds=$state/builds` без переопределения через `DASHBOARD_BUILDS`: туда пишет `dashboard_publish`. Удалить блоки M1 про `dashboard/template` (ссылку `legacy`) и `npm ci` шаблона, если они остались: стенду они больше не нужны. Подсказка в конце `install`: «Создайте и опубликуйте ROI через Desktop (Создать dashboard → Опубликовать), затем выполните check».
-- [ ] **Step 2: `check`.** Привязка ROI — три поля; ключ:
+- [ ] **Step 2: `check`.** Общая привязка ROI — три поля и используется также завершающим readiness lookup установки, без server/port. Ключ вычислять только внутри check после наличия установленных Node/server.mjs: свежий install этих файлов заранее не требует и не зависит от опубликованной ROI. Ключ:
 
 ```bash
 binding='{"packagePath":"/user/dashboard-roi/campaign.lgp","workflowGuid":"27cb94a9-f6e9-35ff-80b7-bc7d01ba6aa7","nodeGuid":"77c145b1-6ce3-458f-aa36-e6afdab2a930"}'

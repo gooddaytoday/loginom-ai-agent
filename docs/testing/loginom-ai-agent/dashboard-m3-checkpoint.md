@@ -17,4 +17,4 @@
 - Установленная поставка, настоящая модель, стенд, публикация на настоящем стенде и задачи 15–18 ещё не приняты. Установка DEB и слияние требуют команды владельца по плану; Windows runtime здесь не проверялся.
 - Дополнение Task18 о сохранении Server, исходной Studio и прежнего web независимо одобрено после исправлений; перед исполнением повторно проверить состояние. Стенд и удалённый рабочий компьютер не изменялись.
 - Для итогового ревью остаются P3 Copilot `_noop` и Host else-if Minor; Product catalog-check исправлен, secret scanning не менялся.
-- Задача 15: [CI2](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43538336920) — Ubuntu/macOS/template и browser PASS; Windows template+3 примера PASS, 6 CSS FAIL на child-process запрете. Последний раунд 3: preserveSymlinks лишь CSS-сканеру с сохранением realpath guard; затем fresh CI, Task16 не начинать.
+- Задача 15: [CI3](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43542247918) — template Ubuntu/Windows/macOS, browser, evals и E2E PASS; только unit ещё выполняется. Ждать итог; Task16 plan Approved, production не начата; после третьего обязательного отказа — владелец.
