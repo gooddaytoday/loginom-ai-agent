@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
+test('typed and NULL filter scenarios retain approved tasks, frozen expectations and private oracle',()=>{
+ const code=`import importlib.util
+s=importlib.util.spec_from_file_location('r','scripts/node-acceptance/run-check.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+for name,case,count in [('row-filter-typed','typed',4),('row-filter-null','null',2)]:
+ c=m.scenario(name)
+ assert c['prompt'].name=='task-variable-'+case+'.md'
+ assert c['input_files']==['rows.csv'] and c['export_count']==count and c['base'] is None
+ assert c['filter_variable_case']==case and c['oracle'].is_file()
+ assert c['expected_name']==('expected-typed-final.json' if case=='typed' else 'expected-null.json')
+ assert c['filter_initial']==('expected-typed-initial.json' if case=='typed' else None)
+`;
+ execFileSync('python3',['-B','-c',code],{cwd:new URL('../../../',import.meta.url)});
+});
 
 test('Top-N registers the approved task, two private ordered phases and builtin control source',()=>{
  const code=`import importlib.util

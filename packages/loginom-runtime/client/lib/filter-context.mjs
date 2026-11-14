@@ -44,9 +44,9 @@ export function readFilterBrowser(prefix){
  // a display suffix to manufacture a binding name.
  const variables=controller.FVariablesData?.FVariables??[];
  if(!Array.isArray(variables)||variables.length>1000)return fail('filter_variables_inventory');
- const controlVariables=variables.map(v=>({name:v.DisplayName,type:types[v.DataType],index:v.Index,value:v.Value??null,is_null:v.IsNull}));
+ const controlVariables=variables.map(v=>({name:v.DisplayName,type:types[v.DataType],index:v.Index,value:v.DataType===2&&!v.IsNull?literal(v.Value,'datetime'):v.Value??null,is_null:v.IsNull}));
  const bound=(text,type)=>{
-  const matches=variables.filter(v=>v.DataType===({integer:4,string:5})[type]
+  const matches=variables.filter(v=>v.DataType===({integer:4,real:3,datetime:2,string:5})[type]
    &&(text===v.DisplayName||typeof v.ValueAsString==='string'&&text===v.DisplayName+' ( '+v.ValueAsString+' )'));
   if(matches.length!==1||typeof matches[0].DisplayName!=='string'||!Number.isInteger(matches[0].Index))throw Error('variable identity');
   return {kind:'variable',name:matches[0].DisplayName};
@@ -64,7 +64,7 @@ export function readFilterBrowser(prefix){
    // scalar slots for an interval, list or null/boolean predicate.
    if(type){
     if(d.UseVariables!==0){
-     if(!['integer','string'].includes(type)||d.RowNumberer===1&&(type!=='integer'||d.UseVariables!==1||d.RelationType>5))return fail('filter_variable_type');
+     if(!['integer','real','datetime','string'].includes(type)||d.RowNumberer===1&&(type!=='integer'||d.UseVariables!==1||d.RelationType>5))return fail('filter_variable_type');
      if(d.UseVariables===1&&d.RelationType<=5)row.value=bound(d.CompareValue,type);
      else if(d.UseVariables===128&&[10,11].includes(d.RelationType))row.values=bound(d.CompareValueListAsString,'string');
      else return fail('filter_variable_operator');
