@@ -153,7 +153,8 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   }
   if (method === "connection.verify-resources") {
     state.setupVerified = false
-    await host.verifyInstallationResources({ reusePrewarm: true }).catch(() => {
+    await host.verifyInstallationResources({ reusePrewarm: true }).catch((error: unknown) => {
+      if (error instanceof Error && error.message === "LOGINOM_KNOWLEDGE_UNAVAILABLE") throw error
       throw new Error("LOGINOM_RUNTIME_START_FAILED")
     })
     state.setupVerified = true

@@ -1,6 +1,6 @@
 import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
-import { basename, dirname, isAbsolute, join } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { Schema } from "effect"
@@ -147,7 +147,9 @@ export async function warmInstallationBrowser(options: {
       const result = await worker.request(
         "warm",
         { browserPath: options.verified.browserPath, profile, timeout_ms: timeout },
-        timeout,
+        // Warm replies after Chromium closes. Its IPC budget includes that work;
+        // the browser launch itself still has the separate 30-second ceiling.
+        remaining(),
       )
       if (!result || typeof result !== "object" || !("warmed" in result) || result.warmed !== true) {
         if (result && typeof result === "object" && "reason" in result) failure = result.reason
@@ -617,6 +619,22 @@ export async function createLoginomHost(options: {
         // A fresh CLI already hashed every resource in this invocation. Revalidate
         // metadata and require the durable cache, rather than hash the tree twice.
         forceHash: !(settings.reusePrewarm && prewarmHashedAll),
+      }).catch((error: unknown) => {
+        // Preserve setup's missing-Help classification before connection.check.
+        // The verifier already recorded its original filesystem diagnostic.
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          "path" in error &&
+          (error.code === "ENOENT" || error.code === "ENOTDIR") &&
+          typeof error.path === "string"
+        ) {
+          const missing = relative(join(resources, "help"), error.path)
+          if (!isAbsolute(missing) && missing !== ".." && !missing.startsWith(".." + sep))
+            throw new Error("LOGINOM_KNOWLEDGE_UNAVAILABLE", { cause: error })
+        }
+        throw error
       })
     },
     journal,

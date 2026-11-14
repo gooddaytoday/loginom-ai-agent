@@ -166,3 +166,28 @@ test
     expect(phases.at(-1)).toMatchObject({ scope: "installation", status: "failed", error: { name: "Error", code } })
   },
 )
+
+test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE)(
+  "warm response includes browser closure without reusing the browser launch timeout",
+  async () => {
+    await using f = await fixture(
+      false,
+      `let warm;
+process.on('message', m => {
+  if(m.method==='start')process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
+  if(m.method==='warm') {
+    if(m.input.timeout_ms > 30000)throw Error('BROWSER_LAUNCH_LIMIT_INCREASED');
+    warm=setTimeout(()=>process.send({id:m.id,result:{warmed:true}}),31000);
+  }
+  if(m.method==='close'){clearTimeout(warm);process.send({id:m.id,result:{closed:true}},()=>process.disconnect());}
+});`,
+    )
+    const verified = await verifyInstallationResources({ ...f, resourceVersion: "fixture" })
+    await warmInstallationBrowser({ ...f, verified })
+    const receipt = JSON.parse(await readFile(join(f.root, "browser-warmup.json"), "utf8"))
+    expect(receipt).toMatchObject({ status: "ready", closed_ack: true, node_exit_code: 0 })
+    expect(receipt.duration_ms).toBeLessThan(60_000)
+    await expect(readFile(receipt.profile)).rejects.toMatchObject({ code: "ENOENT" })
+  },
+  40_000,
+)
