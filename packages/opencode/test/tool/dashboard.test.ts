@@ -81,6 +81,31 @@ const publicationFolder = Effect.fn(function* () {
   return { root, work: folder.directory }
 })
 
+it.instance("dashboard_draft limits the complete diagnostic output to whole UTF-8 code points", () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const flags = yield* RuntimeFlags.Service
+  yield* Effect.promise(() => Bun.write(join(folder.work, "src/main.tsx"),
+    Array.from({ length: 150 }, (_, index) => `const ошибка${index} = отсутствует𝒳${index};`).join("\n"),
+  ))
+  yield* Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create()
+    const definition = yield* DashboardDraftTool
+    const tool = yield* definition.init()
+    const result = yield* tool.execute({}, {
+      sessionID: session.id, messageID: MessageID.ascending(), agent: "build", messages: [],
+      abort: new AbortController().signal, metadata: () => Effect.void, ask: () => Effect.die("Draft must not ask permission"),
+    })
+    expect(Buffer.byteLength(result.output)).toBeLessThanOrEqual(8192)
+    expect(Buffer.byteLength(result.output)).toBeGreaterThan(8188)
+    expect(result.output).toStartWith("Сборка не удалась. Исправьте код и вызовите dashboard_draft снова.\n")
+    expect(result.output).toContain("отсутствует𝒳")
+    expect(result.output).not.toContain("�")
+    expect(result.title).toBe("Черновик dashboard")
+    expect(result.metadata).toEqual({ truncated: false })
+  }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
+}))
+
 for (const reply of ["reject", "abort", "once"] as const) {
   it.instance("publishing with a global allow still asks once for the bound node and package: " + reply, () => Effect.gen(function* () {
     const folder = yield* publicationFolder()

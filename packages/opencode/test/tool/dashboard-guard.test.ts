@@ -1,6 +1,7 @@
 import { afterEach, expect } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { Cause, Effect, Exit, Layer } from "effect"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -121,6 +122,116 @@ it.live("dashboard write allows src but refuses workspace data without asking", 
     }).pipe(provideInstance(dirs.work))
   }),
 )
+
+for (const operation of ["write", "edit create", "edit replace", "apply_patch"] as const) {
+  it.live(`dashboard ${operation} does not execute source Prettier configuration`, () =>
+    Effect.gen(function* () {
+      const dirs = yield* folder
+      const marker = path.join(dirs.root, "control", "formatter-marker")
+      yield* Effect.promise(() =>
+        Bun.write(
+          path.join(dirs.work, "loginom-ai-agent.json"),
+          JSON.stringify({
+            formatter: {
+              prettier: {
+                command: ["node", fileURLToPath(import.meta.resolve("prettier/bin/prettier.cjs")), "--write", "$FILE"],
+                extensions: [".tsx"],
+              },
+            },
+          }),
+        ),
+      )
+      yield* Effect.gen(function* () {
+        const info = yield* WriteTool
+        const tool = yield* info.init()
+        const ctx = context([])
+        yield* tool.execute(
+          {
+            filePath: "src/.prettierrc.cjs",
+            content: `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "synthetic-boundary-proof"); module.exports = {};`,
+          },
+          ctx,
+        )
+        if (operation === "write")
+          yield* tool.execute({ filePath: "src/main.tsx", content: "export const value=1" }, ctx)
+        if (operation === "edit create" || operation === "edit replace") {
+          if (operation === "edit replace")
+            yield* Effect.promise(() => Bun.write(path.join(dirs.work, "src/main.tsx"), "export const value=0"))
+          const definition = yield* EditTool
+          const edit = yield* definition.init()
+          yield* edit.execute(
+            {
+              filePath: "src/main.tsx",
+              oldString: operation === "edit create" ? "" : "export const value=0",
+              newString: "export const value=1",
+            },
+            ctx,
+          )
+        }
+        if (operation === "apply_patch") {
+          const definition = yield* ApplyPatchTool
+          const patch = yield* definition.init()
+          yield* patch.execute(
+            { patchText: "*** Begin Patch\n*** Add File: src/main.tsx\n+export const value=1\n*** End Patch" },
+            ctx,
+          )
+        }
+        expect(yield* Effect.promise(() => Bun.file(marker).exists())).toBe(false)
+        expect(yield* Effect.promise(() => Bun.file(path.join(dirs.work, "src/main.tsx")).text())).toBe(
+          operation === "apply_patch" ? "export const value=1\n" : "export const value=1",
+        )
+      }).pipe(provideInstance(dirs.work))
+    }),
+  )
+}
+
+for (const operation of ["write", "read"] as const) {
+  it.live(`dashboard ${operation} does not launch configured LSP`, () =>
+    Effect.gen(function* () {
+      const dirs = yield* folder
+      const marker = path.join(dirs.root, "control", "lsp-marker")
+      yield* Effect.promise(() =>
+        Bun.write(
+          path.join(dirs.work, "loginom-ai-agent.json"),
+          JSON.stringify({
+            lsp: {
+              fake: {
+                command: [
+                  "node",
+                  "-e",
+                  `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "synthetic-lsp-start"); require(${JSON.stringify(path.resolve(import.meta.dir, "../fixture/lsp/fake-lsp-server.js"))});`,
+                ],
+                extensions: [".repro"],
+              },
+            },
+          }),
+        ),
+      )
+      yield* Effect.gen(function* () {
+        const lsp = yield* LSP.Service
+        if (operation === "write") {
+          const definition = yield* WriteTool
+          const tool = yield* definition.init()
+          const result = yield* tool.execute({ filePath: "src/main.repro", content: "synthetic" }, context([]))
+          expect(result.output).toContain("successfully")
+        }
+        if (operation === "read") {
+          const file = path.join(dirs.work, "src/main.repro")
+          yield* Effect.promise(() => Bun.write(file, "synthetic"))
+          const definition = yield* ReadTool
+          const tool = yield* definition.init()
+          const result = yield* tool.execute({ filePath: file }, context([]))
+          expect(result.output).toContain("synthetic")
+          // Join any LSP startup from the asynchronous read warm-up.
+          yield* lsp.touchFile(file)
+        }
+        expect(yield* Effect.promise(() => Bun.file(marker).exists())).toBe(false)
+        expect(yield* lsp.status()).toEqual([])
+        expect(yield* lsp.diagnostics()).toEqual({})
+      }).pipe(provideInstance(dirs.work))
+    }),
+  )
+}
 
 it.live("dashboard edit cannot change sample data", () =>
   Effect.gen(function* () {

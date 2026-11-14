@@ -24,7 +24,7 @@ export const DashboardDraftTool = Tool.define(
           const session = yield* sessions.getForExecution(ctx.sessionID)
           const resources = dashboardResources(flags.loginomResources)
           const output = yield* Effect.promise(() => draftDashboard({ work: session.directory, resources, signal: ctx.abort }))
-          return { title: "Черновик dashboard", output, metadata: { truncated: false } }
+          return { title: "Черновик dashboard", output: outputText(Buffer.from(output)), metadata: { truncated: false } }
         }).pipe(Effect.orDie),
     }
   }),
