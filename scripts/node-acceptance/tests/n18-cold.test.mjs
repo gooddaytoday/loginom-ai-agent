@@ -29,7 +29,9 @@ function fixture({syntax='javascript',stage='calculator',change=()=>{},closed={}
     state.ui.dialogs=[{ref:'question',title:'Loginom 7.4.2',text:'Loginom 7.4.2 Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить? Удалить и продолжить Не удалять и продолжить Отмена'}];
     state.ui.masks=[{kind:'modal_background',ref:'wizard-ref'}];
     state.ui.elements.push(...Object.entries({yes:'Удалить и продолжить',no:'Не удалять и продолжить',cancel:'Отмена'}).map(([name,label])=>({tid:'msgbox;tlb;'+name,ref:name,label,signature:{dialog_ref:'question'},allowed_actions:['click']})));
-    return;
+    const error=Error('Node procedure step did not confirm completion; inspect before retry');
+    error.receipt={status:'AMBIGUOUS',cleanup_complete:true,error:{code:'WIZARD_STEP_NOT_CONFIRMED'}};
+    throw error;
    }
    state.wizard.stage=action.expected_stage;}};
  const importChannel={};

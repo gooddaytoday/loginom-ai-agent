@@ -39,6 +39,8 @@ export async function verifyN18JavascriptStep({graph,requirement,load,channelFor
    ready:s=>owned(s)&&['input_mapping','calculator'].includes(s.wizard?.stage)});
   if(opened.wizard.stage==='input_mapping'){
    const binding=wizardCloseBinding(opened);
+   let advanceError;
+   try{
    await channel.perform({condition:'cold n18 advance saved Calculator',
    ready:s=>owned(s)&&s.wizard?.stage==='input_mapping',identity:s=>s.prepared_node_context,
    resolve:s=>{
@@ -46,12 +48,17 @@ export async function verifyN18JavascriptStep({graph,requirement,load,channelFor
     need(next.length===1,'COLD_N18_CALCULATOR_NEXT_UNCONFIRMED');
     return {verb:'wizard_step',ref:next[0].ref,expected_stage:'calculator'};
    }});
+   }catch(error){
+    if(error.receipt?.status!=='AMBIGUOUS'||error.receipt?.cleanup_complete!==true||error.receipt?.error?.code!=='WIZARD_STEP_NOT_CONFIRMED')throw error;
+    advanceError=error;
+   }
    const advanced=await channel.observe({condition:'cold n18 Calculator advanced or lost-links question',wizardConfirmation:binding,
     ready:s=>owned(s)&&s.wizard?.stage==='calculator'||boundInputMappingConflict(s,binding)});
    if(boundInputMappingConflict(advanced,binding)){
     closingObservation=advanced;
     throw Error('COLD_N18_CALCULATOR_LOST_LINKS');
    }
+   if(advanceError)throw advanceError;
   }
   const ready=s=>owns(s.prepared_node_context,node)&&s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true
    &&s.node_calculator.inventory_complete===true&&owns(s.node_calculator.node_context,node);
