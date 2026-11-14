@@ -8,13 +8,13 @@
 Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Агрегаты выполняй Группировкой, не Калькулятором/JS.
 
 - `median`: integer/real → real; без NULL, полностью NULL → NULL.
-- `mode`: integer/string/real/boolean/datetime/variant → тот же тип; без NULL, полностью NULL → 0/пустая строка/False/1899-12-30/NULL (Variant). При ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).
+- `mode`: integer/string/real/boolean/datetime/variant → тот же тип; без NULL, полностью NULL → 0/пустая строка/False/1899-12-30/NULL (Variant). Для скалярных типов при ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).
 - `stddev`: integer/real → real; выборочное без NULL, одно значение → 0, полностью NULL → NULL.
 - `null_count`: integer/string/real/boolean/datetime/variant → integer; считает NULL, не пустые строки.
 - `unique_count`: integer/string/real/boolean/datetime/variant → integer, без NULL; пустая строка считается один раз.
 - `min`/`max` для boolean → boolean (False < True), без NULL; полностью NULL → NULL.
 DateTime/Variant: count/min/max/mode/unique_count/null_count/first/last/only; счётчики → integer, остальные сохраняют тип. Sum/avg/median/stddev/concat недоступны. Variant читай точно: `cell_type`/`value`; Min пропускает NULL.
-При нескольких функциях native-суффиксы: Mode, Std, Null.
+Variant mode: 10/3.5/"text" → real 3.5; 1/1.0/"1" → integer 1; другие подтипы не обобщай. unique_count(1,1.0,"1")=2.
 
 ## Первое, последнее, единственное, список
 
