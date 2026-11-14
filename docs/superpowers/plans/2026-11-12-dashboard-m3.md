@@ -1368,6 +1368,8 @@ if (permission.permission === "dashboard_publish") return false
   `permission.tsx` уже передаёт туда полный `PermissionRequest`; других изменений не нужно.
 - [x] **Step 6: Окно разрешений.** `session-permission-dock.tsx`: кнопку `ui.permission.allowAlways` обернуть в `<Show when={props.request.always.length > 0}>`. i18n: `settings.permissions.tool.dashboard_publish.description` — ru «Опубликовать dashboard на стенд. Проверьте узел и пакет ниже», en «Publish the dashboard to the stand. Check the node and package below». Проверка: e2e `session-request-docks.spec.ts` дополнить запросом с `always: []` → две кнопки, если e2e приложения запускается в этой среде; иначе — ручная проверка в приёмке задачи 18 и запись в отчёт задачи.
 - [x] **Step 7: Прогон.** `bun typecheck` в `packages/opencode`, `packages/app`, `packages/dashboard`; тесты шагов 1–2 (в `packages/app` — `bun test src/context/permission-auto-respond.test.ts`) → PASS.
+
+  Интеграция общего unit: английский ключ описания разрешения размещается в существующем `LOGINOM_ENGLISH`, который уже включают остальные локали; русский перевод сохраняется. Неизменённый `packages/app/src/i18n/parity.test.ts` проверяет полный набор ключей. В `O/test/session/prompt.test.ts` фактический запрос к провайдеру допускает только девять инструментов профиля и требует присутствия `dashboard_draft` и `dashboard_publish`; прежние проверки отсутствия MCP сохраняются.
 - [x] **Step 8: Коммит.** `git commit -m "feat(dashboard): publish drafts to the local stand with confirmation"`.
 
 ### Task 13: `run --dashboard` в CLI
