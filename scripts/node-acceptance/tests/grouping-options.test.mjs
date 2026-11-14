@@ -52,3 +52,25 @@ for name in ['grouping-cache','grouping-sort-result']:
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
+
+test('Grouping Variant uses its unchanged typed stages and only its original scalar CSV',()=>{
+ const result=spawnSync('python3',['-B','-c',`
+import importlib.util,json
+def load(name):
+ s=importlib.util.spec_from_file_location(name,'scripts/node-acceptance/'+name+'.py')
+ m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+r=load('run-check');checks=load('required-checks')
+c=r.scenario('group-variant');e=r.expected_for(c,'/own/variant.lgp');cold=r.expected_for(c,'/own/variant.lgp',cold=True)
+proposal=json.loads((c['source']/'expected.json').read_text())
+assert e['outputs']==cold['outputs']==proposal['cases']['variant']['stages']
+assert e['package_path']=='/own/variant.lgp'
+assert [n['type'] for n in e['nodes']]==['imports.text','transform.collapse_columns','transform.group_data','exports.text']
+assert c['input_files']==['variant.csv'] and c['prompt'].name=='task-variant.md'
+assert c['prompt'].is_file() and (c['data']/'variant.csv').is_file()
+assert 'group-variant' in checks.select([checks.C+'grouping-parameters.mjs'])[1]
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+ const expected=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/grouping/acceptance/types/expected-variant.json',import.meta.url)));
+ expected.package_path='/own/variant.lgp';
+ assert.equal(parseExpectedOutputs(expected).outputs.length,1);
+});

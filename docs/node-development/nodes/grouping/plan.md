@@ -139,6 +139,14 @@ count/min/max/mode/unique_count/null_count/first/last/only; тип даты со
 в сохранённых масках. Значения mode для DateTime описаны в discovery;
 бизнес-приёмка этого цикла проверяет min/max/last/null_count, CSV, Save и cold.
 
+**Цикл ничьи моды и пустого входа LAB-1663:** `group-mode-tie` и `group-empty`
+используют исходные `task-mode-tie.md` / `task-empty.md` и соответствующие CSV.
+`expected-mode-tie.json` / `expected-empty.json` без изменений выделяют
+`cases.mode_tie.stages` / `cases.empty.stages`. Native Q2/Q7 подтверждают
+минимум integer/string при ничьей и пустой результат с точными пятью типами.
+CSV пустого результата содержит только заголовок; Save, cold Execute без
+настройки и cleanup проверяются штатно. Валидатор runtime не изменён.
+
 База `v040@864fad6efe`, 13.11.2026, только документы: runtime, навык и
 run-check не менялись, native-пробы не было (её делает разработчик первым
 шагом цикла). Решение владельца `v040-open-scope`. Комплект —

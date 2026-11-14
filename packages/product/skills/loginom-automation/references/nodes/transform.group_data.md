@@ -5,20 +5,20 @@
 
 В output mapping `configured_field.name` — текущее выходное имя: после apply с `measures` это `name` меры (например `Metric`) или имя ключа; не составляй имя из поля и функции (`Amount_Median`), если узел его не выдал.
 
-Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Прочитай карточку через `dock_action_describe`. Агрегаты выполняй Группировкой, не Калькулятором/JS.
+Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Агрегаты выполняй Группировкой, не Калькулятором/JS.
 
 - `median`: integer/real → real; без NULL, полностью NULL → NULL.
-- `mode`: integer/string/real/boolean/datetime → тот же тип; без NULL, полностью NULL → 0/пустая строка/False/1899-12-30. При ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).
+- `mode`: integer/string/real/boolean/datetime/variant → тот же тип; без NULL, полностью NULL → 0/пустая строка/False/1899-12-30/NULL (Variant). Для скалярных типов при ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).
 - `stddev`: integer/real → real; выборочное без NULL, одно значение → 0, полностью NULL → NULL.
-- `null_count`: integer/string/real/boolean/datetime → integer; считает NULL, не пустые строки.
-- `unique_count`: integer/string/real/boolean/datetime → integer, без NULL; пустая строка считается один раз.
+- `null_count`: integer/string/real/boolean/datetime/variant → integer; считает NULL, не пустые строки.
+- `unique_count`: integer/string/real/boolean/datetime/variant → integer, без NULL; пустая строка считается один раз.
 - `min`/`max` для boolean → boolean (False < True), без NULL; полностью NULL → NULL.
-DateTime: count/min/max/mode/unique_count/null_count/first/last/only; даты сохраняют тип и время, счётчики → integer. Sum/avg/median/stddev/concat для DateTime недоступны.
-При нескольких функциях native-суффиксы: Mode, Std, Null.
+DateTime/Variant: count/min/max/mode/unique_count/null_count/first/last/only; счётчики → integer, остальные сохраняют тип. Sum/avg/median/stddev/concat недоступны. Variant читай точно: `cell_type`/`value`; Min пропускает NULL.
+Variant mode: 10/3.5/"text" → real 3.5; 1/1.0/"1" → integer 1; другие подтипы не обобщай. unique_count(1,1.0,"1")=2.
 
 ## Первое, последнее, единственное, список
 
-В том же узле `first`/`last` — первое/последнее в исходном порядке, включая крайний NULL; `only` — единственное различное значение (повторы допустимы), иначе NULL; `concat` — список без NULL, пустой текст сохраняется, полностью NULL → пустая строка. Для first/last/only вход integer/string/real/boolean/datetime; тип сохраняется. Для concat — только integer/string → string. Вход перед first/last не сортируй.
+В том же узле `first`/`last` — первое/последнее в исходном порядке, включая крайний NULL; `only` — единственное различное значение (повторы допустимы), иначе NULL; `concat` — список без NULL, пустой текст сохраняется, полностью NULL → пустая строка. Для first/last/only вход integer/string/real/boolean/datetime/variant; тип сохраняется. Для concat — только integer/string → string. Вход перед first/last не сортируй.
 
 Только `concat` требует `concat: {separator: "|", wrapper: "\"", unique: false, order: "none"}`. `wrapper`: пустая строка, двойная или одинарная кавычка; для чисел без ограничителя — пустая. `none` сохраняет порядок, `ASC`/`DESC` сортируют значения; `unique:true` удаляет повторы. Настройки одного поля. Для нескольких состояний перенастраивай тот же узел полными ключами, мерами, входом 0; после каждого Execute читай весь результат и отдельный CSV. Save сохраняет финальное состояние.
 

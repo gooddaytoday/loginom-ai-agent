@@ -1,0 +1,94 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.collapse_columns"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "output_port": 0,
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Cells",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "EmptyCells",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "FirstValue",
+          "type": "variant",
+          "label_any": true
+        },
+        {
+          "name": "LastValue",
+          "type": "variant",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "Cells": 3,
+          "EmptyCells": 0,
+          "FirstValue": {
+            "cell_type": "integer",
+            "value": 10
+          },
+          "LastValue": {
+            "cell_type": "string",
+            "value": "text"
+          }
+        },
+        {
+          "RowID": 2,
+          "Cells": 3,
+          "EmptyCells": 1,
+          "FirstValue": null,
+          "LastValue": {
+            "cell_type": "string",
+            "value": "word"
+          }
+        },
+        {
+          "RowID": 3,
+          "Cells": 3,
+          "EmptyCells": 3,
+          "FirstValue": null,
+          "LastValue": null
+        },
+        {
+          "RowID": 4,
+          "Cells": 3,
+          "EmptyCells": 1,
+          "FirstValue": {
+            "cell_type": "integer",
+            "value": -4
+          },
+          "LastValue": null
+        }
+      ]
+    }
+  ]
+}
