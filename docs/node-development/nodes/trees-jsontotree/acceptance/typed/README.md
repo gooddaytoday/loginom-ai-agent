@@ -1,14 +1,16 @@
 Комплект LAB-1558: typed tree reader на одном узле `trees.from_json`.
 R1 (LAB-1601): даты подтверждены native-пробой на Loginom 7.4.2 от 13.11.2026
 и зарегистрированы как `tree-dates`; общий reader не меняется. R2 (LAB-1647)
-добавляет массивы скаляров и `tree-scalar-arrays`; Variant остаётся циклом R3. План общего
+добавляет массивы скаляров и `tree-scalar-arrays`; R3 (LAB-1668) добавляет
+Variant-листья и отдельный сценарий `tree-variant`. План общего
 reader — [variant-reader/tree-reader.md](../../../variant-reader/tree-reader.md),
 раздел цикла — [plan.md](../../plan.md), «Typed tree reader — LAB-1558».
 `expected.json` — контейнер `cases` в формате `tree_outputs` (`check_tree`),
 **не вход stock run-check**. `expected-dates.json` — отдельная stock-проекция
 `cases.dates` без изменения исходных значений, с `outputs:[]`, двумя узлами
 `label_any` и `tree_outputs`. `expected-scalar-arrays.json` так же проецирует
-`cases.scalar_arrays`; обе проекции проверяет `oracle.py --check`.
+`cases.scalar_arrays`; `expected-variant.json` проецирует `cases.variant`.
+Все три проекции проверяет `oracle.py --check`.
 
 Модели передаются только выбранный `task-*.md` и
 `../../fixtures/typed/documents.csv` (одна строка, три строковых JSON-столбца).
@@ -27,7 +29,8 @@ python3 -I docs/node-development/nodes/trees-jsontotree/acceptance/typed/oracle.
 лист `type:"variant"` с `cell_type`/`value`, тип схемы `<scalar>_array` и
 значение DateTime `YYYY-MM-DDTHH:MM:SS.mmm`. DateTime уже проверяется с
 `precision:millisecond` и `representation:local_datetime`; `<scalar>_array`
-проверяется в R2, Variant ждёт R3. Нового механизма проверки нет. Массив назван
+проверяется в R2; Variant требует `precision:exact_native`, native-тег,
+точные `cell_type` и `value` (NULL — `cell_type:null`). Нового механизма проверки нет. Массив назван
 `items`: этого требует `check_tree`.
 
 Отношение к прежним комплектам. `acceptance/task-mixed-leaves.md` (LAB-1136)

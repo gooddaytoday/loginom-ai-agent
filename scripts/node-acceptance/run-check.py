@@ -429,7 +429,7 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures',
                     input_files=['orders.csv' if name == 'table-tree-json' else 'documents.csv'], base=None, external=True, tree_conversion=True)
-    if name in ['tree-dates', 'tree-scalar-arrays']:
+    if name in ['tree-dates', 'tree-scalar-arrays', 'tree-variant']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         src = node / 'acceptance/typed'
         kind = name.removeprefix('tree-')
@@ -1803,7 +1803,14 @@ def check_tree(port, expected):
         assert actual['index'] == index and actual['path'] == want['path'] and kind == want['type'], 'TREE_INSTANCE_ORDER_OR_TYPE'
         assert (actual['parent'] == binding['parent'] and 0 <= actual['schema_index'] < len(schema)
                 and schema[actual['schema_index']]['path'] == binding['schema_path']), 'TREE_SCHEMA_BINDING'
-        if 'children' in want:
+        if actual.get('type') == 'variant':
+            subtype = want.get('cell_type', 'null' if kind == 'null' else None)
+            assert (schema[actual['schema_index']]['type'] == 'variant' and subtype is not None
+                    and actual.get('cell_type') == subtype and actual.get('precision') == 'exact_native'
+                    and actual.get('native', {}).get('tag') == {'null': 1, 'real': 5, 'datetime': 7, 'string': 8, 'boolean': 11, 'integer': 20}.get(subtype)
+                    and actual.get('is_null') is (subtype == 'null')
+                    and type(actual.get('value')) is type(want['value']) and actual.get('value') == want['value']), 'TREE_VARIANT'
+        elif 'children' in want:
             assert actual['children'] == binding['children'], 'TREE_CHILDREN'
         elif kind == 'integer':
             assert actual.get('is_null') is False and actual.get('precision') == 'exact_integer' and actual.get('value') == want['value'], 'TREE_INT64'

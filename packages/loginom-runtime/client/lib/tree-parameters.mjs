@@ -77,7 +77,8 @@ export function validateTreeJsonScope(text){
    if(!key||key.length>128)throw Error('Tree field name exceeds stage 1 scope');
    const child=path+'/'+key.replaceAll('~','~0').replaceAll('/','~1');
    const kind=cell===null?'null':numbers.has(cell)?'number':Array.isArray(cell)?'array':typeof cell;
-   if(kind!=='null'&&kinds.has(child)&&kinds.get(child)!==kind)throw Error('Mixed Variant fields are outside tree stage 1');
+   if(kind!=='null'&&kinds.has(child)&&kinds.get(child)!==kind
+    &&([kind,kinds.get(child)].some(t=>['object','array'].includes(t))))throw Error('Mixed scalar/container fields are outside tree scope');
    if(kind!=='null')kinds.set(child,kind);
    const scalar=cell===null||numbers.has(cell)||typeof cell!=='object';
    if(scalar){if(leafNames.has(key)&&leafNames.get(key)!==child)throw Error('Colliding leaf names are outside tree stage 1');leafNames.set(key,child);}
@@ -105,7 +106,7 @@ export function validateJsonTreeSchema(schema){
  validateJsonArrayPaths(arrays.map(n=>n.path));
  const leaves=schema.filter(n=>!n.is_container);
  if(new Set(leaves.map(n=>n.name)).size!==leaves.length
-  ||leaves.some(n=>!['integer','real','string','boolean','datetime'].includes(n.type)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
+  ||leaves.some(n=>(!['integer','real','string','boolean','datetime','variant'].includes(n.type)||n.type==='variant'&&n.is_array)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
  return true;
 }
 

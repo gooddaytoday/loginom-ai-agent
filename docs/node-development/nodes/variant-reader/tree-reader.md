@@ -86,6 +86,19 @@ civil `YYYY-MM-DDTHH:MM:SS.mmm`. Это аддитивная строка осн
 метода/интерфейса и pins в `discovery` и делает один PR на R3, без
 рефакторинга. Подмена или перехват JS Loginom не нужны ни в одной ветке.
 
+### Реализация R3 / LAB-1668
+
+`tree-variant` использует ветку (б): reader166, internal interface2178,
+GetAsVariant7230, существующие decodeVariantFrame/adaptCell. `DataType 6`
+допущен общим reader; JSON preflight/output допускают смешанные скалярные
+листья. `cell_type`, native-тег и точное `value` сохраняются в tree instances;
+`check_tree` сравнивает их и отдельно проверяет native NULL. Табличный канал
+116/321 и переменные 427/1141 сохраняют прежние привязки и правила тегов.
+Пины функций, формат запроса и правила отказа —
+[discovery](../trees-jsontotree/discovery.md#r3--lab-1668-variant-reader-ветка-б).
+Сценарий и отдельная oracle-проекция — в typed-комплекте; смешанные массивы
+скаляров и преобразование Variant в таблицу остаются вне этого цикла.
+
 ## Кто выигрывает
 
 Все узлы с выходом-деревом читаются через `readTreePortSource`:

@@ -4,8 +4,8 @@ import {createNativeVariantReader} from './variant-native-read.mjs';
 import {decodeVariantFrame} from './variant-native-decode.mjs';
 import {adaptCell} from './variant-native-values.mjs';
 import {collectNativeRuntime} from './collapse-native-runtime.mjs';
-import {nativeRuntimePins,nativeVariablePins} from './collapse-native-runtime-pins.mjs';
-const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins,
+import {nativeRuntimePins,nativeVariablePins,nativeTreePins} from './collapse-native-runtime-pins.mjs';
+const variantCapability={read:createNativeVariantReader.toString(),decode:decodeVariantFrame.toString(),adapt:adaptCell.toString(),collect:collectNativeRuntime.toString(),pins:nativeRuntimePins,treePins:nativeTreePins,
  variables:readNativeVariableCells.toString(),variablePins:nativeVariablePins};
 
 export function makeNodeVariableOutputCode(binding,options){
@@ -184,7 +184,7 @@ export async function readNativeVariableCells(port,metadata,{deadline,stable},ca
 
 // The native reader indexes the ordered list passed to GetReader; array row
 // ranges are bound to their parent row, rather than inferred from leaf counts.
-export async function readTreePortSource(source,call,track,decode) {
+export async function readTreePortSource(source,call,track,decode,native) {
  const need=(ok,reason)=>{if(!ok)throw Error(reason);};
  const schema=[],definitions=[];
  const rpc=async(name,fn,parameters={})=>call(async()=>{try{return await fn();}catch(error){
@@ -206,7 +206,7 @@ export async function readTreePortSource(source,call,track,decode) {
   need(typeof name==='string'&&name.length<=512&&typeof label==='string'&&label.length<=16384
    &&typeof container==='boolean'&&typeof array==='boolean','tree_schema_metadata');
   const type=container?'object':types[await rpc('schema_type',()=>def.get_DataType())];
-  need(type&&type!=='variant','tree_scalar_type');
+  need(type,'tree_scalar_type');
   const item={index,parent,path,name,label,type,is_container:container,is_array:array,children:[]};
   schema.push(item);definitions.push(def);
   if(container){
@@ -224,6 +224,9 @@ export async function readTreePortSource(source,call,track,decode) {
  };
  const root=await acquire('root',()=>source.get_RootNodeDef());await visit(root,null,'',0);
  const reader=await acquire('reader',()=>source.GetReader(definitions));
+ const variants=schema.some(n=>n.type==='variant');
+ need(!variants||typeof native==='function','tree_variant_reader_required');
+ const readVariant=variants?await native(reader):null;
  let nodeCount=0,maxDepth=0;
  const count=depth=>{need(++nodeCount<=256,'tree_instance_limit');need(depth<=16,'tree_depth_limit');maxDepth=Math.max(maxDepth,depth);};
  const bytes=tree=>need(new TextEncoder().encode(JSON.stringify(tree)).length<=1024*1024,'tree_response_byte_limit');
@@ -245,7 +248,9 @@ export async function readTreePortSource(source,call,track,decode) {
    for(const child of def.children)children.push(await instance(child,row,path+'/'+pointer(schema[child].name),depth+1));
    const value={schema_index:index,path,type:'object',children};bytes(value);return value;
   }
-  const decoded=decode(await rpc('value',()=>reader.AsVariant(index,row),{schema_index:index,row}),def.type);
+  const decoded=def.type==='variant'
+   ?{cell:await rpc('variant_value',()=>readVariant(row,index),{schema_index:index,row}),limitations:[]}
+   :decode(await rpc('value',()=>reader.AsVariant(index,row),{schema_index:index,row}),def.type);
   need(decoded.limitations.length===0,'tree_unverified_precision');
   const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
  };
@@ -410,7 +415,14 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    if(target.kind==='tree'){
     need(q.rowOffset===undefined,'tree_row_offset');
     const call=async read=>{live();stable();const result=await read();live();stable();return result;};
-    const tree=await readTree(dataSource,call,proxy=>{items.push(proxy);return proxy;},decode);
+    const tree=await readTree(dataSource,call,proxy=>{items.push(proxy);return proxy;},decode,async reader=>{
+     const getter=dataSource.GetReader;
+     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(Function.prototype.toString.call(getter))))).map(n=>n.toString(16).padStart(2,'0')).join('');
+     need(hash===variant.treePins.get_reader&&reader.$S===dataSource.$S,'tree_reader_implementation');
+     const nativeDecode=eval('('+variant.decode+')'),adapt=eval('('+variant.adapt+')');
+     nativeReader=await eval('('+variant.read+')')(reader,{deadline:o.deadline,treeValue:true,stable:()=>{live();stable();need(dataSource.GetReader===getter,'tree_reader_changed');}},nativeDecode,eval('('+variant.collect+')'),variant.pins,variant.treePins);
+     return async(row,index)=>{const raw=await nativeReader.read(row,index);return adapt(raw,{type:'variant'},{dateProfile:'loginom-7.4.2-native-oadate',civilTime:raw.civilTime},nativeDecode);};
+    });
     result={port:q.port,port_guid:baseline.portGuid,port_kind:'tree',fresh:true,execution_id:q.execution.execution_id,
      freshness_basis:'completed_execution_port_source',tree,sample_complete:true};
    }else{
