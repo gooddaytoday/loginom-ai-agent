@@ -32,6 +32,16 @@ oracle из данных, reference, collect/check, cold, finalize и validation
 только с B+inputs; ответ закрепить до раскрытия D/oracle. Не использовать
 контекст автора как blind executor. Измерительный FAIL/NULL сохраняется.
 
+Измерения: `bun --no-env-file run script/run-analytics-measurements.ts --manifest <private-series.json>`.
+Worker каждой заранее установленной root-owned unit: те же аргументы с
+`--job <id> --generation <0..3>`. В manifest initial unit/resultsDir и до трёх
+`retryBindings` каждой формы закреплены до серии. После исправления доказанного
+предмодельного отказа: `--retry-preflight <id> --generation <1..3>`; затем обычный
+controller. Authorization требует terminal own invocation, нулевых measurement
+admissions всей истории и проверенного release server/profile/judge. Unknown и
+начатые FAIL/NULL не повторять. Код 1 означает running/hold, а не разрешение
+нового запуска; читать точный stderr и unit/native evidence.
+
 Для cold использовать `node script/analytics-cold-rerun.mjs <private-input.json>`.
 Вход: `resources`, `connection` (url/username/password), `packagePath`,
 `output` (новый каталог), `skillEnv`, `caseDir`, `attemptDir`. Команда проверяет

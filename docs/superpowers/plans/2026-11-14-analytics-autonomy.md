@@ -44,6 +44,10 @@ evals Loginom» на runner2 самостоятельно создаёт пят�
   runPreparedSlots. Manifest задаёт 2/8 упорядоченных jobs, pins, units и memory
   scope. Lock + атомарный launch intent + native journals, без второго workflow
   journal. Adopt active/terminal unit, сохранять FAIL/NULL; unknown запуск — hold.
+  Для доказанного zero-admission допускаются до трёх заранее закреплённых retry
+  bindings (свои unit/resultsDir), immutable authorization, проверка всей истории
+  в controller и worker и отдельный gate release судьи. Общие locks исключают
+  параллельный ремонт. Это реализует согласованный premodel retry без replay.
   Полные before/after snapshots и audit каждой попытки. Результат: restart,
   unknown admission, cleanup, память и cold проверены; run-campaign не меняется.
 - [ ] **4. Инструкции и установка.** Обновить Git и live роли существующих
@@ -94,8 +98,10 @@ evals: около 140 файлов / 5000 строк + LGP. При удвоен�
 - Cold caller перенесён; measurement CLI/memory/audit реализованы частично, source-only.
 - Проверено: 37 PASS, 8 systemd/live SKIP, package typecheck, syntax и staged secret scan.
 - Review: обязательные замечания к готовому коду закрыты; readiness не принята.
-- Осталось: explicit zero-admission repair, subprocess crash/adopt, installed units и полная репетиция.
-- Сеть runner2 блокирует Multica: configured upstream и direct MAS TCP/HTTPS timeout даже без DNS.
+- Explicit zero-admission retry реализован/review APPROVE, 12 tests PASS + typecheck.
+- На runner2: четыре systemd tests PASS/41 assertions; scoped judge --version PASS.
+- Осталось: восстановить начальную preparation по сохранённым receipts, installed measurement units и репетиция.
+- Сеть восстановлена владельцем; online runtime подтверждён. Новые выделенные pairs созданы.
 - Shared daemon не перезапускался, чужие ресурсы не изменялись; готовая Backlog-карточка не создана.
-- Условие продолжения: рабочий сетевой путь runner2→Multica/model/Knowledge/memory, runtime online.
+- Текущий этап: own prepare/verify; исходные отказы/история сохраняются, готовность не заявлена.
 - Push/PR выполняет владелец здесь после карточки; GitHub credential runner2 исключён.

@@ -60,7 +60,7 @@ export async function snapshotActor(memory: ActorMemory, base: string, token: st
     peer_root_entries: { [memory.peerRoot]: peer }, directories, files, peer_metadata }
 }
 
-export type MeasurementJob = { id: string; form: string; taskId: string; tasksDir: string; unit: string; resultsDir: string }
+export type MeasurementJob = { id: string; form: string; taskId: string; tasksDir: string; unit: string; resultsDir: string; retryBindings?: { unit: string; resultsDir: string }[] }
 export async function freezeMeasurementInputs(file: string, manifestHash: string, jobs: MeasurementJob[]) {
   const { agentInputsHash, loadTasks, rubricHash } = await import("./task")
   const pins = await Promise.all(jobs.map(async job => {
@@ -99,6 +99,12 @@ export function validateManifest(value: unknown): MeasurementManifest {
     !["business", "detailed"].includes(job.form) || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.service$/.test(job.unit) ||
     ![job.tasksDir, job.resultsDir].every(item => typeof item === "string" && path.isAbsolute(item))) throw Error("MANIFEST_JOB_INVALID")
   for (const key of ["id", "unit", "resultsDir"] as const) if (new Set(manifest.jobs.map(job => job[key])).size !== manifest.jobs.length) throw Error("MANIFEST_JOB_DUPLICATE")
+  const bindings = manifest.jobs.flatMap(job => {
+    if (job.retryBindings !== undefined && (!Array.isArray(job.retryBindings) || job.retryBindings.length > 3)) throw Error("MANIFEST_RETRY_INVALID")
+    return [job, ...(job.retryBindings ?? [])]
+  })
+  for (const binding of bindings) if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.service$/.test(binding.unit) || typeof binding.resultsDir !== "string" || !path.isAbsolute(binding.resultsDir) || path.resolve(binding.resultsDir) !== binding.resultsDir) throw Error("MANIFEST_RETRY_INVALID")
+  if (new Set(bindings.map(binding => binding.unit)).size !== bindings.length || bindings.some((binding, index) => bindings.some((other, at) => at !== index && (binding.resultsDir === other.resultsDir || binding.resultsDir.startsWith(other.resultsDir + path.sep))))) throw Error("MANIFEST_BINDING_DUPLICATE")
   return manifest
 }
 
@@ -164,4 +170,33 @@ export async function auditMeasurement(job: MeasurementJob, journalFile: string,
   })
   return { version: 1, kind: "analytics-measurement-audit", job: job.id, runDir: journal.runDir, journalFile, rawOutcome,
     outcomeAvailable: result !== null, unavailable, checks, status: checks.every(item => item.passed) ? "PASS" : "INCOMPLETE" }
+}
+
+export async function measurementRetrySources(job: MeasurementJob, unit: Record<string, string>, nativeFile: string, entryFile: string, manifestHash: string) {
+  const native = await Bun.file(nativeFile).json(), entry = await Bun.file(entryFile).json()
+  if (measurementState(job, unit, native) !== "zero-admissions" || entry.manifestHash !== manifestHash || entry.job !== job.id ||
+    entry.binding?.manager !== "system" || JSON.stringify(entry.binding) !== JSON.stringify(native.unitBinding)) throw Error("RETRY_SOURCE_UNCONFIRMED")
+  return Promise.all([nativeFile, entryFile].map(async file => ({ file, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") })))
+}
+
+export async function verifyMeasurementRetryProof(file: string, manifestHash: string, job: string, generation: number) {
+  const proof = await Bun.file(file).json()
+  if (proof.manifestHash !== manifestHash || proof.job !== job || proof.generation !== generation || !Array.isArray(proof.sources) || proof.sources.length < 2 || !Array.isArray(proof.releases)) throw Error("RETRY_PROOF_UNCONFIRMED")
+  for (const source of [...proof.sources, ...proof.releases]) {
+    if (typeof source.file !== "string" || !path.isAbsolute(source.file) || new Bun.CryptoHasher("sha256").update(await Bun.file(source.file).bytes()).digest("hex") !== source.sha256) throw Error("RETRY_EVIDENCE_CHANGED")
+  }
+}
+
+export async function measurementRetryReleases(keys: string[], lockRoot?: string) {
+  const { readResourceReservation } = await import("./lease")
+  const releases: { file: string; sha256: string }[] = []
+  for (const key of keys) {
+    const reservation = await readResourceReservation({ key, lockRoot })
+    if (!reservation && key.startsWith("judge:")) continue
+    if (reservation?.state !== "released" || !reservation.releaseEvidence) throw Error("RETRY_RELEASE_UNCONFIRMED")
+    const file = reservation.releaseEvidence.path
+    if (new Bun.CryptoHasher("sha256").update(JSON.stringify(await Bun.file(file).json())).digest("hex") !== reservation.releaseEvidence.sha256) throw Error("RETRY_RELEASE_UNCONFIRMED")
+    releases.push({ file, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") })
+  }
+  return releases
 }

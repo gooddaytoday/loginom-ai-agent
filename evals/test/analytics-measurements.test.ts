@@ -109,3 +109,69 @@ test("frozen measurement inputs reject later task or rubric changes", async () =
     }
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("retry bindings reject duplicate units and overlapping results across the entire series", () => {
+  const manifest = { version: 1, kind: "analytics-measurements", id: "example", stateDir: "/tmp/example/state", controllerEnvFile: "/tmp/example/env", slotsFile: "/tmp/example/slots", resourceBudgetFile: "/tmp/example/budget", memory: { scope: "actor" }, pins: Object.fromEntries(["controllerEnvSha256", "slotsSha256", "resourceBudgetSha256", "cliBinarySha256", "cliManifestSha256"].map(key => [key, "a".repeat(64)])), jobs: Array.from({ length: 2 }, (_, index) => ({ id: `job-${index}`, taskId: "sample", form: "business", unit: `example-${index}.service`, tasksDir: "/tmp/example/tasks", resultsDir: `/tmp/example/results-${index}`, retryBindings: [{ unit: `retry-${index}.service`, resultsDir: `/tmp/example/retry-${index}` }] })) }
+  expect(validateManifest(manifest).jobs).toHaveLength(2)
+  expect(() => validateManifest({ ...manifest, jobs: manifest.jobs.map(job => ({ ...job, retryBindings: [{ unit: "example-0.service", resultsDir: "/tmp/example/other" }] })) })).toThrow()
+  expect(() => validateManifest({ ...manifest, jobs: manifest.jobs.map(job => ({ ...job, retryBindings: [{ unit: `retry-${job.id}.service`, resultsDir: job.resultsDir + "/nested" }] })) })).toThrow()
+})
+
+test("retry source admission requires terminal own worker and preserves original evidence", async () => {
+  const { measurementRetrySources } = await import("../src/analytics-measurements")
+  const root = await mkdtemp(path.join(os.tmpdir(), "measurement-retry-"))
+  try {
+    const job = { id: "one", taskId: "sample", form: "business", tasksDir: root, unit: "example.service", resultsDir: root }
+    const unit = { Id: job.unit, Delegate: "no", ActiveState: "failed", MainPID: "0", ControlGroup: "", InvocationID: "own" }
+    const binding = { unit: job.unit, invocation: "own", manager: "system" }
+    const native = path.join(root, "native.json"), entry = path.join(root, "entry.json")
+    await Bun.write(native, JSON.stringify({ version: 2, kind: "unactivated-preparation", runDir: root + "/run", unitBinding: binding, attempts: [] }))
+    await Bun.write(entry, JSON.stringify({ manifestHash: "pin", job: job.id, binding }))
+    expect(await measurementRetrySources(job, unit, native, entry, "pin")).toHaveLength(2)
+    const journal = await Bun.file(native).json()
+    for (const attempts of [undefined, null, [{ purpose: "measurement", taskId: job.taskId, slotId: "example", attempt: 1 }]]) {
+      await Bun.write(native, JSON.stringify({ ...journal, attempts }))
+      await expect(measurementRetrySources(job, unit, native, entry, "pin")).rejects.toThrow("RETRY_SOURCE_UNCONFIRMED")
+    }
+    await Bun.write(native, JSON.stringify(journal))
+    await expect(measurementRetrySources(job, { ...unit, ActiveState: "active" }, native, entry, "pin")).rejects.toThrow("RETRY_SOURCE_UNCONFIRMED")
+    await Bun.write(entry, JSON.stringify({ manifestHash: "pin", job: job.id, binding: { ...binding, invocation: "foreign" } }))
+    await expect(measurementRetrySources(job, unit, native, entry, "pin")).rejects.toThrow()
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("retry proof restart preserves immutable authorization and refuses changed native history", async () => {
+  const { verifyMeasurementRetryProof } = await import("../src/analytics-measurements")
+  const root = await mkdtemp(path.join(os.tmpdir(), "measurement-proof-"))
+  try {
+    const native = path.join(root, "native.json"), entry = path.join(root, "entry.json"), authorization = path.join(root, "authorization.json")
+    await Bun.write(native, "zero admissions"); await Bun.write(entry, "original worker")
+    const sources = await Promise.all([native, entry].map(async file => ({ file, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") })))
+    const proof = { manifestHash: "pin", job: "one", generation: 1, sources, releases: [] }
+    expect(await exclusiveFact(authorization, proof)).toBe(true)
+    expect(await exclusiveFact(authorization, { ...proof, generation: 2 })).toBe(false)
+    const child = Bun.spawn([process.execPath, "-e", `const {verifyMeasurementRetryProof}=await import(${JSON.stringify(path.join(evalsRoot, "src/analytics-measurements.ts"))});await verifyMeasurementRetryProof(process.argv[1],"pin","one",1)`, authorization], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    await expect(verifyMeasurementRetryProof(authorization, "pin", "one", 2)).rejects.toThrow("RETRY_PROOF_UNCONFIRMED")
+    await Bun.write(native, "measurement admitted")
+    await expect(verifyMeasurementRetryProof(authorization, "pin", "one", 1)).rejects.toThrow("RETRY_EVIDENCE_CHANGED")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("retry release gate rejects a real held judge reservation and accepts its confirmed release", async () => {
+  const { measurementRetryReleases } = await import("../src/analytics-measurements")
+  const { acquireJudgeLease, writeLeaseReceipt } = await import("../src/lease")
+  const root = await mkdtemp(path.join(os.tmpdir(), "measurement-release-"))
+  try {
+    const home = path.join(root, "judge"), journal = path.join(root, "journal.json"), lockRoot = path.join(root, "locks")
+    await mkdir(home, { mode: 0o700 }); await mkdir(lockRoot, { mode: 0o700 }); await writeLeaseReceipt(journal, { commandId: "example" })
+    const lease = await acquireJudgeLease({ codexHome: home, commandId: "example", journal, lockRoot })
+    try {
+      await expect(measurementRetryReleases([`judge:${home}`], lockRoot)).rejects.toThrow("RETRY_RELEASE_UNCONFIRMED")
+      const file = path.join(root, "release.json")
+      await writeLeaseReceipt(file, { version: 2, status: "confirmed", reason: "judge-unit-terminated", key: lease.reservation.key, token: lease.reservation.token, revision: lease.reservation.revision })
+      await lease.release(file)
+      expect(await measurementRetryReleases([`judge:${home}`], lockRoot)).toHaveLength(1)
+    } finally { await lease.close() }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
