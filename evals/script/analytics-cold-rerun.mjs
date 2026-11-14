@@ -1,10 +1,10 @@
 // Cold rerun through the installed browser procedures; no settings or Save.
 // Input contains connection, saved package and resources; no oracle or D prompt.
-import {readFile,writeFile,mkdir} from 'node:fs/promises';
-import {execFileSync} from 'node:child_process';
+import {readFile,writeFile,mkdir,realpath} from 'node:fs/promises';
+import {execFileSync,spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {join} from 'node:path';
+import {join,isAbsolute,sep} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
 process.umask(0o077);
@@ -17,15 +17,28 @@ const python=(name,args)=>execFileSync('python3',['-B',join(scripts,name),...arg
 const settings=Object.fromEntries((await readFile(input.skillEnv,'utf8')).split('\n').filter(l=>l.includes('=')&&!l.trimStart().startsWith('#')).map(l=>{const i=l.indexOf('=');return[l.slice(0,i).trim(),l.slice(i+1).trim()]}));
 const storage=JSON.parse(await readFile(join(input.attemptDir,'storage.json'),'utf8'));
 if (settings.LOGINOM_USERNAME!==input.connection.username || settings.LOGINOM_URL!==input.connection.url || storage.package!==input.packagePath) throw Error('COLD_ATTEMPT_IDENTITY');
+// Units may use the host Node; browser resources require their pinned executable.
+const resourceRoot=await realpath(input.resources);
+const runtimeManifest=JSON.parse(await readFile(join(resourceRoot,'resource-manifest.json'),'utf8'));
+if (typeof runtimeManifest.node!=='string' || isAbsolute(runtimeManifest.node) || runtimeManifest.node.split(/[\\/]/).some(x=>x==='..'||x==='.')) throw Error('COLD_NODE_RUNTIME_INVALID');
+const nodePath=await realpath(join(resourceRoot,runtimeManifest.node));
+if (!nodePath.startsWith(resourceRoot+sep) || !/^[a-f0-9]{64}$/.test(runtimeManifest.nodeSha256) ||
+    !Array.isArray(runtimeManifest.files) || !runtimeManifest.files.some(file=>file.path===runtimeManifest.node&&file.sha256===runtimeManifest.nodeSha256) ||
+    createHash('sha256').update(await readFile(nodePath)).digest('hex')!==runtimeManifest.nodeSha256) throw Error('COLD_NODE_RUNTIME_INVALID');
+if (await realpath(process.execPath)!==nodePath) {
+ const child=spawnSync(nodePath,[fileURLToPath(import.meta.url),...process.argv.slice(2)],{stdio:'inherit'});
+ if(child.error)throw child.error;
+ process.exit(child.status??1);
+}
+const load=p=>import(pathToFileURL(join(resourceRoot,'runtime',p)).href);
+const {verifyResources}=await load('src/resources.mjs');
+const resources=await verifyResources(resourceRoot);
 const serverPath=join(settings.LOGINOM_STORAGE,input.packagePath.split('/').at(-1));
 const serverHash=()=>createHash('sha256').update(execFileSync('docker',['exec',settings.LOGINOM_CONTAINER,'cat',serverPath],{maxBuffer:64*1024*1024})).digest('hex');
 const before=serverHash();
 if(before!==createHash('sha256').update(await readFile(join(input.attemptDir,'package.lgp'))).digest('hex')) throw Error('COLD_PACKAGE_CHANGED');
 await mkdir(input.output,{recursive:false,mode:0o700});
 python('collect_artifacts.py',[input.attemptDir,'--park']);
-const load=p=>import(pathToFileURL(join(input.resources,'runtime',p)).href);
-const {verifyResources}=await load('src/resources.mjs');
-const resources=await verifyResources(input.resources);
 const {loginBrowser}=await load('src/connection-check.mjs');
 const {makeWorkspacePrepareCode}=await load('client/lib/workspace.mjs');
 const {createNodeTargetBrowserAdapter}=await load('client/lib/node-target-browser.mjs');
