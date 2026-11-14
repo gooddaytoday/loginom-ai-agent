@@ -156,6 +156,11 @@ async function management(method: string, input: unknown, host: Awaited<ReturnTy
   if (method === "connection.save") {
     const value = save(input)
     if (Option.isNone(value)) throw new Error("LOGINOM_SAVE_INVALID")
+    // Only setup saves a connection. Ordinary check/status keep the fast cache
+    // path, including when they run after a fresh CLI process is started.
+    await host.verifyInstallationResources().catch(() => {
+      throw new Error("LOGINOM_RUNTIME_START_FAILED")
+    })
     await host.api.save(value.value)
     await host.settled()
     return host.api.status()
