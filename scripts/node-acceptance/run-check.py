@@ -82,6 +82,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'supernode-calc' and not cases and not case_root:
+        node = REPO / 'docs/node-development/nodes/control-supernode'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task.md', data=node / 'fixtures',
+                    base=None, input_files=['input.csv', 'replacement.csv'], export_count=2,
+                    supernode=True, initial_table='expected-initial.json')
     if name in ['bindings-grouping-sort', 'bindings-sorting-locale']:
         node = 'grouping' if name == 'bindings-grouping-sort' else 'sorting'
         src = REPO / 'docs/node-development/variables/bindings/acceptance/cycle3'
@@ -113,6 +118,14 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src / 'acceptance', prompt=src / 'acceptance/task-filter.md', data=src / 'fixtures', base=None,
                     input_files=['filter.csv'], export_count=6, filter_initial='filter/expected-initial.json',
                     expected_name='filter/expected.json', oracle=src / 'acceptance/oracle.py')
+    if name in ['row-filter-typed', 'row-filter-null']:
+        node = REPO / 'docs/node-development/nodes/row-filter'
+        typed = name == 'row-filter-typed'
+        return dict(source=node / 'acceptance/typed', prompt=node / ('acceptance/typed/task-variable-typed.md' if typed else 'acceptance/typed/task-variable-null.md'),
+                    data=node / 'fixtures/typed', base=None, input_files=['rows.csv'], export_count=4 if typed else 2,
+                    expected_name='expected-typed-final.json' if typed else 'expected-null.json',
+                    filter_initial='expected-typed-initial.json' if typed else None,
+                    oracle=node / 'acceptance/typed/oracle.py', filter_variable_case='typed' if typed else 'null')
     if name == 'row-filter-top-n':
         node = REPO / 'docs/node-development/nodes/row-filter'
         return dict(source=node / 'acceptance/typed', prompt=node / 'acceptance/typed/task-top-n.md',
@@ -2184,6 +2197,15 @@ class Runner:
                 mode='variable', variable=dict(kind='control', input=0, name='TopN' if spec.get('filter_top_n') else 'Limit', type='integer', is_null=False),
                 source=dict(type='variables.user', output=4))]
             if spec.get('filter_top_n'): expected['binding_inventory'][0]['field'] = dict(kind='row_number')
+        if spec.get('filter_variable_case'):
+            typed = spec['filter_variable_case'] == 'typed'
+            expected['row_filter_typed' if typed else 'row_filter_null'] = True
+            variables = [('MinScore', 'real', not typed), *([('Since', 'datetime', False)] if typed else [])]
+            expected['binding_inventory'] = [dict(node=dict(type='transform.filter_data'), parameter=f'/groups/0/{i}/value',
+                mode='variable', variable=dict(kind='control', input=0, name=name, type=kind, is_null=is_null),
+                source=dict(type='variables.user', output=4),
+                condition=dict(field=dict(kind='input_field', name='Score' if i == 0 else 'Seen'), type=kind, operator_code=3))
+                for i, (name, kind, is_null) in enumerate(variables)]
         if spec.get('boolean_binding'):
             grouping = spec['boolean_binding'] == 'grouping'
             for output in expected['outputs']: output['column_order'] = 'exact'
@@ -2324,12 +2346,12 @@ class Runner:
             write(folder / 'binding-events.json', evidence)
             self.phase('boolean-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/bindings-grouping-sort.mjs',
                 src / spec['binding_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
-        if case in ['filter-bindings', 'row-filter-top-n']:
+        if case in ['filter-bindings', 'row-filter-top-n'] or spec.get('filter_variable_case'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
             write(folder / 'binding-events.json', evidence)
             self.phase('filter-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/filter-bindings.mjs',
-                src / spec['filter_initial'], folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
+                src / (spec.get('filter_initial') or spec['expected_name']), folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
         if spec.get('excel_named_initial'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -2790,6 +2812,9 @@ class Runner:
         header = spec.get('csv_header', 'names')
         if case == 'text-multi-file-list':
             check_text_multi_file_list(replies)
+        if spec.get('supernode'):
+            self.phase('supernode-audit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/supernode-audit.mjs',
+                       folder / 'model.stdout', src, folder / 'supernode-audit.json', *sorted(profile.rglob('execution-events.jsonl'))], folder, timeout=60)
         if spec.get('text_file_info'):
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_file_info(replies)
@@ -2834,7 +2859,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
+            csv_expected = (read(src / spec['initial_table'])['outputs'][0] if spec.get('initial_table') and index == 0
+                            else expected['outputs'][0] if spec.get('initial_table')
+                            else read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
                             else expected['outputs'][0] if spec.get('rest_query_initial')
                             else read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
                             else expected['outputs'][0] if spec.get('binding_initial')

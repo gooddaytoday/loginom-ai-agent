@@ -1,5 +1,5 @@
 /** Shared 02/03 contract. Runtime publication of node.apply belongs to 03. */
-export type NodeType = 'imports.database' | 'variables.replace' | 'variables.column_union' | 'variables.calculator' | 'variables.from_table' | 'variables.to_table' | 'variables.user' | 'research.quality' | 'imports.lgd' | 'exports.lgd' | 'preprocessing.coarse_classes' | 'research.factor_analysis' | 'trees.from_table' | 'trees.to_json' | 'datamining.assn_rules' | 'transform.ungroup_data' | 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
+export type NodeType = 'control.supernode' | 'control.supernode_output' | 'imports.database' | 'variables.replace' | 'variables.column_union' | 'variables.calculator' | 'variables.from_table' | 'variables.to_table' | 'variables.user' | 'research.quality' | 'imports.lgd' | 'exports.lgd' | 'preprocessing.coarse_classes' | 'research.factor_analysis' | 'trees.from_table' | 'trees.to_json' | 'datamining.assn_rules' | 'transform.ungroup_data' | 'preprocessing.smoothing' | 'preprocessing.binning' | 'research.auto_correlation' | 'exports.excel' | 'trees.from_json' | 'trees.to_table' | 'preprocessing.elim_outlier' | 'datamining.log_regression' | 'research.corr_analysis' | 'preprocessing.sampling' | 'preprocessing.data_partition' | 'imports.excel' | 'integration.rest_request' | 'datamining.lin_regression' | 'datamining.clustering' | 'exports.text' | 'transform.collapse_columns' | 'preprocessing.data_recovery' | 'transform.date_time' | 'transform.sliding_window' | 'imports.text' | 'transform.calculator' | 'transform.reform_columns'
   | 'research.duplicates' | 'transform.replace_columns' | 'transform.filter_data' | 'transform.group_data' | 'transform.sorting'
   | 'transform.enrich_data' | 'transform.join_data' | 'transform.union_data' | 'transform.cross_table' | 'programming.javascript' | 'programming.python';
 export interface WorkflowRef { workflow_id: string; tab_tid: string; prefix: string; navigation_path: {tid: string; label: string}[] }
@@ -13,7 +13,10 @@ export interface VariableInputLink extends InputLink { kind: 'variables' | 'cont
 export interface VariableBinding { parameter: string; variable: {kind: 'variables' | 'control'; input: number; name: string} }
 export interface VariableBindingReadback extends VariableBinding {
   mode: 'variable'; row_id: string;
-  variable: VariableBinding['variable'] & {id: number; type: 'integer' | 'string' | 'boolean'; is_null: false};
+  variable: VariableBinding['variable'] & {id: number} & (
+    {type: 'integer' | 'string' | 'boolean'; is_null: false}
+    | {kind: 'control'; input: 0; type: 'real'; is_null: boolean}
+    | {kind: 'control'; input: 0; type: 'datetime'; is_null: false});
   source: {ref: NodeRef; type: NodeType; output: number; variable_id: number};
   input_port_guid: string; connected: true; verified: true;
 }

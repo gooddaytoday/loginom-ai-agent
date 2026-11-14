@@ -12,6 +12,13 @@ function fixture(){
  const context={document:{querySelectorAll:()=>[root]},Ext:{getCmp:()=>grid},Date};
  return {data,rows,inputs,rs,grid,controller,context,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readFilterBrowser.toString()+')("WF")',context)))};
 }
+for(const [type,value] of [[3,0.5],[2,new Date(2024,1,29)],[3,null]])test('native typed variable identity '+type+' '+value,()=>{
+ const f=fixture();f.inputs[0].data.DataType=type;
+ Object.assign(f.data,{DataType:type,UseVariables:1,RelationType:3,CompareValue:'Threshold'});
+ f.controller.FVariablesData={FVariables:[{Index:0,DisplayName:'Threshold',DataType:type,Value:value,ValueAsString:'native display',IsNull:value===null}]};
+ const r=f.read();assert.equal(r.verified,true);assert.deepEqual(r.rows[0].value,{kind:'variable',name:'Threshold'});
+ if(type===2)assert.equal(r.control_variables[0].value,'2024-02-29T00:00:00.000');
+});
 test('filter reads the complete ordered local condition inventory and preserves exact values',()=>{
  const f=fixture();f.rows.push({isModel:true,internalId:'or',data:{IsOperatorRecord:true}});
  f.rows.push({isModel:true,internalId:'row',data:{...f.data,Name:'',RowNumberer:1,RelationType:8,CompareValueLowerBound:2,CompareValueUpperBound:4}});
