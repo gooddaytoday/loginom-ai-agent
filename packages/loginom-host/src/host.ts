@@ -1,6 +1,7 @@
 import { inputStore, type InputFile } from "./inputs"
-import { appendFile, mkdir, readFile, rm } from "node:fs/promises"
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
+import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { Schema } from "effect"
 import { Loginom } from "@opencode-ai/schema/loginom"
@@ -13,6 +14,7 @@ import { fileReferences } from "./file-reference"
 import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
+import { launchNodeHost, NodeHostStartupError } from "./node-client"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export function verifyInstallationResources(options: {
@@ -30,6 +32,71 @@ export function verifyInstallationResources(options: {
     requireCache: true,
     signal: options.signal,
   })
+}
+
+export async function warmInstallationBrowser(options: {
+  root: string
+  resources: string
+  verified: Awaited<ReturnType<typeof verifyInstallationResources>>
+}) {
+  const started = performance.now()
+  // Keep Chromium's nested paths short on Windows, as in managed-entry.
+  const profile = await mkdtemp(join(tmpdir(), "lbw"))
+  const receipt = {
+    protocol: 1,
+    profile,
+    manifestHash: options.verified.manifestHash,
+    browserHash: options.verified.browserHash,
+  }
+  const path = join(options.root, "browser-warmup.json")
+  const cleanup = { confirmed: true }
+  try {
+    await writeFile(path, JSON.stringify({ ...receipt, status: "starting" }) + "\n", { mode: 0o600 })
+    cleanup.confirmed = false
+    const worker = await launchNodeHost({
+      node: options.verified.nodePath,
+      entry: join(options.resources, "runtime/src/browser-warmup-entry.mjs"),
+      root: options.root,
+      resources: options.resources,
+      headless: true,
+    })
+    try {
+      const result = await worker.request("warm", { browserPath: options.verified.browserPath, profile }, 45_000)
+      if (!result || typeof result !== "object" || !("warmed" in result) || result.warmed !== true)
+        throw Error("LOGINOM_BROWSER_WARMUP_FAILED")
+    } finally {
+      await worker.close()
+      cleanup.confirmed = true
+    }
+    const exit = await worker.exited
+    await rm(profile, { recursive: true, force: true })
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...receipt,
+        status: "ready",
+        closed_ack: true,
+        node_exit_code: exit.code,
+        duration_ms: Math.round(performance.now() - started),
+        completed_at: new Date().toISOString(),
+      }) + "\n",
+      { mode: 0o600 },
+    )
+  } catch (error) {
+    if (error instanceof NodeHostStartupError) cleanup.confirmed = error.cleanupConfirmed
+    if (cleanup.confirmed) await rm(profile, { recursive: true, force: true })
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...receipt,
+        status: "failed",
+        closed_ack: cleanup.confirmed,
+        duration_ms: Math.round(performance.now() - started),
+      }) + "\n",
+      { mode: 0o600 },
+    ).catch(() => undefined)
+    throw Error("LOGINOM_BROWSER_WARMUP_FAILED", { cause: error })
+  }
 }
 
 export async function createLoginomHost(options: {

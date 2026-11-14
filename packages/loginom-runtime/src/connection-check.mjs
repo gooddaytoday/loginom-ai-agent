@@ -38,23 +38,47 @@ export function loginomAddress(value) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
+  const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
+  const measure = async (name, action) => {
+    const start = performance.now()
+    await emit({ phase: name, status: "starting" })
+    try {
+      const result = await action()
+      await emit({ phase: name, status: "ready", duration_ms: Math.round(performance.now() - start) })
+      return result
+    } catch (error) {
+      await emit({ phase: name, status: "failed", duration_ms: Math.round(performance.now() - start) })
+      throw error
+    }
+  }
   const remaining = limit => {
     const left = deadline - Date.now()
     if (left <= 0) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     return Math.min(limit, left)
   }
   try {
-    await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: remaining(60_000) })
+    const response = await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
+      { waitUntil: "domcontentloaded", timeout: remaining(60_000) }))
+    try {
+      const timing = response?.request?.()?.timing?.()
+      if (timing) {
+        const span = (a,b) => Number.isFinite(a) && Number.isFinite(b) && a >= 0 && b >= a ? Math.round(b-a) : null
+        await emit({ phase:"login.network", status:"ready", dns_ms:span(timing.domainLookupStart,timing.domainLookupEnd),
+          tcp_ms:span(timing.connectStart,timing.secureConnectionStart >= 0 ? timing.secureConnectionStart : timing.connectEnd),
+          tls_ms:span(timing.secureConnectionStart,timing.connectEnd), server_ms:span(timing.requestStart,timing.responseStart),
+          transfer_ms:span(timing.responseStart,timing.responseEnd) })
+      }
+    } catch { /* Network timings are optional and contain no URL, headers or body. */ }
     const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
     const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
     for (;;) {
       phase = "form"; phaseStarted = performance.now()
-      await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) })
+      await measure("login.form", () => avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) }))
       phase = "theme"; phaseStarted = performance.now()
-      const missing = await page.evaluate(function themeStylesheetMissing() {
+      const missing = await measure("login.theme", () => page.evaluate(function themeStylesheetMissing() {
         const missing = [...document.querySelectorAll('link[rel~="stylesheet"][href]')].some(link => {
           const url = new URL(link.href, location.href)
           if (url.origin !== location.origin || !/\/packages\/deductor-theme\/build\/resources\/deductor-theme-all(?:-debug)?\.css$/.test(url.pathname)) return false
@@ -62,7 +86,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
           catch { return true }
         })
         return missing && globalThis.__loginomThemeStartupInteracted === true ? "interacted" : missing
-      })
+      }))
       if (missing !== true && missing !== "interacted") break
       themeState.failed = true
       if (themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
@@ -84,21 +108,25 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     phase = "form"; phaseStarted = performance.now()
     if (!(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
-      await field("edtUsername").locator("input").fill(candidate.username, { timeout: remaining(30_000) })
-      await field("edtUsername").locator("input").press("Tab", { timeout: remaining(30_000) })
+      await measure("login.username", async () => {
+        await field("edtUsername").locator("input").fill(candidate.username, { timeout: remaining(30_000) })
+        await field("edtUsername").locator("input").press("Tab", { timeout: remaining(30_000) })
+      })
       const password = field("edtPassword").locator("input")
       // Passwordless accounts may make an already empty field readonly after username lookup.
-      if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
-      await field("btnLogin").click({ timeout: remaining(30_000) })
-      await avatar.waitFor({ state: "visible", timeout: remaining(30_000) }).catch((error) => {
+      await measure("login.password", async () => {
+        if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
+      })
+      await measure("login.submit", () => field("btnLogin").click({ timeout: remaining(30_000) }))
+      await measure("login.response", () => avatar.waitFor({ state: "visible", timeout: remaining(30_000) })).catch((error) => {
         original = error
         throw Error("LOGINOM_LOGIN_REJECTED")
       })
     }
     phase = "identity"; phaseStarted = performance.now()
-    const identity = await page.evaluate(
+    const identity = await measure("login.identity", () => page.evaluate(
       () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName ?? null,
-    )
+    ))
     if (identity !== candidate.username) throw Error("LOGINOM_ACCOUNT_MISMATCH")
     return { authenticated: true }
   } catch (error) {
@@ -173,15 +201,21 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
 export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
   deadline = Date.now() + 150_000, onRetry, onPhase }) {
   signal?.throwIfAborted()
+  const phase = onPhase ?? (async () => {})
+  const dependenciesStarted = performance.now()
+  await phase({ phase: "browser.dependencies", status: "starting" })
   const { chromium } = require("playwright-core")
+  await phase({ phase: "browser.dependencies", status: "ready", duration_ms: Math.round(performance.now() - dependenciesStarted) })
   const launch = browserLaunch(headless)
+  const profileStarted = performance.now()
+  await phase({ phase: "browser.profile", status: "starting" })
   await mkdir(profile, { recursive: true, mode: 0o700 })
+  await phase({ phase: "browser.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
   signal?.throwIfAborted()
   // Both attempts share the original admission deadline and the same profile.
   const record = onRetry ?? createExecutionJournal({ directory: profile, metadata: { sessionId: null } })
   // Retry observers run only after confirmed browser close; phase observers
   // run during startup and must never be routed through that callback.
-  const phase = onPhase ?? (async () => {})
   const themeState = { reloaded: false }
   for (let attempt = 0; attempt < 2; attempt++) {
   signal?.throwIfAborted()
@@ -254,7 +288,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     if (onContextCreated) await onContextCreated(context)
     const loginStarted = performance.now()
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
-    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline, themeState, onThemeReload: record })
+    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline, themeState, onThemeReload: record, onPhase: phase })
       .then(async result => {
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         return result

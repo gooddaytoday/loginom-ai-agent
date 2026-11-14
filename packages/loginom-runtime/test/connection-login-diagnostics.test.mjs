@@ -5,6 +5,27 @@ import { loginPage } from "../src/connection-check.mjs"
 const candidate = { url: "https://example.test/app/?opaque=private-query#private-fragment",
   username: "private-user", password: 'tiny"pass', apiKey: "private-key" }
 
+test("successful login separates network, form, credentials and server response without retaining data", async () => {
+  const f = fixture(undefined, undefined), phases = []
+  const goto = f.page.goto
+  f.page.goto = async (...args) => {
+    await goto(...args)
+    return { request: () => ({ timing: () => ({ domainLookupStart:0,domainLookupEnd:2,
+      connectStart:2,secureConnectionStart:4,connectEnd:10,requestStart:11,responseStart:31,responseEnd:41,
+      url:candidate.url,authorization:candidate.password }) }) }
+  }
+  assert.deepEqual(await loginPage(f.page,candidate,{onPhase:event=>phases.push(event)}),{authenticated:true})
+  assert.deepEqual(phases.filter(e=>e.status==='ready').map(e=>e.phase),[
+    'login.navigation','login.network','login.form','login.theme','login.username','login.password','login.submit','login.response','login.identity',
+  ])
+  assert.deepEqual(phases.find(e=>e.phase==='login.network'),{
+    phase:'login.network',status:'ready',dns_ms:2,tcp_ms:2,tls_ms:6,server_ms:20,transfer_ms:10,
+  })
+  for(const e of phases.filter(e=>e.duration_ms!==undefined))assert.ok(Number.isInteger(e.duration_ms)&&e.duration_ms>=0)
+  for(const secret of [candidate.username,candidate.password,candidate.apiKey,'private-query','private-fragment'])
+    assert.ok(!JSON.stringify(phases).includes(secret))
+})
+
 function fixture(failure, error, authenticated = false) {
   const calls = []
   let loggedIn = authenticated
