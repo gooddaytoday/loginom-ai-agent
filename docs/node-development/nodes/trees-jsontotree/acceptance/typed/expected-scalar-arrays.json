@@ -1,0 +1,150 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "trees.from_json",
+      "label_any": true
+    }
+  ],
+  "outputs": [],
+  "tree_outputs": [
+    {
+      "output_node_type": "trees.from_json",
+      "output_port": 0,
+      "port_kind": "tree",
+      "ordered": true,
+      "tolerance": {
+        "abs": 0,
+        "rel": 0
+      },
+      "source_column": "arrays",
+      "schema_field_order": [
+        "items"
+      ],
+      "item_field_order": [
+        "id",
+        "tags",
+        "scores"
+      ],
+      "schema_types": {
+        "/items": "object_array",
+        "/items/id": "integer",
+        "/items/tags": "string_array",
+        "/items/scores": "real_array"
+      },
+      "document": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "1"
+                  },
+                  {
+                    "path": "/items/0/tags",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/0/tags/0",
+                        "type": "string",
+                        "value": "a"
+                      },
+                      {
+                        "path": "/items/0/tags/1",
+                        "type": "string",
+                        "value": "b"
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/0/scores",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/0/scores/0",
+                        "type": "real",
+                        "value": "1.5"
+                      },
+                      {
+                        "path": "/items/0/scores/1",
+                        "type": "real",
+                        "value": "2.5"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "2"
+                  },
+                  {
+                    "path": "/items/1/tags",
+                    "type": "array",
+                    "children": []
+                  },
+                  {
+                    "path": "/items/1/scores",
+                    "type": "array",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/id",
+                    "type": "integer",
+                    "value": "3"
+                  },
+                  {
+                    "path": "/items/2/tags",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/2/tags/0",
+                        "type": "string",
+                        "value": "c"
+                      }
+                    ]
+                  },
+                  {
+                    "path": "/items/2/scores",
+                    "type": "array",
+                    "children": [
+                      {
+                        "path": "/items/2/scores/0",
+                        "type": "real",
+                        "value": "0.25"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

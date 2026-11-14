@@ -112,6 +112,14 @@ settings changes and cleanup are required. No export/CSV is requested or passed
 to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
 the model; oracle and expected remain private.
 
+`tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
+`fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
+projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema
+types `string_array`/`real_array`, ordered values, parent row ranges and both
+empty arrays in the second record are checked directly. Full tree read, Save,
+cold reexecution without configuration and cleanup are required; no CSV export.
+Only the business task and original CSV reach the model.
+
 Run live acceptance without repeatedly reading live logs:
 
 `group-mode-tie` and `group-empty` use grouping `acceptance/types/task-mode-tie.md`

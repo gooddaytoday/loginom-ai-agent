@@ -425,11 +425,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures',
                     input_files=['orders.csv' if name == 'table-tree-json' else 'documents.csv'], base=None, external=True, tree_conversion=True)
-    if name == 'tree-dates':
+    if name in ['tree-dates', 'tree-scalar-arrays']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         src = node / 'acceptance/typed'
-        return dict(source=src, prompt=src / 'task-dates.md', data=node / 'fixtures/typed',
-                    input_files=['documents.csv'], base=None, external=True, tree_only=True, expected_name='expected-dates.json')
+        kind = name.removeprefix('tree-')
+        return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=node / 'fixtures/typed',
+                    input_files=['documents.csv'], base=None, external=True, tree_only=True, expected_name='expected-' + kind + '.json')
     if name in ['tree-null-leaves', 'tree-nested-records', 'tree-empty-containers']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         return dict(source=node / 'acceptance/nested-records', prompt=node / ('acceptance/task-' + name[5:] + '.md'),
@@ -1773,7 +1774,7 @@ def check_tree(port, expected):
     assert branch['is_array'] and [schema[i]['name'] for i in branch['children']] == expected['item_field_order'], 'TREE_ITEM_ORDER'
     for path, kind in expected['schema_types'].items():
         actual = [n for n in schema if n['path'] == path]
-        assert len(actual) == 1 and ('object_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
+        assert len(actual) == 1 and (actual[0]['type'] + '_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
     for path, order in expected.get('nested_field_order', {}).items():
         parent = next(n for n in schema if n['path'] == path)
         assert [schema[i]['name'] for i in parent['children']] == order, 'TREE_NESTED_ORDER'

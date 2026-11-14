@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {configureTextImportPatch,ImportInitialSettingsError} from '../lib/text-import-procedure.mjs';
 
-function fixture({samePath=false,emptyPatch=false,control='valid',drift=false,incompleteNewField=false,unconfigured=false}={}) {
+function fixture({samePath=false,emptyPatch=false,control='valid',drift=false,incompleteNewField=false,unconfigured=false,sourceColumns}={}) {
  const retained=[{name:'Id',label:'Identifier',type:'integer',data_kind:'Дискретный',used:true},
   {name:'Title',label:'Custom title',type:'string',data_kind:'Дискретный',used:true}];
  const extra={name:'Zone',label:'Zone',type:'string',data_kind:'Дискретный',used:true};
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'path',label:'Scenario'}]};
  const gestures=[];
- let stage='text_import_file',sourcePath=unconfigured?'':'/test/old.csv',columns=structuredClone(retained),refreshes=0,decimal='.';
+ let stage='text_import_file',sourcePath=unconfigured?'':'/test/old.csv',columns=structuredClone(sourceColumns??retained),refreshes=0,decimal='.';
  const source={source_path:sourcePath,connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true};
  const parameters=emptyPatch?{}:{source:{source_path:samePath?sourcePath:'/test/new.csv'},...(!samePath?{columns:[{...extra}]}:{})};
  if(unconfigured)Object.assign(parameters,{source:{source_path:'/test/new.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},format:{delimiter:';',text_qualifier:'"',null_marker:'NULL',decimal_separator:'.'},columns:structuredClone(retained)});
@@ -220,6 +220,55 @@ test('bound existing patches reject a literal conflict or an unobserved variable
   assert.equal(result.source.fields.source_path.value,'/test/new.csv');
   assert.deepEqual(result.columns.map(c=>c.used),[true,false]);
   assert.deepEqual(f.parameters,before);
+ });
+ test('unconfigured patch derives missing names and labels from ASCII source headers with verified readback',async()=>{
+  const sourceColumns=[{name:'Id',label:'Id',type:'integer',data_kind:'Дискретный',used:true},
+   {name:'Title',label:'Title',type:'string',data_kind:'Дискретный',used:true}];
+  const f=fixture({unconfigured:true,sourceColumns});
+  f.parameters.columns=sourceColumns.map(c=>({source_name:c.name,type:c.type}));
+  const before=structuredClone(f.parameters);
+  const result=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv');
+  assert.equal(result.verified,true);
+  assert.deepEqual(result.columns.map(({name,label,type,data_kind,used})=>({name,label,type,data_kind,used})),sourceColumns);
+  assert.deepEqual(f.parameters,before);
+  assert.equal(f.refreshes,0);
+ });
+ test('unconfigured patch retains explicit names and labels independently',async()=>{
+  const sourceColumns=[{name:'Id',label:'Identifier',type:'integer',data_kind:'Дискретный',used:true},
+   {name:'Title',label:'DisplayTitle',type:'string',data_kind:'Дискретный',used:true}];
+  const f=fixture({unconfigured:true,sourceColumns});
+  f.parameters.columns=[{source_name:'Id',label:'Identifier',type:'integer'},
+   {source_name:'DisplayTitle',name:'Title',type:'string'}];
+  const before=structuredClone(f.parameters);
+  const result=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv');
+  assert.equal(result.verified,true);
+  assert.deepEqual(result.columns.map(({name,label,type,data_kind,used})=>({name,label,type,data_kind,used})),sourceColumns);
+  assert.deepEqual(f.parameters,before);
+ });
+ test('unconfigured patch preserves fully explicit names and labels',async()=>{
+  const f=fixture({unconfigured:true});
+  f.parameters.columns=f.parameters.columns.map(c=>({source_name:c.label,...c}));
+  const before=structuredClone(f.parameters);
+  const result=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv');
+  assert.equal(result.verified,true);
+  assert.deepEqual(result.columns.map(({name,label,type,data_kind,used})=>({name,label,type,data_kind,used})),f.retained);
+  assert.deepEqual(f.parameters,before);
+ });
+ for(const source_name of ['Код','Order ID','1Value'])test('unconfigured patch requires explicit technical name for source header '+source_name,async()=>{
+  const f=fixture({unconfigured:true});
+  f.parameters.columns=[{source_name,type:'integer'},{source_name:'Title',type:'string'}];
+  const before=structuredClone(f.parameters);
+  await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'),
+   e=>e instanceof ImportInitialSettingsError&&/settings.columns.name.*ASCII/.test(e.message)&&!/Duplicate column names/.test(e.message));
+  assert.deepEqual(f.gestures,[]);
+  assert.deepEqual(f.parameters,before);
+ });
+ test('unconfigured patch still refuses duplicate derived technical names before mutation',async()=>{
+  const f=fixture({unconfigured:true});
+  f.parameters.columns=[{source_name:'Id',type:'integer'},{source_name:'Title',name:'Id',type:'string'}];
+  await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'),
+   e=>e instanceof ImportInitialSettingsError&&/Duplicate column names/.test(e.message));
+  assert.deepEqual(f.gestures,[]);
  });
  test('unconfigured patch with incomplete settings refuses before any settings gesture and leaves request intact',async()=>{
   for(const change of [p=>delete p.source,p=>p.columns=[],p=>p.columns.forEach(c=>c.used=false),p=>p.source.source_path='/test/foreign.csv']) {
