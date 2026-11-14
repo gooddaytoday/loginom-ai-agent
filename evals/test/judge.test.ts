@@ -422,7 +422,12 @@ test("ordinary exec: late descendant adoption prevents early proof", async () =>
     await Bun.write(fixture.file("spawn-late"), "1")
     await fixture.wait(() => Bun.file(fixture.file("late-image")).exists())
     const child = await Bun.file(fixture.file("late-image")).json() as Pick<ProcessIdentity, "pid" | "starttime">
-    await fixture.wait(async () => !await fixture.active(fixture.pid))
+    await fixture.wait(async () => {
+      if (await fixture.active(fixture.pid)) return false
+      const fields = (await Bun.file(`/proc/${child.pid}/stat`).text()).split(") ")[1]!.split(" ")
+      expect(fields[19]).toBe(child.starttime)
+      return Number(fields[1]) === fixture.launcher.pid
+    })
     expect(await fixture.active(child.pid)).toBe(true)
     expect(Number((await Bun.file(`/proc/${child.pid}/stat`).text()).split(") ")[1]!.split(" ")[1])).toBe(fixture.launcher.pid)
     await Bun.sleep(150)
