@@ -96,6 +96,12 @@ review — PASS без обязательных замечаний. Ранний
 Запущена пакетная detailed-калибровка A02–A05: 24 плановых оценки Sol/xhigh;
 business-калибровка и восемь SOLE ещё не начаты. Source и runtime pins заморожены.
 
+AnalyticsReviewer закрыл обязательное source/native/cold-ревью A02–A05:
+**APPROVE — SPEC+QUALITY**, mandatory/optional замечаний нет. Подтверждены
+D/B parity, исходные постановки и oracle, реальные графы, полные reference/cold CSV,
+все 64 исполнения узлов и 16 уникальных содержательных мутаций. Source/pins не
+менялись. Финальное QUALITY/PR review остаётся после калибровок и восьми SOLE.
+
 Локальная среда подготовлена штатным frozen install на закреплённых Bun 1.3.14 и
 Node 24.19.0. Полный `bun typecheck` завершился успешно: 33/33 задачи; исходники
 и lockfile установкой не изменены.
