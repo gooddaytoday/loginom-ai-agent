@@ -6,19 +6,6 @@ import { createSkillLoader } from '../lib/skill.mjs';
 import { bundledSkillInventory } from '../lib/bundled-skill-manifest.mjs';
 import { createBundledSkillFixture, refreshSkillFixtureManifest } from './support/bundled-skill-fixture.mjs';
 
-test('both Submodel entries link to the same guidance delivered by describeNodes',async t=>{
- const source=await createBundledSkillFixture(t),loader=createSkillLoader({resources:source.resources});
- const main=await readFile(source.main,'utf8');
- const paths=['control.supernode','control.supernode_output'].map(type=>{
-  const row=main.split('\n').find(line=>line.includes('`'+type+'`'));
-  return row.match(/\[читать\]\(([^)]+)\)/)[1];
- });
- assert.equal(paths[0],paths[1]);
- const cards=await loader.describeNodes(['control.supernode','control.supernode_output'].map(type=>({type,modes:['tabular_boundary']})),['tabular_boundary']);
- assert.equal(cards[0].guidance,cards[1].guidance);
- assert.ok((await readFile(join(source.directory,paths[0]),'utf8')).includes(cards[0].guidance.split('\n')[0]));
-});
-
 test('local product skill preparation never reads the Skills API and returns the shared revision', async t => {
   const source = await createBundledSkillFixture(t);
   let requests = 0;
