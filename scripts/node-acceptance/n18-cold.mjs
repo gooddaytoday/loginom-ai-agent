@@ -12,18 +12,19 @@ export async function verifyN18JavascriptStep({graph,requirement,load,channelFor
  need(alternative,'COLD_NODE_TYPE_MISSING:programming.javascript');
  const calculators=graph.nodes.filter(node=>node.type==='transform.calculator');
  need(calculators.length===1,'COLD_N18_CALCULATOR_MISSING_OR_AMBIGUOUS');
- // A dynamic import has no saved ColumnDefs. Materialize its schema before
- // the Calculator's input mapping can validate the saved field links.
+ // A dynamic import has no saved ColumnDefs. Materialize a unique direct
+ // import before checking field links; other topologies keep the saved-wizard path.
  const incoming=graph.links.filter(link=>link.target===calculators[0].ref.node_id&&link.input===0);
  const imports=graph.nodes.filter(node=>node.type==='imports.text'&&incoming.length===1&&node.ref.node_id===incoming[0].source);
- need(imports.length===1,'COLD_N18_IMPORT_MISSING_OR_AMBIGUOUS');
- const {createNodeExecutionProcedure}=await load('client/lib/node-execution-procedure.mjs');
- const driver=createNodeExecutionProcedure(channelFor(imports[0].ref,'n18-saved-import'),imports[0].ref,{allowDeactivate:true});
- await driver.prepare();
- await driver.launchGraph();
- await driver.identify();
- const execution=await driver.waitCompleted();
- need(execution.status==='completed'&&execution.verified===true&&execution.owner_verified===true,'COLD_N18_IMPORT_EXECUTION_UNCONFIRMED');
+ if(imports.length===1){
+  const {createNodeExecutionProcedure}=await load('client/lib/node-execution-procedure.mjs');
+  const driver=createNodeExecutionProcedure(channelFor(imports[0].ref,'n18-saved-import'),imports[0].ref,{allowDeactivate:true});
+  await driver.prepare();
+  await driver.launchGraph();
+  await driver.identify();
+  const execution=await driver.waitCompleted();
+  need(execution.status==='completed'&&execution.verified===true&&execution.owner_verified===true,'COLD_N18_IMPORT_EXECUTION_UNCONFIRMED');
+ }
  const node=calculators[0].ref,channel=channelFor(node,'n18-saved-calculator');
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');

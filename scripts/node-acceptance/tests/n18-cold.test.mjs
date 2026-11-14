@@ -74,6 +74,14 @@ test('dynamic import is executed before the saved input_mapping wizard, preventi
  assert.deepEqual(f.state,{...f.baseline,wizard:{...f.baseline.wizard,stage:'calculator'}});
  assert.equal(f.records[0].settings_applied,false);
 });
+for(const stage of ['input_mapping','calculator'])test('an intermediate node preserves the saved '+stage+' path without executing the import',async()=>{
+ const f=fixture({stage}),g=observed();
+ g.links=[{source:'imports.text',output:0,target:'transform.sorting',input:0},{source:'transform.sorting',output:0,target:'calc',input:0}];
+ await f.run(g);
+ assert.deepEqual(f.executions,[]);
+ assert.deepEqual(f.calls,stage==='input_mapping'?['graph','select','open','wizard','next','wizard','read','cancel']:['graph','select','open','wizard','read','cancel']);
+ assert.equal(f.records[0].syntax,'javascript');assert.equal(f.records[0].settings_applied,false);
+});
 test('persistent lost-links question is cancelled by native cleanup and fails with a clear code',async()=>{
  const f=fixture({stage:'input_mapping',persistentConflict:true});
  await assert.rejects(f.run(observed()),/COLD_N18_CALCULATOR_LOST_LINKS/);
