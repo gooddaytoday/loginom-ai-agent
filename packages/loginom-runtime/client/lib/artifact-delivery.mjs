@@ -332,7 +332,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     ? {code:'ARTIFACT_DESTINATION_UNAVAILABLE',message:String(error.message).slice(0,1000),
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
-    : {code:String(error.code??'ARTIFACT_DELIVERY_INCOMPLETE'),message:String(error.message).slice(0,1000)};
+    : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',
+      message:String(error.message).slice(0,1000),...(error.code!=null?{cause_code:String(error.code)}:{})};
    // Known navigation effects remain recorded, but an undelivered attachment
    // with no unknown child is a settled refusal, not an ambiguous transfer.
    job.outcome={status:navigationResumable?'NOT_APPLIED':effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
