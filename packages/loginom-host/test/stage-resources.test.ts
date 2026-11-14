@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { cp, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { actionCatalogForPlatform, catalogForTarget, setLinuxSandboxMode, stageResources } from "../script/stage-resources"
 import release from "../../product/loginom-release.json"
+import { dashboardResources } from "../../dashboard/src/agent/resources"
+import { buildDashboard } from "../../dashboard/src/agent/build"
 import { productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { verifyBundledSkills } from "../src/bundled-skills"
 
@@ -79,6 +81,7 @@ posixTest.each([
   { destination: "/missing/output", browsers: "/missing/output.staging/browser" },
   { destination: "/missing/output", browsers: "/missing/output.staging" },
   { destination: resolve(import.meta.dir, "../../loginom-runtime/generated"), browsers: "/missing/browser" },
+  { destination: resolve(import.meta.dir, "../../dashboard/generated"), browsers: "/missing/browser" },
 ])("resource output and staging cannot overlap inputs: %j", async (paths) => {
   await expect(
     stageResources({
@@ -130,7 +133,7 @@ test.skipIf(process.platform !== "linux")("linux sandbox mode keeps the setuid b
 // Full staging uses the same pinned Node distribution and Chromium as release builds.
 // Release/acceptance runners provide these paths; the small boundary tests above do not need them.
 test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_AGENT_TEST_BROWSERS)(
-  "full resource staging delivers the canonical product skills before inventory",
+  "full resource staging inventories product skills and a buildable dashboard kit",
   async () => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE!
     const browsers = process.env.LOGINOM_AI_AGENT_TEST_BROWSERS!
@@ -138,6 +141,30 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
     try {
       const destination = join(root, "resources")
       await stageResources({ destination, node, browsers, target, flavor: "cli", knowledgeKey: " UNIT-NONSECRET\n" })
+      for (const path of [
+        "template/node_modules/typescript/bin/tsc",
+        "template/node_modules/vite/bin/vite.js",
+        "template/index.html",
+        "template/tsconfig.json",
+        "template/env.d.ts",
+        "template/vite.config.mjs",
+        "template/resolver.mjs",
+        "template/scan.mjs",
+        "template/src/main.tsx",
+        "template/src/loginom.ts",
+        "draft.js",
+        "selfcheck.mjs",
+      ]) expect(await Bun.file(join(destination, "dashboard", path)).exists()).toBe(true)
+      await expect(stat(join(destination, "dashboard/template/node_modules/.bin"))).rejects.toMatchObject({ code: "ENOENT" })
+      for (const [staged, source] of [["draft.js", "dist/draft.js"], ["selfcheck.mjs", "src/draft/selfcheck.mjs"]]) {
+        expect(await readFile(join(destination, "dashboard", staged!)))
+          .toEqual(await readFile(resolve(import.meta.dir, "../../dashboard", source!)))
+      }
+      const dashboard = dashboardResources(destination)
+      const work = join(root, "work")
+      await cp(join(dashboard.template, "src"), join(work, "src"), { recursive: true })
+      const build = await buildDashboard({ work, template: dashboard.template, node: dashboard.node, out: join(root, "builds") })
+      expect(build.ok, build.output).toBe(true)
       // The built-in key is a separate inventoried resource, never part of the manifest itself.
       expect(await readFile(join(destination, "knowledge-key"), "utf8")).toBe("UNIT-NONSECRET")
       expect(await readFile(join(destination, "resource-manifest.json"), "utf8")).not.toContain("UNIT-NONSECRET")
@@ -146,6 +173,9 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
       expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(true)
+      for (const path of ["dashboard/template/src/main.tsx", "dashboard/draft.js"]) {
+        expect(manifest.files.some((file: { path: string }) => file.path === path)).toBe(true)
+      }
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
       const notices = await Bun.file(join(destination, "licenses/package-docs/inventory.json")).json()
       expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@zip.js/zip.js")).toBe(true)

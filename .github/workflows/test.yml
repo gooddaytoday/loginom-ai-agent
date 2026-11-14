@@ -158,6 +158,39 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  dashboard-template:
+    name: dashboard-template (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.macos == false && '["ubuntu-24.04","windows-2022"]' || '["ubuntu-24.04","windows-2022","macos-15"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: packages/loginom-runtime/client/.node-version
+
+      - name: Setup Loginom pinned inputs
+        uses: ./.github/actions/setup-loginom-inputs
+
+      - name: Install locked dashboard template dependencies
+        working-directory: packages/dashboard/template
+        run: |
+          node_dir=$(dirname "$LOGINOM_AI_AGENT_TEST_NODE")
+          npm_cli=$node_dir/../lib/node_modules/npm/bin/npm-cli.js
+          [[ -f $npm_cli ]] || npm_cli=$node_dir/node_modules/npm/bin/npm-cli.js
+          "$LOGINOM_AI_AGENT_TEST_NODE" "$npm_cli" ci --ignore-scripts --no-audit --fund=false
+          du -sh node_modules
+
+      - name: Build the template and examples like dashboard_draft
+        working-directory: packages/dashboard
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/build/build.test.mjs test/build/resolver.test.mjs'
+
   dashboard-browser:
     name: dashboard-browser
     runs-on: ubuntu-24.04

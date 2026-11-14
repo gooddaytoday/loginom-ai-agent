@@ -62,13 +62,14 @@ export async function stageResources(input: {
     throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const source = resolve(import.meta.dir, "../../loginom-runtime")
   const docsSource = resolve(import.meta.dir, "../src/package-docs")
+  const dashboard = resolve(import.meta.dir, "../../dashboard")
   const destination = resolve(input.destination)
   const node = input.node
   const browsers = input.browsers
   const staging = destination + ".staging"
   for (const paths of [
-    [destination, staging, source, node, browsers, productSkillsDirectory, docsSource],
-    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory, docsSource].map(canonicalBuildPath)),
+    [destination, staging, source, node, browsers, productSkillsDirectory, docsSource, dashboard],
+    await Promise.all([destination, staging, source, node, browsers, productSkillsDirectory, docsSource, dashboard].map(canonicalBuildPath)),
   ]) {
     if (
       paths
@@ -105,6 +106,23 @@ export async function stageResources(input: {
   await mkdir(join(staging, "bin"), { recursive: true })
   if (input.knowledgeKey?.trim()) await Bun.write(join(staging, "knowledge-key"), input.knowledgeKey.trim())
   await cp(productSkillsDirectory, join(staging, "skills"), { recursive: true, verbatimSymlinks: true })
+  const npm = resolve(
+    dirname(node),
+    process.platform === "win32" ? "node_modules/npm/bin/npm-cli.js" : "../lib/node_modules/npm/bin/npm-cli.js",
+  )
+  await $`${process.execPath} run script/build.ts`.cwd(dashboard)
+  const template = join(staging, "dashboard/template")
+  // Install the locked kit; never copy a developer's dependencies or build output.
+  await cp(join(dashboard, "template"), template, {
+    recursive: true,
+    filter: (path) => !["node_modules", "dist", ".vite-cache"].includes(relative(join(dashboard, "template"), path).split(sep)[0]!),
+  })
+  await $`${node} ${npm} ci --ignore-scripts --no-audit --fund=false --workspaces=false`
+    .cwd(template)
+    .env({ ...process.env, PATH: `${dirname(node)}${delimiter}${process.env.PATH ?? ""}` })
+  await rm(join(template, "node_modules/.bin"), { recursive: true, force: true })
+  await cp(join(dashboard, "dist/draft.js"), join(staging, "dashboard/draft.js"))
+  await cp(join(dashboard, "src/draft/selfcheck.mjs"), join(staging, "dashboard/selfcheck.mjs"))
   await cp(node, join(staging, pins.node))
   await cp(browsers, join(staging, "browsers"), {
     recursive: true,
@@ -124,10 +142,6 @@ export async function stageResources(input: {
   ]) {
     await cp(join(source, path), join(staging, "runtime", path))
   }
-  const npm = resolve(
-    dirname(node),
-    process.platform === "win32" ? "node_modules/npm/bin/npm-cli.js" : "../lib/node_modules/npm/bin/npm-cli.js",
-  )
   await $`${node} ${npm} ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false`
     .cwd(join(staging, "runtime/client"))
     .env({
