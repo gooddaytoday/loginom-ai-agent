@@ -95,7 +95,7 @@ export async function configureLoopBrowser(page,t,readNode=readPreparedNodeConte
   let previous;
   while(remaining()){
    await guard();const s=await read();if(ready(s)&&previous&&same(previous,s))return s;
-   previous=ready(s)?s:null;await new Promise(r=>setTimeout(r,200));
+   previous=ready(s)?s:null;await page.waitForTimeout(Math.min(200,remaining()));
   }
  };
  const value=async(name)=>at(params+';'+name).locator('input:visible').inputValue();
