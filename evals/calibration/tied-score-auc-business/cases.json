@@ -1,0 +1,134 @@
+{
+  "sources": {
+    "SPEC.md": "9cb190e72a42f05805b171eb55e89ad7bb005587db97dff0bb1c1361fd7b2141",
+    "acceptance.json": "ab27f7ffd6e2477c57a8a9378960fe32c5f5ab344fe7595dc68eea2932bf8ffe",
+    "data/auc_models.csv": "591d9de73bfebdb6c41ed22b1043bc4c77c995a0c3230ca02d1c55bf1f2602f2",
+    "data/auc_scores.csv": "8634f8ec5da591944b048b35118ff3daa65efb764df25d342b98880dd8f23e9e",
+    "oracle.csv": "62016421efbc32788029d777ca7c172937a1ca9e3147827b7b11ea0561ba08ac",
+    "oracle.py": "641bae756c0a35228d9cacb0c3072b4124773c3248936330fbe78620f3793084",
+    "provenance.json": "d072df226cefaea343e2d547fff7c03a9d7bb7a8522d7d3ab53dd68496a1e99b",
+    "reference.lgp": "cea01b1b92df2078f0aae469d8bcca8a7e9c61c1abcab49b0caa6f729ce57a4a",
+    "task.json": "ec6878a74125de24093fcffa091eb2d8bf0dfe1d2328e9ee8425d4801af0a72d"
+  },
+  "cases": [
+    {
+      "id": "ties-zero",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(concordant_pairs + 0.5 * tied_pairs) / comparable_pairs\"",
+          "to": "Expression=\"concordant_pairs / comparable_pairs\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "ties",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "ties-zero.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('ties-zero')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "threshold-recall",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"If(score_positive &gt; score_negative, 1, 0)\"",
+          "to": "Expression=\"If(score_positive &gt;= 0.5, 1, 0)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"If(score_positive = score_negative, 1, 0)\"",
+          "to": "Expression=\"0\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "ranking",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "threshold-recall.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "            if variant == \"ties-zero\":",
+            "to": "            if variant == \"threshold-recall\":\n                wins = sum(s >= F(1, 2) for s in positive)*len(negative)\n                ties = 0\n                auc = F(wins, pairs)\n            if variant == \"ties-zero\":",
+            "count": 1
+          },
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('threshold-recall')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "auto-flip",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"(concordant_pairs + 0.5 * tied_pairs) / comparable_pairs\"",
+          "to": "Expression=\"If(((concordant_pairs + 0.5 * tied_pairs) / comparable_pairs) &lt; 0.5, 1 - ((concordant_pairs + 0.5 * tied_pairs) / comparable_pairs), ((concordant_pairs + 0.5 * tied_pairs) / comparable_pairs))\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "ties",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "auto-flip.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('auto-flip')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "undefined-zero",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(auc, 6)\"",
+          "to": "Expression=\"If(IsNull(auc), 0, Round(auc, 6))\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "classes",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "undefined-zero.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('undefined-zero')",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

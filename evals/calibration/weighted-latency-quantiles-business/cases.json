@@ -1,0 +1,156 @@
+{
+  "sources": {
+    "SPEC.md": "03cba67b0965a310d19eae71209c9c15ffe3f7c6a0223750ae5ca071e9a3df4e",
+    "acceptance.json": "d0ff836369b3e6b9d4306f92fc2dee1ff8e55dc914b9bfb126a50988c83b329a",
+    "data/latency_frequencies.csv": "c67eb50f5505ca4a1f754b9b6ad7100912c018b20bd27670892eb995735407c7",
+    "data/latency_services.csv": "343da43b5c5e60c56959e96412570cfe3a27d56e14c74b253493cbfb4cbd4ace",
+    "oracle.csv": "6fb67993b49ee7e518c29def0b7bcb9601af3d8a0ac9718a3d98a1dc44108e89",
+    "oracle.py": "967806ab6dcb83a9e39a28a608b090811ca3ba50b4d0b4abb4e132fb82ba8f08",
+    "provenance.json": "b2b36045bd50ee33cea04aef5491d7ab076886f690bee4e2e49f48c27b8badcd",
+    "reference.lgp": "c19773f7dec812328f36c726e57877895ac05c54d44f79aaef9189548a401889",
+    "task.json": "b67684b151ce4f5aed9ce1b2379335c023f3c94fae75627c47ad203652d52e68"
+  },
+  "cases": [
+    {
+      "id": "bucket-counts",
+      "kind": "aggregate",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"requests\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"requests\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdSum\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>",
+          "to": "<Item Name=\"requests\" DataType=\"dtInteger\" DataKind=\"dkContinuous\" UsageType=\"utValue\" InputColumnInfoName=\"requests\">\n\t\t\t\t\t\t\t\t\t\t\t<Extensions>\n\t\t\t\t\t\t\t\t\t\t\t\t<Item Guid=\"4e016f37-9d38-4f5f-a107-5590464316e2\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t<Extension xsi:type=\"TBGGroupDataColumnDefExtension\" GroupFunctions=\"gdCount\" Order=\"0\"/>\n\t\t\t\t\t\t\t\t\t\t\t\t</Item>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Source=\"requests_Sum\"",
+          "to": "Source=\"requests_Count\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "weights",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "bucket-counts.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "    expanded = {s: [] for s in services}",
+            "to": "    expanded = {s: [] for s in services}\n    original = {s: [] for s in services}",
+            "count": 1
+          },
+          {
+            "from": "        expanded[r[\"service_id\"]].extend([latency]*n)",
+            "to": "        original[r[\"service_id\"]].append((latency,n))\n        if variant == \"bucket-counts\":\n            n = 1\n        expanded[r[\"service_id\"]].extend([latency]*n)",
+            "count": 1
+          },
+          {
+            "from": "            tail = float(F(count, n))",
+            "to": "            if variant == \"bucket-counts\":\n                count = sum(weight for value, weight in original[service] if value > p90)\n            tail = float(F(count, n))",
+            "count": 1
+          },
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('bucket-counts')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "strict-quantile",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(cumulative &gt;= 0.50 * total, 1, 0)\"",
+          "to": "Expression=\"IF(cumulative &gt; 0.50 * total, 1, 0)\"",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(cumulative &gt;= 0.90 * total, 1, 0)\"",
+          "to": "Expression=\"IF(cumulative &gt; 0.90 * total, 1, 0)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "quantiles",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "strict-quantile.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('strict-quantile')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "tail-inclusive",
+      "kind": "threshold",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"IF(latency_ms &gt; p90_ms, requests, 0)\"",
+          "to": "Expression=\"IF(latency_ms &gt;= p90_ms, requests, 0)\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "tail",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "tail-inclusive.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('tail-inclusive')",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "empty-zero",
+      "kind": "column",
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Int(NVL(total, 0))\"/>",
+          "to": "Expression=\"Int(NVL(total, 0))\"/>\n<Item Name=\"p50_ms\" DataType=\"dtFloat\" Expression=\"NVL(p50_ms, 0)\" Replaced=\"true\"/>\n<Item Name=\"p90_ms\" DataType=\"dtFloat\" Expression=\"NVL(p90_ms, 0)\" Replaced=\"true\"/>",
+          "count": 1
+        },
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(exceed_count / IF(total &gt; 0, total, Null), 6)\"",
+          "to": "Expression=\"IF(NVL(total, 0) = 0, 0, Round(exceed_count / IF(total &gt; 0, total, Null), 6))\"",
+          "count": 1
+        }
+      ],
+      "expected_failed": [
+        "tail",
+        "result"
+      ],
+      "expected_oracle_pass": false,
+      "result_csv": "empty-zero.csv",
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "good = calculate()",
+            "to": "good = calculate('empty-zero')",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}

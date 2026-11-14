@@ -1,0 +1,15 @@
+division;sku;period;quantity;unit_price
+D01;K01;current;15;12
+D02;K04;base;4;40
+D01;K02;base;20;5
+D03;K07;current;6;9
+D01;K01;base;10;10
+D02;K05;current;0;30
+D03;K08;base;8;3
+D01;K02;current;10;4
+D02;K04;current;4;50
+D03;K07;base;0;7
+D02;K05;base;5;25
+D01;K03;current;12;2
+D03;K08;current;8;3
+D01;K03;base;8;2

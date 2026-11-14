@@ -1,0 +1,9 @@
+batch_id;cohort_id;trials;successes
+B01;S01;1;1
+B02;S02;20;20
+B03;S03;2;0
+B04;S04;20;0
+B05;S05;2;1
+B06;S05;18;9
+B07;S07;1;1
+B08;S07;9;0
