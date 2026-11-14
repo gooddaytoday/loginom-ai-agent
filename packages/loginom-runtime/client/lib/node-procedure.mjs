@@ -272,7 +272,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const readType=(operation.nodeApply?.request??operation.parameters)?.target?.type;
       if(['variables.to_table','imports.lgd','imports.text'].includes(readType))request={...request,typedVariants:true};
       // Exact reads of these ports refused Variant cells as unverified_precision; ordinary reads keep their envelope.
-      if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns'].includes(readType))
+      if(request.requireExactNumbers===true&&['transform.collapse_columns','transform.replace_columns','transform.group_data'].includes(readType))
         request={...request,typedVariants:true,...(readType==='transform.replace_columns'?{variantEmptyIsNull:true}:{})};
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});

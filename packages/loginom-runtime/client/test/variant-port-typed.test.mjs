@@ -40,3 +40,10 @@ test('ordinary Collapse/Replacement reads and other types keep their previous re
 for(const route of ['apply','read'])test('Text Import always uses the shared typed Variant reader: '+route,async()=>{
  for(const exact of [false,true])assert.equal((await dispatched('imports.text',exact,route)).typedVariants,true);
 });
+
+for(const route of ['apply','read'])test('Grouping exact read preserves Variant subtypes: '+route,async()=>{
+ const request=await dispatched('transform.group_data',true,route);
+ assert.equal(request.typedVariants,true);
+ assert.equal(Object.hasOwn(request,'variantEmptyIsNull'),false);
+ assert.equal(Object.hasOwn(await dispatched('transform.group_data',false,route),'typedVariants'),false);
+});

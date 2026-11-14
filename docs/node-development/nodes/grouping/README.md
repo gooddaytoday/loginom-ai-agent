@@ -16,6 +16,15 @@ integer. `group-date` проверяет min/max/last/null_count на `types.csv
 `expected-date.json`, включая NULL, CSV, Save и cold Execute. Недоступные
 sum/avg/median/stddev/concat отклоняются до настройки.
 
+Variant (LAB-1675): native count/min/max/mode/unique_count/null_count/first/last/only;
+счётчики → integer, остальные выходы → Variant с точным подтипом ячейки.
+Недоступные sum/avg/median/stddev/concat отклоняются до настройки.
+`group-variant` использует исходную Свёртку IntValue/RealValue/TextValue из
+`variant.csv`, затем count/null_count/first/last по RowID; отдельный expected
+сохраняет `cases.variant.stages`. Полные typed-чтения проверяют `cell_type`/`value`
+и крайние NULL; CSV, Save, cold Execute и cleanup — штатные. Регистрация не
+заменяет живую приёмку SHA. Native-наблюдения: [discovery](discovery.md), Q1/3/4/6/9.
+
 Ничья моды и пустой вход (LAB-1663): зарегистрированы `group-mode-tie` и
 `group-empty` по native-наблюдениям LAB-1581 Q2/Q7. Первый проверяет минимум
 при равной частоте integer/string, второй — 0 строк с полной схемой
