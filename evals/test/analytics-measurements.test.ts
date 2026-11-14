@@ -175,3 +175,38 @@ test("retry release gate rejects a real held judge reservation and accepts its c
     } finally { await lease.close() }
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("exact missing current peer is a complete empty scope and later peer creation changes the snapshot", async () => {
+  const userRoot = "viking://user/example", peerRoot = userRoot + "/peers/current"
+  let present = false
+  let absentStatus = 404, absentCode = "NOT_FOUND"
+  const visited: string[] = []
+  const server = Bun.serve({ port: 0, fetch(request) {
+    const url = new URL(request.url), uri = url.searchParams.get("uri") ?? ""
+    visited.push(uri)
+    if (url.pathname === "/health") return Response.json({ healthy: true, account_id: "example", user_id: "example", role: "user" })
+    if (uri === peerRoot && !present && absentStatus === 200) return Response.json(null)
+    if (uri === peerRoot && !present) return Response.json({ status: "error", error: { code: absentCode } }, { status: absentStatus })
+    return Response.json({ status: "ok", result: uri.endsWith("memories") ? [] : [{ uri: uri + "/memories", name: "memories", isDir: true }] })
+  } })
+  const memory = { scope: "actor" as const, userRoot, peerRoot, identity: { account_id: "example", user_id: "example", role: "user" } }
+  try {
+    const before = await snapshotActor(memory, server.url.href, "fake-key")
+    expect(before.roots).toEqual([userRoot + "/memories"])
+    expect(before.peers_entries).toEqual([])
+    expect(before.peer_root_entries).toEqual({})
+    expect(visited).not.toContain(peerRoot + "/memories")
+    expect(visited).not.toContain(userRoot + "/peers")
+    present = true
+    const after = await snapshotActor(memory, server.url.href, "fake-key")
+    expect(after.roots).toEqual([userRoot + "/memories", peerRoot + "/memories"])
+    expect(JSON.stringify(before)).not.toBe(JSON.stringify(after))
+    present = false
+    for (const failure of [{ status: 403, code: "NOT_FOUND" }, { status: 404, code: "OTHER" }]) {
+      absentStatus = failure.status; absentCode = failure.code
+      await expect(snapshotActor(memory, server.url.href, "fake-key")).rejects.toThrow("MEMORY_HTTP")
+    }
+    absentStatus = 200
+    await expect(snapshotActor(memory, server.url.href, "fake-key")).rejects.toThrow("MEMORY_INCOMPLETE_LIST")
+  } finally { server.stop(true) }
+})

@@ -19,18 +19,26 @@ type Entry = { uri: string; name: string; isDir: boolean }
 export async function snapshotActor(memory: ActorMemory, base: string, token: string) {
   if (memory.scope !== "actor" || memory.userRoot !== `viking://user/${memory.identity.user_id}` ||
     !memory.peerRoot.startsWith(memory.userRoot + "/peers/") || memory.peerRoot.slice((memory.userRoot + "/peers/").length).includes("/")) throw Error("MEMORY_SCOPE")
+  const missingPeer = Symbol("missingPeer")
   const get = async (route: string, params: Record<string, string> = {}) => {
     const url = new URL(route, base)
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value))
     const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30000) })
-    if (!response.ok) throw Error("MEMORY_HTTP")
+    if (!response.ok) {
+      if (response.status === 404 && route === "/api/v1/fs/ls" && params.uri === memory.peerRoot) {
+        const missing = await response.json()
+        if (missing.status === "error" && missing.error?.code === "NOT_FOUND") return missingPeer
+      }
+      throw Error("MEMORY_HTTP")
+    }
     return response.json()
   }
   const health = await get("/health")
   if (health.healthy !== true || Object.entries(memory.identity).some(([key, value]) => health[key] !== value)) throw Error("MEMORY_IDENTITY")
-  const list = async (uri: string): Promise<Entry[]> => {
+  const list = async (uri: string): Promise<Entry[] | null> => {
     const doc = await get("/api/v1/fs/ls", { uri, output: "original", show_all_hidden: "true", recursive: "false", node_limit: "10000" })
-    if (doc.status !== "ok" || !Array.isArray(doc.result) || doc.result.length >= 10000 || doc.truncated || doc.has_more) throw Error("MEMORY_INCOMPLETE_LIST")
+    if (doc === missingPeer) return null
+    if (!doc || doc.status !== "ok" || !Array.isArray(doc.result) || doc.result.length >= 10000 || doc.truncated || doc.has_more) throw Error("MEMORY_INCOMPLETE_LIST")
     const entries = doc.result as Entry[]
     if (entries.some(item => typeof item.isDir !== "boolean" || typeof item.name !== "string" || item.name.includes("/") || item.name === "." || item.name === ".." || item.uri !== uri + "/" + item.name)) throw Error("MEMORY_ENTRY")
     if (new Set(entries.map(item => item.uri)).size !== entries.length) throw Error("MEMORY_DUPLICATE")
@@ -42,22 +50,24 @@ export async function snapshotActor(memory: ActorMemory, base: string, token: st
     return doc.result as string
   }
   const user = await list(memory.userRoot), peer = await list(memory.peerRoot)
-  const roots = [memory.userRoot + "/memories", memory.peerRoot + "/memories"]
-  if (![user, peer].every(entries => entries.some(item => item.name === "memories" && item.isDir))) throw Error("MEMORY_ROOT_MISSING")
+  const roots = [memory.userRoot + "/memories", ...(peer === null ? [] : [memory.peerRoot + "/memories"])]
+  if (!user || ![user, ...(peer === null ? [] : [peer])].every(entries => entries.some(item => item.name === "memories" && item.isDir))) throw Error("MEMORY_ROOT_MISSING")
   const directories: Record<string, Entry[]> = {}, files: Record<string, string> = {}, peer_metadata: Record<string, string> = {}
   const queue = [...roots]
   while (queue.length) {
     const uri = queue.shift()!
     if (directories[uri]) throw Error("MEMORY_CYCLE")
-    directories[uri] = await list(uri)
+    const entries = await list(uri)
+    if (!entries) throw Error("MEMORY_ROOT_MISSING")
+    directories[uri] = entries
     for (const item of directories[uri]) {
       if (item.isDir) queue.push(item.uri)
       else files[item.uri] = await read(item.uri)
     }
   }
-  for (const item of [...user, ...peer].filter(item => !item.isDir)) peer_metadata[item.uri] = await read(item.uri)
-  return { identity: memory.identity, roots, peers_entries: [{ uri: memory.peerRoot, name: memory.peerRoot.split("/").at(-1), isDir: true }],
-    peer_root_entries: { [memory.peerRoot]: peer }, directories, files, peer_metadata }
+  for (const item of [...user, ...(peer ?? [])].filter(item => !item.isDir)) peer_metadata[item.uri] = await read(item.uri)
+  return { identity: memory.identity, roots, peers_entries: peer === null ? [] : [{ uri: memory.peerRoot, name: memory.peerRoot.split("/").at(-1), isDir: true }],
+    peer_root_entries: peer === null ? {} : { [memory.peerRoot]: peer }, directories, files, peer_metadata }
 }
 
 export type MeasurementJob = { id: string; form: string; taskId: string; tasksDir: string; unit: string; resultsDir: string; retryBindings?: { unit: string; resultsDir: string }[] }
