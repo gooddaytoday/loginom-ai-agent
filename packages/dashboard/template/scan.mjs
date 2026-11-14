@@ -36,7 +36,8 @@ if (errors.length) {
 if (styles.length) {
   const { resolveConfig } = await import("vite")
   // Explicit roots avoid Vite's ancestor workspace discovery under Node permissions.
-  const config = await resolveConfig({ root: process.cwd(), configFile: false, envFile: false, css: { postcss: { plugins: [] } }, server: { fs: { allow: [process.cwd()] } } }, "build", "production", "production")
+  // Avoid Vite's Windows drive discovery; canonical containment is checked below.
+  const config = await resolveConfig({ root: process.cwd(), configFile: false, envFile: false, resolve: { preserveSymlinks: true }, css: { postcss: { plugins: [] } }, server: { fs: { allow: [process.cwd()] } } }, "build", "production", "production")
   // Match the installed Vite CSS URL and @import resolver modes.
   const assets = config.createResolver({ preferRelative: true, tryIndex: false, extensions: [] })
   const imports = config.createResolver({ extensions: [".css"], mainFields: ["style"], conditions: ["style", "production"], tryIndex: false, preferRelative: true })
