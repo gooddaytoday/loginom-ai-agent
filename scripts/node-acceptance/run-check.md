@@ -122,6 +122,13 @@ Only the business task and original CSV reach the model.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-date` uses grouping `acceptance/types/task-date.md` and only
+`fixtures/types/types.csv`. `expected-date.json` preserves unchanged
+`cases.date.stages` from LAB-1558: DateTime min/max/last (including final NULL),
+integer null_count, full typed rows and exact field order with `ordered:false`.
+The independent oracle stays private. CSV, Save, cold Execute without
+configuration and cleanup use stock checks; only task and CSV reach the model.
+
 `group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
 `fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
 `cases.boolean.stages` from LAB-1558. Native Boolean min/max/mode and integer
@@ -1173,3 +1180,12 @@ lift 0, max_items=3, max_consequents=2, исключение поддержки 
 не сверяется (решение владельца 12.11). Остальные сценарии сохраняют строгий cold.
 Save/cleanup обязательны; expected-exclude*.json генерируются oracle.py --write-exclude.
 Вспомогательный вход и отбор выбранных элементов не входят в сценарий.
+
+`supernode-calc` uses the approved control-supernode/acceptance/task.md and only
+input.csv/replacement.csv. Stock typed output and CSV matchers check the complete
+ordered external output 0 (5×6, then 3×6), exact field order/types and Real abs/rel=0.
+The node audit checks retained Import/container/Calculator/boundary GUIDs and a
+normal NW1 observation of InputNode → Calculator → OutputNode. Cold enters and
+leaves through the production NW1 adapter, observes that graph, then executes the
+saved parent with stock typed reads and cleanup. No settings are reapplied.
+Oracle and expected JSON remain private. Empty input is outside this scenario.

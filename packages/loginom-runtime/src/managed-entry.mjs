@@ -159,6 +159,8 @@ async function handle(message) {
       await startupPhase({ phase: "resources.verify", status: "ready",
         duration_ms: Math.round(performance.now() - state.startupStarted), ...resources.verification })
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
+      const profileStarted = performance.now()
+      await startupPhase({ phase: "runtime.profile", status: "starting" })
       const directory = join(
         input.stateDir,
         "generations",
@@ -175,6 +177,7 @@ async function handle(message) {
       const browserProfile =
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
+      await startupPhase({ phase: "runtime.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
       const login = {
         browserPath: resources.browserPath,
         profile: browserProfile,

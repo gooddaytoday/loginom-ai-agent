@@ -82,6 +82,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name == 'supernode-calc' and not cases and not case_root:
+        node = REPO / 'docs/node-development/nodes/control-supernode'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance/task.md', data=node / 'fixtures',
+                    base=None, input_files=['input.csv', 'replacement.csv'], export_count=2,
+                    supernode=True, initial_table='expected-initial.json')
     if name in ['bindings-grouping-sort', 'bindings-sorting-locale']:
         node = 'grouping' if name == 'bindings-grouping-sort' else 'sorting'
         src = REPO / 'docs/node-development/variables/bindings/acceptance/cycle3'
@@ -342,7 +347,7 @@ def scenario(name, case_root=None, *, cases=None):
                     data=node / 'fixtures/extended', input_files=['typed.csv', 'typed-update.csv'] if update else ['typed.csv'], base=None,
                     expected_name='expected-auto-update.json' if update else 'expected-auto-types.json',
                     text_update=update, export_count=2 if update else 1)
-    if name in ['group-real', 'group-boolean']:
+    if name in ['group-real', 'group-boolean', 'group-date']:
         root = REPO / 'docs/node-development/nodes/grouping'
         kind = name.removeprefix('group-')
         return dict(source=root / 'acceptance/types', prompt=root / ('acceptance/types/task-' + kind + '.md'),
@@ -2806,6 +2811,9 @@ class Runner:
         header = spec.get('csv_header', 'names')
         if case == 'text-multi-file-list':
             check_text_multi_file_list(replies)
+        if spec.get('supernode'):
+            self.phase('supernode-audit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/supernode-audit.mjs',
+                       folder / 'model.stdout', src, folder / 'supernode-audit.json', *sorted(profile.rglob('execution-events.jsonl'))], folder, timeout=60)
         if spec.get('text_file_info'):
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_file_info(replies)
@@ -2850,7 +2858,9 @@ class Runner:
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             counts = {}
-            csv_expected = (read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
+            csv_expected = (read(src / spec['initial_table'])['outputs'][0] if spec.get('initial_table') and index == 0
+                            else expected['outputs'][0] if spec.get('initial_table')
+                            else read(folder / 'expected-initial.json')['outputs'][0] if spec.get('rest_query_initial') and index == 0
                             else expected['outputs'][0] if spec.get('rest_query_initial')
                             else read(src / spec['binding_initial'])['outputs'][0] if spec.get('binding_initial') and index == 0
                             else expected['outputs'][0] if spec.get('binding_initial')
