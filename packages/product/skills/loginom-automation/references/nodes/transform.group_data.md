@@ -8,10 +8,11 @@
 Для каждой меры задай `field: {kind: "input_field", name: "имя"}`, `function`, выходные `name`/`label`. Две меры одного поля могут иметь разные имена. Прочитай карточку через `dock_action_describe`. Агрегаты выполняй Группировкой, не Калькулятором/JS.
 
 - `median`: integer/real → real; без NULL, полностью NULL → NULL.
-- `mode`: integer/string/real → тот же тип; без NULL, полностью NULL → 0/пустая строка. При ничьей — наименьшее значение (для строк порядок кодовых точек, например Beta < alpha).
+- `mode`: integer/string/real/boolean → тот же тип; без NULL, полностью NULL → 0/пустая строка/False. При ничьей — наименьшее значение (Boolean → False; строки — по кодовым точкам, например Beta < alpha).
 - `stddev`: integer/real → real; выборочное без NULL, одно значение → 0, полностью NULL → NULL.
-- `null_count`: integer/string/real → integer; считает NULL, не пустые строки.
-- `unique_count`: integer/string/real → integer, без NULL; пустая строка считается один раз.
+- `null_count`: integer/string/real/boolean → integer; считает NULL, не пустые строки.
+- `unique_count`: integer/string/real/boolean → integer, без NULL; пустая строка считается один раз.
+- `min`/`max` для boolean → boolean (False < True), без NULL; полностью NULL → NULL.
 При нескольких функциях native-суффиксы: Mode, Std, Null.
 
 ## Первое, последнее, единственное, список

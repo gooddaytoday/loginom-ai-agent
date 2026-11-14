@@ -10,8 +10,19 @@ test('tree stage 1 admits the independent acceptance JSON with exact original in
  assert.equal(validateTreeJsonScope(text).verified,true);
 });
 for(const value of ['[]','null','1','{"items":[]}','{"a":[{}],"b":[{}]}','{"items":[1,2]}','{"items":[{"v":1},{"v":"1"}]}',
- '{"items":[{"v":"2024-01-01"}]}','{"items":[{"v":1,"v":2}]}','{"id":1,"items":[{"id":2}]}','{"items":[{"v":9223372036854775808}]}'])test('tree scope refuses '+value,()=>{
+ '{"items":[{"v":1,"v":2}]}','{"id":1,"items":[{"id":2}]}','{"items":[{"v":9223372036854775808}]}'])test('tree scope refuses '+value,()=>{
  assert.throws(()=>validateTreeJsonScope(value));
+});
+test('JSON tree admits the native-confirmed dates fixture and datetime schema without extending tree-to-table',async()=>{
+ const csv=await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/fixtures/typed/documents.csv',import.meta.url),'utf8');
+ const text=csv.split(/\r?\n/)[1].match(/^"((?:""|[^"])*)";/)[1].replaceAll('""','"');
+ assert.equal(validateTreeJsonScope(text).verified,true);
+ assert.equal(validateTreeJsonScope('{"items":[{"when":"2026-01-15"}]}').verified,true);
+ const schema=[{path:'',name:'Root',is_container:true,is_array:false},{path:'/items',name:'items',is_container:true,is_array:true},
+  {path:'/items/id',name:'id',type:'integer',is_container:false},{path:'/items/when',name:'when',type:'datetime',is_container:false}];
+ assert.equal(validateJsonTreeSchema(schema),true);
+ assert.throws(()=>validateSelectedTreePaths(schema,['/items/when']),/supported types/);
+ for(const type of ['variant','unknown'])assert.throws(()=>validateJsonTreeSchema(schema.map(n=>n.name==='when'?{...n,type}:n)),/supported types/);
 });
 test('tree schema paths bind exact leaves in native order and reject indexes and containers',()=>{
  const schema=[{path:'',name:'Root',is_container:true,is_array:false},{path:'/id',name:'id',type:'integer',is_container:false},
@@ -144,7 +155,7 @@ test('JSON output admits nested object arrays while tree-to-table retains its on
   {ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{});
  assert.equal(result.verified,true);
  assert.throws(()=>validateSelectedTreePaths(schema),/one object and one repeated branch/);
- for(const fault of ['sibling','scalar-array','variant','datetime']){
+ for(const fault of ['sibling','scalar-array','variant']){
   const bad=structuredClone(schema);
   if(fault==='sibling')bad[3].path='/other';
   if(fault==='scalar-array')bad[3].is_container=false;
@@ -168,13 +179,12 @@ test('JSON preflight admits empty record containers only with an object-array wi
  ])assert.throws(()=>validateTreeJsonScope(JSON.stringify(input)));
 });
 
-test('nested JSON keeps sibling/scalar arrays, mixed types, dates and limits outside scope',async()=>{
+test('nested JSON keeps sibling/scalar arrays, mixed types and limits outside scope',async()=>{
  for(const value of [
   {items:[{parts:[{sku:'a'}],other:[{name:'b'}]}]},
   {items:[{parts:[1]}]}, {items:[{parts:[]}]},
   {items:[{details:{code:'A'}},{details:{code:1}}]},
   {items:[{details:{code:'A'}},{details:'A'}]},
-  {items:[{parts:[{date:'2024-01-01'}]}]},
   {items:Array.from({length:257},()=>({id:1}))},
   {items:[{text:'x'.repeat(1024*1024)}]},
  ])assert.throws(()=>validateTreeJsonScope(JSON.stringify(value)));
@@ -231,7 +241,7 @@ test('tree-to-table configure refuses when the native index leaf does not settle
  await assert.rejects(tableImplementation().configure(channel,{global_index_paths:['/items']},{request:{finish:'execute',target:{kind:'new'}}}),/Tree table stage 1 settings differ/);
  assert.deepEqual(performed,['index']);
 });
-test('earlier tree and table refusals are unchanged: dates, Variant, inferred dates and non-tree cell decoding',async()=>{
+test('tree-to-table and serialization still refuse dates and Variant; JSON admits inferred dates',async()=>{
  const {decodePortCell}=await import('../lib/node-port-output.mjs');
  const {validateSerializationTree}=await import('../lib/tree-conversion-parameters.mjs');
  const schema=type=>[{path:'',name:'Root',is_container:true,is_array:false},{path:'/items',name:'items',is_container:true,is_array:true},
@@ -240,7 +250,7 @@ test('earlier tree and table refusals are unchanged: dates, Variant, inferred da
   assert.throws(()=>validateSelectedTreePaths(schema(type),['/items/v']),/supported types/);
   assert.throws(()=>validateSerializationTree({port_kind:'tree',tree:{complete:true,schema:schema(type)}}),/dates and Variant/);
  }
- assert.throws(()=>validateTreeJsonScope('{"items":[{"v":"2024-01-01"}]}'),/inferred dates/);
+ assert.equal(validateTreeJsonScope('{"items":[{"v":"2024-01-01"}]}').verified,true);
  assert.deepEqual(decodePortCell('x','variant').limitations,['variant_display_precision']);
  assert.deepEqual(decodePortCell(1.5,'real').limitations,[]);
  assert.throws(()=>decodePortCell({},'string'),/unsupported_type/);

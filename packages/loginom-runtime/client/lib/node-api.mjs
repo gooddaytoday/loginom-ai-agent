@@ -197,7 +197,7 @@ userVariablesParametersSchema.description='Existing root scenario builtin, user 
 export const nodeApplyInputSchema=object({
  operation_id:id,contract_revision:choice('1.0.0'),document_id:id,
  workflow_ref:object({workflow_id:id,tab_tid:text(128),prefix:text(128),navigation_path:array(object({tid:text(512),label:{type:'string'}}),32,1)}),
- target:object({kind:choice('new','existing'),type:choice('imports.database','variables.replace','variables.column_union','variables.calculator','variables.from_table','variables.to_table','variables.user','transform.enrich_data','research.quality','imports.lgd','exports.lgd','preprocessing.coarse_classes','research.factor_analysis','trees.from_table','trees.to_json','datamining.assn_rules','transform.ungroup_data','preprocessing.smoothing','preprocessing.binning','research.auto_correlation','exports.excel','trees.from_json','trees.to_table','preprocessing.elim_outlier','datamining.log_regression','research.corr_analysis','preprocessing.sampling','preprocessing.data_partition','imports.excel','integration.rest_request','datamining.lin_regression','datamining.clustering','transform.cross_table','exports.text','transform.collapse_columns','preprocessing.data_recovery','transform.date_time','transform.sliding_window','research.duplicates','imports.text','transform.calculator','transform.group_data','transform.sorting','transform.replace_columns','transform.reform_columns','transform.filter_data','transform.join_data','transform.union_data','transform.col_union_data','programming.javascript','control.condition'),label:{...text(200),pattern:'^(?!\\s*$)[^;|<>"\'\\\\\\u0000-\\u001f]+$',description:'Optional nonblank node caption, 1–200 UTF-16 units. No ; | < >, single/double quotes, backslash or U+0000..U+001F. Omit if unneeded; conditions and formulas in parameters, not target.label.'},ref,
+ target:object({kind:choice('new','existing'),type:choice('programming.python','imports.database','variables.replace','variables.column_union','variables.calculator','variables.from_table','variables.to_table','variables.user','transform.enrich_data','research.quality','imports.lgd','exports.lgd','preprocessing.coarse_classes','research.factor_analysis','trees.from_table','trees.to_json','datamining.assn_rules','transform.ungroup_data','preprocessing.smoothing','preprocessing.binning','research.auto_correlation','exports.excel','trees.from_json','trees.to_table','preprocessing.elim_outlier','datamining.log_regression','research.corr_analysis','preprocessing.sampling','preprocessing.data_partition','imports.excel','integration.rest_request','datamining.lin_regression','datamining.clustering','transform.cross_table','exports.text','transform.collapse_columns','preprocessing.data_recovery','transform.date_time','transform.sliding_window','research.duplicates','imports.text','transform.calculator','transform.group_data','transform.sorting','transform.replace_columns','transform.reform_columns','transform.filter_data','transform.join_data','transform.union_data','transform.col_union_data','programming.javascript','control.condition'),label:{...text(200),pattern:'^(?!\\s*$)[^;|<>"\'\\\\\\u0000-\\u001f]+$',description:'Optional nonblank node caption, 1–200 UTF-16 units. No ; | < >, single/double quotes, backslash or U+0000..U+001F. Omit if unneeded; conditions and formulas in parameters, not target.label.'},ref,
   position:{...object({x:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000},y:{type:'number',minimum:NODE_POSITION_MIN,maximum:10000}}),description:'Model coordinates; safe label/port margin. Omit=auto; explicit unchanged.'}},['kind','type']),
  inputs:array(object({source:ref,output:integer(0,99),input:integer(0,99)}),15),
  variable_inputs:array(object({source:ref,output:integer(0,99),input:integer(0,99),kind:choice('variables','control')}),15),
@@ -238,12 +238,12 @@ nodeApplyInputSchema.allOf=[
  {if:{properties:{target:{properties:{type:{const:'research.quality'}},required:['type']}},required:['target']},then:{properties:{mode:{const:'profile'},parameters:{type:'object',properties:{},additionalProperties:false}}},else:{properties:{read:{properties:{ports:array(integer(0,2),3)}}}}},
  {if:{properties:{target:{properties:{type:choice('research.quality','preprocessing.coarse_classes','research.factor_analysis','datamining.assn_rules','transform.ungroup_data','preprocessing.smoothing','preprocessing.elim_outlier','preprocessing.data_partition')},required:['type']}},required:['target']},
   then:{},else:{properties:{read:{properties:{ports:array(integer(0,1),2)}}}}},
- {if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']}},required:['target']},
+ {if:{properties:{target:{properties:{type:{enum:['programming.javascript','programming.python']}},required:['type']}},required:['target']},
   then:{properties:{mode:{const:'script'},parameters:javascriptParametersSchema}},
   else:{properties:{mode:{not:{const:'script'}},parameters:{not:{anyOf:Object.keys(javascriptParametersSchema.properties).filter(key=>key!=='columns').map(key=>({required:[key]}))}}}}},
  {if:{properties:{target:{properties:{type:{const:'transform.cross_table'}},required:['type']}},required:['target']},
   then:{properties:{parameters:{properties:{columns:crossTableParametersSchema.properties.columns}}}},
-  else:{if:{properties:{target:{properties:{type:{const:'programming.javascript'}},required:['type']}},required:['target']},
+  else:{if:{properties:{target:{properties:{type:{enum:['programming.javascript','programming.python']}},required:['type']}},required:['target']},
    else:{properties:{parameters:{not:{required:['columns']}}}}}},
  {if:{properties:{finish:{enum:['done','close']}},required:['finish']},
   then:{properties:{read:{properties:{ports:{maxItems:0}}}}}},
@@ -311,6 +311,12 @@ export function validateNodeApplyEnvelope(args) {
  // The small structural validator does not interpret JSON Schema allOf.
  if(!['datamining.assn_rules','preprocessing.coarse_classes','preprocessing.elim_outlier','preprocessing.data_partition'].includes(args.target?.type)&&args.read?.ports!==undefined)
   validateActionParameters(array(integer(0,1),2),args.read.ports,'parameters.read.ports');
+ if(args.target?.type==='programming.python'){
+  if(args.mode!=='script')throw Error('Invalid parameters.mode: programming.python requires script');
+  validateActionParameters(javascriptParametersSchema,args.parameters,'parameters.parameters');
+  if(args.read?.coverage==='full')throw Error('Invalid parameters.read.coverage: programming.python reads sample_rows up to 100');
+  return args;
+ }
  const javascript=args.target?.type==='programming.javascript';
  if(javascript){
   if(args.mode!=='script')throw Error('Invalid parameters.mode: programming.javascript requires script');

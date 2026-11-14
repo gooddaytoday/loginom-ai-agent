@@ -1,6 +1,6 @@
 # Python: подплан для Multica
 
-Статус: `discovery_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
+Статус: `stage1_handler` — этап 1 (LAB-1597): обработчик `programming.python` / `external_process` на общем табличном пути, сценарии `py-stdlib` и `py-pandas`; приёмка — отчёт карточки LAB-1597. Редакция 2 от 2026-11-13 (редакция 1 от 2026-10-05 — переработка подпланов в ветке `node-coverage-plans`).
 Component ID: `component.programming.Python`, slug `programming-python`. Runtime type и режим: `programming.python` / `external_process` — предложение до конца этапа 0.
 База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
 
@@ -177,7 +177,9 @@ Dynamic schema extraction и preview запускают весь Python код; 
 
 ## 6. Точка продолжения
 
-- **Подтверждено:** источники Help/E2E и отсутствие обработчика на `dada8010e`; живых наблюдений и прогонов нет, `discovery_required`.
+- **Этап 1 (LAB-1597):** модули `client/lib/python-*.mjs` — политика `python-module-v1` (только builtin_data, builtin_pandas_utils, pandas, numpy и вычислительные модули; без `open`/`eval`/`exec`/dunder и pandas/numpy-чтения/записи файлов; ≤2048 символов, ≤128 строк), флажок «из кода» (`BooleanPropEdit;ValueControl;DisplayEl`), объявленные столбцы через `EditColumnDefForm` с явным типом из `cbxDataType;trg_picker` и readback сетки, код дословно через `replace_expression` в `PythonCodeWizard;cmpCodeCM`, compact readback с `source_sha256`. Сценарии run-check — `py-stdlib`, `py-pandas` (имя без отдельного слова `python`: имя пакета попадает в хлебные крошки, где его закрывает охрана кодовых имён UI).
+- **Не проверено (`not_checked`):** входные переменные, `Input_Add`/`Output_Add`, несколько выходов, изменение объявленных столбцов существующего узла (поддержаны пустая страница или те же имена), PY_ENV/venv, отмена и тайм-аут выполнения.
+- **Ранее подтверждено:** источники Help/E2E и отсутствие обработчика на `dada8010e`; этап 0 — [discovery](discovery.md).
 - **Генератор:** сверить активные карточки, назначить этап 0, зафиксировать SHA/аккаунты/внешнюю среду.
 - **Исполнитель:** discovery, матрица W для владельца, fixtures и независимый комплект до обработчика.
 - **Владелец:** решение по W до карточки разработки; следующие этапы отдельными назначениями.

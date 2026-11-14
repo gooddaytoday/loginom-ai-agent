@@ -146,7 +146,7 @@ console.log(JSON.stringify({trace,verified:mapped.verified}));
  assert.equal(result.status,0,result.stderr+result.stdout);
  assert.equal(JSON.parse(result.stdout).verified,true);
 });
-for(const mode of ['no-path','explicit-path'])test('existing import without a saved source skips layout capture: '+mode,()=>{
+for(const mode of ['no-path','explicit-path','verified-path','auto-path','multiple-paths','mismatched-path'])test('existing import without a saved source skips layout capture: '+mode,()=>{
  // A discarded first configuration leaves no source and no output layout. Next
  // on an empty path opens a native error; refuse first or fill the path first.
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks','--input-type=module','-e',`
@@ -178,19 +178,28 @@ mock.module(href('node-wizard-close.mjs'),{exports:{...await real('node-wizard-c
 const {createTextImportNodeSupport}=await import(href('text-import-node.mjs'));
 const settings=mode==='no-path'?{source:{encoding:'UTF-8'}}:{source:{source_path:'/test/upload.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
  format:{delimiter:';',decimal_separator:'.',null_marker:'',text_qualifier:'"'},columns:[{name:'Id',label:'Id',type:'integer',data_kind:'Дискретный',used:true}]};
+if(mode==='verified-path'||mode==='auto-path'||mode==='multiple-paths')delete settings.source.source_path;
+if(mode==='auto-path'){delete settings.columns;settings.format.auto_detect_columns='new';}
+if(mode==='mismatched-path')settings.source.source_path='/test/other.csv';
 // A verified local delivery may omit settings.source.source_path.
 const sha='a'.repeat(64),artifact={artifact_id:'a1',bytes:3,sha256:sha};
 const upload={operation_id:'up1',artifact,outcome:{operation_id:'up1',status:'SUCCEEDED',cleanup_complete:true,action_key:'artifact.upload',
  output:{artifact_id:'a1',destination:'/test/upload.csv',bytes:3,sha256:sha,server_copy_verification:{status:'SUCCEEDED',upload_completion_verified:true,
   destination:'/test/upload.csv',bytes:3,bytes_verified:true,sha256:sha,verification_id:'v1'}}}};
-const p={source:{artifact_id:'a1',upload_operation_id:'up1'},settings};
+const p={source:mode==='multiple-paths'?{kind:'verified_sources',sources:[{artifact_id:'a1',upload_operation_id:'up1'},{artifact_id:'a2',upload_operation_id:'up2'}]}:{artifact_id:'a1',upload_operation_id:'up1'},settings};
+const second=structuredClone(upload);second.operation_id=second.outcome.operation_id='up2';second.artifact.artifact_id=second.outcome.output.artifact_id='a2';second.outcome.output.destination=second.outcome.output.server_copy_verification.destination='/test/second.csv';
 const request={target:{kind:'existing'},finish:'done',inputs:[],mappings:[],read:{ports:[]},bindings:[],parameters:p};
 const operation={id:'op',parameters:request,nodeApply:{request},nodeTargetAdapter:{observe:async()=>({})}};
 const driver=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation,execute:async()=>assert.fail('no browser'),onRecord:()=>{},now:Date.now,receiptOptions:()=>({}),
- verifiedUploads:()=>[upload]});
+ verifiedUploads:()=>[upload,second]});
 const ctx={signal:new AbortController().signal,deadline:Date.now()+60000,document_id:'d',workflow_ref:{workflow_id:'w'},node:{node_id:'n'}};
+if(mode==='mismatched-path'){
+ await assert.rejects(driver.verifySource(p),/exact destination do not match/);
+ assert.deepEqual(actions,[]);console.log(JSON.stringify({verified:true,actions}));process.exit(0);
+}
 await driver.verifySource(p);await driver.openWizard(ctx);
-if(mode==='no-path'){
+const original=structuredClone(settings);
+if(mode==='no-path'||mode==='multiple-paths'){
  const error=await driver.configureTextImport(ctx,p).then(()=>assert.fail('configured without a source'),e=>e);
  assert.match(error.message,/Existing import has no saved source/);
  assert.equal(error.nodePhaseRefusal?.settings_unchanged,true);
@@ -200,6 +209,7 @@ if(mode==='no-path'){
  assert.deepEqual(actions,[['fill','text_import_file','/test/upload.csv',''],['press','text_import_file','Tab','/test/upload.csv'],
   ['wizard_step','text_import_file','text_import_format','/test/upload.csv']]);
 }
+assert.deepEqual(settings,original,'caller settings must remain unchanged');
 console.log(JSON.stringify({verified:true,actions}));
 `,mode],{encoding:'utf8',timeout:30000});
  assert.equal(result.status,0,result.stderr+result.stdout);

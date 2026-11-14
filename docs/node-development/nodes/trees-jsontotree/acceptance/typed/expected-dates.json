@@ -1,0 +1,99 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text",
+      "label_any": true
+    },
+    {
+      "type": "trees.from_json",
+      "label_any": true
+    }
+  ],
+  "outputs": [],
+  "tree_outputs": [
+    {
+      "output_node_type": "trees.from_json",
+      "output_port": 0,
+      "port_kind": "tree",
+      "ordered": true,
+      "tolerance": {
+        "abs": 0,
+        "rel": 0
+      },
+      "source_column": "dates",
+      "schema_field_order": [
+        "items"
+      ],
+      "item_field_order": [
+        "id",
+        "when"
+      ],
+      "schema_types": {
+        "/items": "object_array",
+        "/items/id": "integer",
+        "/items/when": "datetime"
+      },
+      "document": {
+        "path": "",
+        "type": "object",
+        "children": [
+          {
+            "path": "/items",
+            "type": "array",
+            "children": [
+              {
+                "path": "/items/0",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/0/id",
+                    "type": "integer",
+                    "value": "1"
+                  },
+                  {
+                    "path": "/items/0/when",
+                    "type": "datetime",
+                    "value": "2026-01-15T12:00:00.000"
+                  }
+                ]
+              },
+              {
+                "path": "/items/1",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/1/id",
+                    "type": "integer",
+                    "value": "2"
+                  },
+                  {
+                    "path": "/items/1/when",
+                    "type": "datetime",
+                    "value": "2026-07-01T12:30:15.000"
+                  }
+                ]
+              },
+              {
+                "path": "/items/2",
+                "type": "object",
+                "children": [
+                  {
+                    "path": "/items/2/id",
+                    "type": "integer",
+                    "value": "3"
+                  },
+                  {
+                    "path": "/items/2/when",
+                    "type": "null",
+                    "value": null
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

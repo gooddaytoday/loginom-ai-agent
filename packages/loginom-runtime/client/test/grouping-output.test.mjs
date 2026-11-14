@@ -99,13 +99,14 @@ test('Grouping preserves an explicit autosync choice for a requested field order
  const f=outputChannel();await configureGroupingOutput(f.channel,f.config,f.params,{autosync:true});
  assert.equal(f.native.autosync,true);assert.ok(!f.actions.some(a=>a.ref==='auto'));
 });
-for(const bound of [false,true])test('Grouping '+(bound?'bound':'literal')+' already ordered layout preserves its persistence policy',async()=>{
+for(const bound of [false,true])test('Grouping '+(bound?'bound':'literal')+' already ordered layout freezes autosync without requested options',async()=>{
  const f=outputChannel();
  f.native.target_fields.sort((a,b)=>Number(a.record_id.slice(1))-Number(b.record_id.slice(1)));
  f.native.target_fields.forEach((field,index)=>Object.assign(field,{index,group_index:index}));
  f.config.options={pedSortResult:{switch_pressed:bound}};
  await configureGroupingOutput(f.channel,f.config,f.params,{});
- assert.equal(f.native.autosync,!bound);
+ assert.equal(f.native.autosync,false);
+ assert.equal(f.actions[0].ref,'auto');
  assert.deepEqual(f.native.target_fields.map(f=>f.name),['Segment','Group','OtherTotal','MeanAmount','TextRows']);
 });
 
@@ -122,11 +123,12 @@ for(const parameters of [{},{cache_groups:false},{sort_result:true}])test(`Group
  await configureGroupingOutput(f.channel,f.config,parameters,{});
  assert.deepEqual(f.native,before);assert.deepEqual(f.actions,[]);
 });
-test('Grouping retains legacy defaults and explicit autosync for an already ordered layout',async()=>{
+test('Grouping preserves explicit autosync for an already ordered layout with or without options',async()=>{
  for(const parameters of [{},{sort_result:true}]){
   const f=outputChannel();
   f.native.target_fields.sort((a,b)=>a.source.index-b.source.index).forEach((field,index)=>{field.index=index;field.group_index=index;});
-  await configureGroupingOutput(f.channel,f.config,{...f.params,...parameters},parameters.sort_result===true?{autosync:true}:{});
+  await configureGroupingOutput(f.channel,f.config,{...f.params,...parameters},{autosync:true});
   assert.equal(f.native.autosync,true);
+  assert.ok(!f.actions.some(a=>a.ref==='auto'));
  }
 });
