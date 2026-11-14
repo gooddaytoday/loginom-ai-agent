@@ -11,4 +11,6 @@
 - Установленная поставка, настоящая модель, стенд, публикация на настоящем стенде и задача 18 ещё не приняты. Перед DEB-установкой требуется команда владельца по плану; слияние и выпуск — отдельно.
 - Дополнение Task18 о сохранении Server, исходной Studio и прежнего web независимо одобрено; перед исполнением повторно проверить состояние. Стенд и удалённый рабочий компьютер не изменялись.
 - Для итогового ревью остаются P3 Copilot `_noop` и Host else-if Minor; Product catalog-check исправлен, secret scanning не менялся.
-- Следующая Task18: входы/прежние отдельные Desktop и CLI проверены в `task-18-build-inputs.md`. Нужны итоговое ревью всей ветки, финальный CI и сборка из отдельного чистого checkout окончательного SHA; чужие untracked сохраняются.
+- Следующая Task18: входы/прежние отдельные Desktop и CLI проверены в `task-18-build-inputs.md`. Нужны финальный CI и сборка из отдельного чистого checkout окончательного SHA; чужие untracked сохраняются.
+- Итоговое Astra-ревью и один fix wave завершены: общий запрет auto formatter/LSP и конечный draft-output исправлены, scoped review Approved; 205 tests/types/native smoke PASS. Чистый build checkout с dependencies/Electron пока на прежнем SHA и требует обновления перед сборкой.
+- [CI5](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/43553062512): 10 jobs PASS, evals FAIL на PPID assertion; исправлено ожидание фактической adoption с прежним birth/deadline, focused 1/types PASS, независимое ревью Approved. Нужен новый полный CI исправленного SHA. Сборка/замеры/установка/стенд ещё не начаты.
