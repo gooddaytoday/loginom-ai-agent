@@ -61,13 +61,13 @@ Workflow `.github/workflows/secrets.yml` запускает единственн
 
 В PR-проверке код, lockfile, Bun-конфигурация, правила и исключения сканера берутся из base SHA. Файлы PR не checkout-ятся и не исполняются; команда сканера вызывается непосредственно с `bun --no-install`, без package scripts из PR. Отсутствие сканера в base не разрешает fallback на head. Fetch объектов выполняется без credentials из публичного origin.
 
-Первое внедрение требует отдельного слияния PR #185: до него `pull_request_target` workflow отсутствует в `loginom` и независимая PR-проверка из base не запускается. Push CI проверяет конкретный SHA #185, но не заменяет эту гарантию. После слияния следующие PR используют доверенную базовую версию. Изменения самого workflow/сканера требуют содержательного ревью владельца: статус **Secret scan** от GitHub Actions с нулём обязательных одобрений не является криптографическим подтверждением конкретной реализации workflow.
+Hooks и `pull_request_target` workflow включены в `loginom` через [PR #185](https://github.com/gooddaytoday/loginom-ai-agent/pull/185) и последующую интеграцию [PR #237](https://github.com/gooddaytoday/loginom-ai-agent/pull/237). PR-проверки используют доверенную базовую версию. Изменения самого workflow/сканера требуют содержательного ревью владельца: статус **Secret scan** от GitHub Actions с нулём обязательных одобрений не является криптографическим подтверждением конкретной реализации workflow.
 
 Push тега запускает workflow, только если его файл присутствует в целевом коммите. Тег на старый коммит без workflow не получает такой проверки; полная обязательная серверная защита любых тегов этим workflow не обеспечивается. Защита ветки `loginom` не изменяется.
 
 19 октября 2026 года после успешных проверочных [push CI](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/39263559725) и [PR CI](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/39263566257) серверное правило для `loginom` включено и повторно прочитано через GitHub API: обязательный `Secret scan` именно от GitHub Actions (`app_id=15368`), слияние через PR, применение к администраторам, **0** обязательных одобрений. Force push и удаление защищённой ветки запрещены. GitHub secret scanning и push protection уже были включены и сохранены.
 
-Изменения опубликованы в [PR #185](https://github.com/gooddaytoday/loginom-ai-agent/pull/185), целевая ветка `loginom`. Слияние PR — отдельное действие; после слияния hooks и workflow станут частью интеграционной ветки. Первая ошибка валидации workflow устранена до включения защиты: `runner.temp` недоступен в job-level env, поэтому `TMPDIR` устанавливается в исполняемом шаге через `$RUNNER_TEMP` и `$GITHUB_ENV`.
+`runner.temp` недоступен в job-level env, поэтому `TMPDIR` устанавливается в исполняемом шаге через `$RUNNER_TEMP` и `$GITHUB_ENV`.
 
 ## Полный аудит
 
