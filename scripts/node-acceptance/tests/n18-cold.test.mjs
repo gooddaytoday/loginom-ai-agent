@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {verifyN18JavascriptStep} from '../n18-cold.mjs';
+import {closePreparedWizard,wizardCloseBinding,boundInputMappingConflict} from '../../../packages/loginom-runtime/client/lib/node-wizard-close.mjs';
 
 // Run the real cold graph branch; the native wizard dependencies alone are mocked.
 const source=readFileSync(new URL('../cold-check.mjs',import.meta.url),'utf8');
@@ -10,23 +11,44 @@ assert.ok(branch);
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 const check=new AsyncFunction('graph','expected','load','channelFor','record','verifyN18JavascriptStep',branch);
 const node={document_id:'doc',workflow_id:'flow',node_id:'calc'};
-const graph=(...types)=>({nodes:types.map(type=>({type,ref:{...node,node_id:type==='transform.calculator'?'calc':type}}))});
+const graph=(...types)=>({nodes:types.map(type=>({type,ref:{...node,node_id:type==='transform.calculator'?'calc':type}})),links:[{source:'imports.text',output:0,target:'calc',input:0}]});
 const expected=(alternative=true)=>({n18_javascript_step:true,nodes:[{type:'imports.text'},{type:'programming.javascript',...(alternative?{alternative_types:['transform.calculator'],alternative_syntax:'javascript'}:{})},{type:'exports.text'}]});
-function fixture({syntax='javascript',stage='calculator',change=()=>{},closed={},nextError}={}){
- const calls=[],records=[];
+function fixture({syntax='javascript',stage='calculator',change=()=>{},closed={},nextError,dynamic=false,persistentConflict=false,execution={status:'completed',verified:true,owner_verified:true}}={}){
+ const calls=[],records=[],executions=[];
+ let materialized=false;
  const selected={prepared_node_context:{...node,verified:true,surface:'graph'},wizard:{status:'absent'}};
- const state={prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{stage,root_tid:'wizard'},ui:{elements:[{tid:'wizard;btnNext',ref:'next',enabled:true,allowed_actions:['wizard_step']}]},node_calculator:{verified:true,inventory_complete:true,mode:'expression',syntax,node_context:{...node,verified:true}}};
+ const state={loginom_build:'7.4.2',prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',stage,root_tid:'wizard',root_ref:'wizard-ref',owner_context:{status:'observed'}},ui:{dialogs:[],masks:[],elements:[{tid:'wizard;btnNext',ref:'next',enabled:true,allowed_actions:['wizard_step']},{tid:'wizard;btnClose',ref:'close',allowed_actions:['click']}]},node_calculator:{verified:true,inventory_complete:true,mode:'expression',syntax,node_context:{...node,verified:true}}};
  change(state);
  const baseline=structuredClone(state);
- const channel={async observe(spec){const graph=spec.condition==='cold n18 Calculator graph';calls.push(graph?'graph':spec.readCalculator?'read':'wizard');const s=graph?selected:state;if(!spec.ready(s))throw Error('NodeReadinessTimeout: NOT_READY');return s;},
+ const channel={async observe(spec){const graph=spec.condition==='cold n18 Calculator graph';calls.push(graph?'graph':spec.readCalculator?'read':'wizard');const s=graph?selected:state;
+   if(s.ui?.dialogs.length&&!boundInputMappingConflict(s,spec.wizardConfirmation))throw Error('Node procedure is blocked by a mask or dialog');
+   if(!spec.ready(s))throw Error('NodeReadinessTimeout: NOT_READY');return s;},
   async perform(spec){assert.ok(spec.ready(state));assert.deepEqual(spec.identity(state),state.prepared_node_context);
-   const action=spec.resolve(state);assert.deepEqual(action,{verb:'wizard_step',ref:'next',expected_stage:'calculator'});calls.push('next');if(nextError)throw Error(nextError);state.wizard.stage=action.expected_stage;}};
+   const action=spec.resolve(state);assert.deepEqual(action,{verb:'wizard_step',ref:'next',expected_stage:'calculator'});calls.push('next');if(nextError)throw Error(nextError);
+   if(persistentConflict||dynamic&&!materialized){
+    state.ui.dialogs=[{ref:'question',title:'Loginom 7.4.2',text:'Loginom 7.4.2 Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить? Удалить и продолжить Не удалять и продолжить Отмена'}];
+    state.ui.masks=[{kind:'modal_background',ref:'wizard-ref'}];
+    state.ui.elements.push(...Object.entries({yes:'Удалить и продолжить',no:'Не удалять и продолжить',cancel:'Отмена'}).map(([name,label])=>({tid:'msgbox;tlb;'+name,ref:name,label,signature:{dialog_ref:'question'},allowed_actions:['click']})));
+    const error=Error('Node procedure step did not confirm completion; inspect before retry');
+    error.receipt={status:'AMBIGUOUS',cleanup_complete:true,error:{code:'WIZARD_STEP_NOT_CONFIRMED'}};
+    throw error;
+   }
+   state.wizard.stage=action.expected_stage;}};
+ const importChannel={};
  const modules={
+  'client/lib/node-execution-procedure.mjs':{createNodeExecutionProcedure(actual,ref){assert.equal(actual,importChannel);assert.deepEqual(ref,{...node,node_id:'imports.text'});return {
+   async prepare(){executions.push('prepare');},async launchGraph(){executions.push('launch');},async identify(){executions.push('identify');},async waitCompleted(){executions.push('completed');materialized=true;return execution;}
+  };}},
   'client/lib/node-graph-selection.mjs':{async selectPreparedGraphNode(){calls.push('select');}},
-  'client/lib/node-wizard-open.mjs':{async openPreparedWizard(){calls.push('open');}},
-  'client/lib/node-wizard-close.mjs':{async closePreparedWizard(){calls.push('cancel');return {verified:true,cleanup_complete:true,settings_applied:false,draft_discarded:true,node_context:{...node,verified:true},...closed};}}
+  'client/lib/node-wizard-open.mjs':{async openPreparedWizard(){if(dynamic)executions.push('open');calls.push('open');}},
+  'client/lib/node-wizard-close.mjs':{wizardCloseBinding,boundInputMappingConflict,async closePreparedWizard(unused,options){
+   if(persistentConflict)return closePreparedWizard({...channel,async perform(spec){assert.ok(spec.ready(state));const action=spec.resolve(state);assert.equal(action.verb,'click');
+    if(action.ref==='cancel'){calls.push('cancel-question');state.ui.dialogs=[];state.ui.masks=[];return;}
+    assert.equal(action.ref,'close');calls.push('cancel');state.wizard={status:'absent'};state.prepared_node_context={...node,verified:true,surface:'graph',locked:false};
+   }},options);
+   calls.push('cancel');return {verified:true,cleanup_complete:true,settings_applied:false,draft_discarded:true,node_context:{...node,verified:true},...closed};}}
  };
- return {calls,records,state,baseline,run:(g,e=expected())=>check(g,e,async name=>{assert.ok(modules[name]);return modules[name];},ref=>{assert.deepEqual(ref,node);return channel;},async value=>records.push(value),verifyN18JavascriptStep)};
+ return {calls,records,state,baseline,executions,run:(g,e=expected())=>check(g,e,async name=>{assert.ok(modules[name]);return modules[name];},ref=>{if(ref.node_id==='imports.text')return importChannel;assert.deepEqual(ref,node);return channel;},async value=>records.push(value),verifyN18JavascriptStep)};
 }
 const observed=()=>graph('imports.text','transform.calculator','transform.sorting','exports.text');
 test('legacy exact JavaScript graph remains accepted without an alternative',async()=>{
@@ -42,14 +64,39 @@ test('n18 accepts the observed Calculator only after owned saved JavaScript read
 });
 test('n18 advances an owned saved Calculator from input_mapping once without editing settings',async()=>{
  const f=fixture({stage:'input_mapping'});await f.run(observed());
- assert.deepEqual(f.calls,['graph','select','open','wizard','next','read','cancel']);
+ assert.deepEqual(f.calls,['graph','select','open','wizard','next','wizard','read','cancel']);
  assert.deepEqual(f.state,{...f.baseline,wizard:{...f.baseline.wizard,stage:'calculator'}});
  assert.equal(f.records[0].settings_applied,false);
+});
+test('dynamic import is executed before the saved input_mapping wizard, preventing lost-links without applying settings',async()=>{
+ const f=fixture({stage:'input_mapping',dynamic:true});await f.run(observed());
+ assert.deepEqual(f.executions,['prepare','launch','identify','completed','open']);
+ assert.deepEqual(f.state,{...f.baseline,wizard:{...f.baseline.wizard,stage:'calculator'}});
+ assert.equal(f.records[0].settings_applied,false);
+});
+for(const stage of ['input_mapping','calculator'])test('an intermediate node preserves the saved '+stage+' path without executing the import',async()=>{
+ const f=fixture({stage}),g=observed();
+ g.links=[{source:'imports.text',output:0,target:'transform.sorting',input:0},{source:'transform.sorting',output:0,target:'calc',input:0}];
+ await f.run(g);
+ assert.deepEqual(f.executions,[]);
+ assert.deepEqual(f.calls,stage==='input_mapping'?['graph','select','open','wizard','next','wizard','read','cancel']:['graph','select','open','wizard','read','cancel']);
+ assert.equal(f.records[0].syntax,'javascript');assert.equal(f.records[0].settings_applied,false);
+});
+test('persistent lost-links question is cancelled by native cleanup and fails with a clear code',async()=>{
+ const f=fixture({stage:'input_mapping',persistentConflict:true});
+ await assert.rejects(f.run(observed()),/COLD_N18_CALCULATOR_LOST_LINKS/);
+ assert.ok(f.calls.includes('cancel-question'));assert.ok(f.calls.includes('cancel'));
+ assert.deepEqual(f.state.ui.dialogs,[]);assert.equal(f.state.wizard.status,'absent');assert.deepEqual(f.records,[]);
+});
+test('unverified upstream execution refuses before opening the Calculator',async()=>{
+ const f=fixture({execution:{status:'completed',verified:true,owner_verified:false}});
+ await assert.rejects(f.run(observed()),/COLD_N18_IMPORT_EXECUTION_UNCONFIRMED/);
+ assert.deepEqual(f.calls,[]);assert.deepEqual(f.records,[]);
 });
 test('input_mapping still requires independent JavaScript readback after Next',async()=>{
  const f=fixture({stage:'input_mapping',syntax:'expression'});
  await assert.rejects(f.run(observed()),/COLD_N18_CALCULATOR_JAVASCRIPT_REQUIRED/);
- assert.deepEqual(f.calls,['graph','select','open','wizard','next','read','cancel']);assert.deepEqual(f.records,[]);
+ assert.deepEqual(f.calls,['graph','select','open','wizard','next','wizard','read','cancel']);assert.deepEqual(f.records,[]);
 });
 test('input_mapping of a foreign node cannot authorize Next',async()=>{
  const f=fixture({stage:'input_mapping',change:s=>s.prepared_node_context.node_id='foreign'});

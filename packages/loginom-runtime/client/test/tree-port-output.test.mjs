@@ -42,6 +42,41 @@ function fixture({count=4,depth=0,precision=false,duplicate=false,nativeContaine
  return {source,call,track,owned,released};
 }
 async function read(options){const f=fixture(options);return readTreePortSource(f.source,f.call,f.track,decodePortCell);}
+test('scalar arrays keep parent row ranges, empty arrays and exact leaf types',async()=>{
+ const node=(name,type,children=[],array=false)=>({name,
+  get_Name:async()=>name,get_DisplayName:async()=>name,get_DataType:async()=>type,
+  get_IsContainer:async()=>children.length>0,get_IsArray:async()=>array,
+  get_SubNodes:async()=>({get_Count:async()=>children.length,getItem:async i=>children[i]})});
+ const root=node('Root',0,[node('items',0,[node('id',4),node('tags',5,[],true),node('scores',3,[],true)],true)]);
+ const calls=[],values=[];
+ const source={get_RootNodeDef:async()=>root,GetReader:async definitions=>({
+  GetRowCount:async()=>1,
+  GetRowRange:async(index,parent,start,size)=>{
+   const name=definitions[index].name;calls.push([name,parent]);
+   const range=name==='items'&&parent===0?[3,3]:parent===3?[10,2]:parent===4?[12,0]:parent===5?[12,1]:null;
+   assert.ok(range);[start.$,size.$]=range;
+  },
+  GetContainerExists:async()=>{throw Error('array elements are not containers');},
+  AsVariant:async(index,row)=>{
+   const name=definitions[index].name;values.push([name,row]);
+   const value={id:{3:1,4:2,5:3},tags:{10:'a',11:'b',12:'c'},scores:{10:1.5,11:2.5,12:.25}}[name][row];
+   assert.notEqual(value,undefined);return value;
+  },
+ })};
+ const tree=await readTreePortSource(source,async fn=>fn(),p=>p,decodePortCell);
+ assert.deepEqual(calls,[['items',0],['tags',3],['scores',3],['tags',4],['scores',4],['tags',5],['scores',5]]);
+ assert.deepEqual(values,[['id',3],['tags',10],['tags',11],['scores',10],['scores',11],['id',4],['id',5],['tags',12],['scores',12]]);
+ for(const name of ['tags','scores']){
+  const def=tree.schema.find(n=>n.name===name);assert.equal(def.is_array,true);assert.equal(def.is_container,false);
+  assert.deepEqual(tree.instances.find(n=>n.path==='/items/1/'+name).children,[]);
+ }
+ const document=index=>{const n=tree.instances[index];return {path:n.path,type:n.is_null?'null':n.type,
+  ...(n.children?{children:n.children.map(document)}:{value:n.type==='real'?String(n.value):n.value})};};
+ const approved=JSON.parse(await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/acceptance/typed/expected.json',import.meta.url)));
+ assert.deepEqual(document(0),approved.cases.scalar_arrays.tree_outputs[0].document);
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
+ assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree,sample_complete:true}).valid,true);
+});
 test('tree_io reads ordered schema and every native instance with exact Int64, false, zero and NULL',async()=>{
  const result=await read();
  assert.equal(result.complete,true);assert.equal(result.node_count,24);
@@ -56,6 +91,19 @@ test('tree_io uses root row count and array row ranges as the existence proof fo
  const result=await read({nativeContainers:true});
  assert.equal(result.complete,true);assert.equal(result.node_count,24);
  assert.equal(result.instances.find(n=>n.path==='/items/3/qty').value,'1');
+});
+for(const [type,value,decoded] of [[1,false,false],[2,new Date(2026,0,15,12),'2026-01-15T12:00:00.000'],
+ [3,1.5,1.5],[4,7,'7'],[5,'',''],[6,7,null]])test('scalar array native DataType '+type,async()=>{
+ const leaf={get_Name:async()=> 'values',get_DisplayName:async()=> 'values',get_IsContainer:async()=>false,get_IsArray:async()=>true,get_DataType:async()=>type};
+ const root={get_Name:async()=> 'Root',get_DisplayName:async()=> 'Root',get_IsContainer:async()=>true,get_IsArray:async()=>false,
+  get_SubNodes:async()=>({get_Count:async()=>1,getItem:async()=>leaf})};
+ const source={get_RootNodeDef:async()=>root,GetReader:async()=>({GetRowCount:async()=>1,
+  GetRowRange:async(index,parent,start,size)=>{assert.equal(index,1);assert.equal(parent,0);start.$=9;size.$=2;},
+  AsVariant:async(index,row)=>{assert.equal(index,1);assert.ok([9,10].includes(row));return row===9?value:null;}})};
+ const read=()=>readTreePortSource(source,async fn=>fn(),p=>p,(raw,kind)=>kind==='datetime'&&raw!==null
+  ?{cell:{type:kind,is_null:false,value:decoded,precision:'millisecond',representation:'local_datetime'},limitations:[]}:decodePortCell(raw,kind));
+ if(type===6){await assert.rejects(read(),/tree_scalar_type/);return;}
+ const tree=await read();assert.equal(tree.instances[2].value,decoded);assert.equal(tree.instances[3].is_null,true);
 });
 test('tree_io still refuses a genuinely absent ordinary object container',async()=>{
  await assert.rejects(read({nativeContainers:true,absentContainer:true}),/tree_absent_container/);

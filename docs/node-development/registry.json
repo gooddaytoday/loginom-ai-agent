@@ -8775,13 +8775,24 @@
       "name": "Python",
       "slug": "programming-python",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "programming.python",
+        "modes": [
+          "script"
+        ],
+        "source": "../../packages/loginom-runtime/client/lib/python-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/python-parameters.mjs",
+        "capabilities": [
+          "Python 3.13 в отдельном процессе сервера (external_process); один вход/выход порта 0; схема declared (столбцы мастера с явным типом) или code (из кода); код дословно, readback source_sha256; политика python-module-v1."
+        ]
+      },
       "card": "nodes/programming-python/README.md",
       "initial_scope": "Ограниченный табличный пример в разрешённом отдельном Python-процессе на сервере; без установки библиотек по ходу работы.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Без установки пакетов, сети, файлов, подпроцессов, PY_ENV/venv, входных переменных и дополнительных портов; код до 2048 символов и 128 строк.",
+        "Изменение объявленных столбцов существующего узла не поддержано (пустая страница или те же имена)."
       ],
       "prerequisites": [
         "accepted_base",
@@ -8825,9 +8836,14 @@
           "evidence": []
         }
       },
-      "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
+      "next_action": "Независимая приёмка py-stdlib и py-pandas на SHA отчёта LAB-1597; следующие этапы — отдельными назначениями.",
       "plan": "nodes/programming-python/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "discovery_required",
+      "acceptance": {
+        "status": "этап 1 разработчика LAB-1597; независимая приёмка не проведена",
+        "evidence": [],
+        "note": "Сценарии run-check py-stdlib и py-pandas."
+      }
     },
     {
       "component_id": "component.research.AutoCorrelation",

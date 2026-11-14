@@ -92,6 +92,16 @@ against the frozen `expected.json` (`oracle.py --check`), and Save. No CSV is
 exported; cold reexecutes the saved package without configuration and matches
 all six labelled outputs. Only task and folder paths reach the model.
 
+`tree-dates` uses the approved `trees-jsontotree/acceptance/typed/task-dates.md`
+and unchanged `fixtures/typed/documents.csv` (all three input columns are strings).
+Only task and CSV reach the model. `expected-dates.json` is the separate stock
+projection of `expected.json → cases.dates`, checked by the same independent oracle.
+Full ordered schema/instances, DateTime civil `YYYY-MM-DDTHH:MM:SS.mmm`,
+`precision:millisecond`, `representation:local_datetime` and typed NULL are required.
+Native default format is `YYYY-MM-DDThh:mm:ss`; winter and summer values must
+retain their civil time. Tree-only Save, a fresh cold profile executing without
+configuration, the same full typed matcher and cleanup apply; no CSV export.
+
 `tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
 `trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
 and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks
@@ -101,6 +111,14 @@ string, false and zero. A production tree read, Save, cold reexecution without
 settings changes and cleanup are required. No export/CSV is requested or passed
 to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
 the model; oracle and expected remain private.
+
+`tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
+`fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
+projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema
+types `string_array`/`real_array`, ordered values, parent row ranges and both
+empty arrays in the second record are checked directly. Full tree read, Save,
+cold reexecution without configuration and cleanup are required; no CSV export.
+Only the business task and original CSV reach the model.
 
 Run live acceptance without repeatedly reading live logs:
 
@@ -669,6 +687,16 @@ The existing generated-source storage/disk cleanup runs afterwards. External
 `docs/node-development/nodes/transform-crosstable/acceptance/continuous-real`.
 Проверяет точное равенство числовых ключей, общий 0/−0, отдельный NULL,
 близкие разные real, все суммы/количества, порядок строк, CSV/Save/cold.
+
+Python node scenarios (`programming.python`, `external_process`): `py-stdlib`
+(declared Id/Amount/AmountScaled/Text/Flag/Date, `InputTable.Get`/`OutputTable.Set`,
+AmountScaled = Amount×3, NULL and `''` kept) and `py-pandas` (schema from code,
+`to_data_frame(InputTable, True)` → Flag=true rows → `fill_table`). Fixtures and
+expected tables are in `docs/node-development/nodes/programming-python/acceptance/<case>`;
+the model receives `values.csv` and the case `.py` file, and the saved code must
+equal that file (readback `source_sha256`). The names avoid a standalone
+`python` token: the saved package name appears in breadcrumbs, where the UI
+code-name guard denies it and the cold return to the scenario cannot click.
 
 Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 `corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row

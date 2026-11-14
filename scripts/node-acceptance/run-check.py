@@ -429,6 +429,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes' / slug / 'acceptance'
         return dict(source=src, prompt=src / 'task.md', data=src.parent / 'fixtures',
                     input_files=['orders.csv' if name == 'table-tree-json' else 'documents.csv'], base=None, external=True, tree_conversion=True)
+    if name in ['tree-dates', 'tree-scalar-arrays']:
+        node = REPO / 'docs/node-development/nodes/trees-jsontotree'
+        src = node / 'acceptance/typed'
+        kind = name.removeprefix('tree-')
+        return dict(source=src, prompt=src / ('task-' + kind + '.md'), data=node / 'fixtures/typed',
+                    input_files=['documents.csv'], base=None, external=True, tree_only=True, expected_name='expected-' + kind + '.json')
     if name in ['tree-null-leaves', 'tree-nested-records', 'tree-empty-containers']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         return dict(source=node / 'acceptance/nested-records', prompt=node / ('acceptance/task-' + name[5:] + '.md'),
@@ -504,6 +510,13 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
         return dict(source=src, prompt=src / ('task-discrete.md' if name=='corr-discrete' else 'task-ranks.md'), data=src / 'fixtures', base=None,
                     input_files=['ranks.csv'], corr_ranks='discrete' if name=='corr-discrete' else True)
+    # Not "python-*": the saved package name reaches breadcrumbs, and the UI
+    # code-name guard denies a standalone "python" token (cold return path).
+    if name in ['py-stdlib', 'py-pandas']:
+        src = REPO / 'docs/node-development/nodes/programming-python/acceptance' / ('python-' + name[3:])
+        code = 'calculation.py' if name == 'py-stdlib' else 'pandas_calculation.py'
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    expected_name='expected.json', input_files=['values.csv', code], oracle=src.parent / 'oracle.py')
     if name in ['corr-pairs', 'corr-null', 'corr-age']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance'
         task, expected, data = {'corr-pairs': ('task.md', 'expected.json', 'pairs.csv'),
@@ -1165,8 +1178,13 @@ def expected_for(case, package, cold=False):
     if case.get('rest_query_initial'):
         return rest_query_expected(case, package)
     if case.get('tree_only'):
-        expected = read(src / 'expected.json')['cases'][case['tree_case']]
-        return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
+        if case.get('tree_case'):
+            expected = read(src / 'expected.json')['cases'][case['tree_case']]
+            return dict(expected, package_path=package, tree_outputs=[expected['proposed_tree_output']])
+        expected = read(src / case['expected_name'])
+        assert len(expected.get('tree_outputs', [])) == 1, 'TREE_CONTRACT_COUNT'
+        # The main audit consumes this legacy key; cold consumes tree_outputs.
+        return dict(expected, package_path=package, proposed_tree_output=expected['tree_outputs'][0])
     if case.get('coarse_frozen'):
         return {**expected_for({**case, 'coarse_frozen': False}, package, cold=cold), 'coarse_frozen': True}
     if case.get('autocorrelation_edge'):
@@ -1760,7 +1778,7 @@ def check_tree(port, expected):
     assert branch['is_array'] and [schema[i]['name'] for i in branch['children']] == expected['item_field_order'], 'TREE_ITEM_ORDER'
     for path, kind in expected['schema_types'].items():
         actual = [n for n in schema if n['path'] == path]
-        assert len(actual) == 1 and ('object_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
+        assert len(actual) == 1 and (actual[0]['type'] + '_array' if actual[0]['is_array'] else actual[0]['type']) == kind, 'TREE_SCHEMA_TYPE'
     for path, order in expected.get('nested_field_order', {}).items():
         parent = next(n for n in schema if n['path'] == path)
         assert [schema[i]['name'] for i in parent['children']] == order, 'TREE_NESTED_ORDER'
@@ -1792,6 +1810,12 @@ def check_tree(port, expected):
         elif kind == 'real':
             assert (actual.get('is_null') is False and actual.get('precision') == '17_significant_digits'
                     and type(actual.get('value')) in (int, float) and Decimal(str(actual.get('value'))) == Decimal(want['value'])), 'TREE_REAL'
+        elif kind == 'datetime':
+            assert (actual.get('is_null') is False and actual.get('precision') == 'millisecond'
+                    and actual.get('representation') == 'local_datetime'
+                    and isinstance(actual.get('value'), str)
+                    and re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}', actual['value'])
+                    and actual['value'] == want['value']), 'TREE_DATETIME'
         else:
             assert actual.get('value') == want['value'] and (kind != 'boolean' or type(actual.get('value')) is bool), 'TREE_SCALAR'
             assert actual.get('is_null') is (kind == 'null') and (kind != 'null' or actual.get('precision') == 'exact_null'), 'TREE_NULL'

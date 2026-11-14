@@ -91,7 +91,7 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
   isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,isUnchangedTransformExecution,
   createNodeReadDrivers:readFactory};
  for(const name of ['Supernode','SupernodeOutput','DatabaseImport','Condition','VariablesReplace','VariablesColumnUnion','VariablesCalculator','DataToVar','VariablesToTable','UserVariables','LgdImport','LgdExport','Quality','ColUnion','CoarseClasses','FactorAnalysis','TreeConversion','AssnRules','Enrich','Ungroup','Binning','AutoCorrelation','ExcelExport','Tree','ElimOutlier','CorrAnalysis','Sampling','DataPartition','ExcelImport','LinRegression','LogRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
-  'Smoothing','DateTime','SlidingWindow','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
+  'Smoothing','DateTime','SlidingWindow','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode','Python'])
   context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:real.nodeApplyHandlers,
    nodeApplyDriverFactory:options=>configuredSupport().nodeApplyDriverFactory(options)});
  const support=vm.runInNewContext('('+createCandidateNodeSupport.toString()+')',context)(config);
