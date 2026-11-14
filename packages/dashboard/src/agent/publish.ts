@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs"
-import { cp, mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { open } from "#sqlite"
@@ -47,6 +47,7 @@ export async function finishPublish(input: Prepared & { work: string; builds?: s
       const staging = await mkdtemp(join(keyDir, ".install-"))
       try {
         await cp(input.build.dir, staging, { recursive: true })
+        await chmod(staging, 0o755)
         await rename(staging, directory)
       } finally {
         await rm(staging, { recursive: true, force: true })

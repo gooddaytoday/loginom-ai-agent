@@ -38,6 +38,7 @@ builds=$state/builds
 app_origin=http://dashboards.localhost:32769
 client_origins=http://127.0.0.1:32768,http://localhost:32768
 image=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+local_image=sha256:43f84a0b210f98845ef003912981774c95efe439eaa4b1cb62cf803fd46fc82a
 csp=$(sed "s|<DASH>|$app_origin|g" "$pkg/deploy/studio.csp")
 conf=/usr/local/apache2/conf/dashboard-app.site.conf
 tmp=$(mktemp -d)
@@ -212,12 +213,19 @@ for artifact in "$pkg/dist/server.mjs" "$pkg/dist/shell.js"; do
   "$node_bin" --check "$artifact"
 done
 for file in campaign.lgp dataset.csv; do [[ -s dashboard/fixture/$file ]] || die "Нет dashboard/fixture/$file"; done
+if "$node_bin" -e 'process.exit(process.platform === "linux" && process.arch === "x64" ? 0 : 1)' &&
+   docker image inspect "$local_image" >/dev/null 2>&1; then
+  image=$local_image
+elif ! docker image inspect "$image" >/dev/null 2>&1; then
+  docker pull "$image"
+fi
 docker network inspect "$net" >/dev/null
-install -d -m 700 "$state" "$builds"
+install -d -m 700 "$state"
+install -d -m 755 "$builds"
 install -m 755 "$node_bin" "$state/node.new" && mv -f "$state/node.new" "$state/node"
 install -m 644 "$pkg/dist/server.mjs" "$state/server.mjs.new" && mv -f "$state/server.mjs.new" "$state/server.mjs"
 # Validate the exact Debian/Node combination before stopping M1 or replacing web.
-docker run --rm --network none --read-only --user "$(id -u):$(id -g)" \
+docker run --pull=never --rm --network none --read-only --user "$(id -u):$(id -g)" \
   -v "$state/node:/opt/dashboard/node:ro" -v "$state/server.mjs:/opt/dashboard/server.mjs:ro" "$image" \
   /opt/dashboard/node -e 'if (process.versions.node !== process.argv[1]) process.exit(1); import("/opt/dashboard/server.mjs")' "$pin"
 
@@ -228,7 +236,7 @@ done
 stop_service
 docker exec -u 0 "$server" rm -f /app/dashboard-node "$app/server.mjs"
 if [[ -n $web_id ]]; then docker rm -f "$web_id" >/dev/null; fi
-docker run -d --name "$web" --label "$owner" --network "$net" --user "$(id -u):$(id -g)" \
+docker run --pull=never -d --name "$web" --label "$owner" --network "$net" --user "$(id -u):$(id -g)" \
   --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --memory 512m --pids-limit 64 --log-opt max-size=10m --log-opt max-file=3 --restart unless-stopped \
   -p 127.0.0.1:32769:8101 \

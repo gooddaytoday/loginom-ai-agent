@@ -62,6 +62,7 @@ test("the stand serves the exact build retained for confirmation", async t => {
   assert.deepEqual(await tree(join(input.work, "../control/draft", build.hash)), expected)
   assert.deepEqual(await finishPublish({ ...input, ...prepared }), published)
   const key = join(input.builds, control.key)
+  if (process.platform !== "win32") assert.ok((await fs.stat(join(key, build.hash))).mode & 0o001, "another UID can traverse the published build")
   assert.deepEqual(await tree(join(key, build.hash)), expected)
   assert.equal(await readFile(join(key, "current"), "utf8"), build.hash + "\n")
   assert.equal((await input.lookup()).hash, build.hash)
