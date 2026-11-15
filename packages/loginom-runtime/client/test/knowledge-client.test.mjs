@@ -18,6 +18,25 @@ async function client(t, options) {
   return { knowledge, call };
 }
 
+test('Help timings separate reads, hashes and index without recording paths or content', async t => {
+  const phases = [];
+  const helpRoot = await helpFixture(t);
+  const knowledge = await createKnowledgeClient({ helpRoot, onPhase: event => phases.push(event) });
+  t.after(() => knowledge.close());
+  assert.equal(phases.length, 1);
+  const event = phases[0];
+  assert.equal(event.phase, 'help.load');
+  assert.equal(event.status, 'ready');
+  assert.ok(event.pages > 0 && event.bytes > 0);
+  for (const key of ['duration_ms', 'read_ms', 'hash_ms', 'decode_ms', 'index_ms', 'max_read_ms', 'slow_reads'])
+    assert.ok(Number.isSafeInteger(event[key]) && event[key] >= 0, key);
+  assert.equal(JSON.stringify(event).includes(helpRoot), false);
+  assert.equal(Object.values(event).filter(value => typeof value === 'string').length, 2);
+  const other = await createKnowledgeClient({ helpRoot, onPhase() { throw Error('DIAGNOSTICS_UNAVAILABLE'); } });
+  t.after(() => other.close());
+  assert.equal(other.catalogSha256, knowledge.catalogSha256);
+});
+
 test('catalog keeps the seven read-only tool names and a stable digest', async t => {
   const { knowledge } = await client(t);
   assert.deepEqual(knowledge.tools.map(tool => tool.name).sort(), ['find', 'glob', 'grep', 'list', 'read', 'search', 'tree']);
