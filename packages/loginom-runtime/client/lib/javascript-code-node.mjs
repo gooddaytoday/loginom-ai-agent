@@ -114,7 +114,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter,materializationSettled=false;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter,materializationSettled=false,finalExecutionSettled=false;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -396,7 +396,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           'JavaScript final Execute requires completed materialization and full output mapping');
         return withJavascriptSourcePolicyBoundary({phase:'finish',owner,deadline:ctx.deadline,record:onRecord},async()=>{
           const fresh=policyAdmission('existing',owner,ctx.deadline,expected,configured.settings_sha256),receipt=await fresh.admit({});
-          return fresh.withEffect({receipt,owner},()=>launch(ctx));
+          return fresh.withEffect({receipt,owner},async()=>{
+            try{return await launch(ctx);}finally{finalExecutionSettled=true;}
+          });
         });
       },
       async waitExecution(ctx){
@@ -435,10 +437,11 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       // A materialization launch may settle before its process identity can
       // be read. Release proves cleanup only, never completion or a replay.
       // The retained REST child also uses the independently settled Done.
-      releasePendingPhases:['input_mapping','open','configure','materialization_start'],
+      releasePendingPhases:['input_mapping','open','configure','materialization_start','finish'],
       async releasePending(state,{signal:releaseSignal}={}) {
-        const afterDone=['node_finish','materialization_start'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
-          &&(state.pending.phase==='node_finish'||materializationSettled)
+        const afterDone=['node_finish','materialization_start','finish'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
+          &&(state.pending.phase==='node_finish'||state.pending.phase==='materialization_start'&&materializationSettled
+            ||state.pending.phase==='finish'&&finalExecutionSettled)
           &&adapter?.active===false&&adapter.uncertain===false
           &&lastSourceAdapter?.active===false&&lastSourceAdapter.uncertain===false;
         need(['input_mapping','open','configure'].includes(state.pending?.phase)||afterDone,

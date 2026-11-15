@@ -288,3 +288,8 @@ for(const mode of ['code','declared'])test('configuration-only readback survives
  const forged=structuredClone(result);forged.configuration.readback.output_mapping={port:0,fields:[]};
  assert.equal(validate(forged).valid,false);
 });
+
+test('declared script failure closes the original apply after exactly one execution',()=>{
+ const r=spawnSync(process.execPath,['--experimental-test-module-mocks',fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'declared-execution-error'],{encoding:'utf8',timeout:10000});
+ assert.equal(r.status,0,r.stdout+'\n'+r.stderr);
+});

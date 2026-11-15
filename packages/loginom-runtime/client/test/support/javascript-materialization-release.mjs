@@ -65,6 +65,7 @@ const fakeExecutionDriver=()=>({prepare:async()=>{calls.push('prepare');},launch
   calls.push('Execute');if(sourceExecution){executionCount++;ledger.push('run');}return {verified:true,launch_gesture_verified:true,receipt:{status:'SUCCEEDED',cleanup_complete:true,
    operation_id:'apply-js:n31',action_key:'ui.act',action_revision:'1',output:{gesture_applied:true}}};},
   identify:async()=>{if(fault==='callback-active')await callback.promise;
+   if(fault==='declared-execution-error'){const error=Error('LAB669 intentional execution failure');error.nodeExecutionFailure={code:'NODE_EXECUTION_FAILED',message:error.message};throw error;}
    if(sourceExecution){executed=true;nativeActive=true;return {node,execution_id:'execution-'+executionCount};}
    throw new procedure.NodeReadinessTimeout('prepared node available for process console');},
   waitCompleted:async()=>({verified:true,cleanup_complete:true,status:'completed',execution_id:'execution-'+executionCount,owner_verified:true})});
@@ -107,6 +108,13 @@ runtime.startNodeApply(request);
 let job;
 do{job=await runtime.waitNodeApply('apply-js',{timeoutMs:1000});}while(!job.outcome);
 if(sourceExecution){
+ if(fault==='declared-execution-error'){
+  const result=job.outcome.output;assert.equal(result.cleanup_complete,true,JSON.stringify(result));
+  assert.equal(result.pending_phase,null);assert.equal(result.status,'FAILED');assert.equal(result.error.code,'NODE_EXECUTION_FAILED');
+  assert.match(result.error.message,/LAB669 intentional/);assert.ok(result.next_step);assert.equal(executionCount,1);
+  assert.equal(runtime.hasUnsettledWork(),false);runtime.assertPreparationAllowed();
+  console.log(JSON.stringify({outcome:result,calls,ledger}));process.exit(0);
+ }
  if(guarded){
   assert.notEqual(job.outcome.status,'SUCCEEDED');assert.equal(executionCount,0);assert.ok(!calls.includes('MUTATION'));
   assert.ok(!calls.includes('Done'));assert.equal(job.outcome.output.error.code,'JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT',JSON.stringify(job.outcome));
