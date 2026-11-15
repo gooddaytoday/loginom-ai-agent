@@ -2,7 +2,6 @@ import { loginomHostPort } from "./loginom/host-port"
 import { loginomResources, type desktopLoginom } from "./loginom/desktop-service"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { mkdir } from "node:fs/promises"
 import { app, utilityProcess, MessageChannelMain } from "electron"
 import type { Details } from "electron"
 import { getLogger } from "./logging"
@@ -70,12 +69,8 @@ export async function spawnLocalServer(
   options: SpawnLocalServerOptions,
 ) {
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
-  // Until a project is chosen, avoid indexing the whole Windows home while
-  // connection validation is loading Help and the Loginom browser.
-  const cwd = process.platform === "win32" ? join(options.userDataPath, "workspace") : process.cwd()
-  if (process.platform === "win32") await mkdir(cwd, { recursive: true, mode: 0o700 })
   const child = utilityProcess.fork(sidecar, [], {
-    cwd,
+    cwd: process.cwd(),
     env: createSidecarEnv(options.proxyEnvironment, options.withoutProxy),
     serviceName: SIDECAR_SERVICE_NAME,
     stdio: "pipe",

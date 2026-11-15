@@ -46,7 +46,7 @@ export function createNewSessionWorkspaceController() {
     }),
   )
   const projectRoot = createMemo(() => sync().project?.worktree ?? sdk().directory)
-  const localBranch = createMemo(() => serverSync().child(projectRoot())[0].vcs?.branch)
+  const localBranch = createMemo(() => (visible() ? serverSync().child(projectRoot())[0].vcs?.branch : undefined))
   const branch = createMemo(() =>
     resolveNewSessionBranch({
       worktree: value(),
