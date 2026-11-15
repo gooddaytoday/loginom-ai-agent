@@ -4,7 +4,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, resolve } from "node:path"
-import { appHost } from "../../dist/server.mjs"
+import { appHost } from "../../src/web/apps.ts"
 import { chromium } from "../../../loginom-runtime/client/node_modules/playwright-core/index.mjs"
 
 const sdk = execFileSync("bun", ["build", resolve(import.meta.dirname, "../../src/sdk/loginom.ts"), "--target=browser", "--format=esm"])
@@ -254,6 +254,7 @@ export async function fixture(
                 appOrigin,
                 mode: lookupMode,
                 cliButton,
+                latest: null,
               },
       })
     if (url.pathname === "/dashboard/snapshots") {

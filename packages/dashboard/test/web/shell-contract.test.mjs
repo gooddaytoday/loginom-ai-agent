@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { Option, Schema } from "effect"
-import { LookupResponse } from "../../src/contract/snapshot.ts"
+import { LookupResponse, PublicationStatus } from "../../src/contract/snapshot.ts"
 import { lookupResponse, snapshotResponse } from "../../src/shell/response.ts"
 
 test("compact browser decoders agree with service schemas for every consumed response field", () => {
@@ -13,6 +13,7 @@ test("compact browser decoders agree with service schemas for every consumed res
     appOrigin: "http://dashboards.localhost:32769",
     mode: "normal",
     cliButton: false,
+    latest: null,
   }
   const specials = {
     hash: ["A".repeat(64), "a".repeat(63), "g".repeat(64)],
@@ -28,7 +29,14 @@ test("compact browser decoders agree with service schemas for every consumed res
     }
     assert.deepEqual(decode(input), expected.value, JSON.stringify(input))
   }
-  const consumed = Schema.Struct({ key: LookupResponse.fields.key, exists: LookupResponse.fields.exists, hash: LookupResponse.fields.hash, appOrigin: LookupResponse.fields.appOrigin, mode: LookupResponse.fields.mode, cliButton: LookupResponse.fields.cliButton })
+  const latest = { name: "20261115T120000Z.json", status: "failed", error: "synthetic" }
+  const consumed = Schema.Struct({ key: LookupResponse.fields.key, exists: LookupResponse.fields.exists, hash: LookupResponse.fields.hash, appOrigin: LookupResponse.fields.appOrigin, mode: LookupResponse.fields.mode, cliButton: LookupResponse.fields.cliButton,
+    latest: Schema.NullOr(Schema.Struct({ name: PublicationStatus.fields.name, status: PublicationStatus.fields.status, error: PublicationStatus.fields.error })),
+  })
+  for (const key of Object.keys(latest)) {
+    for (const value of [...fields, "pending", "building", "ready", "failed"]) agree(lookupResponse, consumed, { ...valid, latest: { ...latest, [key]: value } })
+  }
+  assert.deepEqual(lookupResponse({ ...valid, latest: { ...latest, sourceHash: "a".repeat(64) } }), { ...valid, latest })
   agree(lookupResponse, consumed, valid)
   for (const key of Object.keys(valid)) {
     for (const value of fields) agree(lookupResponse, consumed, { ...valid, [key]: value })

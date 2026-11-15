@@ -4,7 +4,10 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile }
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import test from "node:test"
+import { once } from "node:events"
+import { createServer } from "node:http"
 import { buildDashboard, PLATFORM_FILES, sourceFiles } from "../../src/agent/build.ts"
+import { appHost } from "../../src/web/apps.ts"
 
 const template = resolve(import.meta.dirname, "../../template")
 const node = process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath
@@ -120,6 +123,33 @@ test("timeout and cancellation return the specified build failure without a curr
     await assert.rejects(readFile(join(input.out, "current")), { code: "ENOENT" })
     assert.deepEqual(await readdir(input.out), [])
   })
+})
+
+test("timeout terminates a running compiler child and keeps the previous page available", async t => {
+  const input = await fixture(t)
+  const before = await buildDashboard(input)
+  assert.equal(before.ok, true)
+  const kit = join(input.work, "../timeout-template")
+  await mkdir(kit)
+  for (const name of PLATFORM_FILES) await cp(join(template, name), join(kit, name))
+  await symlink(join(template, "node_modules"), join(kit, "node_modules"), process.platform === "win32" ? "junction" : "dir")
+  // A trusted compiler-stage fault exercises termination without changing application permissions.
+  await writeFile(join(kit, "scan.mjs"), 'console.log("SYNTHETIC_COMPILER_PID=" + process.pid); while (true) {}')
+  const result = await buildDashboard({ ...input, template: kit, timeoutMs: 500 })
+  assert.equal(result.ok, false)
+  assert.match(result.output, /превышено время 90 секунд/)
+  const pid = Number(result.output.match(/SYNTHETIC_COMPILER_PID=(\d+)/)?.[1])
+  assert.ok(pid > 0, result.output)
+  assert.throws(() => process.kill(pid, 0), { code: "ESRCH" })
+  assert.equal(await readFile(join(input.out, "current"), "utf8"), before.hash + "\n")
+  const server = createServer().listen(0, "127.0.0.1")
+  await once(server, "listening")
+  t.after(() => server[Symbol.asyncDispose]())
+  const appOrigin = "http://127.0.0.1:" + server.address().port
+  appHost({ server, builds: () => input.out, appOrigin, clientOrigins: [], mode: "normal" })
+  const response = await fetch(appOrigin + `/apps/${"a".repeat(64)}/${before.hash}/`)
+  assert.equal(response.status, 200)
+  assert.equal(await response.text(), await readFile(join(before.dir, "index.html"), "utf8"))
 })
 
 test("type errors reach the caller within the output budget and do not switch current", async t => {

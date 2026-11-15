@@ -269,7 +269,11 @@ function start() {
         })
         stopFrame = dashboard.stop
         dashboard.send(current)
-        note.remove()
+        if (lookup.latest?.status === "failed") {
+          note.textContent = `Новая публикация ${lookup.latest.name} не собрана. Открыта предыдущая версия. ${lookup.latest.error ?? ""}`
+          note.style.cssText += ";max-height:6em;overflow:auto"
+        }
+        if (lookup.latest?.status !== "failed") note.remove()
         section.append(frame)
       } catch (e: unknown) {
         note.textContent = message(e)

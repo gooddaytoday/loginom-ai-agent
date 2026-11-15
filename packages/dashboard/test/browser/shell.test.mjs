@@ -4,6 +4,23 @@ import test from "node:test"
 import { dashboardServer } from "../../src/web/server.ts"
 import { fixture } from "./fixture.mjs"
 
+test("a failed newer publication reports its error while the previous dashboard still opens", async t => {
+  const app = await fixture(t, { published: true })
+  await app.page.route("**/dashboard/lookup", async route => route.fulfill({ json: {
+    exists: true, key: "a".repeat(64), hash: "b".repeat(64), appOrigin: app.appOrigin,
+    mode: "normal", cliButton: false,
+    latest: { name: "20261115T120001Z.json", sourceHash: "c".repeat(64), status: "failed", error: "TS2322 <synthetic> " + "Synthetic compiler diagnostic ".repeat(250) },
+  } }))
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.settled()
+  assert.match(await app.page.locator("#dashboard-tab-overlay").textContent(), /Новая публикация.*20261115T120001Z.json.*не собрана/)
+  assert.match(await app.page.locator("#dashboard-tab-overlay").textContent(), /Открыта предыдущая версия/)
+  assert.match(await app.page.locator("#dashboard-tab-overlay").textContent(), /TS2322 <synthetic>/)
+  assert.equal(await app.page.locator("synthetic").count(), 0)
+  assert.equal(await app.page.locator('iframe[title="Dashboard"]').getAttribute("src"), `${app.appOrigin}/apps/${"a".repeat(64)}/${"b".repeat(64)}/`)
+  assert.deepEqual(app.errors, [])
+})
+
 test("dashboard tables retain at most ten thousand rows and report the full count", async t => {
   const app = await fixture(t, { published: true, table: {
     schema: [{ name: "count", type: 1 }], rows: Array.from({ length: 10_001 }, (_, index) => [index]),

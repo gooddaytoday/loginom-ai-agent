@@ -3,8 +3,12 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
+import { once } from "node:events"
+import { createServer } from "node:http"
 import { scanPublications } from "../../src/publisher/index.ts"
 import { buildNext } from "../../src/builder/index.ts"
+import { dashboardServer } from "../../src/web/server.ts"
+import { appHost } from "../../src/web/apps.ts"
 
 const binding = { packagePath: "/user/fixture.lgp", workflowGuid: "11111111-1111-4111-8111-111111111111", nodeGuid: "22222222-2222-4222-8222-222222222222" }
 const name = "20261115T120000Z.json"
@@ -19,6 +23,84 @@ async function fixture(t) {
   await writeFile(join(input.storage, path), content)
   return input
 }
+
+test("failed publications retain the previous dashboard through real files and HTTP", async t => {
+  const input = await fixture(t)
+  await scanPublications(input)
+  await buildNext({ ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE })
+  await scanPublications(input)
+  const apps = createServer().listen(0, "127.0.0.1")
+  await once(apps, "listening")
+  const appOrigin = "http://127.0.0.1:" + apps.address().port
+  appHost({ server: apps, builds: key => join(input.builds, key), appOrigin, clientOrigins: [], mode: "normal" })
+  t.after(() => apps[Symbol.asyncDispose]())
+  const web = dashboardServer({ buildsRoot: input.builds, appOrigin, clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
+  await once(web, "listening")
+  t.after(() => web[Symbol.asyncDispose]())
+  const lookup = publication => fetch("http://127.0.0.1:" + web.address().port + "/dashboard/lookup", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...binding, ...(publication && { publication }) }),
+  }).then(response => response.json())
+  const before = await lookup()
+  assert.equal(before.currentVersion.name, name)
+  const address = appOrigin + `/apps/${before.key}/${before.hash}/`
+  const page = await (await fetch(address)).text()
+  const invalid = [
+    "{broken",
+    content.replace("/user/fixture.lgp", "/shared/other.lgp"),
+    content.replace('"template":1', '"template":2'),
+    content.replace(binding.workflowGuid, "invalid-guid"),
+    JSON.stringify({ ...JSON.parse(content), files: [{ path: "src/main.tsx", encoding: "utf8", content: Array.from({ length: 1000 }, (_, i) => `const x${i}: number = "synthetic"`).join("\n") }] }),
+    JSON.stringify({ ...JSON.parse(content), files: [{ path: "src/main.tsx", encoding: "utf8", content: 'import "https://synthetic.invalid/module.js"' }] }),
+  ]
+  for (const [index, source] of invalid.entries()) {
+    const failedName = `20261115T12000${index + 1}Z.json`
+    await writeFile(join(input.storage, path.replace(name, failedName)), source)
+    await scanPublications(input)
+    await buildNext({ ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE })
+    await scanPublications(input)
+    const after = await lookup(failedName)
+    assert.equal(after.publication.status, "failed", failedName)
+    assert.equal(after.publication.name, failedName)
+    assert.ok(Buffer.byteLength(after.publication.error) <= 8192)
+    assert.equal(after.key, before.key)
+    assert.equal(after.hash, before.hash)
+    assert.deepEqual(after.currentVersion, before.currentVersion)
+    assert.equal((await fetch(address)).status, 200)
+    assert.equal(await (await fetch(address)).text(), page)
+  }
+  const other = "20261115T120007Z.json"
+  await writeFile(join(input.storage, path.replace(name, other)), content.replace(binding.workflowGuid, "33333333-3333-4333-8333-333333333333"))
+  await scanPublications(input)
+  await buildNext({ ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE })
+  await scanPublications(input)
+  const unchanged = await lookup(other)
+  assert.equal(unchanged.key, before.key)
+  assert.equal(unchanged.hash, before.hash)
+  assert.deepEqual(unchanged.currentVersion, before.currentVersion)
+  assert.equal(unchanged.publication.status, "pending")
+  const state = JSON.parse(await readFile(join(input.builds, "state.json")))
+  assert.notEqual(state[path.replace(name, other)].key, before.key)
+  const oversized = "20261115T120008Z.json"
+  await writeFile(join(input.storage, path.replace(name, oversized)), content)
+  await scanPublications(input)
+  const [id] = await readdir(input.jobsIn)
+  const job = JSON.parse(await readFile(join(input.jobsIn, id, "job.json")))
+  await mkdir(join(input.jobsOut, id, "dist"))
+  await writeFile(join(input.jobsOut, id, "dist/index.html"), Buffer.alloc(20 * 1024 * 1024 + 1))
+  await writeFile(join(input.jobsOut, id, "result.json"), JSON.stringify({ id, sourceHash: job.sourceHash, outcome: "ready", output: "" }))
+  await scanPublications(input)
+  const refused = await lookup(oversized)
+  assert.equal(refused.publication.status, "failed")
+  assert.match(refused.publication.error, /LIMIT/)
+  assert.equal(refused.hash, before.hash)
+  assert.equal(await (await fetch(address)).text(), page)
+  await rm(join(input.storage, path.replace(name, oversized)))
+  await scanPublications(input)
+  const missing = await lookup(oversized)
+  assert.equal(missing.publication.status, "pending")
+  assert.equal(missing.hash, before.hash)
+  assert.equal(await (await fetch(address)).text(), page)
+})
 
 test("stored publication builds once and activates the same immutable output", async t => {
   const input = await fixture(t)

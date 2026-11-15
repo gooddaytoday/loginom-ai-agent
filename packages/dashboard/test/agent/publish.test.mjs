@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
+import { setTimeout } from "node:timers/promises"
 import { buildDashboard } from "../../src/agent/build.ts"
 import { NO_SAMPLE } from "../../src/agent/draft.ts"
 import { prepareDashboard, readDashboardSnapshot } from "../../src/agent/folder.ts"
@@ -190,12 +191,19 @@ test("confirmed transfer survives loss of the local work folder", async t => {
   const input = await fixture(t)
   const prepared = await preparePublish(input)
   assert.equal(prepared.ok, true)
-  const result = await finishPublish({ ...input, ...prepared, timeoutMs: 0, expected: null, publish: async () => {
+  const name = "20261115T120000Z.json"
+  const key = (await input.lookup()).key
+  await writeFile(join(input.builds, "state.json"), JSON.stringify({ [`${prepared.control.binding.packagePath}.dashboards/${prepared.control.binding.nodeGuid}/${name}`]: {
+    key, sourceHash: prepared.publication.sourceHash, status: "ready", buildHash: prepared.build.hash,
+  } }))
+  const result = await finishPublish({ ...input, ...prepared, timeoutMs: 1000, expected: null, publish: async () => {
     await rm(input.work, { recursive: true })
-    return { status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash } }
+    return { status: "written", version: { name, sourceHash: prepared.publication.sourceHash } }
   } })
-  assert.equal(result.status, "pending")
-  assert.match(result.text, /Исходники переданы/)
+  assert.equal(result.status, "published")
+  assert.match(result.text, /Не удалось сохранить основу локального черновика/)
+  assert.match(result.text, /Не удалось удалить локальный образец/)
+  assert.equal((await input.lookup()).currentVersion.name, name)
 })
 
 test("the embedded value threshold counts six Unicode code points", () => {
@@ -231,6 +239,8 @@ test("changed, cancelled and invalid host replies retain the draft without retry
     { status: "written", version: { name: "20261115T120000Z.json", sourceHash: "f".repeat(64) } },
     { status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash }, extra: true },
   ]) await assert.rejects(finishPublish({ ...request, publish: async () => reply }), /DASHBOARD_WRITE_UNKNOWN/)
+  await assert.rejects(finishPublish({ ...request, publish: async () => { writes++; throw Error("DASHBOARD_WRITE_UNKNOWN") } }), /DASHBOARD_WRITE_UNKNOWN/)
+  assert.equal(writes, 2)
   assert.ok(await readFile(join(input.work, "sample.json")))
   assert.ok(await readFile(join(input.work, "src/main.tsx")))
   assert.deepEqual(readDashboardSnapshot(input.work).control, before)
@@ -287,4 +297,51 @@ test("two own writes from A keep base C in either completion order and preserve 
     assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { ...refreshed, base: versions[1] })
     assert.ok(await readFile(join(input.work, "sample.json")))
   }
+})
+
+test("a ready publication survives sample cleanup failure with a warning", async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true)
+  const sample = await readFile(join(input.work, "sample.json"))
+  await rm(join(input.work, "sample.json"))
+  await mkdir(join(input.work, "sample.json"))
+  await writeFile(join(input.work, "sample.json/preserved"), sample)
+  const name = "20261115T120000Z.json"
+  const key = (await input.lookup()).key
+  await writeFile(join(input.builds, "state.json"), JSON.stringify({ [`${prepared.control.binding.packagePath}.dashboards/${prepared.control.binding.nodeGuid}/${name}`]: {
+    key, sourceHash: prepared.publication.sourceHash, status: "ready", buildHash: prepared.build.hash,
+  } }))
+  const result = await finishPublish({ ...input, ...prepared, ...confirmed(prepared), timeoutMs: 1000 })
+  assert.equal(result.status, "published")
+  assert.match(result.text, /Не удалось удалить локальный образец/)
+  assert.deepEqual(await readFile(join(input.work, "sample.json/preserved")), sample)
+  assert.equal((await input.lookup()).currentVersion.name, name)
+})
+
+test("ready after the two-minute deadline leaves the local sample without background cleanup", { timeout: 135_000 }, async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true)
+  const sample = await readFile(join(input.work, "sample.json"))
+  const source = await readFile(join(input.work, "src/main.tsx"))
+  const name = "20261115T120000Z.json"
+  const key = (await input.lookup()).key
+  let writes = 0
+  const start = Date.now()
+  const result = await finishPublish({ ...input, ...prepared, expected: null, publish: async () => {
+    writes++
+    return { status: "written", version: { name, sourceHash: prepared.publication.sourceHash } }
+  } })
+  assert.equal(result.status, "pending")
+  assert.ok(Date.now() - start >= 120_000)
+  assert.equal(writes, 1)
+  await writeFile(join(input.builds, "state.json"), JSON.stringify({ [`${prepared.control.binding.packagePath}.dashboards/${prepared.control.binding.nodeGuid}/${name}`]: {
+    key, sourceHash: prepared.publication.sourceHash, status: "ready", buildHash: prepared.build.hash,
+  } }))
+  await setTimeout(3100)
+  assert.equal((await input.lookup()).currentVersion.name, name)
+  assert.deepEqual(await readFile(join(input.work, "sample.json")), sample)
+  assert.deepEqual(await readFile(join(input.work, "src/main.tsx")), source)
+  assert.equal(writes, 1)
 })
