@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {inspectPythonSourcePolicy,pythonCodeSkeleton} from '../lib/python-source-policy.mjs';
+import {inspectPythonSourcePolicy as inspectPolicy,pythonCodeSkeleton} from '../lib/python-source-policy.mjs';
+import {execFileSync} from 'node:child_process';
 import {validatePythonParameters} from '../lib/python-parameters.mjs';
 import {configurePython} from '../lib/python-procedure.mjs';
 import {pythonConfigurationReadback} from '../lib/python-readback.mjs';
@@ -15,6 +16,9 @@ import {NODE_TYPES} from '../lib/node-contracts.mjs';
 const acceptance=new URL('../../../../docs/node-development/nodes/programming-python/acceptance/',import.meta.url);
 const stdlib=readFileSync(new URL('python-stdlib/data/calculation.py',acceptance),'utf8');
 const pandas=readFileSync(new URL('python-pandas/data/pandas_calculation.py',acceptance),'utf8');
+// Every source checked in this file; the last test compares their skeletons with Python's tokenizer.
+const corpus=new Set();
+const inspectPythonSourcePolicy=source=>{corpus.add(source);return inspectPolicy(source);};
 const sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
 const request=(kind='new',extra={})=>({target:{kind,type:'programming.python'},inputs:[{input:0}],mappings:[],read:{ports:[0]},finish:'execute',...extra});
 const declared=[['Id','integer'],['Amount','real'],['AmountScaled','real'],['Text','string'],['Flag','boolean'],['Date','datetime']].map(([name,type])=>({name,label:name,type}));
@@ -177,7 +181,7 @@ for(const [source,reason] of [
  ['from numpy.lib.format import open_memmap\n','attribute:lib'],['from numpy import open_memmap\n','attribute:open_memmap'],
  ['ｅｖａｌ("1")\n','non_ascii'],
  ['x = ｏｐｅｎ("/etc/passwd").read()\n','non_ascii'],
- ['x = f"{"}" + str(__import__) + "{"}"\n','fstring_braces'],
+ ['x = f"{"}" + str(__import__) + "{"}"\n','name:__import__'],
  ['import operator\nf = operator.attrgetter("__globals__")\n','module:operator'],
  ['import string\nstring.Formatter().get_field("0.__globals__", (f,), {})\n','module:string'],
  ['import typing\ntyping.get_type_hints(f)\n','module:typing'],
@@ -352,4 +356,69 @@ test('allowlist refusal tells the model which member is refused and what to use 
   /python-module-v1 \(attribute:numpy\.fromregex at line 2\): numpy\.fromregex is not an allowed module member .*np\.where.*boolean mask/);
  assert.throws(()=>validatePythonParameters({source_text:'import numpy as np\nf = np\n',schema_mode:'code'},'script',request()),/module_value:numpy at line 2\): use the module only as alias\.member/);
  assert.throws(()=>validatePythonParameters({source_text:'import datetime\nfrom datetime import datetime\n',schema_mode:'code'},'script',request()),/alias:datetime\): datetime is imported as two different things; import it once/);
+});
+
+// LAB-1680 re-review: a string literal inside an f-string field closed the
+// field early ('}' … '{'), so the code between was blanked as literal text and
+// no name check saw it. Each source below was ADMITTED and ran its code.
+for(const [source,reason] of [
+ ['r = f"{\'}\' and exec(\'import os; os.system(chr(105)+chr(100))\') and \'{\'}"\n','name:exec'],
+ ['r = f\'{"}" and open(chr(47)+chr(101)+chr(116)+chr(99)).read() and "{"}\'\n','name:open'],
+ ['r = rf"{\'}\' and eval(chr(49)) and \'{\'}"\n','name:eval'],
+ ['r = fr"{\'}\' and eval(chr(49)) and \'{\'}"\n','name:eval'],
+ ['r = f"""{\'}\' and eval(chr(49)) and \'{\'}"""\n','name:eval'],
+ ['r = f\'\'\'{"""}""" and eval(chr(49)) and """{"""}\'\'\'\n','name:eval'],
+ ['r = f"{"}" and eval(chr(49)) and "{"}"\n','name:eval'],
+ ['r = f"{f\'{eval(chr(49))}\'}"\n','name:eval'],
+ ['r = f"{f\'{\'}\'}\' and eval(chr(49))}"\n','name:eval'],
+ ['r = f"{x:{\'}\'}} {eval(chr(49))}"\n','name:eval'],
+ ['r = f"{x:{eval(chr(49))}}"\n','name:eval'],
+ ['r = f"{(lambda: \'}\')() and eval(chr(49))}"\n','name:eval'],
+ ['r = f"{x # }\n and eval(chr(49))}"\n','name:eval'],
+ ['r = f"\\{eval(chr(49))}}}"\n','name:eval'],
+ ['import numpy as np\nr = f"{\'}\' and np.fromregex(\'/etc/passwd\', \'x\', []) and \'{\'}"\n','attribute:numpy.fromregex'],
+])test('f-string field literal bypass refused: '+reason+' '+JSON.stringify(source.slice(0,44)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('f-string field code stays visible to the name checks',()=>{
+ const source='r = rf"{\'}\' and print(chr(80)+chr(87)+chr(78)+chr(68)) and \'{\'}"\n';
+ assert.match(pythonCodeSkeleton(source).code,/and print\(chr\(80\)/);
+ assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED');
+ for(const source of ['x = f"{d[\'k\']}"\n','x = f"{\'a\' if x else \'b\'}"\n','x = f"{v:,.2f} руб."\n','x = f"{\'}\'}"\n','x = f"{x:{\'}\'}}"\n',
+  'x = f"{x!r:>{w}}"\n','x = f"{a!=b}"\n','x = f"{x:\'>10}"\n','x = f"{x=}"\n','x = f"{d["k"]}"\n','x = f"""{\nx # c\n}"""\n','x = f"\\N{LOW LINE}{x}"\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
+ assert.equal(inspectPythonSourcePolicy('x = f"{x:"}"\n').reason,'fstring_braces');
+});
+
+test('re.compile is admitted only as a member of re; the builtin compile stays refused',()=>{
+ for(const source of ['import re\np = re.compile(r"\\d+")\n','import re as rx\np = rx.compile("a")\n',
+  'import numpy as np\nimport pandas as pd\nx = np.int_(1) + np.uint(2)\nok = np.isdtype(np.dtype("int64"), "integral")\nt = pd.ArrowDtype\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
+ for(const [source,reason] of [['c = compile("1", "f", "eval")\n','name:compile'],['from re import compile\n','name:compile'],
+  ['x.compile("1")\n','name:compile'],['import numpy as np\nnp.compile\n','attribute:numpy.compile'],['import re\nx = (re.\n    compile)\n','name:compile']])
+  assert.equal(inspectPythonSourcePolicy(source).reason,reason,source);
+});
+
+// Differential check: identifiers left in the skeleton are exactly Python's
+// NAME tokens (code regions agree) for every source above that Python 3.12+
+// tokenizes and the skeleton accepts.
+test('skeleton code regions match python tokenize on the test corpus',t=>{
+ const sources=[...corpus,stdlib,pandas];
+ const script='import io,json,sys,tokenize\n'+
+  'if sys.version_info<(3,12):print("null");sys.exit()\n'+
+  'def names(s):\n try:return [t.string for t in tokenize.generate_tokens(io.StringIO(s).readline) if t.type==tokenize.NAME]\n except Exception:return None\n'+
+  'print(json.dumps([names(s) for s in json.load(sys.stdin)]))\n';
+ let expected;
+ try{expected=JSON.parse(execFileSync('python3',['-I','-W','ignore','-c',script],{input:JSON.stringify(sources),encoding:'utf8'}));}catch{expected=null;}
+ if(!expected){t.skip('python3 >= 3.12 unavailable');return;}
+ let compared=0;
+ for(const [index,source] of sources.entries()){
+  const skeleton=pythonCodeSkeleton(source);
+  if(!expected[index]||skeleton.error)continue;
+  const names=[...skeleton.code.matchAll(/(?<![\p{L}\p{N}_])[\p{L}_][\p{L}\p{N}_]*/gu)].filter(m=>!(/^(?:[rRuUbBfF]|[rR][bBfF]|[bBfF][rR])$/.test(m[0])&&/["']/.test(skeleton.code[m.index+m[0].length]??''))).map(m=>m[0]);
+  assert.deepEqual(names,expected[index],source);compared++;
+ }
+ t.diagnostic('compared '+compared+' of '+sources.length);assert.ok(compared>=100,'compared '+compared);
 });
