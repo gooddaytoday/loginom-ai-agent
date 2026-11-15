@@ -121,7 +121,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         if(owner)need(['document_id','workflow_id','node_id'].every(key=>owner[key]===ctx.node[key]),
           'JavaScript Code node owner changed');
         owner??={...initialOwner,node_id:ctx.node.node_id};
-        channel??=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:4096,targetOrigin,targetBuild,
+        channel??=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:4096,targetOrigin,targetBuild,settleReportedErrorToast:true,
           signal:{throwIfAborted:()=>signal?.throwIfAborted(),get aborted(){return signal?.aborted;},get reason(){return signal?.reason;}},
           preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
           wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{

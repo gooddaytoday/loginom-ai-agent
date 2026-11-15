@@ -235,10 +235,13 @@ function seedCleanupState({ready=false}){
 async function storageDirectory(directory){
  if(!directory.startsWith(config.login.package_directory)||directory.split('/').some(p=>p==='.'||p==='..'))throw Error('FS_STORAGE_SCOPE');
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
- const grids=page.locator('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]:visible');
- if(await grids.count()===0)await at('MF;cntMain;tlbMainToolbar;btnFilestorage').click();
- await grids.waitFor({state:'visible'});if(await grids.count()!==1)throw Error('FS_STORAGE_AMBIGUOUS');
- let prefix=(await grids.getAttribute('data-tid')).split(';FileStorageForm;')[0];
+ const active=await page.evaluate(storageFolderListing,{observe:true});
+ if(!active.grid_tid)await at('MF;cntMain;tlbMainToolbar;btnFilestorage').click();
+ const handle=await page.waitForFunction(storageFolderListing,{active:true});
+ let current;try{current=await handle.jsonValue();}finally{await handle.dispose();}
+ let prefix=current.grid_tid.split(';FileStorageForm;')[0];
+ const grids=page.locator('[data-tid='+JSON.stringify(current.grid_tid)+']:visible');
+ await grids.waitFor({state:'visible'});
  const capture=async point=>{
   const state=await page.evaluate(storageFolderListing,{observe:true});
   await record({phase:'fs_storage_navigation',point,directory,state});return state;
@@ -281,12 +284,14 @@ async function storageFolderRow(grids,lookup){
 
 // Native sender binds the current directory; loadCount binds its refreshed
 // listing, including an empty directory. A complete old listing is not ready.
-function storageFolderListing({parent,previous,observe=false}){
- const grids=[...document.querySelectorAll('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]')]
-  .filter(el=>{const b=el.getBoundingClientRect();return b.width>0&&b.height>0;});
- if(grids.length!==1)return observe?{ready:false,reason:'grid_not_unique'}:false;
- const el=grids[0],view=globalThis.Ext?.getCmp?.(el.id),store=view?.getStore?.(),records=store?.getRange?.();
+function storageFolderListing({parent,previous,observe=false,active=false}){
  const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+ const root=form?.FView?.el?.dom,tid=root?.getAttribute?.('data-tid'),prefix=tid?.split(';FileStorageForm')[0];
+ const found=[...document.querySelectorAll('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]')];
+ const grids=form?.constructor?.name==='FileStorageForm'&&prefix?found.filter(el=>
+  el.getAttribute('data-tid')===prefix+';FileStorageForm;pnlFileStorage;tbl'&&root.contains(el)):[];
+ if(grids.length!==1)return observe?{ready:false,reason:'active_grid_not_unique',grids_found:found.length,active_grids:grids.length}:false;
+ const el=grids[0],view=globalThis.Ext?.getCmp?.(el.id),store=view?.getStore?.(),records=store?.getRange?.();
  const sender=form?.FFileSenderManager,current=sender?.CurrentDirectory;
  const bound=form?.constructor?.name==='FileStorageForm'&&sender?.constructor?.name==='FileSenderManager'
   &&form.FView?.el?.dom?.contains(el)===true&&typeof current==='string'&&current.startsWith('/')&&current.endsWith('/');
@@ -294,13 +299,13 @@ function storageFolderListing({parent,previous,observe=false}){
   const path=r.data?.FilePath;if(typeof path!=='string'||!path.startsWith('/'))return null;
   const trimmed=path.replace(/\/$/,'');return trimmed.slice(0,trimmed.lastIndexOf('/')+1);
  }))]:[];
- const state={grid_id:el.id,grid_tid:el.getAttribute('data-tid'),current_parent:current??null,
+ const state={grids_found:found.length,active_grids:grids.length,grid_id:el.id,grid_tid:el.getAttribute('data-tid'),current_parent:current??null,
   count:store?.getCount?.(),total:store?.getTotalCount?.(),loading:store?.isLoading?.(),load_count:store?.loadCount,
   record_parents:parents,records:records?.slice(0,4).map(r=>({name:r.data?.FileName,path:r.data?.FilePath,type:r.data?.Type}))};
  state.ready=bound&&Array.isArray(records)&&state.loading===false&&state.count===records.length&&state.total===records.length
   &&Number.isSafeInteger(state.load_count)&&current===parent&&parents.every(p=>p===parent)
   &&(!previous||previous.current_parent===parent||previous.grid_id!==el.id||state.load_count>previous.load_count);
- return observe?state:state.ready?state:false;
+ return observe?state:active&&bound?state:state.ready?state:false;
 }
 
 // Runs in the existing native grid only; no server request or wider search.
