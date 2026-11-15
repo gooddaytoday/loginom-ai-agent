@@ -1,6 +1,6 @@
 # Dashboard M5 — release-стенд
 
-Task 0: установленные проверки **PASS**, итоговое независимое ревью ожидается. Из предоставленного release подготовлен комплект штатными Dockerfile и installer с одной проверенной поправкой сохранения конфигурации. В собственной VM подтверждены HTTP/HTTPS, WSS, Login/Logout, Integrator и установленная Linux-пара Desktop/CLI; повторный setup сохранил собственные данные. Tasks 1–5 не выполнялись. Основа — только в [checkpoint M5](dashboard-m5-checkpoint.md); контракт — в [плане](../../superpowers/plans/2026-11-15-dashboard-m5.md) и [дизайне](../../superpowers/specs/2026-11-15-dashboard-m5-design.md).
+Task 0 принят: **Spec Approved / Quality Approved**, обязательных замечаний нет. Следующий этап — Task 1. Из предоставленного release подготовлен комплект штатными Dockerfile и installer с одной проверенной поправкой сохранения конфигурации. В собственной VM подтверждены HTTP/HTTPS, WSS, Login/Logout, Integrator и установленная Linux-пара Desktop/CLI; повторный setup сохранил собственные данные. Tasks 1–5 не выполнялись. Основа — только в [checkpoint M5](dashboard-m5-checkpoint.md); контракт — в [плане](../../superpowers/plans/2026-11-15-dashboard-m5.md) и [дизайне](../../superpowers/specs/2026-11-15-dashboard-m5-design.md).
 
 ## Входы и происхождение
 
