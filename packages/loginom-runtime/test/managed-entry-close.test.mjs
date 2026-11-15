@@ -11,7 +11,7 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
   const directory = await mkdtemp(join(tmpdir(), "managed-exit-fallback-"))
   // Entry, input validation and resource closure remain byte-identical. Only
   // external browser/MCP boundaries are fixtures, as in managed-work-entry.
-  for (const name of ["managed-entry", "managed-resources-close", "start-input", "call-timeout"]) {
+  for (const name of ["managed-entry", "managed-resources-close", "start-input", "call-timeout", "dashboard-storage"]) {
     await mkdir(join(directory, "src"), { recursive: true })
     await copyFile(new URL(`../src/${name}.mjs`, import.meta.url), join(directory, "src", `${name}.mjs`))
   }
@@ -179,6 +179,13 @@ for (const scenario of ["unstarted", "invalid-start", "signal"]) {
       assert.equal(response.id, "start")
       assert.equal(response.error, "LOGINOM_START_INVALID")
       assert.equal(JSON.stringify(response).includes("private-invalid-secret"), false)
+    }
+    if (scenario === "unstarted") {
+      for (const operation of ["dashboardRead", "dashboardPublish"]) {
+        const refused = message()
+        child.send({ id: operation, operation, input: { binding: "private-sentinel" } })
+        assert.deepEqual(await refused, { id: operation, error: "LOGINOM_NOT_READY" })
+      }
     }
     if (scenario === "signal") {
       const ready = message()

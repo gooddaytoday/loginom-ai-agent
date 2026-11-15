@@ -992,6 +992,9 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })
     expect(await client.request("interrupt", { run: "one" })).toBe(true)
     expect(await chatStarts()).toEqual([])
+    for (const method of ["dashboardRead", "dashboardPublish"])
+      await expect(client.request(method, { run: "one" })).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    expect(await chatStarts()).toEqual([])
     await client.request("scope", {
       run: "one",
       mode: "bind",
@@ -1022,3 +1025,41 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     await rm(directory, { recursive: true, force: true })
   }
 }, 15000)
+
+test.each([
+  ["disconnect", "DASHBOARD_WRITE_UNKNOWN"],
+  ["malformed", "DASHBOARD_WRITE_UNKNOWN"],
+  ["DASHBOARD_ACCESS_DENIED", "DASHBOARD_ACCESS_DENIED"],
+  ["DASHBOARD_VERSION_EXISTS", "DASHBOARD_VERSION_EXISTS"],
+  ["LOGINOM_RUNTIME_CLEANUP_FAILED", "LOGINOM_RUNTIME_CLEANUP_FAILED"],
+  ["LOGINOM_HOST_CLEANUP_FAILED", "LOGINOM_HOST_CLEANUP_FAILED"],
+])("acquired publication classifies %s without replay", async (outcome, expected) => {
+  const replies = new EventEmitter()
+  const calls: string[] = []
+  LoginomHost.connect({
+    postMessage(value) {
+      const message = value as { id: string; method: string }
+      calls.push(message.method)
+      if (message.method === "dashboardPublish" && outcome === "disconnect") {
+        replies.emit("close")
+        return
+      }
+      replies.emit("message", { data: {
+        id: message.id,
+        ...(message.method === "acquire" ? { result: { generation: 1 } } : outcome === "malformed" ? { result: { status: "written" } } : { error: outcome }),
+      } })
+    },
+    on: replies.on.bind(replies),
+    onClose: listener => { replies.on("close", listener) },
+    start() {},
+  })
+  try {
+    const run = await LoginomHost.acquire("dashboard-uncertain")
+    if (!run) throw Error("No run")
+    const input = { origin: "http://example.test", binding: { packagePath: "/user/example.lgp", workflowGuid: "11111111-1111-4111-8111-111111111111", nodeGuid: "22222222-2222-4222-8222-222222222222" }, content: "{}", expected: null }
+    await expect(run.dashboardPublish(input, AbortSignal.abort())).rejects.toThrow("DASHBOARD_CANCELLED")
+    expect(calls).toEqual(["acquire"])
+    await expect(run.dashboardPublish(input)).rejects.toThrow(expected)
+    expect(calls).toEqual(["acquire", "dashboardPublish"])
+  } finally { LoginomHost.disconnect() }
+})

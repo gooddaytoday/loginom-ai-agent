@@ -1,5 +1,5 @@
 {
   "extends": "@tsconfig/node22/tsconfig.json",
-  "compilerOptions": { "module": "ESNext", "moduleResolution": "bundler", "types": ["bun"], "noEmit": true },
+  "compilerOptions": { "module": "ESNext", "moduleResolution": "bundler", "types": ["bun"], "noEmit": true, "allowImportingTsExtensions": true },
   "include": ["src", "test", "script"]
 }

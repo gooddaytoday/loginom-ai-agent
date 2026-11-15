@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
-import { createReadStream } from "node:fs"
-import { lstat, open, readFile, readdir, readlink, realpath, stat, writeFile } from "node:fs/promises"
+import { createReadStream, lstatSync, readdirSync, readlinkSync, realpathSync, statSync } from "node:fs"
+import { open, readFile, writeFile } from "node:fs/promises"
 import { isAbsolute, join, relative, sep } from "node:path"
 import { Option, Schema } from "effect"
 import { verifyProductSkills } from "./bundled-skills"
@@ -166,28 +166,28 @@ function safePath(path: string) {
 
 async function inventory(root: string) {
   if (!isAbsolute(root)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
-  const canonical = await realpath(root)
+  const canonical = realpathSync(root)
   const files: Array<typeof file.Type> = []
   async function visit(directory: string) {
-    for (const name of (await readdir(directory)).sort()) {
+    for (const name of readdirSync(directory).sort()) {
       const path = join(directory, name)
       const key = relative(root, path).split(sep).join("/")
       if (key === filename) continue
       if (!safePath(key)) throw new Error("LOGINOM_MANIFEST_INVALID")
-      const info = await lstat(path)
+      const info = lstatSync(path)
       if (info.isDirectory()) {
         await visit(path)
         continue
       }
       if (!info.isFile() && !info.isSymbolicLink()) throw new Error("LOGINOM_MANIFEST_FILE_INVALID")
-      const target = relative(canonical, await realpath(path))
+      const target = relative(canonical, realpathSync(path))
       if (!target || target === ".." || target.startsWith(".." + sep) || isAbsolute(target))
         throw new Error("LOGINOM_MANIFEST_PATH_ESCAPE")
-      const link = info.isSymbolicLink() ? await readlink(path) : undefined
+      const link = info.isSymbolicLink() ? readlinkSync(path) : undefined
       const hash = createHash("sha256")
       // macOS app frameworks contain directory symlinks. Record the link text;
       // target files are inventoried through their real directory, never twice.
-      if (link !== undefined && (await stat(path)).isDirectory()) hash.update(link)
+      if (link !== undefined && statSync(path).isDirectory()) hash.update(link)
       else for await (const chunk of createReadStream(path)) hash.update(chunk)
       files.push({
         path: key,

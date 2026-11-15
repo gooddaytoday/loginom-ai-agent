@@ -11,6 +11,8 @@ import { connectionStore, type ActiveConnection } from "./connection/connection-
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
 import { fileReferences } from "./file-reference"
+import { dashboardRequest } from "../../loginom-runtime/src/dashboard-storage.mjs"
+import { DashboardRead, DashboardPublish, PublicationSource, PublicationWrite } from "./dashboard"
 import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
@@ -584,10 +586,57 @@ export async function createLoginomHost(options: {
     },
     journal,
   )
+  const dashboardOperations = new Map<AbortController, Promise<unknown>>()
+  function dashboardOperation(operation: "dashboardRead" | "dashboardPublish", input: DashboardRead | DashboardPublish, signal?: AbortSignal) {
+    const controller = new AbortController()
+    const pending = performDashboard(operation, input, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
+    dashboardOperations.set(controller, pending)
+    void pending.finally(() => dashboardOperations.delete(controller)).catch(() => undefined)
+    return pending
+  }
+  async function performDashboard(operation: "dashboardRead" | "dashboardPublish", input: DashboardRead | DashboardPublish, signal?: AbortSignal) {
+    const request = input
+    dashboardRequest(request, operation === "dashboardPublish")
+    if (!Number.isSafeInteger(request.generation) || request.generation < 1) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
+    if (signal?.aborted) throw new Error("DASHBOARD_CANCELLED")
+    const current = generations.get(request.generation)
+    if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
+    if (new URL(current.connection.url).origin !== request.origin) throw new Error("DASHBOARD_ORIGIN_MISMATCH")
+    const chat = randomUUID()
+    const lease = service.acquire(chat)
+    if (!lease) throw new Error("LOGINOM_CONNECTION_NOT_READY")
+    try {
+      if (lease.generation !== request.generation) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
+      const child = await retain(current, chat, launch(current.connection, chat, false, signal)).catch((error: unknown) => {
+        if (signal?.aborted && error instanceof RuntimeStartupError && error.cleanupConfirmed)
+          throw new Error("DASHBOARD_CANCELLED")
+        throw error
+      })
+      const cancel = () => { void child.request("interrupt").catch(() => undefined) }
+      signal?.addEventListener("abort", cancel, { once: true })
+      try {
+        if (signal?.aborted) throw new Error("DASHBOARD_CANCELLED")
+        return await child.request(operation, request)
+      } catch (error) {
+        if (operation === "dashboardPublish" && !(error instanceof Error && [
+          "DASHBOARD_INPUT_INVALID", "DASHBOARD_VERSION_EXISTS", "DASHBOARD_ACCESS_DENIED", "DASHBOARD_STORAGE_UNAVAILABLE", "DASHBOARD_CANCELLED",
+        ].includes(error.message))) throw new Error("DASHBOARD_WRITE_UNKNOWN")
+        throw error
+      } finally {
+        signal?.removeEventListener("abort", cancel)
+        await child.close().catch((error: unknown) => { shutdown.failed = true; throw error })
+        current.children.delete(chat)
+        lost.delete(chat)
+      }
+    } finally {
+      lease.release()
+    }
+  }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   function beginClose() {
     service.beginClose()
     resourceController.abort()
+    for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
   }
   return {
     ...service,
@@ -623,9 +672,22 @@ export async function createLoginomHost(options: {
     },
     browserRecovery: options.browserRecovery === true,
     references,
+    async readDashboard(input: DashboardRead, signal?: AbortSignal): Promise<PublicationSource | null> {
+      if (!Schema.is(DashboardRead)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
+      const result = await dashboardOperation("dashboardRead", input, signal)
+      if (!Schema.is(Schema.NullOr(PublicationSource))(result)) throw new Error("LOGINOM_REPLY_INVALID")
+      return result
+    },
+    async publishDashboard(input: DashboardPublish, signal?: AbortSignal): Promise<PublicationWrite> {
+      if (!Schema.is(DashboardPublish)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
+      const result = await dashboardOperation("dashboardPublish", input, signal)
+      if (!Schema.is(PublicationWrite)(result)) throw new Error("DASHBOARD_WRITE_UNKNOWN")
+      return result
+    },
     async close() {
       beginClose()
       await verifiedResources
+      await Promise.allSettled([...dashboardOperations.values()])
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.
@@ -712,6 +774,8 @@ export async function createLoginomHost(options: {
       lost.delete(chat)
     },
     async interruptAll() {
+      for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
+      await Promise.allSettled([...dashboardOperations.values()])
       const results = await Promise.allSettled(
         [...generations.values()].flatMap((generation) => [
           generation.knowledge.request("interrupt", { all: true }),
