@@ -217,6 +217,9 @@ test("audit failure preserves raw FAIL and NULL model outcomes without touching 
 
 test("dynamic recovery tools require a qualified, bounded and closed native handoff", async () => {
   const { recoveryToolsCovered } = await import("../src/analytics-measurements")
+  const check = (value: Omit<Parameters<typeof recoveryToolsCovered>[0], "isBrowserRecoveryTool" | "isRecoveryBrowserTool">) =>
+    recoveryToolsCovered({ ...value, isBrowserRecoveryTool: name => ["dock_browser_recovery", "browser_snapshot"].includes(name),
+      isRecoveryBrowserTool: name => name === "browser_snapshot" })
   const metadata = { sessionId: "synthetic-runtime", clientRevision: "c".repeat(64),
     actionManifestDigest: "d".repeat(64), targetIdentity: { platform: "linux" }, archiveActive: false, resultProfile: "user-v1" }
   const common = { session_id: metadata.sessionId, runtime_revision: metadata.clientRevision,
@@ -225,7 +228,8 @@ test("dynamic recovery tools require a qualified, bounded and closed native hand
   const calls: Parameters<typeof recoveryToolsCovered>[0]["calls"] = [
     { tool: "loginom_dock_browser_recovery", status: "completed", input: { action: "start", operation_id: "step" } },
     { tool: "loginom_browser_snapshot", status: "completed", input },
-    { tool: "loginom_dock_browser_recovery", status: "error", input: { action: "finish", operation_id: "step" } },
+    { tool: "loginom_dock_browser_recovery", status: "error", input: { action: "finish", operation_id: "step" },
+      error: JSON.stringify({ refused: "finish requires actions_performed." }) },
     { tool: "loginom_dock_browser_recovery", status: "completed", input: { action: "stop", operation_id: "step" } },
   ]
   const records: Parameters<typeof recoveryToolsCovered>[0]["records"] = [
@@ -234,18 +238,43 @@ test("dynamic recovery tools require a qualified, bounded and closed native hand
     { ...common, phase: "browser_recovery_action", tool: "browser_snapshot",
       arguments_sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(input)).digest("hex"),
       is_error: false, transport_error: null, page: { ok: true }, budget: { calls_left: 29, ms_left: 599000 } },
-    { ...common, phase: "browser_recovery_stopped", cleanup: { state: "retained" } },
+    { ...common, phase: "browser_recovery_stopped", code: "model_stopped", reason: "Stopped by the model.",
+      cleanup: { state: "retained" }, budget: { calls_left: 29, ms_left: 598000 } },
   ]
-  const sample = { calls, records, metadata, qualifiedRevision: metadata.clientRevision, browserTools: ["browser_snapshot"] }
-  expect(recoveryToolsCovered(sample)).toBe(true)
+  const sample = { calls, records, metadata, qualifiedRevision: metadata.clientRevision }
+  expect(check(sample)).toBe(true)
+  const knownError = structuredClone(sample)
+  knownError.records[2]!.is_error = true
+  knownError.calls[1]!.status = "error"
+  knownError.calls[1]!.error = "Element not found"
+  expect(check(knownError)).toBe(true)
   const verified = structuredClone(sample)
-  verified.records.splice(3, 1, { ...common, phase: "browser_recovery_attested" },
+  verified.records.splice(3, 1, { ...common, phase: "browser_recovery_attested",
+    attested_by_model: { actions_performed: ["inspected"], expected_result: null, browser_settings: [] } },
     { ...common, phase: "browser_recovery_verified", status: "completed" })
   verified.calls[3] = { tool: "loginom_dock_browser_recovery", status: "completed",
     input: { action: "finish", operation_id: "step", actions_performed: ["inspected"] } }
-  expect(recoveryToolsCovered(verified)).toBe(true)
+  expect(check(verified)).toBe(true)
+  const unresolved = structuredClone(verified)
+  unresolved.records[4]!.status = "unresolved"
+  unresolved.records.push(structuredClone(sample.records[3]!))
+  unresolved.calls.push(structuredClone(sample.calls[3]!))
+  expect(check(unresolved)).toBe(true)
+  const automatic = structuredClone(unresolved)
+  automatic.calls.pop(); automatic.records[5]!.code = "runtime_closed"
+  expect(check(automatic)).toBe(true)
+  const afterFinish = structuredClone(verified)
+  afterFinish.calls.push(afterFinish.calls.splice(1, 1)[0]!)
+  expect(check(afterFinish)).toBe(false)
+  const verifierUnknown = structuredClone(unresolved)
+  verifierUnknown.records[5]!.code = "browser_unavailable"
+  expect(check(verifierUnknown)).toBe(false)
+  const stopUnknown = structuredClone(unresolved)
+  stopUnknown.records[5]!.cleanup = { state: "retained_uncertain" }
+  expect(check(stopUnknown)).toBe(false)
   for (const change of ["no-handoff", "no-stop", "foreign-session", "foreign-operation", "unqualified", "page",
-    "transport", "budget", "arguments", "unknown-tool", "archive", "extra-action", "no-native", "runtime", "manifest", "target", "cleanup"]) {
+    "transport", "budget", "arguments", "unknown-tool", "archive", "extra-action", "no-native", "runtime", "manifest", "target", "cleanup",
+    "uncertain", "missing-cli-stop", "late-action", "verifier-unknown", "memory-write"]) {
     const changed = structuredClone(sample)
     if (change === "no-handoff") changed.records.splice(1, 1)
     if (change === "no-stop") changed.records.pop()
@@ -264,7 +293,12 @@ test("dynamic recovery tools require a qualified, bounded and closed native hand
     if (change === "manifest") changed.records[2]!.manifest_sha256 = "f".repeat(64)
     if (change === "target") changed.records[2]!.target = { foreign: true }
     if (change === "cleanup") changed.records[3]!.cleanup = { state: "unknown" }
-    expect(recoveryToolsCovered(changed)).toBe(false)
+    if (change === "uncertain") changed.records[3]!.cleanup = { state: "retained_uncertain" }
+    if (change === "missing-cli-stop") changed.calls.pop()
+    if (change === "late-action") { const action = changed.calls.splice(1, 1)[0]!; changed.calls.push(action) }
+    if (change === "verifier-unknown") Object.assign(changed.records[3]!, { code: "browser_unavailable" })
+    if (change === "memory-write") changed.calls[1]!.tool = "loginom_memory_write"
+    expect(check(changed)).toBe(false)
   }
 })
 

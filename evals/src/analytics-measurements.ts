@@ -121,89 +121,107 @@ export function validateManifest(value: unknown): MeasurementManifest {
 }
 
 type RecoveryMetadata = { sessionId: string; clientRevision: string; actionManifestDigest: string; targetIdentity: unknown; archiveActive: boolean; resultProfile: string }
-type RecoveryCall = { tool: string; status: string; input: Record<string, unknown> }
+type RecoveryCall = { tool: string; status: string; input: Record<string, unknown>; error?: string }
 type RecoveryRecord = { phase?: string; session_id?: string; runtime_revision?: string; manifest_sha256?: string; target?: unknown
   attempt_id?: string; operation_id?: string; stopped?: boolean; tool?: string; arguments_sha256?: string; is_error?: boolean
-  transport_error?: string | null; page?: { ok?: boolean }; budget?: { calls_left: number; ms_left: number }
-  status?: string; cleanup?: { state?: string } }
+  transport_error?: string | null; page?: { ok?: boolean; unknown?: boolean }; budget?: { calls_left: number; ms_left: number }
+  status?: string; code?: string; reason?: string; cleanup?: { state?: string }; attested_by_model?: unknown; uncertain?: boolean }
 export function recoveryToolsCovered(input: {
-  calls: RecoveryCall[]; records: RecoveryRecord[]; metadata: RecoveryMetadata; qualifiedRevision: string; browserTools: string[]
+  calls: RecoveryCall[]; records: RecoveryRecord[]; metadata: RecoveryMetadata; qualifiedRevision: string
+  isBrowserRecoveryTool: (name: string) => boolean; isRecoveryBrowserTool: (name: string) => boolean
 }) {
   if (input.metadata.archiveActive !== false || input.metadata.resultProfile !== "user-v1" ||
     !input.metadata.sessionId || !/^[a-f0-9]{64}$/.test(input.qualifiedRevision) ||
     !/^[a-f0-9]{64}$/.test(input.metadata.actionManifestDigest) ||
     input.metadata.clientRevision !== input.qualifiedRevision) return false
-  const attempts = new Map<string, { operation: string; handoff: boolean; closed: boolean; attested: boolean; finishes: number; calls: number; ms: number }>()
-  const actions: { tool: string; hash: string; operation: string }[] = []
   const phases = new Set(["browser_recovery_started", "browser_recovery_handoff", "browser_recovery_action",
     "browser_recovery_attested", "browser_recovery_verified", "browser_recovery_stopped"])
-  for (const row of input.records.filter(row => phases.has(row.phase ?? ""))) {
+  const ledger = input.records.filter(row => phases.has(row.phase ?? ""))
+  for (const row of ledger) {
     if (row.session_id !== input.metadata.sessionId || row.runtime_revision !== input.qualifiedRevision ||
       row.manifest_sha256 !== input.metadata.actionManifestDigest || JSON.stringify(row.target) !== JSON.stringify(input.metadata.targetIdentity) ||
-      !row.attempt_id || !row.operation_id) return false
-    if (row.phase === "browser_recovery_started") {
-      if (attempts.has(row.attempt_id) || [...attempts.values()].some(value => !value.closed) || !row.budget ||
-        !Number.isInteger(row.budget.calls_left) || row.budget.calls_left < 0 || row.budget.calls_left > 30 ||
-        !Number.isFinite(row.budget.ms_left) || row.budget.ms_left < 0 || row.budget.ms_left > 600000) return false
-      attempts.set(row.attempt_id, { operation: row.operation_id, handoff: false, closed: false, attested: false, finishes: 0,
-        calls: row.budget.calls_left, ms: row.budget.ms_left })
-      continue
-    }
-    const attempt = attempts.get(row.attempt_id)
-    if (!attempt || attempt.operation !== row.operation_id || attempt.closed) return false
-    if (row.phase === "browser_recovery_handoff") {
-      if (row.stopped !== true || attempt.handoff) return false
-      attempt.handoff = true
-      continue
-    }
-    if (!attempt.handoff) return false
-    if (row.phase === "browser_recovery_action") {
-      if (!row.tool || !input.browserTools.includes(row.tool) || row.is_error !== false || row.transport_error !== null ||
-        row.page?.ok !== true || !/^[a-f0-9]{64}$/.test(row.arguments_sha256 ?? "") ||
-        !row.budget || row.budget.calls_left !== attempt.calls - 1 || row.budget.calls_left < 0 ||
-        !Number.isFinite(row.budget.ms_left) || row.budget.ms_left < 0 || row.budget.ms_left > attempt.ms) return false
-      attempt.calls = row.budget.calls_left; attempt.ms = row.budget.ms_left
-      actions.push({ tool: row.tool, hash: row.arguments_sha256!, operation: row.operation_id })
-    }
-    if (row.phase === "browser_recovery_attested") attempt.attested = true
-    if (row.phase === "browser_recovery_verified") {
-      if (!attempt.attested || !["completed", "continuable", "unresolved"].includes(row.status ?? "")) return false
-      attempt.attested = false; attempt.finishes++
-      if (row.status !== "unresolved") attempt.closed = true
-    }
-    if (row.phase === "browser_recovery_stopped") {
-      if (!["retained", "retained_uncertain"].includes(row.cleanup?.state ?? "")) return false
-      attempt.closed = true
-    }
+      !row.attempt_id || !row.operation_id || row.uncertain === true) return false
   }
-  if (!attempts.size || [...attempts.values()].some(value => !value.closed)) return false
-  const starts = new Map<string, number>(), finishes = new Map<string, number>()
-  let operation: string | undefined
-  for (const call of input.calls) {
-    if (call.tool === "loginom_dock_browser_recovery") {
-      if (!["start", "finish", "stop"].includes(String(call.input.action)) || typeof call.input.operation_id !== "string" ||
-        ![...attempts.values()].some(value => value.operation === call.input.operation_id) ||
-        !["completed", "error"].includes(call.status)) return false
-      if (call.input.action === "start") {
-        if (call.status !== "completed") return false
-        operation = call.input.operation_id; starts.set(operation, (starts.get(operation) ?? 0) + 1)
+  let cursor = 0, current: { id: string; operation: string; calls: number; ms: number } | undefined
+  const seen = new Set<string>()
+  const require = (condition: unknown) => { if (!condition) throw Error("RECOVERY_LEDGER") }
+  const take = (phase: string) => {
+    const row = ledger[cursor++]
+    require(row?.phase === phase)
+    if (current) require(row!.attempt_id === current.id && row!.operation_id === current.operation)
+    return row!
+  }
+  const stop = (code: string) => {
+    require(current)
+    const row = take("browser_recovery_stopped")
+    require(row.code === code && row.cleanup?.state === "retained")
+    require(row.budget && row.budget.calls_left === current!.calls && Number.isFinite(row.budget.ms_left) &&
+      row.budget.ms_left >= 0 && row.budget.ms_left <= current!.ms)
+    current = undefined
+    return row
+  }
+  try {
+    for (const call of input.calls) {
+      const tool = call.tool.startsWith("loginom_") ? call.tool.slice(8) : ""
+      require(input.isBrowserRecoveryTool(tool))
+      // A native refusal is a proved non-execution, not a successful gesture.
+      if (call.status === "error" && call.error) {
+        let refusal: { refused?: unknown; uncertain?: unknown; page?: unknown } | undefined
+        try { refusal = JSON.parse(call.error) } catch {}
+        const executed = ledger[cursor]?.phase === "browser_recovery_action" && ledger[cursor]?.tool === tool &&
+          ledger[cursor]?.arguments_sha256 === new Bun.CryptoHasher("sha256").update(JSON.stringify(call.input)).digest("hex")
+        if (!executed && typeof refusal?.refused === "string" && refusal.refused && !refusal.uncertain && !refusal.page) continue
       }
-      if (call.input.action === "finish" && call.status === "completed")
-        finishes.set(call.input.operation_id, (finishes.get(call.input.operation_id) ?? 0) + 1)
-      if (call.input.action === "stop") operation = undefined
-      continue
+      if (input.isRecoveryBrowserTool(tool)) {
+        require(current)
+        if (ledger[cursor]?.phase === "browser_recovery_stopped" && ledger[cursor]?.code === "budget_exhausted") {
+          require(call.status === "completed")
+          const row = stop("budget_exhausted")
+          require(row.budget?.calls_left === 0 || row.budget?.ms_left === 0)
+          continue
+        }
+        const row = take("browser_recovery_action")
+        require(row.tool === tool && row.arguments_sha256 === new Bun.CryptoHasher("sha256").update(JSON.stringify(call.input)).digest("hex"))
+        require(typeof row.is_error === "boolean" && row.transport_error === null && row.page?.ok === true && !row.page.unknown)
+        require(call.status === (row.is_error ? "error" : "completed"))
+        require(row.budget && row.budget.calls_left === current!.calls - 1 && row.budget.calls_left >= 0 &&
+          Number.isFinite(row.budget.ms_left) && row.budget.ms_left >= 0 && row.budget.ms_left <= current!.ms)
+        current!.calls = row.budget!.calls_left; current!.ms = row.budget!.ms_left
+        continue
+      }
+      require(tool === "dock_browser_recovery" && call.status === "completed" && typeof call.input.operation_id === "string")
+      if (call.input.action === "start") {
+        require(!current)
+        const row = take("browser_recovery_started")
+        require(row.operation_id === call.input.operation_id && !seen.has(row.attempt_id!) && row.budget &&
+          Number.isInteger(row.budget.calls_left) && row.budget.calls_left >= 0 && row.budget.calls_left <= 30 &&
+          Number.isFinite(row.budget.ms_left) && row.budget.ms_left >= 0 && row.budget.ms_left <= 600000)
+        seen.add(row.attempt_id!)
+        current = { id: row.attempt_id!, operation: row.operation_id!, calls: row.budget!.calls_left, ms: row.budget!.ms_left }
+        const handoff = take("browser_recovery_handoff")
+        if (handoff.stopped !== true) stop("executor_not_stopped")
+      } else {
+        require(current?.operation === call.input.operation_id)
+        if (call.input.action === "stop") {
+          const row = stop("model_stopped")
+          require(row.reason === (call.input.reason ?? "Stopped by the model."))
+        } else {
+          require(call.input.action === "finish")
+          const attested = take("browser_recovery_attested")
+          require(JSON.stringify(attested.attested_by_model) === JSON.stringify({
+            actions_performed: call.input.actions_performed ?? [], expected_result: call.input.expected_result ?? null,
+            browser_settings: call.input.browser_settings ?? [] }))
+          const verified = take("browser_recovery_verified")
+          require(["completed", "continuable", "unresolved"].includes(verified.status ?? ""))
+          if (verified.status !== "unresolved") current = undefined
+          else if (ledger[cursor]?.phase === "browser_recovery_stopped" && ledger[cursor]?.code === "unresolved") stop("unresolved")
+        }
+      }
     }
-    const tool = call.tool.startsWith("loginom_") ? call.tool.slice(8) : ""
-    const hash = new Bun.CryptoHasher("sha256").update(JSON.stringify(call.input)).digest("hex")
-    const index = actions.findIndex(action => action.tool === tool && action.hash === hash && action.operation === operation)
-    if (!input.browserTools.includes(tool) || call.status !== "completed" || index < 0) return false
-    actions.splice(index, 1)
-  }
-  return !actions.length && [...starts].every(([key, count]) =>
-    count === [...attempts.values()].filter(value => value.operation === key).length) &&
-    [...attempts.values()].every(value => starts.has(value.operation)) &&
-    [...starts.keys()].every(key => (finishes.get(key) ?? 0) === [...attempts.values()]
-      .filter(value => value.operation === key).reduce((sum, value) => sum + value.finishes, 0))
+    // Runtime shutdown is automatic; a model_stopped record requires its explicit CLI stop above.
+    if (current && ledger[cursor]?.phase === "browser_recovery_stopped") stop("runtime_closed")
+    return !current && cursor === ledger.length
+  } catch { return false }
 }
 
 export async function auditMeasurement(job: MeasurementJob, journalFile: string, slots: Pick<import("./slots").SlotFile, "slots" | "judge">) {
@@ -251,20 +269,22 @@ export async function auditMeasurement(job: MeasurementJob, journalFile: string,
       runtimeEvidence.push({ metadata, file: path.join(archive, path.dirname(relative), "execution-events.jsonl") })
     }
     must(runtimes > 0)
-    const unknown = new Set(events.tools.filter(item => item.tool.startsWith("loginom_") && !catalogNames.has(item.tool.slice(8))).map(item => item.tool))
-    if (unknown.size) {
+    const { verifyAdminRuntime } = await import("./preflight")
+    const { pathToFileURL } = await import("node:url")
+    const qualified = await verifyAdminRuntime(config.agent.cliBin)
+    const contract = await import(pathToFileURL(path.join(qualified.resources, "runtime/client/lib/browser-recovery.mjs")).href)
+    must(contract.browserRecoveryToolName === "dock_browser_recovery" &&
+      typeof contract.isBrowserRecoveryTool === "function" && typeof contract.isRecoveryBrowserTool === "function")
+    must(events.tools.every(item => !item.tool.startsWith("loginom_") || catalogNames.has(item.tool.slice(8)) ||
+      contract.isBrowserRecoveryTool(item.tool.slice(8))))
+    const calls = eventsText.split("\n").filter(Boolean).flatMap(line => {
+      const event = JSON.parse(line) as { type?: string; part?: { tool?: string; state?: { status?: string; input?: Record<string, unknown>; error?: string } } }
+      const part = event.part
+      return event.type === "tool_use" && part?.tool?.startsWith("loginom_") && contract.isBrowserRecoveryTool(part.tool.slice(8))
+        ? [{ tool: part.tool, status: part.state?.status ?? "?", input: part.state?.input ?? {}, error: part.state?.error }] : []
+    })
+    if (calls.length) {
       must(runtimes === 1)
-      const { verifyAdminRuntime } = await import("./preflight")
-      const { pathToFileURL } = await import("node:url")
-      const qualified = await verifyAdminRuntime(config.agent.cliBin)
-      const contract = await import(pathToFileURL(path.join(qualified.resources, "runtime/client/lib/browser-recovery.mjs")).href)
-      must(contract.browserRecoveryToolName === "dock_browser_recovery" && Array.isArray(contract.recoveryBrowserTools))
-      const calls = eventsText.split("\n").filter(Boolean).flatMap(line => {
-        const event = JSON.parse(line) as { type?: string; part?: { tool?: string; state?: { status?: string; input?: Record<string, unknown> } } }
-        const part = event.part
-        return event.type === "tool_use" && part?.tool && unknown.has(part.tool)
-          ? [{ tool: part.tool, status: part.state?.status ?? "?", input: part.state?.input ?? {} }] : []
-      })
       const evidence = runtimeEvidence[0]!
       const records = (await Bun.file(evidence.file).text()).split("\n").filter(Boolean).map(line => JSON.parse(line) as RecoveryRecord)
       const clientUrl = pathToFileURL(path.join(qualified.resources, "runtime/client/lib/session.mjs"))
@@ -273,7 +293,7 @@ export async function auditMeasurement(job: MeasurementJob, journalFile: string,
       const sourcePin = await createRuntimeSourcePin(clientUrl, ["../.node-version", "../package.json", "../package-lock.json"])
       must(JSON.stringify(sourcePin.manifest) === JSON.stringify((evidence.metadata as RecoveryMetadata & { clientSourceManifest: unknown }).clientSourceManifest))
       must(recoveryToolsCovered({ calls, records, metadata: evidence.metadata, qualifiedRevision: sourcePin.revision,
-        browserTools: contract.recoveryBrowserTools }))
+        isBrowserRecoveryTool: contract.isBrowserRecoveryTool, isRecoveryBrowserTool: contract.isRecoveryBrowserTool }))
     }
     const readyAttempt = path.join(journal.runDir, `request-preflight-${slot.id}`, "1"), ready = await json(path.join(journal.runDir, "request-preflight.json")), readyCleanup = await json(path.join(readyAttempt, "cleanup.json"))
     must(ready.code === null && readyCleanup.processes?.status === "confirmed" && readyCleanup.processes.capture_complete === true && readyCleanup.nextAdmissionAllowed === true)
