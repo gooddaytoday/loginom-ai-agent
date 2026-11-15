@@ -291,3 +291,65 @@ test('declared columns refuse at once when the open type picker lacks the wanted
  assert.equal(r.status,'AMBIGUOUS');assert.match(r.error,/type option missing: Дата\/Время/);assert.equal(r.cleanup_complete,true);
  assert.ok(Date.now()-started<1500,'no polling until the deadline');
 });
+
+// LAB-1680: module members are allowlisted. Each source below was ADMITTED by
+// the denylist-only python-module-v1 (np.fromregex and pd.ExcelFile read files).
+for(const [source,reason] of [
+ ['import numpy as np\nrows = np.fromregex("/etc/passwd", r"(\\w+):", [("u", "U32")])\n','attribute:numpy.fromregex'],
+ ['import pandas as pd\nx = pd.ExcelFile("/srv/secret.xlsx").parse(0)\n','attribute:pandas.ExcelFile'],
+ ['from numpy import fromregex\n','attribute:numpy.fromregex'],
+ ['from numpy import (array,\n    fromregex)\n','attribute:numpy.fromregex'],
+ ['from numpy import \\\n    fromregex\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = (np.\n    fromregex)\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = (np\n    .fromregex)\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = np . fromregex\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = f"{np.fromregex(1)}"\n','attribute:numpy.fromregex'],
+ ['from pandas import ExcelFile as E\n','attribute:pandas.ExcelFile'],
+ ['from numpy.ma.mrecords import fromtextfile\n','attribute:numpy.ma.mrecords'],
+ ['import numpy.ma.mrecords as m\n','attribute:numpy.ma.mrecords'],
+ ['import numpy as np\nx = np.ma.mrecords.fromtextfile("/etc/passwd")\n','attribute:numpy.ma.mrecords'],
+ ['import numpy as np\nx = np.rec.fromrecords([])\n','attribute:numpy.rec'],
+ ['import pandas as pd\nx = pd.api.extensions\n','attribute:pandas.api.extensions'],
+ ['import pandas as pd\nx = pd.plotting\n','attribute:pandas.plotting'],
+ ['import numpy as np\nnp.show_config()\n','attribute:numpy.show_config'],
+ ['import math\nx = math.no_such_name\n','attribute:math.no_such_name'],
+ ['from numpy import *\n','attribute:numpy.*'],
+ ['import numpy as np\nf = np\nf.fromregex("/etc/passwd", "x", [])\n','module_value:numpy'],
+ ['import numpy as np\nr = np.random\n','module_value:numpy.random'],
+ ['import numpy as np\nprint(np)\n','module_value:numpy'],
+ ['import datetime\nfrom datetime import datetime\n','alias:datetime'],
+ ['import numpy as random\nfrom random import random\n','alias:random'],
+])test('module member allowlist refuses '+reason+' '+JSON.stringify(source.slice(0,40)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('module member allowlist admits computation code, aliases, submodules and from-imported classes',()=>{
+ for(const source of [
+  'import json\nimport math\nfrom collections import Counter\nimport datetime\nrows = json.loads("[1, 2]")\ny = math.sqrt(2)\nc = Counter(rows)\nnow = datetime.datetime.now()\n',
+  'from datetime import datetime, timedelta\nx = datetime.now() + timedelta(days=1)\n',
+  'import datetime as dt\nx = dt.date(2024, 1, 1) - dt.timedelta(days=1)\n',
+  'import pandas as pd\nimport numpy as np\nfrom builtin_data import InputTable, OutputTable\nfrom builtin_pandas_utils import to_data_frame, prepare_compatible_table, fill_table\n'+
+   'df = to_data_frame(InputTable, True)\ndf["d"] = pd.to_datetime(df["d"])\ndf["n"] = pd.to_numeric(df["n"], errors="coerce")\n'+
+   'df["k"] = np.where(df["n"] > 0, "pos", np.nan)\ndf["s"] = np.select([df["n"] > 1], ["big"], default="small")\n'+
+   'g = df.groupby("k").agg(total=("n", "sum"), avg=("n", "mean")).reset_index()\ng["b"] = pd.cut(g["total"], bins=3)\n'+
+   'm = pd.merge(df, g, on="k", how="left")\nm = pd.concat([m, m], ignore_index=True)\nm = m[pd.notna(m["d"]) & ~pd.isna(m["n"])]\n'+
+   'm["e"] = m["d"] + pd.Timedelta(days=1) + pd.offsets.MonthEnd(0)\nprepare_compatible_table(OutputTable, m, with_index=False)\nfill_table(OutputTable, m, with_index=False)\n',
+  'import numpy as np\nrng = np.random.default_rng(1)\nx = (np.\n    linalg.norm(np.array([3, 4])))\ny = np.round(np.mean(np.arange(10)), 2)\n',
+  'from numpy import random as npr, where\nx = where(npr.default_rng(1).random(3) > 0.5, 1, 0)\n',
+  'import pandas as pd\nok = pd.api.types.is_numeric_dtype(pd.Series([1]))\n',
+  'import collections.abc\nok = isinstance({}, collections.abc.Mapping)\n',
+  'import fractions as f\nx = f"{1}" + str(f.Fraction(1, 3))\n',
+  'import re\nx = re.sub(r"\\s+", " ", "a  b")\nlabel = f"{1234.5:,.2f} руб."\nfor _ in range(3):\n    pass\n',
+  'import statistics, itertools, functools, random, decimal, cmath\nx = statistics.median([1, 2])\ny = list(itertools.chain([1], [2]))\n'+
+   'z = functools.reduce(lambda a, b: a + b, y)\nrandom.seed(1)\nd = decimal.Decimal("1.5").quantize(decimal.Decimal("1"), rounding=decimal.ROUND_HALF_UP)\nc = cmath.sqrt(-1)\n',
+  'try:\n    pass\nexcept ValueError as error:\n    raise RuntimeError("x") from error\n',
+ ])assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source+JSON.stringify(inspectPythonSourcePolicy(source)));
+});
+
+test('allowlist refusal tells the model which member is refused and what to use instead',()=>{
+ assert.throws(()=>validatePythonParameters({source_text:'import numpy as np\nx = np.fromregex("f", "x", [])\n',schema_mode:'code'},'script',request()),
+  /python-module-v1 \(attribute:numpy\.fromregex at line 2\): numpy\.fromregex is not an allowed module member .*np\.where.*boolean mask/);
+ assert.throws(()=>validatePythonParameters({source_text:'import numpy as np\nf = np\n',schema_mode:'code'},'script',request()),/module_value:numpy at line 2\): use the module only as alias\.member/);
+ assert.throws(()=>validatePythonParameters({source_text:'import datetime\nfrom datetime import datetime\n',schema_mode:'code'},'script',request()),/alias:datetime\): datetime is imported as two different things; import it once/);
+});
