@@ -16,7 +16,7 @@ test("successful login separates network, form, credentials and server response 
   }
   assert.deepEqual(await loginPage(f.page,candidate,{onPhase:event=>phases.push(event)}),{authenticated:true})
   assert.deepEqual(phases.filter(e=>e.status==='ready').map(e=>e.phase),[
-    'login.navigation','login.network','login.form','login.theme','login.username','login.password','login.submit','login.response','login.identity',
+    'login.navigation','login.network','login.form','login.form.network','login.theme','login.username','login.password','login.submit','login.response','login.identity',
   ])
   assert.deepEqual(phases.find(e=>e.phase==='login.network'),{
     phase:'login.network',status:'ready',dns_ms:2,tcp_ms:2,tls_ms:6,server_ms:20,transfer_ms:10,
