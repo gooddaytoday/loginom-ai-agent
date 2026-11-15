@@ -203,7 +203,7 @@ page = context.pages()[0]
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
-  if(expected.nodes.some(n=>n.type==='control.supernode'))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
+  if(expected.nodes.some(n=>n.type==='control.supernode')&&expected.outputs.some(o=>o.output_node_type==='control.supernode'))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
    platform:compatibilityPlatform,makeWorkspacePrepareCode,record});
   await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
