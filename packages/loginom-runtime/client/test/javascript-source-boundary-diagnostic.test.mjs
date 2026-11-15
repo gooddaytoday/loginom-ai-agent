@@ -6,9 +6,18 @@ import {createJavascriptSourceAdmission} from '../lib/javascript-source-admissio
 import {createRedactor} from '../lib/redact.mjs';
 import {makeJavascriptManagedDeactivationPointCode} from '../lib/javascript-managed-deactivation.mjs';
 
-function fixture(fault){
+function fixture(fault,{nested=false,wizard=false,foreign=false}={}){
+ class ModelNodeTreeNode{};class WizardTreeNode{};class WizardModelComponentForm{};
  const document={},packageNode={},workflow={ParentNode:packageNode},nodeData={},cell={},model={FDiagram:{FmxGraph:{}}};
+ if(nested)workflow.ParentNode={ParentNode:Object.assign(new ModelNodeTreeNode(),{
+  ParentNode:packageNode,FGuid:'submodel',FModelNode:{}})};
  const native={FGuid:'node',data:nodeData,FCell:cell},card={Controller:{Node:{data:{node:workflow}},FController:model}};
+ const root={isConnected:true,getBoundingClientRect:()=>({width:100,height:100}),querySelectorAll:()=>[]};
+ if(wizard){
+  const tree=Object.assign(new ModelNodeTreeNode(),{ParentNode:workflow,FGuid:foreign?'foreign':'node',FModelNode:nodeData});
+  card.Controller.Node.data.node=Object.assign(new WizardTreeNode(),{ParentNode:tree});
+  card.Controller.FController=Object.assign(new WizardModelComponentForm(),{FModelNode:nodeData,FView:{el:{dom:root}}});
+ }
  const tab={classList:{contains:()=>true}},receipt={phase:'verified',workflowId:'flow',nodeTargetWorkflowNode:workflow,packageNode,tab};
  const preparation={document,id:'doc',receipts:new Map([['owner',receipt]])};
  const task={operation_id:'managed',owner:{document_id:'doc',workflow_id:'flow',node_id:'node'},
@@ -21,10 +30,12 @@ function fixture(fault){
  const crumbs=Array.from({length:fault==='count'?4:1},()=>({
   getAttribute:()=>fault==='tid'?'PRIVATE_ACTUAL_PATH':'PRIVATE_EXPECTED_PATH',
   textContent:fault==='label'?'PRIVATE_ACTUAL_LABEL':'PRIVATE_EXPECTED_LABEL'}));
+ if(wizard)crumbs.push(...Array.from({length:2},()=>({getAttribute:()=>'',textContent:''})));
  document.querySelectorAll=selector=>selector.includes(task.workflow_ref.tab_tid)?[tab]
-  :selector.includes('cnrNaviMode')?crumbs:[];
+  :selector.includes('cnrNaviMode')?crumbs:selector.includes(';WizrdMCF')?[root]:[];
  const context={document,__loginomDockPreparationV1:preparation,location:{origin:task.targetOrigin},
-  bg:{app:{Version:task.targetBuild,Application:{FInstance:{FMainForm:{
+  getComputedStyle:()=>({visibility:'visible'}),
+  bg:{app:{Version:task.targetBuild,ModelNodeTreeNode,WizardTreeNode,Application:{FInstance:{FMainForm:{
    FMapTree:{FServerConnection:{UserName:'account'}},Items:{Workspace:{getActiveTab:()=>card}}}}}}}};
  const calls=[],page={
   [Symbol.for('loginom-dock.javascript-owned-selection-v1')]:new Map([[task.operation_id,{
@@ -35,6 +46,19 @@ function fixture(fault){
  const read=async()=>JSON.parse(JSON.stringify(await run(page)));
  return {read,run:()=>waitManagedJavascriptWizardSettlement({task,execute:read,record:async e=>e}),calls,task,page};
 }
+
+for(const wizard of [false,true])test('REST query encoder settlement stays inside its nested workflow: '+(wizard?'wizard':'graph'),async()=>{
+ const f=fixture('valid',{nested:true,wizard}),result=await f.read();
+ assert.equal(result.native_owner_verified,true);
+ assert.equal(result.surface,wizard?'wizard':'graph');
+ assert.equal(result.ready,wizard);
+ assert.deepEqual(f.calls,['evaluate']);
+});
+
+test('nested encoder settlement still refuses a foreign wizard node',async()=>{
+ const f=fixture('valid',{nested:true,wizard:true,foreign:true});
+ await assert.rejects(f.read(),/current native owner changed/);
+});
 
 test('navigation diagnostics add no browser read and preserve transport errors',async()=>{
  const f=fixture('valid'),result=await f.read();
