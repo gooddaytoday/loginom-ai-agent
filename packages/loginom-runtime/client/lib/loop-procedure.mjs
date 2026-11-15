@@ -32,7 +32,14 @@ export function readLoopSourceBrowser(t){
   const ps=n.FPorts.flatMap(g=>g.FCollection);
   need(ps.length===2&&ps.every(p=>p.parent===n&&p.FCell.parent===n.FCell&&p.FSubType===1&&[0,1].includes(p.FType)),'one table input/output without variables required');
   return [0,1].map(direction=>{const p=one(ps.filter(p=>p.FType===direction));
-   need(p.FPortIndex===0&&typeof p.FGuid==='string'&&typeof p.FDisplayName==='string','port identity unavailable');
+   let zero=p.FPortIndex===0;
+   if(p.FPortIndex===undefined){
+    const g=d.FmxGraph,e=g?.view?.getState(p.FCell)?.shape?.node,tid=e?.getAttribute('data-tid');
+    zero=typeof tid==='string'&&tid.startsWith(t.workflow_ref.prefix+';Graph;')
+     &&tid.endsWith(';'+(direction===0?'Input':'Output')+'_Data-0')&&g.container.contains(e)
+     &&g.container.querySelectorAll('[data-tid='+JSON.stringify(tid)+']').length===1;
+   }
+   need(zero&&typeof p.FGuid==='string'&&typeof p.FDisplayName==='string','port identity unavailable');
    return {direction:direction===0?'input':'output',index:0,guid:p.FGuid,label:p.FDisplayName,kind:'table'};});
  };
  const result={body:{...t.body},label:body.FLabel.FRawValue,proxy:{...body.data.__ObjectId},ports:ports(body)};

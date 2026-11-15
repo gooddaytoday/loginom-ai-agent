@@ -53,7 +53,7 @@ function sourceFixture(){
  const context={document,location:{origin:'https://app.loginom.ai'},__loginomDockPreparationV1:preparation,bg:{app}};
  const task={document_id:'doc',workflow_ref:request.workflow_ref,body,loop:{...body,node_id:'loop'},origin:'https://app.loginom.ai',build:'7.4.2'};
  const run=()=>vm.runInNewContext('('+readLoopSourceBrowser.toString()+')(task)',{...context,task});
- return {source,loop,tree,w,preparation,task,run};
+ return {source,loop,tree,w,preparation,task,run,diagram:model.FDiagram};
 }
 test('live port replacements and added variables refuse before target mutation',()=>{
  const f=sourceFixture();assert.equal(f.run().actual_ports[0].guid,'port0');
@@ -99,4 +99,17 @@ test('unfinished Loop can be configured on the same target without claiming live
  delete f.task.allow_unconfigured;assert.throws(f.run,/without variables/);
  const partial=sourceFixture();partial.loop.FPorts[0].FCollection.pop();partial.task.allow_unconfigured=true;
  assert.throws(partial.run,/without variables/);
+});
+
+test('reopened single-table body binds an absent native index to its exact rendered Data-0',()=>{
+ const f=sourceFixture();f.loop.FPorts=[];f.task.allow_unconfigured=true;
+ const ports=f.source.FPorts[0].FCollection,shapes=new Map();
+ for(const p of ports){delete p.FPortIndex;shapes.set(p.FCell,{getAttribute:()=>`MF;TF-1;Graph;Same;${p.FType===0?'Input':'Output'}_Data-0`});}
+ const container={contains:e=>[...shapes.values()].includes(e),querySelectorAll:()=>[{}]};
+ const diagram={FNodes:{FCollection:[f.source,f.loop]},FmxGraph:{container,view:{getState:cell=>({shape:{node:shapes.get(cell)}})}}};
+ // Use the same native diagram object captured by the fixture's active model.
+ Object.assign(f.diagram,diagram);
+ assert.equal(f.run().actual_ports.length,0);
+ shapes.get(ports[0].FCell).getAttribute=()=> 'MF;TF-1;Graph;Same;Input_Data-1';
+ assert.throws(f.run,/port identity/);
 });
