@@ -64,3 +64,26 @@ test("Windows environment keeps mixed-case OS/proxy keys with one canonical spel
   })
   expect(runtimeEnvironment({ SystemRoot: "mixed", SYSTEMROOT: "exact" }, "linux")).toEqual({ SYSTEMROOT: "exact" })
 })
+
+test("Unix runtime preserves lowercase proxy, CA and bypass keys without model settings", () => {
+  expect(
+    runtimeEnvironment({
+      http_proxy: "http://proxy.test:8080",
+      https_proxy: "http://tls-proxy.test:8080",
+      all_proxy: "http://fallback.test:8080",
+      no_proxy: "127.0.0.1,.internal",
+      SSL_CERT_FILE: "/fixture/system.pem",
+      SSL_CERT_DIR: "/fixture/certs",
+      NODE_OPTIONS: "--untrusted",
+      ANTHROPIC_API_KEY: "fixture-provider",
+      LOGINOM_AI_AGENT_SYSTEM_PROXY: "on",
+    }, "linux"),
+  ).toEqual({
+    http_proxy: "http://proxy.test:8080",
+    https_proxy: "http://tls-proxy.test:8080",
+    all_proxy: "http://fallback.test:8080",
+    no_proxy: "127.0.0.1,.internal",
+    SSL_CERT_FILE: "/fixture/system.pem",
+    SSL_CERT_DIR: "/fixture/certs",
+  })
+})

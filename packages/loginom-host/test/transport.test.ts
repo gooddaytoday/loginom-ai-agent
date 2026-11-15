@@ -1,5 +1,26 @@
 import { expect, test } from "bun:test"
 import { supervise } from "../src/supervisor"
+import { hostFailure } from "../src/errors"
+
+test("cloud private failures preserve exact safe codes and discard secret-bearing details", () => {
+  for (const code of [
+    "LOGINOM_CLOUD_CONNECTION_REQUIRED",
+    "LOGINOM_CLOUD_ALREADY_CONNECTED",
+    "LOGINOM_CLOUD_UNAVAILABLE",
+    "LOGINOM_CLOUD_PROTOCOL_INVALID",
+    "LOGINOM_CLOUD_ACCESS_DENIED",
+    "LOGINOM_CLOUD_EXPIRED",
+    "LOGINOM_CLOUD_REVOKE_UNCONFIRMED",
+  ]) {
+    const failure = Object.assign(new Error(code, { cause: Error("PRIVATE-TOKEN-CANARY") }), {
+      details: { token: "PRIVATE-TOKEN-CANARY" },
+    })
+    expect(hostFailure(failure)).toEqual({ error: code })
+  }
+  expect(hostFailure(new Error("LOGINOM_CLOUD_ARBITRARY: PRIVATE-TOKEN-CANARY"))).toEqual({
+    error: "LOGINOM_HOST_REQUEST_FAILED",
+  })
+})
 
 test("private disconnect rejects pending and future requests without waiting for timeout", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE

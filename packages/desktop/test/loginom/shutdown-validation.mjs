@@ -31,10 +31,9 @@ async function processes() {
 for (const phase of ["navigation", "login-form"]) {
   const profile = await mkdtemp(join(tmpdir(), "desktop-validation-shutdown-"))
   const cleanup = []
-  // The tested executable carries the knowledge key it was built with.
   const help = await knowledgeServer(
     { after: (callback) => cleanup.push(callback) },
-    { apiKey: process.env.LOGINOM_MCP_API_KEY ?? "UNIT-NONSECRET" },
+    { apiKey: "UNIT-NONSECRET" },
   )
   const entered = Promise.withResolvers()
   const release = Promise.withResolvers()
@@ -83,7 +82,6 @@ for (const phase of ["navigation", "login-form"]) {
         LOGINOM_AI_AGENT_TEST_ROOT: profile,
         LOGINOM_AI_AGENT_TEST_ONBOARDING: "1",
         LOGINOM_AI_AGENT_TEST_HEADLESS: "1",
-        LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT: help.endpoint,
         LOGINOM_AI_AGENT_SYSTEM_PROXY: "off",
       },
     })
@@ -100,10 +98,11 @@ for (const phase of ["navigation", "login-form"]) {
     const electronCdpPort = Number((await readFile(join(data, "DevToolsActivePort"), "utf8")).split("\n")[0])
     if (!Number.isInteger(electronCdpPort) || electronCdpPort < 1) throw Error("ELECTRON_CDP_PORT_UNKNOWN")
     ports.add(electronCdpPort)
-    const checking = page.evaluate(async (url) => {
+    const checking = page.evaluate(async ({ url, endpoint }) => {
       const current = await window.api.loginom.read()
       try {
         return await window.api.loginom.check({
+          mode: "custom", endpoint, apiKey: { operation: "replace", value: "UNIT-NONSECRET" },
           revision: current.revision,
           url,
           username: "user",
@@ -112,7 +111,7 @@ for (const phase of ["navigation", "login-form"]) {
       } catch {
         return "cancelled"
       }
-    }, `http://127.0.0.1:${http.address().port}/app/`)
+    }, { url: `http://127.0.0.1:${http.address().port}/app/`, endpoint: help.endpoint })
     void checking.catch(() => {})
     await bounded(
       Promise.race([

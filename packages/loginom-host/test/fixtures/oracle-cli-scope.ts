@@ -5,6 +5,11 @@ import { join } from "node:path"
 // an unprepared receipt stops the driver before any browser or signal target.
 const profile = process.env.LOGINOM_AI_AGENT_CLI_PROFILE!
 if (process.argv.includes("setup")) {
+  if (process.env.LOGINOM_ORACLE_SETUP_REPORT) {
+    const chunks: Buffer[] = []
+    for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk))
+    await Bun.write(process.env.LOGINOM_ORACLE_SETUP_REPORT, Buffer.concat(chunks))
+  }
   await mkdir(join(profile, "config"), { recursive: true })
   console.log("{}")
   process.exit(0)

@@ -13,7 +13,7 @@ export async function cliOracleTransport(options: {
   profile?: string
   csv?: string
   resume?: { profile: string; workspace: string; session: string; latest?: boolean; prompt: string }
-  connection: { apiKey: string; password: string; username: string; url: string }
+  connection: { endpoint: string; apiKey: string; password: string; username: string; url: string }
 }) {
   await mkdir(options.directory, { recursive: true, mode: 0o700 })
   if (!options.resume && typeof options.csv !== "string") throw Error("CLI_ORACLE_INPUT_REQUIRED")
@@ -26,7 +26,7 @@ export async function cliOracleTransport(options: {
   if (!options.resume && !options.profile) {
     const setup = Bun.spawn([options.executable, "loginom", "setup", "--stdin-json", "--format", "json"], {
       env,
-      stdin: new Blob([JSON.stringify(options.connection)]),
+      stdin: new Blob([JSON.stringify({ ...options.connection, mode: "custom" })]),
       stdout: "pipe",
       stderr: "pipe",
     })

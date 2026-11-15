@@ -6,6 +6,7 @@ import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promi
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { stageResources } from "./stage-resources"
 import { buildNodeHost } from "./build-node-host"
+import { cloudBuild } from "./cloud-build"
 import { buildCliInstaller } from "./build-cli-installer"
 import { collectBuildNotices } from "./collect-build-notices"
 import { writeCliManifest, verifyCliManifest } from "../src/cli-manifest"
@@ -16,6 +17,7 @@ import bunNativeNotices from "../licenses/bun/native/sources.json"
 import webkitSource from "../licenses/bun/webkit-source.json"
 import chromiumNotice from "../licenses/chromium/source.json"
 
+const endpoints = cloudBuild(process.env)
 const repo = resolve(import.meta.dir, "../../..")
 const args = process.argv.slice(2)
 const destination = args[0]
@@ -77,10 +79,9 @@ try {
       browsers,
       target: { platform: process.platform, arch: process.arch },
       flavor: "cli",
-      knowledgeKey: process.env.LOGINOM_MCP_API_KEY,
     }),
   )
-  await buildPhase("cli-node-host", () => buildNodeHost(join(resources, "host")))
+  await buildPhase("cli-node-host", () => buildNodeHost(join(resources, "host"), endpoints))
   await buildPhase("cli-installer", () => buildCliInstaller(artifact, process.platform as "linux" | "darwin" | "win32"))
   await buildPhase("cli-notices", async () =>
     collectBuildNotices(join(artifact, "licenses/bundled-npm"), [

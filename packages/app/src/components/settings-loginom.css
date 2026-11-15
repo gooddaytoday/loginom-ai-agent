@@ -26,3 +26,10 @@
 [data-component="settings-loginom"] .loginom-feedback[data-failed="true"] {
   color: var(--text-on-critical-base);
 }
+
+[data-component="settings-loginom"] [data-component$="-card"] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}

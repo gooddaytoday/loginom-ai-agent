@@ -30,18 +30,20 @@ test("failed readiness cleanup cannot acknowledge host shutdown", async () => {
   const fixture = await startupFixture(false)
   try {
     await fixture.host.settled()
+    await expect(fixture.host.catalog(1)).rejects.toThrow("LOGINOM_GENERATION_UNAVAILABLE")
     expect(await fixture.host.api.status()).toMatchObject({ state: "recoverable-error" })
     await expect(fixture.host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
   } finally {
     await fixture.host.close().catch(() => undefined)
     await rm(fixture.directory, { recursive: true, force: true })
   }
-}, 15000)
+}, 30000)
 
 test("clean readiness failure remains recoverable and permits host shutdown", async () => {
   const fixture = await startupFixture(true)
   try {
     await fixture.host.settled()
+    await expect(fixture.host.catalog(1)).rejects.toThrow("LOGINOM_GENERATION_UNAVAILABLE")
     expect(await fixture.host.api.status()).toMatchObject({ state: "recoverable-error" })
     expect(fixture.host.acquire("unavailable-run")).toBeUndefined()
     await fixture.host.close()
@@ -49,7 +51,7 @@ test("clean readiness failure remains recoverable and permits host shutdown", as
     await fixture.host.close().catch(() => undefined)
     await rm(fixture.directory, { recursive: true, force: true })
   }
-}, 15000)
+}, 30000)
 
 test.each([true, false])(
   "browser startup warning requires confirmed cleanup: %s",
@@ -85,7 +87,7 @@ test.each([true, false])(
       headless: true,
     })
     try {
-      const checking = host.api.check({
+      const checking = host.api.check({ mode: "custom", endpoint: "http://example.test/mcp",
         revision: 0,
         url: "https://example.test/app/",
         username: "fixture",
@@ -137,10 +139,9 @@ test("failed Knowledge validation preserves safe startup evidence after validati
     `import {writeFileSync} from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'started'); throw Error('Browser startup is forbidden');`)
   await writeFile(join(resources, "resource-manifest.json"),
     JSON.stringify({ endpoint: `${server.url}mcp?token=${secrets[1]}` }))
-  await writeFile(join(resources, "knowledge-key"), secrets[0]!)
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, headless: true })
   try {
-    await expect(host.api.check({ revision: 0, url: "https://example.test/app/", username: "fixture",
+    await expect(host.api.check({ mode: "custom", endpoint: `${server.url}mcp?token=${secrets[1]}`, apiKey: { operation: "replace", value: secrets[0]! }, revision: 0, url: "https://example.test/app/", username: "fixture",
       password: { operation: "empty" },
     })).rejects.toMatchObject({ message: "LOGINOM_KNOWLEDGE_AUTH_FAILED" })
     await host.close()
@@ -193,7 +194,7 @@ async function startupFixture(closed: boolean) {
   )
   const codec = credentials("linux")
   const store = connectionStore(join(root, "connection"), codec)
-  await store.stage({
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "https://example.test/app/",

@@ -2,7 +2,7 @@ import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { appendFile, mkdir, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
-import { hostError, hostException } from "./errors"
+import { hostError, hostException, knowledgeFailure } from "./errors"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
@@ -13,8 +13,8 @@ export type Launch = {
   stateDir: string
   generation: number
   chat: string
-  endpoint: string
-  connection: { apiKey: string; password: string; url: string; username: string }
+  endpoint?: string
+  connection: { apiKey?: string; password: string; url: string; username: string }
   actionManifestUri?: string
   actionManifestSha256?: string
   validation?: boolean
@@ -30,8 +30,8 @@ export type Launch = {
   startupDeadline?: number
 }
 
-type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[] }
-export type KnowledgeLaunch = ProcessLaunch & Pick<Launch, "endpoint"> & { apiKey: string }
+type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment"> & { diagnosticSecrets?: string[]; knowledge?: boolean }
+export type KnowledgeLaunch = ProcessLaunch & { endpoint: string; apiKey: string; deadline?: number }
 
 export class RuntimeStartupError extends Error {
   constructor(
@@ -108,8 +108,23 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   // Browser validation follows the separate key-only Help check in Host.
   const runtime = await superviseProcess(
-    { ...input, diagnosticSecrets: [input.connection.apiKey, input.connection.password, input.connection.username] },
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, diagnosticSecrets: [input.connection.password, input.connection.username] },
+    {
+      protocol: 1,
+      resources: input.resources,
+      stateDir: input.stateDir,
+      generation: input.generation,
+      chat: input.chat,
+      connection: { password: input.connection.password, url: input.connection.url, username: input.connection.username },
+      actionManifestUri: input.actionManifestUri,
+      actionManifestSha256: input.actionManifestSha256,
+      validation: input.validation,
+      headless: input.headless,
+      acceptanceCleanupPackage: input.acceptanceCleanupPackage,
+      closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown,
+      browserRecovery: input.browserRecovery,
+      startupDeadline: input.startupDeadline,
+    },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
     input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 5000,
@@ -130,15 +145,17 @@ export async function supervise(input: Launch, signal?: AbortSignal) {
 }
 
 export async function superviseKnowledge(input: KnowledgeLaunch, signal?: AbortSignal) {
+  const deadline = input.deadline ?? Date.now() + 120_000
   const runtime = await superviseProcess(
-    { ...input, diagnosticSecrets: [input.apiKey] },
+    { ...input, diagnosticSecrets: [input.apiKey], knowledge: true },
     {
       protocol: 1,
       generation: input.generation,
       endpoint: input.endpoint,
       apiKey: input.apiKey,
+      deadline,
     },
-    120_000,
+    Math.max(1, deadline - Date.now()),
     signal,
   )
   const ready = runtime.ready
@@ -215,7 +232,8 @@ async function superviseProcess(
     }
     if ("error" in message) {
       startupFailure.value ??= knowledgeStartupFailure("startupFailure" in message ? message.startupFailure : undefined)
-      request.reject(
+      const failure = knowledgeFailure(message)
+      request.reject(Object.assign(
         hostError(message) !== "LOGINOM_HOST_REQUEST_FAILED"
           ? hostException(message)
           : new Error(
@@ -223,25 +241,37 @@ async function superviseProcess(
                 ? message.error
                 : "LOGINOM_RUNTIME_FAILED",
             ),
-      )
+        failure ? { knowledgeFailure: failure } : {},
+      ))
       return
     }
     request.resolve("result" in message ? message.result : undefined)
   })
-  function request(operation: string, value?: unknown, timeout = 120_000) {
+  function request(operation: string, value?: unknown, timeout = 120_000, signal?: AbortSignal) {
+    if (signal?.aborted) return Promise.reject(signal.reason)
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
+    if (timeout <= 0) return Promise.reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
-      }, timeout)
-      pending.set(id, { resolve, reject, timer })
-      child.send({ id, operation, input: value }, (error) => {
-        if (error) fail()
-      })
+      const stop = (error: Error) => {
+        if (!pending.delete(id)) return
+        cleanup()
+        if (input.knowledge && operation === "call" && value && typeof value === "object" && "run" in value && "id" in value)
+          child.send({ id: randomUUID(), operation: "interrupt", input: { run: value.run, id: value.id } }, () => {})
+        reject(error)
+      }
+      const abort = () => stop(signal?.reason instanceof Error ? signal.reason : Error("LOGINOM_KNOWLEDGE_INTERRUPTED"))
+      const timer = setTimeout(() => stop(Error("LOGINOM_RUNTIME_TIMEOUT")), timeout)
+      const cleanup = () => {
+        clearTimeout(timer)
+        signal?.removeEventListener("abort", abort)
+      }
+      pending.set(id, { timer, resolve(value) { cleanup(); resolve(value) }, reject(error) { cleanup(); reject(error) } })
+      signal?.addEventListener("abort", abort, { once: true })
+      child.send({ id, operation, input: value }, (error) => { if (error) fail() })
     })
   }
+
   const closing: { promise?: Promise<void> } = {}
   function close() {
     if (closing.promise) return closing.promise

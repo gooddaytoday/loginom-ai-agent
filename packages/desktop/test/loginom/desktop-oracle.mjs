@@ -42,6 +42,7 @@ try {
   await page.evaluate(async (connection) => {
     const current = await window.api.loginom.read()
     const validation = await window.api.loginom.check({
+      mode: "custom", endpoint: connection.endpoint, apiKey: { operation: "replace", value: connection.apiKey },
       revision: current.revision,
       url: connection.url,
       username: connection.username,

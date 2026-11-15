@@ -47,13 +47,17 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
       join(resources, "runtime/src/knowledge-entry.mjs"),
     )
     await Bun.write(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: server.endpoint }))
-    await Bun.write(join(resources, "knowledge-key"), "UNIT-NONSECRET")
     await Bun.write(
       join(resources, "runtime/src/managed-entry.mjs"),
       `
       import { appendFileSync } from 'node:fs';
       process.on('message', m => {
         if (m.operation === 'start') {
+          if ('endpoint' in m.input || 'apiKey' in m.input.connection
+            || process.argv.join(' ').includes('UNIT-NONSECRET') || Object.values(process.env).includes('UNIT-NONSECRET')) {
+            process.send({id:m.id,error:'LOGINOM_HANDSHAKE_INVALID'});
+            return;
+          }
           appendFileSync(${JSON.stringify(join(directory, "startup.json"))}, JSON.stringify({deadline:m.input.startupDeadline})+'\\n');
           process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true,checked:true}});
         }
@@ -66,7 +70,7 @@ test.each(["ready", "retry", "twice", "semantic", "deadline", "release", "interr
     `,
     )
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({
+    await store.stage({ mode: "custom", endpoint: server.endpoint,
       generation: 1,
       revision: 1,
       url: "http://example.test",

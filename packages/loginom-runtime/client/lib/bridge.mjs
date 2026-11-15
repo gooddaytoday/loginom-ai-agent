@@ -105,6 +105,8 @@ export async function createBridge(config, session, { browserTransport: managedB
     throw Error('Invalid private browser recovery policy');
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
+  const localOnly = config.mode === 'executor-replay' && userProfile
+    && config.bundledCatalog === true && !!managedBrowserTransport;
   const userWorkflows = createUserWorkflowBindings();
   let userBundleDelivered = false;
   const logResult = async (tool, result) => {
@@ -159,10 +161,14 @@ export async function createBridge(config, session, { browserTransport: managedB
     metadata: session.metadata, redactor });
   const startup = catalogStartup(startupOptions);
   try {
-    const connections = await Promise.allSettled([connectRemote(() => ({ client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport() }), { startup }).then(client => { remote = client; }), browser.connect(browserTransport)]);
+    const connecting = [browser.connect(browserTransport)];
+    if (!localOnly) connecting.push(connectRemote(() => ({
+      client: new Client({ name: 'loginom-dock', version: session.metadata.client }), transport: remoteTransport(),
+    }), { startup }).then(client => { remote = client; }));
+    const connections = await Promise.allSettled(connecting);
     const failed = connections.find(result => result.status === 'rejected');
     if (failed) throw failed.reason;
-    const [remoteTools, browserTools] = await Promise.all([readCatalog(remote, { startup }), readCatalog(browser)]);
+    const [remoteTools, browserTools] = await Promise.all([localOnly ? [] : readCatalog(remote, { startup }), readCatalog(browser)]);
     if (!browserTools.some(tool => tool.name === 'browser_run_code_unsafe')) {
       throw new Error('The pinned browser runtime lacks the verified clipboard execution tool');
     }
@@ -173,7 +179,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         ...(config.bundledCatalog === true ? { releases: BUNDLED_CATALOG_RELEASES } : {}),
       } : {}) });
       pinnedActions = pinned;
-      recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
+      if (!localOnly) recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
       actionRuntime = createActionRuntime({ pinned,
         cacheDirectory:join(session.directory,'server-cache'),
@@ -308,7 +314,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           finally { queue.close(); }
         }
         session.metadata.archiveActive = archive?.active === true;
-        const connection = request.params.arguments?.checkConnections === false ? null : await diagnoseConnection(config);
+        const connection = localOnly || request.params.arguments?.checkConnections === false ? null : await diagnoseConnection(config);
         return { content: [{ type: 'text', text: JSON.stringify({
         ...session.metadata, endpoint: config.endpoint, loginomUrl: config.loginomUrl, toolCatalogSha256: catalog.sha256,
         remoteTools: remoteTools.length, browserTools: browserTools.length,

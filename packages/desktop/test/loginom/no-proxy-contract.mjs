@@ -1,5 +1,7 @@
 import { createServer } from "node:http"
 import { once } from "node:events"
+import { readFile } from "node:fs/promises"
+import assert from "node:assert/strict"
 
 const nodeHttp = await import("node:http")
 
@@ -40,5 +42,13 @@ const proxied = await fetch("http://notexample.test/model", { signal: signal() }
 proxy.close()
 if (direct !== "bypassed" || child !== "bypassed" || !seen.some((url) => url.includes("notexample.test"))) {
   throw new Error(`NO_PROXY_CONTRACT direct=${direct} child=${child} body=${proxied} seen=${seen.join(",")}`)
+}
+
+// Source guards; bundled Desktop first-shell-request and native Chromium remain separate acceptance gates.
+const main = await readFile(new URL("../../src/main/index.ts", import.meta.url), "utf8")
+assert.doesNotMatch(main, /logger\.warn\("failed to load proxy environment",/)
+assert.match(main, /const shellEnv = preferAppEnv\(app.getPath\("userData"\)\)\s+useEnvProxy\(\)/)
+for (const path of ["../../../loginom-runtime/src/connection-check.mjs", "../../../loginom-runtime/client/lib/session.mjs"]) {
+  assert.match(await readFile(new URL(path, import.meta.url), "utf8"), /["']--no-proxy-server["']/)
 }
 console.log(JSON.stringify({ status: "PASS", runtime: process.versions.bun ? "bun" : "node", node: process.versions.node }))

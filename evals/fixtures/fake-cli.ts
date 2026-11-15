@@ -125,7 +125,7 @@ if (command === "loginom") {
   const stateFile = process.env.EVAL_FAKE_STATE_FILE ?? (await Bun.file(transitionState).exists() ? transitionState : undefined)
   const view = stateFile
     ? ((await Bun.file(stateFile).json()) as Record<string, unknown>)
-    : { state: "ready", hasApiKey: true, revision: 1, generation: 1 }
+    : { state: "ready", mode: "custom", endpoint: "https://x/mcp", help: { state: "ready" }, hasApiKey: true, revision: 1, generation: 1 }
   if (sub === "setup" && process.env.LOGINOM_AI_AGENT_CLI_PROFILE) {
     await Bun.write(
       path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE, "cli-profile.json"),
@@ -134,11 +134,18 @@ if (command === "loginom") {
     await Bun.write(path.join(process.env.LOGINOM_AI_AGENT_CLI_PROFILE, "setup-called"), "1")
   }
   const candidate = sub === "setup" && Bun.argv.includes("--stdin-json") ? await Bun.stdin.json() as Record<string, unknown> : undefined
+  if (sub === "setup" && (!candidate || candidate.mode !== "custom" || typeof candidate.endpoint !== "string" ||
+    !/^https?:\/\/.+\/mcp$/.test(candidate.endpoint) || typeof candidate.apiKey !== "string" || !candidate.apiKey)) {
+    process.stderr.write("custom mode, endpoint and apiKey required\n")
+    process.exit(2)
+  }
+  if (candidate && process.env.EVAL_FAKE_SETUP_INPUT_FILE)
+    await Bun.write(process.env.EVAL_FAKE_SETUP_INPUT_FILE, JSON.stringify(candidate))
   const setup = sub === "setup" && process.env.EVAL_FAKE_SETUP_FILE
     ? await Bun.file(process.env.EVAL_FAKE_SETUP_FILE).json() as { reply: unknown; state: unknown } : undefined
   const next =
     sub === "setup" && stateFile
-      ? setup?.state ?? { state: "ready", hasApiKey: true, ...(candidate ? { url: candidate.url, username: candidate.username } : {}) }
+      ? setup?.state ?? { state: "ready", mode: "custom", endpoint: candidate?.endpoint, help: { state: "ready" }, hasApiKey: true, ...(candidate ? { url: candidate.url, username: candidate.username } : {}) }
       : sub === "recover"
         ? process.env.EVAL_FAKE_RECOVERY_PERSISTS ? view : { ...view, recoveries: [] }
         : view

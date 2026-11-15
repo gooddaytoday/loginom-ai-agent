@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
+import type { CallBudget } from "./cloud-auth"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
@@ -6,6 +7,7 @@ import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
+import { RuntimeStartupError } from "./supervisor"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
 
@@ -55,6 +57,23 @@ function catalogTools(input: unknown) {
   return input.tools
 }
 
+function recoverableCatalogFailure(error: unknown) {
+  return (
+    error instanceof Error &&
+    [
+      "LOGINOM_KNOWLEDGE_AUTH_FAILED",
+      "LOGINOM_KNOWLEDGE_UNAVAILABLE",
+      "LOGINOM_KNOWLEDGE_FAILED",
+      "LOGINOM_KNOWLEDGE_CATALOG_INVALID",
+      "LOGINOM_CLOUD_UNAVAILABLE",
+      "LOGINOM_CLOUD_PROTOCOL_INVALID",
+      "LOGINOM_CLOUD_CONNECTION_REQUIRED",
+      "LOGINOM_STORE_WRITE_FAILED",
+    ].includes(error.message) &&
+    (!(error instanceof RuntimeStartupError) || error.cleanupConfirmed)
+  )
+}
+
 export type HostPort = {
   postMessage(value: unknown): void
   on(event: "message", listener: (event: { data: unknown }) => void): void
@@ -81,6 +100,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       catalog: Set<string>
       admitted: Set<string>
       packagePreparation?: AbortController
+      knowledge: Map<string, AbortController>
       // Operation of a browser recovery attempt that still holds the page.
       recovery?: string
     }
@@ -131,39 +151,48 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     id: string,
     run: NonNullable<ReturnType<typeof runs.get>>,
     preparation?: { deadline: number; signal: AbortSignal; waited: boolean },
+    inputBudget?: CallBudget,
   ) {
     if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
     if (run.lease) return run.lease
     const status = await service.api.status()
     if (run.lease) return run.lease
     if (!status.generation) throw new Error("LOGINOM_CONFIG_REQUIRED")
-    if (preparation && status.state === "starting") {
-      // Reuse this generation's startup request; it spends the prepare budget.
-      preparation.waited = true
-      const remaining = preparation.deadline - Date.now()
+    if (
+      (status.state === "starting" && (preparation || (inputBudget && service.recoveringKnowledge(status.generation)))) ||
+      status.help.state === "recoverable-error"
+    ) {
+      const budget = preparation ??
+        inputBudget ?? { deadline: Date.now() + 120_000, signal: AbortSignal.timeout(120_000) }
+      if (preparation) preparation.waited = true
+      const remaining = budget.deadline - Date.now()
       if (remaining <= 0) throw new Error("LOGINOM_CONNECTION_NOT_READY")
-      const cancelled = () => state.closed || run.released || preparation.signal.aborted
+      const cancelled = () => state.closed || run.released || budget.signal.aborted
       if (cancelled()) throw new Error("LOGINOM_CONNECTION_NOT_READY")
       let timer: ReturnType<typeof setTimeout> | undefined
       let abort: (() => void) | undefined
       try {
         await Promise.race([
-          service.catalog(status.generation),
+          service.catalog(status.generation, budget),
           new Promise<never>((_, reject) => {
-            abort = () => reject(new Error("LOGINOM_CONNECTION_NOT_READY"))
+            abort = () => reject(inputBudget?.signal.aborted ? inputBudget.signal.reason : new Error(inputBudget ? "LOGINOM_RUNTIME_TIMEOUT" : "LOGINOM_CONNECTION_NOT_READY"))
             timer = setTimeout(abort, remaining)
-            preparation.signal.addEventListener("abort", abort, { once: true })
+            budget.signal.addEventListener("abort", abort, { once: true })
           }),
-        ])
+        ]).catch((error: unknown) => {
+          if (preparation && !cancelled() && Date.now() < budget.deadline && recoverableCatalogFailure(error))
+            throw new Error("LOGINOM_CONNECTION_NOT_READY", { cause: error })
+          throw error
+        })
       } finally {
         clearTimeout(timer)
-        if (abort) preparation.signal.removeEventListener("abort", abort)
+        if (abort) budget.signal.removeEventListener("abort", abort)
       }
       const current = await service.api.status()
       if (
         cancelled() ||
         runs.get(id) !== run ||
-        Date.now() >= preparation.deadline ||
+        Date.now() >= budget.deadline ||
         current.generation !== status.generation ||
         current.state !== "ready"
       )
@@ -242,6 +271,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             applyingScope: false,
             catalog: new Set([prepareTool.name]),
             admitted: new Set(),
+            knowledge: new Map(),
           })
           reply({ id: data.id, result: { generation: status.generation } })
         } finally {
@@ -254,6 +284,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       if (data.method === "release") {
         run.released = true
         run.packagePreparation?.abort()
+        run.knowledge.forEach(controller => controller.abort(Error("LOGINOM_KNOWLEDGE_INTERRUPTED")))
         if (!run.calls) {
           await release(input.run, run)
         }
@@ -371,6 +402,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           : undefined
       const packageAborted = () =>
         packageInput && (state.closed || run.released || run.packagePreparation?.signal.aborted)
+      const knowledge = data.method === "tools" || (data.method === "call" && "name" in input && typeof input.name === "string" && knowledgeTools.has(input.name))
+        ? new AbortController() : undefined
+      if (knowledge) run.knowledge.set(data.id, knowledge)
+      const knowledgeTimer = knowledge ? setTimeout(() => knowledge.abort(Error("LOGINOM_RUNTIME_TIMEOUT")), Math.max(0, started + 120_000 - Date.now())) : undefined
+      const knowledgeBudget = { deadline: started + 120_000, signal: knowledge?.signal ?? new AbortController().signal,
+        recovery: { refreshed: false, switched: false } }
       if (browserCall || referenceCall) run.browserDispatching = true
       run.calls++
       try {
@@ -379,17 +416,28 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           const automation = run.scope?.profile === "loginom-automation"
           const generation = run.lease?.generation ?? status.generation
           const knowledge =
-            run.lease || status.state === "ready"
-              ? catalogTools(await service.catalog(generation).catch(() => ({ tools: [] }))).filter((tool) =>
-                  knowledgeTools.has(tool.name),
-                )
+            (status.mode === "custom" || status.cloud.connected) &&
+            (run.lease ||
+              status.help.state === "ready" ||
+              service.recoveringKnowledge(generation) ||
+              status.help.state === "recoverable-error")
+              ? await service.catalog(generation, knowledgeBudget)
+                  .then((value) => catalogTools(value).filter((tool) => knowledgeTools.has(tool.name)))
+                  .catch((error: unknown) => {
+                    if (
+                      state.closed || run.released || knowledgeBudget.signal.aborted ||
+                      Date.now() >= knowledgeBudget.deadline || !recoverableCatalogFailure(error)
+                    ) throw error
+                    // Remote Help refusal does not hide local diagnostics or automation preparation.
+                    return undefined
+                  })
               : []
           // Listing an existing browser is an external operation; an empty local
           // catalog must remain usable when that connection cannot be leased.
-          if (automation && !run.lease && service.hasRuntime(generation, run.chat))
+          if (knowledge !== undefined && automation && !run.lease && service.hasRuntime(generation, run.chat))
             await connectionLease(input.run, run).catch(() => undefined)
           const listed =
-            automation && run.lease && service.hasRuntime(run.lease.generation, run.chat)
+            knowledge !== undefined && automation && run.lease && service.hasRuntime(run.lease.generation, run.chat)
               ? await (await service.runtime(run.lease.generation, run.chat)).request("list")
               : undefined
           // The runtime lists recovery tools only under its own capability; the host
@@ -404,7 +452,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               id: data.id,
               result: {
                 tools: [
-                  ...knowledge,
+                  ...(knowledge ?? []),
                   ...(automation ? [prepareTool] : []),
                   diagnosticTool,
                   ...browser.filter(
@@ -493,6 +541,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
         if (data.method === "interrupt") {
           run.packagePreparation?.abort()
+          run.knowledge.forEach(controller => controller.abort(Error("LOGINOM_KNOWLEDGE_INTERRUPTED")))
           if (!run.lease) {
             const status = await service.api.status()
             if (service.hasRuntime(status.generation, run.chat)) await connectionLease(input.run, run)
@@ -501,7 +550,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             reply({ id: data.id, result: true })
             return
           }
-          await service.knowledge(run.lease.generation).request("interrupt", { run: `${owner}:${input.run}` })
+          await service.interruptKnowledge(run.lease.generation, { run: `${owner}:${input.run}` })
           if (!service.hasRuntime(run.lease.generation, run.chat)) {
             reply({ id: data.id, result: true })
             return
@@ -520,18 +569,38 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         )
           throw new Error("LOGINOM_CALL_INVALID")
         if (knowledgeTools.has(input.name)) {
-          const lease = await connectionLease(input.run, run)
-          const result = await service.knowledge(lease.generation).request("call", {
-            run: `${owner}:${input.run}`,
-            id: data.id,
-            name: input.name,
-            arguments: "args" in input ? input.args : undefined,
-          })
+          const budget = knowledgeBudget
+          const lease = await connectionLease(input.run, run, undefined, budget)
+          const result = await service.callKnowledge(
+            lease.generation,
+            {
+              run: `${owner}:${input.run}`,
+              id: data.id,
+              name: input.name,
+              arguments: "args" in input ? input.args : undefined,
+            },
+            budget,
+          )
           reply({ id: data.id, result }, lease.generation)
           return
         }
         if (input.name === "dock_diagnostics") {
-          const status = await service.api.status()
+          const view = await service.api.status()
+          const status = {
+            revision: view.revision,
+            generation: view.generation,
+            url: view.url,
+            username: view.username,
+            folder: view.folder,
+            hasPassword: view.hasPassword,
+            state: view.state,
+            browser: view.browser,
+            failure: view.failure,
+            recoveries: view.recoveries,
+            mode: view.mode,
+            server: view.server,
+            help: view.help,
+          }
           reply(
             {
               id: data.id,
@@ -647,6 +716,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
+        clearTimeout(knowledgeTimer)
+        run.knowledge.delete(data.id)
         if (data.method === "call" || referenceCall) {
           run.dispatching = false
           run.packagePreparation = undefined
@@ -676,6 +747,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     runs.forEach((run) => {
       run.released = true
       run.packagePreparation?.abort()
+      run.knowledge.forEach(controller => controller.abort(Error("LOGINOM_HOST_CLOSED")))
     })
     // In-flight operations retain their leases until their finally handlers run.
     state.stopping = Promise.all([...pending]).then(async () => {

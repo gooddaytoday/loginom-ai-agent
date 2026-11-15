@@ -37,12 +37,13 @@ def prepare(repo, home, head, out, started=None, mutate=False, builds=None):
             if builds: builds.wait(timeout=5)
             source = kwargs['cwd'].parents[1]
             assert not runner.git('status', '--porcelain', cwd=source)
-            # The stand key reaches only the build environment, never its argv.
-            assert kwargs['env']['LOGINOM_MCP_API_KEY'] == 'stand-key'
+            # Builds need no stand key and must not embed one.
+            assert 'LOGINOM_MCP_API_KEY' not in kwargs['env']
+            assert 'LOGINOM_DOCK_API_KEY' not in kwargs['env']
             assert not any('stand-key' in str(part) for part in command)
             build = cache / 'cli'
             (build / 'resources/loginom').mkdir(parents=True)
-            (build / 'resources/loginom/knowledge-key').write_text(kwargs['env']['LOGINOM_MCP_API_KEY'])
+            assert not (build / 'resources/loginom/knowledge-key').exists()
             runner.write(build / 'cli-manifest.json', {'metadata': {'sourceCommit': head, 'sourceDirty': False}})
 
     instance.phase = phase
@@ -68,7 +69,6 @@ class BuildPreparationTests(unittest.TestCase):
         (self.home / '.cache/loginom-bootstrap/node/pinned/bin').mkdir(parents=True)
         (self.home / '.cache/loginom-bootstrap/node/pinned/bin/node').touch()
         (self.home / '.config/loginom-ai-agent').mkdir(parents=True)
-        (self.home / '.config/loginom-ai-agent/mcp-api-key').write_text('stand-key\n')
         for args in [('init', '-q'), ('config', 'user.name', 'Test'), ('config', 'user.email', 'test@example.invalid')]:
             runner.git(*args, cwd=self.repo)
         (self.repo / 'packages/cli/bin').mkdir(parents=True)
@@ -137,16 +137,107 @@ class BuildPreparationTests(unittest.TestCase):
         prepare(self.repo, self.home, self.head, out)
         self.assertEqual(out.get(timeout=1), 'Dirty build source')
 
-    def test_build_requires_the_stand_knowledge_key(self):
-        (self.home / '.config/loginom-ai-agent/mcp-api-key').unlink()
+    def test_build_succeeds_without_the_stand_knowledge_key(self):
         out = multiprocessing.get_context('fork').Queue()
         prepare(self.repo, self.home, self.head, out)
-        self.assertIn('LOGINOM_MCP_API_KEY', out.get(timeout=1))
+        self.assertIsNone(out.get(timeout=1))
+        self.assertFalse((self.cache / 'cli/resources/loginom/knowledge-key').exists())
 
     def test_install_cannot_hide_content_changes(self):
         out = multiprocessing.get_context('fork').Queue()
         prepare(self.repo, self.home, self.head, out, mutate=True)
         self.assertEqual(out.get(timeout=1), 'Dependencies modified tracked source')
+
+
+class SetupBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        runner.write(self.root / 'results.json', {'started': time.time(), 'runs': [{'scenario': 'C1', 'status': 'PENDING'}]})
+        runner.write(self.root / 'request.json', {'pair': str(self.root), 'cold': False, 'cases': str(self.root / 'cases')})
+        (self.root / 'cases/C1').mkdir(parents=True)
+        (self.root / 'cases/C1/task.md').write_text('Synthetic fixture only')
+        runner.write(self.root / 'worker.json', {'url': 'https://loginom.test/app/', 'username': 'fixture-user',
+                                              'password': 'password-canary', 'package_directory': '/fixtures'})
+
+    def test_setup_uses_custom_stand_key_only_through_stdin(self):
+        self.setup_boundary('https://stand.test/mcp')
+
+    def test_setup_keeps_the_default_dock_endpoint(self):
+        self.setup_boundary()
+
+    def setup_boundary(self, endpoint=None):
+        env = dict(LOGINOM_DOCK_API_KEY='stand-canary')
+        if endpoint: env['LOGINOM_DOCK_ENDPOINT'] = endpoint
+        with patch.dict(os.environ, env, clear=True):
+            instance = runner.Runner(self.root)
+            instance.save = lambda: runner.write(self.root / 'results.json', instance.report)
+            instance.build = lambda: self.root / 'build'
+            calls = []
+
+            def phase(name, command, folder, **kwargs):
+                calls.append(name)
+                instance.report['phase'] = name
+                self.assertEqual(name, 'setup')
+                body = json.loads(kwargs['stdin'])
+                self.assertEqual(body, dict(mode='custom', endpoint=endpoint or 'https://mcp.loginom.ai/mcp', apiKey='stand-canary',
+                                           url='https://loginom.test/app/', username='fixture-user', password='password-canary'))
+                self.assertFalse(any('stand-canary' in str(value) for value in command))
+                self.assertFalse('LOGINOM_DOCK_API_KEY' in kwargs['env'])
+                runner.write(folder / 'setup.stdout', {'browser': {'state': 'verified'}})
+                (folder / 'profile/data').mkdir(parents=True)
+                (folder / 'profile/config').mkdir()
+
+            def model(*args):
+                calls.append('model')
+                raise RuntimeError('MODEL_BOUNDARY_REACHED')
+
+            instance.phase, instance.model = phase, model
+            instance.run()
+        self.assertEqual(instance.report['runs'][0]['detail'], 'MODEL_BOUNDARY_REACHED')
+        self.assertEqual(calls, ['setup', 'model'])
+        for file in self.root.rglob('*'):
+            if file.is_file() and not file.is_symlink():
+                self.assertFalse('stand-canary' in file.read_text())
+
+    def test_missing_key_fails_before_setup_or_model_and_prepare_only_succeeds(self):
+        with patch.dict(os.environ, {'LOGINOM_MCP_API_KEY': 'legacy-unused-canary'}, clear=True), \
+             patch.object(runner, 'KNOWLEDGE_KEY', self.root / 'missing-private-key'):
+            instance = runner.Runner(self.root)
+            instance.report['phase'] = 'prepared'
+            instance.save = lambda: runner.write(self.root / 'results.json', instance.report)
+            instance.build = lambda: self.root / 'build'
+            calls = []
+            instance.phase = lambda *args, **kwargs: calls.append('setup')
+            instance.model = lambda *args: calls.append('model')
+            instance.run()
+            self.assertEqual(calls, [])
+            self.assertIn('required for setup', instance.report['runs'][0]['detail'])
+            self.assertEqual(instance.report['runs'][0]['status'], 'FAIL')
+            self.assertFalse('legacy-unused-canary' in json.dumps(instance.report))
+            instance.report['runs'] = [{'scenario': 'C1', 'status': 'PENDING'}]
+            instance.options['prepare_only'] = True
+            instance.run()
+            self.assertEqual(calls, [])
+            self.assertEqual(instance.report['runs'][0]['reason'], 'PREPARE_ONLY')
+
+    def test_private_file_is_setup_input_and_new_environment_key_takes_priority(self):
+        private = self.root / 'stand-key'
+        private.write_text('private-file-canary\n')
+        private.chmod(0o600)
+        with patch.dict(os.environ, {}, clear=True), patch.object(runner, 'KNOWLEDGE_KEY', private):
+            self.assertEqual(runner.stand_knowledge_key(), 'private-file-canary')
+            with patch.dict(os.environ, {'LOGINOM_DOCK_API_KEY': 'environment-canary'}):
+                self.assertEqual(runner.stand_knowledge_key(), 'environment-canary')
+
+    def test_child_environment_omits_stand_keys_and_preserves_provider_environment(self):
+        with patch.dict(os.environ, {'LOGINOM_MCP_API_KEY': 'legacy-canary', 'LOGINOM_DOCK_API_KEY': 'stand-canary',
+                                     'OPENAI_API_KEY': 'provider-canary'}, clear=True):
+            instance = runner.Runner(self.root)
+        self.assertFalse('LOGINOM_MCP_API_KEY' in instance.env)
+        self.assertFalse('LOGINOM_DOCK_API_KEY' in instance.env)
+        self.assertEqual(instance.env['OPENAI_API_KEY'], 'provider-canary')
 
 
 if __name__ == '__main__':

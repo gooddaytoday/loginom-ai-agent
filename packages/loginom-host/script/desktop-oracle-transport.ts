@@ -7,7 +7,7 @@ export async function desktopOracleTransport(options: {
   node: string
   directory: string
   csv: string
-  connection: { apiKey: string; password: string; username: string; url: string }
+  connection: { endpoint: string; apiKey: string; password: string; username: string; url: string }
 }) {
   await mkdir(options.directory, { recursive: true, mode: 0o700 })
   const provider = oracleProvider({ directory: options.directory, apiKey: options.connection.apiKey })

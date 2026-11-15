@@ -137,15 +137,16 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
     const root = await mkdtemp(join(tmpdir(), "loginom-stage-product-skills-"))
     try {
       const destination = join(root, "resources")
-      await stageResources({ destination, node, browsers, target, flavor: "cli", knowledgeKey: " UNIT-NONSECRET\n" })
-      // The built-in key is a separate inventoried resource, never part of the manifest itself.
-      expect(await readFile(join(destination, "knowledge-key"), "utf8")).toBe("UNIT-NONSECRET")
+      const input = { destination, node, browsers, target, flavor: "cli" as const, knowledgeKey: " UNIT-NONSECRET\n" }
+      await stageResources(input)
+      // Obsolete callers cannot place a shared credential in the payload.
+      expect(await Bun.file(join(destination, "knowledge-key")).exists()).toBe(false)
       expect(await readFile(join(destination, "resource-manifest.json"), "utf8")).not.toContain("UNIT-NONSECRET")
       const skills = await verifyBundledSkills(destination)
       expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs"])
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
-      expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "knowledge-key")).toBe(false)
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
       const notices = await Bun.file(join(destination, "licenses/package-docs/inventory.json")).json()
       expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@zip.js/zip.js")).toBe(true)

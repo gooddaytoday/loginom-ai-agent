@@ -15,6 +15,7 @@ export function desktopLoginom() {
     resources: loginomResources(),
     codec: credentials(process.platform, safeStorage),
     environment: process.env,
+    cloudEndpoints: import.meta.env.LOGINOM_AI_AGENT_CLOUD_BUILD,
     headless:
       process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1" && process.env.LOGINOM_AI_AGENT_TEST_HEADLESS === "1",
     // Only the packaged app with its own resources may carry the baked capability.

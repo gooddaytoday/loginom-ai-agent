@@ -1,5 +1,8 @@
 # Приёмка Loginom AI Agent на отдельных машинах
 
+Облачное подключение: [source/local приёмка и оставшиеся gates](cloud-auth.md).
+Это отдельный клиентский результат; native и внешняя облачная приёмка ещё не выполнены.
+
 Самостоятельный CLI из ветки `loginom-cli` проверяется по отдельному
 [runbook IND-01…14](standalone-cli.md). Его текущая спецификация —
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);
@@ -97,7 +100,7 @@ Beta,1,1
 | --- | --- | --- |
 | PKG-01 | На чистой машине установить пакет без Node, Bun, Python, npm и отдельно установленного Chrome/Chromium; отключить сеть для первого открытия | Открывается мастер. Приложение не требует установки runtime и не скачивает Chromium. Отсутствие связи с сервисом обозначено отдельно |
 | PKG-02 | Вернуть доступ к тестовым сервисам; запустить Loginom | Node/исполнитель и Chromium запускаются из путей manifest; системный Edge/Safari не используется вместо комплектного Chromium |
-| UI-01 | Первый запуск в чистом профиле | Три поля: URL `https://app.loginom.ai`; имя `user`; пустой пароль **без placeholder**. Поля ключа нет: ключ сервиса знаний встроен в сборку. Нет шага выбора LLM и поля папки |
+| UI-01 | Первый запуск в чистом профиле | Две карточки: Loginom AI (cloud по умолчанию; custom с явным endpoint/ключом) и Loginom (URL `https://app.loginom.ai`, имя `user`, пустой пароль **без placeholder**). Общего ключа в сборке нет. Сохранение доступно до облачного входа; browser status отдельно. Нет шага выбора LLM и поля папки |
 | UI-02 | Открыть «Loginom» из боковой панели и из настроек; изменить поля | Одна и та же форма, заметный вход, одинаковые сохранённые значения/статусы. Пароль не появляется в форме открытым текстом и не подставляется placeholder |
 | CON-01 | Проверить корректные параметры и сохранить | Отдельно подтверждаются доступ к серверу знаний и вход в Loginom; состояние подключения воспроизводится после перезапуска |
 | CON-02 | Использовать разрешённую трассировку запросов либо изолированную fixture, где файловый сервис недоступен, а вход работает | Проверка подключения **не вызывает** listing/stat/create/probe папки `/<username>` и не блокируется её состоянием. Рабочий сервер не изменяется; при отсутствии доказательства эта проверка не считается пройденной |
@@ -165,3 +168,45 @@ REC-01/CON-07 выполняются на одноразовом тестово�
 Приватный IPC дополнен `acknowledgeRecovery({revision, ids})` для явного завершения восстановления после аварии. Renderer получает только непрозрачные ID маркеров и наличие секретов. Windows/macOS должны реализовать тот же контракт и проверить отказ insecure credential storage. Отдельные попытки runtime сохраняются в `loginom/runtime/generations/<generation>/chats/<chat>/attempts/<uuid>`; новые процессы не перезаписывают старые receipts. Модели не получают этот управляющий IPC.
 
 Linux bundler пока намеренно отклоняет `win32` и `darwin`: нативные агенты должны добавить закреплённые исполняемые ресурсы своих платформ, обновить manifest и выполнить полный runbook. Успех Linux не подтверждает EXE/DMG, native keychain или подпись.
+
+
+## Облачное подключение: текущая граница приёмки
+
+Сборка/изолированные профили и команды compiled gates: [standalone CLI, этапы13–15](standalone-cli.md#локальный-cloud-staging-этапы-1315).
+Новые Desktop/CLI не содержат общего Dock key; cloud credentials появляются после
+входа в независимом профиле, custom endpoint/key задаются явно. Смена режима
+сохраняет оба набора credentials. Logout удаляет локальные cloud credentials и
+отдельно сообщает неподтверждённый revoke; custom KB ограничен Loginom Dock root.
+Вход не применяет черновые настройки; Save до входа и browser verification
+проверяются отдельно. Runtime env/manifest не выбирает cloud адреса.
+Source и собственные HTTPS fixtures не являются native/production/site приёмкой.
+Точные Task13 артефакты/команды/ограничения отражаются в canonical checkpoint;
+Windows/macOS, настоящий сайт/reserve и authentic0.3.9 остаются отдельными gate15.
+
+Локальная проверка Dock/Help находится в
+`services/loginom-ai/tests/server/test_agent_cloud_access.py`. Она требует настоящих
+RagFS и vector engine, отдельного временного workspace и закреплённого Node из
+release manifest (`LOGINOM_AI_AGENT_TEST_NODE`, проверенные версия и SHA256).
+Задать `TMPDIR`, `TMP`, `TEMP` в `$HOME/storage/tmp/`. Окружение uv и
+`OPENVIKING_CONFIG_FILE` для существующих admin-тестов должны быть отдельными
+тестовыми, с local storage и синтетическими model settings; личный
+`~/.openviking` не использовать. Затем из
+`services/loginom-ai` выполнить:
+
+```bash
+uv run pytest tests/server/test_agent_cloud_access.py tests/server/test_admin_api.py::test_register_user tests/server/test_admin_api.py::test_regenerate_key tests/server/test_admin_api.py::test_user_role_cannot_access_admin_api tests/server/test_content_write_service.py::test_shared_resource_creation_inherits_acl_and_preserves_plain_append
+```
+
+Тест поднимает один loopback Dock с собственным auth registry и проверяет семь
+чтений настоящим managed client, права USER, ротацию ключа и повторную публикацию.
+Подменяются только внешние embedding/VLM. Отсутствие native storage или Node —
+ошибка prerequisite, а не пропуск с результатом PASS. Команды сборки и конкретный
+результат запуска фиксируются отдельно от приёмки установленного приложения.
+
+[Runbook публикации и ACL](../../../services/loginom-ai/deploy/loginom-dock/README.md#облачный-доступ-agent-отдельная-процедура-для-каждого-dock)
+задаёт независимую подготовку каждого сервера. Сайт, production ACL/admin exposure,
+URL-import и резервный Dock требуют внешней приёмки. На двух реальных серверах
+проверить разные keys при одинаковых IDs, отказ primary key на reserve,
+независимую ротацию и сохранение keys после публикации одной source revision.
+Полный backup содержит реестр identities/keys; его перенос с primary на reserve
+не является синхронизацией знаний.

@@ -42,7 +42,7 @@ test.each([undefined, false, true])(
     )
     const root = join(directory, "profile")
     const store = connectionStore(join(root, "connection"), credentials("linux"))
-    await store.stage({ generation: 1, revision: 1, url: "http://example.test", username: "user", apiKey: "fixture", password: "" })
+    await store.stage({ mode: "custom", endpoint: "http://example.test/mcp", generation: 1, revision: 1, url: "http://example.test", username: "user", apiKey: "fixture", password: "" })
     await store.activate(1)
     const host = await createLoginomHost({
       root,
@@ -127,7 +127,7 @@ test("releasing a run during browser recovery stops the attempt in the runtime",
   )
   const root = join(directory, "profile")
   const store = connectionStore(join(root, "connection"), credentials("linux"))
-  await store.stage({ generation: 1, revision: 1, url: "http://example.test", username: "user", apiKey: "fixture", password: "" })
+  await store.stage({ mode: "custom", endpoint: "http://example.test/mcp", generation: 1, revision: 1, url: "http://example.test", username: "user", apiKey: "fixture", password: "" })
   await store.activate(1)
   const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, browserRecovery: true })
   const requests = new EventEmitter()

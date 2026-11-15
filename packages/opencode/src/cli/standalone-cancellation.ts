@@ -1,7 +1,11 @@
-const state: { signal?: AbortSignal } = {}
+const state: { signal?: AbortSignal; cleanup?: () => void } = {}
 
 export function standaloneCancellation() {
   return state.signal
+}
+
+export function handoffStandaloneCancellation(): void {
+  state.cleanup?.()
 }
 
 // The invocation owns this handler through host cleanup and profile release. Command-specific handlers
@@ -11,10 +15,14 @@ export async function withStandaloneCancellation(run: (signal: AbortSignal) => P
   const interrupt = () => controller.abort()
   state.signal = controller.signal
   process.on("SIGINT", interrupt)
+  state.cleanup = () => {
+    process.off("SIGINT", interrupt)
+    state.signal = undefined
+    state.cleanup = undefined
+  }
   try {
     await run(controller.signal)
   } finally {
-    process.off("SIGINT", interrupt)
-    state.signal = undefined
+    handoffStandaloneCancellation()
   }
 }

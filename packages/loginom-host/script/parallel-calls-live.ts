@@ -25,6 +25,8 @@ const chat = createHash("sha256").update(session).digest("hex")
 const path = `/${config.workflow_profile.loginom_user}/parallel-${session}.lgp`
 const root = join(directory, "profile")
 const connection = {
+  mode: "custom" as const,
+  endpoint: manifest.endpoint as string,
   generation: 1,
   revision: 1,
   url: config.loginom_url as string,

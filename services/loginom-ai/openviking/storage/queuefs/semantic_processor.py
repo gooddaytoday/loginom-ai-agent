@@ -5,7 +5,6 @@
 import asyncio
 import re
 import threading
-from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import quote, unquote, urlsplit
 
@@ -53,6 +52,7 @@ from openviking.storage.queuefs.semantic_ops.freshness_policy import FreshnessAc
 from openviking.storage.queuefs.semantic_queue import is_semantic_msg_stale
 from openviking.storage.viking_fs import LS_ALL_NODES, SyncDiff, get_viking_fs
 from openviking.telemetry import bind_telemetry, bind_telemetry_stage, resolve_telemetry
+from openviking.telemetry.operation import OperationTelemetry
 from openviking.telemetry.request_wait_tracker import get_request_wait_tracker
 from openviking.telemetry.span_models import create_root_span_attributes
 from openviking.utils.circuit_breaker import (
@@ -392,8 +392,11 @@ class SemanticProcessor(DequeueHandlerBase):
                 self.report_success()
                 return None
             collector = resolve_telemetry(msg.telemetry_id)
-            telemetry_ctx = bind_telemetry(collector) if collector is not None else nullcontext()
-            with telemetry_ctx:
+            if collector is None:
+                collector = OperationTelemetry(operation="semantic", enabled=False)
+                # Request waits need the message identity even when metrics are disabled.
+                collector.telemetry_id = msg.telemetry_id
+            with bind_telemetry(collector):
                 root_attrs = create_root_span_attributes(
                     http_method="QUEUE",
                     http_route=msg.context_type or "/queuefs/semantic",

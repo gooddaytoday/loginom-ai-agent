@@ -8,6 +8,8 @@ import { connectionService, type ConnectionRuntime } from "./connection-service"
 import type { Loginom } from "@opencode-ai/schema/loginom"
 
 const candidate: Loginom.Candidate = {
+  mode: "custom",
+  endpoint: "http://example.test/mcp",
   revision: 0,
   url: "http://example.test/app/?a=b",
   username: "User",
@@ -21,9 +23,10 @@ async function fixture(runtime?: ConnectionRuntime) {
   const service = await connectionService(
     store,
     runtime ?? {
-      async check() {},
+      async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
       async prepare(record) {
         return {
+          observeHelp(listener) { listener({ state: "ready" }) },
           async close() {
             closed.push(record.generation)
           },
@@ -67,8 +70,60 @@ test("safe views expose defaults and presence flags only; a successful save surv
       state: "ready",
     })
     expect(JSON.stringify(await f.service.api.read())).not.toContain("private-api-key")
-    // A key sent by an older client is ignored; the built-in knowledge key is never stored.
-    expect((await f.store.read())?.apiKey).toBe("")
+    // Explicit custom credentials remain private in the store.
+    expect((await f.store.read())?.apiKey).toBe("private-api-key")
+  } finally {
+    await f.close()
+  }
+})
+
+test("changing custom origin cannot send the saved key to another server", async () => {
+  const checked: { endpoint?: string; apiKey: string }[] = []
+  const f = await fixture({
+    async check(record) {
+      checked.push({ endpoint: record.endpoint, apiKey: record.apiKey })
+      return { help: { state: "ready" }, browser: { state: "unknown" } }
+    },
+    async prepare() {
+      return {
+        observeHelp(listener) {
+          listener({ state: "ready" })
+        },
+        async close() {},
+      }
+    },
+  })
+  try {
+    await save(f.service)
+    for (const endpoint of ["http://typo.test/mcp", "https://example.test/mcp", "http://example.test:8080/mcp"])
+      for (const apiKey of [
+        undefined,
+        { operation: "preserve" as const },
+        { operation: "empty" as const },
+        { operation: "replace" as const, value: " " },
+      ]) {
+        const input = { ...candidate, revision: 1, endpoint, apiKey }
+        if (!apiKey) delete input.apiKey
+        await expect(f.service.api.check(input)).rejects.toThrow("LOGINOM_API_KEY_REQUIRED")
+      }
+    expect(checked).toEqual([{ endpoint: candidate.endpoint, apiKey: "private-api-key" }])
+    await f.service.api.check({
+      ...candidate,
+      revision: 1,
+      endpoint: "http://EXAMPLE.test:80/other?test=1",
+      apiKey: { operation: "preserve" },
+    })
+    await f.service.api.check({
+      ...candidate,
+      revision: 1,
+      endpoint: "http://typo.test/mcp",
+      apiKey: { operation: "replace", value: "new-server-key" },
+    })
+    expect(checked.slice(1)).toEqual([
+      { endpoint: "http://EXAMPLE.test:80/other?test=1", apiKey: "private-api-key" },
+      { endpoint: "http://typo.test/mcp", apiKey: "new-server-key" },
+    ])
+    expect(await f.store.read()).toMatchObject({ endpoint: candidate.endpoint, apiKey: "private-api-key", revision: 1 })
   } finally {
     await f.close()
   }
@@ -85,9 +140,9 @@ test("automation query stays out of saved settings and restored public views", a
     await f.store.stage({ ...record, generation: 2, revision: 2, url: "https://example.test/app/?a=b&testable=true" })
     await f.store.activate(2)
     const restored = await connectionService(f.store, {
-      async check() {},
+      async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
       async prepare() {
-        return { async close() {} }
+        return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
       },
     })
     try {
@@ -151,10 +206,10 @@ test("cancelling a pending switch keeps the active identity and invalidates stal
 
 test("failed readiness keeps the old runtime and durable connection", async () => {
   const f = await fixture({
-    async check() {},
+    async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
     async prepare(record) {
       if (record.generation === 2) throw new Error("internal failure private-api-key")
-      return { async close() {} }
+      return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} }
     },
   })
   try {
@@ -251,7 +306,7 @@ test("replacing pending settings commits only the latest candidate", async () =>
     expect(await f.service.api.status()).toMatchObject({ state: "pending", generation: 1, revision: 3 })
     run.release()
     await f.service.settled()
-    expect(await f.store.read()).toMatchObject({ generation: 3, username: "Third", apiKey: "" })
+    expect(await f.store.read()).toMatchObject({ generation: 3, username: "Third", apiKey: "replacement-key" })
   } finally {
     await f.close()
   }
@@ -289,9 +344,10 @@ test("post-rename durability failure keeps runtime and active file on the same g
       },
     },
     {
-      async check() {},
+      async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
       async prepare(record) {
         return {
+          observeHelp(listener) { listener({ state: "ready" }) },
           async close() {
             closed.push(record.generation)
           },
@@ -313,4 +369,60 @@ test("post-rename durability failure keeps runtime and active file on the same g
     await service.close()
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test("mode switches preserve custom credentials", async () => {
+  const f = await fixture()
+  try {
+    await save(f.service)
+    await save(f.service, { ...candidate, revision: 1, mode: "cloud", endpoint: "http://ignored.test", apiKey: { operation: "replace", value: "ignored" } })
+    expect(await f.store.read()).toMatchObject({ mode: "cloud", endpoint: candidate.endpoint, apiKey: "private-api-key" })
+    await save(f.service, { ...candidate, revision: 2, mode: "custom", apiKey: { operation: "preserve" } })
+    expect(await f.store.read()).toMatchObject({ mode: "custom", endpoint: candidate.endpoint, apiKey: "private-api-key" })
+    expect(await f.service.api.read()).toMatchObject({ mode: "custom", hasApiKey: true, server: "custom", help: { state: "ready" }, cloud: { connected: false } })
+  } finally { await f.close() }
+})
+
+test("implicit edits retain custom mode and cannot replace custom credentials", async () => {
+  const f = await fixture()
+  try {
+    await save(f.service)
+    await save(f.service, { revision: 1, url: candidate.url, username: candidate.username, password: candidate.password,
+      endpoint: "http://ignored.test", apiKey: { operation: "replace", value: "ignored" } })
+    expect(await f.store.read()).toMatchObject({ mode: "custom", endpoint: candidate.endpoint, apiKey: "private-api-key" })
+  } finally { await f.close() }
+})
+
+
+test("legacy candidate credentials cannot enable custom mode", async () => {
+  const checked: string[] = []
+  const f = await fixture({
+    async check(record) { checked.push(record.apiKey); return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
+    async prepare() { return { observeHelp(listener) { listener({ state: "ready" }) }, async close() {} } },
+  })
+  try {
+    await save(f.service, { revision: 0, url: candidate.url, username: candidate.username, password: candidate.password,
+      endpoint: "http://ignored.test/mcp", apiKey: { operation: "replace", value: "LEGACY-CANARY" } })
+    expect(checked).toEqual([""])
+    expect(await f.store.read()).toMatchObject({ mode: "cloud", apiKey: "" })
+    expect((await f.store.read())?.endpoint).toBeUndefined()
+    expect(await f.service.api.read()).toMatchObject({ mode: "cloud", server: "primary", hasApiKey: false })
+  } finally { await f.close() }
+})
+
+for (const [label, endpoint] of [["empty", ""], ["malformed", "not-a-url"], ["non-HTTP", "file:///private"], ["credential-bearing", "https://user:secret@example.test/mcp"]]) {
+  test(`custom rejects ${label} endpoint before starting runtime`, async () => {
+    const f = await fixture({ async check() { throw Error("RUNTIME_MUST_NOT_START") }, async prepare() { throw Error("unreachable") } })
+    try {
+      await expect(f.service.api.check({ ...candidate, endpoint })).rejects.toThrow("LOGINOM_ENDPOINT_INVALID")
+      expect(await f.store.read()).toBeUndefined()
+    } finally { await f.close() }
+  })
+}
+
+test("custom requires a nonempty key before starting runtime", async () => {
+  const f = await fixture({ async check() { throw Error("RUNTIME_MUST_NOT_START") }, async prepare() { throw Error("unreachable") } })
+  try {
+    await expect(f.service.api.check({ ...candidate, apiKey: { operation: "empty" } })).rejects.toThrow("LOGINOM_API_KEY_REQUIRED")
+  } finally { await f.close() }
 })

@@ -130,6 +130,7 @@ test.each(["pdf", "docx", "md"] as const)(
       )
       const connection = connectionStore(join(fixture.profile, "loginom/connection"), cliCredentials("linux"))
       await connection.stage({
+        mode: "custom", endpoint: knowledge.endpoint,
         generation: 1,
         revision: 1,
         apiKey: "UNIT-NONSECRET",

@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
 import { Option, Schema } from "effect"
-import type { CliSecrets, Secrets } from "./credentials"
+import type { CliSecrets } from "./credentials"
 
 const envelope = Schema.decodeUnknownOption(
   Schema.fromJsonString(
@@ -11,20 +11,13 @@ const envelope = Schema.decodeUnknownOption(
     }),
   ),
 )
-const secrets = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Struct({
-      apiKey: Schema.String,
-      password: Schema.String,
-    }),
-  ),
-)
+const secrets = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)))
 
 // The key is supplied by Keychain; never persist it beside this envelope.
 // Profile identity is authenticated so ciphertext cannot move to another profile.
-export function sealKeychain(value: Secrets, key: Buffer, profile: string): CliSecrets {
+export function sealKeychain(value: Record<string, unknown>, key: Buffer, profile: string): CliSecrets {
   if (key.length !== 32 || !/^[a-f0-9]{64}$/.test(profile)) throw Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
-  const plaintext = Buffer.from(JSON.stringify({ apiKey: value.apiKey, password: value.password }), "utf8")
+  const plaintext = Buffer.from(JSON.stringify(value), "utf8")
   if (plaintext.length > 1024 * 1024) throw Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
   const nonce = randomBytes(12)
   const cipher = createCipheriv("aes-256-gcm", key, nonce)
@@ -41,7 +34,7 @@ export function sealKeychain(value: Secrets, key: Buffer, profile: string): CliS
   }
 }
 
-export function openKeychain(value: CliSecrets, key: Buffer, profile: string): Secrets {
+export function openKeychain(value: CliSecrets, key: Buffer, profile: string): unknown {
   if (
     value.format !== "loginom-cli-secrets-v1" ||
     value.protection !== "keychain" ||

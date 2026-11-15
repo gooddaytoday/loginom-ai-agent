@@ -48,7 +48,7 @@ test("private IPC admits only a reserved original-input reference and retains th
   `,
   )
   const connections = connectionStore(join(root, "connection"), credentials("linux"))
-  await connections.stage({
+  await connections.stage({ mode: "custom", endpoint: "http://example.test/mcp",
     generation: 1,
     revision: 1,
     url: "http://example.test",

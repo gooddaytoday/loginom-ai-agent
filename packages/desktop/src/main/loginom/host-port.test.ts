@@ -54,6 +54,7 @@ test.each(["call", "tools", "admit", "interrupt"])(
     )
     const service = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
     const initial = {
+      mode: "custom" as const, endpoint: "http://example.test/mcp",
       revision: 0,
       url: "http://example.test/app/",
       username: "user",

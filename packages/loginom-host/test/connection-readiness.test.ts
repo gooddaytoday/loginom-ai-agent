@@ -16,26 +16,31 @@ async function readinessFixture(options: Parameters<typeof knowledgeServer>[1]) 
   const cleanup: (() => void | Promise<void>)[] = []
   const server = await knowledgeServer({ after: (callback) => cleanup.push(callback) }, options)
   const store = connectionStore(join(directory, "connection"), credentials("linux"))
-  const original = { generation: 1, revision: 1, url: "http://unavailable.example/app/?custom=1",
+  const original = {
+  mode: "custom" as const,
+  endpoint: server.endpoint, generation: 1, revision: 1, url: "http://unavailable.example/app/?custom=1",
     username: "user", apiKey: "UNIT-NONSECRET", password: "PRIVATE-NONSECRET-PASSWORD" }
   const processes: Awaited<ReturnType<typeof superviseKnowledge>>[] = []
   const readiness: Promise<void>[] = []
   await store.stage(original)
   await store.activate(1)
   const service = await connectionService(store, {
-    async check() {},
+    async check() { return { help: { state: "ready" as const }, browser: { state: "unknown" as const } } },
     async prepare(connection) {
       const child = await superviseKnowledge({
         node, entry: fileURLToPath(new URL("../../loginom-runtime/src/knowledge-entry.mjs", import.meta.url)),
         stateDir: directory, generation: connection.generation, endpoint: server.endpoint,
-        // Like the host, every generation uses the built-in key, not the saved one.
-        apiKey: "UNIT-NONSECRET", environment: {},
+        // Every generation uses its saved custom credentials.
+        apiKey: connection.apiKey, environment: {},
       })
       processes.push(child)
       const ready = child.request("list").then(() => undefined)
       readiness.push(ready)
       void ready.catch(() => {})
-      return { ready, close: () => child.close() }
+      return { observeHelp(listener) {
+        listener({ state: "starting" })
+        void ready.then(() => listener({ state: "ready" }), () => listener({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" }))
+      }, close: () => child.close() }
     },
   })
   return { service, store, original, readiness, processes, server,
@@ -131,4 +136,89 @@ test("a new generation closes pending old readiness and only its own catalog can
     expect((await f.store.read())?.generation).toBe(2)
     expect(await f.service.api.status()).toMatchObject({ generation: 2, state: "ready" })
   } finally { release.resolve(); await f.close() }
+})
+
+test("Help observations preserve pending activation and durable failure and ignore retired handles", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "help-observations-"))
+  const store = connectionStore(join(directory, "connection"), credentials("linux"))
+  await store.stage({ mode: "custom", endpoint: "http://fixture.test/mcp", generation: 1, revision: 1, url: "http://stand.test/app/", username: "user", apiKey: "fixture", password: "" })
+  await store.activate(1)
+  const observers = new Map<number, Parameters<import("../src/connection/connection-service").RuntimeHandle["observeHelp"]>[0]>()
+  const service = await connectionService({ ...store, async clearPending() { throw Error("fixture fsync failure") } }, {
+    async check() { return { help: { state: "ready" }, browser: { state: "unknown" } } },
+    async prepare(connection) { return {
+      observeHelp(listener) { observers.set(connection.generation, listener); listener({ state: "ready" }) },
+      async close() {},
+    } },
+  })
+  try {
+    await service.settled()
+    const lease = service.acquire("held")!
+    const checked = await service.api.check({ revision: 1, url: "http://next.test/app/", username: "next", password: { operation: "preserve" } })
+    await service.api.save({ revision: 1, validationId: checked.validationId })
+    observers.get(1)!({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+    expect(await service.api.status()).toMatchObject({ state: "pending", help: { state: "recoverable-error" } })
+    observers.get(1)!({ state: "ready" })
+    expect(await service.api.status()).toMatchObject({ state: "pending", help: { state: "ready" } })
+    lease.release()
+    await service.settled()
+    observers.get(1)!({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+    observers.get(2)!({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+    observers.get(2)!({ state: "ready" })
+    expect(await service.api.status()).toMatchObject({ generation: 2, state: "ready", help: { state: "ready" }, failure: "LOGINOM_STORE_WRITE_FAILED" })
+    service.beginClose()
+    observers.get(2)!({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+    expect((await service.api.status()).help).toEqual({ state: "ready" })
+  } finally { await service.close(); await rm(directory, { recursive: true, force: true }) }
+}, 180000)
+
+test("saving a new generation keeps the old Help failure out of its activation result", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "help-failure-save-"))
+  const store = connectionStore(join(directory, "connection"), credentials("linux"))
+  await store.stage({ mode: "custom", endpoint: "http://fixture.test/mcp", generation: 1, revision: 1,
+    url: "http://stand.test/app/", username: "user", apiKey: "fixture", password: "" })
+  await store.activate(1)
+  const entered = Promise.withResolvers<void>()
+  const activate = Promise.withResolvers<void>()
+  let oldHelp: Parameters<import("../src/connection/connection-service").RuntimeHandle["observeHelp"]>[0] | undefined
+  const service = await connectionService(store, {
+    async check() { return { help: { state: "connection-required" }, browser: { state: "unknown" } } },
+    async prepare(connection) {
+      if (connection.generation === 2) {
+        entered.resolve()
+        await activate.promise
+      }
+      return {
+        observeHelp(listener) {
+          if (connection.generation === 1) oldHelp = listener
+          listener({ state: connection.generation === 1 ? "ready" : "connection-required" })
+        },
+        async close() {},
+      }
+    },
+  })
+  try {
+    await service.settled()
+    const lease = service.acquire("held")!
+    oldHelp!({ state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+    expect((await service.api.status()).failure).toBe("LOGINOM_RUNTIME_START_FAILED")
+    const checked = await service.api.check({ mode: "cloud", revision: 1, url: "http://next.test/app/",
+      username: "next", password: { operation: "preserve" }, verifyBrowser: false })
+    const saved = await service.api.save({ revision: 1, validationId: checked.validationId })
+    expect(saved.state).toBe("pending")
+    expect(saved.help.state).toBe("recoverable-error")
+    expect(saved.failure).toBeUndefined()
+    lease.release()
+    await entered.promise
+    expect((await service.api.status()).state).toBe("starting")
+    expect((await service.api.status()).failure).toBeUndefined()
+    activate.resolve()
+    await service.settled()
+    expect(await service.api.status()).toMatchObject({ generation: 2, state: "connection-required", mode: "cloud" })
+    expect((await service.api.status()).failure).toBeUndefined()
+  } finally {
+    activate.resolve()
+    await service.close()
+    await rm(directory, { recursive: true, force: true })
+  }
 })

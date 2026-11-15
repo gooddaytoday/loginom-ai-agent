@@ -30,3 +30,9 @@ test("Keychain envelope encrypts UTF-8 secrets with fresh nonces and profile bin
   )
   expect(() => sealKeychain(value, Buffer.alloc(16), profile)).toThrow("LOGINOM_CREDENTIAL_FORMAT_INVALID")
 })
+
+test("Keychain envelope preserves cloud JSON without interpreting connection secrets", () => {
+  const value = { kind: "loginom-cloud-v1", installationKey: "site-canary", email: "user@example.test", dock: { primary: { apiKey: "primary-canary" }, reserve: { apiKey: "reserve-canary" } } }
+  const key = randomBytes(32)
+  expect(openKeychain(sealKeychain(value, key, "a".repeat(64)), key, "a".repeat(64))).toEqual(value)
+})

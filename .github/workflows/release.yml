@@ -127,18 +127,16 @@ jobs:
       channel: ${{ steps.release.outputs.channel }}
       prerelease: ${{ steps.release.outputs.prerelease }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      # Every build stages this key into its resources; without it the app cannot use the knowledge service.
-      - name: Require the built-in knowledge key
-        env:
-          LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
+      - name: Reject cloud build override
+        shell: bash
         run: |
-          if [ -z "$LOGINOM_MCP_API_KEY" ]; then
-            echo "::error::Repository secret LOGINOM_MCP_API_KEY is required: release builds embed the knowledge service key"
+          if [ "${LOGINOM_AI_AGENT_CLOUD_BUILD+x}" = x ]; then
+            echo "::error::LOGINOM_AI_AGENT_CLOUD_BUILD is forbidden in release CI"
             exit 1
           fi
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Resolve version and channel
         id: release
@@ -211,8 +209,15 @@ jobs:
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
-      LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
     steps:
+      - name: Reject cloud build override
+        shell: bash
+        run: |
+          if [ "${LOGINOM_AI_AGENT_CLOUD_BUILD+x}" = x ]; then
+            echo "::error::LOGINOM_AI_AGENT_CLOUD_BUILD is forbidden in release CI"
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -298,10 +303,17 @@ jobs:
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
-      LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
+      - name: Reject cloud build override
+        shell: bash
+        run: |
+          if [ "${LOGINOM_AI_AGENT_CLOUD_BUILD+x}" = x ]; then
+            echo "::error::LOGINOM_AI_AGENT_CLOUD_BUILD is forbidden in release CI"
+            exit 1
+          fi
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -375,10 +387,17 @@ jobs:
       LOGINOM_AI_AGENT_CHANNEL: ${{ needs.verify.outputs.channel }}
       # Release builds bake temporary browser recovery for prod; beta and dev stay without it.
       LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ needs.verify.outputs.channel == 'prod' && '1' || '0' }}
-      LOGINOM_MCP_API_KEY: ${{ secrets.LOGINOM_MCP_API_KEY }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
+      - name: Reject cloud build override
+        shell: bash
+        run: |
+          if [ "${LOGINOM_AI_AGENT_CLOUD_BUILD+x}" = x ]; then
+            echo "::error::LOGINOM_AI_AGENT_CLOUD_BUILD is forbidden in release CI"
+            exit 1
+          fi
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

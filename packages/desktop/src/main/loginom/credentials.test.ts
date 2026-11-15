@@ -33,3 +33,19 @@ for (const platform of ["darwin", "win32"] as const) {
     expect(codec.decode(encoded)).toEqual(secret)
   })
 }
+
+test("Desktop codecs preserve cloud JSON objects without exposing them in protected envelopes", () => {
+  const value = { kind: "loginom-cloud-v1", installationKey: "site-canary", email: "user@example.test", dock: { primary: { apiKey: "primary-canary" }, reserve: { apiKey: "reserve-canary" } } }
+  expect(credentials("linux").decode(credentials("linux").encode(value))).toEqual(value)
+  for (const platform of ["darwin", "win32"] as const) {
+    const payloads: string[] = []
+    const codec = credentials(platform, {
+      isEncryptionAvailable: () => true,
+      encryptString(value) { payloads.push(value); return Buffer.from("test-protected") },
+      decryptString() { return payloads[0] },
+    })
+    const encoded = codec.encode(value)
+    expect(JSON.stringify(encoded)).not.toContain(value.installationKey)
+    expect(codec.decode(encoded)).toEqual(value)
+  }
+})

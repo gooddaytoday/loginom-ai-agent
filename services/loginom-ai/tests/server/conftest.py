@@ -6,6 +6,7 @@
 import asyncio
 import shutil
 import socket
+import tempfile
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -33,7 +34,7 @@ from openviking_cli.utils.config.vlm_config import VLMConfig
 # ---------------------------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-TEST_TMP_DIR = PROJECT_ROOT / "test_data" / "tmp_server"
+TEST_TMP_DIR = Path(tempfile.gettempdir()) / "loginom-dock-server-tests"
 SDK_ROOT_API_KEY = "test-root-api-key"
 
 # ---------------------------------------------------------------------------
