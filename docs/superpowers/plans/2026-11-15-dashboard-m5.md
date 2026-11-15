@@ -10,7 +10,7 @@
 
 **Spec:** [Принятый дизайн M5](../specs/2026-11-15-dashboard-m5-design.md), [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md), [изоляция](../../security/dashboard-isolation.md).
 
-Статус: выполнение разрешено владельцем 15 ноября 2026 года; Tasks 0–1 приняты: Spec Approved и Quality Approved, обязательных замечаний нет. Следующий этап — Task 2; Tasks 2–5 не начинались, M5 не завершён. Уточнение входа ниже принято независимым ревью до сборки; остальные требования M5 сохранены. План прошёл независимое ревью — Approved, неразрешённых замечаний нет. Ход исполнения — [checkpoint M5](../../testing/loginom-ai-agent/dashboard-m5-checkpoint.md).
+Статус: выполнение разрешено владельцем 15 ноября 2026 года; Tasks 0–2 приняты: Spec Approved и Quality Approved, обязательных замечаний нет. Следующий этап — Task 3; Tasks 3–5 не начинались, M5 не завершён. Уточнение входа ниже принято независимым ревью до сборки; остальные требования M5 сохранены. План прошёл независимое ревью — Approved, неразрешённых замечаний нет. Ход исполнения — [checkpoint M5](../../testing/loginom-ai-agent/dashboard-m5-checkpoint.md).
 
 ## Global Constraints
 
@@ -115,7 +115,7 @@ M4 окончательно принят: [checkpoint M4](../../testing/loginom-
 
 **Files:** `deploy/containers.sh`, `deploy/check-studio.mjs`, новый `test/deploy/containers.test.mjs`, `package.json`, runbook M5. Новый помощник допустим только для сложного реально появившегося участка; общий API проверки не требуется.
 
-**Execution:** PASS / independent review pending. Подробности и ограничения — [runbook M5](../../testing/loginom-ai-agent/dashboard-m5.md#task-2--server-check-и-отдельная-клиентская-проверка). Один helper обрабатывает границу JSON/headers/inspect Node образа без сети; новый runtime/API не добавлен.
+**Принятие Task 2:** Spec Approved / Quality Approved, mandatory 0, optional 0. Единственное обязательное замечание к проверке isolation устранено и принято scoped re-review: 1/1 ADDRESSED, новых замечаний нет. Подробности и ограничения — [runbook M5](../../testing/loginom-ai-agent/dashboard-m5.md#task-2--server-check-и-отдельная-клиентская-проверка). Один helper обрабатывает границу JSON/headers/inspect Node образа без сети; новый runtime/API не добавлен.
 
 **Interfaces:** `containers.sh check [--engine …]` читает сохранённую установку, завершает работу кодом 0 только после обязательных серверных проверок и подтверждённой очистки. Node из образа (`--entrypoint /opt/node/bin/node`, без сети) обрабатывает JSON через stdin; host curl выполняет HTTP/TLS со штатным CA. Клиентский запуск сохраняет существующие `DASHBOARD_STUDIO_CONFIG` и pinned Node/Chromium; credentials не передаются серверному check. Команда `check-studio.mjs 7.4.2` применима к подтверждённой текущей версии; изменение допустимых версий пробы сверяется с целевой поставкой Task 0, без снятия ограничений runtime.
 
