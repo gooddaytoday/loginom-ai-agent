@@ -199,11 +199,37 @@ try{
   await download.delete();
   }
  }
+ if(config.fs_fixture===true&&folders?.children.join(',')==='effects'){
+  await captureSeedCleanup('before_cleanup');
+  const ready=await page.waitForFunction(seedCleanupState,{ready:true});
+  try{await record({phase:'fs_seed_cleanup_ready',state:await ready.jsonValue()});}finally{await ready.dispose();}
+ }
  const cleanup=await execute(makePackageCleanupCode({sessionId,documentId:identity.document_id,account:config.login.username,
   packagePath:config.fs_error_seed?directory+'/fixture.lgp':null,unsavedDraft:!config.fs_error_seed,loginomUrl:config.login.url,loginomBuild:'7.4.2',tabTid:identity.workflow_ref.tab_tid}));
  await record({phase:'excel_seed_cleanup',cleanup});await writeFile(output+'/result.json',JSON.stringify({delivered,cleanup}));
  if(cleanup.package_closed!==true||cleanup.logged_out!==true)throw Error('SEED_CLEANUP');
 }finally{await context.close();}
+
+async function captureSeedCleanup(point){
+ const state=await page.evaluate(seedCleanupState,{});
+ await record({phase:'fs_seed_cleanup_state',point,...state});
+ await page.screenshot({path:output+'/'+point+'.png',fullPage:true});
+}
+
+// Creating a directory can expose its row before FileStorageForm drops its
+// native operation mask. Cleanup must see the operation and listing settled.
+function seedCleanupState({ready=false}){
+ const visible=e=>{
+  const b=e.getBoundingClientRect();return b.width>0&&b.height>0&&getComputedStyle(e).visibility!=='hidden';
+ };
+ const blockers=[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].filter(visible)
+  .map(e=>({tid:e.getAttribute('data-tid'),title:globalThis.Ext?.getCmp?.(e.id)?.title??null,
+   text:(e.textContent??'').slice(0,2048),class_name:e.className,native_class:globalThis.Ext?.getCmp?.(e.id)?.$className??null}));
+ const grids=[...document.querySelectorAll('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]')].filter(visible);
+ const loading=grids.length===1?globalThis.Ext?.getCmp?.(grids[0].id)?.getStore?.()?.isLoading?.():null;
+ const state={blockers,storage_loading:loading,ready:blockers.length===0&&grids.length===1&&loading===false};
+ return ready?(state.ready?state:false):state;
+}
 
 // Existing Files UI only; each destination is confined to this run's directory.
 async function storageDirectory(directory){

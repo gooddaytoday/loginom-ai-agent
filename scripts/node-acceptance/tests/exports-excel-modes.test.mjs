@@ -126,3 +126,31 @@ test('the actual ZIP audit reveals an offscreen folder before selecting Download
  await run();assert.equal(saved,true);assert.equal(deleted,true);
  assert.equal(events.find(e=>e.phase==='fs_audit_folder_resolved')?.index,66);
 });
+
+test('FS seed waits for the native storage operation before guarded cleanup',async()=>{
+ const source=await readFile(script,'utf8'),waiting=Promise.withResolvers(),changed=Promise.withResolvers();
+ let busy=true,loading=true,cleanupCalls=0;
+ const blocker={id:'storage',className:'bg-mask-message',textContent:'Files',getAttribute:()=> 'MF;TF-2;FileStorageForm',
+  getBoundingClientRect:()=>({width:100,height:100})};
+ const grid={id:'grid',getBoundingClientRect:()=>({width:100,height:100})};
+ const page={evaluate:async(fn,args)=>fn(args),screenshot:async()=>{},waitForFunction:async(fn,args)=>{
+  assert.equal(fn(args),false,'A visible native operation must block readiness');waiting.resolve(true);await changed.promise;
+  busy=false;assert.equal(fn(args),false,'An unfinished native store still blocks cleanup');loading=false;
+  const value=fn(args);assert.ok(value);return {jsonValue:async()=>value,dispose:async()=>{}};
+ }};
+ const events=[],context={page,config:{fs_fixture:true,login:{username:'worker',url:'https://app.loginom.ai'}},folders:{children:['effects']},output:'unused',
+  record:async e=>events.push(e),writeFile:async()=>{},delivered:[],sessionId:'session',identity:{document_id:'doc',workflow_ref:{tab_tid:'tab'}},
+  makePackageCleanupCode:()=> 'cleanup',execute:async()=>{cleanupCalls++;return {package_closed:!busy&&!loading,logged_out:!busy&&!loading};},
+  document:{querySelectorAll:s=>s.includes('pnlFileStorage;tbl')?[grid]:busy?[blocker]:[]},
+  getComputedStyle:()=>({visibility:'visible'}),Ext:{getCmp:id=>id==='grid'?{getStore:()=>({isLoading:()=>loading})}:{$className:'bg.filestorage.view.FileStorageForm'}}};
+ const begin=source.lastIndexOf(' if(',source.indexOf("  await captureSeedCleanup('before_cleanup')")),end=source.indexOf('\n}finally{await context.close();}',begin);
+ assert.ok(begin>0&&end>begin);
+ const helpers=source.slice(source.indexOf('async function captureSeedCleanup('),source.indexOf('// Existing Files UI only;'));
+ const run=runInNewContext(helpers+'\n(async()=>{'+source.slice(begin,end)+'})',context);
+ const finished=run().then(()=>false);
+ const reached=await Promise.race([waiting.promise,finished]);
+ assert.equal(reached,true,'Production seed must wait before calling cleanup');assert.equal(cleanupCalls,0);
+ changed.resolve();await finished;assert.equal(cleanupCalls,1);
+ assert.equal(events[0].blockers[0].tid,'MF;TF-2;FileStorageForm');
+ assert.equal(events.at(-1).cleanup.package_closed,true);
+});
