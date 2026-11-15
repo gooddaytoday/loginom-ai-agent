@@ -10,3 +10,15 @@ test('late hover repaint can rebind only after a complete unchanged graph proof'
 for(const [name,change] of Object.entries({incomplete:g=>g.complete=false,document:g=>g.document_id='other',workflow:g=>g.workflow_ref.workflow_id='other',container:g=>g.dom_epoch++,position:g=>g.nodes[0].position.x++,label:g=>g.nodes[0].label='other',type:g=>g.nodes[0].type='other',input:g=>g.nodes[0].inputs=[],output:g=>g.nodes[0].outputs=[],identity:g=>g.nodes[0].ref.node_id='other',extra:g=>g.nodes.push({...g.nodes[0]}),link:g=>g.links.push({source:'a',target:'b'}),foreign:g=>g.foreign_links.push('other'),busy:g=>g.interaction_ready=false}))test('late hover graph rebinding refuses '+name,()=>{
  const before=graph(),after=graph();change(after);assert.throws(()=>rebindNodeTargetLinkEpochs({graph_baseline:before,nodes:[{id:'a',tid:'A',dom_epoch:2}]},after));
 });
+
+for(const fault of ['none','y','type','role','identity','port'])test('native output boundary horizontal layout during link rebinding: '+fault,()=>{
+ const before=graph();Object.assign(before.nodes[1],{type:'control.supernode_output',boundary_role:'output'});
+ const after=structuredClone(before);after.nodes[1].position.x+=61;
+ if(fault==='y')after.nodes[1].position.y++;
+ if(fault==='type')after.nodes[1].type='calc';
+ if(fault==='role')delete after.nodes[1].boundary_role;
+ if(fault==='identity')after.nodes[1].ref.node_id='foreign';
+ if(fault==='port')after.nodes[1].inputs.push(1);
+ const run=()=>rebindNodeTargetLinkEpochs({graph_baseline:before,nodes:[{id:'b',tid:'B',dom_epoch:3}]},after);
+ if(fault==='none')assert.equal(run()[0].id,'b');else assert.throws(run);
+});
