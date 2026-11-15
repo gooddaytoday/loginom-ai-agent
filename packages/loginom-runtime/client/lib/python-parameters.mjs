@@ -9,6 +9,9 @@ const pythonRefusalHint=reason=>{
   if(kind==='dispatch')return ': the function argument of '+name+' must be an aggregation literal such as "sum", "mean", "count", "nunique", "first" or "cumsum"'+
     ' (or a list or dict of them), a lambda, a def name, len/str/int/float/abs/round/bool or a module function such as np.mean;'+
     ' call '+name+'(...) directly, without *args/**kwargs, and do not store the method or a function name in a variable';
+  if(kind==='attribute'&&/^(?:plot|hist|boxplot)$/.test(name))return ': plotting is unavailable in the node; compute the values instead';
+  if(kind==='parameter'&&name==='rolling')return ': win_type is refused; use rolling(n).mean() or rolling(n).apply(lambda w: ...)';
+  if(kind==='parameter'&&name==='interpolate')return ': use interpolate() or method "linear", "time", "index", "values" or "pad"';
   if(kind==='alias')return ': '+name+' is imported as two different things; import it once, for example import datetime as dt and dt.datetime.now()';
   return '';
 };

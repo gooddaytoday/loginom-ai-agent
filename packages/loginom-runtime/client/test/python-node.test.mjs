@@ -527,3 +527,36 @@ test('dispatch refusal tells the model which function arguments are allowed',()=
  assert.throws(()=>validatePythonParameters({source_text:'df.agg("query", 0, "a")\n',schema_mode:'code'},'script',request()),
   /python-module-v1 \(dispatch:agg at line 1\): the function argument of agg .*"sum".*lambda.*def/);
 });
+
+// LAB-1689 re-review: pandas parameters that name a module or a scipy routine.
+// plot/hist/boxplot(backend=) import the named module (plotting/_core.py:2503);
+// rolling(win_type=) and interpolate(method=) reach scipy by name.
+for(const [source,reason] of [
+ ['import pandas as pd\npd.DataFrame({"a": [1]}).plot(backend="colorsys")\n','attribute:plot'],
+ ['s.plot(backend="colorsys")\n','attribute:plot'],
+ ['df.plot.area(backend="colorsys")\n','attribute:plot'],
+ ['df.hist(backend="colorsys")\n','attribute:hist'],
+ ['df.boxplot(backend="colorsys")\n','attribute:boxplot'],
+ ['x = (df.\n    plot)\n','attribute:plot'],
+ ['x = df.rolling(2, win_type="boxcar").sum()\n','parameter:rolling'],
+ ['x = df.rolling(2, None, False, "boxcar").sum()\n','parameter:rolling'],
+ ['x = df.groupby("k").rolling(2, **{"win_type": "boxcar"}).sum()\n','parameter:rolling'],
+ ['r = df.rolling\nx = r(2, win_type="boxcar")\n','parameter:rolling'],
+ ['x = df.interpolate(method="spline", order=2)\n','parameter:interpolate'],
+ ['x = df.interpolate("spline", order=2)\n','parameter:interpolate'],
+ ['m = "linear"\nx = df.interpolate(method=m)\n','parameter:interpolate'],
+ ['import pandas as pd\nx = pd.Series.interpolate(s, "spline", order=2)\n','parameter:interpolate'],
+ ['x = df.resample("D").interpolate(method="cubicspline")\n','parameter:interpolate'],
+])test('pandas named-module parameter refused: '+reason+' '+JSON.stringify(source.slice(-40)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('interpolate without scipy and plain rolling stay admitted',()=>{
+ for(const source of ['x = df.interpolate()\n','x = df.interpolate(method="linear")\n','x = df["b"].interpolate("time", limit=2)\n',
+  'x = df.interpolate(method="pad")\n','x = df.rolling(3).mean()\ny = df.rolling(3, min_periods=1, center=True).sum()\n','hist = [1, 2]\nplot = len(hist)\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source+JSON.stringify(inspectPythonSourcePolicy(source)));
+ assert.throws(()=>validatePythonParameters({source_text:'df.plot()\n',schema_mode:'code'},'script',request()),/attribute:plot at line 1\): plotting is unavailable/);
+ assert.throws(()=>validatePythonParameters({source_text:'df.rolling(2, win_type="boxcar")\n',schema_mode:'code'},'script',request()),/parameter:rolling at line 1\): .*win_type/);
+ assert.throws(()=>validatePythonParameters({source_text:'df.interpolate("spline")\n',schema_mode:'code'},'script',request()),/parameter:interpolate at line 1\): .*"linear"/);
+});

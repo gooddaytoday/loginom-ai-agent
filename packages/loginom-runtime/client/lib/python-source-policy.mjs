@@ -322,7 +322,13 @@ function inspectModules(code,stage,literals){
 // def, an allowed builtin or from-import never rebound, a module function or a
 // str/int/float method; lists, tuples and dict values of those. Everything else,
 // a string variable included, is refused as dispatch:<method>.
-const DISPATCH=new Set(['agg','aggregate','transform','apply','filter','pivot_table','crosstab','NamedAgg']);
+// Parameters naming a module or scipy routine: rolling(win_type=) reaches
+// getattr(scipy.signal, win_type) (window/rolling.py:1141), interpolate(method=)
+// scipy.interpolate (missing.py:617); plot/hist/boxplot(backend=) import the
+// named module (plotting/_core.py:2503) and are refused as attributes.
+const PARAMETERS=new Set(['rolling','interpolate']),PLOTTING=new Set(['plot','hist','boxplot']);
+const INTERPOLATIONS=new Set(['linear','time','index','values','pad']);
+const DISPATCH=new Set(['agg','aggregate','transform','apply','filter','pivot_table','crosstab','NamedAgg',...PARAMETERS]);
 const DISPATCH_IMPORTS=new Map([['pandas.pivot_table','pivot_table'],['pandas.crosstab','crosstab'],['pandas.NamedAgg','NamedAgg']]);
 // The card's list and pandas/core/groupby/base.py reduction and transformation kernels.
 const AGGREGATIONS=names(`sum mean median min max count size std var sem first last nunique prod any all idxmin idxmax quantile skew kurt
@@ -437,15 +443,23 @@ function inspectDispatch(code,literals,bound,imported){
   const pending=[];
   for(let d=0;d<tokens.length;d++){
     if(imports.has(d))continue;
+    if(tok(prev(d))==='.'&&PLOTTING.has(tok(d)))return refusal('attribute:'+tok(d),lineAt(d));
     const dotted=tok(prev(d))==='.',kind=dotted?DISPATCH.has(tok(d))&&tok(d):DISPATCH_IMPORTS.get(imported.get(tok(d)));
     if(!kind)continue;
-    const refused=refusal('dispatch:'+kind,lineAt(d)),o=next(d);
+    const refused=refusal((PARAMETERS.has(kind)?'parameter:':'dispatch:')+kind,lineAt(d)),o=next(d);
     if(!dotted&&(binding.has(d)||['def','class'].includes(tok(prev(d)))))return refused;
     if(tok(o)!=='('||!match.has(o))return refused;
     const args=items(o).filter((p,k,all)=>p.length||k<all.length-1);
     if(args.some(a=>!a.length||tok(a[0])==='*'))return refused;
     const keyword=a=>a.length>1&&isName(a[0])&&tok(a[1])==='='&&tok(a[2])!=='=';
     const positional=args.filter(a=>!keyword(a)),keywords=new Map(args.filter(keyword).map(a=>[tok(a[0]),a.slice(2)]));
+    // win_type is the 4th parameter of rolling; interpolate takes only the numpy methods.
+    if(kind==='rolling'){if(positional.length>3||keywords.has('win_type'))return refused;continue;}
+    if(kind==='interpolate'){
+      const method=positional[0]??keywords.get('method'),literal=method?.length===1&&tokens[method[0]].literal;
+      if(method&&!(literal?.plain&&INTERPOLATIONS.has(literal.value)))return refused;
+      continue;
+    }
     const head=prev(prev(d)),module=dotted?[...bound.get(tok(head))??[]].find(Boolean)==='pandas'&&tok(prev(head))!=='.':true;
     const slots={agg:[positional[0],keywords.get('func')],aggregate:[positional[0],keywords.get('func')],
       transform:[positional[0],keywords.get('func'),keywords.get('arg')],apply:[positional[0],keywords.get('func')],
