@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { chmod, copyFile, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { dirname, join, relative } from "node:path"
 import { tmpdir } from "node:os"
 import { parsePublication } from "../contract/publication.ts"
 import { buildSources, outputText } from "./build.ts"
@@ -20,11 +20,16 @@ export async function buildNext(input: { jobsIn: string; jobsOut: string; templa
     }
     const result = await buildSources({ work, template: input.template, node: input.node, out: join(work, "build"), signal: input.signal })
     if (result.ok) {
-      await cp(result.dir, join(output, "dist"), { recursive: true })
-      // Publisher can remove accepted output even when its UID differs and capabilities are dropped.
-      await chmod(join(output, "dist"), 0o777)
-      for (const dir of await readdir(join(output, "dist"), { recursive: true, withFileTypes: true })) {
-        if (dir.isDirectory()) await chmod(join(dir.parentPath, dir.name), 0o777)
+      const entries = await readdir(result.dir, { recursive: true, withFileTypes: true })
+      if (entries.some(entry => !entry.isFile() && !entry.isDirectory())) throw Error("DASHBOARD_OUTPUT_FILE")
+      const directories = ["", ...entries.filter(entry => entry.isDirectory()).map(entry => relative(result.dir, join(entry.parentPath, entry.name)))].sort()
+      for (const directory of directories) {
+        // Never recreate a retired output root; every nonempty directory must already be removable by publisher's UID.
+        await mkdir(join(output, "dist", directory))
+        await chmod(join(output, "dist", directory), 0o777)
+      }
+      for (const file of entries.filter(entry => entry.isFile())) {
+        await copyFile(join(file.parentPath, file.name), join(output, "dist", relative(result.dir, join(file.parentPath, file.name))))
       }
     }
     await writeFile(join(output, "result.tmp"), JSON.stringify({ id, sourceHash, outcome: result.ok ? "ready" : "failed", output: result.output }))

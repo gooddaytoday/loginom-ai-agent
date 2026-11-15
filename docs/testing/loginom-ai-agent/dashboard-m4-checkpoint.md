@@ -16,5 +16,5 @@
 - Task 3 cleanup: четыре собственные native sessions закрыты разрешённым maintenance restart; 25 долговечных файлов неизменны, удалён только package lock. Host resource/exit ACK не означает native Logout.
 - Fix 1: manifest/parallel-build RED→GREEN, targeted 30 и publisher 15 PASS; typecheck/build/reinstall/check/cmp PASS без новой публикации.
 - Task 4 accepted (independent review 0 mandatory): источники/base сохраняются, fresh src читается через pre-chat Host, конфликт подтверждается один раз; source/UI/CLI cancellation проверки и пять package typecheck PASS — [runbook](dashboard-m4.md#task-4--продолжение-черновика-и-осознанная-замена-версии).
-- Task 5: source/native failure matrix и container limits PASS; shell сохраняет старую страницу и показывает новую ошибку — [runbook](dashboard-m4.md#task-5--отказы-сохраняют-работающую-версию).
-- Следующее действие: независимый review Task 5; Tasks 6–7 и установленная Desktop/CLI M4 ещё не приняты.
+- Task 5 accepted: независимые Spec/Quality Approved, 0 mandatory; source/native failure matrix, container limits и сохранение страницы PASS — [runbook](dashboard-m4.md#task-5--отказы-сохраняют-работающую-версию).
+- Task 6: source 24/typecheck/build и свежий own container restart/native rollback PASS; следующий gate — независимый review Task 6. Task 7 и установленная Desktop/CLI M4 не приняты — [runbook](dashboard-m4.md#task-6--откат-удаление-и-перезапуск-worker).

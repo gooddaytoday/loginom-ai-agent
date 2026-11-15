@@ -13,9 +13,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const jobsOut = process.env.DASHBOARD_JOBS_OUT ?? "/jobs-out"
   if (process.argv[2] === "web") startDashboard()
   else if (process.argv[2] === "publisher") {
+    const publications = { storage: process.env.DASHBOARD_STORAGE ?? "/storage", builds: process.env.DASHBOARD_BUILDS ?? "/builds", jobsIn, jobsOut }
+    await scanPublications({ ...publications, restart: true })
     while (true) {
-      await scanPublications({ storage: process.env.DASHBOARD_STORAGE ?? "/storage", builds: process.env.DASHBOARD_BUILDS ?? "/builds", jobsIn, jobsOut })
       await setTimeout(10_000)
+      await scanPublications(publications)
     }
   } else if (process.argv[2] === "builder") {
     while (true) {

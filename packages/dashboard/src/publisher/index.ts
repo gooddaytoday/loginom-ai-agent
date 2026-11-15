@@ -8,11 +8,19 @@ import { outputText, treeHash } from "../builder/build.ts"
 
 type Entry = { sourceHash?: string; key?: string; status: "pending" | "building" | "ready" | "failed"; buildHash?: string; error?: string }
 
-export async function scanPublications(input: { storage: string; builds: string; jobsIn: string; jobsOut: string; signal?: AbortSignal }) {
+export async function scanPublications(input: { storage: string; builds: string; jobsIn: string; jobsOut: string; restart?: boolean; signal?: AbortSignal }) {
   const state: Record<string, Entry> = await readFile(join(input.builds, "state.json"), "utf8").then(JSON.parse).catch(error => {
     if (error.code === "ENOENT") return {}
     throw error
   })
+  if (input.restart) {
+    for (const root of [input.jobsIn, input.jobsOut]) {
+      for (const id of await readdir(root)) {
+        if (/^[a-f0-9]{64}$/.test(id)) await rm(join(root, id), { recursive: true, force: true })
+      }
+    }
+    for (const entry of Object.values(state)) if (entry.status === "building") entry.status = "pending"
+  }
   const files = (await readdir(input.storage, { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => "/" + relative(input.storage, join(entry.parentPath, entry.name)).split(sep).join("/"))
@@ -90,11 +98,15 @@ export async function scanPublications(input: { storage: string; builds: string;
     await rm(join(input.jobsIn, id), { recursive: true, force: true })
     await rm(join(input.jobsOut, id), { recursive: true, force: true })
   }
-  if (!(await readdir(input.jobsIn)).some(name => /^[a-f0-9]{64}$/.test(name))) {
+  const active = (await readdir(input.jobsIn)).filter(name => /^[a-f0-9]{64}$/.test(name))
+  for (const id of await readdir(input.jobsOut)) {
+    if (/^[a-f0-9]{64}$/.test(id) && !active.includes(id)) await rm(join(input.jobsOut, id), { recursive: true, force: true })
+  }
+  if (!active.length) {
     const pending = Object.entries(state).find(([path, entry]) => entry.status === "pending" && captured.has(path))
     if (pending) {
       const [path, entry] = pending
-      const id = createHash("sha256").update(path).update(entry.sourceHash!).digest("hex")
+      const id = createHash("sha256").update(path).update(entry.sourceHash!).update(randomUUID()).digest("hex")
       await rm(join(input.jobsOut, id), { recursive: true, force: true })
       await mkdir(join(input.jobsOut, id), { mode: 0o777 })
       await chmod(join(input.jobsOut, id), 0o777)
@@ -109,6 +121,14 @@ export async function scanPublications(input: { storage: string; builds: string;
   const temporary = join(input.builds, `.state-${randomUUID()}`)
   await writeFile(temporary, JSON.stringify(state))
   await rename(temporary, join(input.builds, "state.json"))
+  const retained = new Set(Object.values(state).filter(entry => entry.status === "ready").map(entry => `${entry.key}/${entry.buildHash}`))
+  for (const key of await readdir(input.builds, { withFileTypes: true })) {
+    if (!key.isDirectory() || !/^[a-f0-9]{64}$/.test(key.name)) continue
+    for (const build of await readdir(join(input.builds, key.name), { withFileTypes: true })) {
+      if (build.isDirectory() && /^[a-f0-9]{64}$/.test(build.name) && !retained.has(`${key.name}/${build.name}`))
+        await rm(join(input.builds, key.name, build.name), { recursive: true, force: true })
+    }
+  }
 }
 
 async function readBounded(path: string, limit: number) {

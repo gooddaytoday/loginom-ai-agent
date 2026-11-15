@@ -1,6 +1,6 @@
 # Dashboard M4: публикация через хранилище
 
-Статус: Tasks 0–4 приняты независимыми review; Task 5 реализована и проверена, ожидается независимый полный review. Это не приёмка установленной M4. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
+Статус: Tasks 0–5 приняты независимыми review; Task 6 реализована и проверена, ожидается независимый полный review. Это не приёмка установленной M4. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
 
 M3 завершена: установленная Linux-приёмка, CI и независимые ревью PASS. Её результаты, ограничения URI dispatch/Windows/macOS и исходные артефакты сохраняются в [runbook M3](dashboard-m3.md). Они не подтверждают новый M4. Первый проверяемый результат реализации — закрытый host-вызов через авторизованную Studio на обеих версиях, затем публикация проверенных исходников до `ready` и открытия Dashboard.
 
@@ -216,4 +216,27 @@ Shell теперь показывает ошибку новой публикац
 
 Evidence хранится в `$M4_SCRATCH/task5-*`; команды и точная граница каждой проверки — в локальном отчёте Task 5. Browser shell проверяется как rebuilt source bundle под закреплённым Chromium. Контейнерные проверки использовали собственный image с побайтным совпадением серверного bundle; это не установленная приёмка Desktop/CLI. Исторический Knowledge UNKNOWN сохраняется. Tasks 6–7, миграция, push/merge/release этим этапом не выполнялись.
 
-Итоговые проверки Task 5: dashboard package 27 web + 68 остальных, folder/publish 44, shell browser 43, build 67, Host 71, runtime 19, Desktop 5, opencode 27, App browser 2 и unit 59, UI 23 — PASS. Web coverage: 97,13% строк / 96,30% функций. Dashboard typecheck/build PASS; остальные package typecheck переиспользованы из Task 4 при неизменном коде. После адресного исправления длинной диагностики browser regression повторён и прошёл; остальные результаты не повторялись. Измеренный бюджет оболочки обновлён после narrow independent review Approved/0 mandatory; фактическое измерение и запас — в [check-size.ts](../../../packages/dashboard/script/check-size.ts). Проверка размера PASS, runtime/security лимиты прежние. Следующий gate — независимый полный review Task 5.
+Итоговые проверки Task 5: dashboard package 27 web + 68 остальных, folder/publish 44, shell browser 43, build 67, Host 71, runtime 19, Desktop 5, opencode 27, App browser 2 и unit 59, UI 23 — PASS. Web coverage: 97,13% строк / 96,30% функций. Dashboard typecheck/build PASS; остальные package typecheck переиспользованы из Task 4 при неизменном коде. После адресного исправления длинной диагностики browser regression повторён и прошёл; остальные результаты не повторялись. Измеренный бюджет оболочки обновлён после narrow independent review Approved/0 mandatory; фактическое измерение и запас — в [check-size.ts](../../../packages/dashboard/script/check-size.ts). Проверка размера PASS, runtime/security лимиты прежние. Task 5 принята независимым review: Spec Approved и Quality Approved, обязательных замечаний нет.
+
+
+## Task 6 — откат, удаление и перезапуск worker
+
+Файловые проверки с настоящим HTTP lookup подтверждают A ready → B failed → удалить B → C ready → удалить C → A без новой сборки; удаление последней папки отключает dashboard. Сборка с общим hash остаётся, пока существует хотя бы один ready-исходник. Старый результат удалённого/заменённого JSON не активируется, поздняя готовность старого имени не откатывает более новое. Смена байтов того же имени инвалидирует статус; неизменный failed повторно не собирается. Посторонние имена в служебных roots не удаляются.
+
+Первый scan после старта сохраняет проверенные ready/failed, сбрасывает building в pending и удаляет прежние jobs до чтения manifests. Новая попытка получает случайную составляющую ID, поэтому manifest живого старого builder не относится к ней. Выходы без входного job удаляются каждым обходом. После атомарного state удаляются только невостребованные каталоги сборок. Builder копирует обычные файлы в нерекурсивно созданные подкаталоги с правами 0777 до записи детей; удалённый publisher корень он не восстанавливает. Новых служб, журнала и повторных сетевых операций нет.
+
+Проверки исходников из `packages/dashboard`:
+
+```sh
+"$LOGINOM_AI_AGENT_TEST_NODE" --test test/publisher/publisher.test.mjs test/builder/build.test.mjs
+bun typecheck
+bun run build
+```
+
+Результат: 24/24 теста, typecheck и build PASS. Три изменения подтверждены RED→GREEN: удаление невостребованной сборки, чистая повторная выдача после restart и запрет воссоздания старого output. Остальные гонки уже работали и получили адресные GREEN-проверки. Перед изменением builder отдельный опыт подтвердил EACCES/EPERM старого recursive copy при разных UID и удаляемость пустого каталога до chmod; пять утверждений PASS.
+
+На собственном dev-master установлен новый образ штатным offline-рецептом. Server bundle побайтно совпал с текущим dist и копией state; все три роли используют этот образ. Две native публикации через авторизованную минифицированную Studio дали отдельные завершения builder с exit 0 и три разных host PID/StartedAt, restart count 0 → 1 → 2. Каталоги dist/assets созданы UID 1000 с 0777 и удалены publisher UID 0 при cap_drop ALL.
+
+При третьей публикации настоящий builder приостановлен во время компиляции; publisher остановлен, в старый output внесён искусственный stale manifest и publisher запущен заново. Готовые state/builds сохранились, появился один новый ID с пустым output. Поздний старый manifest удалён при активной новой задаче. После продолжения старый процесс вышел с ENOENT/exit 1, не восстановив output; штатный restart запустил свежий builder, который завершил новую попытку exit 0/ready. Publisher и builder оставались без сети; native read-back подтвердил прежние исходники без перепубликации. Два native DeleteFile через Studio вернули C → B → A без job. `.lgp` побайтно прежний, Logout подтверждён, 17 исходных контейнеров сохранили ID/статус/StartedAt.
+
+Evidence и одноразовые probes остаются в `$M4_SCRATCH/task6-*`; исходные tests и actual-container proof разделены в локальном отчёте Task 6. Штатный installer check также PASS: HTTP/headers/assets, минифицированный `/app/` и `/app-debug/`, live table API, Close+Logout. Это dev-container проверка master, не установленная приёмка Desktop/CLI M4. Внешняя corruption сохранённых сборок и crash-temp housekeeping не входят в контракт. Task 7, миграция, push/merge/release не выполнялись; следующий gate — независимый review Task 6.
