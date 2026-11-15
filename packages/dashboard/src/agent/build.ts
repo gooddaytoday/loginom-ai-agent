@@ -90,7 +90,10 @@ export async function buildDashboard(input: {
     }
     const hash = await treeHash(join(staging, "dist"))
     const retained = input.publication && join(input.publication.operation, "dist")
-    if (retained) await cp(join(staging, "dist"), retained, { recursive: true })
+    if (retained) {
+      await cp(join(staging, "dist"), retained, { recursive: true })
+      await cp(join(staging, "src"), join(input.publication!.operation, "src"), { recursive: true })
+    }
     const installed = commits.then(async () => {
       const dir = join(input.out, hash)
       if (!existsSync(dir)) await rename(join(staging, "dist"), dir)

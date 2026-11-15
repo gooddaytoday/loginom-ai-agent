@@ -1,4 +1,4 @@
-import { expect } from "bun:test"
+import { afterEach, expect } from "bun:test"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
@@ -7,10 +7,13 @@ import { Session } from "@/session/session"
 import { MessageID } from "@/session/schema"
 import { DashboardDraftTool, DashboardPublishTool } from "@/tool/dashboard"
 import { Agent } from "@/agent/agent"
+import { ToolJsonSchema } from "@/tool/json-schema"
 import { Tool } from "@/tool/tool"
 import { Truncate } from "@/tool/truncate"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { AppProcess } from "@opencode-ai/core/process"
+import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
+import { createHash } from "node:crypto"
 import { join, resolve } from "node:path"
 import { mkdir, readdir, rm, symlink } from "node:fs/promises"
 import { prepareDashboard } from "@loginom-ai-agent/dashboard/agent/folder"
@@ -28,6 +31,31 @@ import { ToolRegistry } from "@/tool/registry"
 import { TestConfig } from "../fixture/config"
 import { provideInstance, TestInstance, testInstanceStoreLayer } from "../fixture/fixture"
 import { pollWithTimeout, testEffect } from "../lib/effect"
+
+type HostRequest = { method: string; input: { content?: string; expected?: unknown; scope?: unknown } }
+function publicationHost(options: { error?: string; latest?: { name: string; sourceHash: string }; changed?: boolean } = {}) {
+  const requests: HostRequest[] = []
+  let receive: ((event: { data: unknown }) => void) | undefined
+  LoginomHost.connect({
+    start() {},
+    on(_event, listener) { receive = listener },
+    postMessage(value) {
+      const request = value as HostRequest & { id: string }
+      requests.push(request)
+      if (request.method === "dashboardPublish" && options.error)
+        return receive?.({ data: { id: request.id, error: options.error } })
+      const result = request.method === "acquire" ? { generation: 1 }
+        : request.method === "scope" ? request.input.scope
+        : request.method === "dashboardRead" ? (options.latest ? { version: options.latest, content: "{}" } : null)
+        : request.method === "dashboardPublish" && options.changed ? { status: "changed", latest: options.latest ?? null }
+        : request.method === "dashboardPublish" ? { status: "written", version: { name: "20261115T120000Z.json", sourceHash: createHash("sha256").update(request.input.content!).digest("hex") } }
+        : true
+      receive?.({ data: { id: request.id, result } })
+    },
+  })
+  return requests
+}
+afterEach(() => LoginomHost.disconnect())
 
 const it = testEffect(Layer.mergeAll(
   LayerNode.compile(LayerNode.group([Agent.node, Session.node, SessionProjector.node, RuntimeFlags.node, Truncate.node, FSUtil.node, AppProcess.node, Permission.node, Plugin.node, MCP.node, ToolRegistry.node]), [
@@ -109,6 +137,7 @@ it.instance("dashboard_draft limits the complete diagnostic output to whole UTF-
 for (const reply of ["reject", "abort", "once"] as const) {
   it.instance("publishing with a global allow still asks once for the bound node and package: " + reply, () => Effect.gen(function* () {
     const folder = yield* publicationFolder()
+    const requests = publicationHost()
     const flags = yield* RuntimeFlags.Service
     yield* Effect.gen(function* () {
       const sessions = yield* Session.Service
@@ -144,14 +173,16 @@ for (const reply of ["reject", "abort", "once"] as const) {
       expect(request.permission).toBe("dashboard_publish")
       expect(request.patterns).toEqual([binding.nodeName, binding.binding.packagePath])
       expect(request.always).toEqual([])
+      expect(requests.map(item => item.method)).toEqual(["acquire", "scope", "dashboardRead", "release"])
       if (reply === "abort") controller.abort()
       else yield* permissions.reply({ requestID: request.id, reply })
       const exit = yield* Fiber.join(fiber)
       if (reply === "reject") expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toBeInstanceOf(PermissionV1.RejectedError)
       if (reply === "abort") expect(Exit.isFailure(exit)).toBe(true)
       if (reply === "once") expect(Exit.isSuccess(exit) && exit.value).toMatchObject({
-        title: "Публикация dashboard", output: "failed: Публикация на этот стенд появится в следующей версии",
+        title: "Публикация dashboard", output: expect.stringMatching(/^pending: Исходники переданы/),
       })
+      expect(requests.filter(item => item.method === "dashboardPublish")).toHaveLength(reply === "once" ? 1 : 0)
       expect((yield* permissions.list()).filter(item => item.sessionID === session.id)).toEqual([])
       expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
       expect((yield* Effect.promise(() => readdir(join(folder.work, "../control")))).filter(item => item.startsWith(".publish-"))).toEqual([])
@@ -208,5 +239,65 @@ it.instance("publication limits the complete model output to whole UTF-8 code po
     expect(result.output.endsWith("🟢")).toBe(true)
     expect(Buffer.byteLength(result.output + "🟢")).toBeGreaterThan(8192)
     expect(result.output).not.toContain("�")
+  }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
+}))
+
+for (const code of ["DASHBOARD_ACCESS_DENIED", "DASHBOARD_VERSION_EXISTS", "DASHBOARD_WRITE_UNKNOWN", "LOGINOM_RUNTIME_CLEANUP_FAILED"]) {
+it.instance("host failure preserves the draft and its specific reason without retry: " + code, () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const requests = publicationHost({ error: code })
+  const flags = yield* RuntimeFlags.Service
+  yield* Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create()
+    const definition = yield* DashboardPublishTool
+    const tool = yield* definition.init()
+    const result = yield* tool.execute({}, {
+      sessionID: session.id, messageID: MessageID.ascending(), agent: "build", messages: [],
+      abort: new AbortController().signal, metadata: () => Effect.void, ask: () => Effect.void,
+    })
+    expect(result.output).toContain(code)
+    if (code === "DASHBOARD_ACCESS_DENIED") expect(result.output).toContain("Недостаточно прав")
+    if (code === "DASHBOARD_WRITE_UNKNOWN") expect(result.output).toContain("автоматически не выполняется")
+    expect(requests.filter(item => item.method === "dashboardPublish")).toHaveLength(1)
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).exists())).toBe(true)
+  }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
+}))
+
+}
+
+it.instance("a changed server version requires new confirmation and preserves edited sources", () => Effect.gen(function* () {
+  const folder = yield* publicationFolder()
+  const latest = { name: "20261115T110000Z.json", sourceHash: "a".repeat(64) }
+  const requests = publicationHost({ latest, changed: true })
+  const flags = yield* RuntimeFlags.Service
+  yield* Effect.gen(function* () {
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create()
+    const definition = yield* DashboardPublishTool
+    const tool = yield* definition.init()
+    expect(ToolJsonSchema.fromSchema(tool.parameters)).toMatchObject({ properties: {} })
+    const before = yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).text())
+    let approvedHash = ""
+    const result = yield* tool.execute({}, {
+      sessionID: session.id, messageID: MessageID.ascending(), agent: "build", messages: [],
+      abort: new AbortController().signal, metadata: () => Effect.void,
+      ask: request => Effect.promise(async () => {
+        expect(request.metadata).toMatchObject({ base: null, latest, conflict: true })
+        if (typeof request.metadata.sourceHash !== "string") throw Error("Missing approved source hash")
+        approvedHash = request.metadata.sourceHash
+        await Bun.write(join(folder.work, "src/main.tsx"), "document.body.textContent = 'new local draft'")
+      }),
+    })
+    expect(result.output).toStartWith("needs-confirmation:")
+    const writes = requests.filter(item => item.method === "dashboardPublish")
+    expect(writes).toHaveLength(1)
+    expect(writes[0].input.expected).toEqual(latest)
+    const content = writes[0].input.content!
+    expect(createHash("sha256").update(content).digest("hex")).toBe(approvedHash)
+    expect(JSON.parse(content).files.find((file: { path: string }) => file.path === "src/main.tsx").content).toBe(before)
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "src/main.tsx")).text())).toContain("new local draft")
+    expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
   }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
 }))

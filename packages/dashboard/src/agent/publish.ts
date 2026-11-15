@@ -1,18 +1,16 @@
-import { existsSync, statSync } from "node:fs"
-import { chmod, cp, mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises"
-import { homedir } from "node:os"
+import { createHash } from "node:crypto"
+import { readFile, realpath } from "node:fs/promises"
 import { join } from "node:path"
-import { open } from "#sqlite"
 import { Option, Schema } from "effect"
-import { LookupResponse } from "../contract/snapshot.ts"
-import { buildDashboard } from "./build.ts"
+import { parsePublication, PublicationVersion, PublicationWrite } from "../contract/publication.ts"
+import { buildDashboard, sourceFiles } from "./build.ts"
 import { NO_SAMPLE } from "./draft.ts"
-import { readDashboardSnapshot, removePublishedSample, type ControlBinding } from "./folder.ts"
+import { readDashboardSnapshot, type ControlBinding } from "./folder.ts"
 import type { DashboardResources } from "./resources.ts"
 
 export { embeddedValues, outputText } from "./build.ts"
 
-type Prepared = { control: ControlBinding; build: { hash: string; dir: string } }
+type Prepared = { publication: { content: string; sourceHash: string }; control: ControlBinding; build: { hash: string; dir: string } }
 
 export async function preparePublish(input: { work: string; operation: string; resources: DashboardResources; signal?: AbortSignal }):
   Promise<({ ok: true } & Prepared) | { ok: false; text: string }> {
@@ -24,58 +22,44 @@ export async function preparePublish(input: { work: string; operation: string; r
     publication: { operation: input.operation, sample: saved.sample }, signal: input.signal,
   })
   if (!build.ok) return { ok: false, text: "Сборка не удалась.\n" + build.output }
-  return { ok: true, control: saved.control, build: { hash: build.hash, dir: build.dir } }
+  const captured = await sourceFiles(input.operation)
+  if ("error" in captured) return { ok: false, text: captured.error }
+  const content = JSON.stringify({
+    format: 1, template: 1, binding: saved.control.binding, title: saved.control.nodeName,
+    parameters: saved.snapshot.parameters.map(parameter => ({ name: parameter.name, label: parameter.name })),
+    files: await Promise.all(captured.files.map(async path => {
+      const bytes = await readFile(join(input.operation, path))
+      const binary = /\.(png|jpg|webp|woff2)$/i.test(path)
+      return { path, encoding: binary ? "base64" : "utf8", content: binary ? bytes.toString("base64") : new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) }
+    })),
+  })
+  try {
+    parsePublication(content)
+  } catch (error) {
+    return { ok: false, text: error instanceof Error && error.message === "DASHBOARD_PUBLICATION_TOO_LARGE"
+      ? "Файл публикации вместе с метаданными и base64 превышает 1 МБ. Уменьшите исходники."
+      : "Файл публикации не соответствует формату dashboard v1." }
+  }
+  return { ok: true, control: saved.control, publication: { content, sourceHash: createHash("sha256").update(content).digest("hex") }, build: { hash: build.hash, dir: build.dir } }
 }
 
-export async function finishPublish(input: Prepared & { work: string; builds?: string; fetch?: typeof fetch }):
-  Promise<{ status: "published" | "failed"; text: string }> {
-  const builds = input.builds ?? join(homedir(), "loginom-dashboard/builds")
-  let db: ReturnType<typeof open> | undefined
-  try {
-    const origin = URL.parse(input.control.origin)
-    if (!origin || origin.origin !== input.control.origin || !["http:", "https:"].includes(origin.protocol) ||
-        !["localhost", "127.0.0.1"].includes(origin.hostname) || !statSync(builds, { throwIfNoEntry: false })?.isDirectory())
-      return { status: "failed", text: "Публикация на этот стенд появится в следующей версии" }
-    const keyDir = join(builds, input.control.key)
-    await mkdir(keyDir, { recursive: true })
-    db = open(join(keyDir, "publish.sqlite"))
-    // A second publisher must return immediately, including while the first reads the lookup body.
-    db.exec("PRAGMA busy_timeout = 0; BEGIN IMMEDIATE")
-    const hash = input.build.hash
-    const directory = join(keyDir, hash)
-    if (!existsSync(directory)) {
-      const staging = await mkdtemp(join(keyDir, ".install-"))
-      try {
-        await cp(input.build.dir, staging, { recursive: true })
-        await chmod(staging, 0o755)
-        await rename(staging, directory)
-      } finally {
-        await rm(staging, { recursive: true, force: true })
-      }
-    }
-    const pointer = join(keyDir, ".current.tmp")
-    await writeFile(pointer, hash + "\n")
-    await rename(pointer, join(keyDir, "current"))
-    const response = await (input.fetch ?? fetch)(input.control.origin + "/dashboard/lookup", {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input.control.binding),
-      redirect: "error", signal: AbortSignal.timeout(10_000),
-    })
-    const lookup = response.ok && Schema.decodeUnknownOption(LookupResponse)(await response.json())
-    if (!lookup || Option.isNone(lookup) || lookup.value.hash !== hash)
-      return { status: "failed", text: "Стенд не подтвердил хеш сборки." }
-  } catch (error) {
-    if (error instanceof Error && (("errcode" in error && error.errcode === 5) || ("code" in error && error.code === "SQLITE_BUSY")))
-      return { status: "failed", text: "Этот dashboard занят другой публикацией. Попробуйте ещё раз." }
-    return { status: "failed", text: "Не удалось опубликовать dashboard: " + (error instanceof Error ? error.message : String(error)) }
-  } finally {
-    db?.close()
+export async function finishPublish(input: Prepared & {
+  work: string
+  signal?: AbortSignal
+  expected: PublicationVersion | null
+  publish: (request: { origin: string; binding: ControlBinding["binding"]; content: string; expected: PublicationVersion | null }, signal?: AbortSignal) => Promise<PublicationWrite>
+}) {
+  input.signal?.throwIfAborted()
+  const result = Schema.decodeUnknownOption(PublicationWrite, { onExcessProperty: "error" })(await input.publish({
+    origin: input.control.origin, binding: input.control.binding, content: input.publication.content, expected: input.expected,
+  }, input.signal))
+  if (Option.isNone(result)) throw Error("DASHBOARD_WRITE_UNKNOWN")
+  if (result.value.status === "changed") return {
+    status: "needs-confirmation" as const, text: "Версия на стенде изменилась. Публикация не начата; подтвердите локальный черновик заново.",
   }
-
-  const text = "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard"
-  try {
-    removePublishedSample(input.work, input.control.snapshotId)
-  } catch {
-    return { status: "published", text: text + "\nНе удалось проверить удаление локального образца. Для дальнейшей правки нажмите «Изменить в чате» в Studio." }
+  if (result.value.version.sourceHash !== input.publication.sourceHash) throw Error("DASHBOARD_WRITE_UNKNOWN")
+  return {
+    status: "pending" as const, version: result.value.version,
+    text: "Исходники переданы в Loginom. Готовность сборки на стенде ещё не подтверждена.",
   }
-  return { status: "published", text }
 }

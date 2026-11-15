@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import assert from "node:assert/strict"
 import fs from "node:fs/promises"
 import { syncBuiltinESMExports } from "node:module"
@@ -13,7 +14,7 @@ import { embeddedValues, preparePublish, finishPublish } from "../../src/agent/p
 import { dashboardServer } from "../../src/web/server.ts"
 
 const resources = { template: resolve(import.meta.dirname, "../../template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE }
-const published = { status: "published", text: "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard" }
+const confirmed = prepared => ({ expected: null, publish: async () => ({ status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash } }) })
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "publish-"))
@@ -31,7 +32,7 @@ async function fixture(t) {
   })
   async function refresh() {
     const response = await post("snapshots", {
-      binding, nodeName: "Заказы", published: false, parameters: [],
+      binding, nodeName: "Заказы", published: false, parameters: [{ name: "Budget", value: 100 }],
       sample: { schema: [{ name: "region", type: "string" }, { name: "total", type: "number" }], rows: [["Москва-Север", 123456], ["Юг", 7]] },
     })
     assert.equal(response.status, 201)
@@ -51,24 +52,22 @@ async function tree(dir) {
   return result
 }
 
-test("the stand serves the exact build retained for confirmation", async t => {
+test("prepare retains checked sources and serializes trusted metadata without sample", async t => {
   const input = await fixture(t)
+  await writeFile(join(input.work, "src/main.tsx"), '\uFEFFdocument.body.textContent = "Привет 🟢"')
+  const image = Buffer.from([0, 128, 255, 1])
+  await writeFile(join(input.work, "src/logo.png"), image)
   const prepared = await preparePublish(input)
   assert.equal(prepared.ok, true, prepared.text)
-  const { build, control } = prepared
-  assert.equal(build.dir, join(input.operation, "dist"))
-  const expected = await tree(build.dir)
-  assert.ok(expected["index.html"])
-  assert.deepEqual(await tree(join(input.work, "../control/draft", build.hash)), expected)
-  assert.deepEqual(await finishPublish({ ...input, ...prepared }), published)
-  const key = join(input.builds, control.key)
-  if (process.platform !== "win32") assert.ok((await fs.stat(join(key, build.hash))).mode & 0o001, "another UID can traverse the published build")
-  assert.deepEqual(await tree(join(key, build.hash)), expected)
-  assert.equal(await readFile(join(key, "current"), "utf8"), build.hash + "\n")
-  assert.equal((await input.lookup()).hash, build.hash)
-  await assert.rejects(readFile(join(input.work, "sample.json")), { code: "ENOENT" })
-  assert.ok(await readFile(join(input.work, "snapshot.json")))
-  assert.ok(await readFile(join(input.work, "../control/binding.json")))
+  const content = JSON.parse(prepared.publication.content)
+  assert.deepEqual(content.binding, prepared.control.binding)
+  assert.equal(content.title, "Заказы")
+  assert.deepEqual(content.parameters, [{ name: "Budget", label: "Budget" }])
+  assert.deepEqual(Buffer.from(content.files.find(file => file.path === "src/logo.png").content, "base64"), image)
+  assert.equal(content.sample, undefined)
+  assert.deepEqual(await tree(join(input.operation, "src")), await tree(join(input.work, "src")))
+  assert.equal(content.files.find(file => file.path === "src/main.tsx").content, await readFile(join(input.work, "src/main.tsx"), "utf8"))
+  assert.equal(prepared.publication.sourceHash, createHash("sha256").update(prepared.publication.content).digest("hex"))
 })
 
 test("publication checks sample values in every captured file including binary assets", async t => {
@@ -91,19 +90,6 @@ test("publication checks sample values in every captured file including binary a
   assert.equal((await preparePublish(input)).ok, true)
 })
 
-test("remote stands and absent local builds directories are left untouched", async t => {
-  const input = await fixture(t)
-  const prepared = await preparePublish(input)
-  assert.equal(prepared.ok, true)
-  const unavailable = { status: "failed", text: "Публикация на этот стенд появится в следующей версии" }
-  const noNetwork = () => { throw Error("Unexpected lookup") }
-  assert.deepEqual(await finishPublish({ ...input, ...prepared, control: { ...prepared.control, origin: "http://192.0.2.1:32768" }, fetch: noNetwork }), unavailable)
-  assert.deepEqual(await readdir(input.builds), [])
-  await rm(input.builds, { recursive: true })
-  assert.deepEqual(await finishPublish({ ...input, ...prepared, fetch: noNetwork }), unavailable)
-  await assert.rejects(readdir(input.builds), { code: "ENOENT" })
-})
-
 test("an accepted publication leaves a newer sample with identical rows intact", async t => {
   const input = await fixture(t)
   const prepared = await preparePublish(input)
@@ -111,51 +97,9 @@ test("an accepted publication leaves a newer sample with identical rows intact",
   await input.refresh()
   const current = JSON.parse(await readFile(join(input.work, "../control/binding.json"), "utf8"))
   assert.notEqual(current.snapshotId, prepared.control.snapshotId)
-  assert.deepEqual(await finishPublish({ ...input, ...prepared }), published)
+  assert.equal((await finishPublish({ ...input, ...prepared, ...confirmed(prepared) })).status, "pending")
   const sample = JSON.parse(await readFile(join(input.work, "sample.json"), "utf8"))
   assert.deepEqual(sample.rows, [["Москва-Север", 123456], ["Юг", 7]])
-})
-
-test("a concurrent publisher is busy until the full lookup body is read and can retry", async t => {
-  const input = await fixture(t)
-  const prepared = await preparePublish(input)
-  assert.equal(prepared.ok, true)
-  const request = { ...input, ...prepared }
-  const reading = Promise.withResolvers()
-  const release = Promise.withResolvers()
-  const first = finishPublish({
-    ...request,
-    fetch: async (url, options) => {
-      const response = await fetch(url, options)
-      return new Response(new ReadableStream({
-        async pull(controller) {
-          reading.resolve()
-          await release.promise
-          controller.enqueue(new Uint8Array(await response.arrayBuffer()))
-          controller.close()
-        },
-      }))
-    },
-  })
-  try {
-    await reading.promise
-    const concurrent = await finishPublish(request)
-    assert.equal(concurrent.status, "failed")
-    assert.match(concurrent.text, /занят/)
-    assert.ok(await readFile(join(input.work, "sample.json")))
-    const other = await fixture(t)
-    const independent = await preparePublish(other)
-    assert.equal(independent.ok, true)
-    // Use a second binding on the same stand while the original lookup is still reading.
-    assert.deepEqual(await finishPublish({
-      ...other, ...independent, builds: input.builds, control: { ...independent.control, origin: prepared.control.origin },
-    }), published)
-  } finally {
-    release.resolve()
-    assert.deepEqual(await first, published)
-  }
-  assert.deepEqual(await finishPublish(request), published)
-  assert.deepEqual((await readdir(join(input.builds, prepared.control.key))).filter(name => /^[a-f0-9]{64}$/.test(name)), [prepared.build.hash])
 })
 
 test("edits to live src cannot conceal a sample value in the captured build", async t => {
@@ -180,20 +124,27 @@ test("edits to live src cannot conceal a sample value in the captured build", as
   assert.deepEqual(await readdir(input.builds), [])
 })
 
-test("two subsequent draft builds cannot prune a build awaiting confirmation", async t => {
+test("approved sources survive edits and draft pruning", async t => {
   const input = await fixture(t)
-  const approved = await preparePublish(input)
-  assert.equal(approved.ok, true)
-  const expected = await tree(approved.build.dir)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true)
   const out = join(input.work, "../control/draft")
   for (const text of ["second", "third"]) {
     await writeFile(join(input.work, "src/main.tsx"), "document.body.textContent = " + JSON.stringify(text))
     const next = await buildDashboard({ work: input.work, ...resources, out })
     assert.equal(next.ok, true, next.output)
   }
-  await assert.rejects(readdir(join(out, approved.build.hash)), { code: "ENOENT" })
-  assert.deepEqual(await finishPublish({ ...input, ...approved }), published)
-  assert.deepEqual(await tree(join(input.builds, approved.control.key, approved.build.hash)), expected)
+  await assert.rejects(readdir(join(out, prepared.build.hash)), { code: "ENOENT" })
+  let transferredContent
+  const result = await finishPublish({ ...input, ...prepared, expected: null, publish: async request => {
+    transferredContent = request.content
+    assert.deepEqual(request.binding, prepared.control.binding)
+    assert.equal(request.expected, null)
+    return { status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash } }
+  } })
+  assert.equal(transferredContent, prepared.publication.content)
+  assert.equal(result.status, "pending")
+  assert.ok(await readFile(join(input.work, "sample.json")))
 })
 
 test("missing sample stops preparation before building", async t => {
@@ -218,28 +169,6 @@ test("a type error returns compiler diagnostics and leaves the stand current alo
   assert.equal(await readFile(current, "utf8"), previous)
 })
 
-test("a different hash in lookup preserves the sample", async t => {
-  const input = await fixture(t)
-  const prepared = await preparePublish(input)
-  assert.equal(prepared.ok, true)
-  const result = await finishPublish({
-    ...input, ...prepared,
-    fetch: async () => Response.json({ ...await input.lookup(), hash: "f".repeat(64) }),
-  })
-  assert.equal(result.status, "failed")
-  assert.ok(await readFile(join(input.work, "sample.json")))
-})
-
-test("an unusable stand key directory reports failure and retains the sample", async t => {
-  const input = await fixture(t)
-  const prepared = await preparePublish(input)
-  assert.equal(prepared.ok, true)
-  await writeFile(join(input.builds, prepared.control.key), "occupied")
-  const result = await finishPublish({ ...input, ...prepared })
-  assert.equal(result.status, "failed")
-  assert.ok(await readFile(join(input.work, "sample.json")))
-})
-
 test("embedded-value diagnostics stay within the builder budget and explain public access", async t => {
   const input = await fixture(t)
   const text = "Ж".repeat(8192)
@@ -252,21 +181,50 @@ test("embedded-value diagnostics stay within the builder budget and explain publ
   assert.ok(Buffer.byteLength(result.text.split("\n").slice(1).join("\n")) <= 8192)
 })
 
-test("confirmed publication survives loss of the local work folder", async t => {
+test("confirmed transfer survives loss of the local work folder", async t => {
   const input = await fixture(t)
   const prepared = await preparePublish(input)
   assert.equal(prepared.ok, true)
-  await rm(input.work, { recursive: true })
-  const result = await finishPublish({ ...input, ...prepared })
-  assert.equal((await input.lookup()).hash, prepared.build.hash)
-  assert.equal(await readFile(join(input.builds, prepared.control.key, "current"), "utf8"), prepared.build.hash + "\n")
-  assert.equal(result.status, "published")
-  assert.ok(result.text.startsWith(published.text))
-  assert.match(result.text, /локального образца.*Изменить в чате/)
+  const result = await finishPublish({ ...input, ...prepared, expected: null, publish: async () => {
+    await rm(input.work, { recursive: true })
+    return { status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash } }
+  } })
+  assert.equal(result.status, "pending")
+  assert.match(result.text, /Исходники переданы/)
 })
 
 test("the embedded value threshold counts six Unicode code points", () => {
   const short = "🟢".repeat(3)
   const boundary = "🟢".repeat(6)
   assert.deepEqual(embeddedValues({ rows: [[short, boundary]] }, [Buffer.from(boundary)]), [boundary])
+})
+
+test("a locally valid source tree exceeding the JSON budget is refused before confirmation", async t => {
+  const input = await fixture(t)
+  await writeFile(join(input.work, "src/large.png"), Buffer.alloc(786432))
+  const result = await preparePublish(input)
+  assert.equal(result.ok, false)
+  assert.match(result.text, /1 МБ/)
+  assert.ok(await readFile(join(input.work, "sample.json")))
+})
+
+test("changed, cancelled and invalid host replies retain the draft without retry", async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true)
+  let writes = 0
+  const request = { ...input, ...prepared, expected: null, publish: async () => {
+    writes++
+    return { status: "changed", latest: null }
+  } }
+  assert.equal((await finishPublish(request)).status, "needs-confirmation")
+  assert.equal(writes, 1)
+  await assert.rejects(finishPublish({ ...request, signal: AbortSignal.abort() }))
+  assert.equal(writes, 1)
+  for (const reply of [
+    { status: "written", version: { name: "20261115T120000Z.json", sourceHash: "f".repeat(64) } },
+    { status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash }, extra: true },
+  ]) await assert.rejects(finishPublish({ ...request, publish: async () => reply }), /DASHBOARD_WRITE_UNKNOWN/)
+  assert.ok(await readFile(join(input.work, "sample.json")))
+  assert.ok(await readFile(join(input.work, "src/main.tsx")))
 })

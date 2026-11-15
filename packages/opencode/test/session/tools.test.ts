@@ -349,6 +349,8 @@ for (const failure of [
         messages: history.slice(1),
         loginom: {
           generation: 7,
+          async dashboardRead() { throw Error("Unexpected dashboard read") },
+          async dashboardPublish() { throw Error("Unexpected dashboard publish") },
           async scope(mode, scope) {
             scopes.push({ mode, scope })
             return scope

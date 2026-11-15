@@ -10,4 +10,5 @@
 - Task 1 принят: fix #1 Approved (focused 38/typecheck PASS), lifecycle #2 ADDRESSED независимым review.
 - Исходный built-check: явный NODE_USE_ENV_PROXY=1 и фактический Knowledge proxy peer подтверждены; exact rights-master ACK + exit0/no signal, owned PID отсутствуют.
 - Этот lifecycle прогон отделён от delivery/fix #1; исторический Knowledge ACK → SIGKILL сохранён, причина UNKNOWN и риск повтора остаются; детали — runbook.
-- Task 2/publisher не начаты.
+- Task 2: проверенный JSON передаётся builtin через private Host; pending/changed/отказы сохраняют черновик, source/built-host live PASS обе версии.
+- Task 2 ожидает независимого review; Task 3/publisher и установленная M4 не начаты. Подробности — runbook и локальный отчёт Task 2.

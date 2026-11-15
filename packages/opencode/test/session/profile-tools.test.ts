@@ -574,6 +574,8 @@ codeMode.instance("code mode keeps the verified Host Help catalog available in d
   Effect.gen(function* () {
     const { tools } = yield* resolveProfile("package-docs", {
       generation: 9,
+      async dashboardRead() { throw Error("Unexpected dashboard read") },
+      async dashboardPublish() { throw Error("Unexpected dashboard publish") },
       async scope(_mode, scope) {
         return scope
       },
@@ -671,6 +673,8 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
       const scopes: unknown[] = []
       const loginom: Awaited<ReturnType<typeof LoginomHost.acquire>> = {
         generation: 9,
+        async dashboardRead() { throw Error("Unexpected dashboard read") },
+        async dashboardPublish() { throw Error("Unexpected dashboard publish") },
         async scope(mode, scope) {
           scopes.push({ mode, scope })
           return scope
@@ -728,6 +732,8 @@ for (const image of [false, true])
     Effect.gen(function* () {
       const loginom: Awaited<ReturnType<typeof LoginomHost.acquire>> = {
         generation: 9,
+        async dashboardRead() { throw Error("Unexpected dashboard read") },
+        async dashboardPublish() { throw Error("Unexpected dashboard publish") },
         async scope(mode, scope) {
           return scope
         },
@@ -772,6 +778,8 @@ function preparedLoginom(
 ): NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>> {
   return {
     generation: 9,
+    async dashboardRead() { throw Error("Unexpected dashboard read") },
+    async dashboardPublish() { throw Error("Unexpected dashboard publish") },
     async scope(_mode, scope) {
       return scope
     },
