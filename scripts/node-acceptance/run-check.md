@@ -112,6 +112,14 @@ settings changes and cleanup are required. No export/CSV is requested or passed
 to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
 the model; oracle and expected remain private.
 
+`tree-variant` uses unchanged `typed/task-variant.md` and only
+`fixtures/typed/documents.csv`. Its private `expected-variant.json` projects
+`cases.variant.tree_outputs`, checked by `oracle.py --check`. Full ordered schema
+and instances must retain DataType 6 and exact native subtypes integer/string/
+boolean/NULL/real/Int64 (`9007199254740993`), compared by `cell_type` and `value`.
+Tree-only Save, fresh cold execution without configuration and cleanup apply;
+no CSV export. Only the business task and original CSV reach the model.
+
 `tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
 `fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
 projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema

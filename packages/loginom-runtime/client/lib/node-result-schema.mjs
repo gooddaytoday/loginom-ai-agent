@@ -32,7 +32,7 @@ const port=object({...nativePortProperties,port:integer,port_guid:str,fresh:bool
  precision:object({numbers_verified:bool,limitations:array(str),strings:str}),table_schema_id:str,filter_enabled:bool},
  ['port','port_guid','fresh','execution_id','schema','row_count','sample','sample_rows','sample_complete','precision'],true);
 const treeSchemaNode=object({index:integer,parent:nullable(integer),path:str,name:str,label:str,type:str,is_container:bool,is_array:bool,children:array(integer)});
-const treeInstance=object({index:integer,parent:nullable(integer),schema_index:integer,path:str,type:str,children:array(integer),
+const treeInstance=object({cell_type:values('null','integer','real','string','boolean','datetime'),native:{anyOf:nativeCellSchema.anyOf.map(s=>s.properties.native)},index:integer,parent:nullable(integer),schema_index:integer,path:str,type:str,children:array(integer),
  is_null:bool,value:{type:['string','number','boolean','null']},precision:str,representation:str,decimal:str,timezone:str,non_finite:values('NaN','Infinity','-Infinity')},['index','parent','schema_index','path','type']);
 const treePort=object({port:integer,port_guid:str,port_kind:values('tree'),fresh:bool,freshness_basis:values('completed_execution_port_source'),execution_id:str,
  tree:object({schema:{...array(treeSchemaNode),minItems:1,maxItems:256},instances:{...array(treeInstance),minItems:1,maxItems:256},

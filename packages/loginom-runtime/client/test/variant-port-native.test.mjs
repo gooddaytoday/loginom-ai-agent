@@ -46,9 +46,9 @@ test('civil datetime is additive; the legacy scalar envelope remains unchanged',
  for(const bad of [{...cell,timezone:''},{...cell,value:'2026-01-02'}, {...cell,native:{...cell.native,civil_time_verified:false}}])assert.equal(validate(bad).valid,false);
 });
 
-function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false,variableValue=false}={}){
+function transportFixture({deferred=false,foreign=false,changed=false,unpinned=false,variableValue=false,treeValue=false}={}){
  const environment={crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,DataView,setTimeout,clearTimeout,decode:decodeVariantFrame,
-  frames:observedRows,pins:{},deferred,foreign,changed,unpinned,variableValue};
+  frames:observedRows,pins:{},deferred,foreign,changed,unpinned,variableValue,treeValue};
  const context=vm.createContext(environment);
  // Exact observed frontend implementations, pinned by the production reader.
  vm.runInContext(`Date.FromOADate=function (d) {
@@ -64,9 +64,9 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
         return result;
     };
  var counters={requests:0,releasedRequests:0,releasedResponses:0},next;
- var source={$:{$I:variableValue?427:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
-  counters.requests++;return {row:0,column:0,set_StaticDataSize(size){if(variableValue&&size!==20)throw Error('variable parameter size');},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==(variableValue?1141:321)||flag!==0)throw Error('wrong method');},
-   WriteParameter(offset,row){if(offset!==0)throw Error('row offset');this.row=row;},WriteParameter$a(offset,column){if(offset!==8)throw Error('column offset');this.column=column;},get_MessageID(){return 101;},Release(){counters.releasedRequests++;}};
+ var source={$:{$I:treeValue?166:variableValue?427:116,$OW:0,$O:9},$S:{$FDisposed:false,$FPendingDisconnect:false,$FTransportStatus:0,$T:{FFinished:false,FDisconnected:false,$FSocket:{readyState:1}},$M:{GetDynamicData(){
+  counters.requests++;return {row:0,column:0,set_StaticDataSize(size){if(size!==(variableValue?20:32))throw Error('variable parameter size');},InitializeMethodCallMessage(owner,object,method,flag){if(owner!==0||object!==9||method!==(treeValue?7230:variableValue?1141:321)||flag!==0)throw Error('wrong method');},
+   WriteParameter(offset,row){if(offset!==(treeValue?4:0))throw Error('row offset');this.row=row;},WriteParameter$a(offset,column){if(offset!==(treeValue?0:8))throw Error('column offset');this.column=column;},get_MessageID(){return 101;},Release(){counters.releasedRequests++;}};
  }},DispatchMessageAsync(request,exceptions){
   if(exceptions!==false)throw Error('exception unmarshalling');
   return {continueWith(callback){
@@ -75,12 +75,16 @@ function transportFixture({deferred=false,foreign=false,changed=false,unpinned=f
    if(deferred)next=complete;else complete();
   }};
  }}};
+ var bg={rpc:{TIBGDataTreeReaderRpcCachedInternal_Proxy:{GetAsVariant:function(proxy,index,row){}}}};
+ source.$FHelper={FBaseProxy:source};
+ var treePins={get_as_variant:''};
  var collect=session=>({functions:{send:session.DispatchMessageAsync},constants:{},objects:[session,session.$M]});
  var stable=()=>{if(changed&&counters.requests)throw Error('binding changed');};
  var make=${createNativeVariantReader.toString()};`,context);
  environment.pins={constants:{},functions:{send:createHash('sha256').update(vm.runInContext('source.$S.DispatchMessageAsync.toString()',context)).digest('hex')}};
+ vm.runInContext('treePins.get_as_variant='+JSON.stringify(createHash('sha256').update(vm.runInContext('bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant.toString()',context)).digest('hex')),context);
  if(unpinned)environment.pins.functions.send='bad';
- return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue},decode,collect,pins)`,context)};
+ return {context,environment,run:(deadline=Date.now()+5000)=>vm.runInContext(`make(source,{deadline:${deadline},stable,variableValue,treeValue},decode,collect,pins,treePins)`,context)};
 }
 
 test('observed W1 interface427/method1141 uses no row/column parameters and retains int32 subtype',async()=>{
@@ -179,4 +183,29 @@ test('observed serial retains 006ms in UTC and Europe/Moscow',async()=>{
    }finally{await context.close();}
   }
  }finally{await browser.close();}
+});
+
+for(const fault of ['none','foreign','changed','unpinned','getter','helper','interface'])test('tree reader166 fixed7230 retains subtype and native guards: '+fault,async()=>{
+ const f=transportFixture({treeValue:true,[fault]:true});
+ if(fault==='getter')vm.runInContext('bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant=function changed(){}',f.context);
+ if(fault==='helper')vm.runInContext('source.$FHelper.FBaseProxy={}',f.context);
+ if(fault==='interface')vm.runInContext('source.$.$I=2178',f.context);
+ if(fault!=='none'){
+  await assert.rejects(async()=>{const reader=await f.run();await reader.read(0,2);});
+ }else{
+  const reader=await f.run();
+  for(let row=0;row<observedRows.length;row++){
+   const raw=await reader.read(row,2),cell=adaptCell(raw,{type:'variant'},{dateProfile:temporalProfile});
+   assert.equal(raw.column,2);assert.equal(cell.cell_type,['integer','boolean','string','datetime','null','real','string','integer'][row]);
+  }
+ }
+ const counters=JSON.parse(vm.runInContext('JSON.stringify(counters)',f.context));
+ assert.equal(counters.releasedRequests,counters.requests);assert.equal(counters.releasedResponses,fault==='changed'?0:counters.requests);
+});
+test('tree fixed7230 rechecks getter binding across an awaited response',async()=>{
+ const f=transportFixture({treeValue:true,deferred:true}),reader=await f.run(),pending=reader.read(0,2);
+ const rejected=assert.rejects(pending,/getter changed/);
+ vm.runInContext('bg.rpc.TIBGDataTreeReaderRpcCachedInternal_Proxy.GetAsVariant=function changed(){};next()',f.context);
+ await rejected;
+ assert.equal(reader.unsettled,false);
 });
