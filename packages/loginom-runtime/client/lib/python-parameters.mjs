@@ -1,5 +1,15 @@
 import {inspectPythonSourcePolicy} from './python-source-policy.mjs';
 
+// Executable rewrite advice for the module-member allowlist refusals.
+const pythonRefusalHint=reason=>{
+  const [kind,name]=String(reason??'').split(/:(.*)/s);
+  if(kind==='attribute'&&name.includes('.'))return ': '+name+' is not an allowed module member (computation only, no file or network I/O);'+
+    ' rewrite with allowed functions such as np.where, np.select, pd.to_datetime, pd.to_numeric, pd.concat, pd.merge, a boolean mask df[df["x"] > 0] or methods of the data';
+  if(kind==='module_value')return ': use the module only as alias.member, for example np.where(...); do not assign, pass or reuse the module name as a variable';
+  if(kind==='alias')return ': '+name+' is imported as two different things; import it once, for example import datetime as dt and dt.datetime.now()';
+  return '';
+};
+
 const need=(v,m)=>{if(!v)throw Error('Python: '+m);};
 export const PYTHON_DECLARED_TYPES=Object.freeze({boolean:1,datetime:2,real:3,integer:4,string:5});
 
@@ -26,7 +36,7 @@ export function validatePythonParameters(p,mode,r){
   }
   if(p.source_text!==undefined){
     const policy=inspectPythonSourcePolicy(p.source_text);
-    need(policy.status==='ADMITTED','source refused by '+policy.policy+' ('+policy.reason+(policy.line?' at line '+policy.line:'')+'). Imports: builtin_data, builtin_pandas_utils, pandas, numpy, math, cmath, datetime, decimal, fractions, statistics, re, json, itertools, functools, collections, random; ASCII code outside strings and comments; known file, network, process, environment and reflection names (read_*, to_*, load, dump, io, lib, dunder names, also inside strings) are refused');
+    need(policy.status==='ADMITTED','source refused by '+policy.policy+' ('+policy.reason+(policy.line?' at line '+policy.line:'')+')'+pythonRefusalHint(policy.reason)+'. Imports: builtin_data, builtin_pandas_utils, pandas, numpy, math, cmath, datetime, decimal, fractions, statistics, re, json, itertools, functools, collections, random; ASCII code outside strings and comments; known file, network, process, environment and reflection names (read_*, to_*, load, dump, io, lib, dunder names, also inside strings) are refused');
   }
   need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0),'one optional table input at port 0');
   need(r.mappings.length===0,'mapping overrides are unsupported');
