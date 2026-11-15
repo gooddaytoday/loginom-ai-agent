@@ -7,5 +7,7 @@
 - Команды, подготовка и границы проверок — [runbook M4](dashboard-m4.md).
 - Оригинальные контейнеры, ROI, backup и рабочее приложение пользователя сохраняются; новый установленный прогон обязателен отдельно.
 - Task 1: финальный built-host roundtrip/ACL/collision/upload+login cancel PASS на обеих версиях; `.lgp` сохранён, ACK+exit подтверждены.
-- Task 1 review: Changes requested; код UNKNOWN на двух publication-границах исправлен, focused 38/typecheck PASS. Knowledge ACK → SIGKILL остаётся обязательным открытым замечанием; детали — runbook.
+- Task 1 принят: fix #1 Approved (focused 38/typecheck PASS), lifecycle #2 ADDRESSED независимым review.
+- Исходный built-check: явный NODE_USE_ENV_PROXY=1 и фактический Knowledge proxy peer подтверждены; exact rights-master ACK + exit0/no signal, owned PID отсутствуют.
+- Этот lifecycle прогон отделён от delivery/fix #1; исторический Knowledge ACK → SIGKILL сохранён, причина UNKNOWN и риск повтора остаются; детали — runbook.
 - Task 2/publisher не начаты.

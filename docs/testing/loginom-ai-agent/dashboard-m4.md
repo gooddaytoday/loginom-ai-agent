@@ -1,6 +1,6 @@
 # Dashboard M4: публикация через хранилище
 
-Статус: Task 0 готовит отдельную базу и ресурсы для реализации. Это не приёмка M4. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
+Статус: Task 0 и Task 1 приняты; Task 2/publisher не начаты. Это не приёмка установленной M4. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
 
 M3 завершена: установленная Linux-приёмка, CI и независимые ревью PASS. Её результаты, ограничения URI dispatch/Windows/macOS и исходные артефакты сохраняются в [runbook M3](dashboard-m3.md). Они не подтверждают новый M4. Первый проверяемый результат реализации — закрытый host-вызов через авторизованную Studio на обеих версиях, затем публикация проверенных исходников до `ready` и открытия Dashboard.
 
@@ -16,11 +16,12 @@ Studio опубликованы только на свободных loopback-п
 
 ## Подготовка и команды
 
-В приватном терминале перед командами загрузить проверенное окружение, затем M4-переменные:
+Для локальной приёмки M4 с уже подготовленным proxy-окружением загрузить проверенные переменные и явно включить его использование Node. Существующие proxy/NO_PROXY сохранить; глобальный скрипт M3 и продуктовую proxy-политику не менять:
 
 ```sh
 source "$ACCEPTANCE_ENVIRONMENT"
 source "$M4_ENVIRONMENT"
+export NODE_USE_ENV_PROXY=1
 cd "$M4_REPO"
 ```
 
@@ -79,8 +80,12 @@ HTTP 200 и `Syntax OK` недостаточны для подтверждени
 
 `RenameFile` оказался небезопасным для занятого имени. После независимого review выбран штатный `MoveFile(part, final, false)`; проверены occupied target (оба содержимых целы) и свободный final (полный размер при первом наблюдении и тот же inode). Продуктовый проход дополнительно подтвердил collision с полным сохранённым `.part` и отмену после появления upload part размером 0 на обеих версиях: возвращается `DASHBOARD_WRITE_UNKNOWN`, final отсутствует, записи не повторяются. Browser runtimes дали close ACK и exit 0.
 
-Права проверены собственными ACL fixtures: master read-only читает, запись возвращает `DASHBOARD_ACCESS_DENIED`; 7.4.2 no-access возвращает тот же код до записи. Отмена во время login проверена временной паузой только своего Server: `DASHBOARD_CANCELLED`, Chromium завершён, ACK + exit 0, Server возобновлён в finally. Последняя сборка прошла все 10 live-сценариев с подтверждённым cleanup. Stale expected возвращает `changed` без создания файлов.
+Права проверены собственными ACL fixtures: master read-only читает, запись возвращает `DASHBOARD_ACCESS_DENIED`; 7.4.2 no-access возвращает тот же код до записи. Отмена во время login проверена временной паузой только своего Server: `DASHBOARD_CANCELLED`, Chromium завершён, ACK + exit 0, Server возобновлён в finally. Сборка `delivery` прошла все 10 live-сценариев с подтверждённым cleanup до последующей правки классификации ошибок (fix #1). Stale expected возвращает `changed` без создания файлов.
 
-Независимое review Task 1: **Changes requested**, задача пока не принята. Замечание о классификации publication-ответа исправлено: некорректный успешный ответ и потеря acquired IPC дают `DASHBOARD_WRITE_UNKNOWN` без replay; известные отказы, отмена до отправки и cleanup failure сохранены. Focused tests: 38 PASS, typecheck PASS. Открыто обязательное замечание о завершении Knowledge. В одном более раннем master-прогоне Knowledge child подтвердил close ACK, но не завершился и был остановлен SIGKILL; общий cleanup именно этого прогона **не подтверждён**. Две focused проверки исходной сборки с внешней диагностикой — no-browser и тот же rights-master цикл — завершились штатно. Причина единичного сбоя неизвестна; повторный успех не объявлен исправлением. Knowledge code и гарантия ACK + actual exit не изменены; исходный failure и diagnostic evidence сохранены для reviewer.
+Task 1 принят независимым review: fix #1 — **Approved**, замечание #2 — **ADDRESSED** в границах Task 1. Fix #1 возвращает `DASHBOARD_WRITE_UNKNOWN` при некорректном успешном ответе публикации и потере acquired IPC без replay; известные отказы, отмена до отправки и cleanup failure сохранены. Проверены focused 38 tests и typecheck; runtime этой правкой не менялся.
 
-Source проверки: границы origin/generation, profile/call/admit, UTF-8/лимит, monotonic UTC, повторные короткие чтения, отмена запуска/операции, held generation/settings pending и shutdown. Отдельный `turn-lifecycle` test сохраняет отсутствие lease у обычного dashboard model-turn. Host suite 63 PASS; после последних изменений focused suite 31 PASS и typecheck PASS; runtime 19 PASS, turn-lifecycle 9 PASS. Точные RED→GREEN команды и локальные ссылки на evidence находятся в отчёте Task 1; raw scripts/configs/logs остаются в `$M4_SCRATCH`, вне Git.
+Для #2 выполнен один штатный exact rights-master на исходном неинструментированном `built-check` с единственным изменённым входом `NODE_USE_ENV_PROXY=1`. Флаг подтверждён у самого Knowledge child; его наблюдённый socket peer совпал с настроенным proxy. Чтение разрешено, запись дала `DASHBOARD_ACCESS_DENIED`, `host.close()` дождался завершения. Исходные receipts Knowledge и обоих browser runtime: ACK true, actual exit 0, signal null; все наблюдавшиеся собственные PID исчезли. Этот запуск проверяет исправленный proxy-вход и lifecycle исходного artifact; он не приписывается `delivery` или Host fix #1. Это также не установленная приёмка Desktop/CLI M4.
+
+Исторический master-прогон с Knowledge ACK → SIGKILL остаётся достоверным отказом: общий cleanup именно того прогона **не подтверждён**, исходная receipt сохранена. Причина **UNKNOWN**, связь с отсутствием proxy-флага у того PID не доказана; новый PASS не объявляется исправлением исторического сбоя. Редкий post-ACK отказ может повториться. Knowledge code, timeout и требование ACK + actual exit0/no signal не изменены; новый cleanup failure потребует адресного разбора. Raw evidence и независимые verdict сохранены в материалах Task 1.
+
+Source проверки: границы origin/generation, profile/call/admit, UTF-8/лимит, monotonic UTC, повторные короткие чтения, отмена запуска/операции, held generation/settings pending и shutdown. Отдельный `turn-lifecycle` test сохраняет отсутствие lease у обычного dashboard model-turn. Host suite 63 PASS; после fix #1 focused suite 38 PASS и typecheck PASS; runtime 19 PASS, turn-lifecycle 9 PASS. Точные RED→GREEN команды и локальные ссылки на evidence находятся в отчёте Task 1; raw scripts/configs/logs остаются в `$M4_SCRATCH`, вне Git.
