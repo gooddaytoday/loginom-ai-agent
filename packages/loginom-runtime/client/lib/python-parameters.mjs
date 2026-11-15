@@ -6,6 +6,9 @@ const pythonRefusalHint=reason=>{
   if(kind==='attribute'&&name.includes('.'))return ': '+name+' is not an allowed module member (computation only, no file or network I/O);'+
     ' rewrite with allowed functions such as np.where, np.select, pd.to_datetime, pd.to_numeric, pd.concat, pd.merge, a boolean mask df[df["x"] > 0] or methods of the data';
   if(kind==='module_value')return ': use the module only as alias.member, for example np.where(...); do not assign, pass or reuse the module name as a variable';
+  if(kind==='dispatch')return ': the function argument of '+name+' must be an aggregation literal such as "sum", "mean", "count", "nunique", "first" or "cumsum"'+
+    ' (or a list or dict of them), a lambda, a def name, len/str/int/float/abs/round/bool or a module function such as np.mean;'+
+    ' call '+name+'(...) directly, without *args/**kwargs, and do not store the method or a function name in a variable';
   if(kind==='alias')return ': '+name+' is imported as two different things; import it once, for example import datetime as dt and dt.datetime.now()';
   return '';
 };

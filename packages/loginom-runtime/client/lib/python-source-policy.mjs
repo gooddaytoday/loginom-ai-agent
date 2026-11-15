@@ -202,20 +202,24 @@ function readField(source,i,quote,raw,strings){
     code+=ch;i++;
   }
 }
+// `literals` locates each top-level string that is not an f-string in `code`
+// (quote at `at`); `plain` text has no escape and no bytes prefix.
 export function pythonCodeSkeleton(source){
-  let out='',i=0;const strings=[];
+  let out='',i=0;const strings=[],literals=[];
   while(i<source.length){
     const c=source[i];
     if(c==='#'){while(i<source.length&&source[i]!=='\n')i++;continue;}
     if(c==='"'||c==="'"){
       // A prefix is the whole word before the quote (`or"…"` has none).
-      const word=/\w*$/.exec(out)[0],literal=readString(source,i,STRING_PREFIX.test(word)?word:'',strings);
+      const word=/\w*$/.exec(out)[0],prefix=STRING_PREFIX.test(word)?word:'',literal=readString(source,i,prefix,strings);
       if(literal.error)return {error:literal.error};
+      if(!/f/i.test(prefix))literals.push({at:out.length,end:out.length+literal.kept.length,value:strings.at(-1),
+        plain:!/b/i.test(prefix)&&!source.slice(i,literal.end).includes('\\')});
       out+=literal.kept;i=literal.end;continue;
     }
     out+=c;i++;
   }
-  return {code:out,strings:strings.join('')};
+  return {code:out,strings:strings.join(''),literals};
 }
 
 // Imports and module members are checked on tokens of the whole skeleton,
@@ -226,12 +230,12 @@ export function pythonCodeSkeleton(source){
 // `alias.name` chain and every `from m import name`. A module bound to a name
 // may only be used as `alias.member`: assigning or passing it would let an
 // unchecked name reach its members. Members of objects stay under the denylist.
-function inspectModules(code,stage){
+function inspectModules(code,stage,literals){
   const members=stage==='members';
   const tokens=[...code.matchAll(/\\\n|\n|(?:\d|\.\d)[\w.]*|[A-Za-z_]\w*|\S/g)].filter(t=>t[0]!=='\\\n');
   const lineOf=index=>code.slice(0,tokens[index]?.index??code.length).split('\n').length;
   const word=index=>/^[A-Za-z_]/.test(tokens[index]?.[0]??'')?tokens[index][0]:null;
-  const bound=new Map(),inImport=new Set();
+  const bound=new Map(),inImport=new Set(),imported=new Map();
   const bind=(name,target)=>{if(!bound.has(name))bound.set(name,new Set());bound.get(name).add(target);};
   // Module path from index: leading dots (relative) and dotted names.
   const path=index=>{
@@ -265,7 +269,7 @@ function inspectModules(code,stage){
         const name=word(j);if(!name)return refusal('import_form',lineOf(j));
         if(members&&!allowed.has(name))return refusal('attribute:'+module.text+'.'+name.slice(0,64),lineOf(j));
         let alias=name;if(word(j+1)==='as'&&word(j+2)){alias=word(j+2);j+=2;}
-        bind(alias,PYTHON_MODULE_NAMES[module.text+'.'+name]?module.text+'.'+name:'');
+        bind(alias,PYTHON_MODULE_NAMES[module.text+'.'+name]?module.text+'.'+name:'');imported.set(alias,module.text+'.'+name);
       }
       for(let k=i;k<j;k++)inImport.add(tokens[k]);i=j;continue;
     }
@@ -306,7 +310,174 @@ function inspectModules(code,stage){
   }
   // The builtin compile stays refused: `.compile` passes the denylist only as re.compile.
   for(const [index,token] of flat.entries())if(token[0]==='compile'&&!reCompile.has(token))return refusal('name:compile',lineAt(index));
+  return inspectDispatch(code,literals,bound,imported);
+}
+
+// pandas dispatchers call getattr(obj, name)(*args, **kwargs) for a string
+// function argument (core/apply.py _apply_str, groupby/generic.py aggregate and
+// filter, groupby/groupby.py apply): agg/aggregate/transform/apply/filter of
+// frames, series, groupby, window and resample objects, and aggfunc of
+// pivot_table, crosstab and NamedAgg. Such a call must be written directly, its
+// function arguments being an aggregation literal, a lambda, an undecorated
+// def, an allowed builtin or from-import never rebound, a module function or a
+// str/int/float method; lists, tuples and dict values of those. Everything else,
+// a string variable included, is refused as dispatch:<method>.
+const DISPATCH=new Set(['agg','aggregate','transform','apply','filter','pivot_table','crosstab','NamedAgg']);
+const DISPATCH_IMPORTS=new Map([['pandas.pivot_table','pivot_table'],['pandas.crosstab','crosstab'],['pandas.NamedAgg','NamedAgg']]);
+// The card's list and pandas/core/groupby/base.py reduction and transformation kernels.
+const AGGREGATIONS=names(`sum mean median min max count size std var sem first last nunique prod any all idxmin idxmax quantile skew kurt
+  cumsum cumprod cummin cummax cumcount rank shift diff pct_change ffill bfill ngroup`);
+const BUILTIN_FUNCTIONS=names('len str int float abs round bool sum min max list set tuple sorted');
+const TYPE_HEADS=new Set(['str','int','float']),REFUSED_METHODS=new Set(['format','format_map','maketrans']);
+const KEYWORDS=names(`False None True and as assert async await break class continue def del elif else except finally for from global if
+  import in is lambda nonlocal not or pass raise return try while with yield`);
+const OPEN=new Set(['(','[','{']),CLOSE=new Set([')',']','}']);
+function inspectDispatch(code,literals,bound,imported){
+  // Tokens with each plain-or-not string literal as one `"` token.
+  const starts=new Map(literals.map(l=>[l.at,l])),tokens=[],pattern=/\\\n|\n|(?:\d|\.\d)[\w.]*|[A-Za-z_]\w*|\S/g;
+  for(let m;(m=pattern.exec(code));){
+    if(m[0]==='\\\n')continue;
+    const literal=starts.get(m.index)??(STRING_PREFIX.test(m[0])?starts.get(m.index+m[0].length):undefined);
+    if(literal){tokens.push({t:'"',index:m.index,literal});pattern.lastIndex=literal.end;continue;}
+    tokens.push({t:m[0],index:m.index});
+  }
+  const tok=i=>tokens[i]?.t,isName=i=>/^[A-Za-z_]/.test(tok(i)??'')&&!KEYWORDS.has(tok(i));
+  const depth=[],open=[],match=new Map(),stack=[];
+  for(const [i,{t}] of tokens.entries()){
+    if(CLOSE.has(t)){const o=stack.pop();if(o!==undefined)match.set(o,i);}
+    depth[i]=stack.length;open[i]=stack.at(-1)??-1;
+    if(OPEN.has(t))stack.push(i);
+  }
+  const lineAt=i=>code.slice(0,tokens[i]?.index??code.length).split('\n').length;
+  // Newlines inside brackets join lines; at depth 0 they end a statement.
+  const next=i=>{let j=i+1;while(tok(j)==='\n'&&depth[j]>0)j++;return j;};
+  const prev=i=>{let j=i-1;while(tok(j)==='\n'&&depth[j]>0)j--;return j;};
+  const statement=i=>{let j=i;while(j<tokens.length&&!(depth[j]===0&&(tok(j)==='\n'||tok(j)===';')))j++;return j;};
+  // Binding positions a name check must not trust: lambda parameters, for
+  // targets, class headers and case patterns; imports and decorated defs.
+  const binding=new Set(),imports=new Set(),decorated=new Set();
+  let decorator=false;
+  for(let i=0;i<tokens.length;i++){
+    const t=tok(i);
+    if(t==='lambda'||t==='for'){
+      let pending=1,j=i+1;
+      for(;j<tokens.length;j++){
+        if(depth[j]<depth[i]||depth[j]===0&&tok(j)==='\n')break;
+        if(depth[j]>depth[i])continue;
+        if(t==='lambda'&&tok(j)==='lambda')pending++;
+        if(t==='lambda'?tok(j)===':'&&!--pending:tok(j)==='in')break;
+      }
+      for(let k=i+1;k<j;k++)binding.add(k);
+    }
+    if(depth[i]!==0||i>0&&tok(i-1)!=='\n'&&tok(i-1)!==';'||t==='\n')continue;
+    const end=statement(i);
+    if(t==='import'||t==='from')for(let k=i;k<end;k++)imports.add(k);
+    if(t==='class'||t==='case')for(let k=i;k<end;k++)binding.add(k);
+    if(t==='@'){decorator=true;continue;}
+    if(decorator&&(t==='def'||t==='async'))decorated.add(t==='def'?i+1:i+2);
+    decorator=false;
+  }
+  const isCall=o=>{
+    if(tok(o)!=='(')return false;
+    const p=prev(o);
+    return tok(p)===')'||tok(p)===']'||isName(p)&&tok(prev(p))!=='def'&&tok(prev(p))!=='class';
+  };
+  const items=o=>{
+    const close=match.get(o),d=depth[o]+1,out=[[]];
+    for(let j=o+1;j<close;j++){if(tok(j)==='\n')continue;if(tok(j)===','&&depth[j]===d){out.push([]);continue;}out.at(-1).push(j);}
+    return out;
+  };
+  const whole=el=>OPEN.has(tok(el[0]))&&match.get(el[0])===el.at(-1);
+  const names=[];
+  // name(.name)*: module function, str/int/float method, literal method, or a name checked below.
+  const chain=el=>{
+    if(el.length%2===0)return false;
+    for(let k=1;k<el.length;k+=2)if(tok(el[k])!=='.'||!/^[A-Za-z_]/.test(tok(el[k+1])??''))return false;
+    const parts=el.filter((_,k)=>k%2===0).map(tok),head=tokens[el[0]];
+    if(head.literal)return parts.length===2&&!REFUSED_METHODS.has(parts[1]);
+    if(!isName(el[0]))return false;
+    const module=[...bound.get(head.t)??[]].find(Boolean);
+    if(module){
+      let path=module,k=1;
+      while(PYTHON_MODULE_NAMES[path]?.has(parts[k]))path+='.'+parts[k++];
+      return k>1&&k===parts.length&&!PYTHON_MODULE_NAMES[path];
+    }
+    if(parts.length===1||parts.length===2&&TYPE_HEADS.has(head.t)&&!REFUSED_METHODS.has(parts[1])){names.push(el[0]);return true;}
+    return false;
+  };
+  const func=el=>{
+    if(!el.length)return false;
+    const first=el[0];
+    if(tok(first)==='lambda')return true;
+    if(el.length===1&&tokens[first].literal)return tokens[first].literal.plain&&AGGREGATIONS.has(tokens[first].literal.value);
+    if(whole(el)){
+      const parts=items(first),list=parts.at(-1).length?parts:parts.slice(0,-1);
+      if(tok(first)==='{')return list.every(p=>{const colon=p.findIndex(j=>tok(j)===':'&&depth[j]===depth[first]+1);return colon>0&&func(p.slice(colon+1));});
+      if(tok(first)==='('&&parts.length===1)return func(parts[0]);
+      return list.every(func);
+    }
+    return chain(el);
+  };
+  // pandas.NamedAgg(...) as a value: its own arguments are checked as a dispatcher.
+  const namedAgg=el=>{
+    if(tok(el.at(-1))!==')')return false;
+    const o=el.findIndex(j=>match.get(j)===el.at(-1)),callee=el.slice(0,o);
+    if(o<1||tok(el[o])!=='(')return false;
+    if(callee.length===1)return imported.get(tok(callee[0]))==='pandas.NamedAgg';
+    const module=[...bound.get(tok(callee[0]))??[]].find(Boolean);
+    return module==='pandas'&&callee.length===3&&tok(callee[1])==='.'&&tok(callee[2])==='NamedAgg';
+  };
+  // Names a failed alternative pushed are dropped.
+  const attempt=(check,el)=>{const mark=names.length;if(check(el))return true;names.length=mark;return false;};
+  const pair=el=>{
+    if(!whole(el)||tok(el[0])!=='(')return false;
+    const parts=items(el[0]).filter((p,k,all)=>p.length||k<all.length-1);
+    return parts.length===2&&func(parts[1]);
+  };
+  const pending=[];
+  for(let d=0;d<tokens.length;d++){
+    if(imports.has(d))continue;
+    const dotted=tok(prev(d))==='.',kind=dotted?DISPATCH.has(tok(d))&&tok(d):DISPATCH_IMPORTS.get(imported.get(tok(d)));
+    if(!kind)continue;
+    const refused=refusal('dispatch:'+kind,lineAt(d)),o=next(d);
+    if(!dotted&&(binding.has(d)||['def','class'].includes(tok(prev(d)))))return refused;
+    if(tok(o)!=='('||!match.has(o))return refused;
+    const args=items(o).filter((p,k,all)=>p.length||k<all.length-1);
+    if(args.some(a=>!a.length||tok(a[0])==='*'))return refused;
+    const keyword=a=>a.length>1&&isName(a[0])&&tok(a[1])==='='&&tok(a[2])!=='=';
+    const positional=args.filter(a=>!keyword(a)),keywords=new Map(args.filter(keyword).map(a=>[tok(a[0]),a.slice(2)]));
+    const head=prev(prev(d)),module=dotted?[...bound.get(tok(head))??[]].find(Boolean)==='pandas'&&tok(prev(head))!=='.':true;
+    const slots={agg:[positional[0],keywords.get('func')],aggregate:[positional[0],keywords.get('func')],
+      transform:[positional[0],keywords.get('func'),keywords.get('arg')],apply:[positional[0],keywords.get('func')],
+      filter:[positional[0],keywords.get('func')],
+      // aggfunc is 5th of pd.pivot_table, 4th of df.pivot_table and 5th of the unbound DataFrame.pivot_table.
+      pivot_table:[positional[4],module?null:positional[3],keywords.get('aggfunc')],
+      crosstab:[positional[5],keywords.get('aggfunc')],NamedAgg:[positional[1],keywords.get('aggfunc')]}[kind].filter(Boolean);
+    // DataFrame.filter takes column labels: a list or tuple literal passes there.
+    if(!slots.every(el=>attempt(func,el)||kind==='filter'&&whole(el)&&(tok(el[0])==='['||tok(el[0])==='('&&items(el[0]).length>1)))return refused;
+    // Without a function, agg/aggregate keywords are named aggregations.
+    if((kind==='agg'||kind==='aggregate')&&!slots.length)
+      for(const [key,value] of keywords)if(!['axis','engine','engine_kwargs'].includes(key)&&!attempt(func,value)&&!attempt(pair,value)&&!namedAgg(value))return refused;
+    for(const k of names.splice(0))pending.push([k,refused]);
+  }
+  for(const [k,refused] of pending)if(!trusted(k))return refused;
   return null;
+  // A name is trusted when it is an allowed builtin, an undecorated def or a
+  // from-imported member, and every occurrence reads it: a call, an attribute,
+  // a call argument or a dispatcher function argument.
+  function trusted(k){
+    const name=tok(k),slotNames=new Set(pending.map(([j])=>j));
+    let defined=BUILTIN_FUNCTIONS.has(name)||imported.has(name)&&!PYTHON_MODULE_NAMES[imported.get(name)];
+    for(let i=0;i<tokens.length;i++){
+      if(tok(i)!==name||imports.has(i)||tok(prev(i))==='.')continue;
+      if(binding.has(i))return false;
+      if(tok(prev(i))==='def'){if(decorated.has(i))return false;defined=true;continue;}
+      const n=tok(next(i));
+      if(slotNames.has(i)||n==='('||n==='.'||(n===','||n===')')&&open[i]>=0&&isCall(open[i]))continue;
+      return false;
+    }
+    return defined;
+  }
 }
 
 export function inspectPythonSourcePolicy(source){
@@ -334,7 +505,7 @@ export function inspectPythonSourcePolicy(source){
   // str.format / Formatter fields reach attributes from string text.
   const dunder=DUNDER.exec(skeleton.strings);
   if(dunder)return refusal('string:'+dunder[0].slice(0,64));
-  const member=inspectModules(skeleton.code,'members');
+  const member=inspectModules(skeleton.code,'members',skeleton.literals);
   if(member)return member;
   return Object.freeze({status:'ADMITTED',policy:PYTHON_MODULE_POLICY,...identity});
 }
