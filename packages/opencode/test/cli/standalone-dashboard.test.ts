@@ -302,6 +302,16 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
     await writeFile(knowledge, "import { appendFileSync } from 'node:fs';\n" + originalKnowledge
       .replace(listReply, `if (m.operation === 'list') appendFileSync(${JSON.stringify(pendingLog.name)}, '{"operation":"knowledgePending"}\\n');`)
       .replace("if (m.operation === 'close')", `if (m.operation === 'close') appendFileSync(${JSON.stringify(pendingLog.name)}, '{"operation":"knowledgeClose"}\\n'); if (m.operation === 'close')`))
+    const host = join(fixture.bundle, "host/node-host.mjs")
+    const originalHost = await Bun.file(host).text()
+    await writeFile(host, originalHost + `
+      {
+        const { appendFileSync } = await import('node:fs');
+        process.on('message', message => {
+          if (message.method === 'connection.ready') appendFileSync(${JSON.stringify(pendingLog.name)}, '{"operation":"connection.ready"}\\n');
+        });
+      }
+    `)
     await provider.runPromise(llm.reset)
     const pending = await fetch(origin + "/dashboard/snapshots", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
@@ -313,12 +323,14 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
     try {
       const cancelled = await invoke(fixture, ["--dashboard", (await pending.json()).id, "--headless", "--", "Отмена."], interrupt => {
         pendingWatcher = setInterval(async () => {
-          if (!(await pendingLog.text()).slice(pendingOffset).includes('"knowledgePending"')) return
+          if (!(await pendingLog.text()).slice(pendingOffset).includes('"connection.ready"')) return
           clearInterval(pendingWatcher)
           interrupt()
         }, 20)
       }, undefined, false)
       expect(cancelled.exit).toBe(130)
+      expect((await pendingLog.text()).slice(pendingOffset)).toContain('"knowledgePending"')
+      expect((await pendingLog.text()).slice(pendingOffset)).toContain('"connection.ready"')
       expect(await provider.runPromise(llm.calls)).toBe(0)
       expect((await pendingLog.text()).slice(pendingOffset)).not.toContain('"dashboardRead"')
       expect((await pendingLog.text()).slice(pendingOffset)).toContain('"knowledgeClose"')
@@ -326,6 +338,7 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
     } finally {
       clearInterval(pendingWatcher)
       await writeFile(knowledge, originalKnowledge)
+      await writeFile(host, originalHost)
     }
     await writeFile(join(fixture.directory, "read-mode"), "hold")
     const cancelling = await fetch(origin + "/dashboard/snapshots", {
