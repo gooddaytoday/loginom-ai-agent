@@ -89,6 +89,8 @@ if (action === "config") {
     assert.equal(container.Config.Labels["loginom.dashboard.owner"], "release")
     assert.equal(container.HostConfig.ReadonlyRootfs, true)
     assert(container.HostConfig.CapDrop.includes("ALL"))
+    assert.notEqual(container.HostConfig.Privileged, true)
+    assert.deepEqual(container.HostConfig.CapAdd ?? [], [])
     assert(container.HostConfig.SecurityOpt.some(value => value.startsWith("no-new-privileges")))
     assert(container.HostConfig.Memory > 0 && container.HostConfig.PidsLimit > 0)
     for (const option of ["noexec", "nosuid", "size="]) assert(container.HostConfig.Tmpfs["/tmp"].includes(option))

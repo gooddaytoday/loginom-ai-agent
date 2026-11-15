@@ -25,3 +25,43 @@ for (const [name, args, error] of [
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+function inspectPublisher(overrides = {}) {
+  const imageID = "sha256:" + "1".repeat(64)
+  const mounts = {
+    web: [["builds", "/builds", false]],
+    publisher: [["builds", "/builds", true], ["jobs-in", "/jobs-in", true], ["jobs-out", "/jobs-out", true]],
+    builder: [["jobs-in", "/jobs-in", false], ["jobs-out", "/jobs-out", true]],
+  }
+  const roles = Object.entries(mounts).map(([role, volumes]) => ({
+    Name: "/loginom-dashboard-" + role,
+    Image: imageID,
+    Config: { Image: "dashboard:test", User: role === "publisher" ? "1234:1234" : "65534:65534", Labels: { "loginom.dashboard.owner": "release" } },
+    State: { Running: true },
+    HostConfig: {
+      ReadonlyRootfs: true, CapDrop: ["ALL"], CapAdd: null, Privileged: false,
+      SecurityOpt: ["no-new-privileges"], Memory: 128 * 1024 * 1024, PidsLimit: 64,
+      Tmpfs: { "/tmp": "rw,noexec,nosuid,size=16m" }, NetworkMode: role === "web" ? "synthetic-network" : "none", PortBindings: {},
+      ...(role === "publisher" ? overrides : {}),
+    },
+    NetworkSettings: { Networks: { "synthetic-network": {} } },
+    Mounts: [
+      ...volumes.map(([name, Destination, RW]) => ({ Source: "/synthetic/state/" + name, Destination, RW })),
+      ...(role === "publisher" ? [{ Source: "/synthetic/storage", Destination: "/storage", RW: false }] : []),
+    ],
+  }))
+  return spawnSync(process.execPath, [fileURLToPath(new URL("../../deploy/check-release.mjs", import.meta.url)), "roles",
+    "dashboard:test", "/synthetic/storage", "/synthetic/state", "1234:1234", "synthetic-network", imageID], {
+    input: JSON.stringify(roles), encoding: "utf8",
+  })
+}
+
+test("role helper rejects privileged publisher despite cap_drop ALL", () => {
+  assert.equal(inspectPublisher().status, 0)
+  assert.equal(inspectPublisher({ Privileged: true }).status, 1)
+})
+
+test("role helper rejects added publisher capabilities despite cap_drop ALL", () => {
+  assert.equal(inspectPublisher({ CapAdd: [] }).status, 0)
+  assert.equal(inspectPublisher({ CapAdd: ["SYS_ADMIN"] }).status, 1)
+})
