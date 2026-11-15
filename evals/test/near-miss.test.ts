@@ -320,14 +320,15 @@ test("calibration checker uses task oracle tolerance", async () => {
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("calibration checker permits join-key mutations but rejects rewired workflow edges", async () => {
+test("calibration checker permits declared endpoints and join keys while preserving node and link identity", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-links-"))
   try {
     const task = path.join(root, "tasks/sales-by-category")
     const corpus = path.join(root, "corpus/sales-by-category")
     await cp(path.join(evalsRoot, "fixtures/calibration/sales-by-category"), task, { recursive: true })
     await mkdir(corpus, { recursive: true })
-    const xml = '<Unit><WorkFlow><Nodes><Item Guid="source"/><Item Guid="join"><Component><Engine><Links><Item><Left Name="site_id"/><Right Name="site_id"/></Item></Links></Engine></Component></Item></Nodes><Links><Item SourceNode="source" TargetNode="join"/></Links></WorkFlow></Unit>'
+    const link = '<Item Guid="edge"><SourcePort NodeGuid="source" PortGuid="source-out"/><TargetPort NodeGuid="join" PortGuid="join-in"/></Item>'
+    const xml = `<Unit><WorkFlow><Nodes><Item Guid="source"/><Item Guid="alternate"/><Item Guid="join"><Component><Engine><Links><Item><Left Name="site_id"/><Right Name="site_id"/></Item></Links></Engine></Component></Item></Nodes><Links>${link}</Links></WorkFlow></Unit>`
     const zip = Bun.spawn(["python3", "-c", 'import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("Unit_0/Unit.xml",sys.argv[2]); z.close()', path.join(task, "reference.lgp"), xml])
     expect(await zip.exited).toBe(0)
     await Bun.write(path.join(corpus, "unchanged.csv"), await Bun.file(path.join(task, "oracle.csv")).text())
@@ -341,9 +342,17 @@ test("calibration checker permits join-key mutations but rejects rewired workflo
       return { code: await proc.exited, errors }
     }
     expect(await run('<Left Name="site_id"/>', '<Left Name="category"/>')).toEqual({ code: 0, errors: "" })
-    const rewired = await run('SourceNode="source"', 'SourceNode="join"')
-    expect(rewired.code).not.toBe(0)
-    expect(rewired.errors).toContain("link topology")
+    expect(await run('<SourcePort NodeGuid="source" PortGuid="source-out"/>', '<SourcePort NodeGuid="alternate" PortGuid="alternate-out"/>')).toEqual({ code: 0, errors: "" })
+    for (const [from, to, error] of [
+      ['Guid="edge"', 'Guid="other-edge"', "link inventory"],
+      [link, "", "link inventory"],
+      ['<Item Guid="source"/>', '<Item Guid="other-source"/>', "node topology"],
+      [`<Links>${link}</Links>`, "", "missing workflow links"],
+    ] as const) {
+      const rejected = await run(from, to)
+      expect(rejected.code).not.toBe(0)
+      expect(rejected.errors).toContain(error)
+    }
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
