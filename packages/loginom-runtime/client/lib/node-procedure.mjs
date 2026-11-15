@@ -1,3 +1,4 @@
+import {makeLoopConfigureCode,makeLoopInspectCode,makeLoopVendorCode} from './loop-procedure.mjs';
 import {makeVariablesReplaceConfigureCode} from './variables-replace-procedure.mjs';
 import {makeConditionConfigureCode} from './control-condition-procedure.mjs';
 import {makeVariablesColumnUnionContextCode} from './variables-coluniondatavar-context.mjs';
@@ -254,7 +255,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('CrossTable step was not durably prepared');
     checkBudget();
     const deadline=operation.deadline,code=makeCode(preparedNodeContext,{...payload,origin:targetOrigin,build:targetBuild,operation_id:id,deadline});
-    const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:${JSON.stringify(verb)},effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:r.error}:null,trace:[]}}`;
+    const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:${JSON.stringify(verb)},effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:${JSON.stringify(verb==='loop_group_rows')}?r.error_code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:r.error}:null,trace:[]}}`;
     let result;
     try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(5000,deadline-now()+5000)});}
     catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
@@ -388,6 +389,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
     async configureCondition(settings){return crossTableOwnedStep('condition',settings,makeConditionConfigureCode);},
     async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
+    async configureLoop(parameters){return crossTableOwnedStep('loop_group_rows',{parameters,source:operation.loopSource},makeLoopConfigureCode);},
+    async inspectLoopVendor(){return crossTableOwnedStep('loop_vendor',{},makeLoopVendorCode);},
+    async inspectLoop(parameters){return crossTableOwnedStep('loop_ports',{parameters,source:operation.loopSource},makeLoopInspectCode);},
     async configureSupernode(parameters){return crossTableOwnedStep('supernode_boundary',{parameters},makeSupernodeConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
     async configurePythonColumns(columns) {return crossTableOwnedStep('python_columns',{columns},makePythonColumnsCode);},

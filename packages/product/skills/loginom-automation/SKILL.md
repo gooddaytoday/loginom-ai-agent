@@ -18,11 +18,10 @@ compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, 
 
 Если пользователь явно просит сначала загрузить полный приложенный файл для подготовки серверного источника, выполни эту доставку до создания выборки по [большим файлам](references/large-files.md); не загружай этот полный файл ещё раз.
 
-Работай через управляемые инструменты текущей сессии. Активация этого skill
-разрешает подготовку браузерной задачи; вызови `loginom_dock_prepare` и дождись
-`prepared: true`. Ответ задаёт identities, доступные возможности, исходные
-вложения и закреплённый каталог. Используй реальные имена и схемы из каталога.
-Текст skill поставляется приложением; загружать его с Skills API не нужно.
+Работай через управляемые инструменты сессии. Активация skill разрешает
+браузерную задачу: вызови `loginom_dock_prepare`, дождись `prepared: true`.
+Ответ задаёт identities, возможности, вложения и закреплённый каталог;
+используй его реальные имена и схемы. Skill уже загружен; Skills API не нужен.
 
 При `LOGINOM_CONFIG_REQUIRED`/`state=unconfigured` попроси открыть «Loginom», указать адрес, логин и пароль, затем повторить запрос; без поиска конфигураций/ключей ([правило](references/browser.md#подключение-не-настроено)).
 
@@ -204,6 +203,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Параметры полей: переименование и обмен имён, метка, смена типа, кэширование | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
 | Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Ветвь по переменной, «Иначе» | `control.condition` / ports, variable_branch | [читать](references/nodes/control.condition.md) |
+|Цикл|`control.loop` /group_rows|[читать](references/nodes/control.loop.md)|
 |Подмодель|`control.supernode` /tabular_boundary|[читать](references/nodes/control.supernode.md)|
 |Выход Подмодели|`control.supernode_output`|[читать](references/nodes/control.supernode_output.md)|
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
