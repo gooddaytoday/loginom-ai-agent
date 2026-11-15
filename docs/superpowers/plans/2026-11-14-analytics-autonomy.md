@@ -102,23 +102,23 @@ evals: около 140 файлов / 5000 строк + LGP. При удвоен�
 
 ## Checkpoint
 
-- Ветка `analytics-autonomy`; инфраструктура установлена и принята полной репетицией LAB-1676.
-- Prepare/verify собственных Authoring и Benchmark: READY/code0/released; исходные отказы сохранены.
-- Scoped units/права/judge/hooks/Gitleaks установлены; live-инструкции команды обновлены и прочитаны обратно.
-- Atomic reservation, private/public provenance, адресное recovery и GC adoption проверены.
-- LAB-1676 завершена done, final independent SPEC+QUALITY APPROVE; оба её wakeups отключены.
-- Author attempt-1: предмодельный отказ каталога сохранён; attempt-2 exit0, actual sol/xhigh, CSV 3x7 PASS, не повторять.
-- Cold all9/new CSV/unchanged LGP/noSave/close/logout PASS; qualified Node repair reviewed.
-- Обе calibration PASS: 22 judgments, positive100, foreign0, все near-miss + oracle=false.
-- Control g0 отвергнут до journal из-за mode budget; bytes/pins не менялись, zero-admission независимо доказан.
-- Штатная g1 authorization связала исходные zero-admission evidence и release proofs; g0 сохранена.
-- Единственный D g1 завершён failed/score0/no_artifact/oracle=false; audit PASS до перехода к B, исход сохранён.
-- Единственный B завершён score100/oracle=true; ровно два measurement admissions, модели не повторялись.
-- Три обязательных browser audit замечания закрыты; ordered replay исходного D PASS, неизвестные эффекты HOLD.
-- Оба полных actor after равны before; cleanup/release PASS, повторная reconciliation code0 без новых admissions.
-- Patch/bundle проверены на точной базе, архив доставлен вложением, скачан обратно и проверен по SHA256.
-- Итоговый source независимо reviewed; локально после объединения 19 tests/135 assertions и bun typecheck PASS.
-- Actor snapshots ограничены разрешёнными operator User/Peer roots; runtime MCP Peer isolation не доказана.
-- Основная LAB-1677 независимо APPROVE: Backlog, squad назначен с suppress_run, read-back текста и 0 runs.
-- Новые пять пар не запускались; wakeups основной карточки включаются только после In progress.
-- Push/PR выполняет владелец здесь; shared daemon и чужие ресурсы не изменялись.
+- Ветка `analytics-autonomy`; инфраструктура принята полной репетицией LAB-1676, история и исходные отказы сохранены.
+- LAB-1677 завершена done: приняты все пять новых пар D/B, final independent SPEC+QUALITY APPROVE без обязательных замечаний.
+- Штатный старт, routed Author/Reviewer handoffs и periodic7200 подтверждены; все девять runs completed, активных нет.
+- Оба собственных main wakeups отключены; правила репетиции также отключены, чужие ресурсы не менялись.
+- Ровно пять started author attempts, без замен; BH выполнена отдельной parentless blind-B с закреплением ответа до oracle-check.
+- Native reference и cold всех пяти PASS: полный новый CSV, неизменный LGP, все ветви, noSettings/noSave и close/logout.
+- Calibration sol/xhigh PASS: 104 judgments / 110 фактических judge-вызовов с сохранённой историей.
+- Ровно десять measurement и десять preflight admissions, retry=0; десять независимых Terra/high сессий.
+- Девять controls — score100/oracle=true; MASE business — сохранённый FAIL/0/no_artifact, CLI exit1, без повтора.
+- Причина отсутствия артефакта MASE B не установлена; исход не подменяет качество принятого eval.
+- Native audits/recovery/release PASS, 40 bindings terminal; две terminal reconciliation code0 без новых admissions.
+- Все 18 полных actor snapshots равны; scope разрешённых User/текущего operator Peer, runtime MCP Peer isolation не доказана.
+- Принятый commit/patch/bundle доставлен вложением, download/read-back и SHA256 архива и компонентов проверены.
+- Исходный итоговый коммит runner2 перенесён локально fast-forward; все 174 принятых файла совпали, subject review не повторялось.
+- Коллекции локально валидны: по 43 задачи, по три прежних предупреждения; новые пять пар без предупреждений.
+- Полный offline suite на закреплённом Bun: 1377 PASS / 68 SKIP / 0 FAIL; typecheck и оба corpus192 + legacy114 PASS.
+- Совместимость checker с объявленными endpoint mutations восстановлена; GUID узлов/связей и точные source pins сохраняются.
+- Локальная подготовка к публикации и ремонт совместимости checker: [план](2026-11-15-analytics-publication.md).
+- Новых live авторских, судейских или контрольных вызовов при переносе нет; GitHub CI выполняется после push владельцем.
+- Push/PR, merge и выпуск остаются владельцу; GitHub credentials на runner2 не требуются.
