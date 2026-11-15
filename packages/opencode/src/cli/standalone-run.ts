@@ -112,9 +112,12 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
               id: dashboard.id, origin, signal,
               dashboards: dashboardDataRoot(process.env),
               template: join(bundle.resources, "dashboard/template"),
-              readPublication: async binding => Schema.decodeUnknownSync(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })(
-                await host.request("dashboard.read", { origin, generation: status.value.generation, binding }),
-              ),
+              readPublication: async binding => {
+                await host.request("connection.ready", {})
+                return Schema.decodeUnknownSync(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })(
+                  await host.request("dashboard.read", { origin, generation: status.value.generation, binding }),
+                )
+              },
             })
           } finally { signal?.removeEventListener("abort", interrupt) }
         })().catch(error => {

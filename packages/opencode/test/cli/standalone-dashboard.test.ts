@@ -107,6 +107,11 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
   await once(server, "listening")
   try {
     await stageKnowledgeFixture(fixture.bundle)
+    const knowledge = join(fixture.bundle, "runtime/src/knowledge-entry.mjs")
+    const originalKnowledge = await Bun.file(knowledge).text()
+    const listReply = "if (m.operation === 'list') process.send({id:m.id,result:{tools}});"
+    await writeFile(knowledge, originalKnowledge.replace(listReply,
+      "if (m.operation === 'list') setTimeout(() => process.send({id:m.id,result:{tools}}), 2000);"))
     await writeFile(join(fixture.bundle, "runtime/src/managed-entry.mjs"), `
       import { appendFileSync, existsSync, readFileSync } from 'node:fs';
       let reading;
@@ -171,6 +176,7 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
       undefined,
       false,
     )
+    await writeFile(knowledge, originalKnowledge)
     expect(result).toMatchObject({ exit: 0 })
     const reads = (await Bun.file(join(fixture.directory, "dashboard-read.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
     expect(reads.map(item => item.operation)).toEqual(["start", "dashboardRead", "close"])
@@ -265,6 +271,61 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
         expect(result.errors).toContain("Недостаточно прав")
         expect(result.errors).not.toContain("DASHBOARD_SNAPSHOT_UNAVAILABLE")
       }
+    }
+    await writeFile(join(fixture.directory, "read-mode"), "")
+    await writeFile(knowledge, originalKnowledge.replace(listReply,
+      "if (m.operation === 'list') process.send({id:m.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE'});"))
+    const savedSource = await Bun.file(join(work, "src/main.tsx")).text()
+    for (const local of [true, false]) {
+      await provider.runPromise(llm.reset)
+      await provider.runPromise(llm.text("Продолжаю локальный черновик без подключения."))
+      const response = await fetch(origin + "/dashboard/snapshots", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+          binding: local ? binding : { ...binding, packagePath: "/user/fixture/not-ready.lgp" },
+          nodeName: "Узел", sample: { schema: [], rows: [] }, parameters: [], published: false,
+        }),
+      })
+      const result = await invoke(fixture, ["--dashboard", (await response.json()).id, "--headless", "--", "Открой."], undefined, undefined, false)
+      expect(result.exit).toBe(local ? 0 : 1)
+      if (local) {
+        expect(result.errors).toContain("Не удалось проверить публикацию")
+        expect(await provider.runPromise(llm.calls)).toBeGreaterThan(0)
+      } else {
+        expect(result.errors).toContain("LOGINOM_CONNECTION_NOT_READY")
+        expect(await provider.runPromise(llm.calls)).toBe(0)
+      }
+      expect(await Bun.file(join(work, "src/main.tsx")).text()).toBe(savedSource)
+      expect(await readdir(fixture.profile)).not.toContain(".writer")
+    }
+    const pendingLog = Bun.file(join(fixture.directory, "dashboard-read.jsonl"))
+    const pendingOffset = (await pendingLog.text()).length
+    await writeFile(knowledge, "import { appendFileSync } from 'node:fs';\n" + originalKnowledge
+      .replace(listReply, `if (m.operation === 'list') appendFileSync(${JSON.stringify(pendingLog.name)}, '{"operation":"knowledgePending"}\\n');`)
+      .replace("if (m.operation === 'close')", `if (m.operation === 'close') appendFileSync(${JSON.stringify(pendingLog.name)}, '{"operation":"knowledgeClose"}\\n'); if (m.operation === 'close')`))
+    await provider.runPromise(llm.reset)
+    const pending = await fetch(origin + "/dashboard/snapshots", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        binding: { ...binding, packagePath: "/user/fixture/readiness-cancel.lgp" },
+        nodeName: "Узел", sample: { schema: [], rows: [] }, parameters: [], published: false,
+      }),
+    })
+    let pendingWatcher: ReturnType<typeof setInterval> | undefined
+    try {
+      const cancelled = await invoke(fixture, ["--dashboard", (await pending.json()).id, "--headless", "--", "Отмена."], interrupt => {
+        pendingWatcher = setInterval(async () => {
+          if (!(await pendingLog.text()).slice(pendingOffset).includes('"knowledgePending"')) return
+          clearInterval(pendingWatcher)
+          interrupt()
+        }, 20)
+      }, undefined, false)
+      expect(cancelled.exit).toBe(130)
+      expect(await provider.runPromise(llm.calls)).toBe(0)
+      expect((await pendingLog.text()).slice(pendingOffset)).not.toContain('"dashboardRead"')
+      expect((await pendingLog.text()).slice(pendingOffset)).toContain('"knowledgeClose"')
+      expect(await readdir(fixture.profile)).not.toContain(".writer")
+    } finally {
+      clearInterval(pendingWatcher)
+      await writeFile(knowledge, originalKnowledge)
     }
     await writeFile(join(fixture.directory, "read-mode"), "hold")
     const cancelling = await fetch(origin + "/dashboard/snapshots", {
