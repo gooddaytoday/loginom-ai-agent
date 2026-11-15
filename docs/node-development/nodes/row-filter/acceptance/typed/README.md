@@ -5,7 +5,10 @@
 **Top-N: готов (LAB-1575)** — native-проба подтвердила picker integer-порога
 номера строки, 1-based, исходный порядок и ссылку после Save/Close/Open.
 Подробности — [discovery-variables.md](../../discovery-variables.md#top-n-native-проба-lab-1575-13112026).
-Real/datetime/NULL: **предл.**, отдельный следующий цикл; здесь не принимаются.
+Real/datetime/NULL: **готов (LAB-1661)**. Native-проба 7.4.2 подтвердила
+оба picker, включённую границу, ссылки после Save/Close/Open и real NULL:
+output 0 пуст, output 1 — все строки. `expected-null.json` оставлен без изменений.
+Подробности — [discovery-variables.md](../../discovery-variables.md#realdatetimenull-native-проба-lab-1661-13112026).
 
 ### Что известно о 7.4.2
 
@@ -16,9 +19,9 @@ Real/datetime/NULL: **предл.**, отдельный следующий ци�
 | Привязка порога к переменной — `input_field` integer/string, integer scalar `row_number` | `filter-bindings.mjs`, LAB-1575 | реализовано |
 | Scalar-редактор `VariantPropEdit;SwitchButton` → picker совместимых переменных (integer) | `../../discovery-variables.md:38-47` | наблюдено для integer |
 | Picker для номера строки; integer TopN | LAB-1575, `native-probe/ui.jsonl:3–4,27` | наблюдено; Save/Close/Open |
-| Picker для real/datetime поля | — | **NOT_CHECKED** |
+| Picker для real/datetime поля | LAB-1661, native UI | наблюдено; Save/Close/Open |
 | Переменные real, datetime, NULL у builtin «Переменные сценария» | `../../../variables-user/discovery.md:1-36` (LAB-898) | наблюдено |
-| Сравнение с NULL ложно, NULL-строки не проходят без условия «пустой» | справка | документ; для NULL-**переменной** — гипотеза |
+| real NULL-переменная: output 0 пуст, output 1 — все 8 строк | LAB-1661, native Execute | наблюдено; `expected-null.json` |
 | Логический тип: только «истина/ложь/пустой/не пустой», значения для привязки нет | справка, таблица операторов | документ |
 
 Выводы для среза:
@@ -31,9 +34,8 @@ Real/datetime/NULL: **предл.**, отдельный следующий ци�
 - **boolean-переменная — огр. 7.4.2, не берём:** у логического поля нет
   оператора со значением; привязывать нечего.
 - **real, datetime** — расширение привязки на эти типы.
-- **NULL-переменная** — гипотеза SQL: выход 0 пуст, все 8 строк в выходе 1.
-  Если native-проба покажет ошибку мастера или выполнения, цикл делает
-  честный отказ до мутации, а `expected-null.json` уходит из комплекта.
+- **Real NULL-переменная** — выход 0 пуст, все 8 строк в выходе 1;
+  штатный мастер и выполнение не отказывают (LAB-1661).
 
 ### Файлы
 

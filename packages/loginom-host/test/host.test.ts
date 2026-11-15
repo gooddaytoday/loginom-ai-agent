@@ -84,6 +84,11 @@ test("Host prewarms one full resource verification and hands every runtime start
     hashedFiles: 2,
     cachedFiles: 0,
   })
+  // Post-warmup refresh rehashes changed metadata while reusing all other files.
+  await writeFile(join(resources, "browser"), "controlled browser payload")
+  expect(
+    (await verifyInstallationResources({ root, resources, resourceVersion: "0.4.0", forceHash: false })).verification,
+  ).toEqual({ mode: "partial", hashedFiles: 1, cachedFiles: 1 })
   const host = await createLoginomHost({
     root,
     resources,
@@ -131,7 +136,9 @@ test("Host prewarms one full resource verification and hands every runtime start
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line))
-      .filter((event) => event.phase === "resources.verify" && event.status === "ready")
+      .filter(
+        (event) => event.phase === "resources.verify" && event.status === "ready" && event.scope !== "installation",
+      )
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({ mode: "metadata", hashedFiles: 0, cachedFiles: 2 })
     expect((await host.verifyInstallationResources()).verification).toEqual({
@@ -153,7 +160,9 @@ test("Host prewarms one full resource verification and hands every runtime start
           .trim()
           .split("\n")
           .map((line) => JSON.parse(line))
-          .filter((event) => event.phase === "resources.verify" && event.status === "ready")
+          .filter(
+            (event) => event.phase === "resources.verify" && event.status === "ready" && event.scope !== "installation",
+          )
         if (events.length === 2) {
           expect(events[1]).toMatchObject({ mode: "metadata", hashedFiles: 0, cachedFiles: 2 })
           break

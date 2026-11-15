@@ -202,23 +202,33 @@ test("CLI setup writes the Host cache before saving; check and the next process 
   }
   const host = await launchNodeHost(input)
   try {
-    const checked = (await host.request("connection.check", candidate)) as { validationId: string }
     const cachePath = join(root, "resource-verification.json")
-    await rm(cachePath)
+    await rm(cachePath, { force: true })
+    await host.request("connection.verify-resources", {})
+    const checked = (await host.request("connection.check", candidate)) as { validationId: string }
+    const beforeSave = await readFile(join(root, "startup-phases.jsonl"), "utf8")
     expect(await host.request("connection.save", { revision: 0, validationId: checked.validationId })).toMatchObject({
       generation: 1,
     })
     expect(JSON.parse(await readFile(cachePath, "utf8"))).toMatchObject({ protocol: 1, version: "" })
+    const installationEvents = (text: string) =>
+      text
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .filter((event) => event.scope === "installation")
+    expect(installationEvents(await readFile(join(root, "startup-phases.jsonl"), "utf8"))).toEqual(
+      installationEvents(beforeSave),
+    )
     // A damaged resource must refuse setup even if browser validation succeeded.
     const current = (await host.request("connection.status", {})) as { revision: number }
-    const again = (await host.request("connection.check", { ...candidate, revision: current.revision })) as {
-      validationId: string
-    }
     await writeFile(join(resources, "browser"), "tampered browser payload")
+    await expect(host.request("connection.verify-resources", {})).rejects.toThrow("LOGINOM_RUNTIME_START_FAILED")
     await expect(
-      host.request("connection.save", { revision: current.revision, validationId: again.validationId }),
+      host.request("connection.save", { revision: current.revision, validationId: "unverified" }),
     ).rejects.toThrow("LOGINOM_RUNTIME_START_FAILED")
     await writeFile(join(resources, "browser"), "controlled browser payload")
+    await host.request("connection.verify-resources", {})
     const retry = (await host.request("connection.check", { ...candidate, revision: current.revision })) as {
       validationId: string
     }

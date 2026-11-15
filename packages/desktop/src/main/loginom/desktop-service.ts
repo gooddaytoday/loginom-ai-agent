@@ -1,6 +1,10 @@
 import { app, safeStorage } from "electron"
 import { join, resolve } from "node:path"
-import { createLoginomHost, verifyInstallationResources } from "@loginom-ai-agent/loginom-host/host"
+import {
+  createLoginomHost,
+  verifyInstallationResources,
+  warmInstallationBrowser,
+} from "@loginom-ai-agent/loginom-host/host"
 import { credentials } from "./credentials"
 
 export function loginomResources() {
@@ -23,10 +27,18 @@ export function desktopLoginom() {
   })
 }
 
-export function verifyDesktopResources() {
-  return verifyInstallationResources({
-    root: join(app.getPath("userData"), "loginom"),
-    resources: loginomResources(),
+export async function verifyDesktopResources() {
+  const root = join(app.getPath("userData"), "loginom")
+  const resources = loginomResources()
+  const verified = await verifyInstallationResources({
+    root,
+    resources,
     resourceVersion: app.getVersion(),
   })
+  if (process.platform === "win32") {
+    // Warmup is advisory. Full integrity/cache failures above and below remain fatal.
+    await warmInstallationBrowser({ root, resources, verified }).catch(() => undefined)
+    return verifyInstallationResources({ root, resources, resourceVersion: app.getVersion(), forceHash: false })
+  }
+  return verified
 }

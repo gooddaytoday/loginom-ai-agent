@@ -32,7 +32,7 @@ export function validateBuiltinBindingSource(result,r,savedMapping){
   const [,,g,c]=b.parameter.split('/'),condition=r.parameters.groups?.[Number(g)]?.[Number(c)],v=vs[0];
   const type=['/sort_result','/compare_with_locale'].includes(b.parameter)?'boolean':condition?.type;
   if(type&&v.type!==type)throw Error('BINDING_TYPE_MISMATCH: '+b.parameter);
-  if(v.cell?.is_null!==false)throw Error('BINDING_NULL_UNSUPPORTED: '+b.parameter);
+  if(v.cell?.is_null!==false&&!(r.target.type==='transform.filter_data'&&v.type==='real'&&v.cell?.is_null===true&&v.cell.value===null&&v.cell.precision==='exact_null'))throw Error('BINDING_NULL_UNSUPPORTED: '+b.parameter);
  }
 }
 export async function preflightBooleanBindings(options,ctx,config){
