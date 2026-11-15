@@ -79,7 +79,9 @@ export async function buildSources(input: {
     }
     const hash = await treeHash(join(staging, "dist"))
     const dir = join(input.out, hash)
-    if (!existsSync(dir)) await rename(join(staging, "dist"), dir)
+    if (!existsSync(dir)) await rename(join(staging, "dist"), dir).catch(error => {
+      if (!["EEXIST", "ENOTEMPTY"].includes(error.code)) throw error
+    })
     return { ok: true, hash, dir, output: outputText(output) }
   } finally {
     await unlink(join(staging, "node_modules")).catch(() => undefined)

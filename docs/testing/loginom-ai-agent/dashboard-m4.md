@@ -133,8 +133,8 @@ channel-summary — 231 530 байт / 4,0 с, campaign-summary — 578 031 ба
 Предел 20 МиБ имеет более чем 30-кратный запас на крупнейшем примере; лимиты не
 изменены. Сравнение локального и серверного результата даёт одинаковый hash.
 
-Проверки из `packages/dashboard`: `bun run build`, `bun typecheck`, focused набор
-из brief — 41/41 PASS, `bun run test` PASS с прежним порогом web coverage. Из корня:
+Первоначальные проверки из `packages/dashboard`: `bun run build`, `bun typecheck`,
+focused набор из brief — 41/41 PASS, `bun run test` PASS с прежним порогом web coverage. Из корня:
 `bash -n packages/dashboard/deploy/dev-master.sh`, ShellCheck, compose config,
 inspect и `dev-master.sh check --config <локальный JSON>` PASS. Последний проверил
 lookup/state, HTTP-заголовки, обе оболочки и штатные adapter-вызовы на `/app/` и
@@ -152,15 +152,36 @@ Evidence вне Git: `$M4_SCRATCH/task3-live.json`, `task3-view.json`, `task3-st
 `task3-inspect.json`, `task3-ro.json`, `task3-container-measure.json`, `task3-check.log`
 и журналы focused/package tests. Первый view-probe ошибся CSS-селектором; повторён
 только просмотр без новой публикации. Этот failed probe закрыл Chromium, но
-пропустил штатный Logout. Его собственный профиль повторно открыт без новой
-аутентификации: показана форма входа, прежняя сессия не восстановилась. Независимый
-read-only разбор native log подтвердил сохранение failed-view сессии после разрыва;
-её завершение в доступном журнале не найдено, текущее состояние позже последней
-записи неизвестно. Форма входа не доказывает завершения server session. Причина
-предупреждения Studio о read-only пакете на screenshot не установлена; чужие
-сессии не закрывались. Snapshot, успешный view и обе проверки `check` завершили
-ClosePackage/Logout; Host закрылся с exit 0, signal null. Исторический Knowledge
-ACK→SIGKILL остаётся отдельным UNKNOWN concern Task 1.
+пропустил штатный Logout. Native log выявил четыре сохранённые собственные сессии:
+три короткие Host-операции и failed view. Они закрыты одним разрешённым maintenance
+restart только новой собственной master-пары: журнал подтвердил закрытие всех
+четырёх контекстов. Все 25 долговечных файлов, включая `.lgp` и публикацию, сохранили
+прежние байты; удалён только lock собственного пакета. Evidence:
+`$M4_SCRATCH/task3-maintenance.json`. Исходная сверка 26→25 и её false сохранены;
+отдельная адресная проверка подтвердила неизменность оставшихся файлов.
+
+`Host cleanup=true` в live evidence означает resource ACK, завершение Chromium и
+child с exit 0; это **не native Logout**. Существующая политика короткого private
+runtime без подготовленного workspace допускает сохранение server session после
+disconnect. Она в Task 3 не менялась. Snapshot, успешный view и проверки `check`
+выполнили ClosePackage/Logout. Cleanup concern failed probe закрыт подтверждённым
+maintenance; причина прежнего read-only warning напрямую не проверялась.
+Исторический Knowledge ACK→SIGKILL остаётся отдельным UNKNOWN concern Task 1.
+
+Независимый review Task 3 выявил два дефекта. Fix 1 учитывает JSON-экранирование
+диагностики и переводит невалидный manifest в отказ только своей задачи; следующая
+публикация продолжает обрабатываться, прежняя ready сохраняется. Предел самой
+диагностики остаётся 8 КиБ. Отсутствующий manifest остаётся ожиданием, включая
+отдельную проверку, что dangling symlink не считается отсутствием. Общая сборка
+переиспользует уже установленный hash при конкретном конфликте одновременного
+rename; другие ошибки распространяются. Новых очередей или повторов нет.
+Fix 1: адресный набор builder/publisher/agent — 30/30 PASS; после добавления
+проверки dangling manifest — publisher 15/15 PASS. `bun typecheck` и `bun run build`
+прошли. Обычные rebuild/install/check собственной пары завершились без новой
+публикации; bundle из source, каталога установки и работающего image совпал
+побайтно. Установщик повторно подтвердил изоляцию до старта, `check` подтвердил
+ClosePackage/Logout на обоих клиентах. Неизменённые широкие suites не повторялись.
+Evidence Fix 1: `$M4_SCRATCH/task3-fix1-*.log` и `task3-fix1-inspect.json`.
 
 Основа/конфликты/UI Task 4, recovery Task 5, расширенная матрица и установленная
-Desktop/CLI приёмка здесь не выполнялись. Следующий шаг — независимое review Task 3.
+Desktop/CLI приёмка здесь не выполнялись. Следующий шаг — независимая проверка исправлений Task 3.

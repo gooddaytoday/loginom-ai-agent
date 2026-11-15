@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto"
 import { constants } from "node:fs"
-import { chmod, mkdir, open, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { chmod, lstat, mkdir, open, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { parsePublication } from "../contract/publication.ts"
 import { bindingKey } from "../contract/snapshot.ts"
@@ -37,14 +37,18 @@ export async function scanPublications(input: { storage: string; builds: string;
   const jobs = (await readdir(input.jobsIn)).filter(name => /^[a-f0-9]{64}$/.test(name))
   for (const id of jobs) {
     const job = JSON.parse(await readFile(join(input.jobsIn, id, "job.json"), "utf8")) as { path: string; sourceHash: string }
-    const raw = await readBounded(join(input.jobsOut, id, "result.json"), 16_384).catch(error => {
-      if (error.code === "ENOENT") return
-      throw error
-    })
-    if (!raw) continue
     const entry = state[job.path]
-    if (entry?.sourceHash === job.sourceHash) {
-      try {
+    try {
+      // Only absence waits; a dangling manifest link is an invalid result.
+      const manifest = join(input.jobsOut, id, "result.json")
+      const present = await lstat(manifest).catch(error => {
+        if (error.code === "ENOENT") return
+        throw error
+      })
+      if (!present) continue
+      // JSON escaping can expand each byte of the 8 KiB diagnostic to six bytes.
+      const raw = await readBounded(manifest, 65_536)
+      if (entry?.sourceHash === job.sourceHash) {
         const result = JSON.parse(raw.toString("utf8"))
         if (result.id !== id || result.sourceHash !== job.sourceHash || !["ready", "failed"].includes(result.outcome) || typeof result.output !== "string") throw Error("DASHBOARD_RESULT_INVALID")
         if (result.outcome === "failed") throw Error(result.output)
@@ -78,9 +82,10 @@ export async function scanPublications(input: { storage: string; builds: string;
           await rm(staging, { recursive: true, force: true })
         })
         state[job.path] = { ...entry, status: "ready", buildHash }
-      } catch (error) {
-        state[job.path] = { ...entry, status: "failed", error: outputText(Buffer.from(String(error))) }
       }
+    } catch (error) {
+      if (entry?.sourceHash === job.sourceHash)
+        state[job.path] = { ...entry, status: "failed", error: outputText(Buffer.from(String(error))) }
     }
     await rm(join(input.jobsIn, id), { recursive: true, force: true })
     await rm(join(input.jobsOut, id), { recursive: true, force: true })

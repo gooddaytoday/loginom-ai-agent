@@ -21,3 +21,33 @@ test("draft and server build the same example without server pruning previous re
   assert.equal(draft.hash, server.hash)
   assert.deepEqual((await readdir(out)).sort(), [server.hash, "previous"].sort())
 })
+
+test("concurrent identical drafts both reuse the installed hash", { timeout: 30_000 }, async t => {
+  const root = await mkdtemp(join(tmpdir(), "concurrent-build-"))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const input = { work: join(root, "work"), out: join(root, "draft"), template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE }
+  await mkdir(join(input.work, "src"), { recursive: true })
+  await writeFile(join(input.work, "src/main.tsx"), 'document.body.textContent = "Synthetic concurrent dashboard"')
+  const fs = (await import("node:fs/promises")).default
+  const { basename } = await import("node:path")
+  const { syncBuiltinESMExports } = await import("node:module")
+  const original = fs.rename
+  const gate = Promise.withResolvers()
+  let installations = 0
+  fs.rename = async (from, to) => {
+    if (basename(from) === "dist" && /^[a-f0-9]{64}$/.test(basename(to))) {
+      if (++installations === 2) gate.resolve()
+      await gate.promise
+    }
+    return original(from, to)
+  }
+  syncBuiltinESMExports()
+  t.after(() => { gate.resolve(); fs.rename = original; syncBuiltinESMExports() })
+  const results = await Promise.allSettled([buildDashboard(input), buildDashboard(input)])
+  assert.equal(installations, 2)
+  assert.deepEqual(results.map(result => result.status), ["fulfilled", "fulfilled"])
+  assert.ok(results.every(result => result.value.ok), JSON.stringify(results))
+  assert.equal(results[0].value.hash, results[1].value.hash)
+  assert.equal(await fs.readFile(join(input.out, "current"), "utf8"), results[0].value.hash + "\n")
+  assert.deepEqual((await readdir(input.out)).sort(), [results[0].value.hash, "current"].sort())
+})
