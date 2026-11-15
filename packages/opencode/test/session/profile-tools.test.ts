@@ -994,7 +994,7 @@ codeMode.instance("a folder prepared by Desktop resolves dashboard tools without
   Effect.gen(function* () {
     expect(dashboardDataRoot(process.env)).toBe(DashboardSession.dashboardRoot())
     const id = crypto.randomUUID()
-    const prepared = yield* Effect.promise(() => prepareDashboard({
+    const prepared = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
       id, origin: "http://localhost:32768", dashboards: dashboardDataRoot(process.env),
       template: resolve(import.meta.dir, "../../../dashboard/template"),
       fetch: Object.assign(async () => Response.json({

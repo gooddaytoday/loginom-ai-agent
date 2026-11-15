@@ -26,13 +26,14 @@ test("consumes the requested one-time snapshot from the configured stand", async
     const target = await getDashboardTarget(id, {
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
       dashboards: () => join(root, "dashboards"),
+      readPublication: async () => null,
       template: resolve(import.meta.dirname, "../../../dashboard/template"),
       fetch: async (url, init) => {
         requests.push([url, init])
         return Response.json(snapshot)
       },
     })
-    expect(requests).toEqual([["http://127.0.0.1:32768/dashboard/snapshots/" + id, { redirect: "error" }]])
+    expect(requests).toEqual([["http://127.0.0.1:32768/dashboard/snapshots/" + id, { redirect: "error", signal: undefined }]])
     expect(target).toMatchObject({ nodeName: snapshot.nodeName, action: "create", fresh: true })
     expect(target.directory.startsWith(join(root, "dashboards") + "/")).toBe(true)
     expect(JSON.parse(await readFile(join(target.directory, "sample.json"), "utf8"))).toEqual(snapshot.sample)
@@ -47,6 +48,7 @@ test("an unconfigured stand fails before fetching a snapshot", async () => {
     getDashboardTarget(id, {
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 0 }),
       dashboards: () => "/unused/dashboards",
+      readPublication: async () => null,
       template: resolve(import.meta.dirname, "../../../dashboard/template"),
       fetch: async (url) => {
         requests.push(url)
@@ -62,6 +64,7 @@ test("an unavailable snapshot reports the public snapshot error", async () => {
     getDashboardTarget(id, {
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
       dashboards: () => "/unused/dashboards",
+      readPublication: async () => null,
       template: resolve(import.meta.dirname, "../../../dashboard/template"),
       fetch: async () => new Response(null, { status: 404 }),
     }),
@@ -74,6 +77,7 @@ test("checks the prepared local folder without consuming a snapshot again", asyn
     await getDashboardTarget(id, {
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
       dashboards: () => join(root, "dashboards"),
+      readPublication: async () => null,
       template: resolve(import.meta.dirname, "../../../dashboard/template"),
       fetch: async () => Response.json(snapshot),
     })
@@ -82,4 +86,20 @@ test("checks the prepared local folder without consuming a snapshot again", asyn
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test("pre-chat publication read uses the captured origin, generation and lifecycle signal", async () => {
+  const root = await mkdtemp(join(tmpdir(), "desktop-dashboard-"))
+  const controller = new AbortController()
+  const reads: unknown[] = []
+  try {
+    await getDashboardTarget(id, {
+      status: async () => ({ url: "http://127.0.0.1:32768/app/", generation: 7 }),
+      dashboards: () => join(root, "dashboards"), template: resolve(import.meta.dirname, "../../../dashboard/template"),
+      signal: controller.signal,
+      readPublication: async (input, signal) => { reads.push([input, signal]); return null },
+      fetch: async (_url, options) => { expect(options?.signal).toBe(controller.signal); return Response.json(snapshot) },
+    })
+    expect(reads).toEqual([[{ origin: "http://127.0.0.1:32768", generation: 7, binding: snapshot.binding }, controller.signal]])
+  } finally { await rm(root, { recursive: true, force: true }) }
 })

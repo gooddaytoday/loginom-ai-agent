@@ -23,5 +23,5 @@ if (input.action === "refresh") {
     process.kill(process.pid, "SIGSTOP")
   }
   syncBuiltinESMExports()
-  await prepareDashboard({ ...input.options, fetch: async () => Response.json(input.snapshot) })
+  await prepareDashboard({ readPublication: async () => null, ...input.options, fetch: async () => Response.json(input.snapshot) })
 }

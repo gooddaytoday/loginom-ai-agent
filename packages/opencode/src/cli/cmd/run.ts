@@ -895,7 +895,9 @@ export const RunCommand = effectCmd({
                 UI.println(
                   UI.Style.TEXT_WARNING_BOLD + "!",
                   UI.Style.TEXT_NORMAL +
-                    `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
+                    (permission.permission === "dashboard_publish"
+                      ? `Публикация отклонена: dashboard_publish (${permission.patterns.join(", ")}) требует явного согласия. Для подтверждения в CLI укажите --auto.`
+                      : `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`),
                 )
                 await client.permission.reply({
                   requestID: permission.id,

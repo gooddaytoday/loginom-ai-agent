@@ -2,11 +2,12 @@ import { expect, test } from "bun:test"
 import { ManagedRuntime, Schema } from "effect"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { once } from "node:events"
-import { cp, mkdir, readdir, symlink, writeFile } from "node:fs/promises"
+import { mkdir, readdir, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { dashboardServer } from "@loginom-ai-agent/dashboard/web/server"
 import { bindingKey } from "@loginom-ai-agent/dashboard/contract/snapshot"
 import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
+import { stageKnowledgeFixture } from "../../../loginom-host/test/fixtures/knowledge"
 import { connectionStore } from "@loginom-ai-agent/loginom-host/connection/connection-store"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
 import { profilePaths } from "@loginom-ai-agent/product/cli-profile"
@@ -93,7 +94,7 @@ test("standalone dashboard does not accept a headless option as its missing snap
   expect(await readdir(fixture.profile)).not.toContain(".writer")
 }, 30_000)
 
-test("standalone dashboard starts from the snapshot in its restricted work directory", async () => {
+test("standalone dashboard starts from the snapshot and preserves explicit publication approval", async () => {
   await using fixture = await standaloneFixture()
   const provider = ManagedRuntime.make(TestLLMServer.layer)
   const server = dashboardServer({
@@ -105,11 +106,23 @@ test("standalone dashboard starts from the snapshot in its restricted work direc
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
   try {
-    await mkdir(join(fixture.bundle, "runtime/src"), { recursive: true })
-    await symlink(
-      resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
-      join(fixture.bundle, "runtime/src/knowledge-entry.mjs"),
-    )
+    await stageKnowledgeFixture(fixture.bundle)
+    await writeFile(join(fixture.bundle, "runtime/src/managed-entry.mjs"), `
+      import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+      let reading;
+      process.on('message', m => {
+        appendFileSync(${JSON.stringify(join(fixture.directory, "dashboard-read.jsonl"))}, JSON.stringify({operation:m.operation,generation:m.input?.generation})+'\\n');
+        if(m.operation==='start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
+        if(m.operation==='dashboardRead') {
+          const mode = existsSync(${JSON.stringify(join(fixture.directory, "read-mode"))}) ? readFileSync(${JSON.stringify(join(fixture.directory, "read-mode"))}, 'utf8') : '';
+          if(mode==='hold') reading=m.id;
+          else process.send({id:m.id,...(mode==='denied'?{error:'DASHBOARD_ACCESS_DENIED'}:{result:null})});
+        }
+        if(m.operation==='dashboardPublish') process.send({id:m.id,result:{status:'changed',latest:null}});
+        if(m.operation==='interrupt') { if(reading) process.send({id:reading,error:'DASHBOARD_CANCELLED'}); process.send({id:m.id,result:true}); }
+        if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.exit(0));
+      });
+    `)
     const address = server.address()
     if (!address || typeof address === "string") throw Error("Missing dashboard address")
     const origin = `http://127.0.0.1:${address.port}`
@@ -141,11 +154,13 @@ test("standalone dashboard starts from the snapshot in its restricted work direc
       url: origin + "/app/",
     })
     await store.activate(1)
-    await cp(
-      resolve(import.meta.dir, "../../../dashboard/template/src"),
-      join(fixture.bundle, "dashboard/template/src"),
-      { recursive: true },
-    )
+    await mkdir(join(fixture.bundle, "dashboard"), { recursive: true })
+    await mkdir(join(fixture.bundle, "runtime/client/node_modules"), { recursive: true })
+    await symlink(resolve(import.meta.dir, "../../../dashboard/template"), join(fixture.bundle, "dashboard/template"), "dir")
+    await symlink(resolve(import.meta.dir, "../../../loginom-runtime/client/node_modules/playwright-core"), join(fixture.bundle, "runtime/client/node_modules/playwright-core"), "dir")
+    for (const file of ["dashboard/draft.js", "dashboard/selfcheck.mjs", "chrome"]) await writeFile(join(fixture.bundle, file), "fixture")
+    const manifest = Bun.file(join(fixture.bundle, "resource-manifest.json"))
+    await Bun.write(manifest, JSON.stringify({ ...await manifest.json(), node: "bin/node", browser: "chrome" }))
     const llm = await provider.runPromise(TestLLMServer)
     await provider.runPromise(llm.text("Создаю dashboard."))
     await writeFile(join(fixture.profile, "config/loginom-ai-agent.json"), JSON.stringify(testProviderConfig(llm.url)))
@@ -157,6 +172,9 @@ test("standalone dashboard starts from the snapshot in its restricted work direc
       false,
     )
     expect(result).toMatchObject({ exit: 0 })
+    const reads = (await Bun.file(join(fixture.directory, "dashboard-read.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(reads.map(item => item.operation)).toEqual(["start", "dashboardRead", "close"])
+    expect(reads[0].generation).toBe(1)
     const requests = await provider.runPromise(llm.hits)
     const work = join(fixture.profile, "data/dashboards", "campaign-" + (await bindingKey(binding)).slice(0, 8), "work")
     expect(JSON.stringify(requests)).toContain(dashboardPrompt("create", true))
@@ -207,8 +225,71 @@ test("standalone dashboard starts from the snapshot in its restricted work direc
     })
     expect(await provider.runPromise(llm.calls)).toBe(calls)
     expect(await readdir(fixture.profile)).not.toContain(".writer")
+    for (const auto of [false, true]) {
+      await provider.runPromise(llm.reset)
+      await provider.runPromise(llm.tool("dashboard_publish", {}))
+      await provider.runPromise(llm.text("Готово."))
+      const response = await fetch(origin + "/dashboard/snapshots", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+          binding, nodeName: "Узел", sample: { schema: [{ name: "count", type: 1 }], rows: [[42]] }, parameters: [], published: false,
+        }),
+      })
+      const result = await invoke(fixture, ["--dashboard", (await response.json()).id, "--headless", ...(auto ? ["--auto"] : []), "--", "Опубликуй."], undefined, undefined, false)
+      expect(result.exit).toBe(auto ? 0 : 1)
+      const events = (await Bun.file(join(fixture.directory, "dashboard-read.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+      expect(events.filter(item => item.operation === "dashboardPublish")).toHaveLength(auto ? 1 : 0)
+      if (!auto) {
+        expect(result.events).toContainEqual(expect.objectContaining({ type: "error", error: expect.objectContaining({ name: "CLI_PERMISSION_REJECTED" }) }))
+        expect(result.errors).toContain("dashboard_publish")
+        expect(result.errors).toContain("--auto")
+        expect(result.errors).toContain("Публикация отклонена")
+      }
+    }
+    await writeFile(join(fixture.directory, "read-mode"), "denied")
+    await provider.runPromise(llm.reset)
+    await provider.runPromise(llm.text("Продолжаю локальный черновик."))
+    for (const local of [true, false]) {
+      const response = await fetch(origin + "/dashboard/snapshots", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+          binding: local ? binding : { ...binding, packagePath: "/user/fixture/denied.lgp" },
+          nodeName: "Узел", sample: { schema: [], rows: [] }, parameters: [], published: false,
+        }),
+      })
+      const result = await invoke(fixture, ["--dashboard", (await response.json()).id, "--headless", "--", "Открой."], undefined, undefined, false)
+      expect(result.exit).toBe(local ? 0 : 1)
+      if (local) {
+        expect(result.errors).toContain("Не удалось проверить публикацию")
+        expect(result.events.some(event => event.type === "error")).toBe(false)
+      } else {
+        expect(result.errors).toContain("DASHBOARD_ACCESS_DENIED")
+        expect(result.errors).toContain("Недостаточно прав")
+        expect(result.errors).not.toContain("DASHBOARD_SNAPSHOT_UNAVAILABLE")
+      }
+    }
+    await writeFile(join(fixture.directory, "read-mode"), "hold")
+    const cancelling = await fetch(origin + "/dashboard/snapshots", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        binding, nodeName: "Узел", sample: { schema: [], rows: [] }, parameters: [], published: false,
+      }),
+    })
+    const log = Bun.file(join(fixture.directory, "dashboard-read.jsonl"))
+    const offset = (await log.text()).length
+    let watcher: ReturnType<typeof setInterval> | undefined
+    try {
+      const cancelled = await invoke(fixture, ["--dashboard", (await cancelling.json()).id, "--headless", "--", "Отмена."], interrupt => {
+        watcher = setInterval(async () => {
+          if (!(await log.text()).slice(offset).includes('"dashboardRead"')) return
+          clearInterval(watcher)
+          interrupt()
+        }, 20)
+      }, undefined, false)
+      expect(cancelled.exit).toBe(130)
+      expect((await log.text()).slice(offset)).toContain('"interrupt"')
+      expect((await log.text()).slice(offset)).toContain('"close"')
+      expect(await readdir(fixture.profile)).not.toContain(".writer")
+    } finally { clearInterval(watcher) }
   } finally {
     await provider.dispose()
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
-}, 30_000)
+}, 60_000)

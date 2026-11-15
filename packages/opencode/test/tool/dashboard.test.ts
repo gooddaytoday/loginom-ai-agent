@@ -97,8 +97,9 @@ const publicationFolder = Effect.fn(function* () {
     for (const name of ["dashboard/draft.js", "dashboard/selfcheck.mjs", "browsers/chrome"]) await Bun.write(join(root, name), "fixture")
   })
   const id = crypto.randomUUID()
-  const folder = yield* Effect.promise(() => prepareDashboard({
-    id, origin: "http://192.0.2.1:32768", dashboards: dashboardDataRoot(process.env), template,
+  const folder = yield* Effect.promise(() => prepareDashboard({ readPublication: async () => null,
+    // Port zero fails locally without depending on external routing or proxy timeouts.
+    id, origin: "http://127.0.0.1:0", dashboards: dashboardDataRoot(process.env), template,
     fetch: Object.assign(async () => Response.json({
       id, created: new Date().toISOString(), published: false, nodeName: "Заказы",
       binding: { packagePath: "/fixture/orders-" + id + ".lgp", workflowGuid: crypto.randomUUID(), nodeGuid: crypto.randomUUID() },
@@ -187,7 +188,7 @@ for (const reply of ["reject", "abort", "once"] as const) {
       expect(yield* Effect.promise(() => Bun.file(join(folder.work, "sample.json")).exists())).toBe(true)
       expect((yield* Effect.promise(() => readdir(join(folder.work, "../control")))).filter(item => item.startsWith(".publish-"))).toEqual([])
     }).pipe(provideInstance(folder.work), Effect.provideService(RuntimeFlags.Service, { ...flags, loginomResources: folder.root }))
-  }))
+  }), 20_000)
 }
 
 it.instance("interruption joins an active publication build before removing its operation", () => Effect.gen(function* () {
@@ -270,7 +271,8 @@ it.instance("host failure preserves the draft and its specific reason without re
 it.instance("a changed server version requires new confirmation and preserves edited sources", () => Effect.gen(function* () {
   const folder = yield* publicationFolder()
   const latest = { name: "20261115T110000Z.json", sourceHash: "a".repeat(64) }
-  const requests = publicationHost({ latest, changed: true })
+  const server = { latest, changed: false }
+  const requests = publicationHost(server)
   const flags = yield* RuntimeFlags.Service
   yield* Effect.gen(function* () {
     const sessions = yield* Session.Service
@@ -284,16 +286,19 @@ it.instance("a changed server version requires new confirmation and preserves ed
       sessionID: session.id, messageID: MessageID.ascending(), agent: "build", messages: [],
       abort: new AbortController().signal, metadata: () => Effect.void,
       ask: request => Effect.promise(async () => {
-        expect(request.metadata).toMatchObject({ base: null, latest, conflict: true })
+        expect(request.metadata).toMatchObject({ dashboardConflict: { base: null, latest } })
         if (typeof request.metadata.sourceHash !== "string") throw Error("Missing approved source hash")
         approvedHash = request.metadata.sourceHash
         await Bun.write(join(folder.work, "src/main.tsx"), "document.body.textContent = 'new local draft'")
+        server.latest = { name: "20261115T120000Z.json", sourceHash: "b".repeat(64) }
+        server.changed = true
       }),
     })
     expect(result.output).toStartWith("needs-confirmation:")
     const writes = requests.filter(item => item.method === "dashboardPublish")
     expect(writes).toHaveLength(1)
     expect(writes[0].input.expected).toEqual(latest)
+    expect(writes.some(write => JSON.stringify(write.input.expected) === JSON.stringify(server.latest))).toBe(false)
     const content = writes[0].input.content!
     expect(createHash("sha256").update(content).digest("hex")).toBe(approvedHash)
     expect(JSON.parse(content).files.find((file: { path: string }) => file.path === "src/main.tsx").content).toBe(before)

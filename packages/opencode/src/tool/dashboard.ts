@@ -68,7 +68,11 @@ export const DashboardPublishTool = Tool.define(
               yield* Effect.raceFirst(ctx.ask({
                 permission: "dashboard_publish",
                 patterns: [prepared.control.nodeName, prepared.control.binding.packagePath],
-                always: [], metadata: { base: null, latest: expected, conflict: expected !== null, sourceHash: prepared.publication.sourceHash },
+                always: [], metadata: {
+                  sourceHash: prepared.publication.sourceHash,
+                  ...(expected && (prepared.control.base?.name !== expected.name || prepared.control.base.sourceHash !== expected.sourceHash)
+                    ? { dashboardConflict: { base: prepared.control.base ?? null, latest: expected } } : {}),
+                },
               }), cancelled)
               ctx.abort.throwIfAborted()
               return yield* Effect.uninterruptible(Effect.tryPromise({ try: () => finishPublish({

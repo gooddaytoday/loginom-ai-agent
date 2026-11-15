@@ -22,7 +22,7 @@ async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "dashboard-draft-"))
   t.after(() => rm(root, { recursive: true, force: true }))
   const id = crypto.randomUUID()
-  const prepared = await prepareDashboard({
+  const prepared = await prepareDashboard({ readPublication: async () => null,
     id, origin: "http://localhost:32768", dashboards: root, template,
     fetch: async () => Response.json({
       id, created: new Date().toISOString(), published: false, nodeName: "Узел",

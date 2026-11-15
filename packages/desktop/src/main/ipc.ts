@@ -41,7 +41,7 @@ type Deps = {
   awaitInitialization: () => Promise<ServerReadyData>
   getDashboardTarget: (
     id: string,
-  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean }>
+  ) => Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
   checkDashboardTarget: (id: string) => Promise<boolean>
   consumeDeepLinks: (sender: WebContents) => PendingDeepLinks
   getDefaultServerUrl: () => Promise<string | null> | string | null

@@ -7,7 +7,7 @@ import { Option, Schema } from "effect"
 import { parsePublication, PublicationVersion, PublicationWrite } from "../contract/publication.ts"
 import { buildDashboard, sourceFiles } from "./build.ts"
 import { NO_SAMPLE } from "./draft.ts"
-import { readDashboardSnapshot, removePublishedSample, type ControlBinding } from "./folder.ts"
+import { readDashboardSnapshot, removePublishedSample, updatePublicationBase, type ControlBinding } from "./folder.ts"
 import type { DashboardResources } from "./resources.ts"
 
 export { embeddedValues, outputText } from "./build.ts"
@@ -62,6 +62,8 @@ export async function finishPublish(input: Prepared & {
   }
   if (result.value.version.sourceHash !== input.publication.sourceHash) throw Error("DASHBOARD_WRITE_UNKNOWN")
   const version = result.value.version
+  let baseWarning = ""
+  try { updatePublicationBase(input.work, input.control, version) } catch { baseWarning = " Не удалось сохранить основу локального черновика." }
   const deadline = Date.now() + (input.timeoutMs ?? 120_000)
   while (Date.now() < deadline) {
     input.signal?.throwIfAborted()
@@ -75,13 +77,13 @@ export async function finishPublish(input: Prepared & {
       if (response.ok && Option.isSome(decoded)) {
         const own = decoded.value.publication
         if (own?.name === version.name && own.sourceHash === version.sourceHash) {
-          if (own.status === "failed") return { status: "failed" as const, version, text: "Сборка на стенде не удалась.\n" + own.error }
+          if (own.status === "failed") return { status: "failed" as const, version, text: "Сборка на стенде не удалась.\n" + own.error + baseWarning }
           if (own.status === "ready" && own.buildHash) {
             let cleanup = ""
             try { removePublishedSample(input.work, input.control.snapshotId) } catch { cleanup = " Не удалось удалить локальный образец." }
             return { status: "published" as const, version,
               text: "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard." +
-                (decoded.value.currentVersion?.name !== version.name ? " На стенде уже активна более новая версия." : "") + cleanup,
+                (decoded.value.currentVersion?.name !== version.name ? " На стенде уже активна более новая версия." : "") + baseWarning + cleanup,
             }
           }
         }
@@ -94,6 +96,6 @@ export async function finishPublish(input: Prepared & {
   }
   return {
     status: "pending" as const, version,
-    text: "Исходники переданы в Loginom. Готовность сборки на стенде ещё не подтверждена.",
+    text: "Исходники переданы в Loginom. Готовность сборки на стенде ещё не подтверждена." + baseWarning,
   }
 }

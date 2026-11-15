@@ -510,7 +510,7 @@ test("a dashboard request keeps the user's words and adds the local folder instr
   ])
 })
 
-test("a fresh edit tells the agent that local sources are only a template", () => {
+test("a fresh edit preserves the prompt without claiming sources are a template", () => {
   const { requestParts } = buildRequestParts({
     prompt: [],
     text: "Edit chart",
@@ -522,6 +522,6 @@ test("a fresh edit tells the agent that local sources are only a template", () =
   })
   expect(requestParts[1]).toMatchObject({ type: "text", synthetic: true, text: dashboardPrompt("edit", true) })
   const note = requestParts[1]
-  expect(note?.type === "text" ? note.text : "").toContain("заготовка шаблона")
+  expect(note?.type === "text" ? note.text : "").not.toContain("заготовка шаблона")
   expect(JSON.stringify(requestParts)).not.toMatch(/127\.0\.0\.1:32768|\/dashboard\//)
 })

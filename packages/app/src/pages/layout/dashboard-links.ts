@@ -47,6 +47,9 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
       if (requests.get(route) !== link) return
       const item = { type: "dashboard", ...link, nodeName: snapshot.nodeName, fresh: snapshot.fresh } as const
       layout.projects.open(snapshot.directory)
+      if (snapshot.notice) showToast({ title: language.t(`dashboard.notice.${snapshot.notice.kind}`, {
+        latest: snapshot.notice.latest ?? "", current: snapshot.notice.current ?? language.t("dashboard.version.none"), error: snapshot.notice.error ?? "",
+      }) })
       if (settings.general.newLayoutDesigns()) {
         await tabs.ready.promise
         if (requests.get(route) !== link) return
@@ -59,15 +62,16 @@ export function useDashboardDeepLinks(handleOther?: (urls: string[]) => void) {
       deliverDashboard(dashboardRoute(key, path, draftID), item)
       navigate(`${path}?dashboardDraft=${draftID}`)
     } catch (error) {
-      if (requests.get(route) === link)
-        showToast({
-          title: language.t(
-            error instanceof Error && error.message.includes("DASHBOARD_NOT_CONFIGURED")
-              ? "dashboard.target.notConfigured"
-              : "dashboard.target.snapshotGone",
-          ),
-          variant: "error",
-        })
+      if (requests.get(route) !== link) return
+      const message = error instanceof Error ? error.message : ""
+      const key = message.includes("DASHBOARD_NOT_CONFIGURED") ? "dashboard.target.notConfigured"
+        : /DASHBOARD_SNAPSHOT_(UNAVAILABLE|INVALID)/.test(message) ? "dashboard.target.snapshotGone"
+        : /DASHBOARD_ACCESS_DENIED/.test(message) ? "dashboard.target.accessDenied"
+        : /DASHBOARD_(PUBLICATION_(INVALID|TOO_LARGE)|INPUT_INVALID)/.test(message) ? "dashboard.target.publicationInvalid"
+        : /DASHBOARD_(BINDING_CONFLICT|ORIGIN_MISMATCH)/.test(message) ? "dashboard.target.bindingConflict"
+        : /LOGINOM_|DASHBOARD_(STORAGE_UNAVAILABLE|CANCELLED)/.test(message) ? "dashboard.target.connectionFailed"
+        : "dashboard.target.failed"
+      showToast({ title: language.t(key), variant: "error" })
     } finally {
       if (requests.get(route) === link) requests.delete(route)
     }

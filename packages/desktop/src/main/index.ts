@@ -179,7 +179,9 @@ const main = Effect.gen(function* () {
   let serverStarting: ReturnType<typeof spawnLocalServer> | undefined
   let stopping: Promise<void> | undefined
   let systemProxy: SystemProxyDetection | undefined
+  const dashboardLifecycle = new AbortController()
   const stopSidecars = () => {
+    dashboardLifecycle.abort()
     systemProxy?.stop()
     stopping ??= (async () => {
       try {
@@ -341,6 +343,8 @@ const main = Effect.gen(function* () {
     getDashboardTarget: (id) =>
       getDashboardTarget(id, {
         status: () => loginom.api.status(),
+        readPublication: (input, signal) => loginom.readDashboard(input, signal),
+        signal: dashboardLifecycle.signal,
         dashboards: () => dashboardDataRoot(process.env),
         template: join(loginomResources(), "dashboard", "template"),
       }),

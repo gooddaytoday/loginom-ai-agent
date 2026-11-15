@@ -37,7 +37,7 @@ async function fixture(t) {
     })
     assert.equal(response.status, 201)
     const { id } = await response.json()
-    return prepareDashboard({ id, origin, dashboards: join(root, "dashboards"), template: resources.template })
+    return prepareDashboard({ readPublication: async () => null, id, origin, dashboards: join(root, "dashboards"), template: resources.template })
   }
   const work = (await refresh()).directory
   const operation = await mkdtemp(join(work, "../control/.publish-"))
@@ -217,6 +217,7 @@ test("changed, cancelled and invalid host replies retain the draft without retry
   const input = await fixture(t)
   const prepared = await preparePublish(input)
   assert.equal(prepared.ok, true)
+  const before = readDashboardSnapshot(input.work).control
   let writes = 0
   const request = { ...input, ...prepared, timeoutMs: 0, expected: null, publish: async () => {
     writes++
@@ -232,6 +233,7 @@ test("changed, cancelled and invalid host replies retain the draft without retry
   ]) await assert.rejects(finishPublish({ ...request, publish: async () => reply }), /DASHBOARD_WRITE_UNKNOWN/)
   assert.ok(await readFile(join(input.work, "sample.json")))
   assert.ok(await readFile(join(input.work, "src/main.tsx")))
+  assert.deepEqual(readDashboardSnapshot(input.work).control, before)
 })
 
 test("finish confirms its own ready A even when B is current", async t => {
@@ -268,4 +270,21 @@ test("ready with a different source hash stays pending without a second write", 
   assert.equal(result.status, "pending")
   assert.equal(writes, 1)
   assert.ok(await readFile(join(input.work, "sample.json")))
+})
+
+test("two own writes from A keep base C in either completion order and preserve a newer snapshot", async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true)
+  const file = join(input.work, "../control/binding.json")
+  const base = { name: "20261115T110000Z.json", sourceHash: "a".repeat(64) }
+  const versions = ["20261115T120000Z.json", "20261115T130000Z.json"].map(name => ({ name, sourceHash: prepared.publication.sourceHash }))
+  for (const order of [versions, [...versions].reverse()]) {
+    await writeFile(file, JSON.stringify({ ...prepared.control, base }))
+    await input.refresh()
+    const refreshed = JSON.parse(await readFile(file, "utf8"))
+    for (const version of order) await finishPublish({ ...input, ...prepared, control: { ...prepared.control, base }, expected: base, timeoutMs: 0, publish: async () => ({ status: "written", version }) })
+    assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { ...refreshed, base: versions[1] })
+    assert.ok(await readFile(join(input.work, "sample.json")))
+  }
 })

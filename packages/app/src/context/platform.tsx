@@ -82,7 +82,7 @@ type PlatformBase = {
   /** Resolve a local Loginom dashboard snapshot selected in the browser. */
   getDashboardTarget?(
     id: string,
-  ): Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean }>
+  ): Promise<{ nodeName: string; directory: string; action: "create" | "edit"; fresh: boolean; notice?: { kind: "newer-publication" | "publication-check-unavailable" | "latest-build-failed"; latest?: string; current?: string; error?: string } }>
   checkDashboardTarget?(id: string): Promise<boolean>
 
   /** Fetch override */

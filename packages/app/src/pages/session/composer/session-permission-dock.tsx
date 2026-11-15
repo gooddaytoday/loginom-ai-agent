@@ -12,6 +12,14 @@ export function SessionPermissionDock(props: {
 }) {
   const language = useLanguage()
 
+  const conflict = () => {
+    if (props.request.permission !== "dashboard_publish") return
+    const value = props.request.metadata.dashboardConflict
+    if (!value || typeof value !== "object" || !("latest" in value)) return
+    const latest = value.latest
+    if (latest && typeof latest === "object" && "name" in latest && typeof latest.name === "string") return latest.name
+  }
+
   const toolDescription = () => {
     const key = `settings.permissions.tool.${props.request.permission}.description`
     const value = language.t(key as Parameters<typeof language.t>[0])
@@ -59,6 +67,13 @@ export function SessionPermissionDock(props: {
           <span data-slot="permission-spacer" aria-hidden="true" />
           <div data-slot="permission-hint">{toolDescription()}</div>
         </div>
+      </Show>
+
+      <Show when={conflict()}>
+        {(latest) => <div data-slot="permission-row" role="alert">
+          <span data-slot="permission-spacer" aria-hidden="true" />
+          <div data-slot="permission-hint">{language.t("dashboard.conflict", { latest: latest() })}</div>
+        </div>}
       </Show>
 
       <Show when={props.request.patterns.length > 0}>

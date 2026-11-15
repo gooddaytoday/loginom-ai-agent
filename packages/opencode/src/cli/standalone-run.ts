@@ -10,6 +10,7 @@ import { InstallationBrowserRecovery } from "@opencode-ai/core/installation/vers
 import { join } from "node:path"
 import { dashboardDataRoot } from "@loginom-ai-agent/product/dashboard-root"
 import { dashboardPrompt } from "@loginom-ai-agent/dashboard/contract/prompt"
+import { hostError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { dashboardFlag } from "./standalone-dashboard"
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run") {
@@ -31,11 +32,11 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
   const filtered = forwarded.filter(
     (value, index) => index >= forwardedBoundary || !["--headless", "--no-headless"].includes(value),
   )
-  const failure = (code: string, exit: number) => {
+  const failure = (code: string, exit: number, message = code) => {
     process.exitCode = exit
     if (json)
-      process.stdout.write(JSON.stringify({ type: "error", error: { name: code, data: { message: code } } }) + "\n")
-    process.stderr.write(code + "\n")
+      process.stdout.write(JSON.stringify({ type: "error", error: { name: code, data: { message } } }) + "\n")
+    process.stderr.write(message + "\n")
   }
   if (
     dashboard === "invalid" ||
@@ -100,18 +101,38 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     const target = dashboard
       ? await (async () => {
           const { prepareDashboard } = await import("@loginom-ai-agent/dashboard/agent/folder")
-          return prepareDashboard({
-            id: dashboard.id,
-            origin: new URL(status.value.url).origin,
-            dashboards: dashboardDataRoot(process.env),
-            template: join(bundle.resources, "dashboard/template"),
-          })
-        })().catch(() => {
-          failure("DASHBOARD_SNAPSHOT_UNAVAILABLE", 1)
+          const { PublicationSource } = await import("@loginom-ai-agent/dashboard/contract/publication")
+          const origin = new URL(status.value.url).origin
+          // Pre-chat owns the whole private Host: shutdown cancels and waits for its Studio operation.
+          const interrupt = () => { void host.close().catch(() => undefined) }
+          signal?.addEventListener("abort", interrupt, { once: true })
+          try {
+            signal?.throwIfAborted()
+            return await prepareDashboard({
+              id: dashboard.id, origin, signal,
+              dashboards: dashboardDataRoot(process.env),
+              template: join(bundle.resources, "dashboard/template"),
+              readPublication: async binding => Schema.decodeUnknownSync(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })(
+                await host.request("dashboard.read", { origin, generation: status.value.generation, binding }),
+              ),
+            })
+          } finally { signal?.removeEventListener("abort", interrupt) }
+        })().catch(error => {
+          const code = error instanceof Error && /^(DASHBOARD_SNAPSHOT_(UNAVAILABLE|INVALID)|DASHBOARD_BINDING_CONFLICT|DASHBOARD_PUBLICATION_(INVALID|TOO_LARGE))$/.test(error.message)
+            ? error.message : hostError(error)
+          failure(code, 1, code === hostError(error) ? hostErrorText(error) : code)
           return undefined
         })
       : undefined
     if (dashboard && !target) return
+    if (target?.notice) {
+      const notice = target.notice
+      process.stderr.write((notice.kind === "newer-publication"
+        ? `На стенде новая версия ${notice.latest}. Локальные исходники сохранены; перед заменой потребуется подтверждение.`
+        : notice.kind === "publication-check-unavailable"
+          ? "Не удалось проверить публикацию в Studio. Открыт сохранённый локальный черновик."
+          : `Сборка версии ${notice.latest} не удалась. Текущая версия: ${notice.current ?? "нет"}. ${notice.error ?? ""}`) + "\n")
+    }
     if (mode === "run" && automation && !status.value.generation) {
       failure("LOGINOM_CONFIG_REQUIRED", 2)
       return
