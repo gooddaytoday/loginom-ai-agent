@@ -1,5 +1,6 @@
 // Operator-only live check. Neither this probe nor its adapter module is installed in Studio.
 import { execFileSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -10,7 +11,6 @@ const mode = process.argv[2]
 const master = process.env.DASHBOARD_STUDIO_ORIGIN ?? "http://127.0.0.1:32768"
 if (URL.parse(master)?.origin !== master || !["http:", "https:"].includes(URL.parse(master)?.protocol)) throw Error("Invalid Studio origin")
 const timeoutMs = 30_000
-const shellPath = fileURLToPath(new URL("../dist/shell.js", import.meta.url))
 
 async function check() {
   if (!["master", "7.4.2"].includes(mode)) throw Error("Использование: node check-studio.mjs master|7.4.2")
@@ -55,13 +55,20 @@ async function check() {
         requireClient()
         const version = await page.evaluate(() => window.bg?.app?.Version)
         if (mode === "7.4.2" && !/^7\.4\.2(?:$|[+-])/.test(version)) throw Error("Не проверено: ожидалась сборка 7.4.2.")
-        phase = "запуск оболочки"
-        if (mode === "7.4.2" && !(await page.locator('script[src$="/shell.js"]').count()))
-          await page.addScriptTag({ path: shellPath })
         phase = "выбор табличного узла тестового сценария"
         const nodeId = ";Graph;" + nodeName.replace(/\s/g, "_").replaceAll(",", "")
         const node = page.locator("[data-tid$=" + JSON.stringify(nodeId) + "]:visible")
         await node.click()
+        phase = "проверка установленной оболочки"
+        const shell = await page.evaluate(async () => {
+          const scripts = [...document.querySelectorAll('script[src$="/shell.js"]')]
+          if (scripts.length !== 1) return false
+          const script = scripts[0]
+          const response = await fetch(script.src, { cache: "no-store" })
+          if (!response.ok) return false
+          return { integrity: script.integrity, bytes: [...new Uint8Array(await response.arrayBuffer())] }
+        })
+        if (!shell || mode === "7.4.2" && shell.integrity !== "sha384-" + createHash("sha384").update(Buffer.from(shell.bytes)).digest("base64")) throw Error("Не проверено: установленная оболочка отсутствует или SRI не совпадает.")
         console.log(path, "Studio", version, "— узел выбран штатным кликом после запуска оболочки.")
         const form = page.locator('[data-tid$=";ModelForm"]').filter({ has: node })
         const button = form.locator('[data-tid$=";tlbModel;dashboardApp"]:visible')
@@ -73,13 +80,39 @@ async function check() {
           "Не проверено: истекло время ожидания ответа Studio.",
         )
         requireClient()
-        if (result) {
-          console.error(path, result)
-          throw Error(result)
-        }
+        if (typeof result === "string") throw Error(result)
         if (!visible) throw Error("Не проверено: адаптер доступен, но установленная оболочка не показала кнопку.")
         console.log(path, "API: привязка, параметры, выполнение и чтение живой таблицы подтверждены.")
+        if (mode === "7.4.2") {
+          phase = "открытие Dashboard и живая таблица"
+          await page.evaluate(() => {
+            window.__dashboardCheckReady = false
+            addEventListener("message", event => {
+              const frame = document.querySelector('iframe[sandbox="allow-scripts"]')
+              if (event.source === frame?.contentWindow && event.data?.type === "loginom-dashboard/ready" && event.data.version === 1)
+                window.__dashboardCheckReady = true
+            })
+          })
+          await button.click()
+          const iframe = page.locator('iframe[sandbox="allow-scripts"]')
+          await iframe.waitFor()
+          const source = new URL(await iframe.getAttribute("src"))
+          if (url.protocol === "https:" && source.protocol !== "https:") throw Error("Не проверено: Dashboard должен использовать HTTPS.")
+          if (source.origin === url.origin) throw Error("Не проверено: Dashboard должен иметь отдельный origin.")
+          await page.waitForFunction(() => window.__dashboardCheckReady === true)
+          const frame = page.frameLocator('iframe[sandbox="allow-scripts"]')
+          await frame.locator("tbody tr").first().waitFor()
+          const expected = result.rows.map(row => row.map(value => value === null ? "" : String(value)))
+          await frame.locator("tbody").evaluate((body, expected) => {
+            const rows = [...body.querySelectorAll("tr")].map(row => [...row.querySelectorAll("td")].map(cell => cell.textContent.trim()))
+            if (JSON.stringify(rows) !== JSON.stringify(expected)) throw Error("Dashboard table differs from live node output")
+          }, expected)
+          console.log(path, "Dashboard ready, отдельный origin и живые строки:", expected.length)
+          await page.getByRole("button", { name: "Вернуться к сценарию", exact: true }).click()
+        }
       } finally {
+        const back = page.getByRole("button", { name: "Вернуться к сценарию", exact: true })
+        if (await back.isVisible()) await back.click()
         await closeSession(page, config.username, packagePath).catch(() => {
           throw Error("Не проверено: штатное закрытие тестового пакета или выход не подтверждены; следующий клиент не открыт.")
         })
@@ -91,7 +124,10 @@ async function check() {
       const code = /^LOGINOM_[A-Z_]+$/.test(error.message) ? " (" + error.message + ")" : ""
       throw Error("Не проверено: " + path + ", " + phase + code + ".")
     } finally {
-      try { await context?.close() } finally { await rm(profile, { recursive: true, force: true }) }
+      try {
+        await context?.close()
+        if (context) console.log(path, "Chromium завершён.")
+      } finally { await rm(profile, { recursive: true, force: true }) }
     }
   }
 }
@@ -188,23 +224,22 @@ async function probe({ moduleURL, nodeName, packagePath, deadline }) {
     if (await node.get_DisplayName() !== nodeName || (await studio.binding(tab, form, node)).packagePath !== packagePath)
       return "Не проверено: выбран другой узел или пакет."
     // Check writable RPC members on the real numerical variable without changing or saving the fixture.
-    const vars = form.FDiagram.VariablesNode?.GetData()
-    if (!vars) return "Не проверено: в тестовом сценарии нет узла переменных."
-    const assistAPI = members(await vars.GetConfigureAssist(), "BeginOperationEx")
-    if (assistAPI) return assistAPI
     const rows = await studio.parameters(form)
-    if (!rows.length) return "Не проверено: нет числовой переменной для проверки параметров."
     // A delayed RPC can resolve while the host is closing the session.
     if (Date.now() >= deadline) return "Не проверено: истекло время ожидания ответа Studio."
     await studio.execute(node)
-    const table = await studio.table(node, 1)
+    const table = await studio.table(node)
     if (!table.schema.length || !table.rows.length) return "Не проверено: нет строки для проверки чтения табличного выхода."
+    if (!rows.length) return table
+    const vars = form.FDiagram.VariablesNode.GetData()
+    const assistAPI = members(await vars.GetConfigureAssist(), "BeginOperationEx")
+    if (assistAPI) return assistAPI
     const sockets = await (await vars.get_Component()).get_OutputSockets()
     const socket = await (await (await sockets.ItemByName("UserVariables")).get_Socket()).QueryInterface(window.bg.IBGEditableVariablesOutputSocket)
     const elements = await (await socket.get_Variables()).get_Elements()
     for (let i = 0; i < await elements.get_Count(); i++) {
       const variable = await elements.getItem(i)
-      if (await variable.get_Name() === rows[0].name) return members(await variable.get_Value(), "get_AsVariant set_AsVariant")
+      if (await variable.get_Name() === rows[0].name) return members(await variable.get_Value(), "get_AsVariant set_AsVariant") ?? table
     }
     return "Не проверено: числовая переменная больше недоступна."
   } catch (error) {
