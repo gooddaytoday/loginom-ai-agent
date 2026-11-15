@@ -138,6 +138,19 @@ test("a dashboard without ready is replaced by the timeout message", async t => 
   await app.page.getByRole("status").filter({ hasText: "Dashboard не ответил" }).waitFor({ timeout: 12_000 })
   assert.equal(await app.page.locator("iframe").count(), 0)
   assert.equal(await app.page.evaluate(() => window.channels), 0)
+  assert.equal(await app.page.getByRole("link", { name: "Открыть Studio по HTTPS", exact: true }).count(), 0)
+  assert.deepEqual(app.errors, [])
+})
+
+test("silent dashboard links to the actual Studio HTTPS port", async t => {
+  const app = await fixture(t, { published: true, app: "silent", studioHttpsPort: "18443" })
+  await app.page.getByRole("button", { name: "Dashboard", exact: true }).click()
+  await app.page.getByRole("status").filter({ hasText: "Dashboard не ответил" }).waitFor({ timeout: 12_000 })
+  const link = app.page.getByRole("link", { name: "Открыть Studio по HTTPS", exact: true })
+  assert.equal(await link.getAttribute("href"), `https://${new URL(app.origin).hostname}:18443/app/`)
+  assert.equal(await app.page.locator("iframe").count(), 0)
+  await app.page.getByRole("button", { name: "Вернуться к сценарию", exact: true }).click()
+  assert.equal(await app.page.locator("#dashboard-tab-overlay").count(), 0)
   assert.deepEqual(app.errors, [])
 })
 
@@ -582,7 +595,7 @@ test("Desktop samples keep whole original rows within the service UTF-8 budget",
   assert.ok(Buffer.byteLength(JSON.stringify(sample)) <= 524_288)
   assert.ok(sample.rows.length > 0 && sample.rows.length < 100)
   assert.ok(sample.rows.every(row => row[0] === text))
-  const server = dashboardServer({ buildsRoot: process.env.TMPDIR, appOrigin: app.appOrigin, mode: "normal", clientOrigins: [app.origin] })
+  const server = dashboardServer({ shell: new Uint8Array(), buildsRoot: process.env.TMPDIR, appOrigin: app.appOrigin, mode: "normal", clientOrigins: [app.origin] })
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
   t.after(() => new Promise(resolve => server.close(resolve)))

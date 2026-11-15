@@ -5,5 +5,5 @@ COPY template/ /opt/dashboard/template/
 COPY npm-cache/ /tmp/npm-cache/
 ENV PATH="/opt/node/bin:$PATH"
 RUN cd /opt/dashboard/template && node /opt/node/lib/node_modules/npm/bin/npm-cli.js ci --offline --cache=/tmp/npm-cache --ignore-scripts --no-audit --fund=false --workspaces=false && rm -rf node_modules/.bin /tmp/npm-cache /root/.npm
-COPY server.mjs /opt/dashboard/server.mjs
+COPY server.mjs shell.js /opt/dashboard/
 ENTRYPOINT ["/opt/node/bin/node", "/opt/dashboard/server.mjs"]

@@ -1,4 +1,4 @@
-import { access, readdir } from "node:fs/promises"
+import { access, readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { setTimeout } from "node:timers/promises"
 import { pathToFileURL } from "node:url"
@@ -11,7 +11,7 @@ export { appHeaders, bindingKey } from "./web/server.ts"
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const jobsIn = process.env.DASHBOARD_JOBS_IN ?? "/jobs-in"
   const jobsOut = process.env.DASHBOARD_JOBS_OUT ?? "/jobs-out"
-  if (process.argv[2] === "web") startDashboard()
+  if (process.argv[2] === "web") startDashboard(process.env, await readFile(new URL("./shell.js", import.meta.url)))
   else if (process.argv[2] === "publisher") {
     const publications = { storage: process.env.DASHBOARD_STORAGE ?? "/storage", builds: process.env.DASHBOARD_BUILDS ?? "/builds", jobsIn, jobsOut }
     await scanPublications({ ...publications, restart: true })

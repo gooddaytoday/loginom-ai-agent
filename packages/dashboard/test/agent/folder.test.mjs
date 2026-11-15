@@ -23,7 +23,7 @@ const snapshot = {
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "dashboard-folder-"))
-  const server = dashboardServer({ buildsRoot: join(root, "builds"), appOrigin: "http://dashboards.localhost:32769", mode: "normal", clientOrigins: [] })
+  const server = dashboardServer({ shell: new Uint8Array(), buildsRoot: join(root, "builds"), appOrigin: "http://dashboards.localhost:32769", mode: "normal", clientOrigins: [] })
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
   t.after(async () => {

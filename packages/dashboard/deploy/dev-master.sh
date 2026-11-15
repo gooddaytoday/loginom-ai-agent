@@ -250,6 +250,7 @@ npm_root=$(dirname "$(dirname "$node_bin")")/lib/node_modules/npm
 cp -R "$npm_root" "$tmp/image/node-runtime/lib/node_modules/npm"
 tar -C "$pkg/template" --exclude=node_modules --exclude=dist -cf - . | tar -C "$tmp/image/template" -xf -
 cp "$pkg/dist/server.mjs" "$tmp/image/server.mjs"
+cp "$pkg/dist/shell.js" "$tmp/image/shell.js"
 # Rootless Docker cannot reach the operators loopback proxy; cache only this pinned kit.
 touch "$tmp/user.npmrc" "$tmp/global.npmrc"
 (cd "$tmp/image/template" && env -i PATH="$PATH" LANG=C.UTF-8 NODE_USE_ENV_PROXY=1 HTTP_PROXY="${HTTP_PROXY:-}" HTTPS_PROXY="${HTTPS_PROXY:-}" NO_PROXY="${NO_PROXY:-}" "$node_bin" "$npm_root/bin/npm-cli.js" ci --userconfig="$tmp/user.npmrc" --globalconfig="$tmp/global.npmrc" --ignore-scripts --no-audit --fund=false --workspaces=false --cache "$tmp/image/npm-cache")

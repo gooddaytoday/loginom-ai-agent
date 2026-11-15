@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { Option, Schema } from "effect"
 import { bindingKey, LookupRequest, Snapshot, SnapshotRequest } from "../contract/snapshot.ts"
 import { appHost, type Mode } from "./apps.ts"
+import { tlsForwarder } from "./tls.ts"
 
 export { appHeaders, appHost } from "./apps.ts"
 export { bindingKey } from "../contract/snapshot.ts"
@@ -29,6 +30,7 @@ async function body(request: IncomingMessage, max: number): Promise<unknown> {
 }
 
 type Options = {
+  shell: Uint8Array
   buildsRoot: string
   appOrigin: string
   mode: Mode
@@ -40,6 +42,7 @@ type Options = {
 }
 
 export function dashboardServer({
+  shell,
   buildsRoot,
   appOrigin,
   mode,
@@ -58,6 +61,11 @@ export function dashboardServer({
         return json(response, 403, { error: "Forbidden host" })
       }
       const path = request.url!.split("?")[0]
+      if (request.method === "GET" && path === "/dashboard/health") return json(response, 200, { ok: true })
+      if (request.method === "GET" && path === "/dashboard/shell.js") {
+        response.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" })
+        return response.end(shell)
+      }
       if (request.method === "POST" && path === "/dashboard/lookup") {
         const binding = Schema.decodeUnknownOption(LookupRequest, { onExcessProperty: "error" })(await body(request, 65_536))
         if (Option.isNone(binding)) return json(response, 400, { error: "Invalid Loginom binding" })
@@ -113,7 +121,7 @@ export function dashboardServer({
 }
 
 // Loopback by default. The stand sets DASHBOARD_HOST=0.0.0.0 because Apache runs in another container.
-export function startDashboard(env: NodeJS.ProcessEnv = process.env) {
+export function startDashboard(env: NodeJS.ProcessEnv, shell: Uint8Array) {
   const requested = env.DASHBOARD_MODE ?? "normal"
   if (requested !== "normal" && requested !== "strict") throw Error("DASHBOARD_MODE must be normal or strict")
   const mode = requested === "strict" ? "strict" : "normal"
@@ -121,9 +129,14 @@ export function startDashboard(env: NodeJS.ProcessEnv = process.env) {
   const clientOrigins = (env.DASHBOARD_CLIENT_ORIGINS ?? "http://127.0.0.1:32768,http://localhost:32768")
     .split(",")
     .map((origin) => requireOrigin(origin.trim()))
+  const upstream = appOrigin.startsWith("https:") ? URL.parse(`tcp://${env.DASHBOARD_TLS_UPSTREAM ?? ""}`) : null
+  if (appOrigin.startsWith("https:") && (!upstream || !upstream.hostname || !upstream.port || upstream.username || upstream.password || upstream.pathname || upstream.search || upstream.hash || !Number(upstream.port)))
+    throw Error("DASHBOARD_TLS_UPSTREAM must be an Apache host:port")
+  const tls = upstream ? tlsForwarder({ host: upstream.hostname, port: Number(upstream.port) }) : undefined
   const buildsRoot = env.DASHBOARD_BUILDS ?? join(homedir(), "loginom-dashboard", "builds")
   const host = env.DASHBOARD_HOST ?? "127.0.0.1"
   const api = dashboardServer({
+    shell,
     buildsRoot,
     appOrigin,
     mode,
@@ -146,8 +159,9 @@ export function startDashboard(env: NodeJS.ProcessEnv = process.env) {
     appOrigin, clientOrigins, mode,
   })
   api.listen(Number(env.DASHBOARD_PORT ?? 8100), host)
-  apps.listen(Number(env.DASHBOARD_APP_PORT ?? 8101), host)
-  return { api, apps }
+  apps.listen(Number(env.DASHBOARD_APP_PORT ?? (tls ? 8102 : 8101)), host)
+  tls?.listen(8101, host)
+  return { api, apps, tls }
 }
 
 function requireOrigin(value: string) {

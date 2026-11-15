@@ -8,6 +8,7 @@ const message = (error: unknown) => String((error as { message?: unknown } | nul
 const nodeError = (error: unknown) => Error("Узел завершился с ошибкой: " + message(error) + ". Исправьте сценарий и нажмите ещё раз")
 start()
 function start() {
+  const studioHttpsPort = document.currentScript?.getAttribute("data-dashboard-studio-https-port")
   let supported: boolean | undefined
   async function post(path: string, body: unknown) {
     const res = await fetch(location.origin + "/dashboard/" + path, {
@@ -264,6 +265,12 @@ function start() {
           close,
           silent: () => {
             note.textContent = "Dashboard не ответил"
+            if (studioHttpsPort) {
+              const link = document.createElement("a")
+              link.href = `https://${location.hostname}:${studioHttpsPort}/app/`
+              link.textContent = "Открыть Studio по HTTPS"
+              note.append(". ", link)
+            }
             frame.replaceWith(note)
           },
         })

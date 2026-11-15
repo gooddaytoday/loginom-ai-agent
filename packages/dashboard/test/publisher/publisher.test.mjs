@@ -87,7 +87,7 @@ test("multiple pending publications complete one at a time", async t => {
   t.after(() => apps[Symbol.asyncDispose]())
   const appOrigin = "http://127.0.0.1:" + apps.address().port
   appHost({ server: apps, builds: key => join(input.builds, key), appOrigin, clientOrigins: [], mode: "normal" })
-  const web = dashboardServer({ buildsRoot: input.builds, appOrigin, clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
+  const web = dashboardServer({ shell: new Uint8Array(), buildsRoot: input.builds, appOrigin, clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
   await once(web, "listening")
   t.after(() => web[Symbol.asyncDispose]())
   const current = await fetch("http://127.0.0.1:" + web.address().port + "/dashboard/lookup", {
@@ -109,7 +109,7 @@ test("failed publications retain the previous dashboard through real files and H
   const appOrigin = "http://127.0.0.1:" + apps.address().port
   appHost({ server: apps, builds: key => join(input.builds, key), appOrigin, clientOrigins: [], mode: "normal" })
   t.after(() => apps[Symbol.asyncDispose]())
-  const web = dashboardServer({ buildsRoot: input.builds, appOrigin, clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
+  const web = dashboardServer({ shell: new Uint8Array(), buildsRoot: input.builds, appOrigin, clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
   await once(web, "listening")
   t.after(() => web[Symbol.asyncDispose]())
   const lookup = publication => fetch("http://127.0.0.1:" + web.address().port + "/dashboard/lookup", {
@@ -348,7 +348,7 @@ for (const invalid of ["symlink", "dangling symlink", "directory", "oversize"]) 
 
 test("deleting publications rolls back without rebuilding and retains shared output until its last source is removed", async t => {
   const input = await fixture(t)
-  const web = dashboardServer({ buildsRoot: input.builds, appOrigin: "http://apps.test", clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
+  const web = dashboardServer({ shell: new Uint8Array(), buildsRoot: input.builds, appOrigin: "http://apps.test", clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
   await once(web, "listening")
   t.after(() => web[Symbol.asyncDispose]())
   const lookup = () => fetch("http://127.0.0.1:" + web.address().port + "/dashboard/lookup", {
@@ -495,7 +495,7 @@ test("finishing an older publication cannot roll back a newer ready version", as
   await scanPublications(input)
   await buildNext({ ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE })
   await scanPublications(input)
-  const web = dashboardServer({ buildsRoot: input.builds, appOrigin: "http://apps.test", clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
+  const web = dashboardServer({ shell: new Uint8Array(), buildsRoot: input.builds, appOrigin: "http://apps.test", clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
   await once(web, "listening")
   t.after(() => web[Symbol.asyncDispose]())
   const lookup = () => fetch("http://127.0.0.1:" + web.address().port + "/dashboard/lookup", {

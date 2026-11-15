@@ -13,6 +13,7 @@ export async function fixture(
   t,
   {
     published = false,
+    studioHttpsPort,
     cliButton = false,
     clipboardWrite = true,
     popupBlocking = false,
@@ -209,7 +210,7 @@ export async function fixture(
             listeners?.afterrender(view);
           };
         }
-      </script><script src="/shell.js"></script>`
+      </script><script src="/shell.js"${studioHttpsPort === undefined ? "" : ` data-dashboard-studio-https-port="${studioHttpsPort}"`}></script>`
   let clientHits = 0
   const studio = createServer((request, response) => {
     if (["/desktop-link", "/ordinary"].includes(request.url)) {

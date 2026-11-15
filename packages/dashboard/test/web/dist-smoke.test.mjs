@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -70,14 +70,17 @@ async function launch(t, root, artifact) {
 test("the standalone Node bundle preserves snapshot HTTP and an existing publication", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "dashboard-dist-"))
   t.after(() => rm(root, { recursive: true, force: true }))
-  // Copy only the artifact: its new directory has no workspace or node_modules.
+  // These installed artifacts have no workspace or node_modules beside them.
   const artifact = join(root, "server.mjs")
   await copyFile(new URL("../../dist/server.mjs", import.meta.url), artifact)
+  await copyFile(new URL("../../dist/shell.js", import.meta.url), join(root, "shell.js"))
   const key = "a".repeat(64)
   const hash = "b".repeat(64)
   await mkdir(join(root, "builds", key, hash), { recursive: true })
   await writeFile(join(root, "builds", key, hash, "index.html"), "Existing dashboard")
   const { base, appOrigin } = await launch(t, root, artifact)
+  assert.deepEqual(await (await fetch(base + "/health")).json(), { ok: true })
+  assert.equal(await (await fetch(base + "/shell.js")).text(), await readFile(join(root, "shell.js"), "utf8"))
   const response = await fetch(base + "/snapshots", {
     method: "POST",
     headers: { "content-type": "application/json" },

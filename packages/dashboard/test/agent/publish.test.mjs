@@ -23,7 +23,7 @@ async function fixture(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   const builds = join(root, "builds")
   await mkdir(builds)
-  const server = dashboardServer({ buildsRoot: builds, appOrigin: "http://dashboards.localhost:8101", mode: "normal", clientOrigins: [] })
+  const server = dashboardServer({ shell: new Uint8Array(), buildsRoot: builds, appOrigin: "http://dashboards.localhost:8101", mode: "normal", clientOrigins: [] })
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
   t.after(() => server[Symbol.asyncDispose]())

@@ -98,6 +98,7 @@ test("standalone dashboard starts from the snapshot and preserves explicit publi
   await using fixture = await standaloneFixture()
   const provider = ManagedRuntime.make(TestLLMServer.layer)
   const server = dashboardServer({
+    shell: new Uint8Array(),
     buildsRoot: join(fixture.directory, "builds"),
     appOrigin: "http://dashboards.localhost:32769",
     mode: "normal",

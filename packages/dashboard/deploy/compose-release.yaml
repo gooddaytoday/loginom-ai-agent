@@ -1,0 +1,59 @@
+version: "2.4"
+x-common: &common
+  image: ${DASHBOARD_IMAGE:?}
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  labels:
+    loginom.dashboard.owner: release
+  logging:
+    options: { max-size: "10m", max-file: "3" }
+services:
+  web:
+    <<: *common
+    container_name: loginom-dashboard-web
+    command: [web]
+    user: "65534:65534"
+    mem_limit: 512m
+    pids_limit: 64
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    volumes: ["${DASHBOARD_STATE:?}/builds:/builds:ro"]
+    networks: [studio]
+    ports: ["${DASHBOARD_APP_HOST_PORT:?}:8101"]
+    environment:
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_APP_ORIGIN: ${DASHBOARD_APP_ORIGIN:?}
+      DASHBOARD_CLIENT_ORIGINS: ${DASHBOARD_CLIENT_ORIGINS:?}
+      DASHBOARD_TLS_UPSTREAM: ${DASHBOARD_TLS_UPSTREAM:-}
+      DASHBOARD_BUILDS: /builds
+  publisher:
+    <<: *common
+    container_name: loginom-dashboard-publisher
+    command: [publisher]
+    user: ${DASHBOARD_PUBLISHER_USER:?}
+    network_mode: none
+    mem_limit: 512m
+    pids_limit: 64
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    volumes:
+      - ${DASHBOARD_USERSTORAGE:?}:/storage:ro
+      - ${DASHBOARD_STATE:?}/builds:/builds:rw
+      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:rw
+      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw
+  builder:
+    <<: *common
+    container_name: loginom-dashboard-builder
+    command: [builder]
+    user: "65534:65534"
+    network_mode: none
+    mem_limit: 1g
+    pids_limit: 256
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=512m,mode=1777"]
+    volumes:
+      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:ro
+      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw
+networks:
+  studio:
+    external:
+      name: ${DASHBOARD_NETWORK:?}

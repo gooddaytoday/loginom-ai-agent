@@ -1,8 +1,11 @@
+import { execFileSync } from "node:child_process"
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { once } from "node:events"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { request } from "node:http"
+import { createServer } from "node:https"
+import { connect } from "node:tls"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -19,6 +22,7 @@ const other = { ...binding, packagePath: "/user/dashboard/B.lgp" }
 async function stand(t, options = {}) {
   const root = await mkdtemp(join(tmpdir(), "dashboard checkout's test-"))
   const server = dashboardServer({
+    shell: new Uint8Array(),
     buildsRoot: join(root, "builds"),
     appOrigin: options.appOrigin ?? "http://dashboards.localhost:32769",
     mode: options.mode ?? "normal",
@@ -41,6 +45,74 @@ async function stand(t, options = {}) {
   }
   return { base, request, projectRoot: root, buildsRoot: join(root, "builds") }
 }
+
+test("health and installed shell respect Host", async t => {
+  const installedShell = "console.log('installed shell')\n"
+  const server = await stand(t, { shell: Buffer.from(installedShell) })
+  const foreignStatus = path => new Promise((resolve, reject) => {
+    const req = request(server.base + path, { headers: { host: "foreign.test" } }, response => {
+      response.resume()
+      resolve(response.statusCode)
+    })
+    req.on("error", reject)
+    req.end()
+  })
+  const foreignHost = { status: await foreignStatus("/health") }
+  assert.equal(foreignHost.status, 403)
+  const health = await fetch(server.base + "/health")
+  assert.deepEqual(await health.json(), { ok: true })
+  assert.equal(health.headers.get("cache-control"), "no-store")
+  const deliveredShell = await fetch(server.base + "/shell.js")
+  assert.equal(await deliveredShell.text(), installedShell)
+  assert.equal(deliveredShell.headers.get("content-type"), "text/javascript; charset=utf-8")
+  assert.equal(deliveredShell.headers.get("cache-control"), "no-store")
+  assert.equal(await foreignStatus("/shell.js"), 403)
+  assert.equal((await fetch(server.base + "/health/extra")).status, 404)
+  assert.equal((await fetch(server.base + "/shell.js", { method: "POST" })).status, 404)
+})
+
+test("TLS bytes reach the configured Apache", async t => {
+  const { tlsForwarder } = await import("../../src/web/tls.ts")
+  const root = await mkdtemp(join(tmpdir(), "dashboard-tls-"))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+    "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost",
+    "-keyout", join(root, "key.pem"), "-out", join(root, "cert.pem")], { stdio: "ignore" })
+  const expectedBytes = Buffer.from([0, 255, 17, 42, 13, 10])
+  let received
+  const upstream = createServer({ key: await readFile(join(root, "key.pem")), cert: await readFile(join(root, "cert.pem")) }, async (request, response) => {
+    const chunks = []
+    for await (const chunk of request) chunks.push(chunk)
+    received = Buffer.concat(chunks)
+    response.writeHead(200, { connection: "close" })
+    response.end("received")
+  }).listen(0, "127.0.0.1")
+  await once(upstream, "listening")
+  t.after(() => new Promise(resolve => upstream.close(resolve)))
+  const forwarder = tlsForwarder({ host: "127.0.0.1", port: upstream.address().port }).listen(0, "127.0.0.1")
+  await once(forwarder, "listening")
+  t.after(() => new Promise(resolve => forwarder.close(resolve)))
+  const client = connect({ host: "127.0.0.1", port: forwarder.address().port, servername: "localhost", ca: await readFile(join(root, "cert.pem")) })
+  t.after(() => client.destroy())
+  const response = []
+  client.on("data", chunk => response.push(chunk))
+  const ended = once(client, "end")
+  await once(client, "secureConnect")
+  assert.equal(client.authorized, true)
+  client.write(`POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${expectedBytes.length}\r\nConnection: close\r\n\r\n`)
+  client.write(expectedBytes)
+  await ended
+  assert.deepEqual(received, expectedBytes)
+  assert.match(Buffer.concat(response).toString(), /200 OK/)
+})
+
+test("HTTPS configuration refuses a missing or invalid upstream before listening", () => {
+  const base = { DASHBOARD_APP_ORIGIN: "https://apps.test:8101", DASHBOARD_PORT: "0", DASHBOARD_APP_PORT: "0" }
+  assert.throws(() => startDashboard(base, new Uint8Array()), /DASHBOARD_TLS_UPSTREAM/)
+  for (const upstream of ["studio", "studio:0", "studio:65536", "https://studio:8444", "user:pass@studio:8444", "studio:8444/path"]) {
+    assert.throws(() => startDashboard({ ...base, DASHBOARD_TLS_UPSTREAM: upstream }, new Uint8Array()), /DASHBOARD_TLS_UPSTREAM/)
+  }
+})
 
 test("published dashboard keeps its metadata private", async t => {
   const server = await stand(t)
@@ -65,7 +137,7 @@ test("dashboard accepts only configured hosts", async t => {
     DASHBOARD_PORT: "0",
     DASHBOARD_APP_PORT: "0",
     DASHBOARD_CLIENT_ORIGINS: "http://Example.test:32768, http://localhost:32768",
-  })
+  }, new Uint8Array())
   t.after(async () => {
     await Promise.all([started.api, started.apps].map(server => new Promise(resolve => server.close(resolve))))
     await rm(root, { recursive: true, force: true })
@@ -95,7 +167,7 @@ test("startup returns a canonical app origin when the configured host uses upper
     DASHBOARD_PORT: "0",
     DASHBOARD_APP_PORT: "0",
     DASHBOARD_APP_ORIGIN: "http://DASHBOARDS.LOCALHOST:32769",
-  })
+  }, new Uint8Array())
   t.after(async () => {
     await Promise.all([started.api, started.apps].map(server => new Promise(resolve => server.close(resolve))))
     await rm(root, { recursive: true, force: true })
@@ -118,9 +190,9 @@ test("startup rejects an unknown mode and an origin with a path", async t => {
     DASHBOARD_PORT: "0",
     DASHBOARD_APP_PORT: "0",
   }
-  assert.throws(() => startDashboard({ ...base, DASHBOARD_MODE: "fast" }))
-  assert.throws(() => startDashboard({ ...base, DASHBOARD_APP_ORIGIN: "http://dashboards.localhost:32769/path" }))
-  assert.throws(() => startDashboard({ ...base, DASHBOARD_CLIENT_ORIGINS: "http://127.0.0.1:32768/studio" }))
+  assert.throws(() => startDashboard({ ...base, DASHBOARD_MODE: "fast" }, new Uint8Array()))
+  assert.throws(() => startDashboard({ ...base, DASHBOARD_APP_ORIGIN: "http://dashboards.localhost:32769/path" }, new Uint8Array()))
+  assert.throws(() => startDashboard({ ...base, DASHBOARD_CLIENT_ORIGINS: "http://127.0.0.1:32768/studio" }, new Uint8Array()))
 })
 
 test("a package path separates applications even when node GUIDs match", async t => {
@@ -296,8 +368,8 @@ test("the snapshot service listens on loopback unless the stand opts in", async 
     DASHBOARD_PORT: "0",
     DASHBOARD_APP_PORT: "0",
   }
-  const loopback = startDashboard(base)
-  const open = startDashboard({ ...base, DASHBOARD_HOST: "0.0.0.0" })
+  const loopback = startDashboard(base, new Uint8Array())
+  const open = startDashboard({ ...base, DASHBOARD_HOST: "0.0.0.0" }, new Uint8Array())
   t.after(async () => {
     await Promise.all([loopback.api, loopback.apps, open.api, open.apps].map(server => new Promise(resolve => server.close(resolve))))
     await rm(root, { recursive: true, force: true })
@@ -332,4 +404,59 @@ test("lookup separates own ready A from newer current B and forgets a deleted fi
   delete state[folder + a]
   await writeFile(join(server.buildsRoot, "state.json"), JSON.stringify(state))
   assert.equal((await server.request("lookup", { ...binding, publication: a })).publication.status, "pending")
+})
+
+test("an unavailable Apache closes the client connection", async t => {
+  const { tlsForwarder } = await import("../../src/web/tls.ts")
+  const { connect, createServer } = await import("node:net")
+  const reservation = createServer().listen(0, "127.0.0.1")
+  await once(reservation, "listening")
+  const port = reservation.address().port
+  await new Promise(resolve => reservation.close(resolve))
+  const forwarder = tlsForwarder({ host: "127.0.0.1", port }).listen(0, "127.0.0.1")
+  await once(forwarder, "listening")
+  t.after(() => new Promise(resolve => forwarder.close(resolve)))
+  const client = connect({ host: "127.0.0.1", port: forwarder.address().port })
+  client.on("error", () => {})
+  await once(client, "close")
+  assert.equal(client.destroyed, true)
+})
+
+test("closing a client closes its Apache connection", async t => {
+  const { tlsForwarder } = await import("../../src/web/tls.ts")
+  const { connect, createServer } = await import("node:net")
+  const accepted = Promise.withResolvers()
+  const upstream = createServer(socket => accepted.resolve(socket)).listen(0, "127.0.0.1")
+  await once(upstream, "listening")
+  t.after(() => new Promise(resolve => upstream.close(resolve)))
+  const forwarder = tlsForwarder({ host: "127.0.0.1", port: upstream.address().port }).listen(0, "127.0.0.1")
+  await once(forwarder, "listening")
+  t.after(() => new Promise(resolve => forwarder.close(resolve)))
+  const client = connect({ host: "127.0.0.1", port: forwarder.address().port })
+  const peer = await accepted.promise
+  peer.resume()
+  const closed = once(peer, "close")
+  client.destroy()
+  await closed
+  assert.equal(peer.destroyed, true)
+})
+
+test("an idle forward closes both connections within its finite timeout", { timeout: 35_000 }, async t => {
+  const { tlsForwarder } = await import("../../src/web/tls.ts")
+  const { connect, createServer } = await import("node:net")
+  const accepted = Promise.withResolvers()
+  const upstream = createServer(socket => accepted.resolve(socket)).listen(0, "127.0.0.1")
+  await once(upstream, "listening")
+  t.after(() => new Promise(resolve => upstream.close(resolve)))
+  const forwarder = tlsForwarder({ host: "127.0.0.1", port: upstream.address().port }).listen(0, "127.0.0.1")
+  await once(forwarder, "listening")
+  t.after(() => new Promise(resolve => forwarder.close(resolve)))
+  const started = Date.now()
+  const client = connect({ host: "127.0.0.1", port: forwarder.address().port })
+  const peer = await accepted.promise
+  peer.resume()
+  await Promise.all([once(client, "close"), once(peer, "close")])
+  assert.ok(Date.now() - started >= 29_000)
+  assert.equal(client.destroyed, true)
+  assert.equal(peer.destroyed, true)
 })
