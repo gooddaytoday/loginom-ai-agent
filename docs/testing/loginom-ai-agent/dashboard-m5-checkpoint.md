@@ -1,6 +1,6 @@
 # Dashboard M5 — checkpoint
 
-- Task 1 принят: Spec Approved / Quality Approved, mandatory 0; реализация `f99d3e53d8`, ветка `dashboard-m5`.
+- Исходная принятая M4 основа M5: `77c275a68f9152efd7f5203b0f6643f11923a8ef`, ветка `dashboard-m5`; Tasks 0–1 приняты: Spec Approved / Quality Approved, mandatory 0.
 - Task 0 принят; подготовленный release input и private installer patch сохранены.
 - Первый установленный Desktop HTTPS main path PASS: native snapshot → real model draft → Allow once → Host JSON → ready.
 - Native Dashboard показал 4 живые строки после изменения CSV; sample preview содержал 3 строки.

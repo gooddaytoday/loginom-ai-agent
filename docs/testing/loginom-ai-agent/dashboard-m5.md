@@ -56,7 +56,7 @@ Task 0 больше не блокируется лицензированием. 
 
 ## Task 1 — первый установленный dashboard по HTTPS
 
-Task 1 принят независимым ревью: **Spec Approved / Quality Approved**, mandatory 0, optional 1 учтён ниже. Создан отдельный Docker installer `packages/dashboard/deploy/containers.sh install --engine docker --public-host <host> [--app-host-port <port>]`. Он обнаруживает одну работающую штатную установку по Compose services/mounts/network, оставляет vendor compose и файлы клиента неизменными и добавляет только `dashboard.site.conf`. Неверная конфигурация возвращает прежний site-файл до graceful reload.
+Task 1 принят независимым ревью: **Spec Approved / Quality Approved**, mandatory 0, optional 1 учтён ниже. Проверенный финальный artifact собран из реализации `f99d3e53d8`. Создан отдельный Docker installer `packages/dashboard/deploy/containers.sh install --engine docker --public-host <host> [--app-host-port <port>]`. Он обнаруживает одну работающую штатную установку по Compose services/mounts/network, оставляет vendor compose и файлы клиента неизменными и добавляет только `dashboard.site.conf`. Неверная конфигурация возвращает прежний site-файл до graceful reload.
 
 Современный Compose ожидаемо предупреждает об устаревших `version: "2.4"` и `external.name`. Этот формат сохранён ради согласованного нижнего Compose; предупреждения не означают отказ установки. `version` не удаляется, синтаксис сети не меняется без доказанной совместимости, stderr не подавляется.
 
