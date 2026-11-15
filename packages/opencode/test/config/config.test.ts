@@ -98,12 +98,13 @@ const configLayer = (
     auth?: Layer.Layer<Auth.Service>
     account?: Layer.Layer<Account.Service>
     client?: HttpClient.HttpClient
+    npm?: Layer.Layer<Npm.Service>
   } = {},
 ) =>
   LayerNode.compile(LayerNode.group([Config.node, FSUtil.node, Env.node, CrossSpawnSpawner.node]), [
     [Auth.node, options.auth ?? AuthTest.empty],
     [Account.node, options.account ?? AccountTest.empty],
-    [Npm.node, NpmTest.noop],
+    [Npm.node, options.npm ?? NpmTest.noop],
     [httpClient, Layer.succeed(HttpClient.HttpClient, options.client ?? unexpectedHttp)],
   ])
 
@@ -1156,6 +1157,153 @@ it.effect("installs dependencies in writable LOGINOM_AI_AGENT_CONFIG_DIR", () =>
 // Note: deduplication and serialization of npm installs is now handled by the
 // core Npm.Service (via EffectFlock). Those behaviors are tested in the core
 // package's npm tests, not here.
+
+for (const flag of ["LOGINOM_AI_AGENT_RESOURCES", "LOGINOM_AI_AGENT_CLI_ROOT"]) {
+  test(`standalone SDK: empty ${flag} profile does not install dependencies`, async () => {
+    const installed: string[] = []
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const dir = yield* tmpdirScoped()
+        yield* withProcessEnv(
+          flag,
+          dir,
+          Config.Service.use((svc) => svc.get().pipe(Effect.andThen(svc.waitForDependencies()))).pipe(
+            provideInstanceEffect(dir),
+          ),
+        )
+        expect(installed).toEqual([])
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(testInstanceStoreLayer),
+        Effect.provide(
+          configLayer({
+            npm: Layer.mock(Npm.Service)({
+              install: (dir) =>
+                Effect.sync(() => {
+                  installed.push(dir)
+                }),
+            }),
+          }),
+        ),
+      ),
+    )
+  })
+}
+
+for (const folder of ["plugin", "plugins", "tool", "tools", "inline"]) {
+  test(`standalone SDK: installs before loading a user module from ${folder}`, async () => {
+    const installed: string[] = []
+    const fixture = { configDir: "" }
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const dir = yield* tmpdirScoped()
+        const configDir = path.join(dir, "config")
+        fixture.configDir = configDir
+        const module = path.join(configDir, folder === "inline" ? "custom.js" : `${folder}/custom.js`)
+        yield* Effect.promise(async () => {
+          await fs.mkdir(path.dirname(module), { recursive: true })
+          await fs.writeFile(
+            module,
+            `import ready from '${folder === "inline" ? "./" : "../"}node_modules/sdk-ready.js'; export default () => ready`,
+          )
+        })
+        yield* withProcessEnvs(
+          {
+            LOGINOM_AI_AGENT_RESOURCES: dir,
+            LOGINOM_AI_AGENT_CONFIG_DIR: configDir,
+            LOGINOM_AI_AGENT_CONFIG_CONTENT:
+              folder === "inline" ? JSON.stringify({ plugin: [pathToFileURL(module).href] }) : undefined,
+          },
+          Config.Service.use((svc) =>
+            Effect.gen(function* () {
+              const config = yield* svc.get()
+              yield* svc.waitForDependencies()
+              expect(installed).toContain(configDir)
+              if (folder === "inline") expect(config.plugin).toContain(pathToFileURL(module).href)
+              const user = yield* Effect.promise(() => import(pathToFileURL(module).href))
+              expect(user.default()).toBe("SDK_READY")
+            }),
+          ).pipe(provideInstanceEffect(dir)),
+        )
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(testInstanceStoreLayer),
+        Effect.provide(
+          configLayer({
+            npm: Layer.mock(Npm.Service)({
+              install: (dir, input) =>
+                Effect.promise(async () => {
+                  expect(input?.add).toEqual([{ name: "@opencode-ai/plugin", version: "1.19.5" }])
+                  if (dir !== fixture.configDir) return
+                  await fs.mkdir(path.join(dir, "node_modules"), { recursive: true })
+                  await fs.writeFile(path.join(dir, "node_modules/sdk-ready.js"), 'export default "SDK_READY"')
+                  installed.push(dir)
+                }),
+            }),
+          }),
+        ),
+      ),
+    )
+  })
+}
+
+test("standalone SDK: existing installed dependencies remain unchanged through real Npm.install", async () => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      const configDir = path.join(dir, "config")
+      const files = ["package.json", "package-lock.json", "node_modules/@opencode-ai/plugin/package.json"]
+      yield* Effect.promise(async () => {
+        await fs.mkdir(path.join(configDir, "node_modules/@opencode-ai/plugin"), { recursive: true })
+        await fs.writeFile(
+          path.join(configDir, files[0]),
+          JSON.stringify({ dependencies: { "@opencode-ai/plugin": "1.19.5" } }),
+        )
+        await fs.writeFile(
+          path.join(configDir, files[1]),
+          JSON.stringify({
+            lockfileVersion: 3,
+            packages: {
+              "": { dependencies: { "@opencode-ai/plugin": "1.19.5" } },
+              "node_modules/@opencode-ai/plugin": { version: "1.19.5" },
+            },
+          }),
+        )
+        await fs.writeFile(
+          path.join(configDir, files[2]),
+          JSON.stringify({ name: "@opencode-ai/plugin", version: "1.19.5" }),
+        )
+      })
+      const before = yield* Effect.promise(() =>
+        Promise.all(
+          files.map(async (file) => ({
+            content: await fs.readFile(path.join(configDir, file), "utf8"),
+            mtime: (await fs.stat(path.join(configDir, file))).mtimeMs,
+          })),
+        ),
+      )
+      yield* withProcessEnvs(
+        { LOGINOM_AI_AGENT_RESOURCES: dir, LOGINOM_AI_AGENT_CONFIG_DIR: configDir },
+        Config.Service.use((svc) => svc.get().pipe(Effect.andThen(svc.waitForDependencies()))).pipe(
+          provideInstanceEffect(dir),
+        ),
+      )
+      const after = yield* Effect.promise(() =>
+        Promise.all(
+          files.map(async (file) => ({
+            content: await fs.readFile(path.join(configDir, file), "utf8"),
+            mtime: (await fs.stat(path.join(configDir, file))).mtimeMs,
+          })),
+        ),
+      )
+      expect(after).toEqual(before)
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(testInstanceStoreLayer),
+      Effect.provide(configLayer({ npm: LayerNode.compile(Npm.node) })),
+    ),
+  )
+})
 
 it.instance("resolves scoped npm plugins in config", () =>
   Effect.gen(function* () {
