@@ -82,6 +82,12 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['loop-pages-offline', 'loop-pages-rest'] and not cases and not case_root:
+        node = REPO / 'docs/node-development/nodes/control-loop'
+        offline = name == 'loop-pages-offline'
+        return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-offline.md' if offline else 'task.md'),
+                    data=node / 'fixtures', base=None, input_files=['pages.csv'],
+                    expected_name='expected-offline.json' if offline else 'expected.json', oracle=node / 'acceptance/oracle.py')
     if name == 'supernode-calc' and not cases and not case_root:
         node = REPO / 'docs/node-development/nodes/control-supernode'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task.md', data=node / 'fixtures',
