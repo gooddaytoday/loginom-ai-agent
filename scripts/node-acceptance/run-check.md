@@ -120,6 +120,18 @@ boolean/NULL/real/Int64 (`9007199254740993`), compared by `cell_type` and `value
 Tree-only Save, fresh cold execution without configuration and cleanup apply;
 no CSV export. Only the business task and original CSV reach the model.
 
+`table-tree-dates-variant` uses the unchanged DataToTree `modes/task-dates-variant.md`,
+rows.csv and input.json. Stock source-package delivery creates a new own package
+with only TypedInput → TypedSource: explicit DateTime/Integer/Boolean/String
+columns followed by native Collapse (ignore NULLs; keep false and empty string).
+The verified seed lab1685-types.csv retains its original basename; the source
+package reads it relative to its own folder. The model opens this prepared package
+and verifies its source before conversion. The private expected-dates-variant.json
+projects the frozen proposal using the existing DateTime/Variant `check_tree`
+forms and label_any. Full ordered tree, exact civil milliseconds and native
+subtypes/Int64, Save, fresh cold execution without configuration and cleanup are
+required. Tree-only mode requests no CSV; oracle/expected stay private.
+
 `tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
 `fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
 projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema
