@@ -41,10 +41,10 @@ const TOOLS = [
 ];
 const NAMES = new Set(TOOLS.map(tool => tool.name));
 
-export async function createKnowledgeClient({ helpRoot }, signal) {
+export async function createKnowledgeClient({ helpRoot, onPhase }, signal) {
   signal?.throwIfAborted();
   if (typeof helpRoot !== 'string' || !isAbsolute(helpRoot)) throw Error('LOGINOM_CONFIG_REQUIRED');
-  const help = await loadHelp(helpRoot).catch(error => { throw Error('LOGINOM_KNOWLEDGE_UNAVAILABLE', { cause: error }); });
+  const help = await loadHelp(helpRoot, onPhase).catch(error => { throw Error('LOGINOM_KNOWLEDGE_UNAVAILABLE', { cause: error }); });
   signal?.throwIfAborted();
   const state = { closed: false };
   return {
@@ -86,23 +86,48 @@ function answer(help, name, args) {
   return reply;
 }
 
-async function loadHelp(root) {
-  const manifest = JSON.parse(await readFile(join(root, 'help-manifest.json'), 'utf8'));
+async function loadHelp(root, onPhase) {
+  const started = performance.now();
+  const timing = { read_ms: 0, hash_ms: 0, decode_ms: 0, index_ms: 0, pages: 0, bytes: 0, max_read_ms: 0, slow_reads: 0 };
+  const read = async (path, encoding) => {
+    const start = performance.now();
+    try { return await readFile(path, encoding); }
+    finally {
+      const elapsed = performance.now() - start;
+      timing.read_ms += elapsed;
+      timing.max_read_ms = Math.max(timing.max_read_ms, elapsed);
+      if (elapsed >= 10) timing.slow_reads++;
+    }
+  };
+  const manifest = JSON.parse(await read(join(root, 'help-manifest.json'), 'utf8'));
   if (manifest?.protocol !== 1 || !Array.isArray(manifest.files) || !manifest.files.length) throw Error('LOGINOM_HELP_MANIFEST_INVALID');
   const pages = new Map();
   for (const file of manifest.files) {
     if (typeof file?.path !== 'string' || !/^data\/(?:[^/]+\/)*[^/]+\.md$/.test(file.path) || file.path.split('/').includes('..'))
       throw Error('LOGINOM_HELP_MANIFEST_INVALID');
-    const bytes = await readFile(join(root, 'loginom-help', file.path));
-    if (createHash('sha256').update(bytes).digest('hex') !== file.sha256) throw Error('LOGINOM_HELP_INTEGRITY');
+    const bytes = await read(join(root, 'loginom-help', file.path));
+    const hashStarted = performance.now();
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    timing.hash_ms += performance.now() - hashStarted;
+    if (digest !== file.sha256) throw Error('LOGINOM_HELP_INTEGRITY');
+    const decodeStarted = performance.now();
     const text = bytes.toString('utf8');
     pages.set(file.path, { path: file.path, text, title: text.match(/^#{1,6}\s+(.+)$/m)?.[1].trim() ?? file.path });
+    timing.decode_ms += performance.now() - decodeStarted;
+    timing.pages++;
+    timing.bytes += bytes.length;
   }
   const site = typeof manifest.source?.url === 'string' && manifest.source.url.startsWith('https://') ? manifest.source.url.replace(/\/*$/, '/') : undefined;
-  const aliases = await readFile(join(root, 'aliases.jsonl'), 'utf8').then(
+  const aliases = await read(join(root, 'aliases.jsonl'), 'utf8').then(
     text => text.split('\n').filter(line => line.trim()).map(line => JSON.parse(line)),
     error => { if (error.code === 'ENOENT') return []; throw error; });
-  return { pages, site, dirs: directories(pages), index: buildIndex(pages, aliases) };
+  const indexStarted = performance.now();
+  const dirs = directories(pages), index = buildIndex(pages, aliases);
+  timing.index_ms = performance.now() - indexStarted;
+  try { await onPhase?.({ phase: 'help.load', status: 'ready', duration_ms: Math.round(performance.now() - started),
+    ...Object.fromEntries(Object.entries(timing).map(([key, value]) => [key, Math.round(value)])) }); }
+  catch { /* Diagnostic storage must not change Help readiness. */ }
+  return { pages, site, dirs, index };
 }
 
 function directories(pages) {

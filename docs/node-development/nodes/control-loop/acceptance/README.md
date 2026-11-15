@@ -1,11 +1,11 @@
-# Приёмочный комплект Цикла: этап 1
+# Приёмочный комплект Цикла: этапы 1 и 2
 
 ## Статус комплекта
 
-**Готов к реализации обработчика** после [native-пробы LAB-1669](../discovery.md)
-14.11.2026 на Loginom 7.4.2. Срез выполним; исходные задания, CSV и ожидаемые данные
-сохранены. Это не PASS обработчика: модельных прогонов и автоматизированного cold
-ещё нет. Модели передаются задание и
+**Этап 1 принят в #1133**: group_rows, табличная Подмодель,
+`loop-pages-offline` 3/3 и независимо 3/3 по назначению LAB-1691.
+[Native-проба этапа 1](../discovery.md) — 14.11.2026 на Loginom 7.4.2.
+Исходные задания, CSV и ожидаемые данные сохранены. Модели передаются задание и
 `../fixtures/pages.csv`; oracle, expected и этот файл остаются вне её контекста.
 
 **Предусловие:** принятый этап 1 Подмодели (NW1 #1078 и обработчик `control.supernode`).
@@ -68,5 +68,77 @@ HTTP 404 сам REST представляет данными: native-проба 
 python3 -I docs/node-development/nodes/control-loop/acceptance/oracle.py --check
 ```
 
-Сценарии run-check предлагается назвать `loop-pages-offline` и `loop-pages-rest`;
-регистрации пока нет. Модель `openai/gpt-6.1-sol`, medium, 1800 с.
+Сценарии run-check зарегистрированы как `loop-pages-offline` и `loop-pages-rest`.
+Модель `openai/gpt-6.1-sol`, medium, 1800 с.
+
+## Этап 2: предложение FOR
+
+15.11.2026, LAB-1691, [native-проба и аудит базы](../discovery-for.md).
+**Предложение комплекта, не принятый runtime-срез.** FOR и var-in/table-out
+пока отклоняются обработчиками. Сборки, изменения `packages/**` и сценариев
+run-check в этой карточке не выполнялись; решения по публичному контракту —
+[plan.md, раздел 7](../plan.md#7-оценка-циклов).
+
+| Случай | Модели передаётся | Приватное ожидание | Поля output 0 Цикла |
+|---|---|---|---|
+| for-offline | `task-for-offline.md`, без fixtures | `expected-for-offline.json` | Skip, Page, Limit, IterationId — integer |
+| for-rest | `task-for-rest.md`, без fixtures | `expected-for-rest.json` | RequestID integer, Response string, IterationId integer |
+
+Один вход переменных Подмодели, один выход таблицы, табличного входа нет.
+Page integer=99, Limit integer=2 заданы в определениях входного порта;
+внешняя связь переменных не требуется. Внутри InputNode снабжает обычными
+переменными «Переменные в таблицу» (columns) и Калькулятор. Таблица от первого
+узла идёт в Калькулятор; он создаёт integer Skip = **Var.Page * Var.Limit**,
+сохраняя Page/Limit. На выходе Калькулятора точный порядок Skip/Page/Limit.
+Для REST сначала выполняется тело для получения полной схемы, затем
+GET httpbin response-headers с query limit←Limit, skip←Skip; ответ порт 0 → OutputNode.
+
+Цикл — FOR, 3 итерации, выбранная входная переменная Page; sequential,
+identifiers=true, ignore_errors=false, save_configuration=false.
+
+| IterationId | Page | Limit | Skip | RequestID REST |
+|---|---|---|---|---|
+| 0 | 0 | 2 | 0 | 0 |
+| 1 | 1 | 2 | 2 | 0 |
+| 2 | 2 | 2 | 4 | 0 |
+
+Маркер Page=99 отличает native-подстановку с нуля от инкремента начального значения.
+IterationId — **последнее** поле, его целый тип проверяется; метки, не заданные
+пользователем, сверяются через `label_any`. REST Response тот же, что в этапе 1:
+три точных 98-байтовых текста для skip 0/2/4, конечный LF сохраняется.
+
+### Приёмка после реализации (предложение)
+
+1. До живых запусков утвердить контракт границы, FOR и readback из раздела 7 плана.
+   Задания/эталоны остаются независимыми; oracle/expected не передаются модели.
+2. Зарегистрировать `loop-for-offline` и `loop-for-rest` в существующем run-check.
+   Это предлагаемые имена: **в текущей базе их нет**. Нового runner или XML-oracle
+   не требуется. Тело и его variable-связи доказываются наблюдениями NW1 в оснастке.
+3. Main: те же GUID Подмодели/входного порта/определения Page/Калькулятора/Цикла;
+   локальные variable_links InputNode→variables.to_table и InputNode→Calculator,
+   табличная цепочка до OutputNode, scoped refs после каждого enter/leave.
+   FOR/count/выбранная переменная/флаги/реальные порты — по readback, не по заданию.
+4. Полный typed output 0 с точными порядком строк/полей/типами, все значения и NULL;
+   фактически скачанный CSV `for-offline.csv` / `for-rest.csv` проверяется целиком.
+   В REST сверять сырой Response, не только распарсенный JSON.
+5. Save после последнего чтения. Cold в новом профиле открывает сохранённый пакет,
+   наблюдает FOR count=3, входную переменную по native ID, определения Page=99/Limit=2,
+   зеркало и связи, выходит к родителю и выполняет **без перенастройки**.
+   Полный typed выход повторяется. Close/logout подтверждены в обоих сеансах.
+6. Исполнитель ≥2/3 PASS и независимо 2/3 на одном точном SHA; обязательные проверки
+   изменённых путей, регрессии `loop-pages-offline`, `supernode-calc`, `rest-get-plain`.
+   Прогоны — только `run-check start`, затем `wait` одной командой по регламенту.
+
+Native уже подтвердил значения обоих FOR и Save/cold в новых контекстах;
+модельные PASS, выгрузка CSV и живой NW1 для переменной границы **не заявляются**.
+Отказы до мутации и ограничения — [plan.md, раздел 4](../plan.md#4-следующие-этапы-отдельные-карточки).
+Fixed group count/group keys имеют наблюдения, но их полный комплект предлагается
+отдельно в цикле 4; два FOR-задания не выдают приёмку этих режимов.
+
+```sh
+python3 -I docs/node-development/nodes/control-loop/acceptance/oracle.py --case for-offline
+python3 -I docs/node-development/nodes/control-loop/acceptance/oracle.py --case for-rest
+python3 -I docs/node-development/nodes/control-loop/acceptance/oracle.py --check
+```
+
+`--check` проверяет все четыре expected; эталоны этапа 1 не изменены.
