@@ -440,7 +440,7 @@ async function completeNodeRecovery(config: NodeOpsConfig, lease: NodeStandLease
     const command = { ...agentCommand(current, env), cleanupDir: path.join(directory(config), "recovery", incident),
       cleanupSecrets: [current.loginom.password, current.dock.apiKey, current.agent.provider?.apiKey ?? ""] }
     if (diagnostic) { diagnostic.stage = "management"; diagnostic.dispatch = "unknown" }
-    await recoverIfNeeded(command, 2)
+    await recoverIfNeeded(command, 2, Boolean(current.loginom.password))
     if (diagnostic) { diagnostic.dispatch = "started"; diagnostic.stage = "history_archive" }
     const historyArchive = await archiveProfileHistory(profile, `node-ops-${incident}`)
     await verifyHistoryArchive(profile, historyArchive)

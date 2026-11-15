@@ -427,7 +427,7 @@ async function prepareProfile(config: EvalConfig, command: AgentCommand, runId: 
   await releaseStaleWriter(config.profileDir, null)
   await ensureProfile(config, command)
   await assertAuth(config, command)
-  await recoverIfNeeded(command, 2)
+  await recoverIfNeeded(command, 2, Boolean(config.loginom.password))
   await archiveProfileHistory(config.profileDir, `${runId}-initial`)
 }
 
@@ -451,7 +451,7 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
     if (!(await waitProfileIdle(config.profileDir, 1_000))) throw Error("Profile still has process owners")
     const released = await releaseStaleWriter(config.profileDir, evidence.processes.writerRefusal ? undefined : evidence.processes.writer)
     evidence.stages.push({ stage: "writer", status: "confirmed" })
-    const recovery = await recoverIfNeeded(command, 1)
+    const recovery = await recoverIfNeeded(command, 1, Boolean(config.loginom.password))
     result.profile_recovered = released || recovery.recovered
     evidence.stages.push({ stage: "ready", status: "confirmed" })
     const archive = await archiveProfileHistory(config.profileDir,

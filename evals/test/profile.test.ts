@@ -610,6 +610,92 @@ test("setupProfile rebinds username before ensureProfile", async () => {
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 
+test.each([
+  { password: "synthetic-password", view: { hasPassword: true }, accepted: true },
+  { password: "", view: { hasPassword: false }, accepted: true },
+  { password: "synthetic-password", view: { hasPassword: false }, accepted: false },
+  { password: "", view: { hasPassword: true }, accepted: false },
+  { password: "synthetic-password", view: { hasPassword: true, hasApiKey: false }, accepted: false },
+  { password: "synthetic-password", view: { hasPassword: false, hasApiKey: true }, accepted: false },
+  { password: "synthetic-password", view: { hasPassword: "true", hasApiKey: true }, accepted: false },
+  { password: "synthetic-password", view: { hasApiKey: true }, accepted: true },
+])("verifyProfile credentials boundary %#", async value => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, password: value.password } }
+  const state = path.join(context.profileDir, "view.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "ready", url: config.loginom.url, username: config.loginom.username, ...value.view }))
+    if (value.accepted) expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    if (!value.accepted) await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_NOT_PREPARED")
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("recoverIfNeeded rejects explicit password mismatch even with a legacy key", async () => {
+  const context = await fakeProfile()
+  const state = path.join(context.profileDir, "view.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "ready", hasPassword: false, hasApiKey: true }))
+    await expect(recoverIfNeeded(command, 1, true)).rejects.toThrow("PROFILE_NOT_PREPARED")
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("ensureProfile repairs a modern password mismatch before reusing the profile", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, password: "synthetic-password" } }
+  const state = path.join(context.profileDir, "view.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "ready", hasPassword: false, hasApiKey: true }))
+    expect(await ensureProfile(config, command)).toEqual({ fresh: true })
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(true)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test.each(["reply", "state"] as const)("setupProfile refuses modern password mismatch in %s", async phase => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: "fixture-slots.json", loginom: { ...context.config.loginom, password: "synthetic-password" } }
+  const state = path.join(context.profileDir, "view.json"), setup = path.join(context.profileDir, "setup.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup } }
+  try {
+    const view = { state: "ready", hasPassword: true, url: config.loginom.url, username: config.loginom.username }
+    await Bun.write(state, JSON.stringify({ state: "unconfigured" }))
+    await Bun.write(setup, JSON.stringify({ reply: view, state: view, [phase]: { ...view, hasPassword: false, hasApiKey: true } }))
+    await expect(setupProfile(config, command)).rejects.toThrow("PROFILE_PASSWORD_MISMATCH")
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test.each([true, false])("modern password presence %s is reused and recovered with a native check", async hasPassword => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, password: hasPassword ? "synthetic-password" : "" } }
+  const state = path.join(context.profileDir, "view.json"), check = path.join(context.profileDir, "check.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "starting", hasPassword, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "verified" } } }))
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect((await recoverIfNeeded(command, 1, hasPassword)).view.state).toBe("starting")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("verifyProfile admits the public password view through native Help check", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a", password: "synthetic-password" } }
+  const state = path.join(context.profileDir, "view.json"), check = path.join(context.profileDir, "check.json"), calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "starting", hasPassword: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "verified" } } }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
 test("verifyProfile checks a starting standalone host without setup or recovery", async () => {
   const context = await fakeProfile()
   const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a" } }
@@ -881,12 +967,12 @@ test.each([
   }
 })
 
-test("recoverIfNeeded: verified Help does not erase a browser warning", async () => {
+test("recoverIfNeeded: verified Help refuses a failed browser", async () => {
   const file = await stateFile({ state: "starting", hasApiKey: true, browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" } })
   const check = await stateFile({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" } } })
   const context = await fakeProfile({ EVAL_FAKE_STATE_FILE: file, EVAL_FAKE_CHECK_FILE: check })
   try {
-    expect((await recoverIfNeeded(context.command, 1)).view).toEqual(await Bun.file(file).json())
+    await expect(recoverIfNeeded(context.command, 1)).rejects.toThrow("LOGINOM_BROWSER_NOT_READY")
   } finally {
     await rm(context.profileDir, { recursive: true, force: true })
     await rm(path.dirname(file), { recursive: true, force: true })

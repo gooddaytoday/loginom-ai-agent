@@ -13,6 +13,7 @@ import { verifyAdminRuntime } from "../src/preflight"
 import type { CampaignServerConfig } from "../script/run-campaign"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { storageCodecFixture } from "./helpers/storage-codec-fixture"
+import { captureUnitBinding } from "../src/process-supervisor"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
 
@@ -97,8 +98,13 @@ test.skipIf(process.env.EVAL_PAIR_INTEGRATION !== "1" || !process.env.EVAL_CAMPA
         }
         console.error(`native generation evidence: ${root}`)
         const input = { slotsFile, parallel, previousSlotsFile: server.slotsFile, config: { ...config, slotsFile } }
-        expect((await prepareEnvironment(input)).ready).toBe(true)
-        expect((await verifyEnvironment({ slotsFile, parallel, config: input.config })).ready).toBe(true)
+        const binding = await captureUnitBinding()
+        const preparation = await prepareEnvironment(input)
+        expect(preparation.ready).toBe(true)
+        expect((await readLeaseReceipt(preparation.journal) as { unitBinding?: unknown }).unitBinding).toEqual(binding)
+        const verification = await verifyEnvironment({ slotsFile, parallel, config: input.config })
+        expect(verification.ready).toBe(true)
+        expect((await readLeaseReceipt(verification.journal) as { unitBinding?: unknown }).unitBinding).toEqual(binding)
         const inventory = (await Bun.$`docker exec ${identity.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet()).text()
         const secrets = await Promise.all(source.slots.map(slot => Bun.file(path.join(file.controller.stateDir, `prepare-${slot.id}.secret.json`)).text()))
         expect((await prepareEnvironment(input)).changedUsers).toEqual([])

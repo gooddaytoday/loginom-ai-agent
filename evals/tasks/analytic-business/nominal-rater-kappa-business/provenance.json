@@ -1,0 +1,66 @@
+{
+  "task_id": "nominal-rater-kappa-business",
+  "dataset_sha256": {
+    "kappa_ratings.csv": "4ac057809d3ed7658980cc6619fcbc304ca7cb8a4f895de9eee8588975dd7896"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "bb16189233e730f5d079d153c751e7eb9354507f729ea691dbe518858ddd0299"
+  },
+  "reference_sha256": "00de25c07f131d25daac327069cabe7e5c583ce0c2c18fbce06626dcb7524432",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "kappa_ratings.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e21d7be71ffeIe3w2qm5zX3W2k",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-15T07:42:20+00:00",
+    "duration_s": 799,
+    "tokens": {
+      "input": 114050,
+      "output": 7896,
+      "reasoning": 1326
+    },
+    "tool_calls": 46,
+    "tool_errors": 2,
+    "memory_tool_calls": 0,
+    "errors": "PRIVATE_DIAGNOSTICS"
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL",
+  "source_task": "nominal-rater-kappa-detailed",
+  "reference_origin": {
+    "form": "detailed",
+    "shared_reference": true,
+    "business_cli_attempt": false
+  }
+}
