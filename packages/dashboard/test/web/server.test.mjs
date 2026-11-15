@@ -143,12 +143,12 @@ test("lookup reports the current build hash, app origin and mode", async t => {
   assert.equal(missing.exists, missing.hash !== null)
   const hash = "b".repeat(64)
   await mkdir(join(server.buildsRoot, missing.key), { recursive: true })
-  await writeFile(join(server.buildsRoot, missing.key, "current"), hash + "\n")
+  await writeFile(join(server.buildsRoot, "state.json"), JSON.stringify({ [`${binding.packagePath}.dashboards/${binding.nodeGuid}/20261115T120000Z.json`]: { key: missing.key, sourceHash: "a".repeat(64), status: "ready", buildHash: hash } }))
   const published = await server.request("lookup", binding)
   assert.equal(published.exists, true)
   assert.equal(published.hash, hash)
   assert.equal(published.exists, published.hash !== null)
-  await writeFile(join(server.buildsRoot, missing.key, "current"), "not-a-build\n")
+  await writeFile(join(server.buildsRoot, "state.json"), "{}")
   const garbage = await server.request("lookup", binding)
   assert.equal(garbage.hash, null)
   assert.equal(garbage.exists, false)
@@ -312,3 +312,24 @@ test("the snapshot service listens on loopback unless the stand opts in", async 
   assert.equal(open.apps.address().address, "0.0.0.0")
 })
 
+
+test("lookup separates own ready A from newer current B and forgets a deleted file", async t => {
+  const server = await stand(t)
+  const { key } = await server.request("lookup", binding)
+  const a = "20261115T120000Z.json", b = "20261115T120001Z.json"
+  const folder = `${binding.packagePath}.dashboards/${binding.nodeGuid}/`
+  await mkdir(server.buildsRoot, { recursive: true })
+  const state = {
+    [folder + a]: { key, sourceHash: "a".repeat(64), status: "ready", buildHash: "c".repeat(64) },
+    [folder + b]: { key, sourceHash: "b".repeat(64), status: "ready", buildHash: "d".repeat(64) },
+  }
+  await writeFile(join(server.buildsRoot, "state.json"), JSON.stringify(state))
+  const result = await server.request("lookup", { ...binding, publication: a })
+  assert.equal(result.publication.name, a)
+  assert.equal(result.publication.buildHash, "c".repeat(64))
+  assert.equal(result.currentVersion.name, b)
+  assert.equal(result.latest.name, b)
+  delete state[folder + a]
+  await writeFile(join(server.buildsRoot, "state.json"), JSON.stringify(state))
+  assert.equal((await server.request("lookup", { ...binding, publication: a })).publication.status, "pending")
+})

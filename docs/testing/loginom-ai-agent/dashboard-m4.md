@@ -1,6 +1,6 @@
 # Dashboard M4: публикация через хранилище
 
-Статус: Task 0 и Task 1 приняты; Task 2 реализована и ожидает независимого review; publisher не начат. Это не приёмка установленной M4. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
+Статус: Task 0 и Task 1 приняты; Task 2 принята независимым review без замечаний; Task 3 реализована, первый source/built-host/live E2E PASS; ожидается независимое review. Это не приёмка установленной M4. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
 
 M3 завершена: установленная Linux-приёмка, CI и независимые ревью PASS. Её результаты, ограничения URI dispatch/Windows/macOS и исходные артефакты сохраняются в [runbook M3](dashboard-m3.md). Они не подтверждают новый M4. Первый проверяемый результат реализации — закрытый host-вызов через авторизованную Studio на обеих версиях, затем публикация проверенных исходников до `ready` и открытия Dashboard.
 
@@ -101,3 +101,66 @@ Source проверки: границы origin/generation, profile/call/admit, U
 Проверки из соответствующих пакетов: dashboard — `"$LOGINOM_AI_AGENT_TEST_NODE" --test test/contract/publication.test.mjs test/agent/publish.test.mjs`, `bun typecheck`, `bun run build`; opencode — `bun test test/tool/dashboard.test.ts test/product/turn-lifecycle.test.ts`, `bun typecheck`. Формат покрывает круговой перенос текста/бинарных байтов, полный UTF-8 лимит, число/повторы/пути/кодировки, строгие поля и entry point. Проверена неизменность подготовленных байтов после правки и двух пересборок. Старые fake lease в двух тестовых файлах дополнены только неожиданными dashboard-вызовами: обязательный typecheck выявил отсутствие этих методов после Task 1. Итог: dashboard 16/16, builtin/lifecycle 21/21 (95 assertions), оба typecheck и сборка dashboard PASS. RED→GREEN приведены в локальном отчёте Task 2.
 
 Task 3 (publisher, lookup и `ready`), Task 4 (основа/конфликты/UI), установленная приёмка и CI в этой задаче не выполнялись. Исторический cleanup concern Task 1 остаётся в своём разделе; новая проверка его не отменяет.
+
+
+## Task 3 — первый dashboard из UserStorage
+
+На собственной master-паре первый путь завершён: кнопка установленной оболочки
+минифицированного `/app/` создала настоящий одноразовый снимок узла «По убыванию
+ROI»; существующий пример `roi` подготовлен локально, source builtin получил одно
+разовое разрешение с `always: []` и передал сохранённые bytes через собранный Host.
+Publisher обнаружил окончательный JSON, builder собрал его, инструмент дождался
+`ready` своего имени/sourceHash и вернул `published`. Затем штатная кнопка Dashboard
+показала пять живых строк в `sandbox="allow-scripts"`. Это source builtin + built
+Host + установленная оболочка/контейнеры, **не установленная Desktop/CLI M4**.
+
+Привязка проверяется по физическому пути, результат — по собственной ограниченной
+копии publisher. Linux publisher удерживает directory fd при чтении: отдельный
+RED→GREEN воспроизвёл подмену родительского каталога ссылкой; исправление независимо
+Approved, source bundle и работающий image сверены побайтно. Один `state.json` заменяет серверный `current`: lookup отдельно
+возвращает текущую работающую версию, последнюю попытку и запрошенный файл. Общая
+сборка обслуживает agent и builder; локальные `current` и две версии остаются
+agent-owned. Стенд использует один image и три роли. Реальное чтение JSON publisher
+прошло; запись в UserStorage отклонена `EROFS`. Inspect подтвердил UID Loginom,
+RO UserStorage, отсутствие этого mount у web/builder, отсутствие сети у
+publisher/builder, non-root web/builder, RO rootfs, cap-drop, no-new-privileges и
+лимиты. `.lgp` совпал побайтно, JSON не содержит образца; локальный sample удалён
+после ready. JSON и output не содержат `sample.json`.
+
+На том же image три примера прошли отдельные последовательные задачи builder при
+90 секундах, 1 ГБ и 256 процессах, exit 0 без OOM: ROI — 607 050 байт / 8,3 с,
+channel-summary — 231 530 байт / 4,0 с, campaign-summary — 578 031 байт / 3,3 с.
+Предел 20 МиБ имеет более чем 30-кратный запас на крупнейшем примере; лимиты не
+изменены. Сравнение локального и серверного результата даёт одинаковый hash.
+
+Проверки из `packages/dashboard`: `bun run build`, `bun typecheck`, focused набор
+из brief — 41/41 PASS, `bun run test` PASS с прежним порогом web coverage. Из корня:
+`bash -n packages/dashboard/deploy/dev-master.sh`, ShellCheck, compose config,
+inspect и `dev-master.sh check --config <локальный JSON>` PASS. Последний проверил
+lookup/state, HTTP-заголовки, обе оболочки и штатные adapter-вызовы на `/app/` и
+`/app-debug/`, включая ClosePackage и Logout.
+
+Dev-config выбирает конкретную пару без discovery; проверка URL в `check-studio`
+минимально параметризована здесь, поскольку это нужно существующему `check`
+новой пары. Fresh install сохраняет pinned Debian fallback при отсутствии
+локального image cache. Rootless Docker не видел loopback proxy хоста: для image
+используется отдельный публичный npm cache, подготовленный с пустыми user/global
+configs и чистым окружением; внутри image — `npm ci --offline`. Credentials,
+Knowledge key и локальные настройки в контекст не копируются. Переноса M3 нет.
+
+Evidence вне Git: `$M4_SCRATCH/task3-live.json`, `task3-view.json`, `task3-studio.png`,
+`task3-inspect.json`, `task3-ro.json`, `task3-container-measure.json`, `task3-check.log`
+и журналы focused/package tests. Первый view-probe ошибся CSS-селектором; повторён
+только просмотр без новой публикации. Этот failed probe закрыл Chromium, но
+пропустил штатный Logout. Его собственный профиль повторно открыт без новой
+аутентификации: показана форма входа, прежняя сессия не восстановилась. Независимый
+read-only разбор native log подтвердил сохранение failed-view сессии после разрыва;
+её завершение в доступном журнале не найдено, текущее состояние позже последней
+записи неизвестно. Форма входа не доказывает завершения server session. Причина
+предупреждения Studio о read-only пакете на screenshot не установлена; чужие
+сессии не закрывались. Snapshot, успешный view и обе проверки `check` завершили
+ClosePackage/Logout; Host закрылся с exit 0, signal null. Исторический Knowledge
+ACK→SIGKILL остаётся отдельным UNKNOWN concern Task 1.
+
+Основа/конфликты/UI Task 4, recovery Task 5, расширенная матрица и установленная
+Desktop/CLI приёмка здесь не выполнялись. Следующий шаг — независимое review Task 3.

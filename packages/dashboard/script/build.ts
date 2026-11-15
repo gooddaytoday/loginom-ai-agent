@@ -1,7 +1,7 @@
 import { join } from "node:path"
 
 const result = await Bun.build({
-  entrypoints: [join(import.meta.dirname, "../src/web/server.ts")],
+  entrypoints: [join(import.meta.dirname, "../src/entry.ts")],
   outdir: join(import.meta.dirname, "../dist"),
   naming: "server.mjs",
   target: "node",

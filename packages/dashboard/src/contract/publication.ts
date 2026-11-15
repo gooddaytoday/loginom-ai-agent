@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect"
-import { Binding } from "./snapshot.ts"
+import { Binding, PublicationVersion } from "./snapshot.ts"
 
 const SourceFile = Schema.Struct({ path: Schema.String, encoding: Schema.Literals(["utf8", "base64"]), content: Schema.String }).check(
   Schema.makeFilter(file => {
@@ -33,11 +33,7 @@ export function parsePublication(content: string): Publication {
   return result.value
 }
 
-export const PublicationVersion = Schema.Struct({
-  name: Schema.String.check(Schema.makeFilter(value => /^\d{8}T\d{6}Z\.json$/.test(value))),
-  sourceHash: Schema.String.check(Schema.makeFilter(value => /^[a-f0-9]{64}$/.test(value))),
-})
-export type PublicationVersion = typeof PublicationVersion.Type
+export { PublicationVersion } from "./snapshot.ts"
 export const PublicationSource = Schema.Struct({ version: PublicationVersion, content: Schema.String })
 export const PublicationWrite = Schema.Union([
   Schema.Struct({ status: Schema.Literal("written"), version: PublicationVersion }),

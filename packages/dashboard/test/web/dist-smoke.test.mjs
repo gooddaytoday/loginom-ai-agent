@@ -28,7 +28,7 @@ async function launch(t, root, artifact) {
   const apiPort = await ephemeral()
   const appPort = await ephemeral()
   const appOrigin = `http://127.0.0.1:${appPort}`
-  const child = spawn(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, [artifact], {
+  const child = spawn(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, [artifact, "web"], {
     cwd: root,
     env: {
       ...process.env,

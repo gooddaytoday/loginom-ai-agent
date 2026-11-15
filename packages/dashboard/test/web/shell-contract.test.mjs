@@ -28,16 +28,19 @@ test("compact browser decoders agree with service schemas for every consumed res
     }
     assert.deepEqual(decode(input), expected.value, JSON.stringify(input))
   }
-  agree(lookupResponse, LookupResponse, valid)
+  const consumed = Schema.Struct({ key: LookupResponse.fields.key, exists: LookupResponse.fields.exists, hash: LookupResponse.fields.hash, appOrigin: LookupResponse.fields.appOrigin, mode: LookupResponse.fields.mode, cliButton: LookupResponse.fields.cliButton })
+  agree(lookupResponse, consumed, valid)
   for (const key of Object.keys(valid)) {
-    for (const value of fields) agree(lookupResponse, LookupResponse, { ...valid, [key]: value })
+    for (const value of fields) agree(lookupResponse, consumed, { ...valid, [key]: value })
     const missing = { ...valid }
     delete missing[key]
-    agree(lookupResponse, LookupResponse, missing)
+    agree(lookupResponse, consumed, missing)
   }
   for (const [key, values] of Object.entries(specials)) {
-    for (const value of values) agree(lookupResponse, LookupResponse, { ...valid, [key]: value })
+    for (const value of values) agree(lookupResponse, consumed, { ...valid, [key]: value })
   }
+
+  assert.deepEqual(lookupResponse({ ...valid, currentVersion: null, latest: null, publication: null }), valid)
 
   const snapshot = Schema.Struct({ id: Schema.String.check(
     Schema.makeFilter(value => /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value)),

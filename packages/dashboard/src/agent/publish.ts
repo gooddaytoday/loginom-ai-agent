@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto"
 import { readFile, realpath } from "node:fs/promises"
 import { join } from "node:path"
+import { setTimeout } from "node:timers/promises"
+import { LookupResponse } from "../contract/snapshot.ts"
 import { Option, Schema } from "effect"
 import { parsePublication, PublicationVersion, PublicationWrite } from "../contract/publication.ts"
 import { buildDashboard, sourceFiles } from "./build.ts"
 import { NO_SAMPLE } from "./draft.ts"
-import { readDashboardSnapshot, type ControlBinding } from "./folder.ts"
+import { readDashboardSnapshot, removePublishedSample, type ControlBinding } from "./folder.ts"
 import type { DashboardResources } from "./resources.ts"
 
 export { embeddedValues, outputText } from "./build.ts"
@@ -47,6 +49,7 @@ export async function finishPublish(input: Prepared & {
   work: string
   signal?: AbortSignal
   expected: PublicationVersion | null
+  timeoutMs?: number
   publish: (request: { origin: string; binding: ControlBinding["binding"]; content: string; expected: PublicationVersion | null }, signal?: AbortSignal) => Promise<PublicationWrite>
 }) {
   input.signal?.throwIfAborted()
@@ -58,8 +61,39 @@ export async function finishPublish(input: Prepared & {
     status: "needs-confirmation" as const, text: "Версия на стенде изменилась. Публикация не начата; подтвердите локальный черновик заново.",
   }
   if (result.value.version.sourceHash !== input.publication.sourceHash) throw Error("DASHBOARD_WRITE_UNKNOWN")
+  const version = result.value.version
+  const deadline = Date.now() + (input.timeoutMs ?? 120_000)
+  while (Date.now() < deadline) {
+    input.signal?.throwIfAborted()
+    try {
+      const response = await fetch(input.control.origin + "/dashboard/lookup", {
+        method: "POST", headers: { "content-type": "application/json" }, redirect: "error",
+        body: JSON.stringify({ ...input.control.binding, publication: version.name }),
+        signal: AbortSignal.any([AbortSignal.timeout(Math.max(1, deadline - Date.now())), ...(input.signal ? [input.signal] : [])]),
+      })
+      const decoded = Schema.decodeUnknownOption(LookupResponse)(await response.json())
+      if (response.ok && Option.isSome(decoded)) {
+        const own = decoded.value.publication
+        if (own?.name === version.name && own.sourceHash === version.sourceHash) {
+          if (own.status === "failed") return { status: "failed" as const, version, text: "Сборка на стенде не удалась.\n" + own.error }
+          if (own.status === "ready" && own.buildHash) {
+            let cleanup = ""
+            try { removePublishedSample(input.work, input.control.snapshotId) } catch { cleanup = " Не удалось удалить локальный образец." }
+            return { status: "published" as const, version,
+              text: "Dashboard опубликован. Откройте узел в Studio и нажмите Dashboard." +
+                (decoded.value.currentVersion?.name !== version.name ? " На стенде уже активна более новая версия." : "") + cleanup,
+            }
+          }
+        }
+      }
+    } catch {
+      input.signal?.throwIfAborted()
+      break
+    }
+    if (Date.now() < deadline) await setTimeout(Math.min(3000, deadline - Date.now()), undefined, { signal: input.signal })
+  }
   return {
-    status: "pending" as const, version: result.value.version,
+    status: "pending" as const, version,
     text: "Исходники переданы в Loginom. Готовность сборки на стенде ещё не подтверждена.",
   }
 }

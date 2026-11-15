@@ -38,6 +38,19 @@ const HttpOrigin = Schema.String.check(
     return url?.origin === value && (url.protocol === "http:" || url.protocol === "https:")
   }),
 )
+export const PublicationVersion = Schema.Struct({
+  name: Schema.String.check(Schema.makeFilter(value => /^\d{8}T\d{6}Z\.json$/.test(value))),
+  sourceHash: Schema.String.check(Schema.makeFilter(value => /^[a-f0-9]{64}$/.test(value))),
+})
+export type PublicationVersion = typeof PublicationVersion.Type
+export const PublicationStatus = Schema.Struct({
+  name: PublicationVersion.fields.name,
+  sourceHash: Schema.NullOr(Hash),
+  status: Schema.Literals(["pending", "building", "ready", "failed"]),
+  buildHash: Schema.optional(Hash),
+  error: Schema.optional(Schema.String),
+})
+export const LookupRequest = Schema.Struct({ ...Binding.fields, publication: Schema.optional(PublicationVersion.fields.name) })
 export const LookupResponse = Schema.Struct({
   key: Schema.String,
   exists: Schema.Boolean,
@@ -45,6 +58,9 @@ export const LookupResponse = Schema.Struct({
   appOrigin: HttpOrigin,
   mode: Schema.Literals(["normal", "strict"]),
   cliButton: Schema.Boolean,
+  currentVersion: Schema.NullOr(PublicationVersion),
+  latest: Schema.NullOr(PublicationStatus),
+  publication: Schema.NullOr(PublicationStatus),
 })
 export const ErrorResponse = Schema.Struct({ error: Schema.String })
 export const Snapshot = Schema.Struct({ id: Schema.String, created: Schema.String, ...SnapshotRequest.fields })

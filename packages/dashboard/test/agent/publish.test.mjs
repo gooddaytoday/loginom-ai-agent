@@ -14,7 +14,7 @@ import { embeddedValues, preparePublish, finishPublish } from "../../src/agent/p
 import { dashboardServer } from "../../src/web/server.ts"
 
 const resources = { template: resolve(import.meta.dirname, "../../template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE }
-const confirmed = prepared => ({ expected: null, publish: async () => ({ status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash } }) })
+const confirmed = prepared => ({ timeoutMs: 0, expected: null, publish: async () => ({ status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash } }) })
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "publish-"))
@@ -97,7 +97,12 @@ test("an accepted publication leaves a newer sample with identical rows intact",
   await input.refresh()
   const current = JSON.parse(await readFile(join(input.work, "../control/binding.json"), "utf8"))
   assert.notEqual(current.snapshotId, prepared.control.snapshotId)
-  assert.equal((await finishPublish({ ...input, ...prepared, ...confirmed(prepared) })).status, "pending")
+  const name = "20261115T120000Z.json"
+  const key = (await input.lookup()).key
+  await writeFile(join(input.builds, "state.json"), JSON.stringify({ [`${prepared.control.binding.packagePath}.dashboards/${prepared.control.binding.nodeGuid}/${name}`]: {
+    key, sourceHash: prepared.publication.sourceHash, status: "ready", buildHash: prepared.build.hash,
+  } }))
+  assert.equal((await finishPublish({ ...input, ...prepared, ...confirmed(prepared), timeoutMs: 1000 })).status, "published")
   const sample = JSON.parse(await readFile(join(input.work, "sample.json"), "utf8"))
   assert.deepEqual(sample.rows, [["Москва-Север", 123456], ["Юг", 7]])
 })
@@ -136,7 +141,7 @@ test("approved sources survive edits and draft pruning", async t => {
   }
   await assert.rejects(readdir(join(out, prepared.build.hash)), { code: "ENOENT" })
   let transferredContent
-  const result = await finishPublish({ ...input, ...prepared, expected: null, publish: async request => {
+  const result = await finishPublish({ ...input, ...prepared, timeoutMs: 0, expected: null, publish: async request => {
     transferredContent = request.content
     assert.deepEqual(request.binding, prepared.control.binding)
     assert.equal(request.expected, null)
@@ -185,7 +190,7 @@ test("confirmed transfer survives loss of the local work folder", async t => {
   const input = await fixture(t)
   const prepared = await preparePublish(input)
   assert.equal(prepared.ok, true)
-  const result = await finishPublish({ ...input, ...prepared, expected: null, publish: async () => {
+  const result = await finishPublish({ ...input, ...prepared, timeoutMs: 0, expected: null, publish: async () => {
     await rm(input.work, { recursive: true })
     return { status: "written", version: { name: "20261115T120000Z.json", sourceHash: prepared.publication.sourceHash } }
   } })
@@ -213,7 +218,7 @@ test("changed, cancelled and invalid host replies retain the draft without retry
   const prepared = await preparePublish(input)
   assert.equal(prepared.ok, true)
   let writes = 0
-  const request = { ...input, ...prepared, expected: null, publish: async () => {
+  const request = { ...input, ...prepared, timeoutMs: 0, expected: null, publish: async () => {
     writes++
     return { status: "changed", latest: null }
   } }
@@ -227,4 +232,40 @@ test("changed, cancelled and invalid host replies retain the draft without retry
   ]) await assert.rejects(finishPublish({ ...request, publish: async () => reply }), /DASHBOARD_WRITE_UNKNOWN/)
   assert.ok(await readFile(join(input.work, "sample.json")))
   assert.ok(await readFile(join(input.work, "src/main.tsx")))
+})
+
+test("finish confirms its own ready A even when B is current", async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true, prepared.text)
+  const name = "20261115T120000Z.json"
+  const key = (await input.lookup()).key
+  const folder = `${prepared.control.binding.packagePath}.dashboards/${prepared.control.binding.nodeGuid}/`
+  await writeFile(join(input.builds, "state.json"), JSON.stringify({
+    [folder + name]: { key, sourceHash: prepared.publication.sourceHash, status: "ready", buildHash: prepared.build.hash },
+    [folder + "20261115T120001Z.json"]: { key, sourceHash: "b".repeat(64), status: "ready", buildHash: "c".repeat(64) },
+  }))
+  const result = await finishPublish({ ...input, ...prepared, ...confirmed(prepared), timeoutMs: 1000 })
+  assert.equal(result.status, "published")
+  assert.equal(result.version.name, name)
+  assert.match(result.text, /новая|новее/)
+  await assert.rejects(readFile(join(input.work, "sample.json")), { code: "ENOENT" })
+})
+
+test("ready with a different source hash stays pending without a second write", async t => {
+  const input = await fixture(t)
+  const prepared = await preparePublish(input)
+  assert.equal(prepared.ok, true)
+  const name = "20261115T120000Z.json"
+  const key = (await input.lookup()).key
+  const folder = `${prepared.control.binding.packagePath}.dashboards/${prepared.control.binding.nodeGuid}/`
+  await writeFile(join(input.builds, "state.json"), JSON.stringify({ [folder + name]: { key, sourceHash: "b".repeat(64), status: "ready", buildHash: prepared.build.hash } }))
+  let writes = 0
+  const result = await finishPublish({ ...input, ...prepared, expected: null, timeoutMs: 50, publish: async () => {
+    writes++
+    return { status: "written", version: { name, sourceHash: prepared.publication.sourceHash } }
+  } })
+  assert.equal(result.status, "pending")
+  assert.equal(writes, 1)
+  assert.ok(await readFile(join(input.work, "sample.json")))
 })

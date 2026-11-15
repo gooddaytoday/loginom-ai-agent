@@ -1,4 +1,5 @@
 // Effect's browser decoder adds 367 KB; these checks cover only fields consumed by the shell.
+// Publication status belongs to the publishing agent; the shell consumes the current build only.
 // Conformance against the service schemas is checked in shell-contract.test.mjs.
 export function lookupResponse(value: unknown) {
   if (!isLookup(value)) throw Error("Некорректный ответ службы dashboard (lookup).")

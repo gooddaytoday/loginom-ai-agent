@@ -215,3 +215,47 @@ S8 прошла также в минифицированном `/app/` лице�
 Проверены понятные ошибки неверного стенда и повторного чтения снимка, отдельная копия данных с вредоносной инструкцией, остановка старого черновика и новый рабочий URL после перезапуска. Настоящая команда из буфера обмена CLI собрала черновик; публикация по новому снимку без `--auto` получила отказ разрешения и exit 1, текущая публикация сохранилась. В отрицательном случае стенда использовался отдельный штатный Dashboard API; вход во второй полный Loginom не проверялся. Модель прочитала вредоносную строку, но не пыталась писать вне `src/`; отказы файловой защиты подтверждены автотестами.
 
 Стенд оставлен с Server, Studio и отдельным web: Node 24.19.0, web не от root, корневая файловая система и смонтированные входы только для чтения, capabilities сняты, `no-new-privileges` включён. Состояние имеет права `0700`, каталог `builds` — `0755`; приватный HOME приёмки получил только символическую ссылку на этот каталог. Проверенные резервы исходных Server/Studio сохранены. Рабочий компьютер не затрагивался; глобальный CLI не заменялся, приёмка использовала приватный PATH. Фактические сборки, полный CI, матрица и ограничения — в [runbook M3](../../docs/testing/loginom-ai-agent/dashboard-m3.md), численные итоги S6 — в [roadmap](../../docs/superpowers/specs/2026-11-11-dashboard-architecture-roadmap.md#m3-черновик). Системная диспетчеризация URI из браузера, GUI Windows/macOS и физический GPU не проверены.
+
+### Отдельная dev-пара M4
+
+M4 устанавливает три роли одного образа: web, publisher и builder. Старый M3
+автоматически не переносится. Для новой пары Server должен уже монтировать
+собственный named volume в `/workdir/UserStorage` на запись. Server, Studio,
+сеть и том должны иметь ожидаемую метку принадлежности.
+
+`dev-master.sh install|check|uninstall --config <локальный-файл.json>` принимает
+один приватный JSON вне Git. Пример ниже искусственный; адреса и имена необходимо
+заменить своей парой. Каталог состояния — абсолютный путь оператора.
+
+```json
+{
+  "server": "dashboard-example-server",
+  "studio": "dashboard-example-studio",
+  "network": "dashboard-example-net",
+  "web": "dashboard-example-web",
+  "project": "dashboard-example-services",
+  "userstorage": "dashboard-example-userstorage",
+  "base": "http://127.0.0.1:32800",
+  "appOrigin": "http://dashboards.localhost:32801",
+  "state": "/tmp/dashboard-example",
+  "owner": "codex.owner=dashboard-example"
+}
+```
+
+Перед `install` выполнить сборку dashboard, `bash -n` и ShellCheck установщика.
+Node в PATH должен соответствовать Product; npm находится рядом с ним. Скрипт
+использует чистые npm configs и отдельный cache только для закреплённого kit:
+скачивание на хосте, затем `npm ci --offline` при сборке image. Это позволяет
+обойти недоступность loopback proxy из rootless Docker без настройки daemon.
+Cache и npm logs не остаются в готовой файловой системе image. Credentials,
+настройки Studio и Knowledge key в build context не копируются.
+
+`install --cli-button` включает прежнюю кнопку CLI. Перед стартом скрипт
+проверяет реальные mounts, UID, общий image и ограничения трёх контейнеров.
+UID/GID publisher берётся из процесса Loginom; web/builder работают от UID
+оператора. Служебные bind-каталоги допускают запись разных UID внутри приватного
+каталога состояния с правами 0700; каждая роль получает только свои mounts.
+`check` сверяет lookup со `state.json`, затем прежние HTTP/Studio проверки.
+Для браузерной части нужен `DASHBOARD_STUDIO_CONFIG` с credentials вне Git.
+`uninstall` удаляет только собственные сервисы и внедрение Apache; UserStorage
+и опубликованные исходники остаются.

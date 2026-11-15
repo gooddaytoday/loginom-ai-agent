@@ -4,9 +4,8 @@ import { readFile } from "node:fs/promises"
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { pathToFileURL } from "node:url"
 import { Option, Schema } from "effect"
-import { bindingKey, Binding, Snapshot, SnapshotRequest } from "../contract/snapshot.ts"
+import { bindingKey, LookupRequest, Snapshot, SnapshotRequest } from "../contract/snapshot.ts"
 import { appHost, type Mode } from "./apps.ts"
 
 export { appHeaders, appHost } from "./apps.ts"
@@ -60,11 +59,29 @@ export function dashboardServer({
       }
       const path = request.url!.split("?")[0]
       if (request.method === "POST" && path === "/dashboard/lookup") {
-        const binding = Schema.decodeUnknownOption(Binding, { onExcessProperty: "error" })(await body(request, 65_536))
+        const binding = Schema.decodeUnknownOption(LookupRequest, { onExcessProperty: "error" })(await body(request, 65_536))
         if (Option.isNone(binding)) return json(response, 400, { error: "Invalid Loginom binding" })
         const key = await bindingKey(binding.value)
-        const hash = await currentBuild(buildsRoot, key)
-        return json(response, 200, { key, exists: hash !== null, hash, appOrigin, mode, cliButton })
+        const state: Record<string, { sourceHash?: string; key?: string; status: "pending" | "building" | "ready" | "failed"; buildHash?: string; error?: string }> = await readFile(join(buildsRoot, "state.json"), "utf8").then(JSON.parse).catch(error => {
+          if (error.code === "ENOENT") return {}
+          throw error
+        })
+        const prefix = `${binding.value.packagePath}.dashboards/${binding.value.nodeGuid}/`
+        const statuses = Object.entries(state).filter(([path]) => path.startsWith(prefix) && /^\d{8}T\d{6}Z\.json$/.test(path.slice(prefix.length)))
+          .sort(([a], [b]) => b.localeCompare(a))
+          .map(([path, entry]) => ({ name: path.slice(prefix.length), sourceHash: entry.sourceHash ?? null, key: entry.key, status: entry.status,
+            ...(entry.status === "ready" && entry.key === key ? { buildHash: entry.buildHash } : {}),
+            ...(entry.status === "failed" ? { error: entry.error } : {}),
+          }))
+        const current = statuses.find(entry => entry.key === key && entry.status === "ready" && entry.buildHash)
+        const status = (entry: typeof statuses[number] | undefined) => entry ? { name: entry.name, sourceHash: entry.sourceHash, status: entry.status,
+          ...(entry.buildHash ? { buildHash: entry.buildHash } : {}), ...(entry.error ? { error: entry.error } : {}) } : null
+        const own = binding.value.publication && statuses.find(entry => entry.name === binding.value.publication && (!entry.key || entry.key === key))
+        const hash = current?.buildHash ?? null
+        return json(response, 200, { key, exists: hash !== null, hash, appOrigin, mode, cliButton,
+          currentVersion: current ? { name: current.name, sourceHash: current.sourceHash } : null,
+          latest: status(statuses[0]), publication: binding.value.publication ? status(own || undefined) ?? { name: binding.value.publication, sourceHash: null, status: "pending" } : null,
+        })
       }
       if (request.method === "POST" && path === "/dashboard/snapshots") {
         const origin = request.headers.origin
@@ -93,16 +110,6 @@ export function dashboardServer({
       })
     }
   })
-}
-
-async function currentBuild(root: string, key: string) {
-  try {
-    const hash = (await readFile(join(root, key, "current"), "utf8")).trim()
-    return /^[a-f0-9]{64}$/.test(hash) ? hash : null
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
-    throw error
-  }
 }
 
 // Loopback by default. The stand sets DASHBOARD_HOST=0.0.0.0 because Apache runs in another container.
@@ -150,5 +157,3 @@ function requireOrigin(value: string) {
     throw Error("Dashboard origin must be an http(s) origin")
   return url.origin
 }
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) startDashboard()

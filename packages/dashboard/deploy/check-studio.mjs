@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url"
 import { loginBrowser } from "../../loginom-runtime/src/connection-check.mjs"
 
 const mode = process.argv[2]
-const master = "http://127.0.0.1:32768"
+const master = process.env.DASHBOARD_STUDIO_ORIGIN ?? "http://127.0.0.1:32768"
+if (URL.parse(master)?.origin !== master || !["http:", "https:"].includes(URL.parse(master)?.protocol)) throw Error("Invalid Studio origin")
 const timeoutMs = 30_000
 const shellPath = fileURLToPath(new URL("../dist/shell.js", import.meta.url))
 

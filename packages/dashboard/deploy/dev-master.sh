@@ -3,46 +3,76 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 pkg=packages/dashboard
-studio=dashboard-master-20261109-studio
-server=dashboard-master-20261109-server
 htdocs=/usr/local/apache2/htdocs
-app=/workdir/dashboard-app
 storage=/workdir/UserStorage/user/dashboard-roi
-base=http://127.0.0.1:32768
 die() { echo "$*" >&2; exit 1; }
-usage="Usage: $0 install [--strict] [--cli-button] [--web NAME] | check [--web NAME] | uninstall [--web NAME]"
+usage="Usage: $0 install|check|uninstall --config FILE [--strict] [--cli-button]"
 [[ $# -ge 1 ]] || die "$usage"
 action=$1
 shift
 mode=normal
 cli_button=0
-web=dashboard-master-20261109-web
+config=
 while [[ $# -gt 0 ]]; do
   case $1 in
     --strict) [[ $action == install ]] || die "$usage"; mode=strict; shift;;
     --cli-button) [[ $action == install ]] || die "$usage"; cli_button=1; shift;;
-    --web) [[ $# -ge 2 ]] || die "$usage"; web=$2; shift 2;;
+    --config) [[ $# -ge 2 ]] || die "$usage"; config=$2; shift 2;;
     *) die "$usage";;
   esac
 done
 case $action in install|check|uninstall) ;; *) die "$usage";; esac
-[[ $web =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || die "Некорректное имя контейнера web"
-[[ $web != "$server" && $web != "$studio" ]] || die "Контейнер web не должен совпадать с Loginom server или Studio"
-if [[ $action == install ]]; then
-  [[ $(id -u) != 0 ]] || die "install от root не поддерживается: запустите от пользователя, который публикует dashboard"
-fi
-net=dashboard-master-20261109-net
-owner=io.loginom.dashboard.dev-master=20261109
-state=$HOME/loginom-dashboard
-builds=$state/builds
-app_origin=http://dashboards.localhost:32769
-client_origins=http://127.0.0.1:32768,http://localhost:32768
-image=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+[[ -n $config ]] || die "$usage"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+node --input-type=module - "$config" > "$tmp/config" <<'JS'
+import { readFileSync } from "node:fs"
+const c = JSON.parse(readFileSync(process.argv[2], "utf8"))
+const names = ["server", "studio", "network", "web", "project", "userstorage"]
+for (const key of names) if (typeof c[key] !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(c[key])) throw Error("Invalid " + key)
+if (new Set([c.server, c.studio, c.web, c.project + "-publisher", c.project + "-builder"]).size !== 5) throw Error("Container names overlap")
+for (const key of ["base", "appOrigin"]) {
+  const u = new URL(c[key])
+  if (u.origin !== c[key] || u.protocol !== "http:" || !["127.0.0.1", "localhost", "dashboards.localhost"].includes(u.hostname) || !u.port) throw Error("Invalid " + key)
+}
+if (new URL(c.appOrigin).hostname !== "dashboards.localhost") throw Error("Separate apps origin required")
+if (typeof c.state !== "string" || !c.state.startsWith("/") || /[\n\r\0,:]/.test(c.state) || c.state === "/" || c.state.split("/").includes("..")) throw Error("Invalid state")
+if (typeof c.owner !== "string" || !/^[a-zA-Z0-9_.-]+=[a-zA-Z0-9_.-]+$/.test(c.owner)) throw Error("Invalid owner label")
+for (const key of [...names, "base", "appOrigin", "state", "owner"]) console.log(c[key])
+JS
+mapfile -t settings < "$tmp/config"
+server=${settings[0]}; studio=${settings[1]}; net=${settings[2]}; web=${settings[3]}
+project=${settings[4]}; userstorage=${settings[5]}; base=${settings[6]}; app_origin=${settings[7]}
+state=${settings[8]}; owner=${settings[9]}; builds=$state/builds
+app_port=${app_origin##*:}
+client_origins=$base
+image=$project:local
 local_image=sha256:43f84a0b210f98845ef003912981774c95efe439eaa4b1cb62cf803fd46fc82a
 csp=$(sed "s|<DASH>|$app_origin|g" "$pkg/deploy/studio.csp")
 conf=/usr/local/apache2/conf/dashboard-app.site.conf
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+for target in "$server" "$studio"; do
+  [[ $(docker inspect --format '{{.Name}}' "$target") == "/$target" ]] || die "Имя Loginom не совпало"
+  [[ $(docker inspect --format "{{index .Config.Labels \"${owner%%=*}\"}}" "$target") == "${owner#*=}" ]] || die "Чужой Loginom контейнер"
+done
+for target in "$project-publisher" "$project-builder"; do
+  if docker inspect "$target" > "$tmp/role.json" 2>/dev/null; then
+    node -e 'const v=JSON.parse(require("node:fs").readFileSync(process.argv[1]))[0]; if(v.Name!=="/"+process.argv[2]||v.Config.Labels?.[process.argv[3]]!==process.argv[4])throw Error("Foreign service")' "$tmp/role.json" "$target" "${owner%%=*}" "${owner#*=}"
+  fi
+done
+[[ $(docker volume inspect --format "{{index .Labels \"${owner%%=*}\"}}" "$userstorage") == "${owner#*=}" ]] || die "Чужой UserStorage"
+[[ $(docker network inspect --format "{{index .Labels \"${owner%%=*}\"}}" "$net") == "${owner#*=}" ]] || die "Чужая сеть"
+docker inspect "$server" > "$tmp/server.json"
+node -e 'const v=JSON.parse(require("node:fs").readFileSync(process.argv[1]))[0]; if(!v.Mounts.some(m=>m.Destination==="/workdir/UserStorage"&&m.Name===process.argv[2]&&m.RW))throw Error("UserStorage mount mismatch")' "$tmp/server.json" "$userstorage"
+publisher_user=$(docker exec "$server" stat -c '%u:%g' /proc/1)
+DASHBOARD_WEB_USER="$(id -u):$(id -g)"
+export DASHBOARD_PROJECT=$project DASHBOARD_IMAGE=$image DASHBOARD_WEB=$web DASHBOARD_WEB_USER
+[[ $(id -u) != 0 ]] || die "web/builder должны работать не от root"
+export DASHBOARD_OWNER_KEY=${owner%%=*} DASHBOARD_OWNER_VALUE=${owner#*=} DASHBOARD_STATE=$state
+export DASHBOARD_PUBLISHER_USER=$publisher_user DASHBOARD_USERSTORAGE=$userstorage DASHBOARD_NETWORK=$net
+export DASHBOARD_APP_PORT=$app_port DASHBOARD_APP_ORIGIN=$app_origin DASHBOARD_CLIENT_ORIGINS=$client_origins
+export DASHBOARD_MODE=$mode DASHBOARD_CLI_BUTTON=$cli_button
+compose() { docker compose -f "$pkg/deploy/compose.yaml" "$@"; }
+compose config --quiet
 
 # Docker also accepts ID prefixes. Only remove an exact installer-owned name, by its full ID.
 web_id=
@@ -98,9 +128,6 @@ app_headers() {
 
 # Only the complete stand-owned script tags (including previous M0 tags).
 tags='/^[[:space:]]*<script src="(dashboard-(probe|parameter|bootstrap)\.js|dashboard\/shell\.js)"><\/script>[[:space:]]*$/d'
-stop_service() {
-  docker exec "$server" sh -ec 'ps -eo pid,args | awk '\''$2 == "/app/dashboard-node" && $3 == "/workdir/dashboard-app/server.mjs" {print $1}'\'' | xargs -r kill'
-}
 reload_apache() {
   docker exec "$studio" apachectl -t
   docker exec "$studio" apachectl -k graceful
@@ -113,10 +140,8 @@ if [[ $action == uninstall ]]; then
   done
   docker exec "$studio" rm -f "$conf"
   reload_apache
-  if [[ -n $web_id ]]; then docker rm -f "$web_id" >/dev/null; fi
+  compose down
   rm -f "$state/node" "$state/server.mjs"
-  stop_service
-  docker exec -u 0 "$server" rm -f /app/dashboard-node "$app/server.mjs"
   client_json original
   echo "Dashboard удалён; builds сохранён, каждый клиент читает свой оригинальный client.json."
   exit
@@ -137,13 +162,13 @@ if [[ $action == check ]]; then
     if (v.Config.User !== process.argv[2] || v.Config.User.split(":")[0] === "0") throw Error("web UID/GID mismatch")
     if (v.HostConfig.ReadonlyRootfs !== true) throw Error("web root must be read-only")
     if (v.HostConfig.CapDrop?.length !== 1 || v.HostConfig.CapDrop[0] !== "ALL") throw Error("web CapDrop mismatch")
-    if (!v.HostConfig.SecurityOpt?.includes("no-new-privileges")) throw Error("web needs no-new-privileges")
+    if (!v.HostConfig.SecurityOpt?.some(option => ["no-new-privileges", "no-new-privileges:true"].includes(option))) throw Error("web needs no-new-privileges")
     if (!v.Mounts.some(m => m.Destination === "/builds" && m.Source === process.argv[3] && m.RW === false)) throw Error("web builds mount mismatch")
     const mode = v.Config.Env.find(e => e.startsWith("DASHBOARD_MODE="))?.slice("DASHBOARD_MODE=".length)
     if (mode !== "normal" && mode !== "strict") throw Error("web mode mismatch")
     console.log(mode)
   ' "$tmp/web.json" "$(id -u):$(id -g)" "$builds")
-  current=$(cat "$builds/$roi/current" 2>/dev/null || true)
+  current=$(node -e 'const state=JSON.parse(require("node:fs").readFileSync(process.argv[1])); const ready=Object.entries(state).filter(([,e])=>e.key===process.argv[2]&&e.status==="ready").sort(([a],[b])=>b.localeCompare(a)); console.log(ready[0]?.[1].buildHash??"")' "$builds/state.json" "$roi")
   [[ -n $current ]] || die "Не проверено: опубликуйте ROI"
   code=$(curl --noproxy '*' -sS -D "$tmp/api.headers" -o "$tmp/lookup" -w '%{http_code}' -H 'Content-Type: application/json' -d "$binding" "$base/dashboard/lookup")
   [[ $code == 200 ]] || die "ROI lookup: HTTP $code (expected 200)"
@@ -192,16 +217,16 @@ if [[ $action == check ]]; then
     cache=no-store
     if [[ $path == "/apps/$roi/$current/" ]]; then expected=200; fi
     if [[ $path == */assets/* ]]; then expected=200; cache='public, max-age=31536000, immutable'; fi
-    code=$(curl --noproxy '*' --resolve dashboards.localhost:32769:127.0.0.1 -sS -D "$tmp/headers" -o /dev/null -w '%{http_code}' "$app_origin$path")
+    code=$(curl --noproxy '*' --resolve "dashboards.localhost:$app_port:127.0.0.1" -sS -D "$tmp/headers" -o /dev/null -w '%{http_code}' "$app_origin$path")
     [[ $code == "$expected" ]] || die "App host $path: HTTP $code (expected $expected)"
     app_headers "$tmp/headers" "$cache"
     [[ -z $(header "$tmp/headers" Location) ]] || die "App host must not redirect"
   done
-  [[ $(curl --noproxy '*' --resolve dashboards.localhost:32769:127.0.0.1 -sS -H 'Host: evil.localhost:32769' -D "$tmp/headers" -o /dev/null -w '%{http_code}' "$app_origin/apps/") == 403 ]] || die 'App host: expected 403'
+  [[ $(curl --noproxy '*' --resolve "dashboards.localhost:$app_port:127.0.0.1" -sS -H "Host: evil.localhost:$app_port" -D "$tmp/headers" -o /dev/null -w '%{http_code}' "$app_origin/apps/") == 403 ]] || die 'App host: expected 403'
   app_headers "$tmp/headers" no-store
   client_json overlay
-  echo "Apache и web: ROI hash/current, режим $mode, заголовки, ограничения контейнера, обе оболочки и оба JSON совпадают."
-  node "$pkg/deploy/check-studio.mjs" master
+  echo "Apache и web: ROI lookup/state, режим $mode, заголовки, ограничения контейнера, обе оболочки и оба JSON совпадают."
+  DASHBOARD_STUDIO_ORIGIN="$base" node "$pkg/deploy/check-studio.mjs" master
   exit
 fi
 
@@ -213,38 +238,53 @@ for artifact in "$pkg/dist/server.mjs" "$pkg/dist/shell.js"; do
   "$node_bin" --check "$artifact"
 done
 for file in campaign.lgp dataset.csv; do [[ -s dashboard/fixture/$file ]] || die "Нет dashboard/fixture/$file"; done
-if "$node_bin" -e 'process.exit(process.platform === "linux" && process.arch === "x64" ? 0 : 1)' &&
-   docker image inspect "$local_image" >/dev/null 2>&1; then
-  image=$local_image
-elif ! docker image inspect "$image" >/dev/null 2>&1; then
-  docker pull "$image"
-fi
-docker network inspect "$net" >/dev/null
 install -d -m 700 "$state"
-install -d -m 755 "$builds"
+# The private 0700 parent protects host access; each role receives only its own mounts.
+install -d -m 777 "$builds" "$state/jobs-in" "$state/jobs-out"
 install -m 755 "$node_bin" "$state/node.new" && mv -f "$state/node.new" "$state/node"
 install -m 644 "$pkg/dist/server.mjs" "$state/server.mjs.new" && mv -f "$state/server.mjs.new" "$state/server.mjs"
-# Validate the exact Debian/Node combination before stopping M1 or replacing web.
-docker run --pull=never --rm --network none --read-only --user "$(id -u):$(id -g)" \
-  -v "$state/node:/opt/dashboard/node:ro" -v "$state/server.mjs:/opt/dashboard/server.mjs:ro" "$image" \
-  /opt/dashboard/node -e 'if (process.versions.node !== process.argv[1]) process.exit(1); import("/opt/dashboard/server.mjs")' "$pin"
-
+mkdir -p "$tmp/image/node-runtime/bin" "$tmp/image/node-runtime/lib/node_modules" "$tmp/image/template"
+cp "$node_bin" "$tmp/image/node-runtime/bin/node"
+npm_root=$(dirname "$(dirname "$node_bin")")/lib/node_modules/npm
+[[ -f $npm_root/bin/npm-cli.js ]] || die "npm рядом с закреплённым Node не найден"
+cp -R "$npm_root" "$tmp/image/node-runtime/lib/node_modules/npm"
+tar -C "$pkg/template" --exclude=node_modules --exclude=dist -cf - . | tar -C "$tmp/image/template" -xf -
+cp "$pkg/dist/server.mjs" "$tmp/image/server.mjs"
+# Rootless Docker cannot reach the operators loopback proxy; cache only this pinned kit.
+touch "$tmp/user.npmrc" "$tmp/global.npmrc"
+(cd "$tmp/image/template" && env -i PATH="$PATH" LANG=C.UTF-8 NODE_USE_ENV_PROXY=1 HTTP_PROXY="${HTTP_PROXY:-}" HTTPS_PROXY="${HTTPS_PROXY:-}" NO_PROXY="${NO_PROXY:-}" "$node_bin" "$npm_root/bin/npm-cli.js" ci --userconfig="$tmp/user.npmrc" --globalconfig="$tmp/global.npmrc" --ignore-scripts --no-audit --fund=false --workspaces=false --cache "$tmp/image/npm-cache")
+rm -rf "$tmp/image/template/node_modules" "$tmp/image/npm-cache/_logs"
+base_image=debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+if docker image inspect "$local_image" >/dev/null 2>&1; then
+  docker tag "$local_image" "$project:base"
+  base_image=$project:base
+fi
+docker build --network none --build-arg "BASE_IMAGE=$base_image" -f "$pkg/deploy/Dockerfile" -t "$image" "$tmp/image"
 docker exec "$server" mkdir -p "$storage"
 for file in campaign.lgp dataset.csv; do
   docker exec -i "$server" sh -ec 'if [ ! -e "$1" ] && [ ! -L "$1" ]; then set -C; cat > "$1"; fi' sh "$storage/$file" < "dashboard/fixture/$file"
 done
-stop_service
-docker exec -u 0 "$server" rm -f /app/dashboard-node "$app/server.mjs"
-if [[ -n $web_id ]]; then docker rm -f "$web_id" >/dev/null; fi
-docker run --pull=never -d --name "$web" --label "$owner" --network "$net" --user "$(id -u):$(id -g)" \
-  --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-  --memory 512m --pids-limit 64 --log-opt max-size=10m --log-opt max-file=3 --restart unless-stopped \
-  -p 127.0.0.1:32769:8101 \
-  -v "$state/node:/opt/dashboard/node:ro" -v "$state/server.mjs:/opt/dashboard/server.mjs:ro" -v "$builds:/builds:ro" \
-  -e DASHBOARD_HOST=0.0.0.0 -e DASHBOARD_PORT=8100 -e DASHBOARD_APP_PORT=8101 -e DASHBOARD_BUILDS=/builds \
-  -e DASHBOARD_APP_ORIGIN="$app_origin" -e DASHBOARD_CLI_BUTTON="$cli_button" \
-  -e DASHBOARD_CLIENT_ORIGINS="$client_origins" -e DASHBOARD_MODE="$mode" \
-  "$image" /opt/dashboard/node /opt/dashboard/server.mjs >/dev/null
+compose create
+docker inspect "$web" "$project-publisher" "$project-builder" > "$tmp/services.json"
+node --input-type=module - "$tmp/services.json" "$state" "$userstorage" "$publisher_user" "$DASHBOARD_WEB_USER" <<'JS'
+import { readFileSync } from "node:fs"
+const [web, publisher, builder] = JSON.parse(readFileSync(process.argv[2], "utf8"))
+const [state, storage, publisherUser, user] = process.argv.slice(3)
+if (new Set([web.Image, publisher.Image, builder.Image]).size !== 1) throw Error("Roles must use one image")
+for (const c of [web, publisher, builder]) {
+  if (!c.HostConfig.ReadonlyRootfs || JSON.stringify(c.HostConfig.CapDrop) !== '["ALL"]' || !c.HostConfig.SecurityOpt.includes("no-new-privileges:true")) throw Error("Container isolation mismatch")
+  if (!c.HostConfig.Tmpfs?.["/tmp"]) throw Error("Working tmpfs missing")
+}
+if (web.Config.User !== user || builder.Config.User !== user || user.split(":")[0] === "0" || publisher.Config.User !== publisherUser) throw Error("Container UID mismatch")
+if (publisher.HostConfig.NetworkMode !== "none" || builder.HostConfig.NetworkMode !== "none") throw Error("Offline roles have network")
+if (builder.HostConfig.Memory !== 1073741824 || builder.HostConfig.PidsLimit !== 256) throw Error("Builder limits mismatch")
+for (const [c, expected] of [[web, [["/builds", false]]], [publisher, [["/storage", false], ["/builds", true], ["/jobs-in", true], ["/jobs-out", true]]], [builder, [["/jobs-in", false], ["/jobs-out", true]]]]) {
+  if (c.Mounts.filter(m=>m.Type!=="tmpfs").length !== expected.length) throw Error("Unexpected role mount")
+  for (const [target, rw] of expected) if (!c.Mounts.some(m=>m.Destination===target&&m.RW===rw&&(target==="/storage"?m.Name===storage:m.Source===state+target))) throw Error("Role mount mismatch")
+}
+console.log("Three-role image, mounts, UID and isolation verified before start")
+JS
+compose start
 
 docker exec "$studio" mkdir -p "$htdocs/dashboard-config"
 for client in client client-debug; do
@@ -268,7 +308,7 @@ Alias "/app-debug/client.json" "$htdocs/dashboard-config/client-debug.json"
   Header set Referrer-Policy "same-origin"
 </LocationMatch>
 <Location "/dashboard/">
-  Require expr "tolower(req('Host')) == '127.0.0.1:32768' || tolower(req('Host')) == 'localhost:32768'"
+  Require expr "tolower(req('Host')) == '${base#http://}'"
   ProxyPreserveHost On
   Header always set Content-Security-Policy "sandbox; default-src 'none'"
   Header always set X-Content-Type-Options "nosniff"
@@ -285,4 +325,4 @@ fi
 docker exec "$studio" rm -f "$conf.bak"
 docker exec "$studio" apachectl -k graceful
 curl --noproxy '*' --retry 5 --retry-delay 1 -fsS -H 'Content-Type: application/json' -d "$binding" "$base/dashboard/lookup" >/dev/null
-echo "Dashboard установлен ($mode). Создайте и опубликуйте ROI через Desktop (Создать dashboard → Опубликовать), затем выполните check: $0 check --web $web"
+echo "Dashboard установлен ($mode). Создайте и опубликуйте ROI через Desktop (Создать dashboard → Опубликовать), затем выполните check: $0 check --config $config"
