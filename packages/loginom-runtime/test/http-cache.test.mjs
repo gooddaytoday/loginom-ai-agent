@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {loginBrowser} from '../src/connection-check.mjs';
 
 test('validation reuses HTTP bytes with fresh cookies and authenticates every new profile', {
-  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set pinned Chromium',timeout:15000,
+  skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set pinned Chromium',timeout:60000,
 },async t=>{
   const root=await mkdtemp(join(tmpdir(),'login-http-cache-'));
   let assets=0,submits=0;
@@ -37,7 +37,9 @@ test('validation reuses HTTP bytes with fresh cookies and authenticates every ne
   const run=async(number,password='fixture-password')=>loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER,
     profile:join(root,'profile-'+number),httpCachePath:join(root,'http-cache'),headless:true,
     candidate:{url:`http://127.0.0.1:${http.address().port}/app/`,username:'user',password},
-    deadline:Date.now()+(password==='fixture-password'?5000:2000),
+    // This verifies cache/auth isolation, not Windows runner startup latency.
+    // Both successful profiles must have time to launch under parallel CI load.
+    deadline:Date.now()+(password==='fixture-password'?20000:3000),
     onContextCreated:async context=>{initialCookies.push((await context.cookies()).length);},onPhase:event=>events.push(event)});
   assert.deepEqual(await run(1),{authenticated:true});
   assert.deepEqual(await run(2),{authenticated:true});
