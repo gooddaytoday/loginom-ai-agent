@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { createHash } from "node:crypto"
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { checkDashboardTarget, getDashboardTarget } from "./dashboard-target"
@@ -24,6 +25,7 @@ test("consumes the requested one-time snapshot from the configured stand", async
   const requests: [unknown, RequestInit | undefined][] = []
   try {
     const target = await getDashboardTarget(id, {
+      settled: async () => {}, catalog: async () => {},
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
       dashboards: () => join(root, "dashboards"),
       readPublication: async () => null,
@@ -46,6 +48,7 @@ test("an unconfigured stand fails before fetching a snapshot", async () => {
   const requests: unknown[] = []
   await expect(
     getDashboardTarget(id, {
+      settled: async () => {}, catalog: async () => {},
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 0 }),
       dashboards: () => "/unused/dashboards",
       readPublication: async () => null,
@@ -62,6 +65,7 @@ test("an unconfigured stand fails before fetching a snapshot", async () => {
 test("an unavailable snapshot reports the public snapshot error", async () => {
   await expect(
     getDashboardTarget(id, {
+      settled: async () => {}, catalog: async () => {},
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
       dashboards: () => "/unused/dashboards",
       readPublication: async () => null,
@@ -75,6 +79,7 @@ test("checks the prepared local folder without consuming a snapshot again", asyn
   const root = await mkdtemp(join(tmpdir(), "desktop-dashboard-"))
   try {
     await getDashboardTarget(id, {
+      settled: async () => {}, catalog: async () => {},
       status: async () => ({ url: "http://127.0.0.1:32768/app/?x=1", generation: 2 }),
       dashboards: () => join(root, "dashboards"),
       readPublication: async () => null,
@@ -94,6 +99,7 @@ test("pre-chat publication read uses the captured origin, generation and lifecyc
   const reads: unknown[] = []
   try {
     await getDashboardTarget(id, {
+      settled: async () => {}, catalog: async () => {},
       status: async () => ({ url: "http://127.0.0.1:32768/app/", generation: 7 }),
       dashboards: () => join(root, "dashboards"), template: resolve(import.meta.dirname, "../../../dashboard/template"),
       signal: controller.signal,
@@ -101,5 +107,125 @@ test("pre-chat publication read uses the captured origin, generation and lifecyc
       fetch: async (_url, options) => { expect(options?.signal).toBe(controller.signal); return Response.json(snapshot) },
     })
     expect(reads).toEqual([[{ origin: "http://127.0.0.1:32768", generation: 7, binding: snapshot.binding }, controller.signal]])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("cold dashboard waits for captured generation before private read", async () => {
+  const root = await mkdtemp(join(tmpdir(), "desktop-dashboard-cold-"))
+  const local = Promise.withResolvers<void>()
+  const catalog = Promise.withResolvers<void>()
+  const settling = Promise.withResolvers<string>()
+  const listing = Promise.withResolvers<string>()
+  const reads: unknown[] = []
+  const requests: unknown[] = []
+  const controller = new AbortController()
+  const content = JSON.stringify({ format: 1, template: 1, binding: snapshot.binding, title: "Synthetic", parameters: [],
+    files: [{ path: "src/main.tsx", encoding: "utf8", content: 'document.body.textContent = "Downloaded"' }] })
+  const version = { name: "20261115T120000Z.json", sourceHash: createHash("sha256").update(content).digest("hex") }
+  const pending = getDashboardTarget(id, {
+    status: async () => ({ url: "http://example.test/app/", generation: 7 }),
+    settled: async () => { settling.resolve("settling"); await local.promise },
+    catalog: async generation => { expect(generation).toBe(7); listing.resolve("catalog"); await catalog.promise },
+    dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"), signal: controller.signal,
+    readPublication: async (input, signal) => { reads.push([input, signal]); return { content, version } },
+    fetch: async url => { requests.push(String(url)); return String(url).includes("/snapshots/") ? Response.json(snapshot) : new Response(null, { status: 404 }) },
+  }).then(target => ({ target }), error => ({ error }))
+  try {
+    expect(await Promise.race([settling.promise, pending])).toBe("settling")
+    expect(reads).toEqual([])
+    local.resolve()
+    expect(await Promise.race([listing.promise, pending])).toBe("catalog")
+    expect(reads).toEqual([])
+    catalog.resolve()
+    const result = await pending
+    if (!("target" in result)) throw result.error
+    expect(await readFile(join(result.target.directory, "src/main.tsx"), "utf8")).toBe('document.body.textContent = "Downloaded"')
+    expect(JSON.parse(await readFile(join(result.target.directory, "../control/binding.json"), "utf8")).base).toEqual(version)
+    expect(reads).toEqual([[{ origin: "http://example.test", generation: 7, binding: snapshot.binding }, controller.signal]])
+    expect(requests.filter(url => String(url).includes("/snapshots/"))).toEqual(["http://example.test/dashboard/snapshots/" + id])
+  } finally {
+    local.resolve(); catalog.resolve(); await pending
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("cancelling catalog wait never reads publication or falls back to local sources", async () => {
+  for (const existing of [false, true]) {
+    const root = await mkdtemp(join(tmpdir(), "desktop-dashboard-cancel-"))
+    const catalog = Promise.withResolvers<void>()
+    const listing = Promise.withResolvers<void>()
+    const controller = new AbortController()
+    const deps = {
+      status: async () => ({ url: "http://example.test/app/", generation: 7 }),
+      settled: async () => {}, catalog: async () => {},
+      dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"),
+      readPublication: async () => null, fetch: async () => Response.json(snapshot),
+    }
+    const local = existing ? await getDashboardTarget(id, deps) : undefined
+    const before = local && await readFile(join(local.directory, "src/main.tsx"))
+    const reads: unknown[] = []
+    const pending = getDashboardTarget(id, { ...deps, signal: controller.signal,
+      catalog: async () => { listing.resolve(); await catalog.promise },
+      readPublication: async input => { reads.push(input); return null },
+    }).then(() => "opened", error => error.message)
+    try {
+      await listing.promise
+      controller.abort(new Error("Synthetic cancellation"))
+      expect(await Promise.race([pending, Bun.sleep(100).then(() => "still waiting")])).toBe("Synthetic cancellation")
+      catalog.resolve()
+      await pending
+      expect(reads).toEqual([])
+      if (local) expect(await readFile(join(local.directory, "src/main.tsx"))).toEqual(before!)
+      if (!local) expect(await readdir(root)).toEqual([])
+    } finally {
+      catalog.resolve(); await pending
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+})
+
+test("failed readiness preserves existing sources and base but cannot create a fresh draft", async () => {
+  const root = await mkdtemp(join(tmpdir(), "desktop-dashboard-unready-"))
+  const deps = {
+    status: async () => ({ url: "http://example.test/app/", generation: 7 }),
+    settled: async () => {}, catalog: async () => {},
+    dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"),
+    readPublication: async () => null, fetch: async () => Response.json(snapshot),
+  }
+  const unavailable = { ...deps, catalog: async () => { throw Error("LOGINOM_CONNECTION_NOT_READY") },
+    readPublication: async () => { throw Error("must not read an unready generation") },
+  }
+  try {
+    await expect(getDashboardTarget(id, unavailable)).rejects.toThrow("LOGINOM_CONNECTION_NOT_READY")
+    expect(await readdir(root)).toEqual([])
+    const local = await getDashboardTarget(id, deps)
+    const before = await readFile(join(local.directory, "src/main.tsx"))
+    const base = JSON.parse(await readFile(join(local.directory, "../control/binding.json"), "utf8")).base
+    const target = await getDashboardTarget(id, unavailable)
+    expect(target.notice?.kind).toBe("publication-check-unavailable")
+    expect(await readFile(join(target.directory, "src/main.tsx"))).toEqual(before)
+    expect(JSON.parse(await readFile(join(target.directory, "../control/binding.json"), "utf8")).base).toEqual(base)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("a connection replacement during readiness never retargets the captured private read", async () => {
+  const root = await mkdtemp(join(tmpdir(), "desktop-dashboard-replaced-"))
+  let view = { url: "http://example.test/app/", generation: 7 }
+  const reads: unknown[] = []
+  try {
+    await expect(getDashboardTarget(id, {
+      status: async () => view,
+      settled: async () => {},
+      catalog: async generation => { expect(generation).toBe(7); view = { url: "http://replacement.test/app/", generation: 8 } },
+      dashboards: () => root, template: resolve(import.meta.dirname, "../../../dashboard/template"),
+      fetch: async () => Response.json(snapshot),
+      readPublication: async input => {
+        reads.push(input)
+        if (input.generation !== view.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+        return null
+      },
+    })).rejects.toThrow("LOGINOM_GENERATION_UNAVAILABLE")
+    expect(reads).toEqual([{ origin: "http://example.test", generation: 7, binding: snapshot.binding }])
+    expect(await readdir(root)).toEqual([])
   } finally { await rm(root, { recursive: true, force: true }) }
 })

@@ -343,6 +343,8 @@ const main = Effect.gen(function* () {
     getDashboardTarget: (id) =>
       getDashboardTarget(id, {
         status: () => loginom.api.status(),
+        settled: () => loginom.settled(),
+        catalog: generation => loginom.catalog(generation),
         readPublication: (input, signal) => loginom.readDashboard(input, signal),
         signal: dashboardLifecycle.signal,
         dashboards: () => dashboardDataRoot(process.env),

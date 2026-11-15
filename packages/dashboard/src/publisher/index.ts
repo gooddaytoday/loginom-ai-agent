@@ -26,7 +26,7 @@ export async function scanPublications(input: { storage: string; builds: string;
     .map(entry => "/" + relative(input.storage, join(entry.parentPath, entry.name)).split(sep).join("/"))
     .filter(path => /\.lgp\.dashboards\/[a-f0-9-]{36}\/\d{8}T\d{6}Z\.json$/i.test(path)).sort()
   for (const path of Object.keys(state)) if (!files.includes(path)) delete state[path]
-  const captured = new Map<string, Buffer>()
+  let candidate: { path: string; bytes: Buffer } | undefined
   for (const path of files) {
     input.signal?.throwIfAborted()
     try {
@@ -37,7 +37,7 @@ export async function scanPublications(input: { storage: string; builds: string;
       const publication = parsePublication(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
       if (path !== `${publication.binding.packagePath}.dashboards/${publication.binding.nodeGuid}/${path.split("/").at(-1)}`) throw Error("DASHBOARD_BINDING_MISMATCH")
       state[path].key = await bindingKey(publication.binding)
-      captured.set(path, bytes)
+      candidate ??= { path, bytes }
     } catch (error) {
       state[path] = { sourceHash: state[path]?.sourceHash, status: error instanceof Error && error.message === "DASHBOARD_FILE_CHANGED" ? "pending" : "failed", error: outputText(Buffer.from(String(error))) }
     }
@@ -103,16 +103,16 @@ export async function scanPublications(input: { storage: string; builds: string;
     if (/^[a-f0-9]{64}$/.test(id) && !active.includes(id)) await rm(join(input.jobsOut, id), { recursive: true, force: true })
   }
   if (!active.length) {
-    const pending = Object.entries(state).find(([path, entry]) => entry.status === "pending" && captured.has(path))
-    if (pending) {
-      const [path, entry] = pending
+    const entry = candidate && state[candidate.path]
+    if (candidate && entry?.status === "pending") {
+      const path = candidate.path
       const id = createHash("sha256").update(path).update(entry.sourceHash!).update(randomUUID()).digest("hex")
       await rm(join(input.jobsOut, id), { recursive: true, force: true })
       await mkdir(join(input.jobsOut, id), { mode: 0o777 })
       await chmod(join(input.jobsOut, id), 0o777)
       const temporary = join(input.jobsIn, `.job-${randomUUID()}`)
       await mkdir(temporary)
-      await writeFile(join(temporary, "publication.json"), captured.get(path)!)
+      await writeFile(join(temporary, "publication.json"), candidate.bytes)
       await writeFile(join(temporary, "job.json"), JSON.stringify({ path, sourceHash: entry.sourceHash }))
       await rename(temporary, join(input.jobsIn, id))
       entry.status = "building"

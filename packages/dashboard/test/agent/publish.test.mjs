@@ -5,10 +5,11 @@ import { syncBuiltinESMExports } from "node:module"
 import { once } from "node:events"
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, join, resolve } from "node:path"
 import test from "node:test"
 import { setTimeout } from "node:timers/promises"
 import { buildDashboard } from "../../src/agent/build.ts"
+import { treeHash } from "../../src/builder/build.ts"
 import { NO_SAMPLE } from "../../src/agent/draft.ts"
 import { prepareDashboard, readDashboardSnapshot } from "../../src/agent/folder.ts"
 import { embeddedValues, preparePublish, finishPublish } from "../../src/agent/publish.ts"
@@ -130,12 +131,35 @@ test("edits to live src cannot conceal a sample value in the captured build", as
   assert.deepEqual(await readdir(input.builds), [])
 })
 
-test("approved sources survive edits and draft pruning", async t => {
+test("approved sources survive concurrent draft installation and later pruning", async t => {
   const input = await fixture(t)
-  const prepared = await preparePublish(input)
-  assert.equal(prepared.ok, true)
+  const original = await readFile(join(input.work, "src/main.tsx"), "utf8")
+  const unlink = fs.unlink
+  const built = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  let held = false
+  t.mock.method(fs, "unlink", async path => {
+    if (!held && basename(path) === "node_modules") {
+      held = true
+      built.resolve()
+      await resume.promise
+    }
+    return unlink(path)
+  })
+  syncBuiltinESMExports()
+  t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+  const pending = preparePublish(input)
+  await built.promise
   const out = join(input.work, "../control/draft")
-  for (const text of ["second", "third"]) {
+  await writeFile(join(input.work, "src/main.tsx"), 'document.body.textContent = "second"')
+  const concurrent = await buildDashboard({ work: input.work, ...resources, out })
+  resume.resolve()
+  const prepared = await pending
+  assert.equal(concurrent.ok, true, concurrent.output)
+  assert.equal(prepared.ok, true, prepared.text)
+  assert.equal(await treeHash(prepared.build.dir), prepared.build.hash)
+  assert.equal(JSON.parse(prepared.publication.content).files.find(file => file.path === "src/main.tsx").content, original)
+  for (const text of ["third", "fourth"]) {
     await writeFile(join(input.work, "src/main.tsx"), "document.body.textContent = " + JSON.stringify(text))
     const next = await buildDashboard({ work: input.work, ...resources, out })
     assert.equal(next.ok, true, next.output)

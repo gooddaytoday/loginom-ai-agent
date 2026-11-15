@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
-import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { buildSources, outputText, sourceFiles, type Build } from "../builder/build.ts"
 
@@ -23,27 +23,36 @@ export async function buildDashboard(input: Parameters<typeof buildSources>[0] &
     const found = embeddedValues(input.publication.sample, files)
     if (found.length) return { ok: false, output: outputText(Buffer.from("Опубликованная сборка будет публичной. Удалите из src/ данные образца: " + found.slice(0, 5).join(", "))) }
   }
-  const build = await buildSources({ ...input, work: input.publication?.operation ?? input.work })
-  if (!build.ok) return build
-  const retained = input.publication && join(input.publication.operation, "dist")
-  if (retained) await cp(build.dir, retained, { recursive: true })
-  const installed = commits.then(async () => {
-    const current = join(input.out, "current")
-    const previous = existsSync(current) ? (await readFile(current, "utf8")).trim() : undefined
-    const temporary = `${current}.${randomUUID()}.tmp`
-    try {
-      await writeFile(temporary, build.hash + "\n")
-      await rename(temporary, current)
-    } finally {
-      await rm(temporary, { force: true })
-    }
-    if (previous !== build.hash) await Promise.all((await readdir(input.out))
-      .filter(name => /^[a-f0-9]{64}$/.test(name) && name !== build.hash && name !== previous)
-      .map(name => rm(join(input.out, name), { recursive: true, force: true })))
-    return { ...build, dir: retained ?? build.dir }
-  })
-  commits = installed.then(() => undefined, () => undefined)
-  return installed
+  await mkdir(input.out, { recursive: true, mode: 0o700 })
+  // A concurrent draft may prune shared hashes before this build commits.
+  const staging = await mkdtemp(join(input.out, ".pending-"))
+  try {
+    const build = await buildSources({ ...input, work: input.publication?.operation ?? input.work, out: staging })
+    if (!build.ok) return build
+    const retained = input.publication && join(input.publication.operation, "dist")
+    if (retained) await cp(build.dir, retained, { recursive: true })
+    const installed = commits.then(async () => {
+      const dir = join(input.out, build.hash)
+      if (!existsSync(dir)) await rename(build.dir, dir)
+      const current = join(input.out, "current")
+      const previous = existsSync(current) ? (await readFile(current, "utf8")).trim() : undefined
+      const temporary = `${current}.${randomUUID()}.tmp`
+      try {
+        await writeFile(temporary, build.hash + "\n")
+        await rename(temporary, current)
+      } finally {
+        await rm(temporary, { force: true })
+      }
+      if (previous !== build.hash) await Promise.all((await readdir(input.out))
+        .filter(name => /^[a-f0-9]{64}$/.test(name) && name !== build.hash && name !== previous)
+        .map(name => rm(join(input.out, name), { recursive: true, force: true })))
+      return { ...build, dir: retained ?? dir }
+    })
+    commits = installed.then(() => undefined, () => undefined)
+    return await installed
+  } finally {
+    await rm(staging, { recursive: true, force: true })
+  }
 }
 
 export function embeddedValues(sample: { rows: readonly (readonly unknown[])[] }, files: Buffer[]) {

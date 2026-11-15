@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -23,6 +25,79 @@ async function fixture(t) {
   await writeFile(join(input.storage, path), content)
   return input
 }
+
+test("pending backlog keeps bounded payload memory before dispatch", async t => {
+  const input = await fixture(t)
+  const publication = { ...JSON.parse(content), files: [{ path: "src/main.tsx", encoding: "utf8", content: "/*" + "x".repeat(900 * 1024) + "*/" }] }
+  for (let second = 0; second < 24; second++) {
+    await writeFile(join(input.storage, path.replace(name, `20261115T1200${String(second).padStart(2, "0")}Z.json`)), JSON.stringify(publication))
+  }
+  // Isolate GC/resource measurement from the test runner and other compiler tests.
+  const output = execFileSync(process.env.LOGINOM_AI_AGENT_TEST_NODE ?? process.execPath, ["--expose-gc", "--input-type=module", "-e", `
+    import assert from "node:assert/strict";
+    import fs from "node:fs/promises";
+    import { syncBuiltinESMExports } from "node:module";
+    import { scanPublications } from ${JSON.stringify(new URL("../../src/publisher/index.ts", import.meta.url).href)};
+    const input = JSON.parse(process.argv[1]);
+    const readdir = fs.readdir;
+    gc();
+    const baseline = process.memoryUsage().arrayBuffers;
+    let retained;
+    fs.readdir = async (path, ...options) => {
+      if (path === input.jobsIn && retained === undefined) {
+        gc();
+        retained = process.memoryUsage().arrayBuffers - baseline;
+      }
+      return readdir(path, ...options);
+    };
+    syncBuiltinESMExports();
+    await scanPublications(input);
+    console.log("retained payload bytes:", retained);
+    assert.ok(retained < 8 * 1024 * 1024, "pending payload memory: " + retained);
+  `, JSON.stringify(input)], { encoding: "utf8", timeout: 15_000 })
+  t.diagnostic(output.trim())
+  assert.equal((await readdir(input.jobsIn)).length, 1)
+})
+
+test("multiple pending publications complete one at a time", async t => {
+  const input = await fixture(t)
+  const names = [name, "20261115T120001Z.json", "20261115T120002Z.json"]
+  for (const [index, file] of names.entries()) {
+    await writeFile(join(input.storage, path.replace(name, file)), content.replace("Synthetic dashboard", `Synthetic dashboard ${index}`))
+  }
+  await scanPublications(input)
+  for (let completed = 0; completed < names.length; completed++) {
+    const jobs = await readdir(input.jobsIn)
+    assert.equal(jobs.length, 1)
+    const job = JSON.parse(await readFile(join(input.jobsIn, jobs[0], "job.json")))
+    const bytes = await readFile(join(input.jobsIn, jobs[0], "publication.json"))
+    assert.deepEqual(bytes, await readFile(join(input.storage, job.path)))
+    assert.equal(job.sourceHash, createHash("sha256").update(bytes).digest("hex"))
+    const entries = Object.values(JSON.parse(await readFile(join(input.builds, "state.json"))))
+    assert.equal(entries.filter(entry => entry.status === "building").length, 1)
+    assert.equal(entries.filter(entry => entry.status === "pending").length, names.length - completed - 1)
+    assert.equal(entries.filter(entry => entry.status === "ready").length, completed)
+    await buildNext({ ...input, template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE })
+    await scanPublications(input)
+  }
+  assert.deepEqual(await readdir(input.jobsIn), [])
+  assert.equal(Object.values(JSON.parse(await readFile(join(input.builds, "state.json")))).filter(entry => entry.status === "ready").length, 3)
+  const apps = createServer().listen(0, "127.0.0.1")
+  await once(apps, "listening")
+  t.after(() => apps[Symbol.asyncDispose]())
+  const appOrigin = "http://127.0.0.1:" + apps.address().port
+  appHost({ server: apps, builds: key => join(input.builds, key), appOrigin, clientOrigins: [], mode: "normal" })
+  const web = dashboardServer({ buildsRoot: input.builds, appOrigin, clientOrigins: [], mode: "normal" }).listen(0, "127.0.0.1")
+  await once(web, "listening")
+  t.after(() => web[Symbol.asyncDispose]())
+  const current = await fetch("http://127.0.0.1:" + web.address().port + "/dashboard/lookup", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(binding),
+  }).then(response => response.json())
+  assert.equal(current.currentVersion.name, names.at(-1))
+  const page = await fetch(appOrigin + `/apps/${current.key}/${current.hash}/`)
+  assert.equal(page.status, 200)
+  assert.match(await page.text(), /Dashboard/)
+})
 
 test("failed publications retain the previous dashboard through real files and HTTP", async t => {
   const input = await fixture(t)

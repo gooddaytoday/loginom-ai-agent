@@ -4,6 +4,8 @@ import type { DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom
 
 export type DashboardDeps = {
   status(): Promise<{ url: string; generation: number }>
+  settled(): Promise<void>
+  catalog(generation: number): Promise<unknown>
   dashboards(): string
   template: string
   fetch?: typeof fetch
@@ -17,7 +19,25 @@ export async function getDashboardTarget(id: string, deps: DashboardDeps) {
   const origin = new URL(view.url).origin
   return prepareDashboard({
     signal: deps.signal,
-    readPublication: binding => deps.readPublication({ origin, generation: view.generation, binding }, deps.signal),
+    readPublication: async binding => {
+      const cancelled = Promise.withResolvers<never>()
+      const abort = () => cancelled.reject(deps.signal?.reason)
+      deps.signal?.addEventListener("abort", abort, { once: true })
+      try {
+        deps.signal?.throwIfAborted()
+        await Promise.race([
+          deps.settled().then(() => {
+            deps.signal?.throwIfAborted()
+            return deps.catalog(view.generation)
+          }),
+          cancelled.promise,
+        ])
+        deps.signal?.throwIfAborted()
+        return deps.readPublication({ origin, generation: view.generation, binding }, deps.signal)
+      } finally {
+        deps.signal?.removeEventListener("abort", abort)
+      }
+    },
     id,
     origin,
     dashboards: deps.dashboards(),

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, join, resolve } from "node:path"
 import test from "node:test"
 import { buildDashboard } from "../../src/agent/build.ts"
-import { buildSources } from "../../src/builder/build.ts"
+import { buildSources, treeHash } from "../../src/builder/build.ts"
 import { buildNext } from "../../src/builder/index.ts"
 
 test("draft and server build the same example without server pruning previous results", async t => {
@@ -23,6 +23,46 @@ test("draft and server build the same example without server pruning previous re
   assert.deepEqual((await readdir(out)).sort(), [server.hash, "previous"].sort())
 })
 
+test("concurrent different drafts retain both committed outputs", { timeout: 30_000 }, async t => {
+  const root = await mkdtemp(join(tmpdir(), "concurrent-different-build-"))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const input = { out: join(root, "draft"), template: resolve("template"), node: process.env.LOGINOM_AI_AGENT_TEST_NODE }
+  for (const name of ["first", "second"]) {
+    await mkdir(join(root, name, "src"), { recursive: true })
+    await writeFile(join(root, name, "src/main.tsx"), `document.body.textContent = "Synthetic ${name} dashboard"`)
+  }
+  const fs = (await import("node:fs/promises")).default
+  const { syncBuiltinESMExports } = await import("node:module")
+  const unlink = fs.unlink
+  const built = Promise.withResolvers()
+  const resume = Promise.withResolvers()
+  let held = false
+  t.mock.method(fs, "unlink", async path => {
+    if (!held && basename(path) === "node_modules") {
+      held = true
+      built.resolve()
+      await resume.promise
+    }
+    return unlink(path)
+  })
+  syncBuiltinESMExports()
+  t.after(() => { resume.resolve(); t.mock.restoreAll(); syncBuiltinESMExports() })
+  const pending = buildDashboard({ ...input, work: join(root, "first") })
+  await built.promise
+  const second = await buildDashboard({ ...input, work: join(root, "second") })
+  resume.resolve()
+  const first = await pending
+  assert.equal(first.ok, true, first.output)
+  assert.equal(second.ok, true, second.output)
+  assert.notEqual(first.hash, second.hash)
+  assert.equal(await fs.readFile(join(input.out, "current"), "utf8"), first.hash + "\n")
+  for (const build of [first, second]) {
+    assert.match(await fs.readFile(join(build.dir, "index.html"), "utf8"), /Dashboard/)
+    assert.equal(await treeHash(build.dir), build.hash)
+  }
+  assert.deepEqual((await readdir(input.out)).sort(), [first.hash, second.hash, "current"].sort())
+})
+
 test("concurrent identical drafts both reuse the installed hash", { timeout: 30_000 }, async t => {
   const root = await mkdtemp(join(tmpdir(), "concurrent-build-"))
   t.after(() => rm(root, { recursive: true, force: true }))
@@ -30,7 +70,6 @@ test("concurrent identical drafts both reuse the installed hash", { timeout: 30_
   await mkdir(join(input.work, "src"), { recursive: true })
   await writeFile(join(input.work, "src/main.tsx"), 'document.body.textContent = "Synthetic concurrent dashboard"')
   const fs = (await import("node:fs/promises")).default
-  const { basename } = await import("node:path")
   const { syncBuiltinESMExports } = await import("node:module")
   const original = fs.rename
   const gate = Promise.withResolvers()
