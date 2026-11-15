@@ -65,10 +65,19 @@ test('existing empty patch preserves source and explicit replacement requires it
 });
 
 test('source policy, UTF-8 bytes, LF count and CR are checked before a browser effect',()=>{
-  for(const source_text of ['import "builtIn/FS";','require("builtIn/FS")','import("builtIn/Data")',
+  for(const source_text of ['require("builtIn/FS")','import("builtIn/Data")',
     '😀'.repeat(8193),'\n'.repeat(1024),'const x=1;\r\n'])
     assert.throws(()=>validateJavascriptParameters({source_text,schema_mode:'code'},'script',request()),/Invalid parameters.source_text/);
   assert.equal(checked({source_text:'\n'.repeat(1023),schema_mode:'code'}).source_text.length,1023);
+});
+
+test('Fetch defers only undeclared Execute to its actionable lifecycle refusal',()=>{
+  const parameters={source_text:'import "builtIn/Fetch";',schema_mode:'code'};
+  assert.doesNotThrow(()=>validateJavascriptParameters(parameters,'script',request()));
+  assert.doesNotThrow(()=>validateJavascriptParameters({...parameters,expected_source_sha256:'a'.repeat(64)},'script',request('existing')));
+  for(const finish of ['done','close'])assert.throws(()=>validateJavascriptParameters({...parameters,expected_source_sha256:'a'.repeat(64)},'script',
+    {...request('existing'),finish,read:{ports:[]}}),/Invalid parameters.source_text/);
+  assert.throws(()=>validateJavascriptParameters({...parameters,schema_mode:'declared',columns:[column]},'script',request()),/Invalid parameters.source_text/);
 });
 
 test('declared columns require exact ordered scalar metadata and case-insensitive unique names',()=>{

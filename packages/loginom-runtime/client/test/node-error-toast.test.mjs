@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
+import {applyNode} from '../lib/node-apply.mjs';
 
 // l667lin-diag:661–737: successful native Train, then a toast outside
 // the toolbar root for every sample. DOM template: manual train-toast.json.
@@ -32,7 +33,7 @@ function replay(fault,verb='train',options={}) {
     {ref:'ui-progress',tid:'MF;cntMain;tlbMainToolbar;btnProgress',signature:{tag:'a'},enabled:true,allowed_actions:['click']} ]}});
  const operation={id:'own',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
  if(options.preProcess||options.exclusive!==undefined)operation.exclusiveNodeExecution=()=>options.exclusive!==false;
- const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},targetOrigin:'http://example.test',targetBuild:'7.4.2',
+ const channel=createNodeProcedure({operation,settleReportedErrorToast:options.settleReportedErrorToast,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},targetOrigin:'http://example.test',targetBuild:'7.4.2',
   now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms},record:async r=>{records.push(structuredClone(r));return structuredClone(r)},
   wrapMutation:(code,reference)=>({code,reference}),execute:async code=>{
    if(typeof code==='string') {
@@ -56,7 +57,7 @@ function replay(fault,verb='train',options={}) {
    else {assert.equal(action.ref,'ui-close');closed=true;}
    return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.reference.id,cleanup_complete:true,effect_possible:true,output:state()};
   }});
- return {channel,actions,records,nativeReads,get clock(){return clock},advance:ms=>{clock+=ms},async run(){
+ return {channel,actions,records,nativeReads,operation,get clock(){return clock},advance:ms=>{clock+=ms},async run(){
   await channel.observe({condition:'native launch available',readTraining:verb==='train',ready:()=>true});
   if(fault!=='no-baseline')await channel.bindExecutionBaseline?.({root_id:'root',node,roots:options.preProcess
    ?[{process_id:'1',record_id:'2858',completed:true},{process_id:'2',record_id:'3150',completed:true}]
@@ -204,4 +205,27 @@ test('LAB-811 cannot report an error if native history remains unready after the
  assert.ok(f.nativeReads.every(r=>!r.masked));
  assert.equal(f.records.some(r=>r.phase==='node_execution_error_toast_observed'),false);
  assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch']);
+});
+
+for(const delayed of [false,true])test('JavaScript reported error closes its still-visible toast before release '+delayed,async()=>{
+ const f=replay(undefined,'execute_graph_node',{preProcess:true,settleReportedErrorToast:true,loadingRace:delayed});
+ await assert.rejects(f.run(),e=>e.nodeExecutionFailure?.code==='NODE_EXECUTION_FAILED');
+ assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch','ui-close']);
+ const state=await f.channel.observe({condition:'release after recorded failure',releaseWizard:true,
+  settleWizard:{graph_only:true,node:{document_id:'doc',workflow_id:'wf',node_id:'node'},deadline:30000},ready:s=>!s.ui.dialogs.length});
+ assert.equal(state.ui.dialogs.length,0);assert.equal(f.actions.filter(a=>a.ref==='ui-launch').length,1);
+});
+
+test('apply runtime releases a recorded JavaScript failure with a persistently visible toast',async()=>{
+ const f=replay(undefined,'execute_graph_node',{preProcess:true,settleReportedErrorToast:true});
+ const node={document_id:'doc',workflow_id:'wf',node_id:'node'},ok=async()=>({verified:true,cleanup_complete:true});
+ const request={operation_id:'own',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},
+  target:{kind:'new',type:'programming.javascript',position:{x:100,y:100}},inputs:[],mode:'script',parameters:{},mappings:[],finish:'execute',
+  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:1000,execute_ms:1000,total_ms:10000}};
+ const drivers={verifySource:ok,prepareTarget:async()=>({...await ok(),node}),mapPorts:ok,openWizard:ok,finish:()=>f.run(),
+  releasePending:async()=>{await f.channel.observe({condition:'release recorded error',releaseWizard:true,settleWizard:{graph_only:true,node,deadline:10000},ready:s=>!s.ui.dialogs.length});
+   return {verified:true,cleanup_complete:true,node_context:node,cleanup:{wizard_closed:false}};}};
+ const result=await applyNode({request,operation:f.operation,drivers,handlers:new Map([['programming.javascript',{revision:'1',modes:['script'],validate:()=>{},configure:ok}]]),record:async e=>e,now:()=>1});
+ assert.equal(result.status,'FAILED');assert.equal(result.error.code,'NODE_EXECUTION_FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);assert.ok(result.next_step);
+ assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch','ui-close']);
 });

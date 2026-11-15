@@ -20,12 +20,86 @@ const request={target:{kind:'new',type:'programming.javascript',position:{x:256,
   inputs:[{source,output:0,input:0}],parameters:{source_text:'import {OutputTable} from "builtIn/Data";\n',schema_mode:'code'},
   mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'}};
 
+test('unconnected source opt-in admits zero inputs without changing the existing Data branch',()=>{
+ const r={...structuredClone(request),inputs:[],parameters:{...request.parameters,input_state:'unconnected'}};
+ assert.doesNotThrow(()=>validateJavascriptCodeRequest(r.parameters,'script',r));
+ for(const change of [r=>delete r.parameters.input_state,r=>r.inputs=request.inputs,
+  r=>r.parameters.input_state='materialized']){
+  const invalid=structuredClone(r);change(invalid);
+  assert.throws(()=>validateJavascriptCodeRequest(invalid.parameters,'script',invalid));
+ }
+ assert.doesNotThrow(()=>validateJavascriptCodeRequest(request.parameters,'script',request));
+});
+
+test('filesystem source requires the opt-in even when a source patch is otherwise valid',()=>{
+ const p={...structuredClone(request),inputs:[],parameters:{schema_mode:'code',input_state:'unconnected',
+  source_text:'import * as fs from "builtIn/FS";\n'}};
+ assert.doesNotThrow(()=>validateJavascriptCodeRequest(p.parameters,'script',p));
+ const connected={...p,inputs:request.inputs,parameters:{...p.parameters}};delete connected.parameters.input_state;
+ assert.throws(()=>validateJavascriptCodeRequest(connected.parameters,'script',connected));
+});
+
+test('unconnected executed readback requires the fresh final execution',()=>{
+ const p=phases();
+ p.find(r=>r.phase==='input_mapping').value.native_mapping={verified:true,source_identity_verified:true,
+  input_state:'unconnected',no_incoming_links_verified:true,autosync:true,source_fields:[],target_fields:[]};
+ const readback=javascriptCodeReadback({node,phases:p});
+ assert.equal(readback.input_state,'unconnected');
+ assert.equal(readback.input_mapping.no_incoming_links_verified,true);
+ assert.deepEqual(readback.input_mapping.fields,[]);
+ const result={operation_id:'op',status:'SUCCEEDED',node,effect_possible:true,cleanup_complete:true,
+  phases:p.map(({value,...phase})=>phase),execution:{status:'completed',execution_id:'materialization_execute'},
+  output:{status:'not_refreshed',evidence_ref:null,ports:[]},package_saved:false,warnings:[],
+  configuration:{status:'applied',readback},persisted_package_verified:false,checkpoint_kind:'local_node_checkpoint'};
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
+ assert.equal(validate(result).valid,true,JSON.stringify(validate(result)));
+ for(const change of [r=>delete r.configuration.readback.input_state,
+  r=>r.configuration.readback.input_mapping.no_incoming_links_verified=false,
+  r=>r.configuration.readback.input_mapping.fields=[{}]]){
+  const invalid=structuredClone(result);change(invalid);assert.equal(validate(invalid).valid,false);
+ }
+ p.find(r=>r.phase==='execute').value.execution_id='materialization_execute';
+ assert.throws(()=>javascriptCodeReadback({node,phases:p}),/readback incomplete/);
+});
+
+test('unconnected source reactivates output mapping with a fresh second Execute',()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-execute'],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+});
+
+test('reapplying Execute to an existing Data source retains two executions',()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-reapply'],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const {ledger}=JSON.parse(result.stdout.trim());
+ assert.deepEqual(ledger,['run','run','run','run']);
+});
+
+for(const fault of ['declared-execute','declared-reapply','declared-done-downstream','declared-stale-output'])
+test('declared single execution lifecycle: '+fault,()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const {ledger,outcome}=JSON.parse(result.stdout.trim());
+ assert.equal(ledger.length,fault==='declared-reapply'?2:fault==='declared-stale-output'?0:1);
+ if(outcome){const validation=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(outcome);assert.equal(validation.valid,true,JSON.stringify(validation));}
+});
+
 for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-configure-cancel.mjs',import.meta.url)),point],{encoding:'utf8',timeout:10000});
  assert.equal(result.error,undefined,String(result.error));
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
  const outcome=JSON.parse(result.stdout.trim());assert.equal(outcome.pending_phase,'configure');
+});
+
+for(const fault of ['effects-new-fs','effects-new-fetch','effects-existing-fs','effects-existing-fetch','effects-existing-fs-replace','effects-existing-late-fs'])
+test('effect imports require declared output before mutation: '+fault,()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const {outcome}=JSON.parse(result.stdout.trim());
+ const checked=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(outcome);assert.equal(checked.valid,true,JSON.stringify(checked));
 });
 
 for(const kind of ['new','existing'])test('redaction preflight refuses before the actual target/browser boundary '+kind,async t=>{
@@ -213,4 +287,9 @@ for(const mode of ['code','declared'])test('configuration-only readback survives
   assert.throws(()=>javascriptCodeReadback({node,phases:[...p,{phase,value:{}}]}),/readback incomplete/);
  const forged=structuredClone(result);forged.configuration.readback.output_mapping={port:0,fields:[]};
  assert.equal(validate(forged).valid,false);
+});
+
+test('declared script failure closes the original apply after exactly one execution',()=>{
+ const r=spawnSync(process.execPath,['--experimental-test-module-mocks',fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'declared-execution-error'],{encoding:'utf8',timeout:10000});
+ assert.equal(r.status,0,r.stdout+'\n'+r.stderr);
 });

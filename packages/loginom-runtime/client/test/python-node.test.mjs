@@ -422,3 +422,141 @@ test('skeleton code regions match python tokenize on the test corpus',t=>{
  }
  t.diagnostic('compared '+compared+' of '+sources.length);assert.ok(compared>=100,'compared '+compared);
 });
+
+// LAB-1689: pandas dispatchers (agg/aggregate/transform/apply/filter, aggfunc of
+// pivot_table/crosstab/NamedAgg) call getattr(obj, name) for a string function
+// argument. Each source below was ADMITTED and, on pandas 3.1.1, the first ran
+// `id` and the second wrote a file.
+const dunder='u = chr(95) * 2\nexpr = "@o." + u+"class"+u + "." + u+"init"+u + "." + u+"globals"+u + "[\'sys\'].modules[\'os\'].system(\'id\')==0"\n';
+for(const [source,reason] of [
+ ['import pandas as pd\ndf = pd.DataFrame({"a": [1]})\n'+dunder+'df.agg("query", 0, expr, engine="python", local_dict={"o": df})\n','dispatch:agg'],
+ ['df.agg("to_csv", 0, "out.csv")\n','dispatch:agg'],
+ ['df.aggregate("to_csv", 0, "out.csv")\n','dispatch:aggregate'],
+ ['df.transform("to_csv", 0, "out.csv")\n','dispatch:transform'],
+ ['df.apply("to_csv", 0, args=("out.csv",))\n','dispatch:apply'],
+ ['df.agg(func="query")\n','dispatch:agg'],
+ ['df.groupby("k").agg("query")\n','dispatch:agg'],
+ ['df.groupby("k")["b"].filter("to_csv", True, "out.csv")\n','dispatch:filter'],
+ ['df.rolling(2).agg(["sum", "query"])\n','dispatch:agg'],
+ ['df.resample("D").agg({"b": "query"})\n','dispatch:agg'],
+ ['df.resample("D").transform(arg="query")\n','dispatch:transform'],
+ ['df.expanding().aggregate({"b": ["sum", "to_csv"]})\n','dispatch:aggregate'],
+ ['df.ewm(com=1).agg(("mean", "query"))\n','dispatch:agg'],
+ ['df.groupby("k").agg(total=("b", "query"))\n','dispatch:agg'],
+ ['df.groupby("k")["b"].agg(total="query")\n','dispatch:agg'],
+ ['df.agg(None, total=("b", "query"))\n','dispatch:agg'],
+ ['import pandas as pd\nx = pd.pivot_table(df, values="b", index="k", aggfunc="query")\n','dispatch:pivot_table'],
+ ['import pandas as pd\nx = pd.pivot_table(df, "b", "k", None, "query")\n','dispatch:pivot_table'],
+ ['x = df.pivot_table("b", "k", None, "query")\n','dispatch:pivot_table'],
+ ['import pandas as pd\nx = pd.crosstab(df.k, df.c, df.b, aggfunc="query")\n','dispatch:crosstab'],
+ ['from pandas import pivot_table as pt\nx = pt(df, aggfunc="to_csv")\n','dispatch:pivot_table'],
+ ['import pandas as pd\nx = df.groupby("k").agg(total=pd.NamedAgg("b", "query"))\n','dispatch:NamedAgg'],
+ ['from pandas import NamedAgg\nx = df.groupby("k").agg(total=NamedAgg(column="b", aggfunc="query"))\n','dispatch:NamedAgg'],
+ ['f = "qu" + "ery"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['df.agg("qu" "ery", 0, "a")\n','dispatch:agg'],
+ ['df.agg(f"query", 0, "a")\n','dispatch:agg'],
+ ['df.agg("\\x71uery", 0, "a")\n','dispatch:agg'],
+ ['df.agg(*["query", 0, "a"])\n','dispatch:agg'],
+ ['df.agg(**{"func": "query"})\n','dispatch:agg'],
+ ['df.agg("sum", *args)\n','dispatch:agg'],
+ ['m = df.agg\nm("query", 0, "a")\n','dispatch:agg'],
+ ['m = df.agg\n("sum")\nm("query", 0, "a")\n','dispatch:agg'],
+ ['x = list(map(df.agg, ["query"]))\n','dispatch:agg'],
+ ['import functools\np = functools.partial(df.agg, "query")\n','dispatch:agg'],
+ ['import pandas as pd\nx = df.pipe(pd.DataFrame.agg, "query", 0, "a")\n','dispatch:agg'],
+ ['import pandas as pd\nx = pd.DataFrame.agg(df, "query", 0, "a")\n','dispatch:agg'],
+ ['import pandas as pd\nf = pd.pivot_table\n','dispatch:pivot_table'],
+ ['x = (df.agg)("query")\n','dispatch:agg'],
+ ['str = "query"\ndf.agg(str, 0, "a")\n','dispatch:agg'],
+ ['len = "query"\ndf.agg([len])\n','dispatch:agg'],
+ ['str = "query"\ndf.agg(str.upper)\n','dispatch:agg'],
+ ['def f(x):\n    return x\nf = "query"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\ndef g(f):\n    return df.agg(f, 0, "a")\ng("query")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nh = lambda f: df.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nh = (lambda a, f, b: df.agg(f, 0, "a"))(1, "query", 2)\n','dispatch:agg'],
+ ['def f(x):\n    return x\nh = print(lambda a=lambda: 0, f, b: df.agg(f, 0, "a"))\n','dispatch:agg'],
+ ['def f(x):\n    return x\nr = [df.agg(f, 0, "a") for f in ["query"]]\n','dispatch:agg'],
+ ['def f(x):\n    return x\nr = sum(df.agg(f, 0, "a") for a, f, b in [(1, "query", 2)])\n','dispatch:agg'],
+ ['def f(x):\n    return x\nif (f := "query"):\n    df.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nfor f in ["query"]:\n    df.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nf += "query"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\na, f = 1, "query"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['dec = lambda _: "query"\n@dec\ndef f(x):\n    return x\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['class f:\n    pass\ndf.agg(f)\n','dispatch:agg'],
+ ['def f(x):\n    return x\nmatch 1:\n    case P(a, f):\n        df.agg(f)\n','dispatch:agg'],
+ ['import numpy as np\ndf.agg(np.random)\n','module_value:numpy.random'],
+ ['import pandas as pd\ndf.agg(pd.Series.query)\n','name:query'],
+ ['import pandas as pd\ndf.agg(pd.Series.nunique)\n','dispatch:agg'],
+ ['df.apply(str.format)\n','dispatch:apply'],
+ ['df.apply(df.query)\n','name:query'],
+ ['df.apply(getter)\n','dispatch:apply'],
+ ['df.filter(cols)\n','dispatch:filter'],
+])test('dispatcher function argument refused: '+reason+' '+JSON.stringify(source.slice(-48)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('dispatchers admit aggregation literals, lambdas, defs, builtins and module functions',()=>{
+ for(const source of [
+  'g = df.groupby("k").agg(["mean", "max"])\n',
+  'g = df.groupby("k").agg({"b": "sum", "c": ["min", "max"]})\n',
+  'g = df.groupby("k").agg(total=("b", "sum"), avg=("b", "mean"))\n',
+  'g = df.groupby("k")["b"].agg(total="sum")\n',
+  'import pandas as pd\ng = df.groupby("k").agg(total=pd.NamedAgg(column="b", aggfunc="sum"), n=pd.NamedAgg("b", "count"))\n',
+  'df["s"] = df.apply(lambda r: r["a"] + r["b"], axis=1)\n',
+  'df["u"] = df["t"].apply(str.upper)\n',
+  'df["t"] = df["t"].astype(str).apply(str.strip)\nn = len(df)\n',
+  'df["c"] = df.groupby("k")["b"].transform("cumsum")\n',
+  'import pandas as pd\np = pd.pivot_table(df, values="b", index="k", columns="c", aggfunc="sum", fill_value=0)\nq = df.pivot_table(values="b", index="k", aggfunc=["sum", "mean"])\n',
+  'import pandas as pd\nx = pd.crosstab(df.k, df.c)\ny = pd.crosstab(df.k, df.c, values=df.b, aggfunc="mean")\n',
+  'import numpy as np\nimport pandas as pd\ndf["n"] = df["s"].apply(pd.to_numeric, errors="coerce")\nm = df.agg(np.mean)\nr = df.rolling(3).apply(np.nanmean, raw=True)\n',
+  'from statistics import median\nm = df.groupby("k")["b"].agg(median)\n',
+  'def label(row):\n    return "big" if row["b"] > 1 else "small"\ndf["l"] = df.apply(label, axis=1)\nprint(label(df.iloc[0]))\n',
+  'names = df.groupby("k")["name"].agg(", ".join)\nlists = df.groupby("k")["b"].agg(list)\nn = df.groupby("k")["b"].agg(len)\n',
+  'r = df.apply(lambda r: r * 2, result_type="expand", args=())\nz = df.resample("D").agg("sum")\nw = df.expanding().agg(["min", "max"])\n',
+  'e = df.ewm(com=0.5).agg("mean")\nt = df.groupby("k").transform(lambda s: s - s.mean())\nh = df.groupby("k").filter(lambda g: len(g) > 1)\n',
+  'a = df.filter(like="x")\nb = df.filter(["a", "b"])\nc = df.filter(items=cols, axis=1)\nd = df.filter(regex="^a")\n',
+  'x = df.agg("sum", numeric_only=True)\ny = df.groupby("k").agg("std", ddof=0)\nz = df["b"].transform("rank", method="dense")\n',
+  'k = list(filter(lambda v: v > 1, [1, 2]))\nagg = df.groupby("k").sum()\n',
+  'x = df.groupby("k").agg(\n    total=("b", "sum"),\n)\ny = df.apply(\n    lambda r: r,\n    axis=1,\n)\n',
+  'x = sorted(names, key=len)\ny = df["b"].map(lambda v: len(str(v)))\n',
+ ])assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source+JSON.stringify(inspectPythonSourcePolicy(source)));
+});
+
+test('dispatch refusal tells the model which function arguments are allowed',()=>{
+ assert.throws(()=>validatePythonParameters({source_text:'df.agg("query", 0, "a")\n',schema_mode:'code'},'script',request()),
+  /python-module-v1 \(dispatch:agg at line 1\): the function argument of agg .*"sum".*lambda.*def/);
+});
+
+// LAB-1689 re-review: pandas parameters that name a module or a scipy routine.
+// plot/hist/boxplot(backend=) import the named module (plotting/_core.py:2503);
+// rolling(win_type=) and interpolate(method=) reach scipy by name.
+for(const [source,reason] of [
+ ['import pandas as pd\npd.DataFrame({"a": [1]}).plot(backend="colorsys")\n','attribute:plot'],
+ ['s.plot(backend="colorsys")\n','attribute:plot'],
+ ['df.plot.area(backend="colorsys")\n','attribute:plot'],
+ ['df.hist(backend="colorsys")\n','attribute:hist'],
+ ['df.boxplot(backend="colorsys")\n','attribute:boxplot'],
+ ['x = (df.\n    plot)\n','attribute:plot'],
+ ['x = df.rolling(2, win_type="boxcar").sum()\n','parameter:rolling'],
+ ['x = df.rolling(2, None, False, "boxcar").sum()\n','parameter:rolling'],
+ ['x = df.groupby("k").rolling(2, **{"win_type": "boxcar"}).sum()\n','parameter:rolling'],
+ ['r = df.rolling\nx = r(2, win_type="boxcar")\n','parameter:rolling'],
+ ['x = df.interpolate(method="spline", order=2)\n','parameter:interpolate'],
+ ['x = df.interpolate("spline", order=2)\n','parameter:interpolate'],
+ ['m = "linear"\nx = df.interpolate(method=m)\n','parameter:interpolate'],
+ ['import pandas as pd\nx = pd.Series.interpolate(s, "spline", order=2)\n','parameter:interpolate'],
+ ['x = df.resample("D").interpolate(method="cubicspline")\n','parameter:interpolate'],
+])test('pandas named-module parameter refused: '+reason+' '+JSON.stringify(source.slice(-40)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('interpolate without scipy and plain rolling stay admitted',()=>{
+ for(const source of ['x = df.interpolate()\n','x = df.interpolate(method="linear")\n','x = df["b"].interpolate("time", limit=2)\n',
+  'x = df.interpolate(method="pad")\n','x = df.rolling(3).mean()\ny = df.rolling(3, min_periods=1, center=True).sum()\n','hist = [1, 2]\nplot = len(hist)\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source+JSON.stringify(inspectPythonSourcePolicy(source)));
+ assert.throws(()=>validatePythonParameters({source_text:'df.plot()\n',schema_mode:'code'},'script',request()),/attribute:plot at line 1\): plotting is unavailable/);
+ assert.throws(()=>validatePythonParameters({source_text:'df.rolling(2, win_type="boxcar")\n',schema_mode:'code'},'script',request()),/parameter:rolling at line 1\): .*win_type/);
+ assert.throws(()=>validatePythonParameters({source_text:'df.interpolate("spline")\n',schema_mode:'code'},'script',request()),/parameter:interpolate at line 1\): .*"linear"/);
+});

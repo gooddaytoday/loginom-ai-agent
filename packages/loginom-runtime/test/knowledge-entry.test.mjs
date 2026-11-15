@@ -5,11 +5,16 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdtempSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { HELP_URI } from '../client/lib/knowledge-client.mjs';
 import { helpFixture } from '../client/test/support/help-fixture.mjs';
 
 function entry(t, held) {
+  const cwd = mkdtempSync(join(tmpdir(), 'knowledge-entry-'));
   const child = fork(fileURLToPath(new URL('../src/knowledge-entry.mjs', import.meta.url)), [], {
+    cwd,
     execPath: process.execPath,
     execArgv: ['--experimental-test-module-mocks', '--import', new URL('./support/knowledge-no-browser.mjs', import.meta.url).href],
     env: { ...(process.platform === 'win32' ? { SystemRoot: process.env.SystemRoot } : {}),
@@ -32,10 +37,12 @@ function entry(t, held) {
     requests.clear();
   });
   t.after(async () => {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    const timer = setTimeout(() => child.kill('SIGKILL'), 3000);
-    if (child.connected) child.send({ id: randomUUID(), operation: 'close' });
-    await exited; clearTimeout(timer);
+    try {
+      if (child.exitCode !== null || child.signalCode !== null) return;
+      const timer = setTimeout(() => child.kill('SIGKILL'), 3000);
+      if (child.connected) child.send({ id: randomUUID(), operation: 'close' });
+      await exited; clearTimeout(timer);
+    } finally { await rm(cwd, { recursive: true, force: true }); }
   });
   return {
     child, exited,

@@ -36,6 +36,120 @@ export function loginomAddress(value) {
   return url.href
 }
 
+// The passive Network domain observes the existing owned page. Retain only
+// numbers, fixed classes and cache flags; URLs, cookies and bodies never enter diagnostics.
+export async function trackLoginNetwork(page) {
+  const session = await page.context?.()?.newCDPSession?.(page).catch(() => undefined)
+  if (!session) return trackPageNetwork(page)
+  const active = new Map(), observed = new Map(), completed = [], hooks = []
+  const types = new Set(["document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "eventsource", "websocket", "manifest"])
+  let origin, firstAt, requests = 0, dropped = 0, errors = 0, closing
+  const relative = timestamp => Math.max(0, Math.round((timestamp - (origin ?? timestamp)) * 1000))
+  const span = (a, b) => Number.isFinite(a) && Number.isFinite(b) && a >= 0 && b >= a ? Math.round(b - a) : null
+  const mime = value => /javascript|ecmascript/i.test(value) ? "javascript" : /^text\/css/i.test(value) ? "css"
+    : /^image\//i.test(value) ? "image" : /font|woff/i.test(value) ? "font" : /json/i.test(value) ? "json" : /html/i.test(value) ? "html" : "other"
+  const response = (entry, value, timestamp) => {
+    const header = Object.keys(value.headers ?? {}).find(key => key.toLowerCase() === "cache-control")
+    const policy = header ? String(value.headers[header]) : ""
+    const age = /\bmax-age\s*=\s*"?(\d+)/i.exec(policy)
+    Object.assign(entry.row, { mime: mime(value.mimeType ?? ""), status: value.status,
+      disk: value.fromDiskCache === true, worker: value.fromServiceWorker === true,
+      no_cache: /\bno-cache\b/i.test(policy), no_store: /\bno-store\b/i.test(policy),
+      max_age: age ? Math.min(Number(age[1]), 315360000) : null })
+    const t = value.timing
+    entry.responseAt = t?.receiveHeadersEnd >= 0 ? t.requestTime + t.receiveHeadersEnd / 1000 : timestamp
+    if (t) Object.assign(entry.row, { dns_ms: span(t.dnsStart, t.dnsEnd),
+      tcp_ms: span(t.connectStart, t.sslStart >= 0 ? t.sslStart : t.connectEnd),
+      tls_ms: span(t.sslStart, t.sslEnd), server_ms: span(t.sendEnd, t.receiveHeadersStart) })
+  }
+  const end = (id, timestamp, failed) => {
+    const entry = active.get(id)
+    if (!entry) return
+    active.delete(id)
+    completed.push(Object.assign(entry.row, { finished_ms: relative(timestamp),
+      duration_ms: Math.max(0, relative(timestamp) - entry.row.started_ms),
+      transfer_ms: Number.isFinite(entry.responseAt) ? Math.max(0, Math.round((timestamp - entry.responseAt) * 1000)) : null, failed }))
+  }
+  const on = (name, handler) => {
+    const safe = event => { try { handler(event) } catch { errors++ } }
+    hooks.push([name, safe]); session.on(name, safe)
+  }
+  on("Network.requestWillBeSent", event => {
+    origin ??= event.timestamp; firstAt ??= performance.now(); requests++
+    if (event.redirectResponse && active.has(event.requestId)) {
+      response(active.get(event.requestId), event.redirectResponse, event.timestamp)
+      end(event.requestId, event.timestamp, false)
+    }
+    if (active.size + completed.length >= 4096) { dropped++; return }
+    const type = String(event.type ?? "").toLowerCase()
+    active.set(event.requestId, { row: { id: requests, type: types.has(type) ? type : "other",
+      started_ms: relative(event.timestamp), wire_bytes: 0, served_cache: false } })
+    observed.set(event.requestId, active.get(event.requestId).row)
+  })
+  on("Network.requestServedFromCache", event => { const entry = active.get(event.requestId); if (entry) entry.row.served_cache = true })
+  on("Network.responseReceived", event => { const entry = active.get(event.requestId); if (entry) response(entry, event.response, event.timestamp) })
+  on("Network.responseReceivedExtraInfo", event => { const row = observed.get(event.requestId); if (row) row.wire_status = event.statusCode })
+  on("Network.loadingFinished", event => { const entry = active.get(event.requestId); if (entry) entry.row.wire_bytes = event.encodedDataLength; end(event.requestId, event.timestamp, false) })
+  on("Network.loadingFailed", event => end(event.requestId, event.timestamp, true))
+  const close = () => closing ??= (async () => { for (const [name, handler] of hooks) session.off(name, handler); await session.detach().catch(() => undefined) })()
+  try { await session.send("Network.enable") }
+  catch { await close(); return trackPageNetwork(page) }
+  return {
+    snapshot() { return { phase: "login.form.network", status: "ready", scope: "navigation_to_form", source: "chromium",
+      requests, dropped, observer_errors: errors, completed: completed.map(row => ({ ...row })),
+      pending: [...active.values()].map(entry => ({ ...entry.row, age_ms: Math.max(0, Math.round(performance.now() - (firstAt ?? performance.now())) - entry.row.started_ms) })) } },
+    close,
+  }
+}
+
+function trackPageNetwork(page) {
+  const started = performance.now(), active = new Map(), completed = []
+  const types = new Set(["document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "eventsource", "websocket", "manifest"])
+  let requests = 0, dropped = 0
+  const begin = request => {
+    try {
+      requests++
+      if (active.size + completed.length >= 4096) { dropped++; return }
+      const type = request.resourceType()
+      active.set(request, { type: types.has(type) ? type : "other", started_ms: Math.round(performance.now() - started) })
+    } catch { /* Optional observer. */ }
+  }
+  const end = (request, failed) => {
+    const row = active.get(request)
+    if (!row) return
+    active.delete(request)
+    const finished_ms = Math.round(performance.now() - started)
+    const result = { ...row, finished_ms, duration_ms: Math.max(0, finished_ms - row.started_ms), failed }
+    try {
+      const t = request.timing()
+      const span = (a, b) => Number.isFinite(a) && Number.isFinite(b) && a >= 0 && b >= a ? Math.round(b - a) : null
+      Object.assign(result, { dns_ms: span(t.domainLookupStart, t.domainLookupEnd),
+        tcp_ms: span(t.connectStart, t.secureConnectionStart >= 0 ? t.secureConnectionStart : t.connectEnd),
+        tls_ms: span(t.secureConnectionStart, t.connectEnd), server_ms: span(t.requestStart, t.responseStart),
+        transfer_ms: span(t.responseStart, t.responseEnd) })
+    } catch { /* Some failed requests have no timing. */ }
+    completed.push(result)
+  }
+  const finished = request => end(request, false), failed = request => end(request, true)
+  page.on?.("request", begin)
+  page.on?.("requestfinished", finished)
+  page.on?.("requestfailed", failed)
+  return {
+    snapshot() {
+      const elapsed = Math.round(performance.now() - started)
+      return { phase: "login.form.network", status: "ready", scope: "navigation_to_form", requests, dropped,
+        completed: completed.map(row => ({ ...row })),
+        pending: [...active.values()].map(row => ({ ...row, age_ms: Math.max(0, elapsed - row.started_ms) })) }
+    },
+    close() {
+      page.off?.("request", begin)
+      page.off?.("requestfinished", finished)
+      page.off?.("requestfailed", failed)
+      active.clear()
+    },
+  }
+}
+
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase } = {}) {
@@ -59,6 +173,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     if (left <= 0) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     return Math.min(limit, left)
   }
+  const network = await trackLoginNetwork(page)
   try {
     const response = await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
       { waitUntil: "domcontentloaded", timeout: remaining(60_000) }))
@@ -76,7 +191,11 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
     for (;;) {
       phase = "form"; phaseStarted = performance.now()
-      await measure("login.form", () => avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) }))
+      try {
+        await measure("login.form", () => avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) }))
+      } finally {
+        await emit(network.snapshot())
+      }
       phase = "theme"; phaseStarted = performance.now()
       const missing = await measure("login.theme", () => page.evaluate(function themeStylesheetMissing() {
         const missing = [...document.querySelectorAll('link[rel~="stylesheet"][href]')].some(link => {
@@ -105,6 +224,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
         }),
       ])
     }
+    await network.close()
     phase = "form"; phaseStarted = performance.now()
     if (!(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
@@ -136,6 +256,8 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     const code = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_ACCOUNT_MISMATCH"].includes(error?.message) ? error.message : "LOGINOM_LOGIN_UNAVAILABLE"
     throw Error(code, { cause: { login: loginFailure(original ?? error, candidate,
       phase, ended - phaseStarted, ended - started) } })
+  } finally {
+    await network.close()
   }
 }
 
@@ -198,7 +320,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
+export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
   deadline = Date.now() + 150_000, onRetry, onPhase }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
@@ -210,7 +332,8 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   const profileStarted = performance.now()
   await phase({ phase: "browser.profile", status: "starting" })
   await mkdir(profile, { recursive: true, mode: 0o700 })
-  await phase({ phase: "browser.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
+  if (httpCachePath && !keepOpen) await mkdir(httpCachePath, { recursive: true, mode: 0o700 })
+  await phase({ phase: "browser.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted), http_cache: !!httpCachePath && !keepOpen })
   signal?.throwIfAborted()
   // Both attempts share the original admission deadline and the same profile.
   const record = onRetry ?? createExecutionJournal({ directory: profile, metadata: { sessionId: null } })
@@ -242,6 +365,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
         // Browser traffic is always direct; backend proxy policy is independent.
         "--no-proxy-server",
         ...browserLoggingArguments(profile),
+        ...(httpCachePath && !keepOpen ? [`--disk-cache-dir=${httpCachePath}`, "--disk-cache-size=16777216"] : []),
         ...launch.args,
         ...(!headless
           ? [

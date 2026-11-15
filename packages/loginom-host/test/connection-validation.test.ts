@@ -52,7 +52,8 @@ async function fixture(
   // Only the browser boundary is controlled. Help uses the real entry over shipped Help files.
   await writeFile(
     join(resources, "runtime/src/managed-entry.mjs"),
-    `import {writeFileSync} from 'node:fs';
+    `import {writeFileSync,existsSync,mkdirSync} from 'node:fs';
+    import {join} from 'node:path';
     let starting;
     function ready() {
       process.send(${JSON.stringify(error)} ? {id:starting.id,error:${JSON.stringify(error)}}
@@ -63,7 +64,10 @@ async function fixture(
     process.on('message', message => {
       if (message.operation === 'start') {
         starting = message;
-        writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:message.input.validation,pid:process.pid}));
+        const cache=join(message.input.stateDir,'http-cache');
+        const cacheHit=message.input.validationHttpCache===true && existsSync(join(cache,'fixture-hit'));
+        if(message.input.validationHttpCache===true){mkdirSync(cache,{recursive:true});writeFileSync(join(cache,'fixture-hit'),'owned fixture cache');}
+        writeFileSync(${JSON.stringify(marker)}, JSON.stringify({validation:message.input.validation,pid:process.pid,httpCache:message.input.validationHttpCache===true,cacheHit}));
         if (!${holdStart}) ready();
       }
       if (message.operation === 'close') process.send({id:message.id,result:{closed:${!failClose}}},()=>process.exit(${failClose ? 1 : 0}));
@@ -93,6 +97,40 @@ async function fixture(
     },
   }
 }
+
+test("validation shares only HTTP cache for identical credentials and clears it at shutdown", async () => {
+  const f = await fixture("")
+  try {
+    const run = async (candidate = f.candidate) => {
+      await f.host.api.check(candidate)
+      return JSON.parse(await readFile(f.marker, "utf8"))
+    }
+    expect(await run()).toMatchObject({ httpCache: true, cacheHit: false })
+    expect(await run()).toMatchObject({ httpCache: true, cacheHit: true })
+    const changed = { ...f.candidate, password: { operation: "replace" as const, value: "DIFFERENT-NONSECRET" } }
+    expect(await run(changed)).toMatchObject({ httpCache: true, cacheHit: false })
+    expect(await run(changed)).toMatchObject({ httpCache: true, cacheHit: true })
+    expect(await run({ ...changed, username: "other-user" })).toMatchObject({ httpCache: true, cacheHit: false })
+    await f.host.close()
+    await expect(access(join(f.root, "validation/http-cache"))).rejects.toMatchObject({ code: "ENOENT" })
+  } finally { await f.close() }
+})
+
+test("overlapping validation uses a fresh cache without blocking the first check", async () => {
+  const f = await fixture("", "held")
+  const first = f.host.api.check(f.candidate)
+  void first.catch(() => {})
+  try {
+    await f.catalog.entered()
+    await f.host.api.check(f.candidate)
+    expect(JSON.parse(await readFile(f.marker, "utf8"))).toMatchObject({ httpCache: false, cacheHit: false })
+    await f.catalog.release()
+    await first
+    expect(JSON.parse(await readFile(f.marker, "utf8"))).toMatchObject({ httpCache: true, cacheHit: false })
+    await f.host.api.check(f.candidate)
+    expect(JSON.parse(await readFile(f.marker, "utf8"))).toMatchObject({ httpCache: true, cacheHit: true })
+  } finally { await f.close() }
+})
 
 test.each(["host", "node"])(
   "Host shutdown cancels browser validation while its handshake is pending: %s",
