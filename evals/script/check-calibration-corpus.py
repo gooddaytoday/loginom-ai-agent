@@ -69,7 +69,9 @@ def main():
    for file,source in mutated.items():
     original=ElementTree.fromstring(originals[file]);changed=ElementTree.fromstring(source)
     assert [n.get('Guid') for n in original.findall('.//Nodes/Item')]==[n.get('Guid') for n in changed.findall('.//Nodes/Item')],(name,case['id'],'node topology')
-    assert ElementTree.tostring(original.find('.//Links'))==ElementTree.tostring(changed.find('.//Links')),(name,case['id'],'link topology')
+    original_links=original.find('./WorkFlow/Links');changed_links=changed.find('./WorkFlow/Links')
+    assert original_links is not None and changed_links is not None,(name,case['id'],'missing workflow links')
+    assert ElementTree.tostring(original_links)==ElementTree.tostring(changed_links),(name,case['id'],'link topology')
    counts[case['kind']]+=1
  print(str(len(names))+' tasks, '+str(sum(counts.values()))+' cases: '+json.dumps(counts,sort_keys=True))
 if __name__=='__main__':

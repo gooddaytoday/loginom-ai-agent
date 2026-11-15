@@ -1,0 +1,200 @@
+{
+  "sources": {
+    "SPEC.md": "ff8fa9850a6080ead70288fb11c2f0b5855bf08de033b4b263c1e13f9748197a",
+    "acceptance.json": "86fd8dc3e4031a27a4787a364b72268bf5e79385c9b0ea30a4812b1345a75e8b",
+    "data/kappa_ratings.csv": "4ac057809d3ed7658980cc6619fcbc304ca7cb8a4f895de9eee8588975dd7896",
+    "oracle.csv": "bb16189233e730f5d079d153c751e7eb9354507f729ea691dbe518858ddd0299",
+    "oracle.py": "e52a8ffe3640c5216e1a5526c15a17d4499b226e85198f0f999b4118f7306bc4",
+    "provenance.json": "d1c8f993284b7055dcebfea95d47951fee2ac7fa5ee1b73b1900ab3656df8369",
+    "reference.lgp": "00de25c07f131d25daac327069cabe7e5c583ce0c2c18fbce06626dcb7524432",
+    "task.json": "80332279b8adda85bdfbd286f63f098bd4bce8dc154645129fb92cc40298288f"
+  },
+  "cases": [
+    {
+      "id": "raw-agreement-as-kappa",
+      "kind": "aggregate",
+      "expected_failed": [
+        "kappa-status",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(kappa_raw, 6)\"",
+          "to": "Expression=\"IFF(chance_raw = 1, Null, Round(observed_raw, 6))\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "fmt(kappa)",
+            "to": "fmt(None if chance==1 else observed)",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "raw-agreement-as-kappa.csv"
+    },
+    {
+      "id": "pooled-joined-marginals",
+      "kind": "aggregate",
+      "expected_failed": [
+        "separate-marginals",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"1.0 * freq_a * freq_b\"",
+          "to": "Expression=\"(freq_a + freq_b) * (freq_a + freq_b) / 4.0\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "Fraction(a[c]*b[c],n*n)",
+            "to": "(Fraction((a[c]+b[c])**2,4*n*n) if a[c] and b[c] else Fraction(0))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "pooled-joined-marginals.csv"
+    },
+    {
+      "id": "clip-negative-kappa",
+      "kind": "threshold",
+      "expected_failed": [
+        "kappa-status",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(kappa_raw, 6)\"",
+          "to": "Expression=\"Round(IFF(kappa_raw &lt; 0, 0, kappa_raw), 6)\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "fmt(kappa)",
+            "to": "fmt(None if kappa is None else max(kappa,Fraction(0)))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "clip-negative-kappa.csv"
+    },
+    {
+      "id": "one-for-undefined-kappa",
+      "kind": "column",
+      "expected_failed": [
+        "kappa-status",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "Expression=\"Round(kappa_raw, 6)\"",
+          "to": "Expression=\"IFF(chance_raw = 1, 1, Round(kappa_raw, 6))\"",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "fmt(kappa)",
+            "to": "fmt(Fraction(1) if chance==1 else kappa)",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "one-for-undefined-kappa.csv"
+    },
+    {
+      "id": "cross-site-category-join",
+      "kind": "aggregate",
+      "expected_failed": [
+        "separate-marginals",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Guid=\"1aaad693-42d4-4193-ba67-baff38f2afdf\">\n\t\t\t\t\t\t\t\t<Left Name=\"site_id\"/>\n\t\t\t\t\t\t\t\t<Right Name=\"site_id\"/>\n\t\t\t\t\t\t\t</Item>",
+          "to": "",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "b=Counter(r['rater_b'] for r in rows)",
+            "to": "b=Counter(r['rater_b'] for r in read('kappa_ratings.csv'))",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "cross-site-category-join.csv"
+    },
+    {
+      "id": "drop-disjoint-site",
+      "kind": "filter",
+      "expected_failed": [
+        "site-observed",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Engine xsi:type=\"TBGJoinDataEngine\" DisplayNamePrefix=\"Соединение\">",
+          "to": "<Engine xsi:type=\"TBGJoinDataEngine\" JoinType=\"jtJoin\" DisplayNamePrefix=\"Соединение\">",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "python_edits": [
+          {
+            "from": "        kappa=None if chance==1 else (observed-chance)/(1-chance)",
+            "to": "        kappa=None if chance==1 else (observed-chance)/(1-chance)\n        if not (set(a)&set(b)): continue",
+            "count": 1
+          }
+        ]
+      },
+      "result_csv": "drop-disjoint-site.csv"
+    },
+    {
+      "id": "descending-sites",
+      "kind": "sort",
+      "expected_failed": [
+        "final-export",
+        "result-rows"
+      ],
+      "expected_oracle_pass": false,
+      "edits": [
+        {
+          "file": "Unit_0/Unit.xml",
+          "from": "<Item Name=\"site_id\"/>",
+          "to": "<Item Name=\"site_id\" SortDirection=\"sdDesc\"/>",
+          "count": 1
+        }
+      ],
+      "reproduce": {
+        "sort": {
+          "column": "site_id",
+          "descending": true
+        }
+      },
+      "result_csv": "descending-sites.csv"
+    }
+  ]
+}

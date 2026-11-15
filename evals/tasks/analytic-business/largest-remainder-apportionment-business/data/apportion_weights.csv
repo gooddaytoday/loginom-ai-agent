@@ -1,0 +1,14 @@
+pool_id,recipient_id,weight
+P02,C,1
+P01,D,0
+P03,C,0
+P04,C,4
+P01,C,2
+P02,B,1
+P03,B,2
+P01,B,3
+P04,B,2
+P02,A,1
+P01,A,5
+P03,A,1
+P04,A,1

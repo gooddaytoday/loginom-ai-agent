@@ -320,6 +320,33 @@ test("calibration checker uses task oracle tolerance", async () => {
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("calibration checker permits join-key mutations but rejects rewired workflow edges", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-links-"))
+  try {
+    const task = path.join(root, "tasks/sales-by-category")
+    const corpus = path.join(root, "corpus/sales-by-category")
+    await cp(path.join(evalsRoot, "fixtures/calibration/sales-by-category"), task, { recursive: true })
+    await mkdir(corpus, { recursive: true })
+    const xml = '<Unit><WorkFlow><Nodes><Item Guid="source"/><Item Guid="join"><Component><Engine><Links><Item><Left Name="site_id"/><Right Name="site_id"/></Item></Links></Engine></Component></Item></Nodes><Links><Item SourceNode="source" TargetNode="join"/></Links></WorkFlow></Unit>'
+    const zip = Bun.spawn(["python3", "-c", 'import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("Unit_0/Unit.xml",sys.argv[2]); z.close()', path.join(task, "reference.lgp"), xml])
+    expect(await zip.exited).toBe(0)
+    await Bun.write(path.join(corpus, "unchanged.csv"), await Bun.file(path.join(task, "oracle.csv")).text())
+    const run = async (from: string, to: string) => {
+      await Bun.write(path.join(corpus, "cases.json"), JSON.stringify({ sources: {}, cases: [{
+        id: "links", kind: "aggregate", edits: [{ file: "Unit_0/Unit.xml", from, to, count: 1 }],
+        result_csv: "unchanged.csv", expected_oracle_pass: true, reproduce: {},
+      }] }))
+      const proc = Bun.spawn(["python3", path.join(evalsRoot, "script/check-calibration-corpus.py"), "--tasks", path.dirname(task), "--corpus", path.dirname(corpus)], { stdout: "pipe", stderr: "pipe" })
+      const errors = await new Response(proc.stderr).text()
+      return { code: await proc.exited, errors }
+    }
+    expect(await run('<Left Name="site_id"/>', '<Left Name="category"/>')).toEqual({ code: 0, errors: "" })
+    const rewired = await run('SourceNode="source"', 'SourceNode="join"')
+    expect(rewired.code).not.toBe(0)
+    expect(rewired.errors).toContain("link topology")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("calibration checker reproduces semicolon mutations", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-checker-semicolon-"))
   try {

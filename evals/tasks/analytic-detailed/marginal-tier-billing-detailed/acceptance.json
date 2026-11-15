@@ -1,0 +1,23 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGCalcData",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "tier_accounts.csv",
+      "tier_readings.csv",
+      "tier_rates.csv"
+    ]
+  },
+  "forbidden_literals": [
+    "TBGJavaScript"
+  ]
+}

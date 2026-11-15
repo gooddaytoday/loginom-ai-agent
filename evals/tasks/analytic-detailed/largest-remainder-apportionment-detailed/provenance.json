@@ -1,0 +1,65 @@
+{
+  "task_id": "largest-remainder-apportionment-detailed",
+  "dataset_sha256": {
+    "apportion_pools.csv": "1ca1b09205605d79831df23d6da01b102fa8cf4a421644a42cc83f13c0eba277",
+    "apportion_weights.csv": "2e88c6cb74801d859c6b580091b60fa561129b910e01900873f9c8da146e5d5a"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "0b7a87371697b2435b86d578a3f6325c0deee947acadadaac7bb64dccad2441c"
+  },
+  "reference_sha256": "7c6b4e3173608d51a24517b96dd48789addaee4e0a25b115fbca043cb88b5825",
+  "cli": {
+    "binary": "PRIVATE_QUALIFIED_CLI",
+    "version": "0.3.9-eval.20261113.29ea34.palette",
+    "profile": "PRIVATE_AUTHORING_PROFILE"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "PRIVATE_AUTHORING_URL",
+    "build": "7.4.2-test",
+    "container": "PRIVATE_AUTHORING_CONTAINER",
+    "package": "PRIVATE_AUTHORING_STORAGE/reference.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "apportion_pools.csv",
+        "matches": true
+      },
+      {
+        "input": "apportion_weights.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e21ba0c9cffeXS9PgdYr146lXK",
+    "skill_revision": "926a45ac279dc6aebdf34ccb4e7b8245601488b9b3384a3247b87b521d6513b2",
+    "exit_code": 0,
+    "started_at": "2026-11-15T08:14:46+00:00",
+    "duration_s": 1106,
+    "tokens": {
+      "input": 115976,
+      "output": 9603,
+      "reasoning": 1104
+    },
+    "tool_calls": 55,
+    "tool_errors": 3,
+    "memory_tool_calls": 0,
+    "errors": "PRIVATE_DIAGNOSTICS"
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "PRIVATE_SCENARIO_URL"
+}
