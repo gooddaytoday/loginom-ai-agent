@@ -1,6 +1,6 @@
 # Dashboard M5 — release-стенд
 
-Task 0 принят: **Spec Approved / Quality Approved**, обязательных замечаний нет. Task 1 принят: **Spec Approved / Quality Approved**, обязательных замечаний нет. Task 2 принят: **Spec Approved / Quality Approved**, обязательных замечаний нет. Следующий этап — Task 3; M5 не завершён. Из предоставленного release подготовлен комплект штатными Dockerfile и installer с одной проверенной поправкой сохранения конфигурации. В собственной VM подтверждены HTTP/HTTPS, WSS, Login/Logout, Integrator и установленная Linux-пара Desktop/CLI; повторный setup сохранил собственные данные. Tasks 3–5 не выполнялись. Основа — только в [checkpoint M5](dashboard-m5-checkpoint.md); контракт — в [плане](../../superpowers/plans/2026-11-15-dashboard-m5.md) и [дизайне](../../superpowers/specs/2026-11-15-dashboard-m5-design.md).
+Task 0 принят: **Spec Approved / Quality Approved**, обязательных замечаний нет. Task 1 принят: **Spec Approved / Quality Approved**, обязательных замечаний нет. Task 2 принят: **Spec Approved / Quality Approved**, обязательных замечаний нет. Task 3 реализован и проверен; независимое ревью ожидается. Следующий этап после его принятия — Task 4; M5 не завершён. Из предоставленного release подготовлен комплект штатными Dockerfile и installer с одной проверенной поправкой сохранения конфигурации. В собственной VM подтверждены HTTP/HTTPS, WSS, Login/Logout, Integrator и установленная Linux-пара Desktop/CLI; повторный setup сохранил собственные данные. Tasks 4–5 не выполнялись. Основа — только в [checkpoint M5](dashboard-m5-checkpoint.md); контракт — в [плане](../../superpowers/plans/2026-11-15-dashboard-m5.md) и [дизайне](../../superpowers/specs/2026-11-15-dashboard-m5-design.md).
 
 ## Входы и происхождение
 
@@ -114,3 +114,45 @@ NODE_USE_ENV_PROXY=1 DASHBOARD_STUDIO_CONFIG="$M5_STUDIO_CONFIG" \
 Fix round 1 добавил два assertions в существующую проверку всех трёх ролей: `Privileged=true` и непустой `CapAdd` отвергаются, стандартные Docker `CapAdd=null` и `[]` разрешены. Настоящий helper с синтетическим JSON через stdin прошёл отдельные RED→GREEN для обоих отказов; адресный набор **5/5 PASS** включает три прежних CLI-теста и два новых isolation-теста. Эти два новых теста не входили в исторические 53 выше; полный suite после узкого fix не повторялся. Точный обновлённый helper установлен в собственные manual-каталоги и включён в `SHA256SUMS`; один текущий серверный check дал exit 0, новую публикацию/ready/HTML/assets и подтверждённую cleanup. Хеши прежних .lgp/CSV/обоих JSON и работающей страницы до/после совпали; текущие роли прежнего образа имеют `Privileged=false`, `CapAdd=null`, `paused=false`. Эти receipts отдельно сохранены в `$M5_SCRATCH/task2/fix-1/`. Клиентская/TLS/model матрица fix round не повторялась.
 
 Private evidence — `$M5_SCRATCH/task2/`: server/client/failure logs, полные status/headers, доказательства source/manual/image bytes, сохранности, native Close/Logout и actual exit; эксплуатационные команды в `OPERATIONS.md`. Ограничения прежние: Docker normal на современной проверенной версии; Task 3 lifecycle/archive, Task 4 Podman/SELinux/minimums и Task 5 update matrix не реализованы. Browser/build gates Task 1 для неизменённых server/shell/template не повторялись; actual installed client прогнан текущим скриптом. Первый прерванный package test остаётся наблюдением с неизвестной причиной. Task 2 принят, следующий этап — Task 3; merge/release не выполнялись.
+
+
+## Task 3 — lifecycle и переносимый архив
+
+Реализация и установленная проверка PASS; независимое ревью ещё ожидается. `containers.sh` поддерживает `install|check|stop|start|uninstall`, повторяемый `--public-host`, `--app-host-port`, `--strict`, `--app-host-domain/cert/key`, `--cli-button`; `--remove-image` разрешён только для uninstall. В этом этапе реализован Docker. Rootless Podman, минимальные версии, SELinux и его crontab — Task 4.
+
+Собственное состояние Docker — `/var/opt/loginom-dashboard`. Принадлежность проверяется по точным именам, меткам Compose/owner и mount собственного state; занятые имена/проект/каталог отвергаются. UserStorage обнаруживается физически; неоднозначные mounts и несколько общих сетей отвергаются. Сохранённые настройки — ограниченные строковые данные `.env`, они не исполняются через `source`. Повторный install сохраняет настройки; stop удаляет только собственные контейнеры и освобождает внешний endpoint, start воссоздаёт их. Uninstall удаляет собственные state/Apache-конфиг/контейнеры, сохраняет UserStorage и по умолчанию образ. Образ удаляется только с `--remove-image`. Docker использует существующий `restart: unless-stopped`; crontab этого этапа не создаёт.
+
+Сборка из `packages/dashboard`, с закреплёнными Bun из workspace и Node из Product в PATH:
+
+```sh
+NODE_USE_ENV_PROXY=1 bun run build:release --out "$RELEASE_OUT"
+```
+
+Скрипт сам собирает dist и один образ трёх ролей. Он использует существующий Dockerfile/base pin и template lock, копирует npm рядом с закреплённым Node, готовит cache с пустыми npmrc и `--ignore-scripts`, затем выполняет image build с `--network none` и offline npm ci. Локального fallback по image ID и ROI fixture нет. Тег зависит от содержимого runtime/набора сборки; `image.ref` содержит только имя/тег, не shell config. Архив включает `containers.sh`, `compose-release.yaml`, `check-release.mjs`, `image.tar`, `image.ref`, `SHA256SUMS`. На сервере Node/Bun/npm/checkout не нужны.
+
+На целевом сервере после распаковки архива:
+
+```sh
+cd <release-dir>/loginom-dashboard
+sha256sum -c SHA256SUMS
+sudo docker load -i image.tar
+sudo ./containers.sh install --engine docker --public-host studio.example --app-host-port 8101
+sudo ./containers.sh check --engine docker
+sudo ./containers.sh stop
+sudo ./containers.sh start
+# После start снова проверить сервер и отдельный клиент.
+sudo ./containers.sh uninstall
+# Явный выбор удаления образа: uninstall --remove-image.
+```
+
+Для strict передайте отдельный от всех Studio hosts домен и абсолютные пути сертификата/ключа **внутри Apache**: `--strict --app-host-domain apps.example --app-host-cert /usr/local/apache2/conf/dashboard-tls/app.crt --app-host-key /usr/local/apache2/conf/dashboard-tls/app.key`. Сертификат/ключ устанавливает администратор, доверие CA — штатно в ОС/браузере. Они не добавляются в mounts web. Любая проверка сервера выполняет новую уникальную публикацию и ожидает publisher cleanup; клиентский результат остаётся отдельным, команда — в разделе Task 2.
+
+Проверен архив `loginom-dashboard-6492f888ee4c5f31.tar.gz`, SHA256 `949aa8dae2e58808a440d9b365c5a65cd76de96758ad8c0140c270084b1f74e9`, загруженный image ID `sha256:558fcc0ab7a72118eab82f6c39984744b77a53a2bc34cd4e6105bee092452d03`. Это текущий проверенный артефакт Task 3, не новый реестр пинов. Server/shell установленного образа побайтно равны текущему dist. Новая отдельная VM использует тот же принятый provided-release из раздела входов, без Node/Bun/npm/checkout/shared folders. До dashboard load/install/check/client исходящий Интернет закрыт в host OUTPUT и Docker FORWARD, включая proxy хоста; сохранены только established ответы клиенту, локальная Docker-сеть и конкретный ранее разрешённый адрес лицензирования. Реально отказали direct host curl, host proxy и TCP из web-role в Интернет.
+
+HTTP-only: sums → load → install с двумя public hosts/CLI button → обязательная пробная публикация/HTML/assets/cleanup — PASS. Отдельный неизменённый `check-studio.mjs 7.4.2` — PASS: установленный shell/SRI, API/execute/live4, iframe ready4, native Close/Logout, Chromium close; процессов Chromium с собственными профилями после завершения нет. Повреждённый compose отказал по checksum до изменения Loginom. HTTP+HTTPS strict: отдельный домен и новый сертификат/ключ, origin/mode/CLI-button, OS TLS trust и равенство peer certificate, API404 на app-origin, точные mounts без ключей — PASS; server check со своей публикацией/cleanup — PASS. Это конфигурационная проверка, не полная security-приёмка M6.
+
+На исходной VM проверены stop×2/start, повторные install, occupied foreign name, ambiguous mount, неверный внешний host и настоящий `httpd -t` failure. Откат сохранил bytes/hash и нестандартные права0640, затем прежние права восстановлены. Uninstall сохранил образ и все файлы UserStorage; тот же пакет открылся без shell, native Close/Logout — PASS. Повторная установка восстановила прежние публикации. На новой VM отдельный uninstall --remove-image удалил выбранный образ, без широкой очистки. Все файлы UserStorage исходной VM и новой VM до/после HTTP→strict сохранены побайтно.
+
+Источник: `bun typecheck`, focused deploy8/8, Bash syntax, ShellCheck0.9.0, полный package run33 web/27 workers/58 final — PASS. Runtime/browser/template не менялись; прежние browser/size результаты применимы к тем же dist bytes. Исторический Task2 TLS hang остаётся неизвестным. В Task3 первые клиентские FAIL сохранены: admin-only account, fixture с абсолютным CSV path в другом каталоге, затем LOGIN_REJECTED и cleanup incomplete. После восстановления исходного пути read-only diagnostic и один точный штатный повтор прошли; остаточная причина последних двух отказов не установлена и не объявлена исправленной. Нового retry/fallback или speculative patch нет.
+
+Private evidence map относительно `$M5_SCRATCH/task3`: `build-release-accepted.log`, `accepted-archive.sha256`, `offline-vm/accepted-load-install-check.log/.exit`, `offline-vm/client-final.log/.exit`, `offline-vm/strict-install-check.log/.exit`, `offline-vm/firewall-verified.txt`, `offline-vm/web-internet-proof.log`, `offline-vm/final-state.txt`, `apache-nondefault-mode.log`, `uninstall-green.log`, `no-dashboard-client.log`, `preservation-final.txt`. Реальные локальные пути, credentials, ключи, диски и сырая диагностика остаются вне Git. Команды возобновления — private OPERATIONS. Push/PR/merge/release, Task4–5 и внешние стенды не выполнялись.

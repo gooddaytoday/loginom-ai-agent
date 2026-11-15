@@ -9,6 +9,7 @@ import test from "node:test"
 const script = fileURLToPath(new URL("../../deploy/containers.sh", import.meta.url))
 
 for (const [name, args, error] of [
+  ["remove-image on install", ["--remove-image"], /Usage:/],
   ["invalid host", ["--public-host", "https://invalid.example"], /Usage:/],
   ["invalid port", ["--public-host", "studio.example", "--app-host-port", "65536"], /Invalid app host port/],
   ["incomplete strict configuration", ["--public-host", "studio.example", "--strict"], /Usage:/],
@@ -64,4 +65,24 @@ test("role helper rejects privileged publisher despite cap_drop ALL", () => {
 test("role helper rejects added publisher capabilities despite cap_drop ALL", () => {
   assert.equal(inspectPublisher({ CapAdd: [] }).status, 0)
   assert.equal(inspectPublisher({ CapAdd: ["SYS_ADMIN"] }).status, 1)
+})
+
+test("ownership accepts only the exact reserved compose container and state mount", () => {
+  const inspect = [{ Name: "/loginom-dashboard-web", Config: { Labels: {
+    "loginom.dashboard.owner": "release", "com.docker.compose.project": "loginom-dashboard",
+    "com.docker.compose.service": "web", "com.docker.compose.project.working_dir": "/synthetic/state",
+  } }, Mounts: [{ Source: "/synthetic/state/builds", Destination: "/builds" }] }]
+  const run = () => spawnSync(process.execPath, [fileURLToPath(new URL("../../deploy/check-release.mjs", import.meta.url)), "owned", "/synthetic/state", "web"], { input: JSON.stringify(inspect), encoding: "utf8" })
+  assert.equal(run().status, 0)
+  inspect[0].Config.Labels["com.docker.compose.project"] = "foreign"
+  assert.equal(run().status, 1)
+  inspect[0].Config.Labels["com.docker.compose.project"] = "loginom-dashboard"
+  inspect[0].Mounts[0].Source = "/synthetic/foreign/builds"
+  assert.equal(run().status, 1)
+})
+
+test("release builder rejects unknown arguments before preparation", () => {
+  const result = spawnSync("bun", [fileURLToPath(new URL("../../script/build-release.ts", import.meta.url)), "--unknown"], { encoding: "utf8" })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /Usage:.*--out/)
 })

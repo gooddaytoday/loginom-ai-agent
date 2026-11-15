@@ -22,7 +22,7 @@ if (action === "config") {
 } else if (action === "ready") {
   const result = JSON.parse(input())
   assert.equal(result.appOrigin, args[2])
-  assert.equal(result.mode, "normal")
+  assert.equal(result.mode, args[3] || "normal")
   if (result.publication?.status === "failed") {
     console.error("Probe build failed")
     process.exit(2)
@@ -78,6 +78,17 @@ if (action === "config") {
   // Installer v7.4.2: src/ssl/default-cert.crt. Identity warning only; curl still verifies TLS.
   if (cert.fingerprint256.replaceAll(":", "").toLowerCase() === "e87a7dc099cb92d08014858d509af4e497c64d5a7d032330a0a5a95fe06912d5")
     console.log("WARNING: Loginom distribution certificate; replace it because its private key is publicly known")
+} else if (action === "owned") {
+  const containers = JSON.parse(input())
+  assert.equal(containers.length, 1)
+  const container = containers[0]
+  assert.equal(container.Name, "/loginom-dashboard-" + args[1])
+  for (const [name, value] of Object.entries({
+    "loginom.dashboard.owner": "release", "com.docker.compose.project": "loginom-dashboard",
+    "com.docker.compose.service": args[1], "com.docker.compose.project.working_dir": args[0],
+  })) assert.equal(container.Config.Labels[name], value, "Foreign dashboard container")
+  const directory = args[1] === "builder" ? "jobs-in" : "builds"
+  assert(container.Mounts.some(mount => mount.Source === args[0] + "/" + directory && mount.Destination === "/" + directory))
 } else if (action === "roles") {
   const roles = JSON.parse(input())
   assert.equal(roles.length, 3)
