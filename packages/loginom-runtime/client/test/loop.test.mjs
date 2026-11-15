@@ -92,3 +92,11 @@ test('Loop reread rejects the old active execution and accepts only the new comp
   assert.equal(out.status==='SUCCEEDED',outputExecution==='fresh');assert.equal(launches,1);
  }
 });
+
+test('unfinished Loop can be configured on the same target without claiming live ports',()=>{
+ const f=sourceFixture();f.loop.FPorts=[];f.task.allow_unconfigured=true;
+ assert.equal(f.run().actual_ports.length,0);
+ delete f.task.allow_unconfigured;assert.throws(f.run,/without variables/);
+ const partial=sourceFixture();partial.loop.FPorts[0].FCollection.pop();partial.task.allow_unconfigured=true;
+ assert.throws(partial.run,/without variables/);
+});

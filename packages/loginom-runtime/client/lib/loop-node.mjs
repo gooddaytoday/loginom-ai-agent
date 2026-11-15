@@ -1,3 +1,6 @@
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
+import {openPreparedWizard} from './node-wizard-open.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {loopParametersSchema,validateLoopParameters} from './loop-parameters.mjs';
 import {makeLoopSourceCode} from './loop-procedure.mjs';
@@ -11,7 +14,16 @@ export function createLoopNodeSupport(config){
   configurationObservation:{condition:'owned Loop selection',ready:s=>s.wizard?.stage==='loop_node'},
   configureInputs:async()=>verified({not_applicable:true,mappings:[]}),
   configure:(channel,p)=>channel.configureLoop(p),
-  configureAllOutputs:async(channel,_c,p)=>channel.inspectLoop(p),
+  configureAllOutputs:async(channel,_c,p)=>{
+   const graph=await channel.inspectLoop(p);
+   const s=await channel.observe({condition:'saved Loop before derived component readback',ready:s=>s.prepared_node_context?.surface==='graph'});
+   await selectPreparedGraphNode(channel,s,'select saved Loop');await openPreparedWizard(channel);
+   await channel.observe({condition:'saved Loop selection readback',ready:s=>s.wizard?.stage==='loop_node'});
+   const vendor=await channel.inspectLoopVendor();await closePreparedWizard(channel);
+   const after=await channel.inspectLoop(p);
+   if(JSON.stringify(graph.actual_ports)!==JSON.stringify(after.actual_ports))throw Error('Loop ports changed during saved readback');
+   return {...after,derived_component:vendor.derived_component};
+  },
   readOutputs:async(channel,read,ctx)=>{
    const ports=[];
    for(const port of read.ports){const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
@@ -27,7 +39,7 @@ export function createLoopNodeSupport(config){
    ||JSON.stringify(source[0].outputs)!=='[0]'||source[0].variable_inputs?.length||source[0].variable_outputs?.length
    ||source[0].input_kinds?.some(k=>k!=='data')||source[0].output_kinds?.some(k=>k!=='data'))throw Error('Loop: same-workflow one-table Supernode required before mutation');
   const evidence=await options.execute(makeLoopSourceCode({document_id:r.document_id,workflow_ref:r.workflow_ref,body:r.parameters.body,
-   ...(r.target.kind==='existing'?{loop:r.target.ref}:{}),origin:config.targetOrigin,build:config.targetBuild}),{timeout:Math.max(1000,ctx.deadline-Date.now())});
+   ...(r.target.kind==='existing'?{loop:r.target.ref,allow_unconfigured:true}:{}),origin:config.targetOrigin,build:config.targetBuild}),{timeout:Math.max(1000,ctx.deadline-Date.now())});
   options.operation.loopSource=evidence;
   return verified({source_kind:'same_workflow_supernode',...evidence});
  }})};

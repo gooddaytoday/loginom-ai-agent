@@ -42,7 +42,7 @@ export function readLoopSourceBrowser(t){
  if(t.loop){
   const loop=one(d.FNodes.FCollection.filter(n=>n.FGuid===t.loop.node_id));
   need(loop.FIconCls==='bg-vendor-icon-loop','target is not Loop');
-  const actual=ports(loop);need(actual.every((p,i)=>p.guid===result.ports[i].guid),'live inherited ports differ from body');
+  const actual=t.allow_unconfigured&&loop.FPorts.flatMap(g=>g.FCollection).length===0?[]:ports(loop);need(actual.every((p,i)=>p.guid===result.ports[i].guid),'live inherited ports differ from body');
   result.actual_ports=actual;
  }
  return result;
@@ -53,31 +53,37 @@ export function makeLoopConfigureCode(binding,options){
  return `async page=>(${configureLoopBrowser.toString()})(page,${JSON.stringify({...options,binding})},${readPreparedNodeContext.toString()},${selectLoopBodyRecord.toString()},${loopSettingsSupported.toString()})`;
 }
 export async function configureLoopBrowser(page,t,readNode=readPreparedNodeContext,selectRecord=selectLoopBodyRecord,supported=loopSettingsSupported){
- let effect=false,owner;
+ let effect=false,owner,waitingFor='wizard_ready',lastSettings;
  const need=(v,m)=>{if(!v)throw Error('Loop: '+m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  const b=t.binding,root=b.workflow_ref.prefix+';WizrdMCF',first=root+';LoopNodeWizard',params=root+';LoopParamsWizard';
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']:visible');
- const remaining=()=>{const n=t.deadline-Date.now();need(n>0,'original deadline expired');return n;};
+ const remaining=()=>{const n=t.deadline-Date.now();if(n<=0){const e=Error('LOOP_CONFIGURATION_DEADLINE: waiting for '+waitingFor+'; partial wizard retained; inspect/release original operation, then configure SAME target with body again');e.code='LOOP_CONFIGURATION_DEADLINE';throw e;}return n;};
  const guard=async()=>{
   for(;;){
    remaining();const n=await readNode(page,b);need(n.verified&&n.surface==='wizard'&&!n.input_port&&!n.output_port,'owned node wizard required');
    need(!owner||same(n,owner),'wizard owner changed');owner??=n;
    const s=await page.evaluate(({origin,build,root})=>{
     const visible=e=>e.checkVisibility({checkVisibilityCSS:true});
+    const grids=document.querySelectorAll('[data-tid='+JSON.stringify(root+';LoopParamsWizard;grdDataSet')+']');
+    const grid=grids.length===1&&grids[0],native=grid&&globalThis.Ext?.getCmp(grid.id);
+    const group=document.querySelector('[data-tid='+JSON.stringify(root+';LoopParamsWizard;pedLoopKind;ValueControl;radiofield-2')+']');
+    const disabledKeyMask=e=>e.classList.contains('x-mask')&&grid&&grid.contains(e)
+     &&native?.el?.dom===grid&&native.$className==='Ext.grid.Panel'&&native.disabled===true
+     &&group?.classList.contains('x-form-cb-checked')&&!Array.from(e.querySelectorAll('.x-mask-msg')).some(visible);
     return {compatible:location.origin===origin&&bg.app.Version===build
      &&document.querySelectorAll('[data-tid='+JSON.stringify(root)+']').length===1,
      dialog:[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].some(visible),
-     masked:[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].some(visible)};
+     masked:[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].some(e=>visible(e)&&!disabledKeyMask(e))};
    },{origin:t.origin,build:t.build,root});
    need(s.compatible,'origin/build or root changed');need(!s.dialog,'dialog changed');
-   if(!s.masked)return;
+   if(!s.masked)return;waitingFor='wizard_blocker';
    // Body selection builds the derived component asynchronously. While masked,
    // only reread the pinned owner; no gesture is authorized until it is quiet.
    await page.waitForTimeout(Math.min(100,remaining()));
   }
  };
  const bodyRow=async()=>{
-  await guard();const rows=await page.evaluate(({b,t,first})=>{
+  waitingFor='body_selection';await guard();const rows=await page.evaluate(({b,t,first})=>{
    const need=(v,m)=>{if(!v)throw Error('Loop: '+m);};
    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
    let w=c.Node.data.node;while(w&&!(w instanceof bg.app.WorkFlowTreeNode))w=w.ParentNode;
@@ -97,7 +103,7 @@ export async function configureLoopBrowser(page,t,readNode=readPreparedNodeConte
   },{b,t,first});return selectRecord(rows,true);
  };
  const click=async(tid,identity)=>{
-  await guard();const e=at(tid);need(await e.count()===1,'unique rendered control required: '+tid);
+  waitingFor='control '+tid;await guard();const e=at(tid);need(await e.count()===1,'unique rendered control required: '+tid);
   await e.click({trial:true,timeout:remaining()});const before=identity&&await identity();await guard();
   if(identity)need(same(before,await identity()),'control identity changed before gesture');
   effect=true;await e.click({timeout:remaining()});
@@ -105,7 +111,7 @@ export async function configureLoopBrowser(page,t,readNode=readPreparedNodeConte
  const settle=async(read,ready)=>{
   let previous;
   while(remaining()){
-   await guard();const s=await read();if(ready(s)&&previous&&same(previous,s))return s;
+   await guard();const s=await read();lastSettings=s;if(ready(s)&&previous&&same(previous,s))return s;
    previous=ready(s)?s:null;await page.waitForTimeout(Math.min(200,remaining()));
   }
  };
@@ -131,7 +137,7 @@ export async function configureLoopBrowser(page,t,readNode=readPreparedNodeConte
   const group=params+';pedLoopKind;ValueControl;radiofield-2';
   if(!await at(group).evaluate(e=>e.classList.contains('x-form-cb-checked')))await click(group+';DisplayEl');
   await at(params+';pedGroupSize;ValueControl').waitFor({state:'visible',timeout:remaining()});
-  const observed=await settle(settings,supported);
+  waitingFor='group_rows_settings';const observed=await settle(settings,supported);
   const native=await page.evaluate(({root,params})=>{
    const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
    const first=c.FWizardItems.FItems.find(i=>i.FWizard.constructor.name==='LoopNodeWizard')?.FWizard;
@@ -139,17 +145,28 @@ export async function configureLoopBrowser(page,t,readNode=readPreparedNodeConte
    const sockets=p?.FSocketStore?.getRange();
    if(p?.FInputVariablesStore.getCount()!==0||p.FOutputVariablesStore.getCount()!==0||sockets?.length!==1
     ||JSON.stringify(p.FItems.cbxSourceSocket.value)!==JSON.stringify(sockets[0].data.Value))throw Error('Loop: one table source and no variables required');
-   const id=first?.FReferencedVendor?.__ObjectId;if(typeof id?.Module!=='string'||!Number.isSafeInteger(id.Instance))throw Error('Loop: derived vendor identity unavailable');
-   return {derived_component:{module:id.Module,instance:id.Instance},input_label:sockets[0].data.DisplayText,reference_label:p.FItems.txtReferenceNode.inputEl.dom.value};
+   return {input_label:sockets[0].data.DisplayText,reference_label:p.FItems.txtReferenceNode.inputEl.dom.value};
   },{root,params});
   need(native.reference_label===selected.label&&native.input_label===t.source.ports[0].label,'selected body/port readback differs');
   await click(root+';btnNext');await at(root+';DoneWizard').waitFor({state:'visible',timeout:remaining()});await guard();
   return {status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:effect,node_context:owner,validation:{status:'accepted_by_loginom_next',node_context:owner},
-   configuration:{verified:true,node_context:owner,mode:'group_rows',body:{ref:t.parameters.body,label:selected.label},derived_component:native.derived_component,input_port:t.source.ports[0],settings:observed}};
- }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,cleanup_complete:!effect,effect_possible:effect,node_context:owner??null,error:String(error.message).slice(0,1500)};}
+   configuration:{verified:true,node_context:owner,mode:'group_rows',body:{ref:t.parameters.body,label:selected.label},input_port:t.source.ports[0],settings:observed}};
+ }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,cleanup_complete:!effect,effect_possible:effect,node_context:owner??null,error:String(error.message).slice(0,1500),error_code:error.code??'LOOP_CONFIGURATION_UNCONFIRMED',waiting_for:waitingFor,last_settings:lastSettings??null};}
 }
 export function makeLoopInspectCode(binding,t){
  validatePreparedNodeContext(binding);
  const task={...t,document_id:binding.document_id,workflow_ref:binding.workflow_ref,body:t.parameters.body,loop:binding.node};
  return `async page=>{const n=await (${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)});if(!n.verified||n.surface!=='graph')throw Error('Loop graph owner changed');const s=await page.evaluate(${readLoopSourceBrowser.toString()},${JSON.stringify(task)});return {status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,node_context:n,...s}}`;
+}
+
+export function makeLoopVendorCode(binding,t){
+ validatePreparedNodeContext(binding);
+ return `async page=>{const n=await (${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)});if(!n.verified||n.surface!=='wizard')throw Error('Loop vendor owner changed');
+ const v=await page.evaluate(t=>{if(location.origin!==t.origin||bg.app.Version!==t.build)throw Error('Loop origin/build changed');
+ const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+ const ws=c.FWizardItems.FItems.filter(i=>i.FWizard.constructor.name==='LoopNodeWizard');
+ if(ws.length!==1)throw Error('Loop selection page required');const id=ws[0].FWizard.FReferencedVendor?.__ObjectId;
+ if(typeof id?.Module!=='string'||!Number.isSafeInteger(id.Instance))throw Error('Loop: saved derived vendor identity unavailable');
+ return {module:id.Module,instance:id.Instance};},${JSON.stringify(t)});
+ return {status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,node_context:n,derived_component:v}}`;
 }
