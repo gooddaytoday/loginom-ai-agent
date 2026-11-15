@@ -490,3 +490,15 @@ test('D19 lost disconnect reply remains uncertain and is never repeated',async()
  assert.equal((await f.run(r)).status,'AMBIGUOUS');assert.equal((await f.run(r)).status,'AMBIGUOUS');
  assert.deepEqual(f.calls,['remove_link']);assert.ok(f.operation.targetPhase.pending);
 });
+
+for(const fault of ['none','y','ordinary','identity','port'])test('connect verifies native output boundary horizontal relayout: '+fault,()=>{
+ const before={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,nodes:[structuredClone(source),{ref:ref('boundary'),type:'control.supernode_output',boundary_role:'output',position:{x:906,y:272},inputs:[0],outputs:[]}],links:[],foreign_links:[]};
+ if(fault==='ordinary'){before.nodes[1].type='transform.calculator';delete before.nodes[1].boundary_role;}
+ const after=structuredClone(before),edge={source:'source',output:0,target:'boundary',input:0};
+ after.nodes[1].position.x=967;after.links.push(edge);
+ if(fault==='y')after.nodes[1].position.y++;
+ if(fault==='identity')after.nodes[1].ref.node_id='foreign';
+ if(fault==='port')after.nodes[1].inputs.push(1);
+ const result=verifyNodeTargetEffect({kind:'connect',before,parameters:{edge}},after);
+ if(fault==='none')assert.ok(result);else assert.equal(result,null);
+});

@@ -7,7 +7,9 @@ import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-par
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const digest = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
-const domainNode=({dom_epoch,...value})=>value;
+// The native output boundary follows the diagram's right extent on repaint.
+// Its horizontal layout is not a graph edit; GUID, role, ports and y remain bound.
+const domainNode=({dom_epoch,...value})=>value.type==='control.supernode_output'&&value.boundary_role==='output'&&Number.isFinite(value.position?.x)?{...value,position:{...value.position,x:0}}:value;
 const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
 export function normalizeGraphRefusal(effect,receipt){
  if(effect.kind==='connect'&&receipt?.status==='FAILED'&&receipt.action_key==='link.create'
