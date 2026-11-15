@@ -7,5 +7,5 @@
 - Команды, подготовка и границы проверок — [runbook M4](dashboard-m4.md).
 - Оригинальные контейнеры, ROI, backup и рабочее приложение пользователя сохраняются; новый установленный прогон обязателен отдельно.
 - Task 1: финальный built-host roundtrip/ACL/collision/upload+login cancel PASS на обеих версиях; `.lgp` сохранён, ACK+exit подтверждены.
-- Task 1 передан на независимое review: DONE_WITH_CONCERNS; исходный Knowledge ACK → SIGKILL не воспроизведён двумя focused probes, причина неизвестна. Source tests/typecheck PASS; детали — runbook.
+- Task 1 review: Changes requested; код UNKNOWN на двух publication-границах исправлен, focused 38/typecheck PASS. Knowledge ACK → SIGKILL остаётся обязательным открытым замечанием; детали — runbook.
 - Task 2/publisher не начаты.

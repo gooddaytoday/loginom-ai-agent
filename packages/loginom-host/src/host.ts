@@ -278,7 +278,7 @@ export async function createLoginomHost(options: {
     async publishDashboard(input: DashboardPublish, signal?: AbortSignal): Promise<PublicationWrite> {
       if (!Schema.is(DashboardPublish)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
       const result = await dashboardOperation("dashboardPublish", input, signal)
-      if (!Schema.is(PublicationWrite)(result)) throw new Error("LOGINOM_REPLY_INVALID")
+      if (!Schema.is(PublicationWrite)(result)) throw new Error("DASHBOARD_WRITE_UNKNOWN")
       return result
     },
     async close() {

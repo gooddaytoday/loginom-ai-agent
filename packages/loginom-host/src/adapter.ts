@@ -56,6 +56,11 @@ export async function acquire(session: string) {
       if (signal?.aborted) throw new Error("DASHBOARD_CANCELLED")
       signal?.addEventListener("abort", abort, { once: true })
       try { return await connection!.request(method, { ...input, run }, undefined, observe) }
+      catch (error) {
+        if (method === "dashboardPublish" && error instanceof Error &&
+          ["LOGINOM_HOST_CLOSED", "LOGINOM_HOST_TIMEOUT"].includes(error.message)) throw new Error("DASHBOARD_WRITE_UNKNOWN")
+        throw error
+      }
       finally { signal?.removeEventListener("abort", abort) }
     })
   }
@@ -64,7 +69,9 @@ export async function acquire(session: string) {
       return Schema.decodeUnknownSync(Schema.NullOr(PublicationSource))(await dashboard("dashboardRead", input, signal))
     },
     async dashboardPublish(input: DashboardOperation & { content: string; expected: PublicationRef | null }, signal?: AbortSignal): Promise<PublicationWrite> {
-      return Schema.decodeUnknownSync(PublicationWrite)(await dashboard("dashboardPublish", input, signal))
+      const result = await dashboard("dashboardPublish", input, signal)
+      if (!Schema.is(PublicationWrite)(result)) throw new Error("DASHBOARD_WRITE_UNKNOWN")
+      return result
     },
     get generation() {
       return queue.generation

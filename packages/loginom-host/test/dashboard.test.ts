@@ -33,6 +33,7 @@ async function fixture(hold: boolean | "start" = false, closeFailure = false) {
       appendFileSync(${JSON.stringify(join(directory, 'runtime.jsonl'))}, JSON.stringify({operation:m.operation,pid:process.pid})+'\\n');
       if(m.operation==='start' && ${JSON.stringify(hold)}!=='start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,...(m.input.validation?{checked:true}:{ready:true})}});
       if(m.operation==='dashboardRead') { if(${JSON.stringify(hold)}) reading=m.id; else process.send({id:m.id,result:null}); }
+      if(m.operation==='dashboardPublish' && m.input.content==='\"malformed-reply\"') {process.send({id:m.id,result:{status:'written'}});return;}
       if(m.operation==='dashboardPublish' && m.input.content==='\"lose-reply\"') {process.send({id:m.id,error:'LOGINOM_RUNTIME_FAILED'});return;}
       if(m.operation==='dashboardPublish') process.send({id:m.id,result:{status:'written',version:{name:'20261115T000000Z.json',sourceHash:createHash('sha256').update(m.input.content).digest('hex')}}});
       if(m.operation==='interrupt') { if(reading) process.send({id:reading,error:'DASHBOARD_CANCELLED'}); process.send({id:m.id,result:true}); }
@@ -240,5 +241,16 @@ test("an unclassified publication transport failure is unknown and is never repl
     await expect(f.host.publishDashboard({ origin: "http://example.test", generation: 1, binding, content: '"lose-reply"', expected: null })).rejects.toThrow("DASHBOARD_WRITE_UNKNOWN")
     const events = (await readFile(join(f.directory, "runtime.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line))
     expect(events.map(event => event.operation)).toEqual(["start", "dashboardPublish", "close"])
+  } finally { await f.close() }
+})
+
+
+test("a malformed publication result is unknown after one dispatch and confirmed cleanup", async () => {
+  const f = await fixture()
+  try {
+    await expect(f.host.publishDashboard({ origin: "http://example.test", generation: 1, binding, content: '"malformed-reply"', expected: null })).rejects.toThrow("DASHBOARD_WRITE_UNKNOWN")
+    const events = (await readFile(join(f.directory, "runtime.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line))
+    expect(events.map(event => event.operation)).toEqual(["start", "dashboardPublish", "close"])
+    expect(() => process.kill(events[0].pid, 0)).toThrow()
   } finally { await f.close() }
 })
