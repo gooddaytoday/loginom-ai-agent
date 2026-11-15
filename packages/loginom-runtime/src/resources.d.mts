@@ -7,6 +7,8 @@ export function verifyResources(
     signal?: AbortSignal
     cachePath?: string
     cacheVersion?: string
+    forceHash?: boolean
+    requireCache?: boolean
   },
 ): Promise<{
   manifest: { files: { path: string; sha256: string }[]; actionManifestSha256?: string }

@@ -90,7 +90,7 @@
 | Управление | `control-condition` | backlog | `nested_workflow`, `typed_variables` (по справке вложенного графа нет — см. подплан, раздел 2) |
 | Управление | `control-loop` | backlog | `nested_workflow`, `typed_variables` |
 | Управление | `control-execnode`, `control-referencenode` | backlog | `nested_workflow` |
-| Управление | `control-supernode` | backlog | `nested_workflow`, `tabular` |
+| Управление | `control-supernode` | in_progress (LAB-1615), `supernode-calc` | `nested_workflow`, `tabular` |
 | Data Mining | `datamining-arimax` | backlog | `tabular`, `ordered_fixture`, `training_contract`, `typed_variables` |
 | Data Mining | `datamining-clope` | backlog | `tabular`, `transactions_fixture`, `training_contract` |
 | Data Mining | `datamining-emclust`, `datamining-neuralnetclass`, `datamining-neuralnetreg`, `datamining-sonn` | backlog | `tabular`, `training_contract` |
@@ -101,7 +101,7 @@
 | SOAP | `integration-soaprequest` | backlog | `connections`, `soap_fixture` |
 | XML | `imports-xml`, `exports-xml` | backlog | `xml_fixture`, `file_artifacts` |
 | XML | `integration-datatoxml`, `integration-extractxml` | backlog | `xml_fixture`, `tree_io` |
-| Python | `programming-python` | backlog | `tabular`, `programming_runtime` |
+| Python | `programming-python` | этап 1 — LAB-1597: обработчик `programming.python` / `external_process`, сценарии `py-stdlib`, `py-pandas` | `tabular`, `programming_runtime` |
 | Деревья | `trees-calculatortree` | backlog | `tree_io` |
 | Деревья | `trees-joindatatree`, `trees-uniontree` | backlog | `tree_io`, `multiple_inputs` |
 | Условный резерв | `exports-tableau` | conditional_reserve | `tabular`, `file_artifacts` |

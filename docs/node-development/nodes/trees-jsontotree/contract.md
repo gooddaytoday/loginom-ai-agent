@@ -3,6 +3,13 @@
 Статус: предложение LAB-536 для утверждения владельцем. В v0.3.8 нет
 этапа реализации этой пары. Этот документ не разрешает общие правки.
 
+Дополнение v0.4.0 R1 (LAB-1601): `trees.from_json` принимает native DateTime
+при исходном формате `YYYY-MM-DDThh:mm:ss`; точное значение читается как
+civil `YYYY-MM-DDTHH:MM:SS.mmm`, `precision:millisecond`,
+`representation:local_datetime`, с типизированным NULL. Новых параметров нет.
+Ограничение дат для `trees.to_table` сохраняется. Ниже — исходное предложение
+этапа 1; актуальная приёмка дат — `acceptance/typed/expected-dates.json`.
+
 ## Ограниченный первый этап
 
 | Runtime type / mode | Компонент | Основные порты |

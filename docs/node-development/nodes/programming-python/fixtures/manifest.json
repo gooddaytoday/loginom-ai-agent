@@ -4,7 +4,7 @@
     "acceptance/python-stdlib/data/values.csv": {"bytes": 148, "sha256": "26841ba0074b7afe35e9e8a8de9f0c1ee8cad49ebfb44f8784c447208c0a5670", "rows": 4, "encoding": "UTF-8", "delimiter": ",", "decimal": ".", "null_marker": "?", "empty_string": "\"\""},
     "acceptance/python-pandas/data/values.csv": {"bytes": 148, "sha256": "26841ba0074b7afe35e9e8a8de9f0c1ee8cad49ebfb44f8784c447208c0a5670", "same_as": "acceptance/python-stdlib/data/values.csv"},
     "acceptance/python-stdlib/data/calculation.py": {"bytes": 512, "sha256": "6b63e44b588c39c04de67bb3970be1d14cde83676c4d5d80554242acf5a8b9df", "uses": "standard library, InputTable.Get / OutputTable.Append+Set"},
-    "acceptance/python-pandas/data/pandas_calculation.py": {"bytes": 394, "sha256": "0e181ac778f88b5d9c0aff091bab1790bbc537eff377705bdfba9b90feab296f", "uses": "pandas: to_data_frame(useNullableArrays=True), prepare_compatible_table, fill_table"}
+    "acceptance/python-pandas/data/pandas_calculation.py": {"bytes": 526, "sha256": "14b91d42f8726d099e1f0e4362cb7bf986c8632ce3712c233f39689fb220811a", "uses": "pandas: to_data_frame(useNullableArrays=True), prepare_compatible_table, fill_table"}
   },
   "columns": {"Id": "integer", "Amount": "real", "Text": "string", "Flag": "boolean", "Date": "datetime"},
   "edge_values": {

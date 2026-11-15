@@ -65,6 +65,18 @@ test('tree_io native schema RPC failure retains server text privately behind its
  assert.deepEqual(result.read_diagnostic,{stage:'schema_name',parameters:{},native_response:{name:'Error',message:'private server text'}});
  assert.deepEqual(f.disposed.sort(),['dataSource','output','treeRoot']);
 });
+test('serialized tree reader admits scalar arrays with owned source cleanup',async()=>{
+ const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
+ f.dataSource.get_RootNodeDef=async()=>{const root=await get(),children=await root.get_SubNodes(),leaf=await children.getItem(0);
+  leaf.get_IsArray=async()=>true;return root;};
+ f.dataSource.GetReader=async()=>({GetRowCount:async()=>1,
+  GetRowRange:async(index,parent,start,size)=>{assert.equal(index,1);assert.equal(parent,0);start.$=7;size.$=2;},
+  AsVariant:async(index,row)=>{assert.equal(index,1);return row===7?false:true;},dispose:async()=>f.disposed.push('treeReader')});
+ const result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});
+ assert.equal(result.verified,true,JSON.stringify(result));assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(result.output.tree.instances.slice(2).map(n=>n.value),[false,true]);
+ assert.deepEqual(f.disposed.sort(),['dataSource','leaf','output','treeChildren','treeReader','treeRoot']);
+});
 test('tree_io bounds Saltarelle native exception messages in the private diagnostic',async()=>{
  const f=fixture({treeOutput:true}),get=f.dataSource.get_RootNodeDef;
  f.dataSource.get_RootNodeDef=async()=>{const root=await get();root.get_Name=async()=>{throw {constructor:{__typeName:'rpc.NativeException'},get_message:()=> 'x'.repeat(2000)};};return root;};

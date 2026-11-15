@@ -1,3 +1,4 @@
+import {createSupernodeNodeSupport,createSupernodeOutputNodeSupport} from './supernode-node.mjs';
 import {createDatabaseImportNodeSupport} from './imports-database-node.mjs';
 import {prepareImportBinding,importBindingChannel,readImportBindings} from './import-bindings.mjs';
 import {createVariablesReplaceNodeSupport} from './variables-replace-node.mjs';
@@ -25,6 +26,7 @@ import {createRestRequestNodeSupport} from './rest-request-node.mjs';
 import {createLinRegressionNodeSupport} from './linregression-node.mjs';
 import {createAutoCorrelationNodeSupport} from './auto-correlation-node.mjs';
 import {createCorrAnalysisNodeSupport} from './corr-analysis-node.mjs';
+import {createPythonNodeSupport} from './python-node.mjs';
 import {createElimOutlierNodeSupport} from './elim-outlier-node.mjs';
 import {createFactorAnalysisNodeSupport} from './factor-analysis-node.mjs';
 import {createClusteringNodeSupport} from './clustering-node.mjs';
@@ -65,6 +67,7 @@ export function nodeOutputForJournal(value,redactor){
 // Candidate implementations share one lifecycle, gate and browser. Dispatch by
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
+ const supernode=createSupernodeNodeSupport(config),supernodeOutput=createSupernodeOutputNodeSupport(config);
  const variablesReplace=createVariablesReplaceNodeSupport(config);
  const condition=createConditionNodeSupport(config);
  const dataToVar=createDataToVarNodeSupport(config);
@@ -92,11 +95,14 @@ export function createCandidateNodeSupport(config) {
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...databaseImport.nodeApplyHandlers,...condition.nodeApplyHandlers,...variablesReplace.nodeApplyHandlers,...variablesColumnUnion.nodeApplyHandlers,...variablesCalculator.nodeApplyHandlers,...dataToVar.nodeApplyHandlers,...variablesToTable.nodeApplyHandlers,...userVariables.nodeApplyHandlers,...quality.nodeApplyHandlers,...colUnion.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const python=createPythonNodeSupport(config);
+ const nodeApplyHandlers=new Map([...supernode.nodeApplyHandlers,...supernodeOutput.nodeApplyHandlers,...python.nodeApplyHandlers,...databaseImport.nodeApplyHandlers,...condition.nodeApplyHandlers,...variablesReplace.nodeApplyHandlers,...variablesColumnUnion.nodeApplyHandlers,...variablesCalculator.nodeApplyHandlers,...dataToVar.nodeApplyHandlers,...variablesToTable.nodeApplyHandlers,...userVariables.nodeApplyHandlers,...quality.nodeApplyHandlers,...colUnion.nodeApplyHandlers,...lgdImport.nodeApplyHandlers,...lgdExport.nodeApplyHandlers,...coarseClasses.nodeApplyHandlers,...factorAnalysis.nodeApplyHandlers,...tableTree.nodeApplyHandlers,...treeJson.nodeApplyHandlers,...assnRules.nodeApplyHandlers,...enrich.nodeApplyHandlers,...ungroup.nodeApplyHandlers,...smoothing.nodeApplyHandlers,...binning.nodeApplyHandlers,...autoCorrelation.nodeApplyHandlers,...excelExport.nodeApplyHandlers,...jsonTree.nodeApplyHandlers,...treeTable.nodeApplyHandlers,...elimOutlier.nodeApplyHandlers,...logregression.nodeApplyHandlers,...correlation.nodeApplyHandlers,...sampling.nodeApplyHandlers,...partition.nodeApplyHandlers,...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...slidingWindow.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||nodeApplyHandlers.get(type)?.unchangedExecution?.(options.operation.parameters)===true||isUnchangedTransformExecution(options.operation.parameters,nodeApplyHandlers.get(type));
   const drivers=(()=>{
+  if(type==='control.supernode'&&!readOnly)return supernode.nodeApplyDriverFactory(options);
+  if(type==='control.supernode_output')return supernodeOutput.nodeApplyDriverFactory(options);
   if(type==='variables.column_union'&&!readOnly)return variablesColumnUnion.nodeApplyDriverFactory(options);
   if(type==='variables.calculator'&&!readOnly)return variablesCalculator.nodeApplyDriverFactory(options);
   if(type==='variables.replace'&&!readOnly)return variablesReplace.nodeApplyDriverFactory(options);
@@ -128,6 +134,7 @@ export function createCandidateNodeSupport(config) {
   if(type==='research.factor_analysis')return factorAnalysis.nodeApplyDriverFactory(options);
   if(type==='research.auto_correlation')return autoCorrelation.nodeApplyDriverFactory(options);
   if(type==='research.corr_analysis')return correlation.nodeApplyDriverFactory(options);
+  if(type==='programming.python')return python.nodeApplyDriverFactory(options);
   if(type==='datamining.assn_rules')return assnRules.nodeApplyDriverFactory(options);
   if(type==='datamining.clustering')return clustering.nodeApplyDriverFactory(options);
   if(type==='preprocessing.data_recovery')return missingValues.nodeApplyDriverFactory(options);

@@ -204,6 +204,8 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Параметры полей: переименование и обмен имён, метка, смена типа, кэширование | `transform.reform_columns` / scalar | [читать](references/nodes/transform.reform_columns.md) |
 | Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Ветвь по переменной, «Иначе» | `control.condition` / ports, variable_branch | [читать](references/nodes/control.condition.md) |
+|Подмодель|`control.supernode` /tabular_boundary|[читать](references/nodes/control.supernode.md)|
+|Выход Подмодели|`control.supernode_output`|[читать](references/nodes/control.supernode_output.md)|
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|
 |Доли итогов, веса, сезонная разгруппировка|`transform.ungroup_data` / shares, computed, seasonal|[читать](references/nodes/transform.ungroup_data.md)|
@@ -217,6 +219,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Дополнение данных | `transform.enrich_data` / left | [читать](references/nodes/transform.enrich_data.md) |
 | Соединение по позиции | `transform.col_union_data` / positional | [читать](references/nodes/transform.col_union_data.md) |
 | Явный JS/подтверждённый пробел | `programming.javascript` / script | [читать](references/nodes/programming.javascript.md) |
+| Узел «Python», код `.py` | `programming.python` / script | [читать](references/nodes/programming.python.md) |
 
 Новый CSV/TXT: сначала нативное автоопределение Loginom через серверный preview
 по [справке импорта](references/nodes/imports.text.md), затем сверка типов и

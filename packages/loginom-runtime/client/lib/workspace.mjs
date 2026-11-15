@@ -408,7 +408,7 @@ async function navigatePreparedGraph(page, options) {
       if(existing?.phase!=='verified'||existing.nodeTargetWorkflowNode!==workflow||JSON.stringify(existing.crumbs)!==JSON.stringify(crumbs))fail('Navigation receipt is no longer current');
       return existing.navigationResult;
     }
-    if(mode==='settle'){
+    if(mode==='settle'||mode==='return_dispatch'){
       if(!existing?.navigationStarted)fail('Navigation receipt missing');
       if(workflow===source.nodeTargetWorkflowNode){
         if(Date.now()>=deadline)fail('DEADLINE');
@@ -419,6 +419,17 @@ async function navigatePreparedGraph(page, options) {
         ||direction==='leave'&&workflow!==source.navigationParentWorkflow)fail('Navigation reached a foreign workflow');
       if(direction==='enter'&&!ancestors.some(n=>n.FGuid===existing.navigationOwnerGuid&&n.FModelNode===existing.navigationOwnerData))fail('Navigation entered a different submodel');
       if(direction==='enter'&&source.navigationParentWorkflow===workflow)fail('Navigation direction changed');
+      // Leave may select the composite's node card. Finish at the attested
+      // parent scenario before binding a new workflow ref to its breadcrumbs.
+      const parent=source.navigationParentReceipt?.crumbs;
+      if(direction==='leave'&&parent?.length&&JSON.stringify(crumbs)!==JSON.stringify(parent)){
+        const owner=ancestors.find(n=>n.FGuid===source.navigationOwnerGuid&&n.FModelNode===source.navigationOwnerData),targets=exact(parent.at(-1).tid);
+        if(crumbs.length!==parent.length+1||!parent.every((c,i)=>c.tid===crumbs[i].tid&&c.label===crumbs[i].label)
+          ||!owner||owner.ParentNode!==workflow||targets.length!==1||!visible(targets[0])||targets[0].querySelectorAll('.maptree-icon-workflow').length!==1)fail('Parent workflow return binding changed');
+        if(mode==='return_dispatch'){if(existing.navigationReturnStarted)fail('Parent workflow return already dispatched');existing.navigationReturnStarted=true;}
+        return {pending:true,...(!existing.navigationReturnStarted||mode==='return_dispatch'?{return_tid:parent.at(-1).tid}:{})};
+      }
+      if(mode==='return_dispatch')fail('Parent workflow return changed before gesture');
       if(!crumbs.length||crumbs.length>32||samePath)fail('Navigation breadcrumbs did not change or exceeded the bound');
       // Invalidate every receipt for the departed scope, including an earlier
       // prepare of that same workflow. Returning always receives a fresh ID.
@@ -444,6 +455,19 @@ async function navigatePreparedGraph(page, options) {
       controlTid=tid+';GenericEnterLabel;Label';
       nativeControl=owner.FEnterLabel;
       if(nativeControl?.parent!==owner||nativeControl.FCell?.parent!==owner.FCell)fail('Submodel entry label owner changed');
+      if(mode==='lookup')return {exists:false};
+      if(mode==='selection'){
+        const entry=exact(controlTid),rendered=graph.view.getState(nativeControl.FCell)?.text?.node;
+        if(entry.length===1&&entry[0]===rendered&&visible(entry[0]))return {};
+        // Live fresh Supernodes have no rendered entry until selected. Bind
+        // the native selection overlay, never an arbitrary covering element.
+        if(entry.length||nativeControl.FCell.visible!==false||rendered)fail('Graph navigation control unavailable');
+        const selection=owner.FControls,element=selection&&graph.view.getState(selection.FCell)?.shape?.node;
+        const selectionTid=tid+';NodesControls',matches=exact(selectionTid);
+        if(selection?.parent!==owner||selection.FCell?.parent!==owner.FCell||matches.length!==1
+          ||matches[0]!==element||!roots[0].contains(element)||!visible(element))fail('Submodel selection control unavailable');
+        return {control_tid:selectionTid};
+      }
     }else{
       if(!source.navigationParentWorkflow)fail('Prepared graph has no bound parent');
       controlTid=ref.prefix+';Graph;LeaveSubmodelLabel;Label';
@@ -475,15 +499,40 @@ async function navigatePreparedGraph(page, options) {
     // A retry only observes the original gesture under this call's deadline.
     if(!old.exists||old.phase==='reserved'&&!options.recoverOnly){
       if(options.recoverOnly)throw Error('RECEIPT_LOST');
+      if(options.graphNavigation.direction==='enter'){
+        const selection=await inspect('selection');
+        if(selection.control_tid){
+          const control=page.locator('[data-tid='+JSON.stringify(selection.control_tid)+']');
+          await control.click({trial:true,timeout:remaining()});remaining();
+          const fresh=await inspect('selection');
+          if(fresh.control_tid){
+            if(fresh.control_tid!==selection.control_tid)throw Error('Submodel selection changed before gesture');
+            await control.click({timeout:remaining()});remaining();
+            trace.push({event:'graph_navigation_owner_selected',control_tid:selection.control_tid});
+          }
+        }
+      }
       const before=await inspect('reserve');trace.push({event:'graph_navigation_prepared',direction:options.graphNavigation.direction,control_tid:before.control_tid});
       const control=page.locator('[data-tid='+JSON.stringify(before.control_tid)+']');
-      await control.click({trial:true,timeout:remaining()});remaining();await inspect('dispatch');
+      await control.click({trial:true,timeout:remaining()});remaining();
+      try{await inspect('dispatch');}
+      catch(error){
+        effectPossible=true;
+        try{effectPossible=(await inspect('lookup')).effect_possible===true;}catch{}
+        throw error;
+      }
       effectPossible=true;await control.click({timeout:remaining()});
       trace.push({event:'graph_navigation_clicked',control_tid:before.control_tid});
     }else if(old.phase==='reserved')throw Error('Navigation was reserved; no gesture is replayed');
     while(remaining()){
       const state=await inspect('settle');
       if(!state.pending){trace.push({event:'graph_navigation_verified',workflow_ref:state.workflow_ref});return result('READY',null,state);}
+      if(state.return_tid){
+        if(options.recoverOnly)throw Error('Parent workflow return has not been dispatched');
+        const control=page.locator('[data-tid='+JSON.stringify(state.return_tid)+']');await control.click({trial:true,timeout:remaining()});remaining();
+        const fresh=await inspect('return_dispatch');if(fresh.return_tid!==state.return_tid)throw Error('Parent workflow return control changed');
+        await control.click({timeout:remaining()});trace.push({event:'graph_navigation_parent_returned',control_tid:state.return_tid});
+      }
       await page.waitForTimeout(Math.min(100,remaining()));
     }
   }catch(error){return result('NOT_READY',String(error.message).slice(0,500),{verification_required:effectPossible});}

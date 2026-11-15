@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Proposal only (LAB-1558): typed tree reader cases for trees.from_json.
+"""Independent typed tree cases for trees.from_json (LAB-1558 / R1 LAB-1601).
 
 Stdlib JSON oracle, never supplied to the model and independent of Loginom and
 the runtime. Output follows the run-check `tree_outputs` format of `check_tree`
-(scripts/node-acceptance/run-check.py). Three additive forms are proposed for
-stage 1 and are not accepted by the current checker:
+(scripts/node-acceptance/run-check.py). Dates have a registered stock projection
+expected-dates.json; Variant and scalar arrays remain proposals for R2/R3:
   * a Variant leaf instance carries `type: "variant"`, `cell_type` and `value`;
   * a scalar array schema type is `<scalar>_array` (Array=true, Container=false);
   * a DateTime leaf value is civil `YYYY-MM-DDTHH:MM:SS.mmm`, no time zone.
@@ -131,6 +131,12 @@ if __name__ == '__main__':
     if '--check' in sys.argv:
         committed = json.loads((ROOT / 'expected.json').read_text(encoding='utf-8'))
         assert result == committed, 'expected.json differs from the independent calculation'
+        for name in ['dates', 'scalar_arrays']:
+            projection = dict(package_path='{{PACKAGE_PATH}}',
+                              nodes=[dict(type='imports.text', label_any=True), dict(type='trees.from_json', label_any=True)],
+                              outputs=[], tree_outputs=result['cases'][name]['tree_outputs'])
+            filename = 'expected-' + name.replace('_', '-') + '.json'
+            assert projection == json.loads((ROOT / filename).read_text(encoding='utf-8')), filename + ' differs from the independent case'
         print('trees.from_json typed proposal: independent expected matches (%d cases)' % len(result['cases']))
     else:
         print(json.dumps(result, ensure_ascii=False, indent=2))

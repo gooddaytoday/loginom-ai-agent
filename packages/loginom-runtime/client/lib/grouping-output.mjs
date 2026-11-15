@@ -71,11 +71,9 @@ export async function configureGroupingOutput(channel,configuration,parameters,m
  const planned=resolveGroupingOutput(configuration,parameters,initial.node_mapping,mapping),changes=[];
  // Native regeneration can reorder even an initially matching layout after
  // reopen (LAB-1100: Region,Metric -> Metric,Region with autosync=true).
- // Freeze complete layouts for the new option paths, retaining an explicit
- // autosync choice and every options-only/legacy preservation request.
- const reordered=planned.fields&&!same(planned.fields.map(f=>f.current.record_id),initial.node_mapping.target_fields.map(f=>f.record_id));
- const optionLayout=planned.fields&&(parameters.cache_groups!==undefined||parameters.sort_result!==undefined);
- if(mapping.autosync!==undefined||reordered||optionLayout)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
+ // Freeze every newly configured layout, retaining an explicit autosync
+ // choice and options-only/legacy preservation requests.
+ if(mapping.autosync!==undefined||planned.fields)changes.push(await configureOutputAutosync(channel,mapping.autosync??false));
  if(planned.fields){
   // Finish table edits before exclusion introduces a separate native group.
   // Existing exclusions stay excluded; new exclusions use the same guarded

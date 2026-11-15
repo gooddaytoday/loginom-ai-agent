@@ -1,5 +1,5 @@
 import { credentials } from "./loginom/credentials"
-import { desktopLoginom } from "./loginom/desktop-service"
+import { desktopLoginom, verifyDesktopResources } from "./loginom/desktop-service"
 import { registerLoginomIpc } from "./loginom/ipc"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync } from "node:fs"
@@ -160,6 +160,18 @@ const main = Effect.gen(function* () {
     onboardingTestRoot ? join(onboardingTestRoot, "desktop") : join(app.getPath("appData"), appId),
   )
   if (onboardingTestRoot) app.setPath("sessionData", join(onboardingTestRoot, "session"))
+  // NSIS runs this synchronously after copying the final payload, including
+  // --updated. Exit before single-instance forwarding, UI or any sidecars.
+  if (process.argv.includes("--verify-resources")) {
+    const code = yield* Effect.promise(() =>
+      verifyDesktopResources().then(
+        () => 0,
+        () => 1,
+      ),
+    )
+    app.exit(code)
+    return
+  }
   initializeOldLayoutEligibility(app.getPath("userData"))
   logger = initLogging()
   initCrashReporter()

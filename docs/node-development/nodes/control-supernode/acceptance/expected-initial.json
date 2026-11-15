@@ -60,7 +60,7 @@
           "Amount": 1.25,
           "Note": "alpha",
           "Flag": true,
-          "Moment": "2026-01-03 10:00:00",
+          "Moment": "2026-01-03T10:00:00.000",
           "Doubled": 2.5
         },
         {
@@ -68,7 +68,7 @@
           "Amount": null,
           "Note": "",
           "Flag": false,
-          "Moment": "2026-01-01 00:00:00",
+          "Moment": "2026-01-01T00:00:00.000",
           "Doubled": null
         },
         {
@@ -92,7 +92,7 @@
           "Amount": 0.0,
           "Note": "zero",
           "Flag": null,
-          "Moment": "2026-01-04 12:30:00",
+          "Moment": "2026-01-04T12:30:00.000",
           "Doubled": 0.0
         }
       ]

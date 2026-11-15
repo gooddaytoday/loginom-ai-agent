@@ -92,6 +92,16 @@ against the frozen `expected.json` (`oracle.py --check`), and Save. No CSV is
 exported; cold reexecutes the saved package without configuration and matches
 all six labelled outputs. Only task and folder paths reach the model.
 
+`tree-dates` uses the approved `trees-jsontotree/acceptance/typed/task-dates.md`
+and unchanged `fixtures/typed/documents.csv` (all three input columns are strings).
+Only task and CSV reach the model. `expected-dates.json` is the separate stock
+projection of `expected.json → cases.dates`, checked by the same independent oracle.
+Full ordered schema/instances, DateTime civil `YYYY-MM-DDTHH:MM:SS.mmm`,
+`precision:millisecond`, `representation:local_datetime` and typed NULL are required.
+Native default format is `YYYY-MM-DDThh:mm:ss`; winter and summer values must
+retain their civil time. Tree-only Save, a fresh cold profile executing without
+configuration, the same full typed matcher and cleanup apply; no CSV export.
+
 `tree-null-leaves`, `tree-nested-records`, `tree-empty-containers` use the approved
 `trees-jsontotree/acceptance/task-{null-leaves,nested-records,empty-containers}.md`
 and only `fixtures/nested-records/documents.csv`. Their `tree_only` mode checks
@@ -102,7 +112,22 @@ settings changes and cleanup are required. No export/CSV is requested or passed
 to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
 the model; oracle and expected remain private.
 
+`tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
+`fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
+projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema
+types `string_array`/`real_array`, ordered values, parent row ranges and both
+empty arrays in the second record are checked directly. Full tree read, Save,
+cold reexecution without configuration and cleanup are required; no CSV export.
+Only the business task and original CSV reach the model.
+
 Run live acceptance without repeatedly reading live logs:
+
+`group-date` uses grouping `acceptance/types/task-date.md` and only
+`fixtures/types/types.csv`. `expected-date.json` preserves unchanged
+`cases.date.stages` from LAB-1558: DateTime min/max/last (including final NULL),
+integer null_count, full typed rows and exact field order with `ordered:false`.
+The independent oracle stays private. CSV, Save, cold Execute without
+configuration and cleanup use stock checks; only task and CSV reach the model.
 
 `group-boolean` uses grouping `acceptance/types/task-boolean.md` and only
 `fixtures/types/types.csv`. `expected-boolean.json` preserves the unchanged
@@ -127,6 +152,16 @@ both full ordered outputs and four CSVs. The source alone changes on the same
 Filter GUID; readback requires integer `row_number <= TopN`, not a literal.
 Stock Save, cold binding/field readback without configuration, both typed
 outputs and cleanup apply. Oracle/expected never reach the model.
+
+`row-filter-typed` and `row-filter-null` use the unchanged approved
+`acceptance/typed/task-variable-{typed,null}.md` and `fixtures/typed/rows.csv`.
+The private stdlib oracle checks initial RowID 2,8 → final 2,3,7,8 for typed,
+and empty output 0 / all eight rows in output 1 for real NULL, as confirmed
+by the LAB-1661 native probe before registration. Typed changes only MinScore
+and Since on the same builtin source, retaining both scalar bindings and the
+Filter GUID. Full typed outputs, four/two CSVs, Save, cold native `>=` predicates
+and binding identities without reconfiguration, and cleanup use stock checks.
+Only task and CSV reach the model; oracle and expected remain private.
 
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as
@@ -670,6 +705,16 @@ The existing generated-source storage/disk cleanup runs afterwards. External
 Проверяет точное равенство числовых ключей, общий 0/−0, отдельный NULL,
 близкие разные real, все суммы/количества, порядок строк, CSV/Save/cold.
 
+Python node scenarios (`programming.python`, `external_process`): `py-stdlib`
+(declared Id/Amount/AmountScaled/Text/Flag/Date, `InputTable.Get`/`OutputTable.Set`,
+AmountScaled = Amount×3, NULL and `''` kept) and `py-pandas` (schema from code,
+`to_data_frame(InputTable, True)` → Flag=true rows → `fill_table`). Fixtures and
+expected tables are in `docs/node-development/nodes/programming-python/acceptance/<case>`;
+the model receives `values.csv` and the case `.py` file, and the saved code must
+equal that file (readback `source_sha256`). The names avoid a standalone
+`python` token: the saved package name appears in breadcrumbs, where the UI
+code-name guard denies it and the cold return to the scenario cannot click.
+
 Pearson node scenarios: `corr-pairs` (all X/Y × Z/W pairs in native order),
 `corr-null` (pairwise NULL deletion and constant field), `corr-age` (300-row
 age/pressure business task). Fixtures and independent expected tables are in
@@ -1135,3 +1180,12 @@ lift 0, max_items=3, max_consequents=2, исключение поддержки 
 не сверяется (решение владельца 12.11). Остальные сценарии сохраняют строгий cold.
 Save/cleanup обязательны; expected-exclude*.json генерируются oracle.py --write-exclude.
 Вспомогательный вход и отбор выбранных элементов не входят в сценарий.
+
+`supernode-calc` uses the approved control-supernode/acceptance/task.md and only
+input.csv/replacement.csv. Stock typed output and CSV matchers check the complete
+ordered external output 0 (5×6, then 3×6), exact field order/types and Real abs/rel=0.
+The node audit checks retained Import/container/Calculator/boundary GUIDs and a
+normal NW1 observation of InputNode → Calculator → OutputNode. Cold enters and
+leaves through the production NW1 adapter, observes that graph, then executes the
+saved parent with stock typed reads and cleanup. No settings are reapplied.
+Oracle and expected JSON remain private. Empty input is outside this scenario.

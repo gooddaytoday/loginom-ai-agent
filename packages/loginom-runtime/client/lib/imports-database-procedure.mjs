@@ -18,7 +18,7 @@ export async function configureDatabaseImportBrowser(page,t,readContext){
    const boxes=page.locator('[data-tid="msgbox;cnt"]:visible');
    if(await boxes.count()===1)throw Error('Database import: '+(await boxes.innerText()).replace(/\s+/g,' ').trim().slice(0,500));
   };
-  const wait=async(label,read)=>{while(Date.now()<t.deadline){await guard();await nativeError();const r=await read();if(r)return r;await page.waitForTimeout(Math.min(80,t.deadline-Date.now()));}throw Error('Database import: '+label+' did not settle');};
+  const wait=async(label,read,until=t.deadline)=>{while(Date.now()<until){await guard();await nativeError();const r=await read();if(r)return r;await page.waitForTimeout(Math.min(80,until-Date.now()));}throw Error('Database import: '+label+' did not settle');};
   // Run 05 (SQL mode) timed out here waiting for every .x-mask. Waiting for
   // loading messages and windows only, SQL mode reached Done in lab1555-06
   // (execution-events.jsonl:80); point() still hit-tests each control. The
@@ -66,7 +66,9 @@ export async function configureDatabaseImportBrowser(page,t,readContext){
     if(!s.fields.every(f=>f.checked)){await click(find(wiz+'btnExtractAll'));s=await wait('all fields selected',async()=>{const v=await state();return v.fields.every(f=>f.checked)?v:null;});}
    }
    if(t.mode==='sql'&&(s.sql??'').replace(/\r\n/g,'\n')!==t.sql){
-    const editor=find(wiz+'cmpQueryCM').locator('.CodeMirror');need(await editor.count()===1,'SQL editor is unavailable');
+    const editor=find(wiz+'cmpQueryCM').locator('.CodeMirror');
+    // SQL mode becomes active before its editor is rendered on the first switch.
+    await wait('SQL editor readiness',async()=>await editor.count()===1&&await editor.isVisible(),Math.min(t.deadline,Date.now()+15000));
     await click(editor);await page.keyboard.press('Control+A');await page.keyboard.insertText(t.sql);
     s=await wait('SQL text',async()=>{const v=await state();return (v.sql??'').replace(/\r\n/g,'\n')===t.sql?v:null;});
    }

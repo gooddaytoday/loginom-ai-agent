@@ -52,7 +52,8 @@ export function validateFilterConditions(p){
    if(variable){
     need((variable==='value'&&['<','<=','>','>=','=','<>'].includes(c.operator)
      &&(c.field.kind==='input_field'||c.field.kind==='row_number'&&c.type==='integer')
-     ||variable==='values'&&arity==='list'&&c.field.kind==='input_field')&&['integer','string'].includes(c.type),'Unsupported filter variable operand');
+     &&['integer','real','datetime','string'].includes(c.type)
+     ||variable==='values'&&arity==='list'&&c.field.kind==='input_field'&&['integer','string'].includes(c.type)),'Unsupported filter variable operand');
     need(object(c[variable],['kind','name'])&&c[variable].kind==='variable'&&name(c[variable].name),'Exact mapped filter variable name required');
     continue;
    }
@@ -81,12 +82,12 @@ function validateFilterOperand(c,variables){
  const operand=c.value??c.values;
  if(isFilterVariable(operand)&&variables!==undefined){
    const matches=variables.filter(v=>v.name===operand.name);need(matches.length===1,'Missing or ambiguous mapped filter variable: '+operand.name);
-   const v=matches[0];need(v.type===(c.values?'string':c.type)&&v.is_null===false,'Filter variable type or NULL differs: '+operand.name);
+   const v=matches[0];need(v.type===(c.values?'string':c.type)&&(v.is_null===false||!c.values&&v.type==='real'&&v.is_null===true&&v.value===null),'Filter variable type or NULL differs: '+operand.name);
    if(c.values){
     need(typeof v.value==='string'&&v.value.length<=32768,'Bounded string list variable required');
     const list=v.value.split(',');need(list.length>0&&list.length<=128&&list.every(x=>x.length>0&&!/[\"\r\n]/.test(x)),'Simple nonempty comma-separated variable list required');
     if(c.type==='integer')need(list.every(x=>/^-?\d+$/.test(x)&&Number.isSafeInteger(Number(x))),'Integer variable list required');
-   }else validateFilterValue(v.value,c.type);
+   }else if(!v.is_null)validateFilterValue(v.value,c.type);
  }
 }
 

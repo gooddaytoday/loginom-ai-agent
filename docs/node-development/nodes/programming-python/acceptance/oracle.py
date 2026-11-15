@@ -10,7 +10,9 @@ scripts given to the model (data/*.py).
                  Amount * 3, NULL Amount gives NULL AmountScaled.
   python-pandas: rows with Flag = true only, fields in DataFrame order
                  Id, Amount, Text, Flag, Date, then AmountScaled (schema from
-                 code via prepare_compatible_table); types as observed on stage 0.
+                 code via prepare_compatible_table); Flag stays Boolean because the
+                 script casts it to pandas "boolean" (Loginom 7.4.2 to_data_frame
+                 fills a NULL-free Boolean column into numpy dtype 'b' = int8).
 
 Usage: python3 -I oracle.py [--case python-stdlib|python-pandas] [--check]
 """
@@ -42,7 +44,8 @@ def read(case):
                 "AmountScaled": None if amount is None else float(amount * FACTOR),
                 "Text": None if null["Text"] else raw["Text"],
                 "Flag": {"true": True, "false": False}[raw["Flag"]],
-                "Date": None if null["Date"] else raw["Date"],
+                # Port/cold readers report local DateTime as ISO with milliseconds.
+                "Date": None if null["Date"] else raw["Date"].replace(" ", "T") + ".000",
             })
     return rows
 

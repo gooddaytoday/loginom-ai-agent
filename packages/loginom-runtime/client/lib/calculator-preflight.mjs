@@ -51,7 +51,31 @@ export function preflightCalculatorSource(options,ctx,config){
   resolve:(parameters,fields)=>predictNewCalculatorOutput(parameters,fields,request.mappings)});
 }
 
-export function preflightInactiveCalculatorSource(options,source){
- return preflightInactiveTabularSource(options,source,{label:'calculator',sourceIcons:['bg-vendor-icon-importtextfile'],
+export async function preflightInactiveCalculatorSource(options,source){
+ const sourceIcons=['bg-vendor-icon-importtextfile'];
+ const {binding,state}=source;
+ const boundary=state.ui.elements.some(e=>e.tid===state.prepared_node_context?.tid
+  &&e.signature?.native_graph?.status==='non_script'&&e.signature.native_graph.icon==='bg-vendor-icon-nullvendor'
+  &&e.signature.native_graph.node_id===binding.node.node_id);
+ if(boundary){
+  // Nullvendor alone is ambiguous. The observed native input boundary has
+  // no output schema editor. Validate its fields in the Calculator's owned
+  // input/configuration wizard, as for an existing target's effective schema.
+  const graph=await options.operation.nodeTargetAdapter.observe(options.operation.parameters,options.operation.deadline);
+  const nodes=graph.nodes.filter(n=>n.ref.node_id===binding.node.node_id);
+  if(graph.complete===true&&graph.document_id===binding.document_id
+    &&JSON.stringify(graph.workflow_ref)===JSON.stringify(binding.workflow_ref)&&nodes.length===1
+    &&nodes[0].ref.document_id===binding.node.document_id&&nodes[0].ref.workflow_id===binding.node.workflow_id
+    &&nodes[0].boundary_role==='input'&&nodes[0].type==='bg-vendor-icon-nullvendor'
+    &&nodes[0].inputs.length===0&&JSON.stringify(nodes[0].outputs)==='[0]'
+    &&source.port.index===0&&source.port.active===false){
+   const proof={verified:true,cleanup_complete:true,settings_changed:false,source:binding.node,port:0,
+    validation_deferred:'input_mapping',source_activity:{before:false,after:false,changed:false}};
+   const phase='calculator_preflight_completed',saved=await options.onRecord({phase,operation_id:options.operation.id,proof});
+   need(saved?.phase===phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'calculator preflight was not durably acknowledged');
+   return proof;
+  }
+ }
+ return preflightInactiveTabularSource(options,source,{label:'calculator',sourceIcons,
   resolve:(parameters,fields)=>predictNewCalculatorOutput(parameters,fields,options.operation.parameters.mappings)});
 }

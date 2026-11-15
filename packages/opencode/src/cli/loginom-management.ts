@@ -109,6 +109,7 @@ export async function loginomManagement(
   }
   if (command !== "setup") throw new Error("CLI_ARGUMENT_INVALID")
   const candidate = options.stdinJSON ? setupCandidate(await readSetup(), current) : await interactiveSetup(current)
+  await host.request("connection.verify-resources", {})
   const checked = validation(await host.request("connection.check", candidate))
   if (Option.isNone(checked)) throw new Error("LOGINOM_REPLY_INVALID")
   const saved = view(

@@ -56,6 +56,21 @@ test("profile resource cache rechecks changed metadata and invalidates across ve
       hashedFiles: 0,
       cachedFiles: 2,
     })
+    // Install/update must hash every byte even when a previous install left a valid cache.
+    assert.deepEqual((await verifyResources(root, { ...options, forceHash: true, requireCache: true })).verification, {
+      mode: "full",
+      hashedFiles: 2,
+      cachedFiles: 0,
+    })
+    assert.equal((await verifyResources(root, options)).verification.mode, "metadata")
+    const blocked = join(directory, "blocked")
+    await writeFile(blocked, "not a directory")
+    await assert.rejects(
+      verifyResources(root, { ...options, forceHash: true, requireCache: true, cachePath: join(blocked, "cache.json") }),
+      /LOGINOM_RESOURCE_CACHE_WRITE_FAILED/,
+    )
+    // Startup retains its best-effort cache semantics.
+    assert.equal((await verifyResources(root, { ...options, cachePath: join(blocked, "cache.json") })).verification.mode, "full")
     const cache = JSON.parse(await readFile(cachePath, "utf8"))
     assert.ok(cache.files.browser.ino && cache.files.browser.size && cache.files.browser.mtime)
     await writeFile(join(root, "browser"), "original")

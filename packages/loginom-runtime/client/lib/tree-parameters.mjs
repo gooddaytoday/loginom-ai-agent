@@ -1,6 +1,6 @@
 const text=(description,maxLength=128)=>({type:'string',minLength:1,maxLength,description});
 export const jsonToTreeParametersSchema={type:'object',properties:{json_field:text('Exact input string column containing one JSON object.'),
- root_mode:{type:'string',enum:['auto'],description:'Automatic root; nested objects and object arrays in one repeated branch. Empty arrays require a nonempty object-array witness at the same schema path.'}},required:[],additionalProperties:false};
+ root_mode:{type:'string',enum:['auto'],description:'Automatic root; nested objects and object arrays in one repeated branch, with homogeneous scalar arrays. Empty arrays require a typed nonempty witness at the same schema path.'}},required:[],additionalProperties:false};
 export const treeToTableParametersSchema={type:'object',properties:{
  selected_paths:{type:'array',minItems:1,maxItems:64,items:text('JSON Pointer schema leaf path, without array indexes.',512),description:'Replace the complete leaf selection in native schema order.'},
  repeat_parents:{type:'boolean',description:'Repeat selected ancestors on every child row.'},
@@ -54,11 +54,22 @@ export function validateTreeJsonScope(text){
  const walk=(value,depth,path='')=>{
   if(++nodes>256||depth>16)throw Error('Tree JSON exceeds 256 nodes or depth 16');
   if(value===null||numbers.has(value)||['string','boolean'].includes(typeof value)){
-   if(typeof value==='string'&&/^\d{4}-\d\d-\d\d(?:T|$)/.test(value))throw Error('Tree stage 1 does not support inferred dates');return;
+   return;
   }
   if(Array.isArray(value)){
-   if(value.some(v=>!v||typeof v!=='object'||Array.isArray(v)||numbers.has(v)))throw Error('Tree stage 1 requires one nonempty repeated object branch');
-   arrays.set(path,arrays.get(path)===true||value.length>0);validateJsonArrayPaths([...arrays.keys()]);
+   const entry=arrays.get(path)??{kind:null};arrays.set(path,entry);entry.nulls||=value.includes(null);
+   for(const item of value){
+    if(Array.isArray(item))throw Error('Nested scalar arrays are outside tree scope');
+    if(item===null)continue;
+    const kind=numbers.has(item)?'number':typeof item;
+    if(entry.kind&&entry.kind!==kind)throw Error('Mixed Variant arrays are outside tree scope');
+    entry.kind=kind;
+   }
+   if(entry.kind==='object'&&entry.nulls)throw Error('NULL object-array records are outside tree scope');
+   if(entry.kind&&entry.kind!=='object'){
+    const name=path.split('/').at(-1).replaceAll('~1','/').replaceAll('~0','~');
+    if(leafNames.has(name)&&leafNames.get(name)!==path)throw Error('Colliding leaf names are outside tree stage 1');leafNames.set(name,path);
+   }
    for(const record of value)walk(record,depth+1,path);return;
   }
   if(!value||typeof value!=='object')throw Error('Tree stage 1 requires an object document');
@@ -75,7 +86,10 @@ export function validateTreeJsonScope(text){
  };
  if(!root||typeof root!=='object'||Array.isArray(root)||numbers.has(root))throw Error('Tree stage 1 requires one JSON object');
  walk(root,0);if(!arrays.size)throw Error('Tree stage 1 requires one repeated object branch');
- if([...arrays.values()].some(witness=>!witness))throw Error(arrays.size===1?'Tree stage 1 requires one nonempty repeated object branch':'Tree stage 1 requires an object-array witness for each empty array path');
+ if([...arrays.values()].some(entry=>!entry.kind))throw Error(arrays.size===1?'Tree stage 1 requires one nonempty repeated object branch':'Tree stage 1 requires an object-array witness or scalar-type witness for each empty array path');
+ const objectPaths=[...arrays].filter(([,entry])=>entry.kind==='object').map(([path])=>path);
+ if(!objectPaths.length)throw Error('Tree stage 1 requires one nonempty repeated object branch');
+ validateJsonArrayPaths(objectPaths);
  return {verified:true,node_count:nodes};
 }
 
@@ -87,11 +101,11 @@ function validateJsonArrayPaths(paths){
 export function validateJsonTreeSchema(schema){
  if(!Array.isArray(schema)||!schema.length||schema.length>256||schema[0].is_array||!schema[0].is_container)
   throw Error('JSON tree requires one object root');
- const arrays=schema.filter(n=>n.is_array);if(!arrays.length)throw Error('JSON tree requires a repeated object branch');
+ const arrays=schema.filter(n=>n.is_array&&n.is_container);if(!arrays.length)throw Error('JSON tree requires a repeated object branch');
  validateJsonArrayPaths(arrays.map(n=>n.path));
  const leaves=schema.filter(n=>!n.is_container);
- if(arrays.some(n=>!n.is_container)||new Set(leaves.map(n=>n.name)).size!==leaves.length
-  ||leaves.some(n=>!['integer','real','string','boolean'].includes(n.type)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
+ if(new Set(leaves.map(n=>n.name)).size!==leaves.length
+  ||leaves.some(n=>!['integer','real','string','boolean','datetime'].includes(n.type)))throw Error('JSON tree requires distinct scalar leaf names and supported types');
  return true;
 }
 

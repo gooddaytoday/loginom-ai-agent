@@ -8,6 +8,7 @@ import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-cr
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 import { writeHelp } from "../../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
+import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
 
 const host = await realpath(await mkdtemp(join(tmpdir(), "loginom-cli-test-host-")))
 beforeAll(async () => {
@@ -414,20 +415,27 @@ test.each(["setup-recovery", "permissions", "outcomes", "read-offset", "cancella
     try {
       const bundle = join(directory, "bundle")
       const profile = join(directory, "profile")
-      const files = await copyProductSkillsFixture(bundle)
+      await copyProductSkillsFixture(bundle)
       await writeHelp(join(bundle, "help"))
       await mkdir(join(bundle, "bin"), { recursive: true })
       await mkdir(join(bundle, "runtime/src"), { recursive: true })
-      await symlink(bundledNode, join(bundle, "bin/node"))
+      await cp(bundledNode, join(bundle, "bin/node"))
+      await writeFile(join(bundle, "browser"), "controlled browser payload")
       if (process.platform === "darwin") await buildKeychain(join(bundle, "bin"))
       await cp(host, join(bundle, "host"), { recursive: true })
+      await writeFile(
+        join(bundle, "resource-manifest.json"),
+        JSON.stringify({
+          protocol: 1,
+          nodeVersion: "24.19.0",
+          node: "bin/node",
+          browser: "browser",
+          files: await resourceInventory(bundle),
+        }),
+      )
       await symlink(
         resolve(import.meta.dir, "../../../loginom-runtime/src/knowledge-entry.mjs"),
         join(bundle, "runtime/src/knowledge-entry.mjs"),
-      )
-      await writeFile(
-        join(bundle, "resource-manifest.json"),
-        JSON.stringify({ protocol: 1, files }),
       )
       // Fixture only: handshake/validation succeeds without Chromium, Loginom or a provider.
       await writeFile(

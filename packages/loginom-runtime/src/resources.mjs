@@ -9,9 +9,10 @@ import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 // lab1548-resource-cache: the profile cache is explicitly authorized to trust
 // unchanged metadata. It is not protection against an attacker forging that metadata.
 export async function verifyResources(root, { nodeVersion = process.versions.node, nodePath = process.execPath,
-  manifestHash, signal, cachePath, cacheVersion = '' } = {}) {
+  manifestHash, signal, cachePath, cacheVersion = '', forceHash = false, requireCache = false } = {}) {
   signal?.throwIfAborted();
   if (!isAbsolute(root)) throw Error('LOGINOM_RESOURCES_INVALID');
+  if (requireCache && !cachePath) throw Error('LOGINOM_RESOURCES_INVALID');
   const directory = await realpath(root);
   const metadata = value => Object.fromEntries(['dev','ino','size','mtimeNs','ctimeNs','birthtimeNs']
     .map(key => [key === 'mtimeNs' ? 'mtime' : key === 'ctimeNs' ? 'ctime' : key === 'birthtimeNs' ? 'birthtime' : key, String(value[key]) ]));
@@ -35,7 +36,7 @@ export async function verifyResources(root, { nodeVersion = process.versions.nod
   const localCache = cachePath && relative(directory, cachePath);
   if (cachePath && (!isAbsolute(cachePath) || (!isAbsolute(localCache) && !localCache.startsWith('..' + sep))))
     throw Error('LOGINOM_RESOURCES_INVALID');
-  const stored = cachePath
+  const stored = cachePath && !forceHash
     ? await readFile(cachePath, 'utf8').then(text => { try { return JSON.parse(text); } catch { return undefined; } }, () => undefined) : undefined;
   const cached = stored?.protocol === 1 && stored.root === directory && stored.manifestHash === digest
     && stored.version === cacheVersion && same(stored.installation, installation) && stored.files && typeof stored.files === 'object'
@@ -95,7 +96,11 @@ export async function verifyResources(root, { nodeVersion = process.versions.nod
         version: cacheVersion, installation, files }) + '\n', { flag: 'wx', mode: 0o600 });
       signal?.throwIfAborted();
       await rename(temporary, cachePath);
-    } catch (error) { signal?.throwIfAborted(); /* An unwritable cache cannot certify files or fail a valid full pass. */ }
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (requireCache) throw Error('LOGINOM_RESOURCE_CACHE_WRITE_FAILED', { cause: error });
+      /* Startup can still use a valid full pass without a writable cache. */
+    }
     finally { await rm(temporary, { force: true }).catch(() => {}); }
   }
   return {

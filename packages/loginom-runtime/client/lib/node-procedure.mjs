@@ -1,6 +1,8 @@
 import {makeVariablesReplaceConfigureCode} from './variables-replace-procedure.mjs';
 import {makeConditionConfigureCode} from './control-condition-procedure.mjs';
 import {makeVariablesColumnUnionContextCode} from './variables-coluniondatavar-context.mjs';
+import {makeSupernodeContextCode} from './supernode-context.mjs';
+import {makeSupernodeConfigureCode} from './supernode-procedure.mjs';
 import {makeVariablesCalculatorContextCode} from './variables-calculator-context.mjs';
 import {makeVariablesCalculatorConfigureCode} from './variables-calculator-procedure.mjs';
 import {makeVariablePortMappingCode} from './variable-port-mapping.mjs';
@@ -14,6 +16,8 @@ import {makeLogRegressionContextCode} from './log-regression-context.mjs';
 import {makeLinRegressionContextCode} from './linregression-context.mjs';
 import {makeAutoCorrelationContextCode} from './auto-correlation-context.mjs';
 import {makeCorrAnalysisContextCode} from './corr-analysis-context.mjs';
+import {makePythonContextCode} from './python-context.mjs';
+import {makePythonColumnsCode} from './python-columns.mjs';
 import {makeElimOutlierContextCode} from './elim-outlier-context.mjs';
 import {makeFactorAnalysisContextCode} from './factor-analysis-context.mjs';
 import {makeClusteringContextCode} from './clustering-context.mjs';
@@ -384,7 +388,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
     async configureCondition(settings){return crossTableOwnedStep('condition',settings,makeConditionConfigureCode);},
     async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
+    async configureSupernode(parameters){return crossTableOwnedStep('supernode_boundary',{parameters},makeSupernodeConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
+    async configurePythonColumns(columns) {return crossTableOwnedStep('python_columns',{columns},makePythonColumnsCode);},
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
     async revealGraphNode({target='drawing'}={}) {
@@ -456,7 +462,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesColumnUnion = false, readVariablesCalculator = false, readCalculator = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readVariablesToTable = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readAssnRules = false, readLogRegression = false, readLinRegression = false, readAutoCorrelation = false, readCorrAnalysis = false, readPython = false, readFactorAnalysis = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readVariablesColumnUnion = false, readVariablesCalculator = false, readCalculator = false, readSupernode = false, readJavascript = false, readGrouping = false, readDataToVar = false, readCrossTable = false, readSampling = false, readTrees = false, readSlidingWindow = false, readDateTime = false, readElimOutlier = false, readCoarseClasses = false, readBinning = false, readSmoothing = false, readCollapse = false, readMissingValues = false, readVariablesToTable = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readUngroup = false, readJoin = false, readUnion = false, readEnrich = false, readColUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -479,7 +485,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readAssnRules || readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readVariablesColumnUnion || readVariablesCalculator || readCalculator || readJavascript || readGrouping || readDataToVar || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readVariablesToTable || readSorting || readReplacement || readDuplicates || readReform || readFilter || readUngroup || readJoin || readUnion || readEnrich || readColUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readAssnRules || readLogRegression || readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readVariablesColumnUnion || readVariablesCalculator || readCalculator || readSupernode || readJavascript || readGrouping || readDataToVar || readCrossTable || readSampling || readTrees || readSlidingWindow || readDateTime || readElimOutlier || readCoarseClasses || readBinning || readSmoothing || readCollapse || readMissingValues || readVariablesToTable || readSorting || readReplacement || readDuplicates || readReform || readFilter || readUngroup || readJoin || readUnion || readEnrich || readColUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       if(mappingEditor!==undefined){
         if(!readMappings||!preparedNodeContext)throw Error('Owned input editor requires a prepared full mapping read');
         makeNodeMappingContextCode(preparedNodeContext,mappingEditor);
@@ -751,6 +757,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           result.output.node_auto_correlation=await read(makeAutoCorrelationContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_auto_correlation.node_context&&JSON.stringify(canonical(result.output.node_auto_correlation.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Autocorrelation native owner changed during observation');
         }
+        if(readPython){
+          result.output.node_python=await read(makePythonContextCode(preparedNodeContext),{timeout:readTimeout()});
+          if(result.output.node_python.node_context&&JSON.stringify(canonical(result.output.node_python.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Python native owner changed during observation');
+        }
         if(readCorrAnalysis){
           result.output.node_corr_analysis=await read(makeCorrAnalysisContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_corr_analysis.node_context&&JSON.stringify(canonical(result.output.node_corr_analysis.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Correlation native owner changed during observation');
@@ -861,7 +871,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // prepared node before and after. Preserve them in the same journal
         // observation; they are not an execution or data-freshness claim.
         for (const [requested,key,makeCode] of [[readOutputs,'node_outputs',makeNodeOutputContextCode], [readMappings,'node_mapping',makeNodeMappingContextCode],
-          [readSmoothing,'node_smoothing',makeSmoothingContextCode], [readCoarseClasses,'node_coarse_classes',makeCoarseClassesContextCode], [readBinning,'node_binning',makeBinningContextCode], [readTrees,'node_tree',makeTreeWizardContextCode], [readSampling,'node_sampling',makeSamplingContextCode], [readElimOutlier,'node_elim_outlier',makeElimOutlierContextCode], [readSlidingWindow,'node_sliding_window',makeSlidingWindowContextCode], [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readEnrich,'node_enrich',makeEnrichContextCode], [readColUnion,'node_col_union',makeColUnionContextCode], [readUnion,'node_union',makeUnionContextCode], [readUngroup,'node_ungroup',makeUngroupContextCode], [readJoin,'node_join',makeJoinContextCode], [readVariablesColumnUnion,'node_variables_column_union',makeVariablesColumnUnionContextCode], [readVariablesCalculator,'node_variables_calculator',makeVariablesCalculatorContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readDataToVar,'node_datatovar',makeDataToVarContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readVariablesToTable,'node_variables_to_table',makeVariablesToTableContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
+          [readSmoothing,'node_smoothing',makeSmoothingContextCode], [readCoarseClasses,'node_coarse_classes',makeCoarseClassesContextCode], [readBinning,'node_binning',makeBinningContextCode], [readTrees,'node_tree',makeTreeWizardContextCode], [readSampling,'node_sampling',makeSamplingContextCode], [readElimOutlier,'node_elim_outlier',makeElimOutlierContextCode], [readSlidingWindow,'node_sliding_window',makeSlidingWindowContextCode], [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readEnrich,'node_enrich',makeEnrichContextCode], [readColUnion,'node_col_union',makeColUnionContextCode], [readUnion,'node_union',makeUnionContextCode], [readUngroup,'node_ungroup',makeUngroupContextCode], [readJoin,'node_join',makeJoinContextCode], [readVariablesColumnUnion,'node_variables_column_union',makeVariablesColumnUnionContextCode], [readVariablesCalculator,'node_variables_calculator',makeVariablesCalculatorContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readSupernode,'node_supernode',makeSupernodeContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readDataToVar,'node_datatovar',makeDataToVarContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readVariablesToTable,'node_variables_to_table',makeVariablesToTableContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
           const native=await read(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
@@ -1315,8 +1325,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readClustering:initialObservation?.node_clustering!==undefined,
           readAutoCorrelation:initialObservation?.node_auto_correlation!==undefined,
           readCorrAnalysis:initialObservation?.node_corr_analysis!==undefined,
+          readPython:initialObservation?.node_python!==undefined,
           readTraining:initialObservation?.node_training_read===true,
           readCalculator:initialObservation?.node_calculator!==undefined,
+          readSupernode:initialObservation?.node_supernode!==undefined,
           readJavascript:initialObservation?.node_javascript_schema!==undefined,
           readGrouping:initialObservation?.node_grouping!==undefined,
           readDataToVar:initialObservation?.node_datatovar!==undefined,

@@ -19,7 +19,9 @@ test("browser launch retains a sanitized cause and phase before normalizing the 
       assert.equal(JSON.stringify(error.cause).includes(secret), false)
       return true
     })
-    assert.equal(phases[0].phase, "browser.launch")
+    assert.deepEqual(phases.filter(event=>event.status==='starting').map(event=>event.phase),[
+      "browser.dependencies","browser.profile","browser.launch",
+    ])
     assert.equal(phases.at(-1).status, "failed")
     assert.ok(phases.at(-1).duration_ms >= 0)
   } finally {
