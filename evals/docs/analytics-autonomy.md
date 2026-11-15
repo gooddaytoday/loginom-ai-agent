@@ -42,6 +42,11 @@ admissions всей истории и проверенного release server/pr
 начатые FAIL/NULL не повторять. Код 1 означает running/hold, а не разрешение
 нового запуска; читать точный stderr и unit/native evidence.
 
+Временные browser recovery tools сверять с контрактом verified CLI и source pin
+клиента, а не только начальным tools.json. Их вызовы требуют native handoff,
+совпадающих arguments hashes, bounded budget и завершённой recovery lease;
+полный host cleanup/release проверяется отдельно, исходный FAIL/NULL сохраняется.
+
 Преджурнальный budget refusal допускает отдельную post-exit classification
 `jobs/<id>/budget-refusal.json`: точная сохранённая terminal invocation, полный
 authoritative journal, исходная metadata и SHA budget, закреплённая execution

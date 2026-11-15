@@ -215,6 +215,59 @@ test("audit failure preserves raw FAIL and NULL model outcomes without touching 
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 
+test("dynamic recovery tools require a qualified, bounded and closed native handoff", async () => {
+  const { recoveryToolsCovered } = await import("../src/analytics-measurements")
+  const metadata = { sessionId: "synthetic-runtime", clientRevision: "c".repeat(64),
+    actionManifestDigest: "d".repeat(64), targetIdentity: { platform: "linux" }, archiveActive: false, resultProfile: "user-v1" }
+  const common = { session_id: metadata.sessionId, runtime_revision: metadata.clientRevision,
+    manifest_sha256: metadata.actionManifestDigest, target: metadata.targetIdentity, attempt_id: "synthetic-attempt", operation_id: "step" }
+  const input = { depth: 2 }
+  const calls: Parameters<typeof recoveryToolsCovered>[0]["calls"] = [
+    { tool: "loginom_dock_browser_recovery", status: "completed", input: { action: "start", operation_id: "step" } },
+    { tool: "loginom_browser_snapshot", status: "completed", input },
+    { tool: "loginom_dock_browser_recovery", status: "error", input: { action: "finish", operation_id: "step" } },
+    { tool: "loginom_dock_browser_recovery", status: "completed", input: { action: "stop", operation_id: "step" } },
+  ]
+  const records: Parameters<typeof recoveryToolsCovered>[0]["records"] = [
+    { ...common, phase: "browser_recovery_started", budget: { calls_left: 30, ms_left: 600000 } },
+    { ...common, phase: "browser_recovery_handoff", stopped: true },
+    { ...common, phase: "browser_recovery_action", tool: "browser_snapshot",
+      arguments_sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(input)).digest("hex"),
+      is_error: false, transport_error: null, page: { ok: true }, budget: { calls_left: 29, ms_left: 599000 } },
+    { ...common, phase: "browser_recovery_stopped", cleanup: { state: "retained" } },
+  ]
+  const sample = { calls, records, metadata, qualifiedRevision: metadata.clientRevision, browserTools: ["browser_snapshot"] }
+  expect(recoveryToolsCovered(sample)).toBe(true)
+  const verified = structuredClone(sample)
+  verified.records.splice(3, 1, { ...common, phase: "browser_recovery_attested" },
+    { ...common, phase: "browser_recovery_verified", status: "completed" })
+  verified.calls[3] = { tool: "loginom_dock_browser_recovery", status: "completed",
+    input: { action: "finish", operation_id: "step", actions_performed: ["inspected"] } }
+  expect(recoveryToolsCovered(verified)).toBe(true)
+  for (const change of ["no-handoff", "no-stop", "foreign-session", "foreign-operation", "unqualified", "page",
+    "transport", "budget", "arguments", "unknown-tool", "archive", "extra-action", "no-native", "runtime", "manifest", "target", "cleanup"]) {
+    const changed = structuredClone(sample)
+    if (change === "no-handoff") changed.records.splice(1, 1)
+    if (change === "no-stop") changed.records.pop()
+    if (change === "foreign-session") changed.records[2]!.session_id = "foreign"
+    if (change === "foreign-operation") changed.calls[0]!.input.operation_id = "foreign"
+    if (change === "unqualified") changed.qualifiedRevision = "f".repeat(64)
+    if (change === "page") changed.records[2]!.page!.ok = false
+    if (change === "transport") Object.assign(changed.records[2]!, { transport_error: "unknown" })
+    if (change === "budget") changed.records[2]!.budget!.calls_left = -1
+    if (change === "arguments") changed.calls[1]!.input.depth = 3
+    if (change === "unknown-tool") changed.calls[1]!.tool = "loginom_browser_evaluate"
+    if (change === "archive") changed.metadata.archiveActive = true
+    if (change === "extra-action") changed.records.splice(3, 0, structuredClone(changed.records[2]!))
+    if (change === "no-native") changed.records = []
+    if (change === "runtime") changed.records[2]!.runtime_revision = "f".repeat(64)
+    if (change === "manifest") changed.records[2]!.manifest_sha256 = "f".repeat(64)
+    if (change === "target") changed.records[2]!.target = { foreign: true }
+    if (change === "cleanup") changed.records[3]!.cleanup = { state: "unknown" }
+    expect(recoveryToolsCovered(changed)).toBe(false)
+  }
+})
+
 test("frozen measurement inputs reject later task or rubric changes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "measurement-inputs-"))
   try {
