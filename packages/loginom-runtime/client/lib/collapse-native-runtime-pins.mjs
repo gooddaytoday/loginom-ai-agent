@@ -76,3 +76,9 @@ export const nativeVariablePins=Object.freeze({
  value:'0ce6df6e9853a87dc5e889bb44a12db70667e4aecbb721791b0bb0beb4a6cc6e',
  as_variant:'5ff1769d77da67f4be54cf8f51de8e17e85a55a4f0aa24db6da8f8434d958b8d',
 });
+
+// LAB-1668 / R3: tree141 -> reader166, internal2178 GetAsVariant7230.
+export const nativeTreePins=Object.freeze({
+ get_reader:'ca82cebf714d2854aeb1adc60dfc0678e7d19844348760303937e4a6d41cd730',
+ get_as_variant:'29323b4c72312231cd0781a87aafba588ada0fa952f84770fc376617f37db36e',
+});
