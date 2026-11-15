@@ -241,30 +241,57 @@ bun run build
 
 Evidence и одноразовые probes остаются в `$M4_SCRATCH/task6-*`; исходные tests и actual-container proof разделены в локальном отчёте Task 6. Штатный installer check также PASS: HTTP/headers/assets, минифицированный `/app/` и `/app-debug/`, live table API, Close+Logout. Это dev-container проверка master, не установленная приёмка Desktop/CLI M4. Внешняя corruption сохранённых сборок и crash-temp housekeeping не входят в контракт. Task 7, миграция, push/merge/release не выполнялись; следующий gate — независимый review Task 6.
 
-## Task 7 — подготовка поставки
+## Task 7 — промежуточная поставка и сохранный переход
 
 Task 6 принят независимыми Spec/Quality review без обязательных замечаний.
-В существующем unit job Node проверяет private dashboard storage и managed close;
-`test:coverage` отдельно измеряет весь web и publisher/builder с порогами 90%
-строк и функций. Browser job проверяет JSON-конфигурацию installer и Compose;
-шаблон на трёх ОС и browser job сохранены. Нового staging/manifest механизма нет:
-`runtime/src` входит целиком, клиент не получает серверные роли.
+В существующие задачи CI добавлены private storage/managed close, installer/Compose checks;
+web и полный publisher/builder scope измеряются отдельно с порогом 90% строк/функций.
+Skill и профильные инструкции отражают builtin/open, сохранение src, pending/unknown,
+осознанную замену и ручной откат; staging и metadata-only manifest не менялись.
 
-Локальный итоговый source gate: dashboard typecheck/test/size PASS, web27 и
-workers24 с покрытием 97,13/96,30% и 98,79/93,02% строк/функций, остальные Node50.
-Browser239 PASS выявил устаревший test-import `appHost` из bundle; адресный тест
-с реальным `src/web/apps.ts` прошёл 5/5. Host96 PASS; его noEmit typecheck
-разрешил `.ts` imports общей сборки и прошёл после этой адресной правки.
-Desktop18 PASS/2 платформенных SKIP, backend60, UI2+13, runtime19 и typecheck
-Desktop/backend/UI PASS. Эти проверки не подтверждают установленный продукт.
+Source gate: dashboard typecheck/test/size PASS, web27 и workers24 с покрытием
+97,13/96,30% и 98,79/93,02% строк/функций, остальные Node50. Browser239 PASS +
+исторический1 FAIL устаревшего appHost test-import → адресный template5 PASS.
+Host96, Desktop18/2 платформенных SKIP, backend60, UI2+13, runtime19 и
+Host/Desktop/backend/UI typecheck PASS. SKIP — macOS bundle/linker seals.
+CLI installed race исправлен существующим connection.ready внутри readPublication:
+local fallback сохранён, fresh отказ не запускает модель. RED→GREEN, затем CLI6 PASS;
+последующий test-only observer actual IPC для SIGINT проверен отдельно:1 PASS/56 assertions.
 
-Первый установленный CLI выявил гонку: dashboard начинал чтение публикации,
-пока Knowledge ещё восстанавливал каталог. Перед чтением CLI теперь ждёт
-существующий `connection.ready` внутри callback подготовки черновика: отказ
-сохраняет открытие локальных src, а свежий черновик не запускает модель.
-RED→GREEN и CLI6/6 проверяют задержанный каталог, отказ и SIGINT во время
-ожидания с освобождением профиля; прежние allow/deny и отмена чтения сохранены.
-Новая общая поставка Desktop/CLI и её установленная приёмка ещё предстоят.
-Сохранный M3-переход продолжается.
-Полноценная release7.4.x по условию roadmap остаётся перенесённой в M5;
-искусственная пара7.4.2 не заменяет этот результат.
+Проверенная промежуточная Linux-пара: `0.3.10-m4.20261115.2`, source
+`a6b5ca3c02e5c94af588b1d3c1552b064b4a0bdf`, prod/backendV1/browser recovery.
+Полные Desktop DEB/AppImage и CLI archive, clean manifests/static checks и11408
+installed runtime resources PASS. Desktop заменён через dpkg с сохранённым M3 backup;
+CLI установлен штатно в собственный HOME, общий пользовательский CLI launcher не заменён.
+Normal HOME/XDG, дисковая история и provider auth собственных прежних профилей сохранены.
+
+Installed master: Desktop/CLI → настоящий Studio snapshot → реальная модель → draft →
+разовое разрешение/явный CLI auto → собственный ready → Dashboard с5живыми строками PASS.
+Проверены local/downloaded src, Desktop Deny, ACL ACCESS_DENIED в общей read-only папке,
+успешная публикация в writable common и создание новой публикации. Байты .lgp сохранены.
+SIGTERM только compiler child новой собственной задачи дал failed; старая страница осталась.
+Опубликованный .lgp с sidecar также открыт на существующем отдельном стенде без
+компонентов dashboard, байты прежние. На искусственной7.4.2 копия помечена изменённой
+в памяти; обычный Logout не подтверждён из-за модального слоя. Собственный Server
+очищен разрешённым maintenance-перезапуском: долговечные файлы UserStorage сохранены,
+удалён только lock этой собственной копии.
+Штатные лимиты не менялись. Native удаление двух сохранённых own JSON вернуло прежний ready;
+это операторская проверка отказа и ручного отката, не ошибка валидных src в обычной среде.
+
+Освобождённая M3 тройка штатно остановлена и сохранена вместе с private images, полным
+UserStorage, legacy host dashboard и раздельными Desktop/CLI src/control. Новые labelled
+Server/Studio/volume сохраняют прежний origin. Streamed docker cp -a не сохранил UID1000;
+штатный GNU tar с numeric ownership внутри rootless namespace исправил перенос.
+Destination read-back:21исходная запись, все bytes/UID/GID/modes/types/links совпали.
+Основной ROI открыт, сохранённые3src перепубликованы установленным Desktop без изменений;
+own ready, native Dashboard5rows, installer check /app/+/app-debug/, .lgp и все старые bytes PASS.
+Publisher монтирует новый UserStorage RO. Старые контейнеры/данные не удалены; rollback не выполнялся.
+
+Evidence и точные операционные команды остаются вне Git: `$M4_SCRATCH/task7-delivery-2`
+и `$M4_SCRATCH/task7-migration`; исходные FAIL сохранены в локальном Task7 report.
+Native Close/Logout отделён от32 resource ACK+actual exit0; историческая причина
+Knowledge ACK→SIGKILL остаётся UNKNOWN. Full release7.4.x условно перенесена в M5.
+**Task7/M4 ещё не приняты:** whole-branch review требует исправить concurrent local build/prune,
+Desktop cold pre-chat readiness и удержание payload pending-очереди publisher.
+Следующий шаг — согласованная fix-wave, новая общая .3 поставка и адресные installed повторы.
+Push/merge/release и очистка прежних данных не выполнялись.
