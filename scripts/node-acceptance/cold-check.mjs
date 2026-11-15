@@ -489,12 +489,12 @@ page = context.pages()[0]
    data=read.output;
   }
   // Variant cells have no exact table-visualizer proof; read them through the completed port.
-  const variantPortRead=target.type==='transform.replace_columns'&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
+  const variantPortRead=['transform.replace_columns','transform.group_data'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
   if(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
    const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true,
-    ...(variantPortRead||['variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)?{typedVariants:true}:{}),...(variantPortRead?{variantEmptyIsNull:true}:{})});
+    ...(variantPortRead||['variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)?{typedVariants:true}:{}),...(variantPortRead&&target.type==='transform.replace_columns'?{variantEmptyIsNull:true}:{})});
    if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error(target.type==='research.quality'?'COLD_QUALITY_TABLE_INCOMPLETE':'COLD_TREE_TABLE_INCOMPLETE');
    data=read.output;
   }
