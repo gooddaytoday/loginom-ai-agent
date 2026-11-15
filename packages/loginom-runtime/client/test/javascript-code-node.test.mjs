@@ -76,6 +76,16 @@ test('reapplying Execute to an existing FS source performs two more append effec
  assert.deepEqual(ledger,['run','run','run','run']);
 });
 
+for(const fault of ['declared-execute','declared-reapply','declared-done-downstream','declared-stale-output'])
+test('declared single execution lifecycle: '+fault,()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const {ledger,outcome}=JSON.parse(result.stdout.trim());
+ assert.equal(ledger.length,fault==='declared-reapply'?2:fault==='declared-stale-output'?0:1);
+ if(outcome){const validation=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(outcome);assert.equal(validation.valid,true,JSON.stringify(validation));}
+});
+
 for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-configure-cancel.mjs',import.meta.url)),point],{encoding:'utf8',timeout:10000});

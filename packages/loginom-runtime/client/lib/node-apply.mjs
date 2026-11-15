@@ -448,7 +448,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
       else requireValue(value.mode==='done'&&value.settings_applied===true&&value.execution_started===false&&value.execution_id==null,
         'Intermediate node Done must save settings without execution');
     }});
-    if(materialize){
+    const declaredOutput=materialize&&state.phases.find(p=>p.phase==='node_finish')?.value?.schema_mode==='declared';
+    if(declaredOutput){
+      // Native declared columns already expose complete output mapping before
+      // Execute. Keep the existing receipt vocabulary without inventing a run.
+      for(const name of ['materialization_start','materialization_execute']){
+        const prior=state.phases.find(p=>p.phase===name);
+        if(prior){requireValue(prior.status==='not_requested','Declared materialization was already dispatched');continue;}
+        check();
+        const receipt={phase:name,receipt_id:operation.id+':'+name,status:'not_requested',effect_possible:false,
+          value:{verified:true,cleanup_complete:true,effect_possible:false,materialization_required:false,schema_mode:'declared'}};
+        await acknowledge({phase:'node_phase_completed',signature,receipt});
+        state.phases.push(receipt);
+      }
+    }else if(materialize){
       const first=await phase('materialization_start',ctx=>drivers.materializeOutput(ctx),{verify:value=>requireValue(
         value.mode==='execute'&&id(value.execution_id),'Materialization requires a fresh execution identity')});
       state.execution={status:'pending',execution_id:first.execution_id};

@@ -74,12 +74,18 @@ export function javascriptCodeReadback({node,phases}) {
   const mapping=phases.find(phase=>phase.phase==='output_mapping')?.value?.native_mapping;
   const first=phases.find(phase=>phase.phase==='materialization_execute')?.value;
   const final=phases.find(phase=>phase.phase==='execute')?.value;
+  const declarationOnly=configured?.schema_mode==='declared'
+    &&['materialization_start','materialization_execute'].every(name=>{
+      const receipt=phases.find(p=>p.phase===name);
+      return receipt?.status==='not_requested'&&receipt.effect_possible===false
+        &&receipt.value?.materialization_required===false&&receipt.value.schema_mode==='declared';
+    });
   need(configured?.source_readback_verified===true&&configured.wizard_commit_verified===true
     &&(configured.schema_mode!=='declared'||Array.isArray(configured.declared_columns)&&configured.declared_columns.length>0)
     &&input?.verified===true&&input.source_identity_verified===true
     &&mapping?.verified===true&&mapping.source_identity_verified===true
-    &&first?.owner_verified===true&&first.status==='completed'&&final?.owner_verified===true
-    &&final.status==='completed'&&first.execution_id!==final.execution_id,
+    &&(declarationOnly||first?.owner_verified===true&&first.status==='completed'&&first.execution_id!==final?.execution_id)
+    &&final?.owner_verified===true&&final.status==='completed',
     'JavaScript Code lifecycle readback incomplete');
   return {kind:'javascript',scope:'observed_after_verified_finish',node,
     receipt_ids:phases.map(phase=>phase.receipt_id),values_are:'independent_owned_source_readback',schema_mode:configured.schema_mode??'code',
@@ -95,7 +101,7 @@ export function javascriptCodeReadback({node,phases}) {
 export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor,requireWizardErrorDetails=false}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
     &&typeof redactor?.redact==='function'&&typeof requireWizardErrorDetails==='boolean','JavaScript Code runtime dependencies unavailable');
-  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v5',modes:['script'],
+  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v6',modes:['script'],
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
@@ -238,9 +244,16 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         const direction=ctx.receipt_id===operation.id+':input_mapping'?'input'
           :ctx.receipt_id===operation.id+':output_mapping'?'output':null;
         need(direction,'JavaScript mapping phase unavailable');
-        if(direction==='output')need(executionReceipt?.status==='completed'&&executionReceipt.owner_verified===true,
+        if(direction==='output')need(doneReceipt?.schema_mode==='declared'
+          ||executionReceipt?.status==='completed'&&executionReceipt.owner_verified===true,
           'Owned materialization execution required before output mapping');
         const mapping=await readMapping(direction,ctx);
+        if(direction==='output'&&doneReceipt?.schema_mode==='declared'){
+          const columns=doneReceipt.declared_columns;
+          need(Array.isArray(columns)&&columns.length>0&&mapping.source_fields.length===columns.length
+            &&columns.every((column,index)=>['index','name','label','type'].every(key=>mapping.source_fields[index][key]===column[key])),
+            'JavaScript declared output source schema changed before Execute');
+        }
         if(direction==='input')inputMapping=mapping;
         if(direction==='output')outputMapping=mapping;
         return verified({effect_possible:true,native_mapping:mapping,mapping_changes:0});
@@ -372,7 +385,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           need(Object.keys(proof).every(key=>same(ack?.[key],proof[key])),'JavaScript final Done ACK differs');
           return {...doneReceipt};
         }
-        need(mode==='execute'&&outputMapping&&executionReceipt?.status==='completed',
+        need(mode==='execute'&&outputMapping&&(doneReceipt?.schema_mode==='declared'||executionReceipt?.status==='completed'),
           'JavaScript final Execute requires completed materialization and full output mapping');
         return withJavascriptSourcePolicyBoundary({phase:'finish',owner,deadline:ctx.deadline,record:onRecord},async()=>{
           const fresh=policyAdmission('existing',owner,ctx.deadline,expected,configured.settings_sha256),receipt=await fresh.admit({});

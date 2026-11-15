@@ -39,9 +39,9 @@ or move unrelated standard operations into it.
 Для неподключённого источника: inputs:[] и parameters.input_state:"unconnected".
 Runtime проверит отсутствие входящих связей и пустой native input mapping;
 пустая подключённая таблица — другой случай. Этот же input_state нужен при
-повторном выполнении/изменении источника. Each dock_node_apply with finish:execute
-runs the script twice, including existing nodes: materialize, map, reactivate.
-Only cold/downstream execution runs once. Preserve partial failures;
+повторном выполнении/изменении источника. Declared output: apply execute maps first,
+then runs once, including existing nodes. Code-generated output still runs twice:
+materialize, map, reactivate. Cold/downstream runs once. Preserve partial failures;
 never retry unknown effects.
 В обычной табличной ветке input_state опускай.
 
