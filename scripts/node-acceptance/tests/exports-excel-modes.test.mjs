@@ -103,3 +103,26 @@ test('missing folder refuses after parent/listing settled, including an empty di
   const result=await rootTransition(t,{missing:true,empty});assert.match(String(result.error),/FS_STORAGE_FOLDER_NOT_FOUND:\/worker\/missing\//);
  }
 });
+
+test('the actual ZIP audit reveals an offscreen folder before selecting Download',async()=>{
+ const source=await readFile(script,'utf8');
+ const start=source.indexOf("  const {prefix,at}=await storageDirectory(target.slice"),end=source.indexOf('  await download.delete();',start)+'  await download.delete();'.length;
+ assert.ok(start>0&&end>start);
+ const records=Array.from({length:90},(_,i)=>({data:{FileName:'folder'+i,FilePath:'/worker/folder'+i+'/',Type:1}}));
+ let lastVisible=57,selected=false,saved=false,deleted=false;
+ const grid={id:'grid',contains:()=>true,set scrollTop(value){lastVisible=Math.floor(value/24)+57;}};
+ const visible=()=>lastVisible>=66;
+ const row={waitFor:async()=>assert.ok(visible(),'Audit row remains outside the virtual DOM window'),count:async()=>visible()?1:0,
+  click:async()=>{assert.ok(visible());selected=true;}};
+ const grids={count:async()=>1,evaluate:async(fn,args)=>fn(grid,args),locator:()=>row};
+ const view={getStore:()=>({isLoading:()=>false,getCount:()=>90,getTotalCount:()=>90,getRange:()=>records}),
+  bufferedRenderer:{rowHeight:24},getNode:record=>visible()?{record,querySelector:()=>({textContent:record.data.FileName})}:null,getRecord:node=>node.record};
+ const at=tid=>tid.endsWith(';btnDownload')?{click:async()=>assert.equal(selected,true)}:row;
+ const page={locator:()=>grids,waitForEvent:async()=>({saveAs:async()=>{saved=true;},failure:async()=>null,delete:async()=>{deleted=true;}})};
+ const events=[],context={page,storageDirectory:async()=>({prefix:'MF;TF-1',at}),target:'/worker/folder66',output:'unused',
+  record:async e=>events.push(e),execute:async()=>({}),makeWorkspaceUiCode:()=>'',config:{login:{url:'https://app.loginom.ai/'}},URL,
+  Ext:{getCmp:()=>view}};
+ const run=runInNewContext(source.slice(source.indexOf('async function waitStorageParent('))+'\n(async()=>{'+source.slice(start,end)+'})',context);
+ await run();assert.equal(saved,true);assert.equal(deleted,true);
+ assert.equal(events.find(e=>e.phase==='fs_audit_folder_resolved')?.index,66);
+});

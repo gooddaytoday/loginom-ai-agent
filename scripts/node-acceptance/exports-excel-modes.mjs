@@ -185,8 +185,10 @@ try{
    await runtime.cleanupServerCache();
   }else{
   const {prefix,at}=await storageDirectory(target.slice(0,target.lastIndexOf('/')));
-  const name=target.split('/').at(-1),row=at(prefix+';FileStorageForm;colName_'+name);
-  await row.waitFor({state:'visible'});if(await row.count()!==1)throw Error('FS_AUDIT_ROW_AMBIGUOUS');
+  const name=target.split('/').at(-1),grids=page.locator('[data-tid='+JSON.stringify(prefix+';FileStorageForm;pnlFileStorage;tbl')+']:visible');
+  const {row,moved}=await storageFolderRow(grids,{part:name,parent:target.slice(0,target.lastIndexOf('/'))+'/',
+   path:target+'/',tid:prefix+';FileStorageForm;colName_'+name});
+  await record({phase:'fs_audit_folder_resolved',directory:target,...moved});
   await row.click();
   await record({phase:'fs_folder_download_prepared',directory:target,
    observation:await execute(makeWorkspaceUiCode({mode:'observe',expected_origin:new URL(config.login.url).origin,expected_build:'7.4.2'}))});
@@ -224,14 +226,10 @@ async function storageDirectory(directory){
  for(const part of directory.slice(1).split('/')){
   const tid=prefix+';FileStorageForm;colName_'+part.replace(/\s/g,'_').replace(/,/g,'');
   const lookup={part,parent:parent+'/',path:parent+'/'+part+'/',tid};
-  let moved;try{moved=await grids.evaluate(storageFolderRecord,{...lookup,scroll:true});}
+  let resolved;try{resolved=await storageFolderRow(grids,lookup);}
   catch(error){await capture('lookup_refused');await page.screenshot({path:output+'/storage-refused.png',fullPage:true});throw error;}
-  await record({phase:'fs_storage_folder_resolved',directory,...lookup,...moved});
-  const row=grids.locator('[data-tid='+JSON.stringify(tid)+']');
-  await row.waitFor({state:'visible'});
-  await grids.evaluate(storageFolderRecord,{...lookup,visible:true});
-  if(await row.count()!==1)throw Error('FS_STORAGE_FOLDER_DOM_AMBIGUOUS:'+lookup.path);
-  await row.dblclick();parent+='/'+part;
+  await record({phase:'fs_storage_folder_resolved',directory,...lookup,...resolved.moved});
+  await resolved.row.dblclick();parent+='/'+part;
   listing=await waitStorageParent(page,{parent:parent+'/',previous:listing});
   prefix=listing.grid_tid.split(';FileStorageForm;')[0];
   await record({phase:'fs_storage_navigation',point:'folder_settled',directory,state:listing});
@@ -243,6 +241,16 @@ async function storageDirectory(directory){
 async function waitStorageParent(page,{parent,previous}){
  const handle=await page.waitForFunction(storageFolderListing,{parent,previous});
  try{return await handle.jsonValue();}finally{await handle.dispose();}
+}
+
+async function storageFolderRow(grids,lookup){
+ if(await grids.count()!==1)throw Error('FS_STORAGE_GRID_AMBIGUOUS');
+ const moved=await grids.evaluate(storageFolderRecord,{...lookup,scroll:true});
+ const row=grids.locator('[data-tid='+JSON.stringify(lookup.tid)+']');
+ await row.waitFor({state:'visible'});
+ await grids.evaluate(storageFolderRecord,{...lookup,visible:true});
+ if(await row.count()!==1)throw Error('FS_STORAGE_FOLDER_DOM_AMBIGUOUS:'+lookup.path);
+ return {row,moved};
 }
 
 // Native sender binds the current directory; loadCount binds its refreshed
