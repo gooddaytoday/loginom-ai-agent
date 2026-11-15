@@ -38,7 +38,7 @@ else
 fi
 bundle=$(cd "$(dirname "$0")" && pwd)
 state=/var/opt/loginom-dashboard
-[[ $engine != podman ]] || state=${XDG_DATA_HOME:-$HOME/.local/share}/loginom-dashboard
+[[ $engine != podman ]] || state=$HOME/loginom-dashboard
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 saved() { sed -n "s/^$1=//p" "$state/.env"; }
