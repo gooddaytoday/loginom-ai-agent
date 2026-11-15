@@ -6,8 +6,8 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-test("login network diagnostics are bounded numeric timings without request identifiers or secrets", () => {
-  const page = new EventEmitter(), trace = trackLoginNetwork(page)
+test("login network diagnostics retain the whole login chain and remain bounded without secrets", async () => {
+  const page = new EventEmitter(), trace = await trackLoginNetwork(page)
   const sensitive = () => { throw Error("PRIVATE_REQUEST_URL_HEADERS_BODY") }
   const request = (type = "script") => ({ resourceType: () => type,
     timing: () => ({ domainLookupStart: 0, domainLookupEnd: 2, connectStart: 2, secureConnectionStart: 3,
@@ -27,13 +27,49 @@ test("login network diagnostics are bounded numeric timings without request iden
   assert.equal(JSON.stringify(event).includes("PRIVATE"), false)
   for (let i = 0; i < 600; i++) { const r = request(); page.emit("request", r); page.emit("requestfinished", r) }
   const bounded = trace.snapshot()
-  assert.equal(bounded.completed.length + bounded.pending.length, 256)
-  assert.equal(bounded.dropped, 347)
-  trace.close()
+  assert.equal(bounded.completed.length + bounded.pending.length, 603)
+  assert.equal(bounded.dropped, 0)
+  for (let i = 0; i < 4000; i++) { const r = request(); page.emit("request", r); page.emit("requestfinished", r) }
+  assert.equal(trace.snapshot().completed.length + trace.snapshot().pending.length, 4096)
+  assert.equal(trace.snapshot().dropped, 507)
+  await trace.close()
   assert.equal(page.listenerCount("request"), 0)
   assert.equal(page.listenerCount("requestfinished"), 0)
   assert.equal(page.listenerCount("requestfailed"), 0)
   assert.equal(event.completed.length, 2)
+})
+
+test("Chromium network diagnostics retain MIME, 304 and byte counts without touching private fields", async () => {
+  const session = new EventEmitter(), commands = []
+  let detached = 0
+  session.send = async command => commands.push(command)
+  session.detach = async () => { detached++ }
+  const trace = await trackLoginNetwork({ context: () => ({ newCDPSession: async () => session }) })
+  const secret = () => { throw Error("PRIVATE-NETWORK-SECRET") }
+  const headers = { "Cache-Control": "no-cache" }
+  Object.defineProperty(headers, "Set-Cookie", { enumerable: true, get: secret })
+  const request = { requestId: "private-id", type: "XHR", timestamp: 10 }
+  Object.defineProperty(request, "request", { get: secret })
+  session.emit("Network.requestWillBeSent", request)
+  session.emit("Network.responseReceivedExtraInfo", { requestId: "private-id", statusCode: 304 })
+  const response = { mimeType: "application/javascript", status: 200, headers,
+    timing: { requestTime: 10, dnsStart: 0, dnsEnd: 1, connectStart: 1, connectEnd: 4, sslStart: 2, sslEnd: 4, sendEnd: 5, receiveHeadersStart: 7, receiveHeadersEnd: 8 } }
+  Object.defineProperty(response, "url", { get: secret })
+  session.emit("Network.responseReceived", { requestId: "private-id", timestamp: 10.008, response })
+  session.emit("Network.loadingFinished", { requestId: "private-id", timestamp: 10.020, encodedDataLength: 423 })
+  const result = trace.snapshot()
+  assert.equal(result.source, "chromium")
+  assert.equal(result.observer_errors, 0)
+  assert.deepEqual(commands, ["Network.enable"])
+  assert.equal(result.completed[0].mime, "javascript")
+  assert.equal(result.completed[0].wire_status, 304)
+  assert.equal(result.completed[0].no_cache, true)
+  assert.equal(result.completed[0].wire_bytes, 423)
+  assert.equal(result.completed[0].server_ms, 2)
+  assert.equal(JSON.stringify(result).includes("private"), false)
+  await trace.close(); await trace.close()
+  assert.equal(detached, 1)
+  assert.equal(session.eventNames().length, 0)
 })
 
 test("browser launch retains a sanitized cause and phase before normalizing the error", async () => {

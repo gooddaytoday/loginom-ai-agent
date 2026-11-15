@@ -49,8 +49,12 @@ async function handle(message) {
         || typeof input.helpRoot !== 'string' || !isAbsolute(input.helpRoot)
         || Object.keys(input).some(key => !['protocol', 'generation', 'helpRoot'].includes(key)))
         throw Error('LOGINOM_START_INVALID');
-      state.client = createKnowledgeClient({ ...input, onPhase: event => appendFile('startup-phases.jsonl',
-        JSON.stringify({ version: 1, recorded_at: new Date().toISOString(), ...event }) + '\n', { mode: 0o600 }) }, state.controller.signal);
+      const cpu = process.cpuUsage();
+      state.client = createKnowledgeClient({ ...input, onPhase: event => {
+        const used = process.cpuUsage(cpu);
+        return appendFile('startup-phases.jsonl', JSON.stringify({ version: 1, recorded_at: new Date().toISOString(),
+          ...event, cpu_ms: Math.round((used.user + used.system) / 1000) }) + '\n', { mode: 0o600 });
+      } }, state.controller.signal);
       // Readiness is observed through list; admission of start does not wait for the Help index.
       void state.client.catch(() => {});
       send({ id: message.id, result: { protocol: 1, generation: input.generation, started: true } });
