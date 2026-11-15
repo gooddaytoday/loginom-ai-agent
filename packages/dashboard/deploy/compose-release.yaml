@@ -18,7 +18,7 @@ services:
     mem_limit: 512m
     pids_limit: 64
     tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
-    volumes: ["${DASHBOARD_STATE:?}/builds:/builds:ro"]
+    volumes: ["${DASHBOARD_STATE:?}/builds:/builds:ro,z"]
     networks: [studio]
     ports: ["${DASHBOARD_APP_HOST_PORT:?}:8101"]
     environment:
@@ -39,10 +39,10 @@ services:
     pids_limit: 64
     tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
     volumes:
-      - ${DASHBOARD_USERSTORAGE:?}:/storage:ro
-      - ${DASHBOARD_STATE:?}/builds:/builds:rw
-      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:rw
-      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw
+      - ${DASHBOARD_USERSTORAGE:?}:/storage:ro,z
+      - ${DASHBOARD_STATE:?}/builds:/builds:rw,z
+      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:rw,z
+      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw,z
   builder:
     <<: *common
     container_name: loginom-dashboard-builder
@@ -53,9 +53,9 @@ services:
     pids_limit: 256
     tmpfs: ["/tmp:rw,noexec,nosuid,size=512m,mode=1777"]
     volumes:
-      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:ro
-      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw
+      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:ro,z
+      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw,z
 networks:
   studio:
-    external:
-      name: ${DASHBOARD_NETWORK:?}
+    external: true
+    name: ${DASHBOARD_NETWORK:?}

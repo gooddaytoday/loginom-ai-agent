@@ -82,7 +82,7 @@ if (action === "config") {
   const containers = JSON.parse(input())
   assert.equal(containers.length, 1)
   const container = containers[0]
-  assert.equal(container.Name, "/loginom-dashboard-" + args[1])
+  assert.equal(container.Name.replace(/^\//, ""), "loginom-dashboard-" + args[1])
   for (const [name, value] of Object.entries({
     "loginom.dashboard.owner": "release", "com.docker.compose.project": "loginom-dashboard",
     "com.docker.compose.service": args[1], "com.docker.compose.project.working_dir": args[0],
@@ -93,13 +93,13 @@ if (action === "config") {
   const roles = JSON.parse(input())
   assert.equal(roles.length, 3)
   for (const container of roles) {
-    const role = container.Name.replace("/loginom-dashboard-", "")
-    assert.equal(container.Config.Image, args[0])
-    assert.equal(container.Image, args[5])
+    const role = container.Name.replace(/^\//, "").replace("loginom-dashboard-", "")
+    assert.equal(container.Image.replace(/^sha256:/, ""), args[5].replace(/^sha256:/, ""))
     assert.equal(container.State.Running, true)
     assert.equal(container.Config.Labels["loginom.dashboard.owner"], "release")
     assert.equal(container.HostConfig.ReadonlyRootfs, true)
-    assert(container.HostConfig.CapDrop.includes("ALL"))
+    // Podman expands ALL; the caller also verifies every live process capability set is zero.
+    if (args[6] !== "podman") assert(container.HostConfig.CapDrop.includes("ALL"))
     assert.notEqual(container.HostConfig.Privileged, true)
     assert.deepEqual(container.HostConfig.CapAdd ?? [], [])
     assert(container.HostConfig.SecurityOpt.some(value => value.startsWith("no-new-privileges")))

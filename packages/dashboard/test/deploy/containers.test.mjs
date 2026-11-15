@@ -27,7 +27,7 @@ for (const [name, args, error] of [
   }
 })
 
-function inspectPublisher(overrides = {}) {
+function inspectPublisher(overrides = {}, engine = "docker") {
   const imageID = "sha256:" + "1".repeat(64)
   const mounts = {
     web: [["builds", "/builds", false]],
@@ -35,12 +35,12 @@ function inspectPublisher(overrides = {}) {
     builder: [["jobs-in", "/jobs-in", false], ["jobs-out", "/jobs-out", true]],
   }
   const roles = Object.entries(mounts).map(([role, volumes]) => ({
-    Name: "/loginom-dashboard-" + role,
-    Image: imageID,
+    Name: (engine === "docker" ? "/" : "") + "loginom-dashboard-" + role,
+    Image: engine === "docker" ? imageID : imageID.slice(7),
     Config: { Image: "dashboard:test", User: role === "publisher" ? "1234:1234" : "65534:65534", Labels: { "loginom.dashboard.owner": "release" } },
     State: { Running: true },
     HostConfig: {
-      ReadonlyRootfs: true, CapDrop: ["ALL"], CapAdd: null, Privileged: false,
+      ReadonlyRootfs: true, CapDrop: engine === "docker" ? ["ALL"] : ["CAP_CHOWN", "CAP_DAC_OVERRIDE"], CapAdd: null, Privileged: false,
       SecurityOpt: ["no-new-privileges"], Memory: 128 * 1024 * 1024, PidsLimit: 64,
       Tmpfs: { "/tmp": "rw,noexec,nosuid,size=16m" }, NetworkMode: role === "web" ? "synthetic-network" : "none", PortBindings: {},
       ...(role === "publisher" ? overrides : {}),
@@ -52,10 +52,14 @@ function inspectPublisher(overrides = {}) {
     ],
   }))
   return spawnSync(process.execPath, [fileURLToPath(new URL("../../deploy/check-release.mjs", import.meta.url)), "roles",
-    "dashboard:test", "/synthetic/storage", "/synthetic/state", "1234:1234", "synthetic-network", imageID], {
+    "dashboard:test", "/synthetic/storage", "/synthetic/state", "1234:1234", "synthetic-network", imageID, engine], {
     input: JSON.stringify(roles), encoding: "utf8",
   })
 }
+
+test("role helper accepts Podman inspect names and image digest representation", () => {
+  assert.equal(inspectPublisher({}, "podman").status, 0)
+})
 
 test("role helper rejects privileged publisher despite cap_drop ALL", () => {
   assert.equal(inspectPublisher().status, 0)
@@ -73,6 +77,8 @@ test("ownership accepts only the exact reserved compose container and state moun
     "com.docker.compose.service": "web", "com.docker.compose.project.working_dir": "/synthetic/state",
   } }, Mounts: [{ Source: "/synthetic/state/builds", Destination: "/builds" }] }]
   const run = () => spawnSync(process.execPath, [fileURLToPath(new URL("../../deploy/check-release.mjs", import.meta.url)), "owned", "/synthetic/state", "web"], { input: JSON.stringify(inspect), encoding: "utf8" })
+  assert.equal(run().status, 0)
+  inspect[0].Name = "loginom-dashboard-web"
   assert.equal(run().status, 0)
   inspect[0].Config.Labels["com.docker.compose.project"] = "foreign"
   assert.equal(run().status, 1)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 die() { echo "$*" >&2; exit 1; }
-usage="Usage: $0 install|check|stop|start|uninstall [--engine docker] [--public-host HOST] [--app-host-port PORT] [--strict --app-host-domain HOST --app-host-cert PATH --app-host-key PATH] [--cli-button] [--remove-image]"
+usage="Usage: $0 install|check|stop|start|uninstall [--engine docker|podman] [--public-host HOST] [--app-host-port PORT] [--strict --app-host-domain HOST --app-host-cert PATH --app-host-key PATH] [--cli-button] [--remove-image]"
 action=${1:-}
 [[ $action == install || $action == check || $action == stop || $action == start || $action == uninstall ]] || die "$usage"
 shift
@@ -24,7 +24,7 @@ while [[ $# -gt 0 ]]; do
   esac
   shift 2
 done
-[[ $engine == docker ]] || die "$usage"
+[[ $engine == docker || $engine == podman ]] || die "$usage"
 for host in "${hosts[@]}"; do [[ $host =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || die "$usage"; done
 [[ $app_port =~ ^[1-9][0-9]{0,4}$ && $app_port -le 65535 ]] || die "Invalid app host port"
 if [[ $action != install ]]; then
@@ -38,11 +38,13 @@ else
 fi
 bundle=$(cd "$(dirname "$0")" && pwd)
 state=/var/opt/loginom-dashboard
+[[ $engine != podman ]] || state=${XDG_DATA_HOME:-$HOME/.local/share}/loginom-dashboard
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 saved() { sed -n "s/^$1=//p" "$state/.env"; }
-if docker compose version >/dev/null 2>&1; then compose=(docker compose); else compose=(docker-compose); fi
-command -v "${compose[0]}" >/dev/null || die "Docker Compose is required"
+if [[ $engine == podman ]]; then compose=(podman-compose);
+elif docker compose version >/dev/null 2>&1; then compose=(docker compose); else compose=(docker-compose); fi
+command -v "${compose[0]}" >/dev/null || die "${compose[0]} is required"
 (cd "$bundle" && sha256sum -c SHA256SUMS) || die "Release checksum mismatch"
 image=$(cat "$bundle/image.ref")
 [[ $image =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]+$ ]] || die "Invalid image.ref"
@@ -61,20 +63,20 @@ if [[ -e $state || -L $state ]]; then
   installed=true
 fi
 json() {
-  docker run --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  "$engine" run --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
     --memory 128m --pids-limit 32 --user 65534:65534 \
-    -v "$bundle/check-release.mjs:/check.mjs:ro" --entrypoint /opt/node/bin/node "$image" /check.mjs "$@"
+    -v "$bundle/check-release.mjs:/check.mjs:ro,z" --entrypoint /opt/node/bin/node "$image" /check.mjs "$@"
 }
 # Inspect only our reserved names and compose project before any destructive operation.
 for role in web publisher builder; do
-  if docker container inspect "loginom-dashboard-$role" > "$tmp/$role.json" 2>/dev/null; then
+  if "$engine" container inspect "loginom-dashboard-$role" > "$tmp/$role.json" 2>/dev/null; then
     [[ $installed == true ]] || die "Dashboard container name is occupied: $role"
     json owned "$state" "$role" < "$tmp/$role.json"
   fi
 done
 while read -r name; do
   [[ $name == loginom-dashboard-web || $name == loginom-dashboard-publisher || $name == loginom-dashboard-builder ]] || die "Dashboard project is occupied"
-done < <(docker ps -a --filter label=com.docker.compose.project=loginom-dashboard --format '{{.Names}}')
+done < <("$engine" ps -a --filter label=com.docker.compose.project=loginom-dashboard --format '{{.Names}}')
 if [[ $action == stop || $action == start || $action == uninstall ]]; then
   if [[ $installed == false ]]; then [[ $action != start ]] || die "Dashboard is not installed"; echo "Dashboard is not installed"; exit 0; fi
   if [[ $action == stop ]]; then
@@ -166,18 +168,18 @@ if [[ $action == check ]]; then
     [[ $status == "$expected" ]] || die "HTTP check failed: $kind expected $expected, got $status"
     cat "$tmp/headers" "$tmp/body" | json response "$kind" "$app_origin" "$clients" "${integrity:-}" "${encoding:-identity}"
   }
-  mapfile -t studios < <(docker ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
+  mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
   [[ ${#studios[@]} == 1 ]] || die "Expected one installed Studio"
   studio=${studios[0]}
-  conf=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{.Source}}{{end}}{{end}}' "$studio")
-  docker exec "$studio" httpd -t
-  modules=$(docker exec "$studio" httpd -M)
+  conf=$("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{.Source}}{{end}}{{end}}' "$studio")
+  "$engine" exec "$studio" httpd -t
+  modules=$("$engine" exec "$studio" httpd -M)
   for module in substitute headers proxy proxy_http env; do
     [[ $modules == *"${module}_module"* ]] || die "Required Apache module missing: $module"
   done
   grep -Fq 'Header always set Content-Security-Policy "sandbox; default-src' "$conf/dashboard.site.conf" || die "Missing Apache always CSP for API/errors"
   grep -Fq 'Header always set X-Content-Type-Options "nosniff"' "$conf/dashboard.site.conf" || die "Missing Apache always nosniff"
-  integrity=$(docker exec loginom-dashboard-web /opt/node/bin/node --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; console.log("sha384-"+createHash("sha384").update(readFileSync("/opt/dashboard/shell.js")).digest("base64"))')
+  integrity=$("$engine" exec loginom-dashboard-web /opt/node/bin/node --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; console.log("sha384-"+createHash("sha384").update(readFileSync("/opt/dashboard/shell.js")).digest("base64"))')
   IFS=, read -ra origins <<< "$clients"
   for client in "${origins[@]}"; do
     http 200 api "$client/dashboard/health"
@@ -204,54 +206,63 @@ if [[ $action == check ]]; then
   chmod "$html_mode" "$html_file"
   html_mode=''
   http 200 app "$app_url"
-  docker inspect loginom-dashboard-web loginom-dashboard-publisher loginom-dashboard-builder | json roles "$image" "$storage" "$state" "$(saved DASHBOARD_PUBLISHER_USER)" "$(saved DASHBOARD_NETWORK)" "$(docker image inspect --format '{{.Id}}' "$image")"
-  [[ $(docker exec "$(docker ps --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')" stat -c '%u:%g' /proc/1) == "$(saved DASHBOARD_PUBLISHER_USER)" ]] || die "Publisher UID/GID differs from Loginom"
-  for role in publisher builder; do
-    docker exec "loginom-dashboard-$role" /opt/node/bin/node --input-type=module -e 'import {connect} from "node:net"; const socket=connect({host:"192.0.2.1",port:9}); socket.on("connect",()=>process.exit(1)); socket.on("error",()=>process.exit(0)); socket.setTimeout(2000,()=>{socket.destroy();process.exit(0)})'
+  "$engine" inspect loginom-dashboard-web loginom-dashboard-publisher loginom-dashboard-builder | json roles "$image" "$storage" "$state" "$(saved DASHBOARD_PUBLISHER_USER)" "$(saved DASHBOARD_NETWORK)" "$("$engine" image inspect --format '{{.Id}}' "$image")" "$engine"
+  for role in web publisher builder; do
+    "$engine" exec "loginom-dashboard-$role" /opt/node/bin/node --input-type=module -e 'import {readFileSync} from "node:fs"; import assert from "node:assert/strict"; const status=readFileSync("/proc/1/status","utf8"); for (const name of ["CapInh","CapPrm","CapEff","CapBnd","CapAmb"]) assert(new RegExp("^"+name+":\\s+0+$","m").test(status), name)'
   done
-  docker exec loginom-dashboard-publisher /opt/node/bin/node --input-type=module -e 'import {readFileSync,openSync} from "node:fs"; readFileSync(process.argv[1]); try {openSync(process.argv[1],"r+");process.exit(1)} catch(e) {if(e.code!=="EROFS")throw e}' "/storage/$probe.dashboards/$guid/$name"
+  [[ $("$engine" exec "$("$engine" ps --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')" stat -c '%u:%g' /proc/1) == "$(saved DASHBOARD_PUBLISHER_USER)" ]] || die "Publisher UID/GID differs from Loginom"
+  for role in publisher builder; do
+    "$engine" exec "loginom-dashboard-$role" /opt/node/bin/node --input-type=module -e 'import {connect} from "node:net"; const socket=connect({host:"192.0.2.1",port:9}); socket.on("connect",()=>process.exit(1)); socket.on("error",()=>process.exit(0)); socket.setTimeout(2000,()=>{socket.destroy();process.exit(0)})'
+  done
+  "$engine" exec loginom-dashboard-publisher /opt/node/bin/node --input-type=module -e 'import {readFileSync,openSync} from "node:fs"; readFileSync(process.argv[1]); try {openSync(process.argv[1],"r+");process.exit(1)} catch(e) {if(e.code!=="EROFS")throw e}' "/storage/$probe.dashboards/$guid/$name"
   echo "Server checks PASS: Apache/SRI/compression/headers/Host/isolation; mode $mode"
   if [[ $app_origin == https:* ]]; then
     echo "TLS PASS: host curl verified OS trust, certificate name and validity"
     # Compare public certificates only; the private key remains in Apache.
-    certificate=$(docker exec "$studio" cat /usr/local/apache2/conf/env.conf | json certificate-path)
-    docker exec "$studio" cat "$certificate" | json certificate "$certificate"
+    certificate=$("$engine" exec "$studio" cat /usr/local/apache2/conf/env.conf | json certificate-path)
+    "$engine" exec "$studio" cat "$certificate" | json certificate "$certificate"
   fi
   echo "Client access NOT CHECKED: run check-studio.mjs on the client host"
   exit 0
 fi
-mapfile -t studios < <(docker ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
+mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
 [[ ${#studios[@]} == 1 ]] || die "Expected one running standard Loginom installation"
 studio=${studios[0]}
-project=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$studio")
-mapfile -t servers < <(docker ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')
+project=$("$engine" inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$studio")
+mapfile -t servers < <("$engine" ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')
 [[ ${#servers[@]} == 1 ]] || die "Loginom server not found in selected installation"
 server=${servers[0]}
-mapfile -t conf_mounts < <(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{println .Source}}{{end}}{{end}}' "$studio" | sed '/^$/d')
-mapfile -t storage_mounts < <(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/workdir"}}{{println .Source}}{{end}}{{if eq .Destination "/workdir/UserStorage"}}{{println .Source}}{{end}}{{end}}' "$server" | sed '/^$/d')
+mapfile -t conf_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{println .Source}}{{end}}{{end}}' "$studio" | sed '/^$/d')
+mapfile -t storage_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/workdir"}}{{println .Source}}{{end}}{{if eq .Destination "/workdir/UserStorage"}}{{println .Source}}{{end}}{{end}}' "$server" | sed '/^$/d')
 [[ ${#conf_mounts[@]} == 1 && ${#storage_mounts[@]} == 1 ]] || die "Ambiguous Loginom mounts"
 conf=$(realpath -e "${conf_mounts[0]}")
 server_root=$(realpath -e "${storage_mounts[0]}")
 storage=$(realpath -e "$server_root/UserStorage")
 [[ -d $conf && -d $storage && $storage == "$server_root/UserStorage" && $storage =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "Physical UserStorage not found"
-mapfile -t networks < <(comm -12 <(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$server" | sed '/^$/d' | sort) <(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$studio" | sed '/^$/d' | sort))
+# Go templates are interpreted by the container engine, not the shell.
+# shellcheck disable=SC2016
+mapfile -t networks < <(comm -12 <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$server" | sed '/^$/d' | sort) <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$studio" | sed '/^$/d' | sort))
 [[ ${#networks[@]} == 1 ]] || die "Expected one common Loginom network"
 network=${networks[0]}
 site=$conf/dashboard.site.conf
 replace_site() {
   [[ ! -e $site ]] || cp -p "$site" "$tmp/previous.conf"
-  if [[ -f $tmp/dashboard.site.conf ]]; then install -m 644 "$tmp/dashboard.site.conf" "$site.new"; mv -f "$site.new" "$site"; else rm -f "$site"; fi
-  if ! docker exec "$studio" httpd -t; then
-    if [[ -e $tmp/previous.conf ]]; then cp -p "$tmp/previous.conf" "$site.new"; mv -f "$site.new" "$site"; else rm -f "$site"; fi
+  if [[ -f $tmp/dashboard.site.conf ]]; then install -m 644 "$tmp/dashboard.site.conf" "$site.new";
+    if command -v selinuxenabled >/dev/null && selinuxenabled; then chcon --reference="$conf/httpd.conf" "$site.new"; fi
+    mv -f "$site.new" "$site"; else rm -f "$site"; fi
+  if ! "$engine" exec "$studio" httpd -t; then
+    if [[ -e $tmp/previous.conf ]]; then cp -p "$tmp/previous.conf" "$site.new";
+      if command -v selinuxenabled >/dev/null && selinuxenabled; then chcon --reference="$conf/httpd.conf" "$site.new"; fi
+      mv -f "$site.new" "$site"; else rm -f "$site"; fi
     die "Apache configuration rejected; previous file restored"
   fi
 }
 if [[ $action == uninstall ]]; then
   replace_site
-  docker exec "$studio" httpd -k graceful
+  "$engine" exec "$studio" httpd -k graceful
   (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml down)
   rm -rf "$state"
-  if [[ $remove_image == true ]]; then docker image rm --no-prune "$image"; fi
+  if [[ $remove_image == true ]]; then "$engine" image rm --no-prune "$image"; fi
   echo "Dashboard uninstalled; UserStorage publications preserved"
   exit 0
 fi
@@ -266,10 +277,10 @@ fi
 [[ ${#hosts[@]} -gt 0 ]] || die "$usage"
 [[ ! -e $site && ! -L $site ]] || die "Dashboard Apache file is occupied"
 host=${hosts[0]}
-studio_name=$(docker inspect --format '{{.Name}}' "$studio")
+studio_name=$("$engine" inspect --format '{{.Name}}' "$studio")
 studio_name=${studio_name#/}
-http_port=$(docker port "$studio" 80/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
-https_port=$(docker port "$studio" 443/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
+http_port=$("$engine" port "$studio" 80/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
+https_port=$("$engine" port "$studio" 443/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
 [[ -n $http_port || -n $https_port ]] || die "No published Studio HTTP or HTTPS port"
 clients='' scheme=http upstream=''
 for host in "${hosts[@]}"; do
@@ -287,14 +298,14 @@ done
 if [[ -n $https_port || $mode == strict ]]; then
   scheme=https
   upstream=$studio_name:8444
-  docker exec "$studio" test -f /usr/local/apache2/modules/mod_substitute.so || die "Apache mod_substitute is required"
-  docker exec "$studio" sh -c '! grep -qiE "[0-9A-F]+:20FC .* 0A " /proc/net/tcp /proc/net/tcp6' || die "Apache port 8444 is occupied"
+  "$engine" exec "$studio" test -f /usr/local/apache2/modules/mod_substitute.so || die "Apache mod_substitute is required"
+  "$engine" exec "$studio" sh -c '! grep -qiE "[0-9A-F]+:20FC .* 0A " /proc/net/tcp /proc/net/tcp6' || die "Apache port 8444 is occupied"
 fi
 if [[ $mode == strict ]]; then
   host=$domain
   # Paths are administrator-owned paths inside Apache, never mounts into web.
-  docker exec "$studio" test -r "$cert" || die "App certificate is not readable in Apache"
-  docker exec "$studio" test -r "$key" || die "App key is not readable in Apache"
+  "$engine" exec "$studio" test -r "$cert" || die "App certificate is not readable in Apache"
+  "$engine" exec "$studio" test -r "$key" || die "App key is not readable in Apache"
 else
   host=${hosts[0]}
 fi
@@ -302,10 +313,10 @@ app_origin="$scheme://$host:$app_port"
 if [[ $scheme == https && $app_port == 443 || $scheme == http && $app_port == 80 ]]; then app_origin="$scheme://$host"; fi
 [[ -z $(ss -H -lnt "sport = :$app_port") ]] || die "App host port is occupied"
 for client in ${clients//,/ }; do curl --silent --show-error --fail --max-time 10 "$client/app/" -o /dev/null || die "Public Studio address is not reachable"; done
-publisher_user=$(docker exec "$server" stat -c '%u:%g' /proc/1)
-docker load -i "$bundle/image.tar"
-docker image inspect "$image" >/dev/null
-integrity=$(docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --entrypoint /opt/node/bin/node "$image" --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; console.log("sha384-"+createHash("sha384").update(readFileSync("/opt/dashboard/shell.js")).digest("base64"))')
+publisher_user=$("$engine" exec "$server" stat -c '%u:%g' /proc/1)
+"$engine" load -i "$bundle/image.tar"
+"$engine" image inspect "$image" >/dev/null
+integrity=$("$engine" run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --entrypoint /opt/node/bin/node "$image" --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; console.log("sha384-"+createHash("sha384").update(readFileSync("/opt/dashboard/shell.js")).digest("base64"))')
 cat > "$tmp/dashboard.site.conf" <<EOF
 # Managed by loginom-dashboard release installer
 <IfModule !substitute_module>
@@ -362,6 +373,13 @@ replace_site
 install -d -m 755 "$state"
 install -d -m 777 "$state/builds" "$state/jobs-in" "$state/jobs-out"
 cp "$bundle/compose-release.yaml" "$state/compose-release.yaml"
+# Preserve an administrator's private server MCS label; only publisher bypasses that label.
+if [[ $engine == podman ]] && command -v selinuxenabled >/dev/null && selinuxenabled && [[ $(stat -c '%C' "$storage") == *:container_file_t:s0:c* ]]; then
+  sed -i '/^  publisher:$/a\    security_opt: [no-new-privileges:true, label=disable]' "$state/compose-release.yaml"
+  # Keep Compose's variable expression literal.
+  # shellcheck disable=SC2016
+  sed -i 's|${DASHBOARD_USERSTORAGE:?}:/storage:ro,z|${DASHBOARD_USERSTORAGE:?}:/storage:ro|' "$state/compose-release.yaml"
+fi
 cat > "$state/.env" <<EOF
 DASHBOARD_IMAGE=$image
 DASHBOARD_STATE=$state
@@ -376,5 +394,5 @@ DASHBOARD_MODE=$mode
 DASHBOARD_CLI_BUTTON=$cli_button
 EOF
 (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d)
-docker exec "$studio" httpd -k graceful
+"$engine" exec "$studio" httpd -k graceful
 echo "Dashboard installed at $app_origin; verify the client connection separately."
