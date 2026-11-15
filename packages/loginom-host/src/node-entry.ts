@@ -6,6 +6,7 @@ import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
+import { DashboardRead } from "./dashboard"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -119,6 +120,11 @@ async function dispatch(message: unknown) {
       return
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
+    if (message.method === "dashboard.read") {
+      const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
+      reply({ id: message.id, result })
+      return
+    }
     if (!message.method.startsWith("connection.")) {
       events.emit("message", { data: message })
       return

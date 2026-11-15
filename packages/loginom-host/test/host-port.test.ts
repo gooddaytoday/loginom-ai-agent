@@ -961,6 +961,9 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
     expect(await call("dock_diagnostics")).toMatchObject({ structuredContent: { generation: 1, state: "ready" } })
     expect(await client.request("interrupt", { run: "one" })).toBe(true)
     expect(await chatStarts()).toEqual([])
+    for (const method of ["dashboardRead", "dashboardPublish"])
+      await expect(client.request(method, { run: "one" })).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    expect(await chatStarts()).toEqual([])
     await client.request("scope", {
       run: "one",
       mode: "bind",

@@ -46,6 +46,13 @@ for (const scenario of ["unstarted", "invalid-start", "signal"]) {
       assert.equal(response.error, "LOGINOM_START_INVALID")
       assert.equal(JSON.stringify(response).includes("private-invalid-secret"), false)
     }
+    if (scenario === "unstarted") {
+      for (const operation of ["dashboardRead", "dashboardPublish"]) {
+        const refused = message()
+        child.send({ id: operation, operation, input: { binding: "private-sentinel" } })
+        assert.deepEqual(await refused, { id: operation, error: "LOGINOM_NOT_READY" })
+      }
+    }
     if (scenario === "signal") {
       const ready = message()
       child.send({ id: "probe", operation: "list" })

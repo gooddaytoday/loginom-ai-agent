@@ -5,6 +5,7 @@ export * as LoginomHost from "./adapter"
 import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
 import { HostTaskScope } from "./task-scope"
+import { DashboardOperation, PublicationRef, PublicationSource, PublicationWrite } from "./dashboard"
 import { Schema } from "effect"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 
@@ -49,7 +50,22 @@ export async function acquire(session: string) {
       next.resolve()
     }
   }
+  async function dashboard(method: "dashboardRead" | "dashboardPublish", input: DashboardOperation & { content?: string; expected?: PublicationRef | null }, signal?: AbortSignal) {
+    const abort = () => { void connection!.request("interrupt", { run }).catch(() => undefined) }
+    return queued(async () => {
+      if (signal?.aborted) throw new Error("DASHBOARD_CANCELLED")
+      signal?.addEventListener("abort", abort, { once: true })
+      try { return await connection!.request(method, { ...input, run }, undefined, observe) }
+      finally { signal?.removeEventListener("abort", abort) }
+    })
+  }
   return {
+    async dashboardRead(input: DashboardOperation, signal?: AbortSignal): Promise<PublicationSource | null> {
+      return Schema.decodeUnknownSync(Schema.NullOr(PublicationSource))(await dashboard("dashboardRead", input, signal))
+    },
+    async dashboardPublish(input: DashboardOperation & { content: string; expected: PublicationRef | null }, signal?: AbortSignal): Promise<PublicationWrite> {
+      return Schema.decodeUnknownSync(PublicationWrite)(await dashboard("dashboardPublish", input, signal))
+    },
     get generation() {
       return queue.generation
     },

@@ -6,4 +6,6 @@
 - Собственные пары master/7.4.2 имеют отдельные сети и UserStorage volumes; реальные manifest/credentials/evidence вне Git.
 - Команды, подготовка и границы проверок — [runbook M4](dashboard-m4.md).
 - Оригинальные контейнеры, ROI, backup и рабочее приложение пользователя сохраняются; новый установленный прогон обязателен отдельно.
-- Далее Task 1: закрытый host → Studio путь на обеих версиях; продуктовая реализация ещё не начата.
+- Task 1: финальный built-host roundtrip/ACL/collision/upload+login cancel PASS на обеих версиях; `.lgp` сохранён, ACK+exit подтверждены.
+- Task 1 передан на независимое review: DONE_WITH_CONCERNS; исходный Knowledge ACK → SIGKILL не воспроизведён двумя focused probes, причина неизвестна. Source tests/typecheck PASS; детали — runbook.
+- Task 2/publisher не начаты.

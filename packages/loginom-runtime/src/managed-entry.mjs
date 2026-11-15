@@ -14,6 +14,7 @@ import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { createBridge } from "../client/lib/bridge.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
+import { dashboardStorage } from "./dashboard-storage.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -215,6 +216,29 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "dashboardRead" || message.operation === "dashboardPublish") {
+      if (state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+      const controller = new AbortController()
+      state.controller = controller
+      const cancellation = { close: undefined }
+      const cancel = () => {
+        cancellation.close ??= state.browser.close()
+        void cancellation.close.catch(() => undefined)
+      }
+      controller.signal.addEventListener("abort", cancel, { once: true })
+      try {
+        const result = await dashboardStorage(state.browser, message.input, message.operation === "dashboardPublish", controller.signal)
+        send({ id: message.id, result })
+      } catch (error) {
+        if (controller.signal.aborted && message.operation === "dashboardRead") throw Error("DASHBOARD_CANCELLED")
+        throw error
+      } finally {
+        controller.signal.removeEventListener("abort", cancel)
+        await cancellation.close
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation === "work") {
       send({
         id: message.id,
@@ -307,7 +331,7 @@ async function handle(message) {
     }
     if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
       state.startupCleanupFailed = true
-    const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
+    const code = /^(?:LOGINOM|DASHBOARD)_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
     send({ id: message.id, ...(artifactFailure(error) ?? { error: code }),
       ...(message.operation === "start" ? { startupDiagnostics: state.startupDiagnostics.splice(0) } : {}) }, message.operation === "close")
     if (message.operation === "start") {

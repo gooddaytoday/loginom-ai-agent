@@ -1,4 +1,14 @@
 const codes = new Set([
+  "DASHBOARD_ORIGIN_MISMATCH",
+  "DASHBOARD_STORAGE_UNAVAILABLE",
+  "DASHBOARD_ACCESS_DENIED",
+  "DASHBOARD_VERSION_EXISTS",
+  "DASHBOARD_WRITE_UNKNOWN",
+  "DASHBOARD_CANCELLED",
+  "LOGINOM_RUNTIME_CLEANUP_FAILED",
+  "LOGINOM_REPLY_INVALID",
+  "DASHBOARD_INPUT_INVALID",
+  "LOGINOM_GENERATION_UNAVAILABLE",
   "LOGINOM_SCOPE_DENIED",
   "LOGINOM_RECOVERY_REQUIRED",
   "LOGINOM_CALL_UNCERTAIN",
@@ -65,6 +75,12 @@ export function hostError(value: unknown) {
 }
 
 const reasons: Record<string, string> = {
+  DASHBOARD_CANCELLED: "Операция dashboard отменена.",
+  DASHBOARD_WRITE_UNKNOWN: "Результат публикации неизвестен. Проверьте версию на стенде; повторная запись автоматически не выполняется.",
+  DASHBOARD_VERSION_EXISTS: "Имя публикации уже занято. Существующая версия и временный файл сохранены.",
+  DASHBOARD_ACCESS_DENIED: "Недостаточно прав для чтения или записи публикации в Loginom.",
+  DASHBOARD_ORIGIN_MISMATCH: "Подключение относится к другому стенду. Откройте dashboard заново из Studio.",
+  LOGINOM_GENERATION_UNAVAILABLE: "Подключение изменилось. Откройте dashboard заново из Studio.",
   LOGINOM_FILE_TOO_LARGE: "Файл превышает лимит этого способа передачи.",
   LOGINOM_FILE_NOT_FOUND: "Файл не найден. Укажите существующий путь.",
   LOGINOM_FILE_NOT_REGULAR: "Нужен обычный файл, а не каталог или специальный файл.",
