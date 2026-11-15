@@ -1,11 +1,12 @@
 import path from "node:path"
 import { mkdir, readdir, stat } from "node:fs/promises"
 import { parseArgs, parseEnv } from "node:util"
-import { auditMeasurement, exclusiveFact, freezeMeasurementInputs, measurementState, measurementRetrySources, measurementRetryReleases, verifyMeasurementRetryProof, snapshotActor, validateManifest, type MeasurementJob, type MeasurementManifest } from "../src/analytics-measurements"
+import { auditMeasurement, exclusiveFact, freezeMeasurementInputs, measurementState, measurementRetrySources, measurementRetryReleases, prejournalBudgetRetrySources, verifyMeasurementRetryProof, snapshotActor, validateManifest, type MeasurementJob, type MeasurementManifest } from "../src/analytics-measurements"
 import { tryCampaignLock } from "../src/campaign-lock"
 import { loadConfig } from "../src/config"
 import { loadSlots } from "../src/slots"
 import { captureUnitBinding } from "../src/process-supervisor"
+import { readLeaseReceipt } from "../src/lease"
 
 const hash = (value: string | Uint8Array) => new Bun.CryptoHasher("sha256").update(value).digest("hex")
 const json = (file: string) => Bun.file(file).json()
@@ -26,6 +27,7 @@ async function unitState(unit: string) {
 async function pinnedConfiguration(manifest: MeasurementManifest, job: MeasurementJob) {
   for (const [file, pin] of [[manifest.controllerEnvFile, manifest.pins.controllerEnvSha256], [manifest.slotsFile, manifest.pins.slotsSha256], [manifest.resourceBudgetFile, manifest.pins.resourceBudgetSha256]])
     if (hash(await Bun.file(file!).bytes()) !== pin) throw Error("INPUT_PIN_CHANGED")
+  await readLeaseReceipt(manifest.resourceBudgetFile)
   const env = parseEnv(await Bun.file(manifest.controllerEnvFile).text())
   if (env.EVAL_CLI_MODE !== "binary" || !env.EVAL_CLI_BIN || !path.isAbsolute(env.EVAL_CLI_BIN) ||
     env.EVAL_AGENT_MODEL !== "openai/gpt-6.1-terra" || env.EVAL_AGENT_VARIANT !== "high" || env.JUDGE_MODEL !== "gpt-6.1-sol" || env.JUDGE_REASONING !== "xhigh" ||
@@ -65,8 +67,26 @@ async function retryHistory(manifest: MeasurementManifest, job: MeasurementJob, 
     }
     const intentFile = path.join(dir, "launch-intent.json"), intent = await json(intentFile)
     if (intent.manifestHash !== manifestHash || intent.job !== job.id || intent.unit !== current.unit || intent.resultsDir !== current.resultsDir) throw Error("INTENT_MISMATCH")
-    const evidence = await nativeEvidence(current.resultsDir, stateDir)
-    sources.push(...await measurementRetrySources(current, await unitState(current.unit), evidence.file, path.join(dir, "worker-entry.json"), manifestHash), { file: intentFile, sha256: hash(await Bun.file(intentFile).bytes()) })
+    const unit = await unitState(current.unit)
+    const evidence = await nativeEvidence(current.resultsDir, stateDir).catch(error => {
+      if (error.message === "NATIVE_JOURNAL_UNKNOWN") return
+      throw error
+    })
+    if (evidence) {
+      sources.push(...await measurementRetrySources(current, unit, evidence.file, path.join(dir, "worker-entry.json"), manifestHash), { file: intentFile, sha256: hash(await Bun.file(intentFile).bytes()) })
+      continue
+    }
+    const entryFile = path.join(dir, "worker-entry.json"), entry = await json(entryFile)
+    if (!unit.InvocationID || unit.InvocationID !== entry.binding?.invocation) throw Error("PREJOURNAL_INVOCATION_UNKNOWN")
+    const journal = Bun.spawn(["/usr/bin/journalctl", "-u", current.unit, "--boot=" + entry.binding.bootId.replaceAll("-", ""),
+      "--no-pager", "-o", "json"], { stdout: "pipe", stderr: "ignore", timeout: 10000 })
+    const [code, output] = await Promise.all([journal.exited, new Response(journal.stdout).text()])
+    if (code) throw Error("PREJOURNAL_JOURNAL_UNAVAILABLE")
+    const authoritativeJournal = output.trim().split("\n").map(line => JSON.parse(line) as Record<string, string>)
+      .filter(row => (row._SYSTEMD_INVOCATION_ID || row.INVOCATION_ID) === unit.InvocationID)
+    sources.push(...await prejournalBudgetRetrySources({ job: current, unit, stateDir, manifestHash, generation: prior,
+      budgetFile: manifest.resourceBudgetFile, budgetSha256: manifest.pins.resourceBudgetSha256,
+      entryFile, intentFile, proofFile: path.join(dir, "budget-refusal.json"), authoritativeJournal }))
   }
   return sources
 }

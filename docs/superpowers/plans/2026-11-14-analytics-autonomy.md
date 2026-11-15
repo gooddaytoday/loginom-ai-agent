@@ -39,7 +39,7 @@ evals Loginom» на runner2 самостоятельно создаёт пят�
   авторской попытки; конкурентный запуск не перезаписывает evidence. Финализатор
   сохраняет полный provenance приватно, публичный формирует безопасным сразу.
   Результат: поведенческие тесты конкуренции и приватности проходят.
-- [ ] **3. Cold и sole measurements.** Перенести проверенные приватные callers
+- [x] **3. Cold и sole measurements.** Перенести проверенные приватные callers
   пилота в узкие команды: cold rerun и run-analytics-measurements.ts поверх
   runPreparedSlots. Manifest задаёт 2/8 упорядоченных jobs, pins, units и memory
   scope. Lock + атомарный launch intent + native journals, без второго workflow
@@ -47,16 +47,26 @@ evals Loginom» на runner2 самостоятельно создаёт пят�
   Для доказанного zero-admission допускаются до трёх заранее закреплённых retry
   bindings (свои unit/resultsDir), immutable authorization, проверка всей истории
   в controller и worker и отдельный gate release судьи. Общие locks исключают
-  параллельный ремонт. Это реализует согласованный premodel retry без replay.
+  параллельный ремонт. Для отказа budget до native journal допускается отдельная
+  post-exit classification: точный terminal binding с сохранённой invocation,
+  исходные metadata/SHA и journald, закреплённая execution revision, пустой
+  canonical resultsDir и полный scan без native journals. Источники включаются
+  в ту же immutable authorization и повторно проверяются controller/worker.
+  Это закрывает подтверждённый преджурнальный отказ без ретроспективного native
+  journal; неоднозначные исходы сохраняют hold. Общий release gate сохраняется.
+  Временные browser recovery tools проверяются через qualified product predicates
+  и source pin: последовательное соответствие CLI calls и native ledger,
+  подтверждённое завершение lease. Обычный retained и доказанная tool-level
+  ошибка допустимы; неизвестный эффект остаётся hold, исходный FAIL сохраняется.
   Полные before/after snapshots и audit каждой попытки. Результат: restart,
   unknown admission, cleanup, память и cold проверены; run-campaign не меняется.
-- [ ] **4. Инструкции и установка.** Обновить Git и live роли существующих
+- [x] **4. Инструкции и установка.** Обновить Git и live роли существующих
   Author/Reviewer, убрать pilot hardcodes и зависимость от Root. Подготовить свои
   Authoring/Benchmark/judge, auth, CLI с palette repair, browser/Knowledge/memory,
   scoped root-owned units, hooks/Gitleaks. GitHub-публикация выполняется владельцем.
   Native handoff, blocked и periodic 7200s; дополнительного task.failed нет.
   Результат: read-back конфигурации и noninteractive действия из Multica runtime.
-- [ ] **5. Репетиция и передача.** Через Multica выполнить принятую историческую
+- [x] **5. Репетиция и передача.** Через Multica выполнить принятую историческую
   пару в private fixture: author, cold, calibration, D/B, review, доставка
   проверенного binary patch и Git bundle через штатное вложение Multica. Она не попадает в коллекцию и десять контролей новой карточки. Проверить
   wakeup/restart без дублирования, затем передать единственную готовую Backlog
@@ -92,22 +102,23 @@ evals: около 140 файлов / 5000 строк + LGP. При удвоен�
 
 ## Checkpoint
 
-- Ветка `analytics-autonomy`; инфраструктура установлена, основная карточка ещё не передана.
-- Prepare/verify собственных Authoring и Benchmark: READY/code0/released; прежние отказы сохранены.
-- Адресное recovery при живой посторонней unit: 4 PASS / 41 assertions.
-- Собственные units, noninteractive права, judge, hooks и Gitleaks установлены и reviewed.
-- Live-инструкции Author/Reviewer/squad обновлены и прочитаны обратно.
-- Atomic reservation, приватность provenance, zero-admission retry и actor snapshots проверены.
-- GC InvocationID repair установлен: 14 PASS / 62 assertions; typecheck и независимое review APPROVE.
-- Финальное review всего инфраструктурного diff: APPROVE; полная репетиция ещё не принята.
-- Снимок покрывает закреплённые operator User/Peer roots; runtime MCP Peer isolation не доказана.
-- Отсутствие текущего Peer принимается только по точному NOT_FOUND; чужие Peer не обходятся.
-- LAB-1676 штатно запущена In progress; входной Reviewer APPROVE, scoped wakeups включены.
-- Author attempt-1: ProviderModelNotFound, модельных токенов нет; evidence сохранены.
-- Последнее прямое наблюдение: attempt-2 active с вызовами Loginom; её текущий исход неизвестен.
-- Сейчас SSH недоступен, MAS status-запросы нестабильны; online/running повторно не подтверждены.
-- Возобновление: восстановить наблюдение, сверить активные runs/units и усвоить attempt-2 без replay.
-- Затем завершить cold/calibration/D/B/review/delivery LAB-1676; только после принять основную Backlog-карточку.
-- Private draft основной карточки reviewed; история legacy/P/R/A достижима в checkout; новые пять пар не запускались.
-- Основные wakeups включаются только после её In progress; Backlog не должен запускаться periodic событием.
-- Push/PR выполняет владелец здесь после карточки; shared daemon и чужие ресурсы не изменялись.
+- Ветка `analytics-autonomy`; инфраструктура установлена и принята полной репетицией LAB-1676.
+- Prepare/verify собственных Authoring и Benchmark: READY/code0/released; исходные отказы сохранены.
+- Scoped units/права/judge/hooks/Gitleaks установлены; live-инструкции команды обновлены и прочитаны обратно.
+- Atomic reservation, private/public provenance, адресное recovery и GC adoption проверены.
+- LAB-1676 завершена done, final independent SPEC+QUALITY APPROVE; оба её wakeups отключены.
+- Author attempt-1: предмодельный отказ каталога сохранён; attempt-2 exit0, actual sol/xhigh, CSV 3x7 PASS, не повторять.
+- Cold all9/new CSV/unchanged LGP/noSave/close/logout PASS; qualified Node repair reviewed.
+- Обе calibration PASS: 22 judgments, positive100, foreign0, все near-miss + oracle=false.
+- Control g0 отвергнут до journal из-за mode budget; bytes/pins не менялись, zero-admission независимо доказан.
+- Штатная g1 authorization связала исходные zero-admission evidence и release proofs; g0 сохранена.
+- Единственный D g1 завершён failed/score0/no_artifact/oracle=false; audit PASS до перехода к B, исход сохранён.
+- Единственный B завершён score100/oracle=true; ровно два measurement admissions, модели не повторялись.
+- Три обязательных browser audit замечания закрыты; ordered replay исходного D PASS, неизвестные эффекты HOLD.
+- Оба полных actor after равны before; cleanup/release PASS, повторная reconciliation code0 без новых admissions.
+- Patch/bundle проверены на точной базе, архив доставлен вложением, скачан обратно и проверен по SHA256.
+- Итоговый source независимо reviewed; локально после объединения 19 tests/135 assertions и bun typecheck PASS.
+- Actor snapshots ограничены разрешёнными operator User/Peer roots; runtime MCP Peer isolation не доказана.
+- Основная LAB-1677 независимо APPROVE: Backlog, squad назначен с suppress_run, read-back текста и 0 runs.
+- Новые пять пар не запускались; wakeups основной карточки включаются только после In progress.
+- Push/PR выполняет владелец здесь; shared daemon и чужие ресурсы не изменялись.

@@ -1,9 +1,130 @@
 import { expect, test } from "bun:test"
-import { cp, mkdir, mkdtemp, rm, readFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, readFile, chmod, rename, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { auditMeasurement, exclusiveFact, freezeMeasurementInputs, measurementState, snapshotActor, validateManifest } from "../src/analytics-measurements"
 import { evalsRoot } from "../src/config"
+
+async function budgetRefusalFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "budget-refusal-"))
+  const write = async (file: string, value: unknown) => {
+    await Bun.write(file, typeof value === "string" ? value : JSON.stringify(value))
+    await chmod(file, 0o600)
+  }
+  const pin = async (file: string) => ({ file, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") })
+  const job = { id: "one", taskId: "sample", form: "detailed", tasksDir: root,
+    unit: "synthetic-budget-refusal.service", resultsDir: path.join(root, "results") }
+  const stateDir = path.join(root, "controller")
+  await mkdir(job.resultsDir, { mode: 0o700 }); await mkdir(stateDir, { mode: 0o700 })
+  const binding = { unit: job.unit, manager: "system", invocation: "a".repeat(32),
+    cgroup: "/system.slice/" + job.unit, bootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(),
+    producer: { pid: 2147483647, uid: process.getuid!(), starttime: "1" } }
+  const unit = { Id: job.unit, InvocationID: binding.invocation, ActiveState: "failed", MainPID: "0",
+    ControlGroup: "", ExecMainStatus: "1", Restart: "no", Delegate: "no" }
+  const budgetFile = path.join(root, "budget.json"), entryFile = path.join(root, "worker-entry.json"),
+    intentFile = path.join(root, "launch-intent.json"), proofFile = path.join(root, "budget-refusal.json")
+  await write(budgetFile, "[]")
+  const budgetSha256 = (await pin(budgetFile)).sha256, manifestHash = "b".repeat(64)
+  await write(entryFile, { manifestHash, job: job.id, binding })
+  await write(intentFile, { manifestHash, job: job.id, unit: job.unit, resultsDir: job.resultsDir })
+  const sourceRevision = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: path.dirname(evalsRoot) }).stdout.toString().trim()
+  const sourceFile = path.join(root, "source-pins.json"), metadataFile = path.join(root, "original-metadata.json"),
+    journalFile = path.join(root, "journal.jsonl")
+  await write(sourceFile, { sourceRevision, manifestSha256: manifestHash, pins: { resourceBudgetSha256: budgetSha256 } })
+  await write(metadataFile, { resourceBudgetSha256: budgetSha256, mode: "0o664", uid: binding.producer.uid,
+    nlink: 1, originalWorkerInvocation: binding.invocation, resultsDirectoryEmpty: true })
+  const common = { _BOOT_ID: binding.bootId.replaceAll("-", ""), INVOCATION_ID: binding.invocation, UNIT: job.unit }
+  const authoritativeJournal: Record<string, string>[] = [
+    { ...common, __CURSOR: "start", MESSAGE: "Started", _PID: "1", _UID: "0" },
+    { ...common, __CURSOR: "refusal", MESSAGE: "LEASE_FILE_PRIVATE", _PID: String(binding.producer.pid),
+      _UID: String(binding.producer.uid), _SYSTEMD_UNIT: job.unit, _SYSTEMD_CGROUP: binding.cgroup },
+    { ...common, __CURSOR: "exit", MESSAGE: "Exited", _PID: "1", _UID: "0", EXIT_CODE: "exited", EXIT_STATUS: "1" },
+  ]
+  await write(journalFile, authoritativeJournal.map(row => JSON.stringify(row)).join("\n"))
+  const executionSources = []
+  for (const repositoryPath of ["evals/src/prepared-run.ts", "evals/src/lease.ts"]) {
+    const file = path.join(root, path.basename(repositoryPath))
+    const blob = Bun.spawnSync(["git", "show", sourceRevision + ":" + repositoryPath], { cwd: path.dirname(evalsRoot) })
+    if (blob.exitCode) throw Error("FIXTURE_SOURCE_MISSING")
+    await write(file, blob.stdout.toString())
+    executionSources.push({ ...await pin(file), repositoryPath })
+  }
+  const proof = { version: 1, kind: "post-exit-budget-refusal", manifestHash, job: job.id, generation: 0,
+    sourceRevision, sourcePins: await pin(sourceFile), budgetMetadata: await pin(metadataFile),
+    journal: await pin(journalFile), executionSources }
+  await write(proofFile, proof)
+  return { root, write, pin, job, binding, unit, proof, sourceFile, metadataFile, journalFile,
+    input: { job, unit, stateDir, manifestHash, generation: 0, budgetFile, budgetSha256,
+      entryFile, intentFile, proofFile, authoritativeJournal } }
+}
+
+test("prejournal budget refusal uses original evidence across authorization restart", async () => {
+  const { prejournalBudgetRetrySources, verifyMeasurementRetryProof } = await import("../src/analytics-measurements")
+  const f = await budgetRefusalFixture()
+  try {
+    const sources = await prejournalBudgetRetrySources(f.input)
+    expect(sources.map(x => x.file)).toContain(f.metadataFile)
+    expect(sources.map(x => x.file)).toContain(f.journalFile)
+    const authorization = path.join(f.root, "authorization.json")
+    await exclusiveFact(authorization, { manifestHash: f.input.manifestHash, job: f.job.id, generation: 1, sources, releases: [] })
+    await verifyMeasurementRetryProof(authorization, f.input.manifestHash, f.job.id, 1)
+    expect(await prejournalBudgetRetrySources(f.input)).toEqual(sources)
+    await f.write(f.metadataFile, { changed: true })
+    await expect(verifyMeasurementRetryProof(authorization, f.input.manifestHash, f.job.id, 1)).rejects.toThrow("RETRY_EVIDENCE_CHANGED")
+    await expect(prejournalBudgetRetrySources(f.input)).rejects.toThrow()
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("prejournal refusal rejects incomplete identity, evidence and every native admission", async () => {
+  const { prejournalBudgetRetrySources } = await import("../src/analytics-measurements")
+  for (const change of ["missing", "changed", "boot", "invocation", "producer", "uid", "active", "cleared",
+    "results", "symlink-results", "native", "corrupt-native", "ambiguous-native", "measurement", "intent",
+    "revision", "budget", "private-metadata", "no-refusal", "no-exit", "authoritative-mismatch", "execution-source"]) {
+    const f = await budgetRefusalFixture()
+    try {
+      if (change === "missing") await rm(f.metadataFile)
+      if (change === "changed") await f.write(f.journalFile, "changed")
+      if (["boot", "producer", "uid", "no-refusal", "no-exit"].includes(change)) {
+        if (change === "boot") f.input.authoritativeJournal.forEach(row => row._BOOT_ID = "f".repeat(32))
+        if (change === "producer") f.input.authoritativeJournal[1]!._PID = "1"
+        if (change === "uid") f.input.authoritativeJournal[1]!._UID = "0"
+        if (change === "no-refusal") f.input.authoritativeJournal[1]!.MESSAGE = "OTHER_ERROR"
+        if (change === "no-exit") f.input.authoritativeJournal[2]!.EXIT_STATUS = "0"
+        await f.write(f.journalFile, f.input.authoritativeJournal.map(row => JSON.stringify(row)).join("\n"))
+        f.proof.journal = await f.pin(f.journalFile); await f.write(f.input.proofFile, f.proof)
+      }
+      if (change === "authoritative-mismatch") f.input.authoritativeJournal[0]!.MESSAGE = "changed authoritative record"
+      if (change === "invocation") f.unit.InvocationID = "f".repeat(32)
+      if (change === "active") f.unit.ActiveState = "active"
+      if (change === "cleared") f.unit.InvocationID = ""
+      if (change === "results") await f.write(path.join(f.job.resultsDir, "started"), "evidence")
+      if (change === "symlink-results") {
+        await rename(f.job.resultsDir, f.job.resultsDir + "-real")
+        await symlink(f.job.resultsDir + "-real", f.job.resultsDir)
+      }
+      if (["native", "corrupt-native", "ambiguous-native", "measurement"].includes(change)) {
+        const native = { runDir: f.job.resultsDir + "/run", attempts: change === "measurement" ? [{ purpose: "measurement" }] : [] }
+        await f.write(path.join(f.input.stateDir, "run-command-one.json"), change === "corrupt-native" ? "{" : native)
+        if (change === "ambiguous-native") await f.write(path.join(f.input.stateDir, "run-command-two.json"), native)
+      }
+      if (change === "intent") await f.write(f.input.intentFile, { manifestHash: "foreign" })
+      if (change === "revision") { f.proof.sourceRevision = "f".repeat(40); await f.write(f.input.proofFile, f.proof) }
+      if (change === "budget") await f.write(f.input.budgetFile, "[1]")
+      if (change === "private-metadata") {
+        const metadata = await Bun.file(f.metadataFile).json()
+        await f.write(f.metadataFile, { ...metadata, mode: "0o600" })
+        f.proof.budgetMetadata = await f.pin(f.metadataFile); await f.write(f.input.proofFile, f.proof)
+      }
+      if (change === "execution-source") {
+        const original = f.proof.executionSources[0]!
+        await f.write(original.file, "changed source boundary")
+        f.proof.executionSources[0] = { ...await f.pin(original.file), repositoryPath: original.repositoryPath }
+        await f.write(f.input.proofFile, f.proof)
+      }
+      await expect(prejournalBudgetRetrySources(f.input)).rejects.toThrow()
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
+})
 test("concurrent launch facts admit exactly one controller and preserve evidence", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "measurements-"))
   try {
@@ -94,6 +215,93 @@ test("audit failure preserves raw FAIL and NULL model outcomes without touching 
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 
+test("dynamic recovery tools require a qualified, bounded and closed native handoff", async () => {
+  const { recoveryToolsCovered } = await import("../src/analytics-measurements")
+  const check = (value: Omit<Parameters<typeof recoveryToolsCovered>[0], "isBrowserRecoveryTool" | "isRecoveryBrowserTool">) =>
+    recoveryToolsCovered({ ...value, isBrowserRecoveryTool: name => ["dock_browser_recovery", "browser_snapshot"].includes(name),
+      isRecoveryBrowserTool: name => name === "browser_snapshot" })
+  const metadata = { sessionId: "synthetic-runtime", clientRevision: "c".repeat(64),
+    actionManifestDigest: "d".repeat(64), targetIdentity: { platform: "linux" }, archiveActive: false, resultProfile: "user-v1" }
+  const common = { session_id: metadata.sessionId, runtime_revision: metadata.clientRevision,
+    manifest_sha256: metadata.actionManifestDigest, target: metadata.targetIdentity, attempt_id: "synthetic-attempt", operation_id: "step" }
+  const input = { depth: 2 }
+  const calls: Parameters<typeof recoveryToolsCovered>[0]["calls"] = [
+    { tool: "loginom_dock_browser_recovery", status: "completed", input: { action: "start", operation_id: "step" } },
+    { tool: "loginom_browser_snapshot", status: "completed", input },
+    { tool: "loginom_dock_browser_recovery", status: "error", input: { action: "finish", operation_id: "step" },
+      error: JSON.stringify({ refused: "finish requires actions_performed." }) },
+    { tool: "loginom_dock_browser_recovery", status: "completed", input: { action: "stop", operation_id: "step" } },
+  ]
+  const records: Parameters<typeof recoveryToolsCovered>[0]["records"] = [
+    { ...common, phase: "browser_recovery_started", budget: { calls_left: 30, ms_left: 600000 } },
+    { ...common, phase: "browser_recovery_handoff", stopped: true },
+    { ...common, phase: "browser_recovery_action", tool: "browser_snapshot",
+      arguments_sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(input)).digest("hex"),
+      is_error: false, transport_error: null, page: { ok: true }, budget: { calls_left: 29, ms_left: 599000 } },
+    { ...common, phase: "browser_recovery_stopped", code: "model_stopped", reason: "Stopped by the model.",
+      cleanup: { state: "retained" }, budget: { calls_left: 29, ms_left: 598000 } },
+  ]
+  const sample = { calls, records, metadata, qualifiedRevision: metadata.clientRevision }
+  expect(check(sample)).toBe(true)
+  const knownError = structuredClone(sample)
+  knownError.records[2]!.is_error = true
+  knownError.calls[1]!.status = "error"
+  knownError.calls[1]!.error = "Element not found"
+  expect(check(knownError)).toBe(true)
+  const verified = structuredClone(sample)
+  verified.records.splice(3, 1, { ...common, phase: "browser_recovery_attested",
+    attested_by_model: { actions_performed: ["inspected"], expected_result: null, browser_settings: [] } },
+    { ...common, phase: "browser_recovery_verified", status: "completed" })
+  verified.calls[3] = { tool: "loginom_dock_browser_recovery", status: "completed",
+    input: { action: "finish", operation_id: "step", actions_performed: ["inspected"] } }
+  expect(check(verified)).toBe(true)
+  const unresolved = structuredClone(verified)
+  unresolved.records[4]!.status = "unresolved"
+  unresolved.records.push(structuredClone(sample.records[3]!))
+  unresolved.calls.push(structuredClone(sample.calls[3]!))
+  expect(check(unresolved)).toBe(true)
+  const automatic = structuredClone(unresolved)
+  automatic.calls.pop(); automatic.records[5]!.code = "runtime_closed"
+  expect(check(automatic)).toBe(true)
+  const afterFinish = structuredClone(verified)
+  afterFinish.calls.push(afterFinish.calls.splice(1, 1)[0]!)
+  expect(check(afterFinish)).toBe(false)
+  const verifierUnknown = structuredClone(unresolved)
+  verifierUnknown.records[5]!.code = "browser_unavailable"
+  expect(check(verifierUnknown)).toBe(false)
+  const stopUnknown = structuredClone(unresolved)
+  stopUnknown.records[5]!.cleanup = { state: "retained_uncertain" }
+  expect(check(stopUnknown)).toBe(false)
+  for (const change of ["no-handoff", "no-stop", "foreign-session", "foreign-operation", "unqualified", "page",
+    "transport", "budget", "arguments", "unknown-tool", "archive", "extra-action", "no-native", "runtime", "manifest", "target", "cleanup",
+    "uncertain", "missing-cli-stop", "late-action", "verifier-unknown", "memory-write"]) {
+    const changed = structuredClone(sample)
+    if (change === "no-handoff") changed.records.splice(1, 1)
+    if (change === "no-stop") changed.records.pop()
+    if (change === "foreign-session") changed.records[2]!.session_id = "foreign"
+    if (change === "foreign-operation") changed.calls[0]!.input.operation_id = "foreign"
+    if (change === "unqualified") changed.qualifiedRevision = "f".repeat(64)
+    if (change === "page") changed.records[2]!.page!.ok = false
+    if (change === "transport") Object.assign(changed.records[2]!, { transport_error: "unknown" })
+    if (change === "budget") changed.records[2]!.budget!.calls_left = -1
+    if (change === "arguments") changed.calls[1]!.input.depth = 3
+    if (change === "unknown-tool") changed.calls[1]!.tool = "loginom_browser_evaluate"
+    if (change === "archive") changed.metadata.archiveActive = true
+    if (change === "extra-action") changed.records.splice(3, 0, structuredClone(changed.records[2]!))
+    if (change === "no-native") changed.records = []
+    if (change === "runtime") changed.records[2]!.runtime_revision = "f".repeat(64)
+    if (change === "manifest") changed.records[2]!.manifest_sha256 = "f".repeat(64)
+    if (change === "target") changed.records[2]!.target = { foreign: true }
+    if (change === "cleanup") changed.records[3]!.cleanup = { state: "unknown" }
+    if (change === "uncertain") changed.records[3]!.cleanup = { state: "retained_uncertain" }
+    if (change === "missing-cli-stop") changed.calls.pop()
+    if (change === "late-action") { const action = changed.calls.splice(1, 1)[0]!; changed.calls.push(action) }
+    if (change === "verifier-unknown") Object.assign(changed.records[3]!, { code: "browser_unavailable" })
+    if (change === "memory-write") changed.calls[1]!.tool = "loginom_memory_write"
+    expect(check(changed)).toBe(false)
+  }
+})
+
 test("frozen measurement inputs reject later task or rubric changes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "measurement-inputs-"))
   try {
@@ -158,21 +366,26 @@ test("retry proof restart preserves immutable authorization and refuses changed 
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("retry release gate rejects a real held judge reservation and accepts its confirmed release", async () => {
+test("retry release gate rejects held server, profile and judge reservations", async () => {
   const { measurementRetryReleases } = await import("../src/analytics-measurements")
-  const { acquireJudgeLease, writeLeaseReceipt } = await import("../src/lease")
+  const { acquireJudgeLease, acquireResourceLease, writeLeaseReceipt } = await import("../src/lease")
   const root = await mkdtemp(path.join(os.tmpdir(), "measurement-release-"))
   try {
     const home = path.join(root, "judge"), journal = path.join(root, "journal.json"), lockRoot = path.join(root, "locks")
     await mkdir(home, { mode: 0o700 }); await mkdir(lockRoot, { mode: 0o700 }); await writeLeaseReceipt(journal, { commandId: "example" })
-    const lease = await acquireJudgeLease({ codexHome: home, commandId: "example", journal, lockRoot })
-    try {
-      await expect(measurementRetryReleases([`judge:${home}`], lockRoot)).rejects.toThrow("RETRY_RELEASE_UNCONFIRMED")
-      const file = path.join(root, "release.json")
-      await writeLeaseReceipt(file, { version: 2, status: "confirmed", reason: "judge-unit-terminated", key: lease.reservation.key, token: lease.reservation.token, revision: lease.reservation.revision })
-      await lease.release(file)
-      expect(await measurementRetryReleases([`judge:${home}`], lockRoot)).toHaveLength(1)
-    } finally { await lease.close() }
+    for (const key of ["server:synthetic", "profile:" + home, "judge:" + home]) {
+      const lease = key.startsWith("judge:")
+        ? await acquireJudgeLease({ codexHome: home, commandId: "example", journal, lockRoot })
+        : await acquireResourceLease({ key, commandId: "example", journal, lockRoot })
+      try {
+        await expect(measurementRetryReleases([key], lockRoot)).rejects.toThrow("RETRY_RELEASE_UNCONFIRMED")
+        const file = path.join(root, "release-" + key.split(":")[0] + ".json")
+        await writeLeaseReceipt(file, { version: 2, status: "confirmed", reason: "synthetic-confirmed-release",
+          key: lease.reservation.key, token: lease.reservation.token, revision: lease.reservation.revision })
+        await lease.release(file)
+        expect(await measurementRetryReleases([key], lockRoot)).toHaveLength(1)
+      } finally { await lease.close() }
+    }
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
