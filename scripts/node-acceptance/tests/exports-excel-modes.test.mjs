@@ -60,3 +60,46 @@ test('native folder lookup scrolls the same virtual grid beyond DOM index 57 and
  assert.throws(()=>lookup(el,{...args,part:'missing',path:'/worker/missing/'}),/FS_STORAGE_FOLDER_NOT_FOUND:\/worker\/missing\//);
  records[67].data={...records[66].data};assert.throws(()=>lookup(el,args),/FS_STORAGE_FOLDER_AMBIGUOUS/);
 });
+
+async function rootTransition(t,{missing=false,empty=false,staleEmpty=false}={}){
+ const source=await readFile(script,'utf8'),waiting=Promise.withResolvers(),changed=Promise.withResolvers();
+ let records=staleEmpty?[]:[{data:{FileName:'input',FilePath:'/worker/stale/input/',Type:1}}],loadCount=5,directory='/worker/stale/';
+ const grid={id:'grid',scrollTop:0,contains:()=>true,getBoundingClientRect:()=>({width:100,height:100}),getAttribute:()=> 'MF;TF-1;FileStorageForm;pnlFileStorage;tbl'};
+ const store={isLoading:()=>false,getCount:()=>records.length,getTotalCount:()=>records.length,getRange:()=>records,get loadCount(){return loadCount;}};
+ const view={getStore:()=>store,bufferedRenderer:{rowHeight:24},getNode:record=>({record,
+  querySelector:()=>({textContent:record.data.FileName})}),getRecord:node=>node.record};
+ const sender={constructor:{name:'FileSenderManager'},get CurrentDirectory(){return directory;}};
+ const form={constructor:{name:'FileStorageForm'},FFileSenderManager:sender,FView:{el:{dom:{contains:el=>el===grid}}}};
+ let firstReady;
+ const locator=selector=>({count:async()=>1,waitFor:async()=>{},getAttribute:async name=>name==='id'?'grid':'MF;TF-1;FileStorageForm;pnlFileStorage;tbl',
+  locator,evaluate:async(fn,args)=>fn(grid,args),click:async()=>{directory='/';},dblclick:async()=>{
+   const part=selector.includes('colName_worker')?'worker':'input';directory+='/'+part+'/';directory=directory.replaceAll('//','/');loadCount++;
+   records=part==='worker'&&!empty?[{data:{FileName:'input',FilePath:'/worker/input/',Type:1}}]:[];
+  }});
+ const page={locator,screenshot:async()=>{},evaluate:async(fn,args)=>fn(args),waitForFunction:async(fn,args)=>{
+  let value=fn(args);
+  if(firstReady===undefined){firstReady=!!value;waiting.resolve();if(!value){await changed.promise;value=fn(args);}}
+  assert.ok(value,'Native parent/listing must settle without a timer');
+  return {jsonValue:async()=>value,dispose:async()=>{}};
+ }};
+ const context={page,config:{login:{package_directory:'/worker'}},record:async()=>{},output:'unused',
+  document:{getElementById:()=>grid,querySelectorAll:()=>[grid]},Ext:{getCmp:()=>view},
+  bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:form}})}}}}}}}};
+ const run=runInNewContext(source.slice(source.indexOf('// Existing Files UI only;'))+'\nstorageDirectory',context);
+ const outcome=run('/worker/'+(missing?'missing':'input')).then(value=>({value}),error=>({error}));
+ await waiting.promise;
+ const staleAccepted=firstReady;loadCount++;records=[{data:{FileName:'worker',FilePath:'/worker/',Type:1}}];changed.resolve();
+ const result=await outcome;
+ assert.equal(staleAccepted,false,'Root click must not accept a complete listing from the previous parent');
+ return result;
+}
+test('root navigation waits for the new native parent/listing before folder lookup',async t=>{
+ for(const staleEmpty of [false,true]){
+  const result=await rootTransition(t,{staleEmpty});assert.equal(result.error,undefined,String(result.error));
+ }
+});
+test('missing folder refuses after parent/listing settled, including an empty directory',async t=>{
+ for(const empty of [false,true]){
+  const result=await rootTransition(t,{missing:true,empty});assert.match(String(result.error),/FS_STORAGE_FOLDER_NOT_FOUND:\/worker\/missing\//);
+ }
+});

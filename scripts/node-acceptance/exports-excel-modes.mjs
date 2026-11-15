@@ -210,25 +210,63 @@ async function storageDirectory(directory){
  const grids=page.locator('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]:visible');
  if(await grids.count()===0)await at('MF;cntMain;tlbMainToolbar;btnFilestorage').click();
  await grids.waitFor({state:'visible'});if(await grids.count()!==1)throw Error('FS_STORAGE_AMBIGUOUS');
- const prefix=(await grids.getAttribute('data-tid')).split(';FileStorageForm;')[0];
- await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы').click();let trail='',parent='';
+ let prefix=(await grids.getAttribute('data-tid')).split(';FileStorageForm;')[0];
+ const capture=async point=>{
+  const state=await page.evaluate(storageFolderListing,{observe:true});
+  await record({phase:'fs_storage_navigation',point,directory,state});return state;
+ };
+ const previous=await capture('before_root');
+ await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы').click();await capture('after_root');
+ let listing=await waitStorageParent(page,{parent:'/',previous});
+ prefix=listing.grid_tid.split(';FileStorageForm;')[0];
+ await record({phase:'fs_storage_navigation',point:'root_settled',directory,state:listing});
+ let trail='',parent='';
  for(const part of directory.slice(1).split('/')){
   const tid=prefix+';FileStorageForm;colName_'+part.replace(/\s/g,'_').replace(/,/g,'');
   const lookup={part,parent:parent+'/',path:parent+'/'+part+'/',tid};
-  await page.waitForFunction(id=>{
-   const store=globalThis.Ext?.getCmp?.(id)?.getStore?.();
-   return store?.isLoading?.()===false&&store.getCount()===store.getTotalCount();
-  },await grids.getAttribute('id'));
-  const moved=await grids.evaluate(storageFolderRecord,{...lookup,scroll:true});
+  let moved;try{moved=await grids.evaluate(storageFolderRecord,{...lookup,scroll:true});}
+  catch(error){await capture('lookup_refused');await page.screenshot({path:output+'/storage-refused.png',fullPage:true});throw error;}
   await record({phase:'fs_storage_folder_resolved',directory,...lookup,...moved});
   const row=grids.locator('[data-tid='+JSON.stringify(tid)+']');
   await row.waitFor({state:'visible'});
   await grids.evaluate(storageFolderRecord,{...lookup,visible:true});
   if(await row.count()!==1)throw Error('FS_STORAGE_FOLDER_DOM_AMBIGUOUS:'+lookup.path);
   await row.dblclick();parent+='/'+part;
+  listing=await waitStorageParent(page,{parent:parent+'/',previous:listing});
+  prefix=listing.grid_tid.split(';FileStorageForm;')[0];
+  await record({phase:'fs_storage_navigation',point:'folder_settled',directory,state:listing});
   trail+='>'+part;await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы'+trail).waitFor({state:'visible'});
  }
  return {prefix,at};
+}
+
+async function waitStorageParent(page,{parent,previous}){
+ const handle=await page.waitForFunction(storageFolderListing,{parent,previous});
+ try{return await handle.jsonValue();}finally{await handle.dispose();}
+}
+
+// Native sender binds the current directory; loadCount binds its refreshed
+// listing, including an empty directory. A complete old listing is not ready.
+function storageFolderListing({parent,previous,observe=false}){
+ const grids=[...document.querySelectorAll('[data-tid$=";FileStorageForm;pnlFileStorage;tbl"]')]
+  .filter(el=>{const b=el.getBoundingClientRect();return b.width>0&&b.height>0;});
+ if(grids.length!==1)return observe?{ready:false,reason:'grid_not_unique'}:false;
+ const el=grids[0],view=globalThis.Ext?.getCmp?.(el.id),store=view?.getStore?.(),records=store?.getRange?.();
+ const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+ const sender=form?.FFileSenderManager,current=sender?.CurrentDirectory;
+ const bound=form?.constructor?.name==='FileStorageForm'&&sender?.constructor?.name==='FileSenderManager'
+  &&form.FView?.el?.dom?.contains(el)===true&&typeof current==='string'&&current.startsWith('/')&&current.endsWith('/');
+ const parents=Array.isArray(records)?[...new Set(records.filter(r=>r.data?.Type!==2).map(r=>{
+  const path=r.data?.FilePath;if(typeof path!=='string'||!path.startsWith('/'))return null;
+  const trimmed=path.replace(/\/$/,'');return trimmed.slice(0,trimmed.lastIndexOf('/')+1);
+ }))]:[];
+ const state={grid_id:el.id,grid_tid:el.getAttribute('data-tid'),current_parent:current??null,
+  count:store?.getCount?.(),total:store?.getTotalCount?.(),loading:store?.isLoading?.(),load_count:store?.loadCount,
+  record_parents:parents,records:records?.slice(0,4).map(r=>({name:r.data?.FileName,path:r.data?.FilePath,type:r.data?.Type}))};
+ state.ready=bound&&Array.isArray(records)&&state.loading===false&&state.count===records.length&&state.total===records.length
+  &&Number.isSafeInteger(state.load_count)&&current===parent&&parents.every(p=>p===parent)
+  &&(!previous||previous.current_parent===parent||previous.grid_id!==el.id||state.load_count>previous.load_count);
+ return observe?state:state.ready?state:false;
 }
 
 // Runs in the existing native grid only; no server request or wider search.
