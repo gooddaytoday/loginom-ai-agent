@@ -130,6 +130,16 @@ Only the business task and original CSV reach the model.
 
 Run live acceptance without repeatedly reading live logs:
 
+`group-mode-tie` and `group-empty` use grouping `acceptance/types/task-mode-tie.md`
+and `task-empty.md`, respectively, with only `fixtures/types/mode-tie.csv` or
+`empty.csv`. Separate `expected-mode-tie.json` and `expected-empty.json` preserve
+unchanged `cases.mode_tie.stages` and `cases.empty.stages` from LAB-1558.
+Native observations LAB-1581 Q2/Q7 confirm integer/string mode ties select the
+smallest value and header-only input produces zero rows with the complete
+string/integer/real/datetime/boolean schema. Stock full typed matching, exact
+field order, CSV (header only for empty), Save, cold Execute without configuration
+and cleanup apply. Only task and CSV reach the model; oracle/expected stay private.
+
 `group-date` uses grouping `acceptance/types/task-date.md` and only
 `fixtures/types/types.csv`. `expected-date.json` preserves unchanged
 `cases.date.stages` from LAB-1558: DateTime min/max/last (including final NULL),
@@ -160,6 +170,16 @@ both full ordered outputs and four CSVs. The source alone changes on the same
 Filter GUID; readback requires integer `row_number <= TopN`, not a literal.
 Stock Save, cold binding/field readback without configuration, both typed
 outputs and cleanup apply. Oracle/expected never reach the model.
+
+`row-filter-typed` and `row-filter-null` use the unchanged approved
+`acceptance/typed/task-variable-{typed,null}.md` and `fixtures/typed/rows.csv`.
+The private stdlib oracle checks initial RowID 2,8 → final 2,3,7,8 for typed,
+and empty output 0 / all eight rows in output 1 for real NULL, as confirmed
+by the LAB-1661 native probe before registration. Typed changes only MinScore
+and Since on the same builtin source, retaining both scalar bindings and the
+Filter GUID. Full typed outputs, four/two CSVs, Save, cold native `>=` predicates
+and binding identities without reconfiguration, and cleanup use stock checks.
+Only task and CSV reach the model; oracle and expected remain private.
 
 Non-finite Real (owner decision `v040-nan-exact`): the exact port reader returns
 native NaN/±Infinity of a Real or an untyped Variant column as

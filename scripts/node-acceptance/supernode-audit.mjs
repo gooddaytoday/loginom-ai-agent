@@ -11,9 +11,9 @@ function* objects(value){
 export function checkSupernodeGraph(graph,calculatorId){
  need(Array.isArray(graph.nodes)&&Array.isArray(graph.links),'GRAPH_INCOMPLETE');
  const input=graph.nodes.filter(n=>n.boundary_role==='input'),output=graph.nodes.filter(n=>n.boundary_role==='output');
- const calculator=graph.nodes.filter(n=>n.type==='transform.calculator'||calculatorId&&(n.node_id??n.ref?.node_id)===calculatorId);
- need(input.length===1&&output.length===1&&calculator.length===1,'BOUNDARIES_AND_CALCULATOR');
  const id=n=>n.ref?.node_id??n.node_id,label=n=>n.node_ref?.node_label??n.label;
+ const calculator=graph.nodes.filter(n=>calculatorId?id(n)===calculatorId:n.type==='transform.calculator');
+ need(input.length===1&&output.length===1&&calculator.length===1,'BOUNDARIES_AND_CALCULATOR');
  const edge=(source,target)=>graph.links.some(e=>typeof e==='string'
   ?e.endsWith(';Graph;'+label(source)+'|Output_Data-0|'+label(target)+'|Input_Data-0')
   :e.source===id(source)&&e.output===0&&e.target===id(target)&&e.input===0);
@@ -59,8 +59,17 @@ export async function checkSupernodeRun(eventsFile,expectedDirectory,journalFile
   const value=event.outcome.output;
   if(Array.isArray(value?.nodes)&&value.nodes.some(n=>n.boundary_role==='input'))graphs.push({file,line:index+1,value});
  }
- const topology=graphs.map(r=>{try{return {file:r.file,line:r.line,...checkSupernodeGraph(r.value,calculator)};}catch{return null;}}).filter(Boolean);
+ const topology=[];
+ for(const r of graphs){
+  try{topology.push({file:r.file,line:r.line,...checkSupernodeGraph(r.value,calculator)});}
+  catch(error){
+   // Enter and construction observe incomplete graphs. Once the local chain
+   // is complete, every subsequent observation must retain that topology.
+   if(topology.length)throw Error('SUPERNODE_MAIN_NESTED_OBSERVATION: '+r.file+':'+r.line+': '+error.message);
+  }
+ }
  need(topology.length>0,'MAIN_NESTED_OBSERVATION');
+ need(topology.every(t=>t.calculator===calculator),'CALCULATOR_IDENTITY');
  need(new Set(topology.map(t=>JSON.stringify([t.input,t.calculator,t.output]))).size===1,'BOUNDARY_IDENTITY');
  const imports=all.filter(r=>r.value.kind==='text_import');
  const sourceName=r=>r.value.source?.source_path?.split('/').at(-1).replace(/^[a-f0-9]{64}-[0-9]+-/,'');

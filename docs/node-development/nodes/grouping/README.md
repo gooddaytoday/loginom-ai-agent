@@ -16,6 +16,14 @@ integer. `group-date` проверяет min/max/last/null_count на `types.csv
 `expected-date.json`, включая NULL, CSV, Save и cold Execute. Недоступные
 sum/avg/median/stddev/concat отклоняются до настройки.
 
+Ничья моды и пустой вход (LAB-1663): зарегистрированы `group-mode-tie` и
+`group-empty` по native-наблюдениям LAB-1581 Q2/Q7. Первый проверяет минимум
+при равной частоте integer/string, второй — 0 строк с полной схемой
+Region string / Rows integer / Total real / FirstDay datetime / AnyFlag boolean
+и CSV только с заголовком. Отдельные expected сохраняют исходные `cases`
+комплекта LAB-1558; полный typed-результат, CSV, Save и cold Execute проверяются
+штатно. Регистрация сама по себе не является живой приёмкой.
+
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [grouping-node.mjs](../../../../packages/loginom-runtime/client/lib/grouping-node.mjs):1–48; [grouping-parameters.mjs](../../../../packages/loginom-runtime/client/lib/grouping-parameters.mjs):1–57; [transform.group_data.md](../../../../packages/product/skills/loginom-automation/references/nodes/transform.group_data.md):1–6. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 
 ## Исторические материалы и план расширений

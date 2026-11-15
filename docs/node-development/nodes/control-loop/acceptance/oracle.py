@@ -1,4 +1,4 @@
-"""Proposed stage-1 values for Loop, computed without Loginom or runtime.
+"""Stage-1 expected values for Loop, computed without Loginom or runtime.
 
 Loop mode: group processing, fixed group size 1, over fixtures/pages.csv,
 sequential (no parallel threads), iteration identifiers off.
@@ -8,7 +8,9 @@ Cases:
   offline - body is a Calculator: LastIndex = Skip + Limit - 1 (no network);
   rest    - body is REST GET https://httpbin.org/response-headers with query
             limit=<Limit>, skip=<Skip>; output is REST port 0 per iteration.
-Rows of all iterations are appended in iteration order (proposal until probe).
+Native probe LAB-1669 confirmed appended iteration order and exact REST bodies.
+Offline field order is explicitly requested, not the Calculator's native default.
+HTTP error diagnostics are data of REST, not exceptions raised by this oracle.
 """
 import argparse
 import csv

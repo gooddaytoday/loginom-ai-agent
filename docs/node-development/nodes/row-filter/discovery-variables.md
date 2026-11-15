@@ -166,3 +166,39 @@ Close/Open), `:42` (package_closed/logged_out=true, без discard измене�
 дальнейшая проба сохранена под отдельным именем, затем штатно закрыта.
 Изменение 3→5 и независимый cold проверяются сценарием `row-filter-top-n`.
 Real/datetime/NULL-переменные этой пробой не проверялись.
+
+## Real/datetime/NULL: native-проба LAB-1661, 13.11.2026
+
+Loginom 7.4.2, mas3, Node 24.19.0 / Chromium 1246, worker назначенной пары.
+Отдельный собственный пакет `lab1661-native-typed.lgp`. JavaScript служит
+только источником восьми строк `fixtures/typed/rows.csv`; отбор выполняет
+штатный Фильтр. Это discovery, не модельная приёмка CSV.
+
+Для Score (real) и Seen (datetime) доступны `VariantPropEdit;SwitchButton`
+и `VariantPropEdit;VariableControl;trg_picker`. Picker Score предлагает
+real MinScore, picker Seen — datetime Since. Native-store сохраняет
+`DataType=3/2, RelationType=3, UseVariables=1`, CompareValue — имя ссылки.
+В ручной пробе техническое имя MinScore, метка MinScoreMinScore; Since
+совпадает с меткой. Обработчик по-прежнему требует совпадающие имя и метку.
+
+При MinScore=0.5, Since=2024-02-29 00:00:00 output 0 содержит RowID
+**2,3,7,8**: граница `>=` включена; NULL Score/Seen не проходит.
+После Save/Close/Open и выполнения динамического источника обе ссылки
+сохранены, не заменены литералами. Динамические выходные столбцы JavaScript
+надо материализовать до открытия мастера потребителя; приёмка использует CSV.
+
+На том же Фильтре оставлено одно условие Score >= MinScore и пользовательская
+real-переменная переведена в NULL штатным `EditVariableForm;cbxNullValue`.
+Далее и Execute проходят без ошибки: output 0 пуст, output 1 содержит все
+RowID 1–8. Порог остаётся ссылкой и после Save/Close/Open.
+**Решение до прогонов:** `row-filter-null` проверяется по неизменённому
+`expected-null.json`; NULL разрешён для real scalar-порога. NULL других
+типов, переменные интервалов и real/datetime variable lists не расширялись.
+
+Сырой журнал вне Git: `native-probe/ui.jsonl:4–6` — picker и native типы/flags;
+`:7` — final RowID; `:10` — обе сохранённые ссылки; `:11–15` — NULL и оба
+выхода; `:17` — свежий preview полного второго выхода (8 строк, DOM RowID
+1–8; старый скрытый preview с total=0 не считается результатом); `:19` —
+ссылка после повторного открытия; `:20` — пакет закрыт, logout подтверждён.
+Initial 2,8, CSV, независимый cold и изменение только источника проверяет
+автоматическая приёмка. Комплект real/datetime/NULL — **готов**.

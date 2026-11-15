@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateVariableBindings} from '../lib/variable-binding-parameters.mjs';
-import {resolveFilterBindings,configureSavedFilterBindings,preserveFilterBindings} from '../lib/filter-bindings.mjs';
+import {resolveFilterBindings,configureSavedFilterBindings,preserveFilterBindings,validateFilterBindingValues} from '../lib/filter-bindings.mjs';
 import {filterBindingInventory,readFilterBindings} from '../lib/variable-binding-readback.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
@@ -35,13 +35,27 @@ test('strict envelope rejects duplicate, unsupported type, port, extra propertie
  for(const variable of [null,{...binding.variable,input:1},{...binding.variable,kind:'variables'},{...binding.variable,name:''},{...binding.variable,extra:true}])
   assert.throws(()=>validateVariableBindings([{...binding,variable}],'transform.filter_data'),variable?.name===''?/BINDING_VARIABLE_MISSING/:/BINDING_PORT_MISMATCH/);
 });
-test('only canonical scalar pointers and integer/string comparisons are registered',()=>{
+test('only canonical scalar pointers and supported scalar comparisons are registered',()=>{
  for(const parameter of ['/groups/00/0/value','/groups/0/0/lower','/groups/64/0/value','/groups/0/128/value','/groups/0/0/value/x'])
   assert.throws(()=>resolveFilterBindings(parameters,[{...binding,parameter}]),/BINDING_PARAMETER_UNSUPPORTED/);
- for(const patch of [{type:'real'},{operator:'between'}]){
+ for(const patch of [{type:'boolean'},{operator:'between'}]){
   const p=structuredClone(parameters);Object.assign(p.groups[0][0],patch);
   assert.throws(()=>resolveFilterBindings(p,[binding]),/BINDING_PARAMETER_UNSUPPORTED/);
  }
+});
+for(const [type,value] of [['real',0.5],['datetime','2024-02-29T00:00:00.000'],['real',null]])test('typed scalar binding preserves '+type+' '+value,()=>{
+ const p={groups:[[{field:{kind:'input_field',name:'Threshold'},type,operator:'>='}]]};
+ const resolved=resolveFilterBindings(p,[binding]);
+ assert.deepEqual(resolved.groups[0][0].value,{kind:'variable',name:'Limit'});
+ const f=inventory(),v={name:'Limit',index:0,type,value,is_null:value===null};
+ assert.doesNotThrow(()=>validateFilterBindingValues(p,[binding],f.native,[v]));
+ f.native.rows[0].type=type;f.native.control_variables=[{...v,is_null:true,value:null}];
+ f.mapping.fields[0].type=type==='real'?3:2;f.mapping.fields[0].source.type=f.mapping.fields[0].type;
+ const cell={type,is_null:value===null,value,precision:value===null?'exact_null':type==='real'?'17_significant_digits':'millisecond',...(type==='datetime'?{representation:'local_datetime'}:type==='real'&&value!==null?{representation:'binary64'}:{})};
+ const proof={verified:true,independent_readback:true,source:f.graph.nodes[0].ref,variables:[{id:9,name:'Limit',type,cell}]};
+ assert.equal(filterBindingInventory(f.native,f.mapping,f.graph,f.node,proof)[0].variable.is_null,value===null);
+ for(const bad of type==='real'?[NaN,Infinity,'0.5']:['2024-02-30T00:00:00.000','2024-02-29T00:00:00Z'])
+  assert.throws(()=>validateFilterBindingValues(p,[binding],f.native,[{...v,value:bad,is_null:false}]));
 });
 test('Top-N binding resolves new and saved row-number conditions without a literal',()=>{
  const p={groups:[[{field:{kind:'row_number'},type:'integer',operator:'<='}]]};

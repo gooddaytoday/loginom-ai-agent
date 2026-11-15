@@ -89,7 +89,7 @@ export async function configureFilter(channel,parameters,{newNode=false,controlV
  const groups=resolveFilterConditions(parameters,baseline.input_fields,controlVariables??baseline.control_variables),expected=[];
  for(const c of groups.flat())if(c.type==='datetime'){
   const arity=FILTER_OPERATORS[c.operator]?.arity??1,values=arity===1?[c.value]:arity===2?[c.lower,c.upper]:[];
-  if(values.some(v=>v.length>19&&!v.endsWith('.000'))){
+  if(values.some(v=>typeof v==='string'&&v.length>19&&!v.endsWith('.000'))){
    const field=baseline.input_fields.find(f=>f.name===c.field.name);
    need(field?.data_kind==='Дискретный','Datetime scalar/range milliseconds require an observed discrete input field; the continuous native editor supports whole seconds');
   }
