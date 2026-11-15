@@ -40,7 +40,7 @@ test('trial rejects every unsupported operation before target or editor access',
 
 test('fixed trial overrides the general product handler only inside its isolated candidate map',()=>{
  const base=createCandidateNodeSupport({targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2'});
- assert.equal(base.nodeApplyHandlers.get('programming.javascript').revision,'javascript-script-lifecycle-v6');
+ assert.equal(base.nodeApplyHandlers.get('programming.javascript').revision,'javascript-script-lifecycle-v7');
  const trial=createJavascriptTrialNodeSupport({page:{},targetOrigin:'http://logi-test-plan.bg.local',targetBuild:'7.4.2',
   redactor:createRedactor(),pinned:{node,expected_source_sha256:'a'.repeat(64),source_text:source}});
  const combined=new Map([...base.nodeApplyHandlers,...trial.nodeApplyHandlers]);

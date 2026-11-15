@@ -34,7 +34,11 @@ export function validateJavascriptParameters(parameters,mode,request) {
   if(hasSource){
     need(typeof parameters.source_text==='string','source_text');
     const policy=inspectJavascriptModulePolicy(parameters.source_text);
-    need(policy.status==='ADMITTED','source_text');
+    // Fetch is still not admitted in part A. Let the lifecycle deliver its
+    // actionable schema refusal first when execution has undeclared output.
+    const deferredFetch=request.finish==='execute'&&parameters.schema_mode!=='declared'
+      &&policy.reason==='module_specifier'&&policy.effect_imports?.includes('builtIn/Fetch');
+    need(policy.status==='ADMITTED'||deferredFetch,'source_text');
     need(policy.filesystem!==true||parameters.input_state==='unconnected','input_state: FS requires unconnected');
   }
 

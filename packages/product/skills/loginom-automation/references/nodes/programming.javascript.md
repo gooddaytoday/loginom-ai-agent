@@ -40,10 +40,12 @@ or move unrelated standard operations into it.
 Runtime проверит отсутствие входящих связей и пустой native input mapping;
 пустая подключённая таблица — другой случай. Этот же input_state нужен при
 повторном выполнении/изменении источника. Declared output: apply execute maps first,
-then runs once, including existing nodes. Code-generated output still runs twice:
+then runs once, including existing nodes. Code output without FS/Fetch runs twice:
 materialize, map, reactivate. Cold/downstream runs once. Preserve partial failures;
 never retry unknown effects.
 В обычной табличной ветке input_state опускай.
+
+FS/Fetch: объявляй столбцы выхода перед настройкой с выполнением.
 
 ## FS
 

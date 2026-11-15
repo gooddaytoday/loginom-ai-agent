@@ -22,15 +22,21 @@ export function inspectJavascriptModulePolicy(source) {
   let tree;
   try { tree = parse(source, {ecmaVersion: 2025, sourceType: 'module', locations: true}); }
   catch (error) { return refusal(error instanceof SyntaxError ? 'syntax' : 'unclassifiable', locationOf(error)); }
+  // Static dependencies come from this same complete AST, including modules
+  // whose execution is not admitted yet (Fetch remains outside part A).
+  const effects=Object.freeze([...new Set(tree.body.filter(node=>
+    ['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration'].includes(node.type)
+    &&['builtIn/FS','builtIn/Fetch'].includes(node.source?.value)).map(node=>node.source.value))]);
+  const marked=value=>effects.length?Object.freeze({...value,...identity,effect_imports:effects}):value;
   const pending = [tree]; let count = 0,filesystem=false;
   while (pending.length) {
-    if (++count > 65536 || pending.length > 65536) return refusal('ast_bound');
+    if (++count > 65536 || pending.length > 65536) return marked(refusal('ast_bound'));
     const node = pending.pop();
-    if (node.type === 'ImportExpression') return refusal('dynamic_import', locationOf(node));
+    if (node.type === 'ImportExpression') return marked(refusal('dynamic_import', locationOf(node)));
     if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'require')
-      return refusal('direct_require', locationOf(node));
+      return marked(refusal('direct_require', locationOf(node)));
     if (['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration'].includes(node.type) && node.source) {
-      if(!['builtIn/Data','builtIn/FS'].includes(node.source.value))return refusal('module_specifier', locationOf(node.source));
+      if(!['builtIn/Data','builtIn/FS'].includes(node.source.value))return marked(refusal('module_specifier', locationOf(node.source)));
       filesystem ||= node.source.value==='builtIn/FS';
     }
     for (const value of Object.values(node)) {
@@ -39,5 +45,5 @@ export function inspectJavascriptModulePolicy(source) {
       } else if (value && typeof value === 'object' && typeof value.type === 'string') pending.push(value);
     }
   }
-  return Object.freeze({status: 'ADMITTED', policy: JAVASCRIPT_MODULE_POLICY, parser, ...identity,...(filesystem?{filesystem:true}:{})});
+  return marked(Object.freeze({status: 'ADMITTED', policy: JAVASCRIPT_MODULE_POLICY, parser, ...identity,...(filesystem?{filesystem:true}:{})}));
 }

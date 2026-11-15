@@ -5,17 +5,19 @@ import {mock} from 'node:test';
 import {createHash} from 'node:crypto';
 import {createRedactor} from '../../lib/redact.mjs';
 const fault=process.argv[2]??'safe',events=[],calls=[];
-const declared=fault.startsWith('declared-'),sourceExecution=['source-execute','source-reapply'].includes(fault)||declared,ledger=[];let executed=false,nativeActive=false,mappingDirection='input',executionCount=0;
+const guarded=fault.startsWith('effects-'),declared=fault.startsWith('declared-'),sourceExecution=['source-execute','source-reapply'].includes(fault)||declared||guarded,ledger=[];let executed=false,nativeActive=false,mappingDirection='input',executionCount=0;
 const columns=[{name:'Key',label:'Key',type:'integer',data_kind:'Непрерывный',usage:'Не задано'}];
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]};
-const source=(fault==='source-reapply'?'import * as fs from "builtIn/FS";\nfs.appendFileSync("/owned/ledger.txt","run\\n",{encoding:"utf8"});\n':'')+'import {OutputTable} from "builtIn/Data";\n';
+const source=(fault.includes('late')?'/*'+'padding '.repeat(700)+'*/\n':'')
+ +(guarded?'import "builtIn/'+(fault.includes('fetch')?'Fetch':'FS')+'";\n':declared?'import * as fs from "builtIn/FS";\n':'')+'import {OutputTable} from "builtIn/Data";\n';
 const callback=Promise.withResolvers();
 let wizard=false,stopped=false,operation,sourceAdapter;
 const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[
  {ref:{...node,node_id:'input'},type:'imports.text',label:'Input',position:{x:64,y:64},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
 let graphReads=0;
 if(sourceExecution)graph.nodes=[];
+if(guarded&&fault.includes('existing'))graph.nodes=[{ref:node,type:'programming.javascript',label:'Existing',position:{x:320,y:280},inputs:[0],outputs:[0]}];
 const snapshot=()=>{const result={prepared_node_context:{...node,node_id:stopped&&fault==='owner'?'foreign':'js',verified:true,
  surface:wizard?'wizard':'graph',locked:stopped&&fault==='locked'},wizard:wizard?{status:'observed',root_ref:'wizard',root_tid:'W',
  stage:'input_mapping',owner_context:{status:'observed'}}:{status:'absent'},
@@ -79,11 +81,16 @@ if(sourceExecution){request.inputs=[];request.parameters.input_state='unconnecte
 if(declared){request.parameters.schema_mode='declared';request.parameters.columns=columns;}
 if(['declared-done-downstream','declared-stale-output'].includes(fault))request.read.ports=[];
 if(fault==='declared-done-downstream')request.finish='done';
+if(guarded&&fault.includes('existing')){
+ request.target={kind:'existing',type:'programming.javascript',ref:node};
+ if(fault.includes('replace'))request.parameters.expected_source_sha256=createHash('sha256').update(source).digest('hex');
+ else {delete request.parameters.source_text;delete request.parameters.schema_mode;}
+}
 const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
  nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   operation=options.operation;return support.nodeApplyDriverFactory(options);},
  nodeTargetAdapterFactory:()=>({preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
-  mutate:async e=>{if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0]});
+  mutate:async e=>{if(guarded)calls.push('MUTATION');if(e.kind==='create')graph.nodes.push({ref:node,type:'programming.javascript',label:'Parser',position:e.parameters.position,inputs:[0],outputs:[0]});
    else if(e.kind==='connect')graph.links.push(e.parameters.edge);else assert.fail('Unexpected graph mutation '+e.kind);
    return {status:'SUCCEEDED',cleanup_complete:true};},observe:async()=>{
   const g=structuredClone(graph);if(stopped&&fault==='graph'&&graphReads++)g.nodes[0].label='foreign edit';return g;},
@@ -100,6 +107,14 @@ runtime.startNodeApply(request);
 let job;
 do{job=await runtime.waitNodeApply('apply-js',{timeoutMs:1000});}while(!job.outcome);
 if(sourceExecution){
+ if(guarded){
+  assert.notEqual(job.outcome.status,'SUCCEEDED');assert.equal(executionCount,0);assert.ok(!calls.includes('MUTATION'));
+  assert.ok(!calls.includes('Done'));assert.equal(job.outcome.output.error.code,'JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT',JSON.stringify(job.outcome));
+  assert.equal(job.outcome.output.cleanup_complete,true);assert.equal(job.outcome.output.pending_phase,null);
+  assert.equal(job.outcome.output.next_step.tool,'dock_node_apply');assert.match(job.outcome.output.next_step.instruction,/declared/);
+  assert.match(job.outcome.output.next_step.instruction,/done/);
+  console.log(JSON.stringify({fault,status:'PASS',calls,ledger,outcome:job.outcome.output}));process.exit(0);
+ }
  if(fault==='declared-stale-output'){
   assert.notEqual(job.outcome.status,'SUCCEEDED');assert.equal(executionCount,0,'Stale mapping must refuse before script effects');
   console.log(JSON.stringify({fault,status:'PASS',calls,ledger}));process.exit(0);

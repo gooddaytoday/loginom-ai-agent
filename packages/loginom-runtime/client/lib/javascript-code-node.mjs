@@ -16,7 +16,8 @@ import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusa
 import {javascriptExecutionWaitContext} from './javascript-execution-continuation.mjs';
 import {NODE_READ_MODE,alignReadSchema} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
-import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
+import {withJavascriptSourcePolicyBoundary,javascriptEffectsSourceRefusal} from './javascript-source-policy-refusal.mjs';
+import {inspectJavascriptModulePolicy} from './javascript-module-policy.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import {refuseJavascriptPortFullRead} from './native-read-refusal.mjs';
 
@@ -101,7 +102,7 @@ export function javascriptCodeReadback({node,phases}) {
 export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redactor,requireWizardErrorDetails=false}) {
   need(targetBuild==='7.4.2'&&typeof targetOrigin==='string'&&typeof redactor?.text==='function'
     &&typeof redactor?.redact==='function'&&typeof requireWizardErrorDetails==='boolean','JavaScript Code runtime dependencies unavailable');
-  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v6',modes:['script'],
+  const nodeApplyHandlers=new Map([['programming.javascript',{revision:'javascript-script-lifecycle-v7',modes:['script'],
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
@@ -144,7 +145,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       lastSourceAdapter=selected;return selected;
     };
     const policyAdmission=(kind,boundOwner,deadline,expectedSource,expectedSettings)=>createJavascriptSourceAdmission({kind,owner:boundOwner,
-      deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord,expectedSource,expectedSettings});
+      deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord,expectedSource,expectedSettings,
+      ...(request.finish==='execute'?{requireDeclaredOutput:()=>request.target.kind==='new'
+        ?request.parameters.schema_mode==='code':sourceSnapshot?.settings?.generation}:{})});
     const graph=async ctx=>{
       need(typeof operation.nodeTargetAdapter?.observe==='function','JavaScript complete graph observer unavailable');
       const value=await operation.nodeTargetAdapter.observe({document_id:request.document_id,
@@ -204,6 +207,10 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     return {
       verifySource:async parameters=>{
         validateJavascriptCodeRequest(parameters,request.mode,request);
+        if(request.target.kind==='new'&&request.finish==='execute'&&parameters.schema_mode==='code'){
+          const policy=inspectJavascriptModulePolicy(parameters.source_text);
+          if(policy.effect_imports?.length)throw javascriptEffectsSourceRefusal(policy);
+        }
         if(parameters.source_text!==undefined){
           try{prepareJavascriptSourceDelivery({source:parameters.source_text,owner:initialOwner,redactor});}
           catch{

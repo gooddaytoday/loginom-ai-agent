@@ -11,7 +11,8 @@ from zipfile import ZipFile
 HERE = Path(__file__).resolve().parent
 
 
-def files(case, execution=2):
+def files(case, execution=None):
+    if execution is None: execution = 1 if case == 'effects' else 2
     if case == 'read':
         return {name: (HERE / 'fixtures' / name).read_bytes()
                 for name in ['utf8.txt', 'utf16le.txt', 'cp1251.txt', 'bytes.bin']}
@@ -59,13 +60,15 @@ def expected(case):
     else:
         columns = [('FileName', 'string'), ('ByteCount', 'integer'), ('Hex', 'string')]
         rows = [{'FileName': name, 'ByteCount': len(data[name]), 'Hex': data[name].hex()} for name in names]
-    return {'nodes': [{'type': 'programming.javascript'}, {'type': 'exports.text'}],
+    return {**({'effect_executions': {'warm': 1, 'cold': 2}} if case == 'effects' else {}),
+            'nodes': [{'type': 'programming.javascript'}, {'type': 'exports.text'}],
             'outputs': [{'output_node_type': 'export_input', 'export_destination': 'fs-' + case + '.csv',
                          'ordered': True, 'columns': [{'name': name, 'label_any': True, 'type': kind}
                                                      for name, kind in columns], 'rows': rows}]}
 
 
-def verify_archive(case, archive, folder, execution=2):
+def verify_archive(case, archive, folder, execution=None):
+    if case == 'effects': assert execution in [None, 1, 2], 'Effects expects one warm execution and one cold execution'
     wanted = files(case, execution)
     directories = {folder + '/'}
     for name in wanted:
@@ -120,7 +123,7 @@ if __name__ == '__main__':
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--folder')
     parser.add_argument('--check', action='store_true')
-    parser.add_argument('--execution', type=int, choices=[2, 3], default=2)
+    parser.add_argument('--execution', type=int, choices=[1, 2, 3])
     parser.add_argument('--phase', choices=['fixtures', 'saved', 'moved', 'sidecar', 'warm', 'cold'], default='warm')
     parser.add_argument('--sidecar')
     parser.add_argument('--keep-file', type=Path)

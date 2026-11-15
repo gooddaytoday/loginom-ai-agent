@@ -40,7 +40,27 @@ runner=runpy.run_path('scripts/node-acceptance/run-check.py')
 warnings.simplefilter('ignore', UserWarning)
 with TemporaryDirectory() as temp:
  archive=Path(temp)/'files.zip'
- def check(case, entries, execution=2, valid=False):
+ # Real native process identities are counted once across repeated UI samples;
+ # cold has its own session even if native record IDs are reused.
+ journal=Path(temp)/'execution-events.jsonl'
+ target={'phase':'node_phase_completed','receipt':{'value':{'target':{'node':{'type':'programming.javascript','ref':{'node_id':'js'}}}}}}
+ def event(session='warm', record='17', node='js'):
+  return {'session_id':session,'outcome':{'output':{'node_processes':{'verified':True,'inventory_complete':True,'show_completed':True,
+   'root_id':'root','processes':[{'record_id':record,'state':'completed','error':False,'owner':{'verified':True,'node_id':node}}]}}}}
+ def evidence(rows,ledger,count,valid=False):
+  journal.write_text('\n'.join(json.dumps(row) for row in [target,*rows]))
+  try: proof=runner['check_fs_effect_executions']([journal],ledger,count)
+  except AssertionError:
+   assert not valid
+  else:
+   assert valid and proof['ledger_lines']==count
+ evidence([event(),event()],b'run\n',1,True)
+ evidence([event(),event('cold')],b'run\nrun\n',2,True)
+ evidence([event()],b'run\nrun\n',1)
+ evidence([event(),event(record='18')],b'run\n',1)
+ evidence([event(node='export')],b'run\n',1)
+ evidence([event(),event(record='18')],b'run\nrun\n',1)
+ def check(case, entries, execution=None, valid=False):
   with ZipFile(archive,'w') as z:
    z.writestr('output/',b'')
    if case=='operations': z.writestr('output/archive/',b'')
@@ -60,9 +80,10 @@ with TemporaryDirectory() as temp:
   check(case,entries+[entries[0]])
   check(case,[(name,b'corrupt' if i==0 else data) for i,(name,data) in enumerate(entries)])
  check('effects',list(oracle['files']('effects',3).items()))
- check('effects',list(oracle['files']('effects',3).items()),3,valid=True)
- check('effects',list(oracle['files']('effects').items()),3)
- check('effects',list(oracle['files']('effects',1).items()))
+ check('effects',list(oracle['files']('effects',3).items()),3)
+ check('effects',list(oracle['files']('effects',2).items()),2,valid=True)
+ check('effects',list(oracle['files']('effects').items()),2)
+ check('effects',list(oracle['files']('effects',2).items()))
  spec=runner['scenario']('js-fs-paths')
  assert spec['oracle'].is_file()
  paths=oracle['expected']('paths')

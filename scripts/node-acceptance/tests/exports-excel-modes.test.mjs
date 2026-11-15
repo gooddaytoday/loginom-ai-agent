@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {runInNewContext} from 'node:vm';
 const script=fileURLToPath(new URL('../exports-excel-modes.mjs',import.meta.url));
 const real=JSON.stringify(new URL('../../../packages/loginom-runtime/src/connection-check.mjs',import.meta.url).href);
 // Stub runtime; prepare enforces the exact /app/ page path like workspace.mjs (FOREIGN_PAGE otherwise).
@@ -38,4 +39,24 @@ test('seed workspace prepare normalizes a pair URL without /app/ like loginBrows
 test('seed workspace prepare keeps a pair URL that already has /app/',async t=>{
  const prepared=await seed(t,'https://app.loginom.ai/app/');
  assert.equal(prepared.origin,'https://app.loginom.ai');assert.equal(prepared.pathname,'/app/');
+});
+
+test('native folder lookup scrolls the same virtual grid beyond DOM index 57 and verifies its row',async()=>{
+ const source=await readFile(script,'utf8'),fn=source.slice(source.indexOf('function storageFolderRecord('));
+ const records=Array.from({length:90},(_,i)=>({data:{FileName:'folder'+i,FilePath:'/worker/folder'+i+'/',Type:1}}));
+ let visible=57;const el={id:'same-grid',scrollTop:0,contains:node=>node===row};
+ const row={querySelector:()=>({textContent:'folder66'})};
+ const view={getStore:()=>({isLoading:()=>false,getCount:()=>90,getTotalCount:()=>90,getRange:()=>records}),
+  bufferedRenderer:{rowHeight:24},getNode:r=>records.indexOf(r)<=visible?row:null,getRecord:()=>records[66]};
+ const lookup=runInNewContext('('+fn+')',{Ext:{getCmp:id=>id===el.id?view:null}});
+ const args={part:'folder66',parent:'/worker/',path:'/worker/folder66/',tid:'cell66'};
+ assert.throws(()=>lookup(el,{...args,visible:true}),/FS_STORAGE_FOLDER_DOM_IDENTITY/);
+ assert.equal(lookup(el,{...args,scroll:true}).index,66);assert.equal(el.scrollTop,66*24);
+ visible=89;assert.equal(lookup(el,{...args,visible:true}).path,args.path);
+ for(const change of [r=>r.data.Type=0,r=>r.data.FilePath='/foreign/folder66/']){
+  const saved={...records[66].data};change(records[66]);assert.throws(()=>lookup(el,args),/FS_STORAGE_FOLDER_IDENTITY/);records[66].data=saved;
+ }
+ assert.throws(()=>lookup(el,{...args,parent:'/foreign/'}),/FS_STORAGE_FOLDER_IDENTITY/);
+ assert.throws(()=>lookup(el,{...args,part:'missing',path:'/worker/missing/'}),/FS_STORAGE_FOLDER_NOT_FOUND:\/worker\/missing\//);
+ records[67].data={...records[66].data};assert.throws(()=>lookup(el,args),/FS_STORAGE_FOLDER_AMBIGUOUS/);
 });

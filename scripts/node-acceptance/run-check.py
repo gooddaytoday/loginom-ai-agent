@@ -1649,6 +1649,42 @@ def records(path):
         except ValueError: continue
 
 
+def fs_effect_execution_evidence(journals):
+    """Count native completed JS processes, including downstream activation.
+
+    Repeated UI snapshots and duplicated completion receipts are not executions.
+    Node ownership comes from the real JS target receipt, never its label/ledger.
+    """
+    events = [(path, n, event) for path in journals for n, event in records(path)]
+    nodes = set()
+    for _, _, event in events:
+        target = event.get('receipt', {}).get('value', {}).get('target', {}).get('node', {})
+        if event.get('phase') == 'node_phase_completed' and target.get('type') == 'programming.javascript':
+            nodes.add(target['ref']['node_id'])
+    assert len(nodes) == 1, 'FS_EFFECT_JS_OWNER_UNCONFIRMED'
+    executions = {}
+    for path, n, event in events:
+        processes = event.get('outcome', {}).get('output', {}).get('node_processes', {})
+        if not all(processes.get(k) is True for k in ['verified', 'inventory_complete', 'show_completed']): continue
+        for process in processes.get('processes', []):
+            owner = process.get('owner', {})
+            if owner.get('verified') is not True or owner.get('node_id') not in nodes: continue
+            if process.get('state') != 'completed' or process.get('error') is not False: continue
+            identity = (event.get('session_id'), processes.get('root_id'), process.get('record_id'))
+            assert all(isinstance(k, str) and k for k in identity), 'FS_EFFECT_EXECUTION_ID_UNCONFIRMED'
+            executions.setdefault(identity, dict(journal=str(path), line=n, node_id=owner['node_id'],
+                session_id=identity[0], root_id=identity[1], process_record_id=identity[2]))
+    assert executions, 'FS_EFFECT_NO_COMPLETED_JS_EXECUTIONS'
+    return list(executions.values())
+
+
+def check_fs_effect_executions(journals, ledger, expected_count):
+    evidence = fs_effect_execution_evidence(journals)
+    assert ledger == b'run\n' * len(evidence), 'FS_EFFECT_LEDGER_EXECUTION_COUNT_DIFFERS'
+    assert len(evidence) == expected_count, 'FS_EFFECT_EXECUTION_EXPECTATION_DIFFERS'
+    return dict(executions=evidence, ledger_lines=len(evidence))
+
+
 def ports(value, receipt=None):
     if isinstance(value, dict):
         # inspect may wrap an action and its read receipt. Keep each port with
@@ -2095,12 +2131,19 @@ class Runner:
             self.phase(phase + '-bytes', [sys.executable, '-B', oracle, '--case', case,
                 '--keep-file', folder / phase / 'keep.txt', '--inventory', folder / phase / 'inventory.json'], folder, timeout=60)
         elif not prepare or books:
+            execution_count = str(read(spec['source'].parent / ('js-fs-' + case) / 'expected.json')['effect_executions'][phase.removeprefix('fs-')]) if case == 'effects' else ('3' if phase == 'fs-cold' else '2')
             self.phase(phase + '-bytes', [sys.executable, '-B', oracle, '--case', case, '--archive',
                        folder / phase / 'files.zip', '--folder', child,
-                       '--execution', '3' if phase == 'fs-cold' else '2'] if case != 'paths' else
+                       '--execution', execution_count] if case != 'paths' else
                        [sys.executable, '-B', oracle, '--case', case, '--archive', folder / phase / 'files.zip',
                         '--folder', Path(parent).name, '--phase', phase.removeprefix('fs-'),
                         '--sidecar', self.out.name + '-sidecar.txt'], folder, timeout=60)
+            if case == 'effects':
+                journals = sorted((folder / 'profile').glob('loginom/runtime/generations/*/chats/*/attempts/*/execution-events.jsonl'))
+                if phase == 'fs-cold': journals.append(folder / 'cold/execution-events.jsonl')
+                from zipfile import ZipFile
+                with ZipFile(folder / phase / 'files.zip') as archive: ledger = archive.read(child + '/ledger.txt')
+                write(folder / (phase + '-executions.json'), check_fs_effect_executions(journals, ledger, int(execution_count)))
         self.current['fs-bytes'] = phase + ' PASS'
         return folder / phase / 'files.zip'
 

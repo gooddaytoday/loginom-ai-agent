@@ -50,3 +50,13 @@ test('module policy exact maximum UTF8/LF source and deep parser refusal',()=>{
  const result=inspectJavascriptModulePolicy('('.repeat(8000)+'0'+')'.repeat(8000));assert.equal(result.status,'REFUSED');assert.equal(result.reason,'unclassifiable');assert.equal(result.location,null);
 });
 test('module policy reports bounded exact UTF16 location, not forbidden specifier',()=>{const source='//😀\nimport "PRIVATE_SENTINEL";';const result=inspectJavascriptModulePolicy(source);assert.deepEqual(result.location,{offset_utf16:12,line:2,column_utf16:7});assert.ok(!JSON.stringify(result).includes('PRIVATE_SENTINEL'));});
+test('effect imports use the full module AST, decoded specifiers and no comment/string guesses',()=>{
+ for(const module of ['FS','Fetch']){
+  const source='/*'+'padding '.repeat(700)+'*/\nimport "builtIn/'+module+'";';
+  const result=inspectJavascriptModulePolicy(source);
+  assert.deepEqual(result.effect_imports,['builtIn/'+module]);
+  assert.equal(result.source_utf8_bytes,Buffer.byteLength(source));
+ }
+ assert.deepEqual(inspectJavascriptModulePolicy(String.raw`import "builtIn/\u0046S";`).effect_imports,['builtIn/FS']);
+ assert.equal(inspectJavascriptModulePolicy('// import "builtIn/FS";\nconst text="builtIn/Fetch";').effect_imports,undefined);
+});

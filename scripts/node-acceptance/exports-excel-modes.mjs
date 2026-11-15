@@ -96,14 +96,15 @@ try{
   // lifecycle. Its source/expected bytes never enter the model conversation.
   if(config.fs_error_seed!==directory+'/errors'||folders?.children.join(',')!=='errors')throw Error('FS_ERROR_SEED_SCOPE');
   const dir=JSON.stringify(config.fs_error_seed);
-  const source='import * as fs from "builtIn/FS";\nimport {OutputTable,DataType} from "builtIn/Data";\n'
+  const source='import * as fs from "builtIn/FS";\nimport {OutputTable} from "builtIn/Data";\n'
    +'if(!fs.existsSync('+dir+'+"/keep.txt"))fs.writeFileSync('+dir+'+"/keep.txt","KEEP",{encoding:"utf8",flag:"wx"});\n'
    +'const denied='+dir+'+"/denied.txt";let present=false;try{fs.statSync(denied);present=true;}catch(e){}\n'
    +'if(!present){const fd=fs.openSync(denied,"wx",0o000);try{fs.writeSync(fd,"DENIED");}finally{fs.closeSync(fd);}}\n'
-   +'OutputTable.AssignColumns([{Name:"Seed",DataType:DataType.Integer}]);\nOutputTable.Append();OutputTable.Set("Seed",1);\n';
+   +'OutputTable.Append();OutputTable.Set("Seed",1);\n';
   const result=await runtime.runNodeApply({operation_id:'fs-error-seed',contract_revision:'1.0.0',document_id:identity.document_id,
    workflow_ref:identity.workflow_ref,target:{kind:'new',type:'programming.javascript',label:'Private FS fixture',position:{x:240,y:80}},
-   inputs:[],mode:'script',parameters:{input_state:'unconnected',schema_mode:'code',source_text:source},mappings:[],finish:'execute',
+   inputs:[],mode:'script',parameters:{input_state:'unconnected',schema_mode:'declared',
+    columns:[{name:'Seed',label:'Seed',type:'integer',data_kind:'Непрерывный',usage:'Не задано'}],source_text:source},mappings:[],finish:'execute',
    read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:120000,execute_ms:30000,total_ms:180000}});
   if(result.status!=='SUCCEEDED'||result.output?.execution?.status!=='completed'||result.cleanup_complete!==true)throw Error('FS_ERROR_SEED_FAILED:'+JSON.stringify(result));
   const saved=await runtime.run('package.save_checkpoint',{path:directory+'/fixture.lgp',conflict_policy:'fail'},{operationId:'fs-error-seed-save'});
@@ -210,10 +211,42 @@ async function storageDirectory(directory){
  if(await grids.count()===0)await at('MF;cntMain;tlbMainToolbar;btnFilestorage').click();
  await grids.waitFor({state:'visible'});if(await grids.count()!==1)throw Error('FS_STORAGE_AMBIGUOUS');
  const prefix=(await grids.getAttribute('data-tid')).split(';FileStorageForm;')[0];
- await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы').click();let trail='';
+ await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы').click();let trail='',parent='';
  for(const part of directory.slice(1).split('/')){
-  await at(prefix+';FileStorageForm;colName_'+part.replace(/\s/g,'_').replace(/,/g,'')).dblclick();
+  const tid=prefix+';FileStorageForm;colName_'+part.replace(/\s/g,'_').replace(/,/g,'');
+  const lookup={part,parent:parent+'/',path:parent+'/'+part+'/',tid};
+  await page.waitForFunction(id=>{
+   const store=globalThis.Ext?.getCmp?.(id)?.getStore?.();
+   return store?.isLoading?.()===false&&store.getCount()===store.getTotalCount();
+  },await grids.getAttribute('id'));
+  const moved=await grids.evaluate(storageFolderRecord,{...lookup,scroll:true});
+  await record({phase:'fs_storage_folder_resolved',directory,...lookup,...moved});
+  const row=grids.locator('[data-tid='+JSON.stringify(tid)+']');
+  await row.waitFor({state:'visible'});
+  await grids.evaluate(storageFolderRecord,{...lookup,visible:true});
+  if(await row.count()!==1)throw Error('FS_STORAGE_FOLDER_DOM_AMBIGUOUS:'+lookup.path);
+  await row.dblclick();parent+='/'+part;
   trail+='>'+part;await at(prefix+';cnrNaviMode;b.s_Сервер>Файлы'+trail).waitFor({state:'visible'});
  }
  return {prefix,at};
+}
+
+// Runs in the existing native grid only; no server request or wider search.
+function storageFolderRecord(el,{part,parent,path,tid,scroll=false,visible=false}){
+ const view=globalThis.Ext?.getCmp?.(el.id),store=view?.getStore?.(),records=store?.getRange?.();
+ if(store?.isLoading?.()!==false||!Array.isArray(records)||store.getCount()!==store.getTotalCount())throw Error('FS_STORAGE_LIST_INCOMPLETE:'+path);
+ const matches=records.flatMap((record,index)=>record.data?.FileName===part?[{record,index}]:[]);
+ if(matches.length!==1)throw Error((matches.length?'FS_STORAGE_FOLDER_AMBIGUOUS:':'FS_STORAGE_FOLDER_NOT_FOUND:')+path);
+ const {record,index}=matches[0],data=record.data;
+ if(data.Type!==1||data.FilePath!==path||path.slice(0,-(part.length+1))!==parent)throw Error('FS_STORAGE_FOLDER_IDENTITY:'+path);
+ if(scroll){
+  const height=view.bufferedRenderer?.rowHeight;
+  if(!Number.isFinite(height)||height<=0)throw Error('FS_STORAGE_ROW_HEIGHT_UNOBSERVED:'+path);
+  el.scrollTop=index*height;
+ }
+ if(visible){
+  const node=view.getNode?.(record),cell=node?.querySelector('[data-tid='+JSON.stringify(tid)+']');
+  if(!node||!el.contains(node)||view.getRecord?.(node)!==record||cell?.textContent?.trim()!==part)throw Error('FS_STORAGE_FOLDER_DOM_IDENTITY:'+path);
+ }
+ return {index,name:data.FileName,type:data.Type,path:data.FilePath,parent};
 }

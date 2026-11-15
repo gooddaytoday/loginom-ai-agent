@@ -1,4 +1,8 @@
 {
+  "effect_executions": {
+    "warm": 1,
+    "cold": 2
+  },
   "nodes": [
     {
       "type": "programming.javascript"

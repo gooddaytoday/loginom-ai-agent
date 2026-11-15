@@ -68,7 +68,7 @@ test('unconnected source reactivates output mapping with a fresh second Execute'
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
 });
 
-test('reapplying Execute to an existing FS source performs two more append effects',()=>{
+test('reapplying Execute to an existing Data source retains two executions',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),'source-reapply'],{encoding:'utf8',timeout:10000});
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
@@ -92,6 +92,14 @@ for(const point of ['read','replace'])test('configure cancellation during manage
  assert.equal(result.error,undefined,String(result.error));
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
  const outcome=JSON.parse(result.stdout.trim());assert.equal(outcome.pending_phase,'configure');
+});
+
+for(const fault of ['effects-new-fs','effects-new-fetch','effects-existing-fs','effects-existing-fetch','effects-existing-fs-replace','effects-existing-late-fs'])
+test('effect imports require declared output before mutation: '+fault,()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const {outcome}=JSON.parse(result.stdout.trim());
+ const checked=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(outcome);assert.equal(checked.valid,true,JSON.stringify(checked));
 });
 
 for(const kind of ['new','existing'])test('redaction preflight refuses before the actual target/browser boundary '+kind,async t=>{
