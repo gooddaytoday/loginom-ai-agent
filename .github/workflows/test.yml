@@ -203,11 +203,21 @@ jobs:
         run: |
           bash -n packages/dashboard/deploy/dev-master.sh
           shellcheck packages/dashboard/deploy/dev-master.sh
-          if output=$(bash packages/dashboard/deploy/dev-master.sh install --cli-button --web invalid/name 2>&1); then
+          cat > "$RUNNER_TEMP/dashboard-invalid.json" <<'JSON'
+          {"server":"example-server","studio":"example-studio","network":"example-net","web":"invalid/name","project":"example-services","userstorage":"example-storage"}
+          JSON
+          if output=$(bash packages/dashboard/deploy/dev-master.sh install --cli-button --config "$RUNNER_TEMP/dashboard-invalid.json" 2>&1); then
             echo "Expected invalid web name rejection" >&2
             exit 1
           fi
-          [[ $output == 'Некорректное имя контейнера web' ]]
+          [[ $output == *'Error: Invalid web'* ]]
+          DASHBOARD_PROJECT=example-services DASHBOARD_IMAGE=example:local \
+            DASHBOARD_WEB=example-web DASHBOARD_WEB_USER=1000:1000 \
+            DASHBOARD_PUBLISHER_USER=1000:1000 DASHBOARD_OWNER_KEY=codex.owner \
+            DASHBOARD_OWNER_VALUE=example DASHBOARD_STATE="$RUNNER_TEMP/dashboard" \
+            DASHBOARD_APP_PORT=32801 DASHBOARD_APP_ORIGIN=http://dashboards.localhost:32801 \
+            DASHBOARD_CLIENT_ORIGINS=http://127.0.0.1:32800 DASHBOARD_USERSTORAGE=example-storage \
+            DASHBOARD_NETWORK=example-net docker compose -f packages/dashboard/deploy/compose.yaml config --quiet
 
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
@@ -260,7 +270,7 @@ jobs:
 
       - name: Verify Loginom workspace address and native link contracts
         working-directory: packages/loginom-runtime
-        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs'
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --test test/connection-check.test.mjs test/dashboard-storage.test.mjs test/managed-entry-close.test.mjs test/managed-resources-close.test.mjs client/test/workspace.test.mjs client/test/node-link-validation.test.mjs client/test/node-link-hover.test.mjs client/test/node-link-rebind.test.mjs client/test/node-target.test.mjs client/test/text-export-connect.test.mjs client/test/executor.test.mjs'
 
       - name: Verify explicit proxy environment with real Node networking
         working-directory: packages/desktop

@@ -240,3 +240,24 @@ bun run build
 При третьей публикации настоящий builder приостановлен во время компиляции; publisher остановлен, в старый output внесён искусственный stale manifest и publisher запущен заново. Готовые state/builds сохранились, появился один новый ID с пустым output. Поздний старый manifest удалён при активной новой задаче. После продолжения старый процесс вышел с ENOENT/exit 1, не восстановив output; штатный restart запустил свежий builder, который завершил новую попытку exit 0/ready. Publisher и builder оставались без сети; native read-back подтвердил прежние исходники без перепубликации. Два native DeleteFile через Studio вернули C → B → A без job. `.lgp` побайтно прежний, Logout подтверждён, 17 исходных контейнеров сохранили ID/статус/StartedAt.
 
 Evidence и одноразовые probes остаются в `$M4_SCRATCH/task6-*`; исходные tests и actual-container proof разделены в локальном отчёте Task 6. Штатный installer check также PASS: HTTP/headers/assets, минифицированный `/app/` и `/app-debug/`, live table API, Close+Logout. Это dev-container проверка master, не установленная приёмка Desktop/CLI M4. Внешняя corruption сохранённых сборок и crash-temp housekeeping не входят в контракт. Task 7, миграция, push/merge/release не выполнялись; следующий gate — независимый review Task 6.
+
+## Task 7 — подготовка поставки
+
+Task 6 принят независимыми Spec/Quality review без обязательных замечаний.
+В существующем unit job Node проверяет private dashboard storage и managed close;
+`test:coverage` отдельно измеряет весь web и publisher/builder с порогами 90%
+строк и функций. Browser job проверяет JSON-конфигурацию installer и Compose;
+шаблон на трёх ОС и browser job сохранены. Нового staging/manifest механизма нет:
+`runtime/src` входит целиком, клиент не получает серверные роли.
+
+Локальный итоговый source gate: dashboard typecheck/test/size PASS, web27 и
+workers24 с покрытием 97,13/96,30% и 98,79/93,02% строк/функций, остальные Node50.
+Browser239 PASS выявил устаревший test-import `appHost` из bundle; адресный тест
+с реальным `src/web/apps.ts` прошёл 5/5. Host96 PASS; его noEmit typecheck
+разрешил `.ts` imports общей сборки и прошёл после этой адресной правки.
+Desktop18 PASS/2 платформенных SKIP, backend60, UI2+13, runtime19 и typecheck
+Desktop/backend/UI PASS. Эти проверки не подтверждают установленный продукт.
+
+Установленная приёмка, сборка чистого кандидата и сохранный M3-переход продолжаются.
+Полноценная release7.4.x по условию roadmap остаётся перенесённой в M5;
+искусственная пара7.4.2 не заменяет этот результат.
