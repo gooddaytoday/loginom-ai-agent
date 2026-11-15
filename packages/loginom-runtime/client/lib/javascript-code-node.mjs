@@ -437,7 +437,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       // A materialization launch may settle before its process identity can
       // be read. Release proves cleanup only, never completion or a replay.
       // The retained REST child also uses the independently settled Done.
-      releasePendingPhases:['input_mapping','open','configure','materialization_start','finish'],
+      releasePendingPhases:['input_mapping','open','configure','materialization_start'],
       async releasePending(state,{signal:releaseSignal}={}) {
         const afterDone=['node_finish','materialization_start','finish'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
           &&(state.pending.phase==='node_finish'||state.pending.phase==='materialization_start'&&materializationSettled
