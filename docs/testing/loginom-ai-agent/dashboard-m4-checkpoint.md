@@ -1,7 +1,7 @@
 # Dashboard M4 — checkpoint
 
 - Основа checkout: `bbef0b2e4fabda3aba524823dba20c8130419a8e`, ветка `dashboard-m4`.
-- Tasks 0–6 приняты; Task 6 Spec/Quality Approved, обязательных замечаний нет.
+- M4 принят контроллером: Tasks 0–7 завершены, финальные Spec/Quality и whole-branch closure Approved; audit 52/52, обязательных замечаний нет.
 - Текущие команды, версия/source поставки, результаты и история — [runbook M4](dashboard-m4.md).
 - Task 7 source gate PASS; три whole-branch замечания по коду исправлены, strongest re-review Approved.
 - Общая чистая Desktop/CLI поставка установлена; оба normal-profile master main path PASS.
@@ -14,5 +14,5 @@
 - Historical Knowledge ACK→SIGKILL: причина UNKNOWN; поздний PASS не объясняет прежний сбой.
 - Full release 7.4.x при отсутствии полноценного стенда — M5; bare-stand ordinary Logout NOT_PROVEN, выполнен own maintenance.
 - Private configs, credentials, raw logs, команды и receipts вне Git; прежние FAIL сохранены.
-- Следующий шаг: controller final Task7 review, whole-branch closure и completion audit; M4 ещё не объявлен завершённым.
+- Работа M4 завершена. Дальнейшая работа выполняется отдельной задачей; установленные границы приёмки сохраняются.
 - Push/merge/release и очистка прежних данных не разрешены этим результатом.

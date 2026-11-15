@@ -1,6 +1,6 @@
 # Dashboard M4: публикация через хранилище
 
-Статус: Tasks 0–5 приняты независимыми review; Task 6 реализована и проверена, ожидается независимый полный review. Это не приёмка установленной M4. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
+Статус: M4 принят контроллером. Tasks 0–7 завершены; финальные Spec/Quality review и whole-branch closure Approved, completion audit подтвердил 52/52 пункта, обязательных замечаний нет. Исходниковые проверки, установленная приёмка и оставшиеся ограничения разделены ниже. База хранится только в [checkpoint M4](dashboard-m4-checkpoint.md); контракт и последовательность — [дизайн](../../superpowers/specs/2026-11-14-dashboard-m4-design.md) и [план](../../superpowers/plans/2026-11-14-dashboard-m4.md).
 
 M3 завершена: установленная Linux-приёмка, CI и независимые ревью PASS. Её результаты, ограничения URI dispatch/Windows/macOS и исходные артефакты сохраняются в [runbook M3](dashboard-m3.md). Они не подтверждают новый M4. Первый проверяемый результат реализации — закрытый host-вызов через авторизованную Studio на обеих версиях, затем публикация проверенных исходников до `ready` и открытия Dashboard.
 
@@ -317,5 +317,5 @@ Evidence и точные команды вне Git: `$M4_SCRATCH/task7-delivery-
 Xvfb завершились с exit0. Native Close/Logout доказан отдельно. Историческая причина
 Knowledge ACK→SIGKILL остаётся UNKNOWN; поздние PASS её не устанавливают.
 Full release 7.4.x условно перенесена в M5; bare-stand Logout ограничен описанным выше maintenance.
-Кодовые замечания закрыты; итоговая приёмка Task7/M4 ожидает controller review и completion audit.
+Task 7 и M4 приняты контроллером: финальные Spec/Quality review и whole-branch closure Approved; completion audit 52/52, обязательных замечаний нет. Указанные границы проверок и ограничения сохраняются.
 Push/merge/release и очистка прежних данных не выполнялись.
