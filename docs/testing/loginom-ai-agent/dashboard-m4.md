@@ -241,7 +241,7 @@ bun run build
 
 Evidence и одноразовые probes остаются в `$M4_SCRATCH/task6-*`; исходные tests и actual-container proof разделены в локальном отчёте Task 6. Штатный installer check также PASS: HTTP/headers/assets, минифицированный `/app/` и `/app-debug/`, live table API, Close+Logout. Это dev-container проверка master, не установленная приёмка Desktop/CLI M4. Внешняя corruption сохранённых сборок и crash-temp housekeeping не входят в контракт. Task 7, миграция, push/merge/release не выполнялись; следующий gate — независимый review Task 6.
 
-## Task 7 — промежуточная поставка и сохранный переход
+## Task 7 — поставка и сохранный переход
 
 Task 6 принят независимыми Spec/Quality review без обязательных замечаний.
 В существующие задачи CI добавлены private storage/managed close, installer/Compose checks;
@@ -258,14 +258,14 @@ CLI installed race исправлен существующим connection.ready 
 local fallback сохранён, fresh отказ не запускает модель. RED→GREEN, затем CLI6 PASS;
 последующий test-only observer actual IPC для SIGINT проверен отдельно:1 PASS/56 assertions.
 
-Проверенная промежуточная Linux-пара: `0.3.10-m4.20261115.2`, source
-`a6b5ca3c02e5c94af588b1d3c1552b064b4a0bdf`, prod/backendV1/browser recovery.
+Финальная проверенная Linux-пара: `0.3.10-m4.20261115.3`, source
+`7d750f939c60083be92eeb3186f83f51331ec19f`, prod/backendV1/browser recovery.
 Полные Desktop DEB/AppImage и CLI archive, clean manifests/static checks и11408
 installed runtime resources PASS. Desktop заменён через dpkg с сохранённым M3 backup;
 CLI установлен штатно в собственный HOME, общий пользовательский CLI launcher не заменён.
 Normal HOME/XDG, дисковая история и provider auth собственных прежних профилей сохранены.
 
-Installed master: Desktop/CLI → настоящий Studio snapshot → реальная модель → draft →
+Сохранённая installed master матрица промежуточной .2: Desktop/CLI → настоящий Studio snapshot → реальная модель → draft →
 разовое разрешение/явный CLI auto → собственный ready → Dashboard с5живыми строками PASS.
 Проверены local/downloaded src, Desktop Deny, ACL ACCESS_DENIED в общей read-only папке,
 успешная публикация в writable common и создание новой публикации. Байты .lgp сохранены.
@@ -284,14 +284,38 @@ Server/Studio/volume сохраняют прежний origin. Streamed docker c
 штатный GNU tar с numeric ownership внутри rootless namespace исправил перенос.
 Destination read-back:21исходная запись, все bytes/UID/GID/modes/types/links совпали.
 Основной ROI открыт, сохранённые3src перепубликованы установленным Desktop без изменений;
-own ready, native Dashboard5rows, installer check /app/+/app-debug/, .lgp и все старые bytes PASS.
+own ready, native Dashboard с 5 живыми строками, installer check /app/+/app-debug/, .lgp и все старые bytes PASS.
 Publisher монтирует новый UserStorage RO. Старые контейнеры/данные не удалены; rollback не выполнялся.
 
-Evidence и точные операционные команды остаются вне Git: `$M4_SCRATCH/task7-delivery-2`
-и `$M4_SCRATCH/task7-migration`; исходные FAIL сохранены в локальном Task7 report.
-Native Close/Logout отделён от32 resource ACK+actual exit0; историческая причина
-Knowledge ACK→SIGKILL остаётся UNKNOWN. Full release7.4.x условно перенесена в M5.
-**Task7/M4 ещё не приняты:** whole-branch review требует исправить concurrent local build/prune,
-Desktop cold pre-chat readiness и удержание payload pending-очереди publisher.
-Следующий шаг — согласованная fix-wave, новая общая .3 поставка и адресные installed повторы.
+Три обязательных замечания whole-branch code review исправлены и независимо приняты:
+локальная сборка устанавливает результат внутри commit lock, Desktop ждёт готовность
+captured Host в pre-chat, publisher удерживает payload только одного кандидата.
+Адресные source PASS: agent 88 + parallel 3, Desktop 9+36, Host 14; web 27/workers 27/Node 50,
+Desktop/dashboard typecheck, draft browser 6, size 15358/15600. Покрытие web 97,13/96,30%,
+workers 98,48/90,48% строк/функций; полный прежний source gate не повторялся.
+
+На общей .3 паре повторены оба installed master main path на сохранном migrated стенде:
+свежий native snapshot → реальная модель → draft → разовое согласие → собственный ready →
+native Dashboard с 5 живыми строками и Close/Logout. CLI штатно инициализирован в собственном дисковом
+профиле; Desktop продолжил скачанные src, затем локальные src после холодного перезапуска.
+Controlled Desktop IPC при остановленном собственном Knowledge: starting/pending,
+единственный контрольный GET вернул 404 до TTL, затем SIGCONT → ready/downloaded;
+байты src и base совпали с публикацией. Это отдельная проверка установленного IPC,
+не искусственно задержанный deeplink: обычный cold UI проверен другим свежим snapshot.
+Точную внутреннюю последовательность await/cancellation подтверждают source regressions.
+
+Обновлённый общий образ трёх ролей установлен штатным installer на новый сохранный том.
+Image/bundle identity, install/check, UID, RO и изоляция PASS. Native загрузка трёх небольших
+собственных публикаций: одна building и две pending при удержанном builder, не более
+одной задачи; после resume все три ready. Это операторская проверка очереди, не модельный цикл.
+Повторная сверка всех 21 исходных записей UserStorage и primary src/control/published state
+подтвердила сохранность; .lgp новой копии также прежний. История нормальных профилей сохранена.
+
+Evidence и точные команды вне Git: `$M4_SCRATCH/task7-delivery-3`, прежние
+`task7-delivery-2` и `task7-migration`; исходные FAIL сохранены в локальных отчётах.
+В .3 семь runtime receipts: ACK+actual exit0/no signal, PID отсутствуют; Desktop и собственный
+Xvfb завершились с exit0. Native Close/Logout доказан отдельно. Историческая причина
+Knowledge ACK→SIGKILL остаётся UNKNOWN; поздние PASS её не устанавливают.
+Full release 7.4.x условно перенесена в M5; bare-stand Logout ограничен описанным выше maintenance.
+Кодовые замечания закрыты; итоговая приёмка Task7/M4 ожидает controller review и completion audit.
 Push/merge/release и очистка прежних данных не выполнялись.

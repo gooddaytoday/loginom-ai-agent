@@ -1,20 +1,18 @@
 # Dashboard M4 — checkpoint
 
-- Основа отдельного checkout: `bbef0b2e4fabda3aba524823dba20c8130419a8e`, ветка `dashboard-m4`.
-- M3 завершена; принятые результаты и ограничения — [runbook M3](dashboard-m3.md), исходный checkpoint сохранён.
-- Task 0: документы M4 перенесены без потери раздела M3 roadmap; разрешения владельца актуализированы, контракт не изменён.
-- Собственные пары master/7.4.2 имеют отдельные сети и UserStorage volumes; реальные manifest/credentials/evidence вне Git.
-- Команды, подготовка и границы проверок — [runbook M4](dashboard-m4.md).
-- Оригинальные контейнеры, ROI, backup и рабочее приложение пользователя сохраняются; новый установленный прогон обязателен отдельно.
-- Task 1: финальный built-host roundtrip/ACL/collision/upload+login cancel PASS на обеих версиях; `.lgp` сохранён, ACK+exit подтверждены.
-- Task 1 принят: fix #1 Approved (focused 38/typecheck PASS), lifecycle #2 ADDRESSED независимым review.
-- Исходный built-check: явный NODE_USE_ENV_PROXY=1 и фактический Knowledge proxy peer подтверждены; exact rights-master ACK + exit0/no signal, owned PID отсутствуют.
-- Этот lifecycle прогон отделён от delivery/fix #1; исторический Knowledge ACK → SIGKILL сохранён, причина UNKNOWN и риск повтора остаются; детали — runbook.
-- Task 2: проверенный JSON передаётся builtin через private Host; pending/changed/отказы сохраняют черновик, source/built-host live PASS обе версии.
-- Task 2 Approved без замечаний; Task 3 accepted: Fix 1 независимо проверен, оба mandatory замечания закрыты, новых дефектов нет.
-- Task 3: настоящий snapshot → source builtin/built Host → JSON → builder → ready → Dashboard в minified Studio PASS; focused 41, package tests/typecheck/installer check PASS.
-- Task 3 cleanup: четыре собственные native sessions закрыты разрешённым maintenance restart; 25 долговечных файлов неизменны, удалён только package lock. Host resource/exit ACK не означает native Logout.
-- Fix 1: manifest/parallel-build RED→GREEN, targeted 30 и publisher 15 PASS; typecheck/build/reinstall/check/cmp PASS без новой публикации.
-- Task 4 accepted (independent review 0 mandatory): источники/base сохраняются, fresh src читается через pre-chat Host, конфликт подтверждается один раз; source/UI/CLI cancellation проверки и пять package typecheck PASS — [runbook](dashboard-m4.md#task-4--продолжение-черновика-и-осознанная-замена-версии).
-- Task 5 accepted: независимые Spec/Quality Approved, 0 mandatory; source/native failure matrix, container limits и сохранение страницы PASS — [runbook](dashboard-m4.md#task-5--отказы-сохраняют-работающую-версию).
-- Task 6 accepted: Spec/Quality Approved, 0 mandatory. Task7: промежуточная .2 installed master matrix и сохранный M3-переход PASS; 3 mandatory whole-branch review остаются открыты, нужны fix-wave/.3/адресные повторы — [runbook](dashboard-m4.md#task-7--промежуточная-поставка-и-сохранный-переход).
+- Основа checkout: `bbef0b2e4fabda3aba524823dba20c8130419a8e`, ветка `dashboard-m4`.
+- Tasks 0–6 приняты; Task 6 Spec/Quality Approved, обязательных замечаний нет.
+- Текущие команды, версия/source поставки, результаты и история — [runbook M4](dashboard-m4.md).
+- Task 7 source gate PASS; три whole-branch замечания по коду исправлены, strongest re-review Approved.
+- Общая чистая Desktop/CLI поставка установлена; оба normal-profile master main path PASS.
+- Холодный Desktop: controlled IPC pending/consumed → ready/downloaded и отдельно normal cold UI PASS.
+- Обновлённый образ трёх ролей на migrated стенде: identity/isolation/check и три pending → ready PASS.
+- M3-переход сохранный: все21 исходные записи UserStorage, primary src/control и published state прежние.
+- Original M3 trio/images/data, старые артефакты и раздельные Desktop/CLI источники сохранены; rollback не выполнялся.
+- Собственные Desktop/CLI имеют дисковую историю; пользовательское приложение принудительно не закрывалось.
+- Native Close/Logout отделён от runtime ACK/exit; .3 app/runtime/own Xvfb exit PASS.
+- Historical Knowledge ACK→SIGKILL: причина UNKNOWN; поздний PASS не объясняет прежний сбой.
+- Full release 7.4.x при отсутствии полноценного стенда — M5; bare-stand ordinary Logout NOT_PROVEN, выполнен own maintenance.
+- Private configs, credentials, raw logs, команды и receipts вне Git; прежние FAIL сохранены.
+- Следующий шаг: controller final Task7 review, whole-branch closure и completion audit; M4 ещё не объявлен завершённым.
+- Push/merge/release и очистка прежних данных не разрешены этим результатом.
