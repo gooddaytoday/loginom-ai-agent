@@ -1,9 +1,40 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { loginBrowser, loginomAddress, loginPage } from "../src/connection-check.mjs"
+import { loginBrowser, loginomAddress, loginPage, trackLoginNetwork } from "../src/connection-check.mjs"
+import { EventEmitter } from "node:events"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+
+test("login network diagnostics are bounded numeric timings without request identifiers or secrets", () => {
+  const page = new EventEmitter(), trace = trackLoginNetwork(page)
+  const sensitive = () => { throw Error("PRIVATE_REQUEST_URL_HEADERS_BODY") }
+  const request = (type = "script") => ({ resourceType: () => type,
+    timing: () => ({ domainLookupStart: 0, domainLookupEnd: 2, connectStart: 2, secureConnectionStart: 3,
+      connectEnd: 6, requestStart: 7, responseStart: 17, responseEnd: 22 }),
+    url: sensitive, headers: sensitive, postData: sensitive, failure: sensitive, response: sensitive })
+  const ok = request(), failed = request("fetch"), pending = request("PRIVATE-UNEXPECTED-TYPE")
+  for (const r of [ok, failed, pending]) page.emit("request", r)
+  page.emit("requestfinished", ok)
+  page.emit("requestfailed", failed)
+  const event = trace.snapshot()
+  assert.equal(event.requests, 3)
+  assert.equal(event.completed.length, 2)
+  assert.equal(event.completed[0].server_ms, 10)
+  assert.equal(event.completed[0].transfer_ms, 5)
+  assert.equal(event.completed[1].failed, true)
+  assert.equal(event.pending[0].type, "other")
+  assert.equal(JSON.stringify(event).includes("PRIVATE"), false)
+  for (let i = 0; i < 600; i++) { const r = request(); page.emit("request", r); page.emit("requestfinished", r) }
+  const bounded = trace.snapshot()
+  assert.equal(bounded.completed.length + bounded.pending.length, 256)
+  assert.equal(bounded.dropped, 347)
+  trace.close()
+  assert.equal(page.listenerCount("request"), 0)
+  assert.equal(page.listenerCount("requestfinished"), 0)
+  assert.equal(page.listenerCount("requestfailed"), 0)
+  assert.equal(event.completed.length, 2)
+})
 
 test("browser launch retains a sanitized cause and phase before normalizing the error", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-launch-failure-"))

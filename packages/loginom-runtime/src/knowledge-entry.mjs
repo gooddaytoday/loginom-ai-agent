@@ -1,5 +1,6 @@
 import { createKnowledgeClient, knowledgeRequestKey, validateKnowledgeInterrupt } from '../client/lib/knowledge-client.mjs';
 import { isAbsolute } from 'node:path';
+import { appendFile } from 'node:fs/promises';
 import { startupDiagnostic } from '../client/lib/catalog.mjs';
 
 process.umask(0o077);
@@ -48,7 +49,8 @@ async function handle(message) {
         || typeof input.helpRoot !== 'string' || !isAbsolute(input.helpRoot)
         || Object.keys(input).some(key => !['protocol', 'generation', 'helpRoot'].includes(key)))
         throw Error('LOGINOM_START_INVALID');
-      state.client = createKnowledgeClient(input, state.controller.signal);
+      state.client = createKnowledgeClient({ ...input, onPhase: event => appendFile('startup-phases.jsonl',
+        JSON.stringify({ version: 1, recorded_at: new Date().toISOString(), ...event }) + '\n', { mode: 0o600 }) }, state.controller.signal);
       // Readiness is observed through list; admission of start does not wait for the Help index.
       void state.client.catch(() => {});
       send({ id: message.id, result: { protocol: 1, generation: input.generation, started: true } });

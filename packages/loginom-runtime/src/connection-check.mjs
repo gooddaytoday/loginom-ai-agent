@@ -36,6 +36,56 @@ export function loginomAddress(value) {
   return url.href
 }
 
+// Retain only bounded numeric timings and fixed resource types. Never inspect
+// request URLs, headers, post data, failure text or response bodies.
+export function trackLoginNetwork(page) {
+  const started = performance.now(), active = new Map(), completed = []
+  const types = new Set(["document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "eventsource", "websocket", "manifest"])
+  let requests = 0, dropped = 0
+  const begin = request => {
+    try {
+      requests++
+      if (active.size + completed.length >= 256) { dropped++; return }
+      const type = request.resourceType()
+      active.set(request, { type: types.has(type) ? type : "other", started_ms: Math.round(performance.now() - started) })
+    } catch { /* Optional observer. */ }
+  }
+  const end = (request, failed) => {
+    const row = active.get(request)
+    if (!row) return
+    active.delete(request)
+    const finished_ms = Math.round(performance.now() - started)
+    const result = { ...row, finished_ms, duration_ms: Math.max(0, finished_ms - row.started_ms), failed }
+    try {
+      const t = request.timing()
+      const span = (a, b) => Number.isFinite(a) && Number.isFinite(b) && a >= 0 && b >= a ? Math.round(b - a) : null
+      Object.assign(result, { dns_ms: span(t.domainLookupStart, t.domainLookupEnd),
+        tcp_ms: span(t.connectStart, t.secureConnectionStart >= 0 ? t.secureConnectionStart : t.connectEnd),
+        tls_ms: span(t.secureConnectionStart, t.connectEnd), server_ms: span(t.requestStart, t.responseStart),
+        transfer_ms: span(t.responseStart, t.responseEnd) })
+    } catch { /* Some failed requests have no timing. */ }
+    completed.push(result)
+  }
+  const finished = request => end(request, false), failed = request => end(request, true)
+  page.on?.("request", begin)
+  page.on?.("requestfinished", finished)
+  page.on?.("requestfailed", failed)
+  return {
+    snapshot() {
+      const elapsed = Math.round(performance.now() - started)
+      return { phase: "login.form.network", status: "ready", scope: "navigation_to_form", requests, dropped,
+        completed: completed.map(row => ({ ...row })),
+        pending: [...active.values()].map(row => ({ ...row, age_ms: Math.max(0, elapsed - row.started_ms) })) }
+    },
+    close() {
+      page.off?.("request", begin)
+      page.off?.("requestfinished", finished)
+      page.off?.("requestfailed", failed)
+      active.clear()
+    },
+  }
+}
+
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
 export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase } = {}) {
@@ -59,6 +109,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     if (left <= 0) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     return Math.min(limit, left)
   }
+  const network = trackLoginNetwork(page)
   try {
     const response = await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
       { waitUntil: "domcontentloaded", timeout: remaining(60_000) }))
@@ -76,7 +127,11 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
     for (;;) {
       phase = "form"; phaseStarted = performance.now()
-      await measure("login.form", () => avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) }))
+      try {
+        await measure("login.form", () => avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) }))
+      } finally {
+        await emit(network.snapshot())
+      }
       phase = "theme"; phaseStarted = performance.now()
       const missing = await measure("login.theme", () => page.evaluate(function themeStylesheetMissing() {
         const missing = [...document.querySelectorAll('link[rel~="stylesheet"][href]')].some(link => {
@@ -136,6 +191,8 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     const code = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_ACCOUNT_MISMATCH"].includes(error?.message) ? error.message : "LOGINOM_LOGIN_UNAVAILABLE"
     throw Error(code, { cause: { login: loginFailure(original ?? error, candidate,
       phase, ended - phaseStarted, ended - started) } })
+  } finally {
+    network.close()
   }
 }
 
