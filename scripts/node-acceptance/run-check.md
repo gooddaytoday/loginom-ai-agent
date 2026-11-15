@@ -112,6 +112,14 @@ settings changes and cleanup are required. No export/CSV is requested or passed
 to cold; `outputs:[]` requires nonempty `tree_outputs`. Only task and CSV reach
 the model; oracle and expected remain private.
 
+`tree-variant` uses unchanged `typed/task-variant.md` and only
+`fixtures/typed/documents.csv`. Its private `expected-variant.json` projects
+`cases.variant.tree_outputs`, checked by `oracle.py --check`. Full ordered schema
+and instances must retain DataType 6 and exact native subtypes integer/string/
+boolean/NULL/real/Int64 (`9007199254740993`), compared by `cell_type` and `value`.
+Tree-only Save, fresh cold execution without configuration and cleanup apply;
+no CSV export. Only the business task and original CSV reach the model.
+
 `tree-scalar-arrays` uses the unchanged `typed/task-scalar-arrays.md` and
 `fixtures/typed/documents.csv`. Its private `expected-scalar-arrays.json`
 projects `cases.scalar_arrays.tree_outputs` from the approved oracle. Schema
@@ -121,6 +129,25 @@ cold reexecution without configuration and cleanup are required; no CSV export.
 Only the business task and original CSV reach the model.
 
 Run live acceptance without repeatedly reading live logs:
+
+`group-mode-tie` and `group-empty` use grouping `acceptance/types/task-mode-tie.md`
+and `task-empty.md`, respectively, with only `fixtures/types/mode-tie.csv` or
+`empty.csv`. Separate `expected-mode-tie.json` and `expected-empty.json` preserve
+unchanged `cases.mode_tie.stages` and `cases.empty.stages` from LAB-1558.
+Native observations LAB-1581 Q2/Q7 confirm integer/string mode ties select the
+smallest value and header-only input produces zero rows with the complete
+string/integer/real/datetime/boolean schema. Stock full typed matching, exact
+field order, CSV (header only for empty), Save, cold Execute without configuration
+and cleanup apply. Only task and CSV reach the model; oracle/expected stay private.
+
+`group-variant` uses grouping `acceptance/types/task-variant.md` and only
+`fixtures/types/variant.csv`. The separate `expected-variant.json` preserves
+unchanged `cases.variant.stages` from LAB-1558. A native Collapse produces Values
+in IntValue/RealValue/TextValue order, retaining NULL; Grouping checks integer
+count/null_count and Variant first/last with exact `cell_type`/`value`, including
+edge NULLs. Full typed reads, exact field order, CSV, Save, cold Execute without
+configuration and cleanup use stock checks. Only task and CSV reach the model;
+oracle and expected stay private.
 
 `group-date` uses grouping `acceptance/types/task-date.md` and only
 `fixtures/types/types.csv`. `expected-date.json` preserves unchanged
