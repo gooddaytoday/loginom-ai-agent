@@ -1158,17 +1158,35 @@ it.effect("installs dependencies in writable LOGINOM_AI_AGENT_CONFIG_DIR", () =>
 // core Npm.Service (via EffectFlock). Those behaviors are tested in the core
 // package's npm tests, not here.
 
+function withStandaloneConfig<A, E, R>(dir: string, effect: Effect.Effect<A, E, R>) {
+  return Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const previous = Global.Path.config
+      Global.Path.config = dir
+      return previous
+    }),
+    () => effect,
+    (previous) =>
+      Effect.sync(() => {
+        Global.Path.config = previous
+      }),
+  )
+}
+
 for (const flag of ["LOGINOM_AI_AGENT_RESOURCES", "LOGINOM_AI_AGENT_CLI_ROOT"]) {
   test(`standalone SDK: empty ${flag} profile does not install dependencies`, async () => {
     const installed: string[] = []
     await Effect.runPromise(
       Effect.gen(function* () {
         const dir = yield* tmpdirScoped()
-        yield* withProcessEnv(
-          flag,
+        yield* withStandaloneConfig(
           dir,
-          Config.Service.use((svc) => svc.get().pipe(Effect.andThen(svc.waitForDependencies()))).pipe(
-            provideInstanceEffect(dir),
+          withProcessEnv(
+            flag,
+            dir,
+            Config.Service.use((svc) => svc.get().pipe(Effect.andThen(svc.waitForDependencies()))).pipe(
+              provideInstanceEffect(dir),
+            ),
           ),
         )
         expect(installed).toEqual([])
@@ -1207,23 +1225,26 @@ for (const folder of ["plugin", "plugins", "tool", "tools", "inline"]) {
             `import ready from '${folder === "inline" ? "./" : "../"}node_modules/sdk-ready.js'; export default () => ready`,
           )
         })
-        yield* withProcessEnvs(
-          {
-            LOGINOM_AI_AGENT_RESOURCES: dir,
-            LOGINOM_AI_AGENT_CONFIG_DIR: configDir,
-            LOGINOM_AI_AGENT_CONFIG_CONTENT:
-              folder === "inline" ? JSON.stringify({ plugin: [pathToFileURL(module).href] }) : undefined,
-          },
-          Config.Service.use((svc) =>
-            Effect.gen(function* () {
-              const config = yield* svc.get()
-              yield* svc.waitForDependencies()
-              expect(installed).toContain(configDir)
-              if (folder === "inline") expect(config.plugin).toContain(pathToFileURL(module).href)
-              const user = yield* Effect.promise(() => import(pathToFileURL(module).href))
-              expect(user.default()).toBe("SDK_READY")
-            }),
-          ).pipe(provideInstanceEffect(dir)),
+        yield* withStandaloneConfig(
+          configDir,
+          withProcessEnvs(
+            {
+              LOGINOM_AI_AGENT_RESOURCES: dir,
+              LOGINOM_AI_AGENT_CONFIG_DIR: configDir,
+              LOGINOM_AI_AGENT_CONFIG_CONTENT:
+                folder === "inline" ? JSON.stringify({ plugin: [pathToFileURL(module).href] }) : undefined,
+            },
+            Config.Service.use((svc) =>
+              Effect.gen(function* () {
+                const config = yield* svc.get()
+                yield* svc.waitForDependencies()
+                expect(installed).toContain(configDir)
+                if (folder === "inline") expect(config.plugin).toContain(pathToFileURL(module).href)
+                const user = yield* Effect.promise(() => import(pathToFileURL(module).href))
+                expect(user.default()).toBe("SDK_READY")
+              }),
+            ).pipe(provideInstanceEffect(dir)),
+          ),
         )
       }).pipe(
         Effect.scoped,
@@ -1282,10 +1303,13 @@ test("standalone SDK: existing installed dependencies remain unchanged through r
           })),
         ),
       )
-      yield* withProcessEnvs(
-        { LOGINOM_AI_AGENT_RESOURCES: dir, LOGINOM_AI_AGENT_CONFIG_DIR: configDir },
-        Config.Service.use((svc) => svc.get().pipe(Effect.andThen(svc.waitForDependencies()))).pipe(
-          provideInstanceEffect(dir),
+      yield* withStandaloneConfig(
+        configDir,
+        withProcessEnvs(
+          { LOGINOM_AI_AGENT_RESOURCES: dir, LOGINOM_AI_AGENT_CONFIG_DIR: configDir },
+          Config.Service.use((svc) => svc.get().pipe(Effect.andThen(svc.waitForDependencies()))).pipe(
+            provideInstanceEffect(dir),
+          ),
         ),
       )
       const after = yield* Effect.promise(() =>
