@@ -16,10 +16,13 @@ export function userActionInventory(value) {
   const copy=structuredClone(value);
   if(copy.available_actions)copy.available_actions=copy.available_actions.filter(k=>userActionKeys.includes(k));
   for(const key of ['ui_action_tool','artifact_upload_tool','artifact_verify_tool'])delete copy[key];
-  // JS knowledge already carries these exact facts; deliver them once, intact.
+  // The prepared JS reference supplies the executable guidance. Keep the full
+  // versioned knowledge asset in diagnostic describe, not the model's card.
   for(const node of copy.node_types??[])if(node.type==='programming.javascript'&&node.javascript_knowledge){
     for(const key of ['limitations'])
       if(JSON.stringify(node[key])===JSON.stringify(node.javascript_knowledge[key]))delete node[key];
+    delete node.javascript_knowledge;
+    node.knowledge_reference='references/nodes/programming.javascript.md';
   }
   for(const node of copy.node_types??[])if(node.type==='exports.text'&&node.parameter_schema){
     node.creation_defaults={required_parameters:['destination'],parameters:{...exportCreationDefaults}};

@@ -34,6 +34,17 @@ test('managed Next point binds the owned wizard and uncovered native button',()=
   context.document.elementFromPoint=()=>button;
   context.args.expected.page={...from,index:1};
   assert.throws(inspect,/source page changed/);
+  const inputPage={...from,tid:'MF;TF-1;WizrdMCF;TuneDataSourceInputPortWizard',indicator_count:5};
+  const grids=[{id:'source'},{id:'target'}];let count=0;
+  const store={$className:'Ext.data.Store',isLoading:()=>false,getCount:()=>count,getTotalCount:()=>count,getData:()=>({items:count?[{}]:[]})};
+  const input={querySelectorAll:selector=>[selector.includes('grdSourceColumns')?grids[0]:grids[1]]};
+  root.querySelectorAll=selector=>selector.includes('TuneDataSourceInputPortWizard')?[input]:[button];
+  context.Ext.getCmp=id=>id==='btn'?{el:{dom:button},disabled:false}:{el:{dom:grids.find(g=>g.id===id)},getStore:()=>store};
+  context.args.task={...task,inputPage:true};context.args.expected.page=inputPage;
+  context.read=()=>({...before,page:inputPage});
+  assert.equal(inspect().from_index,0);
+  count=1;assert.throws(inspect,/complete and empty/);
+  count=0;context.args.task={...task};assert.throws(inspect,/source page changed/);
 });
 
 test('managed Next dispatches one click and refuses replay or changed point',async()=>{
@@ -55,6 +66,31 @@ test('managed Next dispatches one click and refuses replay or changed point',asy
   lease.nextAttempted=false;current={...point,x:31};
   assert.equal((await runManagedJavascriptNext(page,gesture,()=>{})).status,'NOT_APPLIED');
   assert.equal(clicks,1);
+});
+
+test('five-page source wizard admits one empty Input Next before Columns Next',async()=>{
+  const inputTask={...task,inputPage:true},inputPage={...from,
+    tid:'MF;TF-1;WizrdMCF;TuneDataSourceInputPortWizard',index:0,indicator_count:5};
+  const inputPoint={...point,from_tid:inputPage.tid};
+  const inputGesture={...inputTask,gesture_id:task.operation_id+':next-input-columns',
+    expected:{...before,page:inputPage},point:inputPoint};
+  assert.equal(typeof vm.runInNewContext('('+makeJavascriptManagedNextCode(inputGesture)+')'),'function');
+  const lease={identity:JSON.stringify([task.owner,task.workflow_ref,task.targetOrigin,task.targetBuild,task.deadline]),
+    settingAttempted:true,wizardCaptured:{},handle:{}};
+  let clicks=0,current=inputPoint;
+  const page={[Symbol.for('loginom-dock.javascript-owned-selection-v1')]:new Map([[task.operation_id,lease]]),
+    evaluate:async()=>current,mouse:{click:async()=>{clicks++;}}};
+  assert.equal((await runManagedJavascriptNext(page,inputGesture,()=>{})).status,'SUCCEEDED');
+  assert.equal((await runManagedJavascriptNext(page,inputGesture,()=>{})).status,'NOT_APPLIED');
+  assert.equal(lease.nextAttempted,undefined);
+  current={...point,from_index:1};
+  const columns={...inputTask,gesture_id:task.operation_id+':next-columns-code',
+    expected:{...before,page:{...from,index:1,indicator_count:5}},point:current};
+  assert.equal(typeof vm.runInNewContext('('+makeJavascriptManagedNextCode(columns)+')'),'function');
+  assert.equal((await runManagedJavascriptNext(page,columns,()=>{})).status,'SUCCEEDED');
+  assert.equal((await runManagedJavascriptNext(page,columns,()=>{})).status,'NOT_APPLIED');
+  assert.equal(clicks,2);
+  assert.throws(()=>makeJavascriptManagedNextCode({...inputGesture,inputPage:undefined}),/source page/);
 });
 
 test('managed Next requires exact journal ACK before browser gesture',async()=>{

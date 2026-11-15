@@ -1,0 +1,51 @@
+{
+  "nodes": [
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "fs-operations.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "FileName",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "ByteCount",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "Hex",
+          "label_any": true,
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "FileName": "source.bin",
+          "ByteCount": 5,
+          "Hex": "00017f80ff"
+        },
+        {
+          "FileName": "archive/final.bin",
+          "ByteCount": 3,
+          "Hex": "00017f"
+        },
+        {
+          "FileName": "patched.bin",
+          "ByteCount": 5,
+          "Hex": "4101000000"
+        }
+      ]
+    }
+  ]
+}

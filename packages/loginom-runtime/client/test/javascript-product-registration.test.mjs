@@ -28,7 +28,7 @@ test('product registration describes actual general JavaScript knowledge without
   assert.equal(support.nodeApplyHandlers.has('preprocessing.elim_outlier'),true);
   assert.equal(support.nodeApplyHandlers.has('imports.excel'),true);
   assert.equal(support.nodeApplyHandlers.has('transform.cross_table'),true);
-  assert.equal(handler.revision,'javascript-script-lifecycle-v5');
+  assert.equal(handler.revision,'javascript-script-lifecycle-v7');
   assert.deepEqual(handler.parameter_schema,javascriptParametersSchema);
   const card=describeNodeTypes(['programming.javascript'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
   assert.equal(card.javascript_knowledge.validated_for.loginom_build,'7.4.2');
@@ -71,7 +71,7 @@ test('actual product preflight and driver route '+schema_mode+'/'+kind+'/'+finis
   if(kind==='new'&&finish==='close'){
     assert.throws(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers));return;
   }
-  assert.equal(validateNodeApplyRequest(r,support.nodeApplyHandlers).handler.revision,'javascript-script-lifecycle-v5');
+  assert.equal(validateNodeApplyRequest(r,support.nodeApplyHandlers).handler.revision,'javascript-script-lifecycle-v7');
   let calls=0;
   const drivers=support.nodeApplyDriverFactory({operation:{id:r.operation_id,parameters:r},execute:async()=>{calls++;assert.fail('Unexpected browser effect');}});
   assert.equal(typeof drivers.configureJavascript,'function');

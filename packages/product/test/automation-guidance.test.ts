@@ -108,7 +108,7 @@ test("relocated large-file and JavaScript rules stay reachable from the entry", 
   expect(large).toContain("(workflow.md#серверный-источник-и-cache)")
   expect(skill).toMatch(/Узел JavaScript разрешён только[\s\S]*?\(references\/nodes\/programming.javascript.md\)/)
   expect(skill).toContain("Существующие JS-узлы не удаляй автоматически")
-  expect(javascript).toContain("не являются таким пробелом")
+  expect(javascript).toMatch(/unknown functions,\s*invalid parameters,\s*transient failure,\s*unavailable terminal\/\s*execute_code and incomplete preview are not gaps/)
 })
 
 test("variables calculator dependencies use the Expr. prefix accepted in Loginom 7.4.2", async () => {

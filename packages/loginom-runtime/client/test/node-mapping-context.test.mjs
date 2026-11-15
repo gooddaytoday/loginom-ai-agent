@@ -374,6 +374,20 @@ test('mapping read admits only its native disabled output delete-column mask',()
  }
 });
 
+test('only an empty JS input admits the native disabled delete header',()=>{
+ for(const fault of ['none','nonempty','unbound-type','foreign-column']){
+  const f=fixture({input:true,names:fault==='nonempty'?['A']:[]}),wizard=f.el('MF;TF;WizrdMCF');f.root.parent=wizard;
+  const model={FView:{el:{dom:wizard}}};
+  f.context.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model}})}}}}}}};
+  const column=f.el(f.base+'colTargetDelete','',f.root);f.views[column.id]={el:{dom:fault==='foreign-column'?{}:column},disabled:true};
+  const mask=f.el(null,'',column);mask.parentElement=column;mask.mask=true;
+  mask.classList.contains=name=>name==='x-mask';
+  const request={prefix:'MF;TF',...(fault==='unbound-type'?{}:{node_type:'programming.javascript'})};
+  const result=vm.runInNewContext('('+readMappingBrowser.toString()+')('+JSON.stringify(request)+')',f.context);
+  assert.equal(result.verified,fault==='none',fault+': '+result.reason);
+ }
+});
+
 function inputEditorFixture() {
  const f=fixture({input:true}),wizard=f.el('MF;TF;WizrdMCF'),body=f.el('MF');f.root.parent=wizard;
  const form=f.el('EditTuneColumnDefForm'),mask=f.el(null,'',body);mask.mask=true;mask.parentElement=body;mask.attrs.role='presentation';
