@@ -1315,9 +1315,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
             if(validation.state==='pending')await wait(50);
           }while(validation.state==='pending');
           await ensureReady();
-          // Validation enlarges the target SVG. Re-enter its current center so
-          // mxGraph refreshes the marker after the asynchronous result arrived.
-          await interact(()=>page.mouse.move(validation.point.x,validation.point.y),true);
+          // Validation can enlarge the SVG. Recenter only when needed: another
+          // move at the already-ready center can clear mxGraph's valid marker.
+          if(!validation.target_ready||validation.point.x!==targetPoint.x||validation.point.y!==targetPoint.y)
+            await interact(()=>page.mouse.move(validation.point.x,validation.point.y),true);
           const settled=await interact(()=>readLinkValidation(page,task.node_target_context,task.parameters));
           if(settled.state!=='ready'||!settled.target_ready){
             // Private, single-entry evidence; never add native IDs to the reply.
