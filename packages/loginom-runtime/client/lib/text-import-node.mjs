@@ -54,14 +54,16 @@ export function serverPreviewProfile({source,format,columns,preview}) {
 export function validateTextImportNodeParameters(p,mode,request) {
   p=resolveImportBindingParameters(p,request);
   if(p?.preview_only===true){
-    requireValue(mode==='delimited'&&p.source?.kind==='storage'&&request.finish==='close'
-      &&request.inputs?.length===0&&request.mappings?.length===0&&request.read?.ports?.length===0
-      &&Object.keys(p).sort().join(',')==='preview_only,settings,source'
-      &&Object.keys(p.settings??{}).join(',')==='source'&&Object.hasOwn(p.settings.source??{},'source_path')
-      &&Object.keys(p.settings.source).every(k=>['source_path','encoding'].includes(k)),
-      'Server preview requires storage source, source_path only and Close without execution or mappings');
+    requireValue(mode==='delimited'&&request.finish==='close'&&request.inputs?.length===0&&request.mappings?.length===0&&request.read?.ports?.length===0,
+      'Server preview requires finish:"close", inputs:[], mappings:[] and read.ports:[]');
+    // A verified delivery already names its exact server destination, as for
+    // Execute; storage refs still need the located path. Lists are refused.
+    requireValue(Object.keys(p).sort().join(',')==='preview_only,settings,source'
+      &&Object.keys(p.settings??{}).every(k=>k==='source')&&Object.keys(p.settings.source??{}).every(k=>['source_path','encoding'].includes(k))
+      &&(p.source?.kind!=='storage'||Object.hasOwn(p.settings.source??{},'source_path')),
+      'Server preview parameters: source (storage ref with settings.source.source_path, or verified_delivery IDs; source_path optional) and settings.source {source_path, encoding} only');
     validateImportSource(p.source);validateTextImportPatch(p.settings);
-    if(p.settings.source.encoding!==undefined)resolveTextImportEncoding(p.settings.source.encoding);return;
+    if(p.settings.source?.encoding!==undefined)resolveTextImportEncoding(p.settings.source.encoding);return;
   }
   if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
   requireValue(p && (Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='settings,source'||request.target.kind==='existing'&&request.bindings?.length&&Object.keys(p).join(',')==='settings'),'Exact import source and settings required');
@@ -92,6 +94,26 @@ export function validateTextImportNodeParameters(p,mode,request) {
       &&((m.fields??m.changes)===undefined||m.fields===undefined&&m.changes?.length===0||(m.fields??m.changes).length>0&&(m.fields??m.changes).every(f=>f.source?.kind==='configured_field'&&f.excluded!==true))) && request.inputs.length===0
     && (existing||nativeTypes||p.settings.columns.some(c=>c.used===true)),
   'Private import node currently supports Done/Execute/Close with optional executed output 0 and configured output fields with at least one used field; input mappings and output exclusion are not installed');
+}
+
+// A preview_only Close leaves its new node without a saved source or format,
+// and the reopened wizard shows an unset decimal separator («Не задано (,)»)
+// that is no value. Refuse an incomplete first form before any browser work.
+export function previewImportFirstFormRefusal(request,history) {
+  const ref=request?.target?.kind==='existing'&&request.target.type==='imports.text'?request.target.ref:null;
+  const own=ref?.node_id?(history??[]).filter(h=>h.request?.target?.type==='imports.text'&&h.request.document_id===request.document_id
+    &&(h.outcome?.output?.node??h.request.target.ref)?.node_id===ref.node_id):[];
+  if(!own.length||!own.every(h=>h.request.finish==='close'||h.outcome?.status==='NOT_APPLIED')
+    ||!own.some(h=>h.request.target.kind==='new'&&h.request.parameters?.preview_only===true&&h.outcome?.status==='SUCCEEDED'
+      &&h.outcome.output?.configuration?.status==='discarded'))return null;
+  const s=request.parameters?.settings??{};
+  const missing=['encoding','rows_to_skip','first_line_as_title'].filter(k=>!Object.hasOwn(s.source??{},k)).map(k=>'settings.source.'+k);
+  if(!Object.hasOwn(s.format??{},'decimal_separator'))missing.push('settings.format.decimal_separator');
+  if(s.columns===undefined&&!autoTypesRequested(s))missing.push('settings.columns');
+  return missing.length?'Invalid parameters.parameters.settings: this Import was only previewed (Close), so it has no saved source or format. '
+    +'Missing: '+missing.join(', ')+'. Allowed: decimal_separator "." or "," (preview "Не задано (…)" is not a value); encoding e.g. "UTF-8"; '
+    +'rows_to_skip integer >=0; first_line_as_title boolean; columns, or format.auto_detect_columns "new"/"all". source_path may be omitted. '
+    +'Nothing was changed: resubmit the complete form with a NEW operation_id on the SAME node.':null;
 }
 
 export function verifyTextImportSource(parameters,uploads,uploadHistory,storageProof) {
@@ -399,7 +421,7 @@ export async function restoreImportOutputLayout(channel,before,native,mappings,c
 // catalog until execution, wide mapping and independent acceptance are complete.
 export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const parameterSchema=structuredClone(textImportParametersSchema);
-  parameterSchema.properties.preview_only.description='Native preview FIRST; storage+source_path[/encoding]; Close, reuse node.';
+  parameterSchema.properties.preview_only.description='Native preview FIRST; storage+source_path or delivery[/encoding]; Close, reuse node.';
   parameterSchema.properties.source_switch.description='After scan+Save: profile_id/save_operation_id; source_path only.';
   parameterSchema.properties.source.description='Required except unchanged Execute. Unchanged existing Execute may omit source.';
   parameterSchema.properties.settings.description='New source/format+columns/detection; existing patch.';
@@ -409,7 +431,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
   const nodeApplyDriverFactory=options=>{
-    const {operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,resolveDeliveredSource,verifySourceSwitchSave,scanReceipt}=options;
+    const {operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory,resolveStorageSource,resolveDeliveredSource,verifySourceSwitchSave,scanReceipt,nodeHistory}=options;
     let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,schemaBefore,schemaAfter,saveReceipt,outputLayout;
     const sourceSwitch=(operation.nodeApply?.request??operation.parameters)?.parameters?.source_switch;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
@@ -459,6 +481,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
       }}:{}),
       verifySource:async (p,ctx)=>{
         try{
+        const firstForm=previewImportFirstFormRefusal(operation.nodeApply?.request??operation.parameters,nodeHistory?.());
+        if(firstForm)throw Error(firstForm);
         if(!p.source&&operation.parameters?.bindings?.length&&operation.parameters.target.kind==='existing')return verified({source_kind:'current_bound_file'});
         const storage=p.source.kind==='storage'?await resolveStorageSource?.(p.source.server_source_ref)
           :p.source.kind==='verified_sources'?await Promise.all(p.source.sources.map(s=>s.kind==='storage'?resolveStorageSource?.(s.server_source_ref):undefined)):undefined;
@@ -541,7 +565,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
               const fresh=await read('text_import_file','server preview source path entered');
               await channel.act({verb:'press',ref:fresh.wizard.import_source.fields.source_path.input_ref,key:'Tab'});
             }
-            if(p.settings.source.encoding!==undefined){
+            if(p.settings.source?.encoding!==undefined){
               const encoding=resolveTextImportEncoding(p.settings.source.encoding),s=await read('text_import_file','server preview code page ready',isTextImportSourceReady);
               if(s.wizard.import_source.fields.encoding.value!==encoding.label){
                 const owns=e=>e.wizard_combo?.field?.scope==='import_source'&&e.wizard_combo.field.name==='encoding'

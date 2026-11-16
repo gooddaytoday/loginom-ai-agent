@@ -31,7 +31,7 @@ test('wide/long preview is explicitly incomplete and stays bounded',()=>{
  assert.ok(profile.columns_omitted>0);assert.equal(profile.preview.complete,false);
  assert.ok(Buffer.byteLength(JSON.stringify(profile),'utf8')<2400);
 });
-test('server preview refuses execution, output reads, mappings, caller counts and non-storage sources',()=>{
+test('server preview refuses execution, output reads, mappings, caller counts, lists and storage without its path',()=>{
  const p={source:{kind:'storage',server_source_ref:'storage-one'},settings:{source:{source_path:'/worker/full.csv'}},preview_only:true};
  const r={target:{kind:'new'},finish:'close',inputs:[],mappings:[],read:{ports:[]}};
  assert.doesNotThrow(()=>validateTextImportNodeParameters(p,'delimited',r));
@@ -39,7 +39,18 @@ test('server preview refuses execution, output reads, mappings, caller counts an
   const next=structuredClone(r);change(next);assert.throws(()=>validateTextImportNodeParameters(p,'delimited',next));
  }
  assert.throws(()=>validateTextImportNodeParameters({...p,records:17},'delimited',r));
- assert.throws(()=>validateTextImportNodeParameters({...p,source:{kind:'verified_delivery',artifact_id:'a',upload_operation_id:'u'}},'delimited',r));
+ assert.throws(()=>validateTextImportNodeParameters({...p,source:{kind:'verified_sources',sources:[p.source]}},'delimited',r));
+ assert.throws(()=>validateTextImportNodeParameters({...p,settings:{source:{encoding:'UTF-8'}}},'delimited',r),/storage ref with settings\.source\.source_path/);
+});
+test('server preview accepts the verified delivery just made, with or without its destination path',()=>{
+ // LAB-1735: the first preview after dock_artifact_deliver was refused in 36 of 53 regression runs.
+ const delivery={kind:'verified_delivery',artifact_id:'artifact',upload_operation_id:'deliver:upload'};
+ const r={target:{kind:'new'},finish:'close',inputs:[],mappings:[],read:{ports:[]}};
+ for(const settings of [{source:{encoding:'UTF-8'}},{source:{source_path:'/worker/full.csv',encoding:'UTF-8'}},{source:{}},{}])
+  assert.doesNotThrow(()=>validateTextImportNodeParameters({preview_only:true,source:delivery,settings},'delimited',r),JSON.stringify(settings));
+ assert.throws(()=>validateTextImportNodeParameters({preview_only:true,source:delivery,settings:{source:{rows_to_skip:1}}},'delimited',r));
+ assert.throws(()=>validateTextImportNodeParameters({preview_only:true,source:delivery,settings:{format:{delimiter:';'}}},'delimited',r));
+ assert.throws(()=>validateTextImportNodeParameters({preview_only:true,source:delivery,settings:{}},'delimited',{...r,finish:'execute'}),/finish:"close"/);
 });
 
 test('server preview accepts an explicit existing source encoding without column edits',()=>{
