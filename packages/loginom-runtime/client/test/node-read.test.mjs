@@ -394,13 +394,15 @@ test('W1 builtin snapshot follows only confirmed same-document Save continuation
 
 // The downstream consumer receives the production driver's output, not a
 // hand-written javascript_source field as in the older rereadFixture.
-test('production existing JS read retains source admission for Sorting preflight',async()=>{
+test('production existing JS read without source wizard admits Sorting from its last managed source',async()=>{
  const history=JSON.parse(readFileSync(new URL('./fixtures/javascript-preflight-source.json',import.meta.url),'utf8'));
  const request=buildNodeReadRequest({operation_id:'read',source_operation_id:history.request.operation_id},
   {parameters:history.request,outcome:history.outcome});
- const target=request.target.ref,execution=target.document_id+':root:1';
+ const target=request.target.ref,execution=history.outcome.output.execution.execution_id;
  const output={...structuredClone(history.outcome.output.output.ports[0]),schema:request.parameters.schemas[0].schema,execution_id:execution};
- const snap=nativeExecution();snap.node_context={...target,verified:true,surface:'graph'};snap.processes[1].owner.node_id=target.node_id;
+ const snap=nativeExecution(),[,rootId,groupId]=execution.split(':');
+ snap.root_id=rootId;snap.processes[0].process_id=groupId;snap.processes[1].process_id=groupId+'.1';snap.processes[1].parent_id=groupId;
+ snap.node_context={...target,verified:true,surface:'graph'};snap.processes[1].owner.node_id=target.node_id;
  let admissions=0;
  const f=portReadFixture(request,output,[snap],{admit:async expected=>{admissions++;assert.deepEqual(expected,request.parameters.javascript_source);
   return {intent:'preserve',effective_source:{...expected,policy:'javascript-module-v1'},settings_sha256:'b'.repeat(64)};}});
@@ -413,7 +415,8 @@ test('production existing JS read retains source admission for Sorting preflight
  const binding={node:target,document_id:target.document_id,workflow_ref:request.workflow_ref};
  const port={index:0,native_index:0,active:true,port_guid:output.port_guid};
  const proof=managedJavascriptPreviewAdmission([history,{sequence:history.sequence+1,request,outcome,cleanup_confirmed:true}],binding,port);
- assert.equal(proof.source_operation_id,'read');assert.equal(proof.execution_id,execution);
+ assert.equal(result.output.javascript_source,undefined);
+ assert.equal(proof.source_operation_id,history.request.operation_id);assert.equal(proof.execution_id,execution);
  const state={prepared_node_context:{...target,surface:'graph',tid:'js'},wizard:{status:'absent'},node_outputs:{verified:true,ports:[{...port,tid:'js-port'}]},
   ui:{elements:[{tid:'js-port',signature:{native_graph:{status:'script',icon:'bg-vendor-icon-javascript'}}}]}};
  const preflight=vm.runInNewContext('('+preflightSortingSource.toString()+')',{
@@ -428,9 +431,16 @@ test('production existing JS read retains source admission for Sorting preflight
   target:{kind:'new'},inputs:[{source:target,input:0,output:0}],mappings:[],parameters:{keys:[{field:{kind:'input_field',name:output.schema[0].name},direction:'ASC'}]}}},
   nodeHistory:()=>[history,{sequence:history.sequence+1,request,outcome,cleanup_confirmed:true}],execute:async()=>({ready:true,node_tid:'js'}),onRecord:async e=>e}, {}, {});
  assert.equal(admitted.verified,true);assert.equal(admitted.parameters_valid,true);
- assert.equal(admitted.managed_javascript_source.source_operation_id,'read');
+ assert.equal(admitted.managed_javascript_source.source_operation_id,history.request.operation_id);
 
- assert.ok(admissions>0);assert.equal(f.launches,0);
+ assert.equal(admissions,0,'Source wizard must not deactivate the existing output');assert.equal(f.launches,0);
+ const failed={sequence:history.sequence+1,request:structuredClone(request),outcome:{status:'FAILED',cleanup_complete:true},cleanup_confirmed:true};
+ const retry={sequence:history.sequence+2,request,outcome,cleanup_confirmed:true};
+ assert.equal(managedJavascriptPreviewAdmission([history,failed,retry],binding,port).source_operation_id,history.request.operation_id);
+ for(const change of [item=>item.cleanup_confirmed=false,item=>item.outcome.output.execution.execution_id='other',item=>item.outcome.output.node.node_id='foreign']){
+  const reread={sequence:history.sequence+1,request:structuredClone(request),outcome:structuredClone(outcome),cleanup_confirmed:true};change(reread);
+  assert.throws(()=>managedJavascriptPreviewAdmission([history,reread],binding,port));
+ }
 });
 for(const reason of ['console_store','process_root','console_not_ready'])test('existing read polls temporary '+reason+' before native completion',async()=>{
  const request=buildNodeReadRequest({...args,execution:undefined},source());

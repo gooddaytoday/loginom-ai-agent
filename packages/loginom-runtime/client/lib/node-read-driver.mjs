@@ -83,8 +83,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    ?{source_kind:unchangedImport?'unchanged_existing_'+(request.target.type==='imports.excel'?'excel':'text')+'_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
    :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id});
   },
-  ...((existing||javascript)?{async beforeTarget(ctx){
-   if(existing){const waited=await waitExisting(ctx);if(!javascript)return waited;}
+  ...(existing?{beforeTarget:ctx=>waitExisting(ctx)}:javascript?{async beforeTarget(ctx){
    enter({...ctx,node:request.target.ref});
    sourceReceipt=await withJavascriptSourcePolicyBoundary({phase:'target',owner,deadline:ctx.deadline,record:onRecord},
     ()=>sourceAdmission(ctx).admit({}));
@@ -179,7 +178,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    }
    return verified({effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',
     execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,
-    ...(javascript?{javascript_source:{...request.parameters.javascript_source,
+    ...(javascript&&!existing?{javascript_source:{...request.parameters.javascript_source,
      source_operation_id:request.parameters.source_operation_id,settings_sha256:sourceReceipt.settings_sha256,
      policy:sourceReceipt.effective_source.policy}}:{})});
   },
