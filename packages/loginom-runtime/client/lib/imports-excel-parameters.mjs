@@ -3,27 +3,37 @@ const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
  source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion. Omit when bound.'},
+ source_paths:{type:'array',items:text(2048),minItems:2,maxItems:16},
+ source_mask:text(2048),
+ parallel_processing:{type:'boolean'},
+ max_threads:{enum:['auto',2,4,8,16,32]},
  sheet_name:{...text(120),description:'Exact worksheet; exclusive with named_range. Omit both=first initially, preserve during source_switch.'},
- named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange. Select the native named range, only its columns; exclusive with sheet_name.'},
- extend_range:{type:'boolean',description:'Only with named_range. false/omitted=defined boundaries; true=continue its columns to the last populated row. Reconfigure the same node to change this.'},
+ named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange: only its columns; exclusive with sheet_name.'},
+ extend_range:{type:'boolean',description:'Only with named_range: false/omitted=its bounds; true=its columns to the last populated row.'},
  header_rows:{type:'integer',minimum:1,maximum:1000,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
- columns:{type:'array',minItems:1,maxItems:64,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
+ columns:{type:'array',minItems:1,maxItems:64,description:'Initial, required: all source columns in order, explicit types (no detection); renaming requires source_name header.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
   type:{type:'string',enum:['string','integer','real','datetime','boolean']},
   data_kind:{type:'string',enum:['Непрерывный','Дискретный']},
  },['name','label','type'])},
 },[]);
+// List/mask refs are validated as importSourceSchema items before mutation.
+const excelSourceSchema={oneOf:[...importSourceSchema.oneOf,object({kind:{const:'verified_sources'},sources:{type:'array',minItems:1,maxItems:16}})]};
 export const excelParametersSchema=object({
- source:importSourceSchema,
+ source:excelSourceSchema,
  excel:excelSettingsSchema,
- source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Existing Excel import only: after exact XLSX scan and package.save_checkpoint, supply profile_id and save_operation_id; excel contains source_path and optional sheet_name only. Preserves columns and mapping, independently reopens, executes once and compares completed output N with the backend scan. Never supply expected_records.'},
+ source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Existing import after exact XLSX scan and package.save_checkpoint: their IDs; excel only source_path, optional sheet_name. Keeps columns/mapping, reopens, executes once, compares output N with the scan. Never expected_records.'},
 },['source','excel']);
 // An empty existing Excel patch executes its saved native configuration.
 export const isUnchangedExcelImportExecution=r=>r?.target?.type==='imports.excel'&&r.target.kind==='existing'&&!r.bindings?.length
  &&r.mode==='xlsx'&&r.finish==='execute'&&Array.isArray(r.inputs)&&r.inputs.length===0&&Array.isArray(r.mappings)&&r.mappings.length===0
  &&!(r.variable_inputs?.length)&&JSON.stringify(r.parameters)==='{"excel":{}}'&&JSON.stringify(r.read?.ports)==='[0]';
-export const validExcelPath=path=>typeof path==='string'&&path.length<=2048&&/^\/(?!\/)/.test(path)&&/\.xlsx$/i.test(path)
- &&!/[|*?%\\\x00-\x1f]/.test(path)&&path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..');
+export const validExcelPath=(path,mask)=>typeof path==='string'&&path.length<=2048&&/^\/(?!\/)/.test(path)&&/\.xlsx$/i.test(path)
+ &&!(mask?/[｜|?%\\\x00-\x1f\[\]{}]/:/[｜|*?%\\\x00-\x1f]/).test(path)&&path.split('/').slice(1).every(s=>s&&s!=='.'&&s!=='..')
+ &&(!mask||!path.slice(0,path.lastIndexOf('/')).includes('*')&&path.slice(path.lastIndexOf('/')+1).includes('*'));
+// Native filename input value: one path, list joined by U+FF5C, or one mask.
+export const excelNativeSource=e=>e.source_paths?e.source_paths.join('｜'):e.source_mask??e.source_path;
+const multiple=e=>Object.hasOwn(e??{},'source_paths')||Object.hasOwn(e??{},'source_mask');
 export function validateExcelParameters(p,mode,r){
  const need=(v,m)=>{if(!v)throw Error('Excel import: '+m);};
  if(isUnchangedExcelImportExecution({...r,parameters:p,mode}))return;
@@ -40,10 +50,24 @@ export function validateExcelParameters(p,mode,r){
  need(r.target?.kind!=='existing'||r.bindings?.length||!p?.excel||Object.keys(p.excel).length>0,
   'execute the SAME node unchanged with parameters exactly {excel:{}} (no source); its saved file or bound variable is used');
  need(mode==='xlsx'&&p&&Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='excel,source','source and excel settings are required, mode xlsx');
- validateImportSource(p.source);
- const e=p.excel;
+ const e=p.excel,list=p.source?.kind==='verified_sources';
  need(e&&Object.keys(e).every(k=>Object.hasOwn(excelSettingsSchema.properties,k)),'unsupported Excel setting');
- need(validExcelPath(e.source_path),'one explicit verified XLSX storage path is required');
+ need(list===multiple(e),'source_paths/source_mask require source kind:verified_sources (one ref per file) and vice versa');
+ if(list){
+  need(!switching&&!r.bindings?.length,'a list or mask cannot use a binding or source_switch');
+  need(Object.keys(p.source).sort().join(',')==='kind,sources'&&Array.isArray(p.source.sources)&&p.source.sources.length>=1&&p.source.sources.length<=16,'verified_sources needs 1..16 refs');
+  p.source.sources.forEach(validateImportSource);
+  need(['source_path','source_paths','source_mask'].filter(k=>Object.hasOwn(e,k)).length===1,'choose one of source_path, source_paths, source_mask');
+  if(e.source_paths)need(Array.isArray(e.source_paths)&&e.source_paths.length>=2&&e.source_paths.length<=16&&e.source_paths.every(x=>validExcelPath(x))
+   &&new Set(e.source_paths).size===e.source_paths.length&&e.source_paths.join('｜').length<=2048&&p.source.sources.length===e.source_paths.length,
+   'source_paths: 2..16 distinct .xlsx paths, one verified source each, same order');
+  else need(validExcelPath(e.source_mask,true),'source_mask: * only in the .xlsx basename of one directory');
+ }else{
+  validateImportSource(p.source);
+  need(validExcelPath(e.source_path),'one explicit verified XLSX storage path is required');
+ }
+ need(!Object.hasOwn(e,'parallel_processing')||list&&typeof e.parallel_processing==='boolean','parallel_processing requires a list or mask and a boolean');
+ need(!Object.hasOwn(e,'max_threads')||e.parallel_processing===true&&['auto',2,4,8,16,32].includes(e.max_threads),'max_threads requires parallel_processing:true; auto/2/4/8/16/32');
  need(e.sheet_name===undefined||typeof e.sheet_name==='string'&&e.sheet_name.length>0&&e.sheet_name.length<=120&&!/[\x00-\x1f]/.test(e.sheet_name),'invalid sheet name');
  if(Object.hasOwn(e,'named_range'))need(typeof e.named_range==='string'&&e.named_range.length>0&&e.named_range.length<=120&&!/[\x00-\x1f]/.test(e.named_range),'invalid named_range');
  need(e.named_range===undefined||e.sheet_name===undefined,'sheet_name and named_range are mutually exclusive');

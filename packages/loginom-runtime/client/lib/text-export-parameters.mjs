@@ -22,9 +22,17 @@ export function validateExportDestination(value,directories=null){
  need(typeof value==='string'&&/\.(csv|tsv|txt)$/i.test(value),'Text export requires a CSV, TSV or TXT filename');
  return requireExportDestination(value,directories);
 }
+// The bound name must denote exactly one connected non-NULL string variable
+// whose observed value is itself an admissible destination (no fallback).
+export function requireTextExportBindingSource(name,variableMapping,directories=null){
+ const named=variableMapping?.kind==='variables'&&variableMapping.direction==='input'&&variableMapping.port===0?variableMapping.fields?.filter(f=>f.name===name)??[]:[];
+ need(named.length===1&&named[0].source&&named[0].type===5&&named[0].is_null===false&&typeof named[0].value==='string','Text export file_name_variable requires one connected non-NULL string variable '+name+' on variables input 0');
+ try{return validateExportDestination(named[0].value,directories);}
+ catch(error){throw Error('Text export file_name_variable '+name+' value is not an allowed export path: '+error.message);}
+}
 export function validateTextExportParameters(p,mode,r,directories=null){
  need(p&&typeof p==='object'&&!Array.isArray(p),'Invalid parameters.parameters: expected export settings object');
- const unknown=Object.keys(p).find(k=>k!=='overwrite'&&!Object.hasOwn(EXPORT_FIELDS,k));
+ const unknown=Object.keys(p).find(k=>k!=='overwrite'&&k!=='file_name_variable'&&!Object.hasOwn(EXPORT_FIELDS,k));
  need(unknown===undefined,'Invalid parameters.parameters.'+unknown+': unknown text export parameter; use the exports.text parameter_schema');
  need(['delimited','fixed_width'].includes(mode),'Invalid parameters.mode: text export supports delimited or fixed_width mode');
  need(r.read.ports.length===0,'Invalid parameters.read.ports: use an empty list; text export returns output.file_artifacts');
@@ -33,8 +41,15 @@ export function validateTextExportParameters(p,mode,r,directories=null){
  need((r.read.sample_rows??0)===0,'Invalid parameters.read.sample_rows: use 0; text export returns verified file bytes');
  need((r.read.require_exact_numbers??false)===false,'Invalid parameters.read.require_exact_numbers: use false; text export has no tabular preview');
  need(r.target.kind==='existing'||r.inputs.length===1,'Invalid parameters.inputs: a new export requires exactly one input table');
+ if('file_name_variable'in p){
+  const b=p.file_name_variable;
+  need(b&&typeof b==='object'&&!Array.isArray(b)&&Object.keys(b).sort().join(',')==='kind,name'&&b.kind==='variable'&&typeof b.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(b.name),'Invalid parameters.file_name_variable: use {kind:"variable",name:<exact variable name>}');
+  need(!('destination'in p),'Invalid parameters.destination: omit the literal when file_name_variable is set');
+  need(r.target.kind==='existing'||r.variable_inputs?.some(i=>i.kind==='variables'&&i.input===0),'Invalid parameters.variable_inputs: file_name_variable needs variables input 0');
+  need(r.finish!=='close','Invalid parameters.finish: file_name_variable needs done or execute');
+ }
  if(r.target.kind==='new'){
-  const missing=['destination','encoding','delimiter','header','bom','line_ending','decimal_separator','null_marker','text_qualifier'].filter(k=>!(k in p));
+  const missing=['destination','encoding','delimiter','header','bom','line_ending','decimal_separator','null_marker','text_qualifier'].filter(k=>!(k in p)&&!(k==='destination'&&'file_name_variable'in p));
   need(!missing.length,'Invalid parameters.'+missing[0]+': required for a new export; missing fields: '+missing.join(', '));
  }
  if('destination'in p)validateExportDestination(p.destination,directories);

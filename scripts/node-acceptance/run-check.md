@@ -243,6 +243,15 @@ checks an ExcelPath-only update on the same Excel node, `/excel/source_path` in
 `configuration.bindings`, re-execution only via `{excel:{}}` or a reread, and cold
 reads the Excel W1 variable caption and mapping before execution.
 
+`excel-import-multi` and `excel-import-parallel` (Excel C4) use
+`imports-excel/acceptance/excel-import-multi`: the stage-0 tasks, the original
+capabilities `sales-a/b.xlsx` delivered into a fresh owned directory, and a stdlib
+OOXML oracle. `multi` checks the explicit list a→b (ordered, `multi.csv`) and then
+the native mask `sales-*.xlsx` on the SAME Import (row multiset, `mask.csv`), both
+sequential on sheet Data. `parallel` checks two threads with the row multiset.
+Stock Save, cold execution without configuration and cleanup apply.
+Only tasks and server paths reach the model.
+
 `acf-nonzero` uses the approved LAB-1144 edge task and
 fixtures under `research-autocorrelation/acceptance/edges`. Count12 on N8 must
 return all lags 0…7. The Fraction oracle stays private. Singleton is only an
@@ -690,6 +699,21 @@ is derived from the independent `expected.json` case `indices`: one Tree-to-Tabl
 table with the native global index column (`name_any`, native 7.4.2 position:
 first column of the array branch), CSV, Save, cold.
 
+`tree-to-table-typed` (LAB-1699) uses `trees-treetodata/acceptance/modes/task-typed.md`
+with the same prepared TypedSource package, seed, rows.csv and input.json as
+`table-tree-dates-variant`. The model builds the When/Value tree and converts it
+with `trees.to_table`. Private `expected-typed-run.json` is the pair oracle's
+`tree_to_table_typed_projection` (checked by `oracle.py --check`): one ordered
+table When DateTime (civil milliseconds) and Value Variant with native subtypes
+integer `9007199254740993`/boolean false/string "", label_any, its CSV, Save and
+cold (exact typed Variant port read). Even with the requested CSV When format
+`yyyy-mm-dd hh:nn:ss.zzz` applied (readback), the native writer prints
+2026-11-08T00:00:00.001 as `2026-11-08` (LAB-1699 a1/b1). Owner decision
+`d76-tree-to-table`: this is the counted D76 `midnight_date` form only, CSV
+status «PASS с ограничением платформы D76»; port read and cold stay exact.
+The CSV compares Variant integers as numbers; Int64 exactness is proven only
+by the typed read. Variant NULL is not covered (the R4 Collapse drops NULL).
+
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
    column types, rows and order policy. Keep oracle values out of the prompt.
@@ -1018,6 +1042,13 @@ oracle.py проверяет полный прогноз 32×8, типы, пор
 и Teach — на том же узле. CSV, Save, cold без настройки/Teach и cleanup — штатные.
 Модель получает только задачу и CSV; expected и oracle остаются приватными.
 
+`logreg-elastic-net`: ручной Elastic Net, lambda_lasso=lambda_ridge=1;
+утверждённые `modes/elastic-net/task-elastic-net.md` и train.csv из
+`datamining-logregression/acceptance`. Независимый неизменённый modes/oracle.py
+проверяет весь прогноз 32×8, точные типы, порядок и NULL. Повтор настройки и
+Teach — на том же узле; CSV, Save, cold без настройки/Teach и cleanup штатные.
+Только задача и CSV передаются модели; oracle и expected приватны.
+
 `logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
 повтор настройки и Teach того же узла; прогноз по независимому штрафному
 score из `datamining-logregression/acceptance/modes/ridge`, CSV/Save/cold.
@@ -1037,6 +1068,15 @@ CRLF. Stock cold reads the saved export input with exact types, values and field
 order; fixed width supplies the real .txt file without treating it as CSV,
 while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
 the byte oracle for the file passed through --csv. No oracle reaches the model.
+
+`text-export-file-variable` uses `nodes/text-import/acceptance/task-file-variable-export.md`
+with only `sales-2026-11-05.csv`. run-check substitutes `{{EXPORTS_DIR}}` with the pair
+folder and a run-unique prefix for `report-`, so `overwrite=reject` never meets an older
+run. Both downloaded CSV (dates 11-05 and 11-06) must carry the first-stage rows
+(`oracle.py --export`: typed rows, header names, LF, no BOM) and come from one Export
+whose readback has `file_name_variable=ReportFile`, the resolved destination and a
+reject check; no exports.text request may carry a literal destination. Cold reads the
+last output and requires the saved filename binding to resolve to the final path.
 
 `factor-auto` uses the approved `modes/task-auto.md`: eigenvalue 1.1 then
 variance 90% on the same node, both complete typed outputs after each execution.
@@ -1104,6 +1144,16 @@ seasonal-constant-support.csv передаются модели; Fraction oracle
 `oracle-seasonal.py` и expected-seasonal.json остаются в harness. Порт 0 без
 доверительных границ (исключены в соответствии полей), порт 1 целиком; повтор
 Execute, native типы и порядок, два CSV, Save/cold/cleanup.
+
+`ungroup-seasonal-zero` и `ungroup-seasonal-null`: те же штатные проверки двух
+портов и CSV, Save, cold Execute без настройки и cleanup. Исходные
+`task-seasonal-{zero,null}.md` и соответствующие CSV — единственные входы
+модели; наблюдённые expected утверждены решением `v040-scope-expansion`.
+Zero проверяет 4/2 строки, null — 0/0 с полной схемой, без подмены NULL нулями.
+`ungroup-seasonal-empty-support` и `ungroup-seasonal-empty-totals` проверяют
+явный отказ с понятной причиной, Save и cleanup; успешная пустая выгрузка
+не считается распределением. Expected отказа фиксируется до прогонов;
+CSV и cold для отказа не требуются. Oracle/expected остаются вне модели.
 
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.

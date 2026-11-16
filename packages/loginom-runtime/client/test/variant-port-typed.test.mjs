@@ -54,3 +54,11 @@ for(const route of ['apply','read'])test('Sorting exact read preserves Variant s
  assert.equal(Object.hasOwn(request,'variantEmptyIsNull'),false);
  assert.equal(Object.hasOwn(await dispatched('transform.sorting',false,route),'typedVariants'),false);
 });
+
+// LAB-1699: Tree-to-table Variant leaves are read with their native subtypes.
+for(const route of ['apply','read'])test('Tree-to-table exact read preserves Variant subtypes: '+route,async()=>{
+ const request=await dispatched('trees.to_table',true,route);
+ assert.equal(request.typedVariants,true);
+ assert.equal(Object.hasOwn(request,'variantEmptyIsNull'),false);
+ assert.equal(Object.hasOwn(await dispatched('trees.to_table',false,route),'typedVariants'),false);
+});

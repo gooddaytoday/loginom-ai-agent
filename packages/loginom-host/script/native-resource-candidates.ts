@@ -27,6 +27,36 @@ export function verifyBunBaselineArchive(archive: Uint8Array, platform: "linux" 
     throw Error("LOGINOM_BUN_CHECKSUM_MISMATCH")
 }
 
+type Fetch = (url: string) => Promise<Response>
+
+// GitHub release downloads occasionally reset mid-transfer (ECONNRESET). Retry
+// only transport failures and server errors a bounded number of times; every
+// attempt's bytes must still match the repository-pinned checksum.
+export async function downloadBunBaselineArchive(
+  url: string,
+  platform: "linux" | "win32",
+  { fetch: get = fetch as Fetch, attempts = 4, sleep = (ms: number) => Bun.sleep(ms) } = {},
+) {
+  for (let attempt = 1; ; attempt++) {
+    let failure: unknown
+    try {
+      const response = await get(url)
+      if (response.ok) {
+        const archive = Buffer.from(await response.arrayBuffer())
+        verifyBunBaselineArchive(archive, platform)
+        return archive
+      }
+      if (response.status < 500 && response.status !== 429) throw Error("LOGINOM_BUN_DOWNLOAD_FAILED")
+      failure = Error("LOGINOM_BUN_DOWNLOAD_FAILED", { cause: { status: response.status } })
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("LOGINOM_")) throw error
+      failure = Error("LOGINOM_BUN_DOWNLOAD_FAILED", { cause: error })
+    }
+    if (attempt >= attempts) throw failure
+    await sleep(1000 * 2 ** (attempt - 1))
+  }
+}
+
 export function useBunBaseline(platform: string, arch: string, args: string[]) {
   return (["linux", "win32"].includes(platform) && arch === "x64") || args.includes("--baseline")
 }

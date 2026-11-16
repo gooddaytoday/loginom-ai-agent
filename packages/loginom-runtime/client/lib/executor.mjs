@@ -3542,7 +3542,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const task={operation_id:operationId,artifact,snapshot,binding,expected_build:targetBuild,expected_origin:targetOrigin,deadline_at:deadline};
       const key=fingerprint('large-file-reuse',[binding.loginom_account,targetOrigin,artifact.upload.directory,artifact.name,artifact.bytes,artifact.sha256]);
       const state={task,submitted:false,bound:false,settled:false,verified:false};largeTasks.set(operationId,state);
-      const native=async(mode,extra={})=>{const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});if(result?.status!=='SUCCEEDED'||result.operation_id!==operationId||result.action_key!=='artifact.large.native'||result.phase!==mode){await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});throw Error('LOGINOM_UPLOAD_UNCERTAIN');}return result.output;};
+      const native=async(mode,extra={})=>{
+        const result=await execute(makeLargeUploadCode({...task,mode,...extra}),{timeout:10000});
+        const owned=result?.operation_id===operationId&&result.action_key==='artifact.large.native'&&result.action_revision==='1'&&result.phase===mode;
+        if(result?.status!=='SUCCEEDED'||!owned){
+          await onRecord({phase:'large_upload_native_refused',operation_id:operationId,mode,error_code:/^[A-Z][A-Z0-9_]{1,100}$/.test(result?.error?.code??'')?result.error.code:'LARGE_UPLOAD_RECEIPT_INVALID',cause:result?.output?.failure??null});
+          if(owned&&mode==='bind'&&result.status==='FAILED'&&result.error?.code==='UPLOAD_PATH_CONFLICT'
+            &&result.effect_possible===false&&result.cleanup_complete===true&&result.output?.conflict_rejected===true&&result.output.upload_submitted===false)
+            throw Object.assign(Error('UPLOAD_PATH_CONFLICT'),{code:'UPLOAD_PATH_CONFLICT'});
+          throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+        }
+        return result.output;
+      };
       try {
         signal?.throwIfAborted();
         state.sourceLease=await artifactStore.stageUpload(artifactId);
@@ -3825,7 +3836,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             await verifyDeferredTextImportSources(request,history,resolve);
           }
           if(request.parameters.source?.kind==='storage')await resolve(request.parameters.source.server_source_ref);
-          if(request.target.type==='imports.text'&&request.parameters.source?.kind==='verified_sources')
+          if(['imports.text','imports.excel'].includes(request.target.type)&&request.parameters.source?.kind==='verified_sources')
             for(const source of request.parameters.source.sources)if(source.kind==='storage')await resolve(source.server_source_ref);
         }catch(error){
           if(pending||running)throw error;

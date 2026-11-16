@@ -69,12 +69,52 @@ def expected():
     }
 
 
+def expected_export():
+    """Stock expectation for task-file-variable-export.md: one export, two dates,
+    both files carry the first-stage rows of sales-2026-11-05.csv."""
+    rows = expected()["file_variable_proposal"]["stages"][0]["rows"]
+    output = {"output_node_type": "export_input", "ordered": True, "column_order": "exact",
+              "columns": COLUMNS, "rows": rows}
+    return {
+        "package_path": "{{PACKAGE_PATH}}",
+        "nodes": [{"type": "imports.text"}, {"type": "variables.calculator"}, {"type": "exports.text"}],
+        "null_marker": "NULL",
+        "outputs": [dict(output, export_destination="{{EXPORTS_DIR}}/report-" + date + ".csv") for date in DATES],
+        "text_binding": {"parameter": "file_name_variable", "variable": "ReportFile", "kind": "variables", "input": 0},
+    }
+
+
+def check_export_bytes(path):
+    data = path.read_bytes()
+    if data.startswith(b"\xef\xbb\xbf"):
+        raise SystemExit("CSV has a BOM")
+    if b"\r" in data or not data.endswith(b"\n"):
+        raise SystemExit("CSV line endings are not LF")
+    if data.split(b"\n", 1)[0] != b"Id,Item,Amount":
+        raise SystemExit("CSV header is not the technical field names")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Compare checked-in expected.json")
     parser.add_argument("--actual", type=Path, help="Downloaded CSV; checks all typed rows and field order")
     parser.add_argument("--date", choices=DATES, default=DATES[-1])
+    parser.add_argument("--export", action="store_true", help="Export-only task: expected-export.json; every date has the first-stage rows")
     args = parser.parse_args()
+    if args.export:
+        result = expected_export()
+        if args.check:
+            if json.loads(Path(__file__).with_name("expected-export.json").read_text(encoding="utf-8")) != result:
+                raise SystemExit("expected-export.json differs from independent CSV calculation")
+            print("expected-export.json matches independent CSV calculation")
+        if args.actual:
+            check_export_bytes(args.actual)
+            if read_rows(args.actual) != result["outputs"][0]["rows"]:
+                raise SystemExit("CSV rows differ")
+            print("CSV matches every typed row, column order, header, LF and no BOM")
+        if not args.check and not args.actual:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
     result = expected()
     if args.check:
         if json.loads(Path(__file__).with_name("expected.json").read_text(encoding="utf-8")) != result:

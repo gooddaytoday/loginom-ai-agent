@@ -45,7 +45,7 @@ python3 -m venv /your/private/excel-env
 | C1: ёмкость | `task-dimensions.md`, отдельно `task-headers.md` | wide16, headers11 | `wide16`, `headers11`: все 32/4 значения, 16/2 полей, 2 строки, точный порядок; крайние C16=16/116; 11 строк заголовка не попадают в данные |
 | C2: boolean | `task-boolean.md` | boolean | `boolean`: `(1,false),(2,true),(3,NULL)`; тип Boolean и дискретный вид; CSV не объединяет false с NULL |
 | C3: именованный диапазон | `task-named-range.md` | named | `named-fixed`, `named-extend`: 2→3 строки одного узла; только B:C, исключены Ignore и Other!99; точный выбор SalesRange |
-| C4: несколько источников | `task-multiple.md`, `task-parallel.md` | sales-a, sales-b | `multi-list`, `multi-mask`, `multi-parallel`: ровно Id 1,2,3 по одному; суммы 10,20,30; параллельный порядок свободный |
+| C4: несколько источников | `task-multiple.md`, `task-parallel.md` | sales-a, sales-b | `multi-list`, `multi-mask`, `multi-parallel`: ровно Id 1,2,3 по одному; суммы 10,20,30; параллельный порядок свободный. Зарегистрировано: `../excel-import-multi` (маска — мультимножество) |
 | C5: сведения о файле | `task-file-info.md` | sales-a, sales-b + независимая серверная метаинформация | Предложение `file-info-name-mtime`; FileName у Id1/2=a, у Id3=b; время связано с исходным файлом; другие варианты — отдельная матрица ниже |
 | C6: XLSM | `task-xlsm.md` | format.xlsm | `xlsm`: 2×2 целых, без преобразования исходной книги и запуска макросов |
 | C7: имя из переменной | `task-filename-variable.md` | sales-a, sales-b | `variable-a`, `variable-b`: 2→1 строка, изменение только ExcelPath, сохранённая привязка; cold использует последнее значение |
