@@ -45,8 +45,6 @@ jobs:
           install-flags: --frozen-lockfile --ignore-scripts
       - name: Verify fixture trust and updater behavior
         working-directory: packages/desktop
-        env:
-          LOGINOM_AI_AGENT_TEST_NODE: ${{ env.NODE }}
         run: |
           export LOGINOM_AI_AGENT_TEST_NODE="$(command -v node)"
           bun test electron.vite.config.test.ts src/main/update-policy.test.ts src/main/update-sources.test.ts src/main/updater-controller.test.ts
