@@ -1,4 +1,11 @@
-Предложение LAB-998, этап 0; runtime не изменяется. Шесть task — шесть
+Комплект LAB-998. `sorting-variant` зарегистрирован в LAB-1697:
+`expected-variant.json` — отдельная неизменная проекция `cases.variant.stages[0]`,
+дважды проверяется на одном узле; финальное состояние — stock typed cold.
+Native-проба mas2 подтвердила ASC: NULL, числовые Integer/Real, DateTime,
+String; DESC обращает порядок Values. Это наблюдение узкой fixture,
+а не универсальный comparator; бизнес-приёмка использует только Integer/Real/String/NULL.
+
+Исходное предложение LAB-998, этап 0. Шесть task — шесть
 будущих циклов: cache, threads, auto, locale, case, variant.
 `expected.json` — контейнер предложений, **не stock expected/регистрация**.
 Основная и изменённая настройки проверяются на одном узле, последнее

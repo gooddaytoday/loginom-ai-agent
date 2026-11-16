@@ -78,6 +78,8 @@ if __name__ == "__main__":
     result = expected()
     if "--check" in sys.argv:
         assert result == json.loads((ROOT / "expected.json").read_text(encoding="utf-8"))
+        frozen = json.loads((ROOT / "expected-variant.json").read_text(encoding="utf-8"))
+        assert frozen["outputs"] == [dict(result["cases"]["variant"]["stages"][0], column_order="exact")]
         print("sorting proposal: independent expected matches")
     else:
         print(json.dumps(result, ensure_ascii=False, indent=2))

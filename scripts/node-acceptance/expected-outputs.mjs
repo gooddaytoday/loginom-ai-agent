@@ -451,6 +451,27 @@ export function matchVariableInventoryLinks(graph,inventory){
  });
 }
 
+// C8 reuses the cold variable matcher for the model's own production read.
+// A displayed or reconstructed summary is not evidence of a fresh port read.
+export function auditLinregSummaryHistory(events,expected){
+ const want=parseExpectedVariableInventory(expected)?.outputs[0];
+ need(want?.node.type==='datamining.lin_regression'&&want.port===0&&want.ordered===true&&want.variables.length===15,'LINREG_SUMMARY_ORACLE');
+ const same=(a,b)=>a&&b&&['document_id','workflow_id','node_id'].every(k=>typeof a[k]==='string'&&a[k]===b[k]);
+ const checkpoints=events.filter(e=>e.phase==='node_checkpoint'&&e.result?.status==='SUCCEEDED'&&e.result.cleanup_complete===true).map(e=>e.result);
+ const configured=checkpoints.filter(r=>r.configuration?.readback?.kind==='lin_regression'&&same(r.node,r.configuration.readback.node));
+ need(configured.length>0&&configured.every(r=>same(r.node,configured[0].node)),'LINREG_SUMMARY_NODE');
+ const match=checkpoints.find(r=>same(r.node,configured[0].node)&&r.execution?.status==='completed'&&r.output?.variable_ports?.some(output=>{
+  if(output.execution_id!==r.execution.execution_id)return false;
+  try{return matchVariableInventoryOutput(output,want);}catch{return false;}
+ }));
+ need(match,'LINREG_SUMMARY_READ_MISSING');
+ return {status:'PASS',node:match.node,execution_id:match.execution.execution_id,port:0,count:15};
+}
+if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='linreg-summary'){
+ const {readFileSync}=await import('node:fs');
+ console.log(JSON.stringify(auditLinregSummaryHistory(JSON.parse(readFileSync(process.argv[4],'utf8')),JSON.parse(readFileSync(process.argv[3],'utf8')))));
+}
+
 export function auditUserVariableHistory(events,initial,final){
  const before=parseExpectedVariableInventory(initial)?.outputs,after=parseExpectedVariableInventory(final)?.outputs;
  need(before?.length===1&&after?.length===1&&before[0].node.type==='variables.user'&&after[0].node.type==='variables.user','USER_VARIABLE_ORACLE_INVALID');
