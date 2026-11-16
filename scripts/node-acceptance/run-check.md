@@ -3,6 +3,10 @@ without input files. The frozen initial/updated tables are checked separately
 against both downloaded CSVs. W1 snapshots prove integer limit/skip, stable
 source IDs and unchanged query bindings on the same REST. Cold uses the updated
 expectation and actual downloaded CSV. Oracle, fixture and expected stay private.
+`read_existing_output` reexecutes without configuring the REST node; its internal
+`schemas` are allowed only when every requested port exactly matches the output
+of the earlier successful, clean, completed source operation on the same REST.
+Connection/query/mapping edits remain `REST_QUERY_RECONFIGURED`.
 
 `rest-simulation` uses the approved C8 `task-simulation.md`, only `response.json`
 and frozen `acceptance/modes/simulation/expected.json`. The native file simulation
