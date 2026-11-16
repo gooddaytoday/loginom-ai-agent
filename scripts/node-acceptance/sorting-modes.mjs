@@ -11,7 +11,7 @@ function* receipts(value){
 function settings(c,mode,stage){
  const keys=c.keys,options=c.options;
  if(mode==='variant')return c.mode==='keys'
-  &&same(keys?.map(k=>[k.name,k.type,k.direction,k.case_sensitive??null]),[['Values','variant','ASC',false],['RowID','integer','ASC',null],['Names','string','ASC',false]])
+  &&same(keys?.map(k=>[k.name,k.type,k.direction,['string','variant'].includes(k.type)?k.case_sensitive:null]),[['Values','variant','ASC',false],['RowID','integer','ASC',null],['Names','string','ASC',false]])
   &&options?.chkLocaleAware?.value===false&&options.chkLocaleAware.switch_pressed===false;
  return c.mode==='keys'&&same(keys?.map(k=>[k.name,k.type,k.direction]),[['Word','string','ASC'],['RowID','integer','ASC']])
   &&keys[0].case_sensitive===(mode==='case'&&stage===0)

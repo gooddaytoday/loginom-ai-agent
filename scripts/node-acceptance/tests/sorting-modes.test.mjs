@@ -35,7 +35,7 @@ const variant=JSON.parse(readFileSync(new URL('../../../docs/node-development/no
 const variantExpected={sorting_mode:'variant',sorting_stages:[variant.outputs[0],variant.outputs[0]]};
 function variantReceipt(stage){
  const r=receipt('case',stage),o=variant.outputs[0];
- r.configuration.readback.keys=[{name:'Values',type:'variant',direction:'ASC',case_sensitive:false},{name:'RowID',type:'integer',direction:'ASC'},{name:'Names',type:'string',direction:'ASC',case_sensitive:false}];
+ r.configuration.readback.keys=[{name:'Values',type:'variant',direction:'ASC',case_sensitive:false},{name:'RowID',type:'integer',direction:'ASC',case_sensitive:true},{name:'Names',type:'string',direction:'ASC',case_sensitive:false}];
  r.configuration.readback.options.chkLocaleAware.value=false;
  const port=r.output.ports[0];port.row_count=o.rows.length;port.schema=o.columns.map(({name,type})=>({name,type}));
  port.sample=o.rows.map(row=>o.columns.map(c=>{
