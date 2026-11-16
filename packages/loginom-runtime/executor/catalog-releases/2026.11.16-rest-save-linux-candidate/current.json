@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "status": "candidate",
+  "catalog_version": "2026.11.16-rest-save-linux-candidate",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-linux-candidate/manifest.json",
+  "manifest_sha256": "118ee37cccf1a80fafa628b370786da9f9e753308c064ac460f83b40f98e8716"
+}

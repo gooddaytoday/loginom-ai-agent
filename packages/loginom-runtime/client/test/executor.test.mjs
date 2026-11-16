@@ -770,6 +770,58 @@ async function continuationPage() {
  return {page,flow,card};
 }
 
+async function restSavePage(modified, restReference = true) {
+ const {page,flow}=await continuationPage(),pkg=flow.ParentNode;
+ page.storageBinding={session_id:'save-session',document_id:'doc',loginom_account:'save-user',origin:'https://loginom.invalid'};
+ pkg.Package={};pkg.HasRunningNodes=()=>false;Object.defineProperty(pkg,'ReadOnly',{value:false});
+ page.model.FDiagram.FNodes={FCollection:[{FIconCls:restReference?'bg-vendor-icon-restclientconnection':'bg-vendor-icon-restclient'}]};
+ page.app.Application.FInstance.FMainForm.FMapTree={PackageNodes:{Count:1,Items:()=>pkg},
+  FServerConnection:{Connected:true,UserName:'save-user',Session:{IsPackageModified:async()=>{
+   page.modifiedReads++;return modified[Math.min(page.modifiedReads-1,modified.length-1)];
+  }}}};
+ page.context.location={origin:'https://loginom.invalid'};
+ page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
+ await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
+ page.saveWrites=0;page.modifiedReads=0;
+ const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
+ page.save=()=>{page.saveWrites++;save();};
+ page.elements=()=>[...elements(),...(page.menu?[page.element('MF;MainMenuForm;btnSavePackage',{symbol:'native-save'})]:[])];
+ page.click=async item=>{if(item.symbol==='native-save'){page.events.push('native_save');page.save();page.menu=false;return;}return click(item);};
+ return page;
+}
+
+for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false]])
+test('REST reference Save normalizes once after reopen: '+action+' '+modified,async()=>{
+ const page=await restSavePage(modified);
+ const outcome=await run(page,action,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.events.filter(e=>e==='package_closed').length,1);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,false);
+ assert.ok(event.duration_ms>=0);assert.equal(outcome.output.reopened,true);
+ validateActionParameters(actions.get(action).output_schema,outcome.output);
+});
+
+test('REST normalization refuses a second dirty result without another Save or reopen',async()=>{
+ const page=await restSavePage([true,true]);
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'AMBIGUOUS',JSON.stringify(outcome));
+ assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ assert.equal(page.saveWrites,2);assert.equal(page.modifiedReads,2);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,true);
+});
+
+test('a REST request without a connection reference keeps the ordinary checkpoint path',async()=>{
+ const page=await restSavePage([true,true],false);
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
+ assert.equal(page.events.includes('package_closed'),false);assert.equal(outcome.output.reopened,false);
+});
+
 test('saved continuation returns current navigation with the same native workflow and original binding',async()=>{
  const {page}=await continuationPage();
  const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/continued.lgp',conflict_policy:'fail'});

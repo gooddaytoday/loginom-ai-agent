@@ -1,5 +1,8 @@
-`rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
-in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
+`rest-query-variables` uses LAB-820 `variables/acceptance/task-rest-variables.md`
+without input files. The frozen initial/updated tables are checked separately
+against both downloaded CSVs. W1 snapshots prove integer limit/skip, stable
+source IDs and unchanged query bindings on the same REST. Cold uses the updated
+expectation and actual downloaded CSV. Oracle, fixture and expected stay private.
 
 `rest-simulation` uses the approved C8 `task-simulation.md`, only `response.json`
 and frozen `acceptance/modes/simulation/expected.json`. The native file simulation

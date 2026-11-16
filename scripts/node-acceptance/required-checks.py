@@ -131,6 +131,8 @@ RULES = (
      ('live-ui',), ('rest-simulation',)),
     (('packages/product/skills/loginom-automation/references/nodes/integration.rest_request.md',),
      ('live-ui',), ('rest-headers', 'rest-variables')),
+    (('docs/node-development/variables/acceptance/**', C + 'package-persistence.mjs'),
+     ('live-ui',), ('rest-query-variables',)),
     (('docs/node-development/nodes/preprocessing-*/acceptance/v040/**', C + 'sampling-*.mjs', C + 'data-partition-*.mjs', 'scripts/node-acceptance/sampling-modes.mjs'), ('live-ui',), ('sampling-uniform', 'partition-uniform', 'partition-test-priority')),
     ((C + 'sampling-*.mjs', C + 'data-partition-*.mjs'), ('live-ui',), ('sampling', 'data-partition')),
     (('scripts/node-acceptance/sampling-modes.mjs',), ('live-ui',), ('sampling-random', 'partition-random', 'sampling-stratified', 'sampling-biased', 'partition-stratified', 'partition-biased')),

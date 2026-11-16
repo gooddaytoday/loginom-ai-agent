@@ -1,6 +1,7 @@
 import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic} from './browser-failure.mjs';
 import {createRedactor} from './redact.mjs';
 import {journalCopy} from './execution-journal.mjs';
+import {readSavedPackageState} from './package-persistence.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools,storageListPattern,listStorageDirectory} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
@@ -791,7 +792,7 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
   },{context,parameters});
 }
 
-function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation, normalizeVariablesToTableLinkGraph) {
+function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, readLinkValidation, normalizeVariablesToTableLinkGraph, readSavedState) {
   const started = Date.now();
   const deadline = task.deadline_at ?? started + task.action.timeout_ms;
   const trace = [];
@@ -1385,8 +1386,19 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       seen.add(node);
       if (app.PackageTreeNode && node instanceof app.PackageTreeNode) {
         const path = node.PackageFileName;
+        const diagrams = [app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController?.FDiagram];
+        const pending = [node], seen = new Set();
+        while (pending.length) {
+          const current = pending.pop();
+          if (seen.has(current)) continue;
+          if (seen.size >= 10000) throw Error('Package reference inventory exceeds bound');
+          seen.add(current);
+          diagrams.push(current.FCustomForm?.FDiagram);
+          pending.push(...(current.FSubNodes?.FItems ?? []));
+        }
         return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
-          running: node.HasRunningNodes?.() === true };
+          running: node.HasRunningNodes?.() === true,
+          rest_reference: diagrams.some(d => d?.FNodes?.FCollection?.some(n => n.FIconCls === 'bg-vendor-icon-restclientconnection')) };
       }
       node = node.ParentNode;
     }
@@ -1633,7 +1645,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const saveError = await resolve('message.error', {}, { cardinality: 'zeroOrOne', stable: false });
     if (saveError) throw new Error((await saveError.innerText()).slice(0, 500));
     record('save_flow_completed', { path: before.path });
-    if (keepOpen) {
+    const normalizeRest = before.package_identity.rest_reference === true;
+    const normalizationStarted = Date.now();
+    if (keepOpen && !normalizeRest) {
       const prefix = await ensureReady();
       const actualPath = normalizeStoredPath((await packageIdentity()).path);
       const graph = await graphSnapshot(prefix);
@@ -1712,7 +1726,42 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     });
     await waitForNoMask(60000);
     transientDialog = false;
-    return verifyReopenedPackage(before);
+    const verified = await verifyReopenedPackage(before);
+    if (!normalizeRest || verified.status !== 'SUCCEEDED') return verified;
+    let modifiedBefore = null, modifiedAfter = null, additionalSave = false;
+    try {
+      const binding = task.storage_binding;
+      if (!binding) throw Error('REST package normalization requires its prepared session storage identity');
+      const read = async () => (await page.evaluate(readSavedState, {
+        sessionId: binding.session_id, documentId: binding.document_id, account: binding.loginom_account,
+        packagePath: before.path, origin: binding.origin, loginomBuild,
+      })).modified;
+      modifiedBefore = await read();
+      modifiedAfter = modifiedBefore;
+      if (modifiedBefore) {
+        await click('packages.menu');
+        const definition = task.normalization_selector;
+        if (definition?.strategy !== 'data_tid' || definition.match !== 'exact') throw Error('Native normalization Save selector unavailable');
+        const button = tid('', definition.value);
+        if (await button.count() !== 1 || !await button.isVisible() || !await button.isEnabled()
+          || normalizeStoredPath((await packageIdentity()).path) !== before.path) throw Error('REST normalization Save owner changed');
+        additionalSave = true;
+        transientDialog = true;
+        await interact(timeout => button.click({ timeout }), true);
+        await poll(async () => !await button.isVisible());
+        await waitForNoMask(60000);
+        transientDialog = false;
+        modifiedAfter = await read();
+      }
+      if (modifiedAfter !== false) throw Error('REST_PACKAGE_NORMALIZATION_STILL_MODIFIED: package is still modified after the one additional Save; no retry was sent');
+    } finally {
+      record('rest_package_normalization', { path: before.path, modified_before: modifiedBefore,
+        modified_after: modifiedAfter, additional_save: additionalSave,
+        started_at_ms: normalizationStarted, finished_at_ms: Date.now(), duration_ms: Date.now() - normalizationStarted });
+    }
+    record('postcondition_verified', { proof: 'rest_package_normalized', package_path: before.path });
+    return keepOpen ? result('SUCCEEDED', { ...verified.output, workflow_preserved: false, save_completed: true,
+      persisted_content_verified: false, workflow_continuations: [] }) : verified;
   };
   const observe = async () => {
     const prefix = await ensureReady();
@@ -1809,8 +1858,9 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
   const handler = requireCapability(action).handler;
   const allowedSelectors = Object.fromEntries(action.selector_symbols.map(symbol => [symbol, selectors.get(symbol)]));
   const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler,
-    ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector) } : {}) };
-  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()}, ${normalizeVariablesToTableLinkGraph.toString()})`;
+    ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector),
+      normalization_selector: structuredClone(selectorCatalog.native_rest_save) } : {}) };
+  const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()}, ${normalizeVariablesToTableLinkGraph.toString()}, ${readSavedPackageState.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
 }

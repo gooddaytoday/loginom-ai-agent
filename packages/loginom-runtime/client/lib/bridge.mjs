@@ -579,6 +579,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&!(['NOT_APPLIED','FAILED'].includes(outcome.status)&&outcome.effect_possible===false))
               saveAdmissions.set(operationId,saveAdmission);
             await logResult(request.params.name,outcome);
+            const normalization = outcome.trace?.find(e => e.event === 'rest_package_normalization');
+            if(normalization)await recordExecution({phase:'rest_package_normalization',operation_id:outcome.operation_id,...normalization});
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
             const confirmedSave=saveRequest?outcome:request.params.name==='dock_operation_inspect'
@@ -599,11 +601,33 @@ export async function createBridge(config, session, { browserTransport: managedB
               if(confirmedSave.output?.reopened===true)
                 reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
             }
+            let normalizedWorkspace = null;
+            if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
+                && outcome.trace.some(e => e.event === 'rest_package_normalization' && e.modified_after === false)) {
+              const previous = session.metadata.workspacePreparation.state;
+              const bindingRequest = {intent:'open_package',package_path:outcome.output.package_ref.path,operation_id:'rest-save-bind-'+randomUUID()};
+              normalizedWorkspace = await prepareWorkspaceSession({metadata:session.metadata,request:bindingRequest,signal:extra.signal,
+                assertAllowed:() => actionRuntime.assertPreparationAllowed(),
+                prepare:async () => {
+                  const code = makeWorkspacePrepareCode({loginomUrl:config.loginomUrl,compatibility:pinnedActions.compatibility,
+                    sessionId:session.metadata.sessionId,operationId:bindingRequest.operation_id,intent:'open_package',
+                    packagePath:bindingRequest.package_path,bindOpenOnly:true,timeoutMs:5000});
+                  const state = parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:6000}));
+                  if(state.status!=='READY'||state.effect_possible!==false||state.document_id!==previous.document_id
+                    ||state.loginom_account!==previous.loginom_account||state.package_ref?.path!==bindingRequest.package_path)
+                    throw Error('REST normalization saved the package, but its reopened workspace could not be bound');
+                  return state;
+                },assertTarget:target=>assertCatalogTarget(pinnedActions,target),record:recordExecution,save:()=>session.save(catalog)});
+              if(userProfile)userWorkflows.remember(normalizedWorkspace);
+            }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
             const reply = actionReply(userProfile?compactActionResult(outcome,{
               wireSize:value=>Buffer.byteLength(JSON.stringify(actionReply(value,{userProfile})),'utf8'),
             }):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
+            if(normalizedWorkspace)reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_workspace',
+              document_id:normalizedWorkspace.document_id,workflow_ref:normalizedWorkspace.workflow_ref,package_ref:normalizedWorkspace.package_ref,
+              instruction:'REST finalization reopened this saved package. Use this fresh workflow and freshly observed node refs for further work.'})});
             if(outcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(outcome.action_key)&&outcome.output?.package_ref?.path){
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,
