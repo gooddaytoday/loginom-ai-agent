@@ -229,6 +229,73 @@ describe("cross-spawn spawner", () => {
   })
 
   describe("process control", () => {
+    for (const scenario of ["scope-stubborn", "scope-exited", "kill-detached", "kill-exited-detached"] as const) {
+      fx.live(
+        `bounds cancellation with inherited stdio: ${scenario}`,
+        Effect.gen(function* () {
+          if (process.platform !== "linux") return
+
+          const tmp = yield* Effect.acquireRelease(
+            Effect.promise(() => tmpdir()),
+            (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+          )
+          const marker = path.join(tmp.path, "ready")
+          const child = yield* Effect.acquireRelease(
+            Effect.sync(() => ({ pid: 0 })),
+            (child) =>
+              Effect.sync(() => {
+                if (child.pid && alive(child.pid)) process.kill(child.pid, "SIGKILL")
+              }),
+          )
+          const detached = scenario.includes("detached")
+          const exited = scenario.includes("exited")
+          const released = yield* Effect.scoped(
+            Effect.gen(function* () {
+              const code = [
+                'const fs = require("node:fs")',
+                scenario === "scope-stubborn" ? 'process.on("SIGTERM", () => {})' : "",
+                `fs.writeFileSync(${JSON.stringify(marker)}, String(process.pid))`,
+                "setTimeout(() => process.exit(0), 8000)",
+              ]
+                .filter(Boolean)
+                .join("; ")
+              const handle = yield* js(
+                [
+                  'const { spawn } = require("node:child_process")',
+                  `const child = spawn(process.execPath, ["-e", ${JSON.stringify(code)}], { detached: ${detached}, stdio: ["ignore", 1, 2] })`,
+                  "child.unref()",
+                  exited ? "process.exit(0)" : "setInterval(() => {}, 1000)",
+                ].join("; "),
+                { forceKillAfter: 500 },
+              )
+              yield* Effect.gen(function* () {
+                while (!child.pid) {
+                  child.pid = Number(yield* Effect.promise(() => fs.readFile(marker, "utf8").catch(() => "0")))
+                  if (!child.pid) yield* Effect.sleep("10 millis")
+                }
+              }).pipe(Effect.timeout("3 seconds"))
+              if (exited) expect(yield* Effect.promise(() => gone(Number(handle.pid)))).toBe(true)
+              const started = Date.now()
+              if (detached) yield* handle.kill({ forceKillAfter: 500 })
+              return { started, pid: Number(handle.pid) }
+            }),
+          )
+          const elapsed = Date.now() - released.started
+          // The 500 ms allowance covers scheduling around the 500 + 2000 ms bound.
+          expect(elapsed).toBeLessThan(3_000)
+          expect(yield* Effect.promise(() => gone(released.pid))).toBe(true)
+          if (detached) {
+            expect(alive(child.pid)).toBe(true)
+            return
+          }
+          // Orphans may remain as zombies until the host's init reaps them.
+          const state = yield* Effect.promise(() => fs.readFile(`/proc/${child.pid}/stat`, "utf8").catch(() => ""))
+          expect(state === "" || state.slice(state.lastIndexOf(")") + 2).startsWith("Z ")).toBe(true)
+        }),
+        15_000,
+      )
+    }
+
     fx.live(
       "releases an exited process while inherited stdio prevents close",
       Effect.gen(function* () {
