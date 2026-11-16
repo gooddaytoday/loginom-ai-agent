@@ -99,7 +99,10 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
       ?{tool:'dock_node_apply',original_operation_id:result.operation_id,instruction:inactiveSorting
         ?'No sorting node was created. First execute/read the SAME upstream node referenced by the rejected inputs[].source and output. Use dock_node_read with a successful local source_operation_id from this preparation; if none exists, use dock_node_apply with its exact existing ref, original type/mode, inputs:[], an empty settings patch from its parameter_schema and finish:"execute". Wait for confirmed success and the needed output, then submit the original sorting request with a NEW operation_id. Do not recreate the source, guess its identity or automatically run REST/JavaScript/export side effects outside the user request. No browser recovery is required.'
         :'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
-      :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:'Inspect the original operation; do not repeat an unresolved effect.'}
+      :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:
+        outcome.error?.code==='NODE_APPLY_STOPPED'&&outcome.error.message.startsWith('Node procedure readiness timeout: calculator done available;')
+          ?'The input mapping or node wizard did not expose an authorized Done action. The timeout authorized no new gesture; earlier node/link/mapping effects may remain. Inspect this original operation and follow its offered recovery: abandon_operation with a NEW recovery_operation_id, or dock_browser_recovery when offered after refused release. Do not submit another node operation, recreate the target, or save through this pending operation.'
+          :'Inspect the original operation; do not repeat an unresolved effect.'}
     :null);
   const reply={
     ...(result.upload_operation_id&&result.status?{upload_status:result.status,progress:pick(result,['bytes','total_bytes','percent','elapsed_ms','deadline_at','poll_after_ms'])}:{}),
