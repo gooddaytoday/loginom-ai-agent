@@ -13,7 +13,7 @@
     "check:size": "bun run script/check-size.ts",
     "test": "bun run build && bun run test:coverage && \"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/web/dist-smoke.test.mjs test/web/shell-contract.test.mjs test/web/sdk.test.mjs test/contract/publication.test.mjs test/agent/folder.test.mjs test/draft/server.test.mjs test/build/resolver.test.mjs test/deploy/containers.test.mjs",
     "test:coverage": "bun run test:coverage:web && bun run test:coverage:workers",
-    "test:browser": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test test/browser/*.test.mjs test/build/*.test.mjs test/agent/draft.test.mjs test/agent/publish.test.mjs",
+    "test:browser": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test --test-concurrency=2 test/browser/*.test.mjs test/build/*.test.mjs test/agent/draft.test.mjs test/agent/publish.test.mjs",
     "test:coverage:web": "\"$LOGINOM_AI_AGENT_TEST_NODE\" --test --experimental-test-coverage --test-coverage-include='**/src/web/**' --test-coverage-lines=90 --test-coverage-functions=90 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./script/check-coverage.mjs --test-reporter-destination=stdout test/web/server.test.mjs test/web/apps.test.mjs",
     "test:coverage:workers": "DASHBOARD_COVERAGE_SCOPE=workers \"$LOGINOM_AI_AGENT_TEST_NODE\" --test --experimental-test-coverage --test-coverage-include='**/src/publisher/**' --test-coverage-include='**/src/builder/**' --test-coverage-lines=90 --test-coverage-functions=90 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./script/check-coverage.mjs --test-reporter-destination=stdout test/builder/build.test.mjs test/publisher/publisher.test.mjs"
   },

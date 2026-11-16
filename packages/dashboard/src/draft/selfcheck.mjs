@@ -3,9 +3,17 @@ import { pathToFileURL } from "node:url"
 
 const [playwright, executablePath, url] = process.argv.slice(2)
 const { chromium } = await import(pathToFileURL(join(playwright, "index.mjs")).href)
+// A stop during launch must wait until the browser can close its helpers cleanly.
+let stopped = false
+let browser
+process.on("SIGTERM", async () => {
+  stopped = true
+  await browser?.close()
+})
 // Model-written code runs in a fresh profile with the Chromium sandbox enabled.
-const browser = await chromium.launch({ executablePath, headless: true, chromiumSandbox: true, args: ["--no-proxy-server"] })
+browser = await chromium.launch({ executablePath, headless: true, chromiumSandbox: true, handleSIGTERM: false, timeout: 30_000, args: ["--no-proxy-server"] })
 try {
+  if (stopped) throw Error("Self-check cancelled")
   const errors = []
   const context = await browser.newContext()
   await context.addInitScript(() => {

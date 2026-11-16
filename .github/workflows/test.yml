@@ -202,7 +202,8 @@ jobs:
       - name: Check dashboard stand installer
         run: |
           bash -n packages/dashboard/deploy/dev-master.sh
-          shellcheck packages/dashboard/deploy/dev-master.sh
+          bash -n packages/dashboard/deploy/containers.sh
+          shellcheck packages/dashboard/deploy/dev-master.sh packages/dashboard/deploy/containers.sh
           cat > "$RUNNER_TEMP/dashboard-invalid.json" <<'JSON'
           {"server":"example-server","studio":"example-studio","network":"example-net","web":"invalid/name","project":"example-services","userstorage":"example-storage"}
           JSON
