@@ -79,10 +79,11 @@ categorical.csv — константа≈2.99, X≈2.02, B=3, C=1. Допуск 
   Порт 1 после Teach — 3; 2; 0.5; 0 (±999 не учтены)?
 - **C6b.** `ByColumnMethodForm;pedPartitionColumn` принимает Boolean IsTest, и
   true — это тест? Если нужен Integer/строковый флаг — стоп, тип не подменять.
-- **C8.** `read.variable_ports:[2]` после Execute даёт полный `VariablesForm`
-  из 15 переменных (complete, fresh)? Порядок и integer у TotalSamples,
-  TotalSelectedSamples, TrainSamples, DFE, ModelDF? StdDev = 0.288675 (`RSS/DFE`),
-  а не 0.25 (`RSS/n`)? LogLikelihood = −0.522307?
+- **C8 (native-проба LAB-1695).** Третий физический выход имеет отдельный
+  variable ordinal 0: `read.variable_ports:[0]` после Execute даёт полный свежий
+  `VariablesForm` из 15 переменных в порядке expected. TotalSamples,
+  TotalSelectedSamples, TrainSamples, DFE, ModelDF — Integer, остальные — Real.
+  Подтверждены StdDev = 0.288675 (`RSS/DFE`), LogLikelihood = −0.522307.
 - **C11.** Строковая дискретная Category получает роль «Входное», нормализатор —
   только «Индикатор», опорная «первое значение» = A, показ опорного
   коэффициента включён? Порт 1 — строки константа, X, A, B, C; DisplayName

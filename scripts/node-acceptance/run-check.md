@@ -977,6 +977,15 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-summary`: C8, исходный task-summary.md и только design.csv. Enter с
+константой и всеми X1/X2/X3. Основной прогон требует свежий полный VariablesForm
+из 15 переменных, принадлежащий завершённому исполнению того же узла; существующий
+typed matcher проверяет имена, порядок, типы и значения. Третий физический выход
+имеет отдельный variable ordinal 0: `read.variable_ports:[0]`, не table port 2.
+Native-проба подтвердила форму; oracle изменён только в адресе выхода.
+Оба табличных порта, CSV прогнозов, Save, cold без настройки и cleanup обязательны.
+Oracle и expected остаются вне рабочего каталога модели.
+
 `linreg-partition-sequential`: C6, Enter на partition.csv, первые 16 строк
 обучают, следующие 2 тестовые. Только task-partition-sequential.md и CSV
 передаются модели; неизменённые expected.json и oracle остаются в оснастке.
