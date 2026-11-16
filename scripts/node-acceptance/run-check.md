@@ -402,8 +402,8 @@ Only the task and `fixtures/variables.csv` reach the model. The update task
 changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 
 `calculator-vars-saveas` (LAB-1729) uses `scenarios/calculator-vars-saveas/task.md`: the
-same Calculator Var.Amount task (value 11), then Save As with reopen and continued work
-in the reopened package. Checks `calculator/acceptance/expected.json`, stock CSV/Save/cold,
+Calculator Var.Amount task (7), Save As with reopen, then Amount=11 and the same Calculator
+in the reopened package, final Save As with reopen. Checks `calculator/acceptance/expected.json`, stock CSV/Save/cold,
 a confirmed `save_as` receipt with `reopened:true` and an accepted
 `reopened_package_cleanup_binding` for the saved path (#986 cleanup branch).
 
