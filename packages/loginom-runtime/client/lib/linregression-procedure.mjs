@@ -120,9 +120,13 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
   state=await channel.observe({condition:'regression input activated',readLinRegression:true,ready:s=>ready('normalization')(s)&&s.node_linregression.source_status!=='Не активировано'});
  }
+ // Native activation rebuilds the local records (LAB-1740 journal 531→535).
+ // Rebind IDs only after proving every field and normalizer stayed the same.
+ const indicatorFields=state.node_linregression.fields;
+ if(indicators.length)need(same(indicatorFields.map(({record_id,...f})=>f),normalization.fields.map(({record_id,...f})=>f)),'input activation changed indicator schema');
  const indicatorReadback=[];
  for(const wanted of indicators){
-  const field=normalization.fields.find(f=>f.name===wanted.field),base=state.wizard.root_tid+';NormTuneWizard;';
+  const field=indicatorFields.find(f=>f.name===wanted.field),base=state.wizard.root_tid+';NormTuneWizard;';
   await channel.perform({condition:'select exact indicator predictor',initialObservation:state,ready:ready('normalization'),identity:s=>({node:s.prepared_node_context,field}),
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===base+'colDisplayName_'+field.name&&e.allowed_actions.includes('click'),'Indicator row unavailable').ref})});
   const selected=s=>ready('normalization')(s)&&s.node_linregression.indicator?.record_id===field.record_id&&s.node_linregression.indicator.field===wanted.field&&s.node_linregression.indicator.values.length>0;
@@ -138,7 +142,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
   }
   const actual=state.node_linregression.indicator;
   need(actual.values.filter(v=>v.selected).length===1&&actual.values[0].selected===true&&same(actual.values.map(({selected,...v})=>v),initial.values.map(({selected,...v})=>v)),'first reference category or complete value order differs');
-  need(same(state.node_linregression.fields,normalization.fields),'indicator selection changed normalizers');
+  need(same(state.node_linregression.fields,indicatorFields),'indicator selection changed normalizers');
   indicatorReadback.push({field:wanted.field,method:'indicator',reference:'first',reference_value:actual.values[0].value});
  }
  await next('normalization','learn_partition');
