@@ -227,7 +227,7 @@ nodeApplyInputSchema.required=nodeApplyInputSchema.required.filter(key=>key!=='v
 // Discovery uses the same public parameter shapes. Requirements depending on
 // target.kind remain in the installed handler, before any browser mutation.
 export const textImportParametersSchema=object({
- preview_only:{const:true,description:'source.kind=storage; settings.source={source_path}; finish=close; inputs=mappings=read.ports=[]. Read encoding/format/columns and <=25 rendered rows; discard without Execute. server_profile: coverage=preview, no SHA/full N. Reuse node after download/profile/scan/sample.'},
+ preview_only:{const:true,description:'source: storage+settings.source.source_path, or verified_delivery (path optional); settings.source={source_path,encoding}; finish=close; inputs=mappings=read.ports=[]. Read encoding/format/columns and <=25 rendered rows; discard without Execute. server_profile: coverage=preview, no SHA/full N. Reuse node after download/profile/scan/sample.'},
  source_switch:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source_switch),description:'Existing import only, after exact scan and package.save_checkpoint: supply profile_id/save_operation_id and change source_path alone. No columns, format or mappings. Text: Done with read.ports:[], fresh dock_storage_source, then terminal Execute; runtime rechecks source identity/size/SHA and full N. Excel: Execute/output 0. Missing scan never verifies N. Timeout: inspect the SAME operation.'},
  source:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source),
   description:'Required except unchanged Execute. Verified storage/delivery refs; bytes/SHA must match. List: kind:verified_sources,sources:[refs] in source_paths order. Unchanged existing Execute may omit source: settings:{}, inputs/mappings:[], read.ports:[0].'},
@@ -279,8 +279,12 @@ const unionObject=branches=>({type:'object',properties:{...Object.assign({},...b
   additionalProperties:false,oneOf:branches});
 export const nodeReadInputSchema=unionObject([nodeOutputReadInputSchema,javascriptSourceInitialSchema,javascriptSourceContinuationSchema,javascriptContextInitialSchema]);
 export const nodeReadOutputSchema=unionObject([nodeJobResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]);
+// Deletion settles synchronously; its outcome is not a node.apply receipt.
+const nodeDeleteResultSchema={type:'object',required:['operation_id','attempt','state','outcome'],properties:{operation_id:{type:'string'},attempt:{type:'integer',minimum:1},
+ state:{type:'string',enum:['settled']},outcome:{type:'object',required:['status','action_key','effect_possible','cleanup_complete'],properties:{
+  status:{type:'string',enum:['SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS']},action_key:{type:'string',const:'node.delete'},effect_possible:{type:'boolean'},cleanup_complete:{type:'boolean'}}}}};
 const tool=(name,description,inputSchema,readOnlyHint=false)=>({name,description,inputSchema:name==='dock_node_apply'?nodeApplyPublishedSchema:inputSchema,
- outputSchema:name==='dock_node_read'?nodeReadOutputSchema:name.startsWith('dock_node_')?nodeJobResultSchema:deliveryJobResultSchema,
+ outputSchema:name==='dock_node_read'?nodeReadOutputSchema:name==='dock_node_delete'?nodeDeleteResultSchema:name.startsWith('dock_node_')?nodeJobResultSchema:deliveryJobResultSchema,
  annotations:{readOnlyHint,destructiveHint:!readOnlyHint,openWorldHint:false}});
 export const nodeApiTools=Object.freeze([
  tool('dock_node_read','Without kind: execute and read an already completed local table node using source_operation_id and a NEW operation_id. With kind:source: read the full saved source of one prepared existing JavaScript node without Execute; use document_id, full workflow_ref, node, and a stable operation_id. The response contains one exact bounded chunk and a SHA-256. Continue with the same operation_id, returned opaque cursor and expected_source_sha256 until cursor is null. Every chunk reopens and discards the owned wizard; a changed source or uncertain Close refuses further reading. Source reads do not save the package. Never relaunch an uncertain read under a new ID.',
@@ -290,6 +294,8 @@ export const nodeApiTools=Object.freeze([
  tool('dock_node_status','Read local state and accepted progress without browser access or re-execution.',operation,true),
  tool('dock_node_wait','Wait up to timeout_ms (0–60000 milliseconds, maximum 60 seconds) for the SAME worker. Timeout returns running; wait again on the same operation_id, never infer termination or start a replacement.',object({operation_id:id,timeout_ms:integer(0,60000)},['operation_id']),true),
  tool('dock_node_cancel','Request local cancellation. Partial effects remain; poll until cleanup settles. Does not stop an identified server execution.',operation),
+ tool('dock_node_delete','Delete ONE node of the prepared workflow only when the user explicitly asks to remove it; never delete nodes on your own initiative, and keep existing JavaScript nodes unless the user names them. Use the scoped node ref from a node receipt and optional label for the caption check. Runtime refuses before any change if the node is absent, ambiguous, locked or executing, a Supernode/Loop boundary node, in another workflow, or while another Dock operation runs. Native Delete with confirmation removes the node and only its own links; the graph is verified. Deleting a Supernode or Loop also deletes its nested nodes: ask the user to confirm that first. Not saved: call package.save_checkpoint afterwards. Reconnect remaining nodes with dock_node_apply if the user wants. AMBIGUOUS: repeat with the SAME operation_id and arguments.',
+  object({operation_id:id,document_id:id,workflow_ref:object({workflow_id:id,tab_tid:text(128),prefix:text(128),navigation_path:array(object({tid:text(512),label:{type:'string'}}),32,1)}),node:ref,label:text(200)},['operation_id','document_id','workflow_ref','node'])),
  tool('dock_node_stop','Request native stop only for an identified server execution currently awaited by this node operation. Poll the same worker for confirmed outcome.',operation),
 ]);
 export const deliveryApiTools=Object.freeze([
@@ -356,6 +362,7 @@ export async function dispatchNodeApi(runtime,name,args,{signal,scanReceipt}={})
   case 'dock_node_wait':return runtime.waitNodeApply(args.operation_id,{timeoutMs:args.timeout_ms??1000,signal});
   case 'dock_node_cancel':return runtime.cancelNodeApply(args.operation_id);
   case 'dock_node_stop':return runtime.stopNodeApply(args.operation_id);
+  case 'dock_node_delete':return runtime.deleteNode(args,{signal});
   case 'dock_artifact_deliver':return runtime.deliverArtifact(args,{signal});
   case 'dock_artifact_delivery_cancel':return runtime.cancelArtifactDelivery(args.operation_id);
   case 'dock_artifact_delivery_status':return runtime.artifactDeliveryStatus(args.operation_id);

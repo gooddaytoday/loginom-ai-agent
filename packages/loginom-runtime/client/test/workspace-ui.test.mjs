@@ -1844,7 +1844,7 @@ test('calculator Preview rejects a native formula error before Next or Done',asy
 });
 
 test('calculator Preview accepts only its native modal and closes with an observed ref',async()=>{
- for(const fault of ['none','console_error','foreign_form','foreign_owner','loading','incomplete']) {
+ for(const fault of ['none','heavy','owned_loading','foreign_loading','console_error','foreign_form','foreign_owner','loading','incomplete']) {
   const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard';c.marker.id='calc-page';
   page.add('button',c.base+';CalcDataWizard;btnAddExpr','',undefined,c.marker);
   page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.marker);
@@ -1859,8 +1859,14 @@ test('calculator Preview accepts only its native modal and closes with an observ
    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
    async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
   const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
-  let popup;const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
-   if(popup){popup.remove();return;}
+  let popup,loading=false,loadingMessage;const evaluate=page.evaluate.bind(page);
+  page.evaluate=async(fn,args)=>{
+   if(fault==='heavy'&&popup&&args&&Object.hasOwn(args,'discoverRoots')&&!args.discoverRoots
+    &&args.rootRef!==page.context[Symbol.for('loginom-dock.workspace-ui.identity.v1')]?.ids.get(popup))
+    return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:'time',scan_stage:'controls'}};
+   return evaluate(fn,args);
+  };
+  const showPreview=()=>{
    popup=page.add('div',c.base+';CalcPreviewForm','',{x:100,y:100,width:600,height:400});popup.id='preview';popup.attrs.class='x-window';
    page.add('div',c.base+';CalcPreviewForm;p.h;close','',{x:650,y:110,width:30,height:30},popup).attrs.class='x-tool';
    const records=fault==='console_error'?[{isModel:true,data:{Text:'Revenue: неверный аргумент',MessageType:2}}]:[];
@@ -1870,15 +1876,25 @@ test('calculator Preview accepts only its native modal and closes with an observ
    if(fault==='foreign_form')previewView.Controller={};
    if(fault==='foreign_owner')controller.FWizardForm={};
   };
-  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+   if(popup){popup.remove();return;}
+   if(['owned_loading','foreign_loading'].includes(fault)){
+    loading=true;c.form.attrs.class='bg-mask-message';
+    loadingMessage=page.add('div',null,'Loading',undefined,fault==='owned_loading'?c.form:undefined);loadingMessage.attrs.class='x-mask-msg';return;
+   }
+   showPreview();
+  };
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);
+   if(loading){loading=false;c.form.attrs.class='';loadingMessage.remove();showPreview();}
+  };
   const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
-  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(result.status,['none','heavy','owned_loading'].includes(fault)?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
   if(fault==='console_error') {
    assert.equal(result.error.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
    assert.equal(result.output.wizard.calculator_validation.source,'loginom_calculator_preview_console');
   }
-  if(fault!=='none')continue;
+  if(!['none','heavy','owned_loading'].includes(fault))continue;
   const close=result.output.ui.elements.find(e=>e.tid.endsWith(';CalcPreviewForm;p.h;close'));
   const closed=await execute({mode:'act',snapshot:result.output,action:{verb:'click',ref:close.ref}});
   assert.equal(closed.status,'SUCCEEDED',JSON.stringify(closed.error));
@@ -5355,6 +5371,39 @@ async function calculatorNodeOverflowFixture() {
   c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
   return {page,crumbs,nodeTree,component,wizard,binding};
 }
+
+test('LAB-1760 input Done retains the native ColUnion third port and hidden Collapse owner',async()=>{
+ // LAB-1693 guide-c5-2:2443 and guide-reg-vars:1123: input2 and Settings
+ // overflow at 1280x800. LAB-1714 C2/collapse-null-ignore:1446 also hides
+ // the input folder after the long saved node caption.
+ for(const vendor of ['colunion','collapse'])for(const fault of ['none','native_index','icon','guid','opening','caption','unverified',...(vendor==='collapse'?['owner']:[])]) {
+  const {page,crumbs,binding}=await calculatorNodeOverflowFixture();
+  const port=vendor==='colunion'?2:0,icon=vendor==='colunion'?'bg-vendor-icon-coluniondata':'bg-vendor-icon-columnflipping';
+  const caption=vendor==='colunion'?'Присоединяемая таблица 2':'Входной источник данных';
+  for(const c of crumbs.slice(7))c.attrs['data-tid']=c.attrs['data-tid'].replace('Входной_источник_данных',caption.replaceAll(' ','_'));
+  crumbs[7].ownText=caption;crumbs[5].children[0].attrs.class=icon;
+  Object.assign(binding.input_port,{port,native_index:port,node_icon_class:icon});
+  if(vendor==='colunion') {
+   // The captured node and input folder are visible; only the port and Settings overflow.
+   for(const [i,x,width] of [[5,656,251],[6,908,142]]){
+    crumbs[i].style.display='';crumbs[i].box={x,y:41,width,height:24};
+    for(const icon of crumbs[i].children)icon.box={x:x+1,y:42,width:16,height:16};
+   }
+  }
+  if(fault==='native_index')binding.input_port.native_index=3;
+  if(fault==='icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-unknown';
+  if(fault==='guid')delete binding.input_port.port_guid;
+  if(fault==='opening')delete binding.input_port.opening_operation_id;
+  if(fault==='caption')crumbs[7].ownText='Присоединяемая таблица 1';
+  if(fault==='owner')binding.navigation_node.label+=' foreign';
+  if(fault==='unverified')binding.verified=false;
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  const done=r.output?.ui?.elements?.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.equal(done?.allowed_actions.includes('finish_wizard')===true,fault==='none',vendor+':'+fault);
+  if(fault==='none')assert.equal(r.output.wizard.input_port_context.status,'observed');
+  assert.deepEqual(page.events,[]);
+ }
+});
 
 test('D52b opened native node wizard retains its complete long workflow ancestry',async()=>{
  // l443f-d52b2:840: native Group wizard opens, but its owner_context is lost.

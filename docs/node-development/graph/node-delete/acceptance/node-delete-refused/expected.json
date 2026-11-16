@@ -1,0 +1,62 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/doubled.csv",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "ID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Value",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Double",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ID": 1,
+          "Value": 10,
+          "Double": 20
+        },
+        {
+          "ID": 2,
+          "Value": -3,
+          "Double": -6
+        },
+        {
+          "ID": 3,
+          "Value": 0,
+          "Double": 0
+        },
+        {
+          "ID": 4,
+          "Value": 7,
+          "Double": 14
+        }
+      ]
+    }
+  ]
+}
