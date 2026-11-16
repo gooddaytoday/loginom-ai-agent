@@ -13,7 +13,7 @@ function fixture(names,{pageSize=8,top=0,stuck=false,syntax='expression'}={}) {
   const rows=expressions.map((e,index)=>control(prefix+'colExpressionName_'+e.name,['click','double_click','scroll'],{
    interaction:{state:index>=top&&index<top+pageSize?'point_observed':'obscured'},bounding_box:{y:(index-top)*24},
    ...(expressions.length>pageSize?{scroll:{ref:'grid',top:top*24,max_top:(expressions.length-pageSize)*24}}:{})}));
-  const ui=[...rows,...['btnExprUp','btnReplaceField','btnAddExpr'].map(k=>control(prefix+k,['click'])),control(prefix+'cmpExpression',['replace_expression']),control(prefix+'btnCalcMode',['click','press'])];
+  const ui=[...rows,...['btnExprUp','btnReplaceField','btnAddExpr','btnDelExpr'].map(k=>control(prefix+k,['click'])),control(prefix+'cmpExpression',['replace_expression']),control(prefix+'btnCalcMode',['click','press'])];
   if(menuOpen)for(const k of ['cmExpression','cmJavaScript'])ui.push(control(prefix+'btnCalcMode;mn;'+k,['click']));
   const wizard={root_tid:base,stage:'calculator'};
   if(draft){wizard.expression_parameters={status:'observed',root_ref:editor,selected_expression:selected().record_id,fields:Object.fromEntries(['name','label'].map(k=>[k,{status:'observed',value:draft[k],input_ref:editor+k}]).concat([['type_label',{status:'observed',value:'Вещественный'}]]))};ui.push(control(editor+'btnApply',['apply_expression_parameters']));
@@ -43,11 +43,21 @@ function fixture(names,{pageSize=8,top=0,stuck=false,syntax='expression'}={}) {
    assert.ok(!expressions.some(e=>e!==selected()&&e.name.toLowerCase()===draft.name.toLowerCase()),'Duplicate name rejected by Loginom');Object.assign(selected(),draft);draft=null;return;
   }
   if(action.verb==='replace_expression'){selected().formula=action.text;return;}
+  if(action.ref===prefix+'btnDelExpr'){expressions.splice(expressions.indexOf(selected()),1);expressions.forEach((e,i)=>e.index=i);return;}
   if(action.ref===prefix+'btnExprUp'){const index=selected().index;[expressions[index],expressions[index-1]]=[expressions[index-1],expressions[index]];expressions.forEach((e,i)=>e.index=i);return;}
   throw Error('Unexpected action '+JSON.stringify(action));
  }};
  return {channel,calls,expressions,syntax:()=>syntax};
 }
+test('only this operation\'s pristine new Calculator template is deleted; existing empty expressions remain',async()=>{
+ for(const [newNode,createdByOperation] of [[true,true],[true,false],[false,true],[false,false]]){
+  const f=fixture(['Expr1']);Object.assign(f.expressions[0],{formula:'',cached:false,description:''});
+  const result=await configureCalculator(f.channel,{expressions:[{target:{kind:'new'},name:'Flag',label:'Flag',type:'real',formula:'1',replace:false}]},{newNode,createdByOperation});
+  assert.equal(f.calls.some(c=>c.ref.endsWith(';btnDelExpr')),newNode&&createdByOperation);
+  if(newNode&&createdByOperation){assert.ok(!f.expressions.some(e=>e.record_id==='r0'));assert.deepEqual(result.configuration.expressions.map(e=>e.name),['Flag']);}
+  if(!newNode)assert.deepEqual(result.configuration.expressions.map(e=>[e.name,e.formula]),[['Expr1',''],['Flag','1']]);
+ }
+});
 test('cyclic rename keeps both record identities, formulas and unrequested options',async()=>{
  const f=fixture(['A','B','Untouched']);const result=await configureCalculator(f.channel,{expressions:[{target:{kind:'existing',name:'A'},name:'B',formula:'2'},{target:{kind:'existing',name:'B'},name:'A',formula:'3'}]});
  assert.equal(result.verified,true);assert.deepEqual(f.expressions.map(e=>[e.record_id,e.name,e.formula,e.description,e.cached]),[['r0','B','2','Keep 0',true],['r1','A','3','Keep 1',true],['r2','Untouched','1','Keep 2',true]]);

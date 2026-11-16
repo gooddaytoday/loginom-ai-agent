@@ -465,6 +465,36 @@ test('a released configure that cancelled its own draft reports discarded settin
  assert.deepEqual(outcome.execution,{status:'not_requested',execution_id:null});assert.match(outcome.warnings[0],/draft/);
 });
 
+test('Calculator configure scan refusal retains recovery when its Close control is unavailable',async()=>{
+ let closeAvailable=false,open=true;const gestures=[];
+ const state=()=>({prepared_node_context:{...node,verified:true,surface:open?'wizard':'graph',locked:false},
+  wizard:open?{status:'observed',stage:'calculator',root_ref:'wizard',root_tid:'W',owner_context:{status:'observed'}}:{status:'absent'},
+  ui:{elements:closeAvailable?[{tid:'W;btnClose',ref:'close',allowed_actions:['click']}]:[],dialogs:[],masks:[]}});
+ const channel={observe:async({ready})=>{const s=state();assert.ok(ready(s));return s;},
+  perform:async({ready,resolve,initialObservation})=>{assert.ok(ready(initialObservation));gestures.push(resolve(initialObservation));open=false;}};
+ const f=fixture({type:'transform.calculator',release:async()=>releasePendingNode({
+  operation:{deadline:Date.now()+10000,nodeApply:{pending:{phase:'configure'},node,request:{target:{type:'transform.calculator'}}},
+   nodeTargetAdapter:{observe:async()=>graphOf()}},channel})});
+ f.handler.modes=['expression'];
+ f.handler.configure=async()=>{throw Error('Workspace scan budget exceeded; UI_SCAN_LIMIT');};
+ f.runtime.startNodeApply({...request(),target:{...request().target,type:'transform.calculator'},mode:'expression',
+  read:{ports:[0],sample_rows:1,require_exact_numbers:true}});
+ const stopped=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(stopped.outcome.output.pending_phase,'configure');
+ assert.deepEqual(stopped.outcome.output.output,{status:'not_refreshed',evidence_ref:null,ports:[]});
+ const refused=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'missing-close'});
+ assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');
+ assert.match(refused.error.message,/wizard Close control is unavailable or ambiguous/);
+ assert.equal(f.runtime.nodeApplyStatus('apply').outcome.cleanup_complete,false);
+ assert.deepEqual(gestures,[]);
+ closeAvailable=true;
+ const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'available-close'});
+ assert.equal(released.status,'SUCCEEDED');
+ assert.equal(released.output.original_outcome.output.configuration.status,'discarded');
+ assert.deepEqual(released.output.original_outcome.output.execution,{status:'not_requested',execution_id:null});
+ assert.deepEqual(gestures,[{verb:'click',ref:'close'}]);
+});
+
 test('dock_node_read accepts only a release stopped at read as its source',async()=>{
  const phases=['finish','output_mapping'].map(phase=>({phase,receipt_id:'apply:'+phase,status:'verified',effect_possible:true}));
  const readback={scope:'observed_before_verified_finish',values_are:'observed_ui_values',node,receipt_ids:['apply:finish','apply:output_mapping'],

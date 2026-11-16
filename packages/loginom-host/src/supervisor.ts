@@ -76,6 +76,7 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
     "all_proxy",
     "no_proxy",
     "NODE_USE_ENV_PROXY",
+    "LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT",
   ]
   if (platform === "linux")
     keys.push(
