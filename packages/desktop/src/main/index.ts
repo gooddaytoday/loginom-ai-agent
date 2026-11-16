@@ -142,7 +142,12 @@ const main = Effect.gen(function* () {
 
   const appId = app.isPackaged ? Product.channels[CHANNEL] : Product.channels.dev
   const onboardingTestRoot = ((): string | undefined => {
-    if (UPDATE_TEST_FIXTURE && (!TEST_ONBOARDING || !process.env.LOGINOM_AI_AGENT_TEST_ROOT))
+    if (
+      UPDATE_TEST_FIXTURE &&
+      (!TEST_ONBOARDING ||
+        !process.env.LOGINOM_AI_AGENT_TEST_ROOT ||
+        !isAbsolute(process.env.LOGINOM_AI_AGENT_TEST_ROOT))
+    )
       throw Error("LOGINOM_UPDATE_TEST_PROFILE_REQUIRED")
     if (!TEST_ONBOARDING) return
 

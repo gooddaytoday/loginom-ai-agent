@@ -563,11 +563,20 @@ test("mirror status verifies the signed releases tree without GitHub or legacy C
     await releaseSums(dir)
     await mirrorRelease(m.store, dir, "0.4.0", "unstable", [publicKey])
     const writes = m.events.length
-    expect(await mirrorStatus(m.store, dir, "0.4.0", "unstable", [publicKey])).toMatchObject({
+    const heads = new Map<string, number>()
+    const store = {
+      ...m.store,
+      async head(path: string) {
+        heads.set(path, (heads.get(path) ?? 0) + 1)
+        return m.store.head(path)
+      },
+    }
+    expect(await mirrorStatus(store, dir, "0.4.0", "unstable", [publicKey])).toMatchObject({
       status: "PASS",
       channel: "unstable",
       version: "0.4.0",
     })
+    expect([...heads.values()].every((count) => count === 1)).toBe(true)
     const pointer = m.files.get("unstable/latest.yml.sig")!
     m.files.set("unstable/latest.yml.sig", { ...pointer, bytes: new TextEncoder().encode("invalid") })
     await expect(mirrorStatus(m.store, dir, "0.4.0", "unstable", [publicKey])).rejects.toThrow("metadata")

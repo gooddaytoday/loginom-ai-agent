@@ -343,12 +343,13 @@ export async function mirrorStatus(
   for (const name of names)
     for (const suffix of ["", ".sig"]) {
       const path = `${target}/${name}${suffix}`
+      const info = await store.head(path)
       if (
-        !(await store.head(path)) ||
+        !info ||
         !Buffer.from(await store.get(path)).equals(Buffer.from(await Bun.file(join(dir, name + suffix)).bytes()))
       )
         throw Error(`Mirror metadata differs: ${path}`)
-      if ((await store.head(path))?.cache !== "no-cache") throw Error(`Invalid metadata cache policy: ${path}`)
+      if (info.cache !== "no-cache") throw Error(`Invalid metadata cache policy: ${path}`)
     }
   for (const [name, expected] of [
     ...sums,

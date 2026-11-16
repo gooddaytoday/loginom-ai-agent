@@ -21,12 +21,14 @@ test("only an explicitly built updater fixture trusts its baked key; runtime ove
   )
   try {
     await symlink(dependencies, join(root, "node_modules"), linkType)
-    for (const [requested, release] of [
-      [false, false],
-      [true, false],
-      [true, true],
+    for (const [requested, releaseName, releaseRef] of [
+      [false, false, false],
+      [true, false, false],
+      [true, true, false],
+      [true, false, true],
+      [true, true, true],
     ]) {
-      const fixture = requested && !release
+      const fixture = requested && !releaseName && !releaseRef
       const config = Bun.spawnSync(
         [
           process.execPath,
@@ -41,7 +43,8 @@ test("only an explicitly built updater fixture trusts its baked key; runtime ove
           cwd: import.meta.dir,
           env: {
             ...process.env,
-            GITHUB_WORKFLOW: release ? "release" : "Loginom Windows candidate",
+            GITHUB_WORKFLOW: releaseName ? "release" : "Loginom Windows candidate",
+            GITHUB_WORKFLOW_REF: `owner/repo/.github/workflows/${releaseRef ? "release" : "loginom-windows"}.yml@refs/heads/test`,
             LOGINOM_AI_AGENT_UPDATE_TEST_BUILD: requested ? "1" : "0",
             LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: pem,
           },

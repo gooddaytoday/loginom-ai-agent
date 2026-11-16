@@ -9,7 +9,12 @@ const LOGINOM_AI_AGENT_SERVER_DIST = "../opencode/dist/node"
 
 // Fixture trust is a build input, never a runtime override. Release CI cannot opt in.
 const updateTestKey = (() => {
-  if (process.env.LOGINOM_AI_AGENT_UPDATE_TEST_BUILD !== "1" || process.env.GITHUB_WORKFLOW === "release") return null
+  if (
+    process.env.LOGINOM_AI_AGENT_UPDATE_TEST_BUILD !== "1" ||
+    process.env.GITHUB_WORKFLOW === "release" ||
+    process.env.GITHUB_WORKFLOW_REF?.includes("/.github/workflows/release.yml@")
+  )
+    return null
   const pem = process.env.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY
   if (!pem?.startsWith("-----BEGIN PUBLIC KEY-----") || createPublicKey(pem).asymmetricKeyType !== "ed25519")
     throw Error("LOGINOM_UPDATE_TEST_PUBLIC_KEY_INVALID")
