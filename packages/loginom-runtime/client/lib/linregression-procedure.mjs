@@ -109,16 +109,37 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  await next('input_mapping','normalization');
  const ready=kind=>s=>s.node_linregression?.verified===true&&s.node_linregression.kind===kind;
  const observe=(kind,condition)=>channel.observe({condition,readLinRegression:true,ready:ready(kind)});
- let state=await observe('normalization','complete regression normalizers');const normalization=state.node_linregression;
+ let state=await observe('normalization','complete regression normalizers');const normalization=state.node_linregression,indicators=p.linear_regression?.normalization??[];
  const used=roles.configuration.fields.filter(f=>f.usage_type!==0);
  // Loginom lists predictors before the target, independently of source order.
  need(normalization.fields.length===used.length&&new Set(normalization.fields.map(f=>f.name)).size===used.length
-  &&normalization.fields.every(f=>f.norm_type===0&&used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1),
-  'only unnormalized continuous predictors and target are supported');
+  &&normalization.fields.every(f=>f.norm_type===(indicators.some(n=>n.field===f.name)?7:0)&&used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1),
+  'only unnormalized continuous numeric fields and explicit string indicators are supported');
  if(!preserve&&normalization.source_status==='Не активировано'){
   await channel.perform({condition:'activate connected regression input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
   state=await channel.observe({condition:'regression input activated',readLinRegression:true,ready:s=>ready('normalization')(s)&&s.node_linregression.source_status!=='Не активировано'});
+ }
+ const indicatorReadback=[];
+ for(const wanted of indicators){
+  const field=normalization.fields.find(f=>f.name===wanted.field),base=state.wizard.root_tid+';NormTuneWizard;';
+  await channel.perform({condition:'select exact indicator predictor',initialObservation:state,ready:ready('normalization'),identity:s=>({node:s.prepared_node_context,field}),
+   resolve:s=>({verb:'click',ref:one(s,e=>e.tid===base+'colDisplayName_'+field.name&&e.allowed_actions.includes('click'),'Indicator row unavailable').ref})});
+  const selected=s=>ready('normalization')(s)&&s.node_linregression.indicator?.record_id===field.record_id&&s.node_linregression.indicator.field===wanted.field&&s.node_linregression.indicator.values.length>0;
+  state=await channel.observe({condition:'complete selected indicator values',readLinRegression:true,ready:selected});
+  const initial=state.node_linregression.indicator,reference=base+'NormSettingsForm;DiscreteNormParamsForm;cbxReferenceType';
+  if(initial.reference_type!==0){
+   await channel.perform({condition:'open indicator reference choices',initialObservation:state,ready:selected,identity:s=>({node:s.prepared_node_context,indicator:s.node_linregression.indicator}),
+    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===reference+';trg_picker'&&e.allowed_actions.includes('click'),'Indicator reference picker unavailable').ref})});
+   state=await channel.observe({condition:'native first indicator reference option',readLinRegression:true,ready:s=>selected(s)&&s.ui.elements.some(e=>e.tid===reference+';boundlist;Первое_в_списке'&&e.allowed_actions.includes('click'))});
+   await channel.perform({condition:'select first indicator reference',initialObservation:state,ready:selected,identity:s=>({node:s.prepared_node_context,indicator:s.node_linregression.indicator}),
+    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===reference+';boundlist;Первое_в_списке'&&e.allowed_actions.includes('click'),'First reference unavailable').ref})});
+   state=await channel.observe({condition:'first indicator reference readback',readLinRegression:true,ready:s=>selected(s)&&s.node_linregression.indicator.reference_type===0});
+  }
+  const actual=state.node_linregression.indicator;
+  need(actual.values.filter(v=>v.selected).length===1&&actual.values[0].selected===true&&same(actual.values.map(({selected,...v})=>v),initial.values.map(({selected,...v})=>v)),'first reference category or complete value order differs');
+  need(same(state.node_linregression.fields,normalization.fields),'indicator selection changed normalizers');
+  indicatorReadback.push({field:wanted.field,method:'indicator',reference:'first',reference_value:actual.values[0].value});
  }
  await next('normalization','learn_partition');
  const partition=await configureLinRegressionPartition(channel,p.linear_regression?.partition,{preserve});
@@ -140,6 +161,8 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  }
  need(state.node_linregression.values.pedAutoMethod===false&&state.node_linregression.values.pedRegressionMethod===method&&state.node_linregression.values.pedDenormalize===true,'manual denormalized method is required');
  if(!state.node_linregression.values.pedUseDetailedSettings){await act(state,'show regression intercept settings','pedUseDetailedSettings;ValueControl;DisplayEl',{verb:'set_checked',checked:true});state=await observe('parameters','regression details enabled');}
+ if(indicators.length&&!state.node_linregression.values.pedShowRefCoeffs){await act(state,'show zero reference coefficients','pedShowRefCoeffs;ValueControl;DisplayEl',{verb:'set_checked',checked:true});state=await observe('parameters','reference coefficients enabled');}
+ if(indicators.length)need(state.node_linregression.values.pedShowRefCoeffs===true,'reference coefficients must remain visible');
  await next('lin_regression','lin_regression_details');
  state=await observe('details','regression intercept readback');
  need(state.node_linregression.values.pedIntercept===true&&Object.values(state.node_linregression.switches).every(v=>v===false),'a fixed intercept is required');
@@ -261,5 +284,5 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  if(enter&&statistics==='full')need(details.values.pedPredictionIntervalLevel===95,'full coefficient statistics require the native 95% confidence level');
  await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
- return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso||elastic?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{statistics,confidence_level:details.values.pedPredictionIntervalLevel}),normalization:normalization.fields,partition,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+ return {...roles,configuration:{...roles.configuration,...(preserve?{mode:'apply'}:ridge||lasso||elastic?{mode:request.mode,regularization,epsilon:details.values.pedEpsilon}:selecting?{mode:request.mode,selection,epsilon:details.values.pedEpsilon}:{statistics,confidence_level:details.values.pedPredictionIntervalLevel}),...(indicators.length?{indicators:indicatorReadback,show_reference_coefficients:true}:{}),normalization:normalization.fields,partition,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
