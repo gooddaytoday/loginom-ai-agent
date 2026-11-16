@@ -32,8 +32,9 @@ export function existingOutputExecution(snapshot,node) {
     &&p.progress_state.source==='native_progress_record'&&p.error===false
     &&['not_started','running','not_responding','completed'].includes(p.progress_state.state),
     'Latest native execution failed, was cancelled or has unknown progress');
-  const pending=state.running||state.locked||[last,group].some(p=>p.progress_state.state!=='completed');
-  if(!pending)requireValue(state.active===true&&group.children_loaded===true,'Node output is inactive or stale; execute only on explicit request');
+  const pending=[last,group].some(p=>p.progress_state.state!=='completed');
+  if(!pending)requireValue(state.active===true&&!state.running&&!state.locked&&group.children_loaded===true,
+    'Node output is inactive, locked or stale; no native running execution is proved; execute only on explicit request');
   return {verified:true,owner_verified:true,cleanup_complete:true,effect_possible:false,
     status:pending?'pending':'completed',execution_id:node.document_id+':'+snapshot.root_id+':'+groupId,
     root_id:snapshot.root_id,group_id:groupId,group_record_id:group.record_id,

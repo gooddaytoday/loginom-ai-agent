@@ -87,7 +87,7 @@ for(const running of [false,true])test('production current-output read '+(runnin
  assert.equal(f.launches,0);assert.equal(f.tableActions,0);
 });
 test('native current-output proof refuses stale, cancelled, missing and foreign process evidence',()=>{
- for(const change of [s=>s.native_state.active=false,s=>s.processes[1].owner.node_id='foreign',
+ for(const change of [s=>s.native_state.active=false,s=>s.native_state.locked=true,s=>s.native_state.running=true,s=>s.processes[1].owner.node_id='foreign',
   s=>s.processes[1].error=true,s=>s.processes[0].progress_state.state='cancelled',
   s=>s.processes[1].progress_state.verified=false,s=>s.root_id='',s=>s.node_context.node_id='foreign',
   s=>s.processes.push({...s.processes[1],process_id:'1.2',record_id:'duplicate'})]){
