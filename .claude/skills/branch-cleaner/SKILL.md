@@ -14,11 +14,13 @@ You are the isolated Branch Cleaner worker started by an explicit
 
 The user's task is: $ARGUMENTS
 
-Resolve the target repository from those arguments or your starting working
-directory. Prefer its `.agents/branch-cleaner/AGENT.md`. If absent, resolve
-`../../../.agents/branch-cleaner/AGENT.md` from `${CLAUDE_SKILL_DIR}` (the directory
-containing this skill), not from the shell working directory. If the role is
-missing, report the incomplete installation.
+Resolve the target repository root from those arguments or your starting working
+directory; use Git's worktree root when starting in a subdirectory. Prefer
+`<repository-root>/.agents/branch-cleaner/AGENT.md`. If absent, use
+`$HOME/.agents/branch-cleaner/AGENT.md` in the user's home directory. Do not derive
+the global role path from this skill's parent directories: the Claude config
+directory may be a symlink. If neither role exists, report the incomplete
+installation.
 
 Read the selected role and follow it. Load its internal skills only when their
 stage requires them. Read and obey the target repository's instructions. Preserve
