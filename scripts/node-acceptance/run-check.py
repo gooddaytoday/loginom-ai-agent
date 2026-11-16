@@ -324,6 +324,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if multi else 'task-parallel.md'), data=src.parent / 'capabilities/fixtures', base=None,
                     input_files=['sales-a.xlsx', 'sales-b.xlsx'], expected_name='expected-mask.json' if multi else 'expected-parallel.json',
                     **(dict(lgd_initial='expected-list.json') if multi else {}), oracle=src / 'oracle.py', excel_multi=name)
+    if name in ['excel-import-auto-none', 'excel-import-auto-new', 'excel-import-auto-columns', 'excel-import-auto-types']:
+        kind = name.removeprefix('excel-import-auto-')
+        src = REPO / 'docs/node-development/nodes/imports-excel/acceptance/auto-schema'
+        files = ['types-a.xlsx', 'types-b.xlsx'] if kind == 'types' else ['schema-ab.xlsx', 'schema-abd.xlsx' if kind == 'new' else 'schema-bc.xlsx']
+        return dict(source=src, prompt=src.parent / ('capabilities/task-auto-' + kind + '.md'), data=src.parent / 'capabilities/fixtures', base=None,
+                    input_files=files, expected_name='expected-' + kind + '.json', excel_auto=kind, oracle=src / 'oracle.py', external=True)
     if name == 'excel-import-named':
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance/excel-import-named'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, excel_named_initial='expected-initial.json')
@@ -2449,6 +2455,8 @@ class Runner:
         source_dir = self.source_dir(spec, login)
         if spec.get('text_folder_masks'): prompt = prompt.replace('{{SOURCE_DIR}}', source_dir)
         expected = bind_source_dir(expected_for(spec, package), source_dir)
+        if spec.get('excel_auto'):
+            self.phase('fixture-oracle', [sys.executable, '-B', spec['oracle'], '--check'], folder, timeout=60)
         if spec.get('lgd_empty_variant') or spec.get('lgd_export_compression'):
             for fmt in expected['lgd']['formats']:
                 fmt['destination'] = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + fmt['name'] + '.lgd'
@@ -2787,6 +2795,12 @@ class Runner:
             write(folder / 'binding-events.json', evidence)
             self.phase('filter-bindings-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/filter-bindings.mjs',
                 src / (spec.get('filter_initial') or spec['expected_name']), folder / 'expected.json', folder / 'binding-events.json'], folder, timeout=60)
+        if spec.get('excel_auto'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            evidence.sort(key=lambda event: event.get('recorded_at', ''))
+            write(folder / 'excel-auto-events.json', evidence)
+            self.phase('excel-auto-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/imports-excel-auto.mjs',
+                folder / 'expected.json', folder / 'excel-auto-events.json'], folder, timeout=60)
         if spec.get('excel_named_initial'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))

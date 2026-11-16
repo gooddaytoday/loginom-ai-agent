@@ -1,0 +1,71 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "export_destination": "all.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "B",
+          "label": "B",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "C",
+          "label": "C",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "B": 20,
+          "C": 2
+        }
+      ]
+    }
+  ],
+  "excel_auto": {
+    "mode": "Все",
+    "initial": "schema-ab.xlsx",
+    "file": "schema-bc.xlsx",
+    "initial_output": {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "A",
+          "label": "A",
+          "label_any": true,
+          "type": "integer"
+        },
+        {
+          "name": "B",
+          "label": "B",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "A": 1,
+          "B": 10
+        }
+      ]
+    }
+  }
+}

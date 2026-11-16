@@ -2,16 +2,17 @@ import {importSourceSchema,validateImportSource} from './storage-policy.mjs';
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
- source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion. Omit when bound.'},
+ source_path:{...text(2048),description:'verified .xlsx delivery path; original bytes, no CSV. Omit if bound.'},
  source_paths:{type:'array',items:text(2048),minItems:2,maxItems:16},
  source_mask:text(2048),
  parallel_processing:{type:'boolean'},
  max_threads:{enum:['auto',2,4,8,16,32]},
- sheet_name:{...text(120),description:'Exact worksheet; exclusive with named_range. Omit both=first initially, preserve during source_switch.'},
- named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange: only its columns; exclusive with sheet_name.'},
- extend_range:{type:'boolean',description:'Only with named_range: false/omitted=its bounds; true=its columns to the last populated row.'},
- header_rows:{type:'integer',minimum:1,maximum:1000,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
- columns:{type:'array',minItems:1,maxItems:64,description:'Initial, required: all source columns in order, explicit types (no detection); renaming requires source_name header.',items:object({
+ auto_detect:{enum:['none','new','all'],description:'none keeps positions/types; new adds fields; all redetects names/types, forbids columns. Path-only existing patch: mode, no headers/columns.'},
+ sheet_name:{...text(120),description:'Exact sheet, exclusive with named_range. Omitted: first initially, saved on switch.'},
+ named_range:{...text(120),description:'Exact defined name (SalesRange); its columns only, no sheet_name.'},
+ extend_range:{type:'boolean',description:'named_range only: false/default=its bounds; true=its columns through last populated row.'},
+ header_rows:{type:'integer',minimum:1,maximum:1000,description:'Initial required, usually 1; omit on switch to preserve.'},
+ columns:{type:'array',minItems:1,maxItems:64,description:'Full source-order manual fields; source_name for renaming. Required unless new/all; forbidden for all. Omit on path-only policy patch.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
   type:{type:'string',enum:['string','integer','real','datetime','boolean']},
   data_kind:{type:'string',enum:['Непрерывный','Дискретный']},
@@ -22,7 +23,7 @@ const excelSourceSchema={oneOf:[...importSourceSchema.oneOf,object({kind:{const:
 export const excelParametersSchema=object({
  source:excelSourceSchema,
  excel:excelSettingsSchema,
- source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Existing import after exact XLSX scan and package.save_checkpoint: their IDs; excel only source_path, optional sheet_name. Keeps columns/mapping, reopens, executes once, compares output N with the scan. Never expected_records.'},
+ source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Exact XLSX scan + Save IDs. Existing: source_path, optional sheet_name only; keeps schema/mapping, reopens, executes once, checks scan N. No expected_records.'},
 },['source','excel']);
 // An empty existing Excel patch executes its saved native configuration.
 export const isUnchangedExcelImportExecution=r=>r?.target?.type==='imports.excel'&&r.target.kind==='existing'&&!r.bindings?.length
@@ -52,6 +53,14 @@ export function validateExcelParameters(p,mode,r){
  need(mode==='xlsx'&&p&&Object.keys(p).filter(k=>k!=='source_switch').sort().join(',')==='excel,source','source and excel settings are required, mode xlsx');
  const e=p.excel,list=p.source?.kind==='verified_sources';
  need(e&&Object.keys(e).every(k=>Object.hasOwn(excelSettingsSchema.properties,k)),'unsupported Excel setting');
+ const policy=Object.hasOwn(e,'auto_detect');
+ if(policy){
+  need(['none','new','all'].includes(e.auto_detect),'auto_detect must be none/new/all');
+  need(!list&&!switching&&!r.bindings?.length,'auto_detect requires one literal source without binding/source_switch');
+  need(e.auto_detect!=='all'||e.columns===undefined,'auto_detect all forbids manual columns');
+  need(r.finish==='execute'&&r.read.ports.length===1&&r.read.ports[0]===0&&r.inputs.length===0&&r.mappings.length===0,
+   'auto_detect requires Execute/read output 0, no inputs or mappings');
+ }
  need(list===multiple(e),'source_paths/source_mask require source kind:verified_sources (one ref per file) and vice versa');
  if(list){
   need(!switching&&!r.bindings?.length,'a list or mask cannot use a binding or source_switch');
@@ -79,7 +88,11 @@ export function validateExcelParameters(p,mode,r){
    'source_switch requires an existing Excel import, source_path/sheet_name only, scan/save IDs and executed output 0; no column or mapping edits');
   return;
  }
+ if(policy&&r.target?.kind==='existing'&&e.header_rows===undefined&&e.columns===undefined){
+  need(Object.keys(e).every(k=>['source_path','sheet_name','auto_detect'].includes(k)),'path-only auto_detect patch preserves other settings');return;
+ }
  need(Number.isInteger(e.header_rows)&&e.header_rows>=1&&e.header_rows<=1000,'header_rows must be 1..1000');
+ if(policy&&['new','all'].includes(e.auto_detect)&&e.columns===undefined)return;
  need(Array.isArray(e.columns)&&e.columns.length>=1&&e.columns.length<=64,'1..64 explicit columns are required');
  for(const c of e.columns){
   need(c&&Object.keys(c).every(k=>['source_name','name','label','type','data_kind'].includes(k)),'unsupported column setting');

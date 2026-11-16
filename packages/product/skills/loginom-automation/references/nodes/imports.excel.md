@@ -3,46 +3,49 @@
 <!-- mode: xlsx -->
 ## Режим XLSX: импорт из Excel
 
-Для исходной XLSX-книги используй `imports.excel`, `mode:"xlsx"`.
-`parameters.source` и `excel.source_path` возьми из проверенной доставки;
-в `excel.sheet_name` передай точное имя выбранного листа (включая пробелы и регистр;
-без него — первый лист, при `source_switch` — прежний). `header_rows` — 1–1000, `columns` — полный список из 1–64
-полей в исходном порядке с явными `name`, `label`, `type`.
-Техническое имя — ASCII identifier,
-для другого исходного заголовка укажи `source_name`. Поля справа от видимой
-области тоже включай: мастер прокручивает сетку. NULL сохраняются. Ни для диапазона,
-логического поля, широкой книги или списка не добавляй Калькулятор/JavaScript.
+Исходная XLSX: `imports.excel`, `mode:"xlsx"`, проверенные `parameters.source` и
+`excel.source_path`. `sheet_name` — точное имя листа с пробелами/регистром;
+без него первый, при `source_switch` прежний. `header_rows`: 1–1000;
+`columns`: все 1–64 поля в исходном порядке с `name`, `label`, `type`.
+Имя — ASCII identifier; иной исходный заголовок — `source_name`.
+Поля справа доступны прокруткой. Сохраняй NULL.
+Не добавляй Калькулятор/JavaScript для диапазона, Boolean, ширины или списка.
 
-Именованный диапазон: тот же `dock_node_apply`, `mode:"xlsx"`,
-`parameters.excel.named_range:"SalesRange"` — точное имя, без `sheet_name`.
-`extend_range:false` (default) — строго его границы; `true` — только его
-столбцы до последней заполненной строки. Задай `header_rows` и `columns`
-этого диапазона. Затем `target.kind:"existing"`, прежний `node_id`, те же
-source/настройки и другое `extend_range`: выполни тот же узел. Первый CSV
-выгрузи до изменения. Читай свежий выход: скан листа не доказывает N диапазона.
-Не заменяй диапазон листом.
+Диапазон: `excel.named_range:"SalesRange"` (точное имя, без `sheet_name`).
+`extend_range:false` (default) — его границы; `true` — его столбцы до последней
+заполненной строки. Задай `header_rows`/`columns` диапазона. Меняя расширение,
+используй `existing`, прежний `node_id` и остальные source/настройки.
+Первый CSV выгрузи до изменения. Читай свежий выход: скан листа не доказывает
+N диапазона. Не заменяй его листом.
 
-Логическое поле импортируй тем же `dock_node_apply` (`imports.excel`, `xlsx`):
-в `parameters.excel.columns` укажи `type:"boolean"` и
-`data_kind:"Дискретный"` (также выбирается по умолчанию). Это нативный тип
-«Логический»: сохрани `false`, `true` и `NULL` раздельно. В `exports.text` задай `null_marker:"NULL"`,
-чтобы незаполненное значение в CSV отличалось от ложного.
+Boolean: `columns` с `type:"boolean"`, `data_kind:"Дискретный"` (default).
+Нативный «Логический» сохраняет `false`/`true`/`NULL`; `exports.text` с
+`null_marker:"NULL"` различает пустое и ложное.
 
-XLSX-профиль показывает листы и видимость, declared и наблюдённую размерность,
-систему дат, формулы и cached values; declared dimension не доказывает N.
-`loginom_file_sample` создаёт XLSX с теми же типами и форматами: доставляй как XLSX,
-настраивай по `settings.excel` профиля. Не преобразуй книгу в CSV. Формулы — cached
-values без пересчёта; нет cache — уточни исходник. `settings_complete=false`:
-настройки не готовы; узел поддерживает импорт пустых строк.
+## Схема
 
-Широкую книгу (>12 столбцов) или >10 строк заголовка настраивай так же, полным
-`columns` и фактическим `header_rows`: данные идут после всех строк заголовка, имя
-поля — непустые части заголовка через `_` (в `source_name`, или `name`, если оно
-допустимо). Пагинацию `loginom_file_profile` дочитай
-через continuation. Сверх 64 полей или 1000 строк заголовка сообщи предел и
-запроси нужную область.
+`excel.auto_detect`: `none`=«Нет», `new`=«Только новые», `all`=«Все».
+None сохраняет позиции/типы, new добавляет позиции с определением типа,
+all заново определяет имена/типы: AB→BC при none/new даёт A,B, при all — B,C.
+All запрещает `columns`; new допускает их отсутствие. Новый узел: `header_rows`.
+Смена файла: ТОТ ЖЕ `existing`, новый verified source,
+`excel:{source_path,auto_detect}` без columns/header_rows/mappings сохраняет остальное.
+Один буквальный XLSX, без binding/source_switch. Execute/read [0]: новые поля
+появляются при исполнении. Проверь `auto_detect`/`dynamic_schema`, свежие типы/CSV.
 
-При `source_switch` ([переключение на полный файл](../large-files.md#переключение-на-полный-файл))
+Профиль: листы/видимость, declared/наблюдённая размерность, система дат,
+формулы/cached values; declared dimension не доказывает N.
+`loginom_file_sample` сохраняет типы/форматы XLSX; доставляй как XLSX,
+настройки — `settings.excel`. Без CSV-конверсии и пересчёта формул;
+нет cache — уточни исходник. `settings_complete=false`: настройки не готовы.
+Пустые строки импортируются.
+
+>12 столбцов/>10 строк заголовка: полные `columns`/`header_rows`; данные после
+заголовков, имя — их непустые части через `_` (в `source_name` либо допустимом
+`name`). Дочитай continuation `loginom_file_profile`. Сверх 64 полей/1000 строк
+заголовка сообщи предел и запроси область.
+
+`source_switch` ([полный файл](../large-files.md#переключение-на-полный-файл)):
 передай только `excel:{source_path:"<полная книга>",sheet_name:"<выбранный лист>"}`,
 без columns/header_rows/mappings. Лист, заголовки и политика пустых строк должны
 совпадать с точным XLSX-проходом. Для Excel остаётся отдельный Execute импорта;

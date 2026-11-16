@@ -153,7 +153,7 @@ RULES = (
       'table-tree-dates-variant', 'tree-to-table-typed')),
     (('packages/product/skills/loginom-automation/references/nodes/trees.to_table.md',), ('live-ui',), ('tree-to-table-typed',)),
     ((C + 'exports-excel-*.mjs', 'scripts/node-acceptance/exports-excel*.mjs'), ('live-ui',), ('exports-excel', 'excel-export-xls', 'excel-export-numeric', 'excel-export-replace')),
-    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named', 'excel-import-binding', 'excel-import-multi', 'excel-import-parallel')),
+    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-*.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named', 'excel-import-binding', 'excel-import-multi', 'excel-import-parallel', 'excel-import-auto-none', 'excel-import-auto-new', 'excel-import-auto-columns', 'excel-import-auto-types')),
     ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',
       'docs/node-development/nodes/exports-lgd/acceptance/**'), ('live-ui', 'cold-export'),
      ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),
