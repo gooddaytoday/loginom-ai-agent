@@ -4,6 +4,13 @@ import { copyFile, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/pro
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { generateKeyPairSync, sign } from "node:crypto"
+import { existsSync } from "node:fs"
+
+// build-windows.ps1 uses a hoisted install; Linux CI may use package-local links.
+const dependencies = existsSync(join(import.meta.dir, "node_modules/electron-vite"))
+  ? join(import.meta.dir, "node_modules")
+  : join(import.meta.dir, "../../node_modules")
+const linkType = process.platform === "win32" ? "junction" : "dir"
 
 test("only an explicitly built updater fixture trusts its baked key; runtime overrides cannot change release trust", async () => {
   const root = await mkdtemp(join(tmpdir(), "loginom-update-trust-"))
@@ -13,7 +20,7 @@ test("only an explicitly built updater fixture trusts its baked key; runtime ove
     `version: 0.4.1\nminSupportedVersion: 0.4.0\nstagingPercentage: 100\npath: releases/0.4.1/loginom-ai-agent-win-x64.exe\nsha512: ${Buffer.alloc(64).toString("base64")}\nfiles:\n  - url: releases/0.4.1/loginom-ai-agent-win-x64.exe\n    sha512: ${Buffer.alloc(64).toString("base64")}\n`,
   )
   try {
-    await symlink(join(import.meta.dir, "node_modules"), join(root, "node_modules"), "dir")
+    await symlink(dependencies, join(root, "node_modules"), linkType)
     for (const [requested, release] of [
       [false, false],
       [true, false],
@@ -110,7 +117,7 @@ test("bakes the source commit and ignores only the config loader's temporary fil
   const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim()
   try {
     await copyFile(join(import.meta.dir, "electron.vite.config.ts"), join(root, "electron.vite.config.ts"))
-    await symlink(join(import.meta.dir, "node_modules"), join(root, "node_modules"), "dir")
+    await symlink(dependencies, join(root, "node_modules"), linkType)
     await writeFile(join(root, ".gitignore"), "node_modules\n")
     await writeFile(join(root, "package.json"), '{"type":"module"}\n')
     git("init", "-q")
