@@ -125,7 +125,7 @@ export async function configureSupernodeVariablesBrowser(page,t,readNode,openPor
   const before=await graphReady();
   const result=await openPort(page,{...t,operation_id:t.operation_id+':port',direction:'input',kind:'variables',port:0},readNode);
   effect=result.effect_possible===true;need(result.status==='SUCCEEDED',result.error);opened=true;
-  await guard();let current=await inspect();const wanted=t.parameters.definitions;
+  await guard();let current=await inspect();const wanted=t.parameters.definitions?.map(d=>({name:d.name,type:d.type,value:d.value}));
   if(current.definitions.length||t.parameters.read_only){
    need(current.definitions.length>0,'saved variable definitions required');
    if(wanted)need(JSON.stringify(current.definitions.map(d=>({name:d.name,type:d.type,value:d.value})))===JSON.stringify(wanted),'saved definitions differ; deletion, replacement and reordering are unsupported');

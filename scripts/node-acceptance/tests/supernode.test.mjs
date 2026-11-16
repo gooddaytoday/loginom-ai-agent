@@ -125,3 +125,7 @@ test('variable body requires BOTH observed variable links and converter table ch
   'MF;TF-2;Graph;convert|Output_Data-0|calc|Input_Data-0','MF;TF-2;Graph;calc|Output_Data-0|output|Input_Data-0']};
  assert.equal(checkSupernodeGraph(raw,'calc','convert').calculator,'calc');
 });
+
+test('variable-boundary kit matches its independent oracle',()=>{
+ assert.match(execFileSync('python3',[new URL('variables/oracle.py',expectedDirectory).pathname,'--check'],{encoding:'utf8'}),/OK/);
+});

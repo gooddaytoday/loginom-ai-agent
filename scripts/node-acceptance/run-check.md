@@ -1270,3 +1270,13 @@ and Calculator, converter table → Calculator → OutputNode, and retained inte
 definition IDs/values and input-port GUID across Save/cold. Only task reaches
 the model; no Loop or XML oracle is involved. Cold uses owned port inspection
 with Close, then stock execution/export checks and confirmed package/logout cleanup.
+
+`loop-for-offline` and `loop-for-rest` use the frozen control-loop FOR tasks and
+expected-for-{offline,rest}.json with no input files. Only the task reaches the
+model. Sequential literal count=3 substitutes the saved Page definition 99 with
+0/1/2; Limit remains 2 and native integer IterationId is last. Both require full
+typed output, downloaded CSV, Save and cold execution without configuration.
+The private audit observes the variable boundary GUID/definition IDs, local
+converter/Calculator links (and REST when present), saved FOR and identifiers;
+cold compares those identities after opening the saved package. Regression:
+loop-pages-offline, loop-pages-rest, supernode-vars, supernode-calc, rest-get-plain.

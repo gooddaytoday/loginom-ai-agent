@@ -83,6 +83,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if name in ['loop-for-offline', 'loop-for-rest'] and not cases and not case_root:
+        src = REPO / 'docs/node-development/nodes/control-loop/acceptance'
+        suffix = name.removeprefix('loop-')
+        return dict(source=src, prompt=src / ('task-' + suffix + '.md'), data=src, base=None,
+                    input_files=[], expected_name='expected-' + suffix + '.json', loop_for=True, oracle=src / 'oracle.py')
     if name in ['loop-pages-offline', 'loop-pages-rest'] and not cases and not case_root:
         node = REPO / 'docs/node-development/nodes/control-loop'
         offline = name == 'loop-pages-offline'
@@ -3005,6 +3010,9 @@ class Runner:
         header = spec.get('csv_header', 'names')
         if case == 'text-multi-file-list':
             check_text_multi_file_list(replies)
+        if spec.get('loop_for'):
+            self.phase('loop-for-audit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/supernode-audit.mjs',
+                       folder / 'model.stdout', folder, folder / 'loop-for-audit.json', '--loop-for', *sorted(profile.rglob('execution-events.jsonl'))], folder, timeout=60)
         if spec.get('supernode'):
             self.phase('supernode-audit', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/supernode-audit.mjs',
                        folder / 'model.stdout', src, folder / 'supernode-audit.json', *sorted(profile.rglob('execution-events.jsonl'))], folder, timeout=60)
@@ -3170,6 +3178,12 @@ class Runner:
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
+                        if spec.get('loop_for'):
+                            main = read(stage / 'loop-for-audit.json')
+                            assert cold.get('supernode_variable_boundary') == main['variable_boundary'], 'COLD_LOOP_DEFINITION_IDENTITY'
+                            observed = cold.get('loop_for')
+                            assert observed and all(observed.get(k) == main['configuration'].get(k) for k in ['mode', 'count', 'iteration_identifiers']), 'COLD_LOOP_FOR_SETTINGS'
+                            assert all(observed['variable'].get(k) == main['configuration']['variable'].get(k) for k in ['port_guid', 'definition_id', 'name', 'type']), 'COLD_LOOP_VARIABLE_IDENTITY'
                         if case == 'supernode-vars':
                             assert cold.get('supernode_variable_boundary') == read(stage / 'supernode-audit.json')['variable_boundary'], 'COLD_SUPERNODE_DEFINITION_IDENTITY'
                         r.update(cold='PASS', cleanup='both PASS')

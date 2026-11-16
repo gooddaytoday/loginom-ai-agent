@@ -8,9 +8,26 @@ import {nodeApiTools} from '../lib/node-api.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {selectLoopBodyRecord,loopSettingsSupported,readLoopSourceBrowser} from '../lib/loop-procedure.mjs';
 import vm from 'node:vm';
+import {loopConfigurationReadback} from '../lib/loop-readback.mjs';
 
 const body={document_id:'doc',workflow_id:'wf',node_id:'body'};
 const request={operation_id:'loop',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},target:{kind:'new',type:'control.loop'},inputs:[],parameters:{body},mode:'group_rows',mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:true},budgets:{configure_ms:60000,execute_ms:60000,total_ms:180000}};
+const forParameters={body,count:3,variable:{port_guid:'input-guid',definition_id:7},iteration_identifiers:true};
+test('FOR reaches the production handler with an observed variable definition identity',()=>{
+ const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
+ const r={...request,mode:'for',parameters:forParameters};
+ validateActionParameters(nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema,r);
+ validateNodeApplyRequest(r,handlers);
+ validateLoopParameters({...forParameters,iteration_identifiers:false},'for',r);
+});
+test('FOR refuses unsupported count, identity, flags and external inputs before browser work',()=>{
+ for(const patch of [{count:0},{count:-1},{count:1.5},{count:'3'},{count:{variable:'Count'}},{count:null},
+  {variable:'Page'},{variable:{name:'Page'}},{variable:{port_guid:'input-guid',definition_id:null}},
+  {parallel:true},{ignore_errors:true},{start:1},{step:2},{save_configuration:true},{group_keys:['Page']}])
+  assert.throws(()=>validateLoopParameters({...forParameters,...patch},'for',request));
+ for(const patch of [{inputs:[{input:0}]},{variable_inputs:[{}]},{bindings:[{}]},{mappings:[{}]}])
+  assert.throws(()=>validateLoopParameters(forParameters,'for',{...request,...patch}));
+});
 test('Loop enters the published apply contract and installed handler',()=>{
  const handlers=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyHandlers;
  validateActionParameters(nodeApiTools.find(t=>t.name==='dock_node_apply').inputSchema,request);
@@ -112,4 +129,30 @@ test('reopened single-table body binds an absent native index to its exact rende
  assert.equal(f.run().actual_ports.length,0);
  shapes.get(ports[0].FCell).getAttribute=()=> 'MF;TF-1;Graph;Same;Input_Data-1';
  assert.throws(f.run,/port identity/);
+});
+
+test('FOR source binds the observed variable port GUID, preserving inherited port identities',()=>{
+ const f=sourceFixture();f.task.mode='for';f.task.variables={port_guid:'port0',definitions:[{id:7,index:0,name:'Page',type:'integer',value:99,is_null:false}]};
+ for(const n of [f.source,f.loop])n.FPorts[0].FCollection[0].FSubType=3;
+ assert.equal(f.run().ports[0].kind,'variables');assert.equal(f.run().actual_ports[1].kind,'table');
+ f.task.variables.port_guid='replaced';assert.throws(f.run,/boundary port differs/);
+});
+test('FOR settings retain literal count and both identifier states',()=>{
+ const s={for:true,count:'3',count_literal:true,parallel:false,identifiers:true,ignore_errors:false,save_configuration:false,
+  variable_identity:{port_guid:'input-guid',definition_id:7,type:'integer'}};
+ assert.equal(loopSettingsSupported(s,{...forParameters,mode:'for'}),true);
+ assert.equal(loopSettingsSupported({...s,identifiers:false},{...forParameters,mode:'for',iteration_identifiers:false}),true);
+ for(const patch of [{count:'0'},{count_literal:false},{parallel:true},{ignore_errors:true},{save_configuration:true},{variable_identity:{definition_id:7,type:'real'}}])
+  assert.equal(loopSettingsSupported({...s,...patch},{...forParameters,mode:'for'}),false);
+});
+
+test('FOR result requires independent saved readback with the same variable definition',()=>{
+ const node={...body,node_id:'loop'},variable={port_guid:'input-guid',definition_id:7,name:'Page',type:'integer',proxy:{module:'vars',instance:7}};
+ const ports=[{direction:'input',index:0,guid:'input-guid',label:'Params',kind:'variables'},{direction:'output',index:0,guid:'output-guid',label:'Answers',kind:'table'}];
+ const config={verified:true,mode:'for',node_context:node,body:{ref:body,label:'Body'},input_port:ports[0],settings:{for:true,count:'3',count_literal:true,parallel:false,identifiers:true,ignore_errors:false,save_configuration:false,variable_identity:{...variable,selected:true}}};
+ const phases=['configure','node_finish','output_mapping','finish'].map(phase=>({phase,status:'verified',receipt_id:'created:'+phase,value:{verified:true,cleanup_complete:true,
+  ...(phase==='configure'?{configuration:config,validation:{status:'accepted_by_loginom_next'}}:phase==='output_mapping'?{actual_ports:ports,derived_component:{module:'body',instance:3},saved_configuration:{mode:'for',count:3,iteration_identifiers:true,variable}}:{settings_applied:true})}}));
+ const read=()=>loopConfigurationReadback({node,phases,operation_id:'created'});
+ assert.equal(read().variable.definition_id,7);assert.equal(read().count,3);
+ phases[2].value.saved_configuration.variable={...variable,definition_id:8};assert.throws(read,/saved FOR readback differs/);
 });
