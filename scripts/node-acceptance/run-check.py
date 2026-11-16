@@ -711,6 +711,12 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / ('acceptance/penalty/task-elastic.md' if name == 'linreg-elastic' else 'acceptance/penalty/task-lasso.md'),
                     data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
                     expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
+    if name == 'linreg-categorical':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        src = node / 'acceptance/modes/categorical'
+        return dict(source=src, prompt=src / 'task-categorical.md',
+                    data=node / 'fixtures/modes', input_files=['categorical.csv'], base=None,
+                    expected_name='expected.json', oracle=node / 'acceptance/modes/oracle.py', linreg_forward=True)
     if name == 'linreg-summary':
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         src = node / 'acceptance/modes/summary'

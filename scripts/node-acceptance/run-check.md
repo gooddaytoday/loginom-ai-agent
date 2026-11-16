@@ -1065,6 +1065,14 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-categorical`: C11, исходный task-categorical.md и только categorical.csv.
+Enter, X numeric и дискретная строковая Category с indicator/reference:first,
+видимый нулевой коэффициент опорной A. Неизменённый modes/categorical/expected.json
+проверяет оба полных typed порта: 18 прогнозов и 5 строк коэффициентов, повторяемый
+Name=Category различается по UniqueValues; у A SE/t/p/границы NULL.
+CSV прогнозов, Save, cold без настройки и cleanup — штатные; task/CSV передаются
+модели, oracle/expected остаются приватными.
+
 `linreg-summary`: C8, исходный task-summary.md и только design.csv. Enter с
 константой и всеми X1/X2/X3. Основной прогон требует свежий полный VariablesForm
 из 15 переменных, принадлежащий завершённому исполнению того же узла; существующий
