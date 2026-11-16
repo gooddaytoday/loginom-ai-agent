@@ -6,6 +6,8 @@ import {createJavascriptSourceAdmission, javascriptSourceSettingsDigest} from '.
 import {waitManagedJavascriptCodeSettlement} from '../lib/javascript-managed-code-settlement.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {openManagedJavascriptExistingWizard} from '../lib/javascript-managed-existing.mjs';
+import {makeJavascriptManagedSelectionReadCode} from '../lib/javascript-managed-selection.mjs';
+import {makeJavascriptManagedPageCode} from '../lib/javascript-managed-page.mjs';
 
 const deadline = Date.now() + 60000;
 const prepared = {document_id: 'document', workflow_ref: {workflow_id: 'workflow', prefix: 'MF;TF-1',
@@ -114,22 +116,22 @@ test('source boundary journals only the failed predicate: '+fault,async()=>{
   assert.equal(JSON.stringify(detail).includes('PRIVATE'),false);
   assert.equal(JSON.stringify(refused).includes('diagnostic'),false);
   assert.equal(refused.javascriptSourceBoundary,undefined);
-  assert.deepEqual(f.calls,['type','open','schema'],'no extra browser read or Next on refusal');
+  assert.deepEqual(f.calls,['type','open','page','schema'],'no extra browser read or Next after schema refusal');
   assert.equal(admission.state,'retired');
 });
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
-  schemaOverride,openingFault,
+  schemaOverride,openingFault,fivePage=false,inputTransitionOnce=false,
   settingsAckChanged = false,
   nativeRefusal=false,doneRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
   graphTransientOnce = false, graphTransientDetail = false, graphEffectPossible = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
-  let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft;
+  let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft,inputNextSent=false,columnsNextSent=false,inputTransitionRead=false;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node);
       if(openingFault){const error=Error('opening failed');if(openingFault==='capture')error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
-      return {task};},
+      return {task:structuredClone(task)};},
     dispatchManagedJavascriptGeneration: async () => {calls.push('generation');
       if (generationFails) throw Error('lost generation reply');
       return {status: 'SUCCEEDED', output: {generation_readback_verified: true, schema: {verified: true,
@@ -139,7 +141,9 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       return {verified:true,generation:false,columns:structuredClone(columns),schema:{verified:true,
         generation:{checked:false},grids:[{tid:'grid',fields:[{record_id:'volatile',Name:columns[0].name}]}]}};
     },
-    dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
+    dispatchManagedJavascriptNext: async ({input=false}) => {calls.push(input?'input-next':'next');
+      if(input)inputNextSent=true;else columnsNextSent=true;
+      return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
     dispatchManagedJavascriptCodeNext: async () => {calls.push('code-next');codeNextSent = true;
       return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
     dispatchManagedJavascriptDone: async () => {calls.push('done');doneSent=true;if(doneFails)throw Error('lost Done reply');
@@ -147,7 +151,9 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     closeManagedJavascriptWizard: async ({task}) => {calls.push('close'); if (closeFails||closeRefusalFails) throw Error('lost Close reply');
       return {verified: true, closed: true, node_id: 'node',draft_discarded:task.error_stage==='done'?null:true,settings_applied:task.error_stage==='done'?null:false,execution_started:task.error_stage==='done'?null:false};},
     makeJavascriptSchemaContextCode: () => 'schema',
-    makeJavascriptManagedPageCode: () => 'page',
+    makeJavascriptManagedPageCode: task => {
+      if(fivePage)makeJavascriptManagedPageCode(task);
+      return 'page';},
     makeJavascriptManagedStageCode: () => 'stage',
     waitManagedJavascriptCodeSettlement,
     waitManagedJavascriptDoneSettlement:async()=>{calls.push('done-settlement');return doneRefusal
@@ -155,7 +161,9 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     captureManagedJavascriptWizardError:async({error_stage})=>{calls.push('capture-error');if(captureFails)throw Error('lost error dialog reply');
       return {error_stage,owner:node,source_sha256:handleDraft,dialog_closed:true,native_owner_verified:true};},
     makeJavascriptManagedSourceCode: () => 'source',
-    makeJavascriptManagedSelectionReadCode: () => 'dispose',
+    makeJavascriptManagedSelectionReadCode: task => {
+      if(fivePage)makeJavascriptManagedSelectionReadCode(task);
+      return 'dispose';},
     makeJavascriptExistingGraphTypeCode: () => 'type',
     replaceManagedJavascriptSource: async ({markUncertain,source_text}) => {calls.push('replace');
       if (closeFails) {markUncertain(true); throw Error('lost source write reply');}
@@ -166,12 +174,20 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     calls.push(code);
     if (code === 'type') return {verified: true, node_id: 'node',
       icon_class: wrongType ? 'bg-vendor-icon-calculator' : 'bg-vendor-icon-javascript'};
+    if (code === 'schema' && fivePage && !inputNextSent) return {verified:true,
+      node_context:{...node,verified:true,surface:'wizard'},grids:[]};
     if (code === 'schema') return schemaOverride??{verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: !generationFalse}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if(code==='stage'||code.includes('runManagedJavascriptStageRead'))return {owner:node,native_owner_verified:true,owner_verified:true,wizard_visible:true,
       pending:false,preview_visible:false,boundary_refusal:null,dialog_diagnostic:{visible_count:0,foreign_count:0,roots:[]},mask_diagnostic:{foreign_count:0},
       wizard_error:{visible:codeNextSent&&nativeRefusal||doneSent&&doneRefusal,exact_count:1,tooltip:'SyntaxError: Syntax error at code (:4:33)',
         tid:'MF;TF-1;WizrdMCF;btnError',tooltip_truncated:false},page_tid:codeNextSent&&!nativeRefusal?'MF;TF-1;WizrdMCF;DoneWizard':'MF;TF-1;WizrdMCF;JavaScriptCodeWizard'};
+    if(code==='page'&&fivePage&&inputTransitionOnce&&inputNextSent&&!columnsNextSent&&!inputTransitionRead){
+      inputTransitionRead=true;throw Error('Managed JavaScript page not ready');}
+    if(code==='page'&&fivePage)return {ready:true,node_guid:'node',page:{
+      tid:'MF;TF-1;WizrdMCF;'+(!inputNextSent?'TuneDataSourceInputPortWizard':!columnsNextSent?'JavaScriptColumnsWizard':codeNextSent?'DoneWizard':'JavaScriptCodeWizard'),
+      index:!inputNextSent?0:!columnsNextSent?1:codeNextSent?4:2,indicator_count:5,
+      visible_editors:columnsNextSent&&!codeNextSent?1:0}};
     if (code === 'page') return {ready: true, node_guid: 'node',
       page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
         : pageTransientOnce && pageReads++ === 0
@@ -212,9 +228,25 @@ test('managed source adapter admits full source after owned open/schema/Next/thr
   assert.equal(receipt.intent, 'preserve');
   assert.equal(receipt.previous_source.source_utf8_bytes, Buffer.byteLength(source, 'utf8'));
   assert.ok(!JSON.stringify(receipt).includes(source));
-  assert.deepEqual(f.calls, ['type', 'open', 'schema', 'next', 'page', 'source', 'source', 'source', 'close', 'dispose']);
+  assert.deepEqual(f.calls, ['type', 'open', 'page', 'schema', 'next', 'page', 'source', 'source', 'source', 'close', 'dispose']);
   assert.equal(f.events.filter(event => event.phase === 'source_delivery_verified').length, 1);
   assert.equal(f.events.filter(event => event.phase === 'source_discard_settled').length, 1);
+});
+
+test('five-page source read discards its owned draft and disposes the original selection lease',async()=>{
+ const f=fixture({fivePage:true,inputTransitionOnce:true});
+ const admission=createJavascriptSourceAdmission({kind:'existing',owner,deadline,
+  sourceAdapter:f.sourceAdapter,redactor:createRedactor(),record:f.record});
+ const receipt=await admission.admit({});
+ assert.equal(receipt.intent,'preserve');
+ assert.equal(f.calls.filter(c=>c==='input-next').length,1);
+ assert.equal(f.calls.filter(c=>c==='next').length,1);
+ assert.equal(f.calls.filter(c=>c==='source').length,3);
+ assert.equal(f.calls.filter(c=>c==='close').length,1);
+ assert.equal(f.calls.filter(c=>c==='dispose').length,1);
+ assert.equal(f.calls.indexOf('input-next')<f.calls.indexOf('schema'),true);
+ assert.equal(f.calls.includes('code-next'),false);
+ assert.equal(f.calls.includes('done'),false);
 });
 
 test('managed source adapter refuses owner drift before any UI action', async () => {
@@ -294,6 +326,18 @@ test('managed source commit uses one Code Next and Done and settles the same gra
   assert.equal(adapter.uncertain,false);assert.equal(adapter.active,false);
   assert.deepEqual(f.calls.filter(call=>['code-next','done','graph','dispose'].includes(call)),
     ['code-next','done','graph','dispose']);
+  await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/handle unavailable/);
+});
+
+test('five-page source mutation commits one owned Code Next and Done and disposes its lease',async()=>{
+  const f=fixture({fivePage:true,inputTransitionOnce:true}),adapter=await f.sourceAdapter();
+  const handle=await adapter.open({owner,deadline});
+  await adapter.replace(handle,{owner,deadline,expected_source_sha256:'0'.repeat(64),source_text:'// changed\n'});
+  const result=await adapter.commit(handle,{owner,deadline});
+  assert.equal(result.owned_done_settled,true);assert.equal(result.execution_started,null);
+  assert.equal(adapter.uncertain,false);assert.equal(adapter.active,false);
+  assert.deepEqual(f.calls.filter(call=>['input-next','next','replace','code-next','done','graph','dispose'].includes(call)),
+    ['input-next','next','replace','code-next','done','graph','dispose']);
   await assert.rejects(()=>adapter.commit(handle,{owner,deadline}),/handle unavailable/);
 });
 

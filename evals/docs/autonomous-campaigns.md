@@ -326,3 +326,38 @@ zombie-состоянием родителя с живыми потоками и
 Production cleanup дождался ребёнка и двух пустых drain-проверок.
 `bun typecheck` прошёл. Полный набор остаётся FAIL; отдельные успешные повторы
 не заменяют его результат.
+
+
+## Повтор пилота после исправления JavaScript wizard
+
+16 ноября LAB-1713 проверил те же три кейса с отдельной prod CLI
+`0.3.9-eval.20261116.05cc4f8a81`, source `05cc4f8a81`. Harness `ab66bfd0cf`
+и корпус сохранены. `pins.sourceSha` остаётся CORPUS_SOURCE `29ea34e27b`;
+происхождение CLI подтверждают отдельные binary/manifest hashes и
+`cli-manifest.metadata.sourceCommit`. Подмена corpus source SHA на CLI SHA
+нарушает существующую проверку `CORPUS_SOURCE`.
+
+`calc-data-double`, `filter-active-rows` и `local-lgp-edit` получили по 100/PASS,
+настоящему LGP и одному вердикту судьи. Три измерительные попытки из лимита
+четыре; CLI exit 0, очистка подтверждена для каждой. Старый результат LAB-1564
+с `no_artifact` сохранён. Исправление учитывает пустую Input-страницу
+пятистраничного JS wizard и освобождение selection lease; требования Host
+ACK, clean exit, Close и package cleanup сохранены. Во всех трёх измерениях
+проверены именно Loginom runtime ACK и exit 0; исходный LGP совпал с immutable
+input и квитанцией загрузки, его штатная очистка подтверждена.
+
+EvalOps самостоятельно создал request/manifest/два wakeup, восстановил launch
+через штатный verify после `POOL_POLICY_ACTIVE`, затем выполнил контрольный
+repair/resume с admissions=0. Обычные партии и сдачу провела служба.
+После назначения внешних вмешательств не было. Результат передан в
+`in_review`, EvalBaseline ответил в исходную ветку отчёта; оба правила выключены,
+controller и batch завершены, owner освобождён. Независимый аудит подтвердил
+сохранность 147 прежних файлов и пяти чужих reservations. Архив: 751028 байт, SHA-256
+`95f94df8f0a271e701946e7c33bf0329e070ebca75bad19ad62fa84c53d44f39`.
+
+Для runtime-исправления прошли 525 проверок клиента, 41 проверка Host и
+typecheck пакета Host; независимое ревью принято. Код harness не менялся, новый
+полный suite не запускался: прежний полный FAIL выше не переименован в PASS.
+Подробности и финальная приёмка — в
+[плане повторного пилота](../../docs/superpowers/plans/2026-11-16-host-cleanup-pilot.md).
+Полный корпус и общий выпуск продукта этим малым пилотом не подтверждаются.
