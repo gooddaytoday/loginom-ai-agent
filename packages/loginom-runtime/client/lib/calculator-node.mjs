@@ -72,7 +72,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
    const verb=mode==='execute'?'execute_wizard':'finish_wizard',key=mode==='execute'?'btnExecute':'btnDone';
    // Complete definition paging leaves the grid on its last addressed page.
    const offset=definition?Math.floor((definition.total_columns-1)/8)*8:0;
-   const s=await channel.observe({condition:'calculator '+mode+' available',...(port?{outputColumnPage:{offset,limit:8}}:{}),ready:s=>s.wizard?.status==='observed'&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb))});
+   const s=await channel.observe({condition:'calculator '+mode+' available',...(port?{outputColumnPage:{offset,limit:8},...(implementation?.type==='imports.excel'?{readMappings:true}:{})}:{}),ready:s=>s.wizard?.status==='observed'&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb))});
    if(recovery){
     const direction=recovery===outputCheckpoint?'output':'input';
     requireValue(s.wizard.stage===direction+'_mapping'&&sameInputRecovery(s.prepared_node_context,recovery.value.native_mapping.node_context),'Mapping owner changed before Done');

@@ -294,6 +294,15 @@ exact-schema `source_switch` сохранены. Path-only existing patch сох
 `scripts/node-acceptance`; исходные task/fixtures/expected контейнера не менялись.
 Native-проба не является CLI/cold/2 из 3 PASS.
 
+Первый CLI C8 None на `2f4ec0c3` выявил отказ завершения отдельного выходного
+порта: `execution-events.jsonl:132` содержит verified native mapping/owner,
+но `:135–201` при `calculator done available` уже не читает mapping, и видимая
+`btnDone` теряет `finish_wizard`. После browser recovery значения AB/BC верны,
+но первоначальный apply не завершён, поэтому audit не засчитывает такой результат.
+В общем finisher только Excel output port получает `readMappings:true`;
+остальные типы и проверки owner/Done сохранены. Повторная CLI/cold приёмка
+выполняется на новом чистом SHA; первая попытка остаётся продуктовым FAIL.
+
 ### Размеры и критерии для утверждения
 
 На базе назначения `node --test test/model-schema-budget.test.mjs`:
