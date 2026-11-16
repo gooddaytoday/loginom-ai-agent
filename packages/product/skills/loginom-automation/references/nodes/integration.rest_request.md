@@ -45,8 +45,9 @@ parameters:{}, inputs:[], variable_inputs:[], mappings:[], finish execute.
 connection.response_content_type: application/json, text/html, text/plain, */* —
 допустимый MIME ответа. Response — строка; Content-Type запроса может иметь charset=UTF-8.
 GET без query: query_parameters:[], inputs:[], finish execute; без таблицы/URL-кодировщика.
-Query переменных: variables.to_table → Калькулятор integer→string;
-limit/skip исходника — integer. Статусы/ошибки: read.ports:[1] —
+Query: string или integer (±9007199254740991); real/boolean запрещены.
+Integer limit/skip после variables.to_table — напрямую: обработчик кодирует
+query. Body — только string. Статусы/ошибки: read.ports:[1] —
 HttpStatusCode/ErrorCode/ErrorDesc; порт 0 — тело/разбор.
 200 ≠ тело; ограничь select, limit/skip по API, без gzip.
 Пустой Response: порт 1; ErrorCode ≠ 0 → REST_RESPONSE_BODY_MISSING:

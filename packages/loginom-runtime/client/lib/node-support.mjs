@@ -165,7 +165,8 @@ export function createCandidateNodeSupport(config) {
   }
   throw Error('No candidate driver for '+type);
   })();
-  return {...drivers,...(['imports.text','imports.excel'].includes(type)&&readOnly&&options.operation.parameters.finish==='execute'?{async beforeTarget(ctx){
+  return {...drivers,...(['imports.text','imports.excel'].includes(type)&&readOnly&&options.operation.parameters.finish==='execute'
+    ?{async beforeTarget(ctx){
    const value=await drivers.beforeTarget?.(ctx);
    const prepared=await prepareImportBinding(options,ctx,config,{saved:true,...(type==='imports.excel'?excelBindingHooks:{})});
    if(prepared){
