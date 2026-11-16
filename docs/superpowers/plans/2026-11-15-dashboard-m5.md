@@ -10,7 +10,7 @@
 
 **Spec:** [Принятый дизайн M5](../specs/2026-11-15-dashboard-m5-design.md), [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md), [изоляция](../../security/dashboard-isolation.md).
 
-Статус: выполнение разрешено владельцем 15 ноября 2026 года; Tasks 0–3 приняты: Spec Approved и Quality Approved, обязательных замечаний нет. Task 4: установленный rootless путь подтверждён; 16 ноября владелец принял проверенные современные версии как нижнюю границу поддержки Dashboard. Документы синхронизированы; итоговый scoped gate Task 4 пройден: Spec ✅ / Quality Approved, mandatory 0. Начат только source/CI/build-context срез Task 5a; установленная приёмка Task 5 и M5 не завершены. Уточнение входа ниже принято независимым ревью до сборки; остальные требования M5 сохранены. План прошёл независимое ревью — Approved, неразрешённых замечаний нет. Ход исполнения — [checkpoint M5](../../testing/loginom-ai-agent/dashboard-m5-checkpoint.md).
+Статус: выполнение разрешено владельцем 15 ноября 2026 года; Tasks 0–3 приняты: Spec Approved и Quality Approved, обязательных замечаний нет. Task 4: установленный rootless путь подтверждён; 16 ноября владелец принял проверенные современные версии как нижнюю границу поддержки Dashboard. Документы синхронизированы; итоговый scoped gate Task 4 пройден: Spec ✅ / Quality Approved, mandatory 0. Source/CI/build-context срез Task 5a принят после scoped re-review; установленный срез Task 5b частично выполнен. 16 ноября владелец приостановил работу в безопасной точке; Task 5 и M5 не завершены. Уточнение входа ниже принято независимым ревью до сборки; остальные требования M5 сохранены. План прошёл независимое ревью — Approved, неразрешённых замечаний нет. Ход исполнения — [checkpoint M5](../../testing/loginom-ai-agent/dashboard-m5-checkpoint.md).
 
 ## Global Constraints
 
@@ -167,7 +167,7 @@ M4 окончательно принят: [checkpoint M4](../../testing/loginom-
 
 ### Task 5: Обновление и итоговая установленная приёмка
 
-**Срез Task 5a:** source/CI/dev build-context PASS, browser 246/246 с concurrency 2; fix round 1 сохраняет один ожидаемый selfcheck close outcome и проверяет обе фазы отмены. Scoped re-review замечания P2 ещё впереди; установленная приёмка, точный release-архив и остальные пункты Task 5 открыты. Подробности и идентичности — [runbook M5](../../testing/loginom-ai-agent/dashboard-m5.md#task-5a--source-ci-и-dev-build-context).
+**Срез Task 5a:** source/CI/dev build-context PASS, browser 246/246 с concurrency 2; fix round 1 сохраняет один ожидаемый selfcheck close outcome и проверяет обе фазы отмены. Scoped re-review пройден, замечание P2 закрыто. Установленный срез Task 5b частично выполнен и приостановлен; его незакрытые пункты перечислены в checkpoint. Подробности и идентичности — [runbook M5](../../testing/loginom-ai-agent/dashboard-m5.md#task-5a--source-ci-и-dev-build-context).
 
 **Files:** runbook/checkpoint/README, owning AGENTS.md, roadmap; `.github/workflows/test.yml`, package scripts/tests — только необходимые итоговые подключения.
 
