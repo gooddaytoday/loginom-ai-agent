@@ -888,6 +888,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task-variables-update.md' if update else 'task-variables.md'),
                     data=src.parent / 'fixtures', input_files=['variables.csv'], base=None,
                     expected_name='expected.json' if update else 'expected-initial.json', oracle=src / 'oracle-variables.py')
+    if name == 'calculator-vars-saveas':
+        # LAB-1729: Save As with reopen, then continue in the reopened package (#986 cleanup).
+        src = REPO / 'docs/node-development/nodes/calculator/acceptance'
+        return dict(source=src, prompt=REPO / 'scripts/node-acceptance/scenarios/calculator-vars-saveas/task.md', data=src.parent / 'fixtures',
+                    input_files=['variables.csv'], base=None, expected_name='expected.json',
+                    oracle=src / 'oracle-variables.py', reopened_cleanup=True)
     if name == 'calculator-expression-options':
         src = REPO / 'docs/node-development/nodes/calculator/acceptance'
         return dict(source=src / 'modes', prompt=src / 'task-expression-options.md', data=src.parent / 'fixtures',
@@ -2907,6 +2913,14 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if spec.get('reopened_cleanup'):
+            # #986: the final cleanup must bind the package reopened by Save As.
+            assert any(save_confirmed(spec, o, package) and o.get('action_key') == 'package.save_as'
+                       and o.get('output', {}).get('reopened') is True for _, o in replies), 'SAVE_AS_REOPEN_MISSING'
+            bindings = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)
+                        if event.get('phase') == 'reopened_package_cleanup_binding']
+            assert any(b.get('accepted') is True and b.get('package_path') == package for b in bindings), 'REOPENED_CLEANUP_BINDING_MISSING'
+            self.current['cleanup'] = 'main PASS (reopened binding)'
         if spec.get('text_folder_masks'):
             self.current.update(folder_source_metrics(events))
             check_text_folder_masks(replies, source_dir, spec['data'], expected, build / 'resources/loginom/bin/node')
