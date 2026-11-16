@@ -9,6 +9,7 @@ import {readSupernodeVariablesBrowser,readSupernodeBrowser} from '../lib/superno
 import {nodeApiTools} from '../lib/node-api.mjs';
 import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
+import {isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
 import {actions} from './support/executor-fixture.mjs';
 
 const boundary={input:{kind:'table',name:'Input',label:'Исходные данные',requirement:'required'},output:{kind:'table',name:'Output',label:'Результат'}};
@@ -36,6 +37,15 @@ test('integer variable boundary passes the public schema and production prefligh
  assert.throws(()=>validateSupernodeParameters({boundary},r.mode,r));
  assert.throws(()=>validateSupernodeParameters({boundary:variableBoundary},'tabular_boundary',r));
  assert.throws(()=>validateSupernodeParameters(r.parameters,r.mode,{...r,inputs:[{source:ref,input:0,output:0}]}));
+});
+
+test('both saved Supernode modes execute through the native read path without reapplying settings',()=>{
+ const r={...request,target:{kind:'existing',type:'control.supernode',ref},parameters:{},finish:'execute'};
+ for(const mode of ['tabular_boundary','variable_boundary']){
+  assert.equal(isUnchangedTransformExecution({...r,mode}),true);
+  assert.equal(isUnchangedTransformExecution({...r,mode,parameters:{boundary:mode==='tabular_boundary'?boundary:variableBoundary}}),false);
+  assert.equal(isUnchangedTransformExecution({...r,mode,finish:'done'}),false);
+ }
 });
 
 test('native output boundary passes executor admission without enabling execution, reads or replay',async()=>{
