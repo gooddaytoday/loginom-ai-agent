@@ -1200,7 +1200,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
-          &&['bg-vendor-icon-ungroupdata','bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression','bg-vendor-icon-corranalysis','bg-vendor-icon-logregression','bg-vendor-icon-coarseclasses','bg-vendor-icon-assnrules'].includes(preparedInputPort.node_icon_class)
+          &&['bg-vendor-icon-ungroupdata','bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-columnflipping','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression','bg-vendor-icon-corranalysis','bg-vendor-icon-logregression','bg-vendor-icon-coarseclasses','bg-vendor-icon-assnrules'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===workflowDepth+4&&crumbs[workflowDepth].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
         const hiddenInputNode=e=>singleInputOverflow&&inputOverflowOwner(e)
           &&(!globalThis.bg?.app?.ModelNodeTreeNode||nativeOverflowNode(e))
@@ -1211,8 +1211,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const joinInputOverflow=preparedInputPort?.direction==='input'&&[0,1].includes(preparedInputPort.port)
           &&preparedInputPort.native_index===preparedInputPort.port&&['bg-vendor-icon-joindata','bg-vendor-icon-ungroupdata'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===workflowDepth+4&&crumbs[workflowDepth].querySelectorAll('.bg-vendor-icon-joindata,.bg-vendor-icon-ungroupdata').length===1;
-        const colUnionInputOverflow=preparedInputPort?.direction==='input'&&[0,1].includes(preparedInputPort.port)
+        const colUnionInputOverflow=preparedInputPort?.direction==='input'&&[0,1,2].includes(preparedInputPort.port)
           &&preparedInputPort.native_index===preparedInputPort.port&&preparedInputPort.node_icon_class==='bg-vendor-icon-coluniondata'
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
           &&crumbs.length===workflowDepth+4&&crumbs[workflowDepth].querySelectorAll('.bg-vendor-icon-coluniondata').length===1;
         const restInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0
           &&preparedInputPort.native_index===2&&preparedInputPort.node_icon_class==='bg-vendor-icon-restclient'

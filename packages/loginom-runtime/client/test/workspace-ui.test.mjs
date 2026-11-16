@@ -5356,6 +5356,39 @@ async function calculatorNodeOverflowFixture() {
   return {page,crumbs,nodeTree,component,wizard,binding};
 }
 
+test('LAB-1760 input Done retains the native ColUnion third port and hidden Collapse owner',async()=>{
+ // LAB-1693 guide-c5-2:2443 and guide-reg-vars:1123: input2 and Settings
+ // overflow at 1280x800. LAB-1714 C2/collapse-null-ignore:1446 also hides
+ // the input folder after the long saved node caption.
+ for(const vendor of ['colunion','collapse'])for(const fault of ['none','native_index','icon','guid','opening','caption','unverified',...(vendor==='collapse'?['owner']:[])]) {
+  const {page,crumbs,binding}=await calculatorNodeOverflowFixture();
+  const port=vendor==='colunion'?2:0,icon=vendor==='colunion'?'bg-vendor-icon-coluniondata':'bg-vendor-icon-columnflipping';
+  const caption=vendor==='colunion'?'Присоединяемая таблица 2':'Входной источник данных';
+  for(const c of crumbs.slice(7))c.attrs['data-tid']=c.attrs['data-tid'].replace('Входной_источник_данных',caption.replaceAll(' ','_'));
+  crumbs[7].ownText=caption;crumbs[5].children[0].attrs.class=icon;
+  Object.assign(binding.input_port,{port,native_index:port,node_icon_class:icon});
+  if(vendor==='colunion') {
+   // The captured node and input folder are visible; only the port and Settings overflow.
+   for(const [i,x,width] of [[5,656,251],[6,908,142]]){
+    crumbs[i].style.display='';crumbs[i].box={x,y:41,width,height:24};
+    for(const icon of crumbs[i].children)icon.box={x:x+1,y:42,width:16,height:16};
+   }
+  }
+  if(fault==='native_index')binding.input_port.native_index=3;
+  if(fault==='icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-unknown';
+  if(fault==='guid')delete binding.input_port.port_guid;
+  if(fault==='opening')delete binding.input_port.opening_operation_id;
+  if(fault==='caption')crumbs[7].ownText='Присоединяемая таблица 1';
+  if(fault==='owner')binding.navigation_node.label+=' foreign';
+  if(fault==='unverified')binding.verified=false;
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  const done=r.output?.ui?.elements?.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.equal(done?.allowed_actions.includes('finish_wizard')===true,fault==='none',vendor+':'+fault);
+  if(fault==='none')assert.equal(r.output.wizard.input_port_context.status,'observed');
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('D52b opened native node wizard retains its complete long workflow ancestry',async()=>{
  // l443f-d52b2:840: native Group wizard opens, but its owner_context is lost.
  for(const hidden of [0,1,2,3,4])for(const fault of ['none','visible_label','path','native','binding','component','visibility','opacity','duplicate','panel']){
