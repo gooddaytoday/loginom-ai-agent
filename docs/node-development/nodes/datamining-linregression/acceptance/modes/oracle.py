@@ -230,7 +230,8 @@ def expected(rows, b, fields, *, full_statistics=False, summary=False, train_row
              rows=coeff, ordered=True)])
     if summary:
         result['variable_inventory'] = dict(outputs=[dict(node=dict(type='datamining.lin_regression'),
-            port=2, ordered=True, variables=[dict(name=k, type='integer' if isinstance(v, int) else 'real', value=v,
+            # Third physical output, ordinal zero among variable outputs (native C8 probe).
+            port=0, ordered=True, variables=[dict(name=k, type='integer' if isinstance(v, int) else 'real', value=v,
             **({} if isinstance(v, int) else {'tolerance': TOL})) for k, v in values.items()])], links=[])
     return result
 

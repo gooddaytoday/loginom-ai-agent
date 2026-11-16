@@ -6,6 +6,16 @@
 
 ## Текущий срез v0.4.0
 
+LAB-1695, C8: сводка качества доступна существующим `read.variable_ports:[0]`
+после Execute. Сводка — третий физический выход, но первый среди выходов
+переменных: API использует раздельные ordinals. Native-проба 7.4.2 подтвердила
+полный свежий VariablesForm: TotalSamples, TotalSelectedSamples, TrainSamples,
+LogLikelihood, R2, AdjustedR2, StdDev, DFE, ModelDF, FStatistic, AIC, AICc, BIC,
+HQC, ModelPValue. Счётчики и степени свободы — Integer, остальные — Real.
+На design.csv Enter с X1/X2/X3: R²≈0.985507, F≈272, DFE=12; численный oracle
+не менялся. `linreg-summary` проверяет чтение модели и cold тем же matcher,
+оба табличных порта, CSV, Save и cleanup; oracle/expected не передаются модели.
+
 LAB-1576, C6: Enter поддерживает последовательное разбиение в строках через
 `linear_regression.partition:{method:"sequential",train_count:16,test_count:2}`.
 Первые 16 строк обучают, следующие 2 получают прогноз без участия в обучении.

@@ -89,6 +89,9 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-offline.md' if offline else 'task.md'),
                     data=node / 'fixtures', base=None, input_files=['pages.csv'],
                     expected_name='expected-offline.json' if offline else 'expected.json', oracle=node / 'acceptance/oracle.py')
+    if name == 'supernode-vars' and not cases and not case_root:
+        src = REPO / 'docs/node-development/nodes/control-supernode/acceptance/variables'
+        return dict(source=src, prompt=src / 'task.md', data=src, base=None, input_files=[], supernode=True, oracle=src / 'oracle.py')
     if name == 'supernode-calc' and not cases and not case_root:
         node = REPO / 'docs/node-development/nodes/control-supernode'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task.md', data=node / 'fixtures',
@@ -662,6 +665,13 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / ('acceptance/penalty/task-elastic.md' if name == 'linreg-elastic' else 'acceptance/penalty/task-lasso.md'),
                     data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
                     expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
+    if name == 'linreg-summary':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        src = node / 'acceptance/modes/summary'
+        return dict(source=src, prompt=src / 'task-summary.md',
+                    data=node / 'fixtures/modes', input_files=['design.csv'], base=None,
+                    expected_name='expected.json', oracle=node / 'acceptance/modes/oracle.py',
+                    linreg_forward=True, linreg_summary=True)
     if name == 'linreg-partition-sequential':
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         src = node / 'acceptance/modes/partition-sequential'
@@ -749,11 +759,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['normalization.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py', logreg_normalization=True,
                     cold_expected_name='cold/expected.json', export_count=2)
-    if name in ['sorting-locale', 'sorting-case', 'sorting-threads', 'sorting-auto']:
+    if name in ['sorting-locale', 'sorting-case', 'sorting-threads', 'sorting-auto', 'sorting-variant']:
         node = REPO / 'docs/node-development/nodes/sorting'
         src = node / 'acceptance/modes'
         return dict(source=src, prompt=src / ('task-' + name.removeprefix('sorting-') + '.md'), data=node / 'fixtures', base=None,
-                    input_files=['modes.csv'], export_count=2, sorting_case=name.removeprefix('sorting-'))
+                    input_files=['variant-wide.csv' if name == 'sorting-variant' else 'modes.csv'], export_count=2, sorting_case=name.removeprefix('sorting-'))
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -1009,6 +1019,8 @@ def scenario(name, case_root=None, *, cases=None):
 
 def sorting_stages(case):
     # Independent oracle: one ordered table per saved/exported stage, last = final node state.
+    if case['sorting_case'] == 'variant':
+        return read(case['source'] / 'expected-variant.json')['outputs'] * 2
     stages = json.loads(subprocess.check_output([sys.executable, '-B', str(case['source'] / 'oracle.py')]))['cases'][case['sorting_case']]['stages']
     return [dict(stage, column_order='exact') for stage in stages]
 
@@ -1246,6 +1258,9 @@ def expected_for(case, package, cold=False):
         stages = read(src / 'expected.json')['cases'][case['grouping_case']]['stages']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}], outputs=[stages[-1]])
     if case.get('sorting_case'):
+        if case['sorting_case'] == 'variant':
+            return dict(read(src / 'expected-variant.json'), package_path=package,
+                        sorting_mode='variant', sorting_stages=sorting_stages(case))
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
                     outputs=[sorting_stages(case)[-1]], **(dict(sorting_mode=case['sorting_case'], sorting_stages=sorting_stages(case)) if case['sorting_case'] != 'locale' else {}))
     if case.get('sampling_uniform'):
@@ -2801,6 +2816,12 @@ class Runner:
             assert self.current.get('tree-read') == 'PASS', 'TREE_READ_MISSING'
             self.current['csv'] = '— (tree)'
             return session, expected, None, None
+        if spec.get('linreg_summary'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            write(folder / 'linreg-summary-events.json', evidence)
+            self.phase('linreg-summary-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                'linreg-summary', folder / 'expected.json', folder / 'linreg-summary-events.json'], folder, timeout=60)
+            self.current['summary-read'] = 'PASS'
         if spec.get('variable_only'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
@@ -3194,6 +3215,8 @@ class Runner:
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
+                        if case == 'supernode-vars':
+                            assert cold.get('supernode_variable_boundary') == read(stage / 'supernode-audit.json')['variable_boundary'], 'COLD_SUPERNODE_DEFINITION_IDENTITY'
                         r.update(cold='PASS', cleanup='both PASS')
                         if spec.get('fs_case'):
                             self.fs_files(spec, folder, login, build, 'fs-cold')
