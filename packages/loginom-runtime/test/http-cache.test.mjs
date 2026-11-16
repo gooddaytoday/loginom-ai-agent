@@ -38,8 +38,10 @@ test('validation reuses HTTP bytes with fresh cookies and authenticates every ne
     profile:join(root,'profile-'+number),httpCachePath:join(root,'http-cache'),headless:true,
     candidate:{url:`http://127.0.0.1:${http.address().port}/app/`,username:'user',password},
     // This verifies cache/auth isolation, not Windows runner startup latency.
-    // Both successful profiles must have time to launch under parallel CI load.
-    deadline:Date.now()+(password==='fixture-password'?20000:3000),
+    // Every profile, including the rejected one, must have time to launch under
+    // parallel CI load: a rejection is only reported once the form was submitted,
+    // so a deadline that expires during startup turns it into UNAVAILABLE.
+    deadline:Date.now()+20000,
     onContextCreated:async context=>{initialCookies.push((await context.cookies()).length);},onPhase:event=>events.push(event)});
   assert.deepEqual(await run(1),{authenticated:true});
   assert.deepEqual(await run(2),{authenticated:true});
