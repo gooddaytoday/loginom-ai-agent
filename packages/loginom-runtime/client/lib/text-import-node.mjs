@@ -107,6 +107,15 @@ export function previewImportFirstFormRefusal(request,history) {
   if(!own.length||!own.every(h=>h.request.finish==='close'||h.outcome?.status==='NOT_APPLIED')
     ||!own.some(h=>h.request.target.kind==='new'&&h.request.parameters?.preview_only===true&&h.outcome?.status==='SUCCEEDED'
       &&h.outcome.output?.configuration?.status==='discarded'))return null;
+  // The native file page refuses Next on an empty literal path; a variable
+  // binding cannot supply the first saved source.
+  if(request.bindings?.length){
+    const path=own.map(h=>h.request.parameters?.settings?.source?.source_path).find(p=>typeof p==='string');
+    return 'Invalid bindings: this Import was only previewed (Close), so it has no saved source; a binding cannot set its first file '
+      +'(native «Имя файла не может быть пустым»). Nothing was changed. On the SAME node: 1) NEW operation_id, bindings:[], same parameters.source, '
+      +'complete settings with settings.source.source_path '+(path?JSON.stringify(path):'= the verified file path')+', finish:"done", read.ports:[]; '
+      +'2) then resend this binding request with a NEW operation_id.';
+  }
   const s=request.parameters?.settings??{};
   const missing=['encoding','rows_to_skip','first_line_as_title'].filter(k=>!Object.hasOwn(s.source??{},k)).map(k=>'settings.source.'+k);
   if(!Object.hasOwn(s.format??{},'decimal_separator'))missing.push('settings.format.decimal_separator');

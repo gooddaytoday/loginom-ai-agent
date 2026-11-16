@@ -57,3 +57,31 @@ test('source phase refuses the incomplete first form as NOT_APPLIED without brow
  });
  assert.equal(browser+storage,0);
 });
+
+// LAB-1766: a binding on a node that was only previewed opened the wizard and
+// failed natively («Имя файла не может быть пустым»): no literal source is saved.
+test('a binding on a previewed-only import is refused before the browser with the working sequence',async()=>{
+ const storage={...preview,request:{...preview.request,parameters:{...preview.request.parameters,
+  source:{kind:'storage',server_source_ref:'s'},settings:{source:{source_path:'/own/a.csv'}}}}};
+ const binding=[{parameter:'/settings/source/source_path',mode:'variable',variable:{kind:'variables',input:0,name:'CsvPath'}}];
+ const r={...request(settings),bindings:binding,variable_inputs:[]};
+ const message=previewImportFirstFormRefusal(r,[storage]);
+ assert.match(message,/only previewed/);
+ assert.match(message,/bindings:\[\]/);
+ assert.match(message,/settings\.source\.source_path "\/own\/a\.csv"/);
+ assert.match(message,/finish:"done"/);
+ assert.match(message,/Nothing was changed/);
+ assert.equal(previewImportFirstFormRefusal(request(settings),[storage]),null,'complete literal first form stays accepted');
+ const saved={...storage,sequence:1,request:{document_id:'d',finish:'done',target:{kind:'existing',type:'imports.text',ref:node},parameters:{settings:{}}},
+  outcome:{status:'SUCCEEDED',output:{node,configuration:{status:'applied'}}}};
+ assert.equal(previewImportFirstFormRefusal(r,[storage,saved]),null,'a saved source accepts the binding');
+ let browser=0;
+ const operation={id:'import',parameters:r,nodeApply:{request:r}};
+ const driver=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation,onRecord:()=>{},now:Date.now,receiptOptions:()=>({}),
+  execute:async()=>{browser++;},resolveStorageSource:async()=>{browser++;},verifiedUploads:()=>[],nodeHistory:()=>[storage]});
+ await assert.rejects(driver.verifySource(r.parameters),error=>{
+  assert.deepEqual(error.nodePhaseRefusal,{phase:'source',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true});
+  return true;
+ });
+ assert.equal(browser,0);
+});
