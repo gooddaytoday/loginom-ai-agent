@@ -92,3 +92,6 @@ C9 остаётся остановлен до отдельного решени�
 
 C8 зарегистрирован как `rest-simulation`: полный типизированный вывод, CSV,
 Save, cold без пересоздания REST и cleanup через штатный `run-check`.
+
+C5 registered as `rest-content-types`: original task/CSV and frozen expected;
+full typed output, UTF-8 CSV, Save, cold execution and cleanup use stock checks.

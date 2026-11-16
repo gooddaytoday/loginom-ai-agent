@@ -15,7 +15,7 @@ Readback: наблюдённые enabled/file_path.
 `dock_node_apply`: `target.type:"integration.rest_request"`, `mode:"request"`,
 `finish:"execute"`. В connection: name, base_url, method; для каждого метода —
 отдельное подключение с уникальным именем.
-POST/PUT/PATCH: connection.request_content_type — application/json или text/plain;
+POST/PUT/PATCH: connection.request_content_type — application/json, text/plain или application/xml;
 body_field — имя наблюдённого строкового поля входа 0. Каждая строка отправляется
 отдельно, Body — исходный UTF-8 без URL-кодирования; query для Body запрещён.
 DELETE не принимает body_field/request_content_type. Передавай исходную таблицу
@@ -44,6 +44,10 @@ mapping входа. Источник Cycle: variables.user или variables.calc
 HttpStatusCode порта 1; выгрузи второй результат и сохрани пакет.
 
 ## GET и ответы
+
+connection.response_content_type: application/json, text/html, text/plain или */*.
+Это допустимый MIME ответа, не формат разбора: Response остаётся строкой.
+Сервис может добавить charset=UTF-8 к Content-Type запроса.
 
 Полный GET URL без query допустим: `query_parameters:[]`, `inputs:[]`,
 finish execute; таблица и URL-кодировщик не нужны.

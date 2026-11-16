@@ -22,6 +22,17 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_rest_content_types_uses_original_fixture_and_frozen_four_rows(self):
+        case = runner.scenario('rest-content-types')
+        self.assertEqual(case['input_files'], ['content-types.csv'])
+        self.assertEqual(case['prompt'].name, 'task-content-types.md')
+        self.assertIsNone(case['base'])
+        expected = runner.expected_for(case, '/own/media.lgp')
+        self.assertEqual(expected['package_path'], '/own/media.lgp')
+        self.assertEqual(len(expected['outputs'][0]['rows']), 4)
+        self.assertEqual(expected['outputs'][0]['rows'][1]['Body'], '<order amount="17">Привет</order>')
+        self.assertTrue(case['oracle'].is_file())
+
     def test_rest_simulation_uses_frozen_fixture_and_keeps_oracle_private(self):
         case = runner.scenario('rest-simulation')
         self.assertEqual(case['input_files'], ['response.json'])

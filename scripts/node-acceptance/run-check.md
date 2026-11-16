@@ -1,3 +1,10 @@
+`rest-content-types` uses frozen C5 `task-content-types.md`, only
+`content-types.csv` and `acceptance/modes/content-types/expected.json`.
+Two raw UTF-8 bodies (text/plain, application/xml) and two response MIME settings
+(text/plain, */*) must produce four typed rows with actual HTTP status.
+Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
+Only task and CSV reach the model; expected/oracle remain private.
+
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
