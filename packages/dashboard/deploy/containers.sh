@@ -345,6 +345,11 @@ if [[ $mode == strict ]]; then
   # Paths are administrator-owned paths inside Apache, never mounts into web.
   "$engine" exec "$studio" test -r "$cert" || die "App certificate unavailable; repeat original --strict --app-host-domain --app-host-cert --app-host-key flags"
   "$engine" exec "$studio" test -r "$key" || die "App key unavailable; repeat original --strict --app-host-domain --app-host-cert --app-host-key flags"
+  command -v openssl >/dev/null || die "Host OpenSSL is required for strict app TLS validation"
+  # Administrator-only stdin validation; private bytes never enter Dashboard roles or shell variables.
+  cert_public=$("$engine" exec "$studio" cat "$cert" | openssl x509 -pubkey -noout) || die "Invalid app certificate"
+  key_public=$("$engine" exec "$studio" cat "$key" | openssl pkey -pubout -passin pass:) || die "Invalid app private key"
+  [[ -n $cert_public && -n $key_public && $cert_public == "$key_public" ]] || die "App certificate and private key do not match"
 else
   host=${hosts[0]}
 fi
