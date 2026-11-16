@@ -7,11 +7,13 @@ export function checkExcelAutoMain(expected,events){
   .filter(r=>r?.status==='SUCCEEDED'&&r.cleanup_complete===true&&r.execution?.status==='completed'
    &&r.configuration?.readback?.kind==='excel_import');
  const rounds=checkpoints.filter(r=>r.configuration.readback.auto_detect===policy.mode);
+ const typed=(r,want)=>{const p=r.output?.ports?.[0];return p?.fresh===true&&p.port===0
+  &&p.execution_id===r.execution.execution_id&&p.freshness_basis==='completed_execution_port_source'&&matchesExpectedOutput(p,want);};
  const initial=rounds.find(r=>r.configuration.readback.source.source_path.endsWith(policy.initial)
-  &&r.output?.ports?.[0]?.fresh===true&&matchesExpectedOutput(r.output.ports[0],expected.excel_auto.initial_output));
+  &&typed(r,expected.excel_auto.initial_output));
  const final=rounds.find(r=>initial&&checkpoints.indexOf(r)>checkpoints.indexOf(initial)
   &&r.execution.execution_id!==initial.execution.execution_id&&r.configuration.readback.source.source_path.endsWith(policy.file)
-  &&r.output?.ports?.[0]?.fresh===true&&matchesExpectedOutput(r.output.ports[0],expected.outputs[0]));
+  &&typed(r,expected.outputs[0]));
  if(!initial||!final||!['document_id','workflow_id','node_id'].every(k=>initial.node[k]===final.node[k]))throw Error('EXCEL_AUTO_SAME_NODE_TYPED_ROUNDS');
  const requests=events.filter(e=>e.phase==='node_apply_prepared').map(e=>e.request);
  if(requests.filter(r=>r.target?.type==='imports.excel'&&r.target.kind==='new').length!==1

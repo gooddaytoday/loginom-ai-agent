@@ -20,7 +20,7 @@ function events(){
  const policy=expected.excel_auto;
  const checkpoint=(file,want,execution_id)=>({phase:'node_checkpoint',result:{status:'SUCCEEDED',cleanup_complete:true,node,
   execution:{status:'completed',execution_id},configuration:{readback:{kind:'excel_import',auto_detect:policy.mode,source:{source_path:'/own/prefix-'+file}}},
-  output:{ports:[{port:0,fresh:true,execution_id,row_count:want.rows.length,schema:want.columns.map((f,index)=>({...f,index})),sample_complete:true,precision:{numbers_verified:true},
+  output:{ports:[{port:0,fresh:true,execution_id,freshness_basis:'completed_execution_port_source',row_count:want.rows.length,schema:want.columns.map((f,index)=>({...f,index})),sample_complete:true,precision:{numbers_verified:true},
    sample:want.rows.map(row=>want.columns.map(f=>({type:f.type,is_null:false,value:f.type==='integer'?String(row[f.name]):row[f.name]})))}]}}});
  return [checkpoint(policy.initial,policy.initial_output,'one'),checkpoint(policy.file,expected.outputs[0],'two'),
   {phase:'node_apply_prepared',request:{target:{type:'imports.excel',kind:'new'}}},
@@ -29,7 +29,8 @@ function events(){
 test('C8 main audit needs two typed rounds on the same node and a native path-only policy patch',()=>{
  const e=events();assert.equal(checkExcelAutoMain(expected,e).status,'PASS');
  for(const mutate of [e=>e[1].result.node={...node,node_id:'replacement'},e=>e[1].result.execution.execution_id='one',
-  e=>e.at(-1).request.parameters.excel.columns=[],e=>e[1].result.output.ports[0].schema.pop()]){
+  e=>e.at(-1).request.parameters.excel.columns=[],e=>e[1].result.output.ports[0].schema.pop(),
+  e=>e[1].result.output.ports[0].execution_id='other',e=>e[1].result.output.ports[0].freshness_basis='grid']){
   const changed=events();mutate(changed);assert.throws(()=>checkExcelAutoMain(expected,changed));
  }
 });
