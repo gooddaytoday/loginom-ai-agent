@@ -1,6 +1,12 @@
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
+`rest-simulation` uses the approved C8 `task-simulation.md`, only `response.json`
+and frozen `acceptance/modes/simulation/expected.json`. The native file simulation
+returns one typed message/amount/ok row without a table input. Full output, CSV,
+Save, cold execution of the saved REST without recreation and cleanup use stock
+checks. Only task and response file reach the model; expected/oracle stay private.
+
 `rest-variables` uses the approved REST C4 `task-variables.md`, requests.csv and
 unchanged `acceptance/modes/variables/expected.json`. Cycle first → second must
 update the response on the same REST without reconfiguration. Full typed output,
@@ -980,6 +986,15 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-summary`: C8, исходный task-summary.md и только design.csv. Enter с
+константой и всеми X1/X2/X3. Основной прогон требует свежий полный VariablesForm
+из 15 переменных, принадлежащий завершённому исполнению того же узла; существующий
+typed matcher проверяет имена, порядок, типы и значения. Третий физический выход
+имеет отдельный variable ordinal 0: `read.variable_ports:[0]`, не table port 2.
+Native-проба подтвердила форму; oracle изменён только в адресе выхода.
+Оба табличных порта, CSV прогнозов, Save, cold без настройки и cleanup обязательны.
+Oracle и expected остаются вне рабочего каталога модели.
+
 `linreg-partition-sequential`: C6, Enter на partition.csv, первые 16 строк
 обучают, следующие 2 тестовые. Только task-partition-sequential.md и CSV
 передаются модели; неизменённые expected.json и oracle остаются в оснастке.
@@ -1066,6 +1081,14 @@ Control не подменяется обычным входом. Только ta
 Case меняет регистр true→false; threads — максимум 1→2; auto — 2→0.
 Cold читает сохранённые ключи и literal максимум, закрывает мастер через Cancel,
 затем штатно выполняет сохранённый узел без настройки; Save/cleanup обязательны.
+
+`sorting-variant` uses the approved sorting `modes/task-variant.md` and only
+`fixtures/variant-wide.csv`. Scalar Import and Collapse retain all nine rows,
+including three NULLs. Frozen `expected-variant.json` is checked against the
+independent oracle; two executions of the same Sorting preserve exact native
+integer/real/string subtypes, Values/RowID/Names keys and disabled locale/case.
+Both ordered full typed outputs and CSVs, Save, cold without configuration and
+cleanup are required. Only task and CSV reach the model.
 
 `text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
 задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.

@@ -5,6 +5,24 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
+test('C8 validates simulation paths and disabling before mutation',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ for(const simulation of [{enabled:true,file_path:'/own/response.json'},{enabled:false}]){
+  const p={connection:{name:'Offline'},query_parameters:[],simulation};
+  assert.equal(validate(p).valid,true);
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',{...request,inputs:[]}));
+ }
+ for(const simulation of [{},{enabled:'true'},{enabled:true},{enabled:true,file_path:'relative.json'},
+  {enabled:true,file_path:'/own/../other.json'},{enabled:true,file_path:'/own/a\n.json'},
+  {enabled:true,file_path:'/own/a.json',extra:true}])
+  assert.throws(()=>validateRestRequestParameters({connection:{name:'Offline'},query_parameters:[],simulation},'request',{...request,inputs:[]}),/simulation/);
+});
+test('C8 readback retains the observed simulation on the same committed node',()=>{
+ const node={document_id:'d',workflow_id:'w',node_id:'n'},simulation={enabled:true,file_path:'/own/response.json'};
+ const phases=[{phase:'configure',status:'verified',receipt_id:'c8:configure',value:{configuration:{verified:true,node_context:node,query_parameters:[],simulation}}},
+  {phase:'node_finish',status:'verified',receipt_id:'c8:node_finish',value:{settings_applied:true,mode:'done',node_context:node}}];
+ assert.deepEqual(restRequestReadback({node,phases,operation_id:'c8'}).simulation,simulation);
+});
 test('C4 accepts a header bound to a string variable through native variables input 0',()=>{
  const p={...parameters(),headers:[{name:'X-Lab-Cycle',value:{variable:'Cycle'}}]};
  const r={...request,variable_inputs:[{kind:'variables',input:0}]};

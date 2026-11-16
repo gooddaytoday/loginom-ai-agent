@@ -23,6 +23,18 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_rest_simulation_uses_frozen_fixture_and_keeps_oracle_private(self):
+        case = runner.scenario('rest-simulation')
+        self.assertEqual(case['input_files'], ['response.json'])
+        self.assertEqual(case['prompt'].name, 'task-simulation.md')
+        self.assertIsNone(case['base'])
+        expected = runner.expected_for(case, '/own/simulation.lgp')
+        self.assertEqual(expected['outputs'][0]['rows'], [json.loads((case['data'] / 'response.json').read_text())])
+        self.assertEqual([c['type'] for c in expected['outputs'][0]['columns']], ['string', 'integer', 'boolean'])
+        self.assertEqual(expected['outputs'][0]['export_destination'], 'simulation.csv')
+        result = subprocess.run([sys.executable, '-B', case['oracle'], '--check', '--case', 'simulation'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_rest_query_variables_is_deferred_while_c4_remains_registered(self):
         with self.assertRaisesRegex(ValueError, 'Unknown scenario: rest-query-variables'):
             runner.scenario('rest-query-variables')
