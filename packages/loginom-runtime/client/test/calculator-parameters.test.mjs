@@ -85,7 +85,7 @@ test('only a pristine new-node default may be reused',()=>{
 });
 test('owned-template cleanup still permits an explicitly requested Expr1 at any position',async()=>{
  const {planCalculatorEdits}=await import('../lib/calculator-parameters.mjs');
- for(const names of [['Flag','Expr1'],['Expr1','Flag']]){
+ for(const names of [['Flag','Expr1'],['Expr1','Flag'],['Flag','expr1'],['Flag','EXPR1']]){
   const o=observed();o.expressions=[{...expression('Expr1'),formula:'',cached:false,description:''}];
   const parameters={expressions:names.map(name=>({target:{kind:'new'},name,label:name,type:'real',formula:'1',replace:false}))};
   const plan=resolveCalculatorPatch(parameters,o,inputs,{newNode:true,removeDefault:true});
