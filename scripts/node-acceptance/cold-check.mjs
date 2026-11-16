@@ -204,7 +204,7 @@ page = context.pages()[0]
     Date.now() + 30_000,
   )
   if(expected.nodes.some(n=>n.type==='control.supernode')&&expected.outputs.some(o=>o.output_node_type==='control.supernode'))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
-   platform:compatibilityPlatform,makeWorkspacePrepareCode,record});
+   platform:compatibilityPlatform,makeWorkspacePrepareCode,record,expected});
   await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
@@ -634,6 +634,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
     ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
     ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),
     ...(state.bindingInventory?{binding_inventory:state.bindingInventory}:{}),

@@ -89,6 +89,9 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-offline.md' if offline else 'task.md'),
                     data=node / 'fixtures', base=None, input_files=['pages.csv'],
                     expected_name='expected-offline.json' if offline else 'expected.json', oracle=node / 'acceptance/oracle.py')
+    if name == 'supernode-vars' and not cases and not case_root:
+        src = REPO / 'docs/node-development/nodes/control-supernode/acceptance/variables'
+        return dict(source=src, prompt=src / 'task.md', data=src, base=None, input_files=[], supernode=True, oracle=src / 'oracle.py')
     if name == 'supernode-calc' and not cases and not case_root:
         node = REPO / 'docs/node-development/nodes/control-supernode'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task.md', data=node / 'fixtures',
@@ -3133,6 +3136,8 @@ class Runner:
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
+                        if case == 'supernode-vars':
+                            assert cold.get('supernode_variable_boundary') == read(stage / 'supernode-audit.json')['variable_boundary'], 'COLD_SUPERNODE_DEFINITION_IDENTITY'
                         r.update(cold='PASS', cleanup='both PASS')
                         if spec.get('fs_case'):
                             self.fs_files(spec, folder, login, build, 'fs-cold')

@@ -8,11 +8,16 @@ import {withBrowserReceipt} from './executor.mjs';
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
 export function createSupernodeNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
-  type:'control.supernode',mode:'tabular_boundary',revision:'supernode-table-v1',
+  type:'control.supernode',modes:['tabular_boundary','variable_boundary'],revision:'supernode-boundary-v2',
   parameterSchema:supernodeParametersSchema,validate:validateSupernodeParameters,readback:supernodeConfigurationReadback,
   configurationObservation:{condition:'owned Supernode ports',readSupernode:true,ready:s=>s.wizard?.stage==='supernode'&&s.node_supernode?.verified===true},
-  configureInputs:async()=>verified({not_applicable:true,mappings:[]}),
-  configureAllOutputs:async()=>verified({not_applicable:true,mappings:[]}),
+  configureInputs:async(channel,_m,_ctx,request)=>{
+   if(request.mode==='variable_boundary'&&request.target.kind==='existing')return channel.configureSupernode({definitions:request.parameters.boundary?.input.definitions??null,read_only:true});
+   return verified({not_applicable:true,mappings:[]});
+  },
+  configureAllOutputs:async(channel,_c,p)=>_c.configuration.mode==='variable_boundary'
+   ?channel.configureSupernode({definitions:p.boundary?.input.definitions??null,read_only:!p.boundary})
+   :verified({not_applicable:true,mappings:[]}),
   configure:configureSupernode,
  });
  return {...support,nodeApplyDriverFactory:options=>({...support.nodeApplyDriverFactory(options),verifySource:async(_p,ctx)=>{
