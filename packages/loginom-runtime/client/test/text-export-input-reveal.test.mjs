@@ -183,7 +183,7 @@ for(const mode of ['mask','lock'])test('Export stops before opening input when a
   if(mode==='mask')f.page.add('div','busy','Loading').attrs.class='x-mask-msg';
   if(mode==='lock')f.node.FLocked=true;
  }});
- await assert.rejects(f.run(),mode==='mask'?/^Node procedure step did not confirm completion; inspect before retry: The workspace is masked;/:/readiness timeout: export input after own label selection;/);assert.equal(f.canvas.scrollTop,82);
+ await assert.rejects(f.run(),mode==='mask'?/Node procedure step did not confirm completion; inspect before retry: The workspace is masked;/:/readiness timeout: export input after own label selection;/);assert.equal(f.canvas.scrollTop,82);
  // A native-only lock race may permit the admitted safe selection, as for scroll.
  // Fresh locked context must still stop before any port/menu or mapping gesture.
  assert.deepEqual(f.gestures.map(g=>g.kind),mode==='lock'?['label-click']:[]);
@@ -219,7 +219,7 @@ for(const mode of ['native owner','graph container'])test('Export refuses change
   if(mode==='native owner')f.node.FGuid='foreign';
   if(mode==='graph container')f.canvas.attrs['data-tid']='MF;TF-2;ModelForm;cmpDiagram';
  }});
- await assert.rejects(f.run(),/^Node procedure roots could not be observed: PREPARED_NODE_CONTEXT_CHANGED$/);assert.deepEqual(f.gestures.map(g=>g.kind),['label-click']);
+ await assert.rejects(f.run(),/Node procedure roots could not be observed: PREPARED_NODE_CONTEXT_CHANGED$/);assert.deepEqual(f.gestures.map(g=>g.kind),['label-click']);
  assert.equal(f.records.filter(e=>e.action?.verb==='open_input_port').length,0);
 });
 
@@ -318,8 +318,8 @@ for(const mode of ['mask','lock','document'])test('Export preserves the '+mode+'
   if(mode==='lock')f.node.FLocked=true;
   if(mode==='document')f.page.context.__loginomDockPreparationV1.id='foreign-document';
  }});
- await assert.rejects(f.run(),{mask:/^Node procedure step did not confirm completion; inspect before retry: The workspace is masked;/,lock:/readiness timeout: export input after canvas scroll;/,
-  document:/^Node procedure step did not confirm completion; inspect before retry: The prepared package, workflow or node changed: document/}[mode]);
+ await assert.rejects(f.run(),{mask:/Node procedure step did not confirm completion; inspect before retry: The workspace is masked;/,lock:/readiness timeout: export input after canvas scroll;/,
+  document:/Node procedure step did not confirm completion; inspect before retry: The prepared package, workflow or node changed: document/}[mode]);
  assert.equal(f.canvas.scrollTop,mode==='lock'?82:0);assert.deepEqual(f.gestures,[]);
  assert.equal(f.records.filter(e=>e.phase==='node_step_prepared'&&e.action.verb==='scroll').length,1);
  assert.equal(f.records.filter(e=>e.action?.verb==='open_input_port').length,0);
