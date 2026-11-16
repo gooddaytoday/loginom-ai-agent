@@ -58,18 +58,20 @@ NULL, точность и порядок сохранены. CSV: `exports.text`
 
 <!-- /mode -->
 
-<!-- mode: ridge lasso -->
-## Ручные Ridge (L2) и LASSO (L1)
+<!-- mode: ridge lasso elastic_net -->
+## Ручные Ridge, LASSO и Elastic Net
 
 `mode:"ridge"`: `parameters.logistic.regularization:{lambda_ridge:1}`.
 `mode:"lasso"`: `parameters.logistic.regularization:{lambda_lasso:1}`.
+`mode:"elastic_net"`: `parameters.logistic.regularization:{lambda_lasso:1,lambda_ridge:1}`.
+Оба λ задаются отдельно вручную; alpha и автонастройки нет.
 λ>0; прочие logistic-параметры обязательны, selection запрещён.
 Задай input_fields, target_field, event и threshold; read.ports:[0] — полный прогноз.
 normalization none/standardize задаёт факторы; пропуск на существующем узле сохраняет её.
 λ ручной, константа не штрафуется; Execute обучает и прогнозирует. Повтор —
 тот же existing target/ref, inputs:[], прежние параметры. Save отдельно.
 После открытия обнови refs наблюдением графа.
-Apply — только Enter. После reopen на прежнем узле — прежний ridge/lasso,
+Apply — только Enter. После reopen на прежнем узле — прежний ridge/lasso/elastic_net,
 прежние параметры, inputs:[], mappings:[], `finish:"done"`, `read.ports:[]`, без Teach.
 После reopen CSV: новый exports.text от output:0, Execute, технические имена
 и сохранённый порядок. Проверь CSV, сохрани пакет.

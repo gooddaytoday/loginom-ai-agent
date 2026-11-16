@@ -988,6 +988,13 @@ oracle.py проверяет полный прогноз 32×8, типы, пор
 и Teach — на том же узле. CSV, Save, cold без настройки/Teach и cleanup — штатные.
 Модель получает только задачу и CSV; expected и oracle остаются приватными.
 
+`logreg-elastic-net`: ручной Elastic Net, lambda_lasso=lambda_ridge=1;
+утверждённые `modes/elastic-net/task-elastic-net.md` и train.csv из
+`datamining-logregression/acceptance`. Независимый неизменённый modes/oracle.py
+проверяет весь прогноз 32×8, точные типы, порядок и NULL. Повтор настройки и
+Teach — на том же узле; CSV, Save, cold без настройки/Teach и cleanup штатные.
+Только задача и CSV передаются модели; oracle и expected приватны.
+
 `logreg-ridge`: ручная Ridge (L2), lambda_ridge=1, все 32 строки train.csv,
 повтор настройки и Teach того же узла; прогноз по независимому штрафному
 score из `datamining-logregression/acceptance/modes/ridge`, CSV/Save/cold.

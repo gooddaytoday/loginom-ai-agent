@@ -725,7 +725,7 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['weighted.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
-    if name in ['logreg-ridge', 'logreg-lasso']:
+    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net']:
         variant = name.removeprefix('logreg-')
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes' / variant
         return dict(source=src, prompt=src / ('task-' + variant + '.md'), data=src / 'data', base=None,
