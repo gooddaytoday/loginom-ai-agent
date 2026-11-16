@@ -482,6 +482,15 @@ class RunCheckTests(unittest.TestCase):
                                                    answer=reason + ': seasonal-empty-' + kind + '.csv')
                     self.assertEqual(result['status'], 'PASS', result)
 
+    def test_seasonal_refusal_rejects_input_read_error_without_empty_reason(self):
+        for kind in ['support', 'totals']:
+            expected = runner.expected_for(runner.scenario('ungroup-seasonal-empty-' + kind), '/test/refusal.lgp')
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                result, _, _ = self.refusal_run(Path(directory), expected_text=expected['refusal']['text'],
+                                               answer='входной файл не прочитан')
+                self.assertEqual(result['status'], 'FAIL', result)
+                self.assertEqual(result['failure_class'], 'REFUSAL_NOT_REPORTED', result)
+
     def test_private_refusal_allows_only_declared_input_imports(self):
         with tempfile.TemporaryDirectory() as directory:
             result, phases, _ = self.refusal_run(Path(directory), 'import node')

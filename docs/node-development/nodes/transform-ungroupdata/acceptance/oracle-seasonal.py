@@ -48,7 +48,7 @@ def expected(case):
         assert (bool(totals), bool(support)) == ((True, False) if case == 'empty-support' else (False, True))
         return dict(package_path='{{PACKAGE_PATH}}',
                     nodes=[dict(type='imports.text'), dict(type='imports.text')],
-                    outputs=[], refusal=dict(text='вход'))
+                    outputs=[], refusal=dict(text='устой вход'))
     signals = {}
     for row in support:
         if row['Weight'] != '?':
