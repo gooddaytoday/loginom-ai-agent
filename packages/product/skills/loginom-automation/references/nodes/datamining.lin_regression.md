@@ -2,15 +2,15 @@
 
 `dock_node_apply`: `input_fields`/`target_field` — технические имена непрерывных числовых полей (индикаторы — ниже); остальные сохраняются вне обучения.
 Сохраняй типы/значения: целые X/ID — `type:"integer", data_kind:"Непрерывный"`; Real — дробные поля или явно запрошенный Y. После импорта читай все поля полностью.
-Все строки, константа, без нормализации/валидации; `finish:"execute"` обучает, затем исполняет. Изменения требуют Teach того же узла.
+Все строки, константа, без нормализации/валидации; `finish:"execute"` — Teach и Execute. Изменения — Teach того же узла.
 Выходы: **0 — прогноз `<target>_rergession` и исходные поля; 1 — коэффициенты `Name`/`<target>_coefficients` с константой; 2 — сводка**. Таблицы: `read.ports:[0,1]`, `sample_rows:100`, `require_exact_numbers:true`.
-CSV прогнозов — `exports.text` от порта 0, `inputs:[{source:regression.node,output:0,input:0}]`, в том числе при `statistics:"full"`. Коэффициенты — чтением порта 1; их CSV — только по явной просьбе в отдельный файл. сохрани пакет; cold без настройки.
-Сводка (физический порт 2): `read.variable_ports:[0]` после Execute, полный свежий `VariablesForm`, 15 переменных. Ordinals переменных отдельные; `read.ports:[2]` неверен. Только native-значения без Калькулятора/JS/пересчёта.
+CSV прогнозов — `exports.text` от порта 0, `inputs:[{source:regression.node,output:0,input:0}]`, в том числе при `statistics:"full"`. Коэффициенты: порт 1; их CSV — лишь по запросу, отдельно. сохрани пакет; cold без настройки.
+Сводка качества модели (физический порт 2): `read.variable_ports:[0]` после Execute, полный свежий `VariablesForm`, 15 переменных. Ordinals переменных отдельные; `read.ports:[2]` неверен. Только native-значения без Калькулятора/JS/пересчёта.
 
 <!-- mode: enter apply -->
 `enter` (пере)обучает. Прогноз новых данных: `mode:"apply"` того же обученного Enter-узла, прежние `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`; модель/настройки сохраняются без Teach.
-Последовательное обучение/тест — Enter, `linear_regression.partition:{method:"sequential",train_count:16,test_count:2}`. Размеры в строках: первые 16 обучают, следующие 2 только прогнозируются.
-Полная статистика: `mode:"enter"`, `linear_regression:{statistics:"full"}` — порт 1, девять native-столбцов с SE/t/p/95% границами и NULL. По умолчанию `statistics:"coefficients"`: Name и Y_coefficients. Сводка без SE/t/p: `statistics:"coefficients"`.
+Последовательное обучение/тест — Enter, `linear_regression.partition:{method:"sequential",train_count:16,test_count:2}`. Первые 16 строк обучают, следующие 2 только прогнозируются.
+Сводка качества модели с F/p — `statistics:"coefficients"` (по умолчанию), порт 1 — Name/Y_coefficients. F/p сводки (порт 2) не требует `full`. SE/t/p/95% границы **коэффициентов** — по запросу: `mode:"enter"`, `linear_regression:{statistics:"full"}` — порт 1, 9 native-столбцов с NULL.
 Категории: дискретная строка в `input_fields` и `linear_regression:{statistics:"full",normalization:[{field:"Category",method:"indicator",reference:"first"}]}`. Первый элемент native-списка — опорный, с видимым нулевым коэффициентом. Name повторяется; категории различает UniqueValues (string). Только Enter, без apply/других опорных значений; числовые поля не нормализуются.
 <!-- /mode -->
 

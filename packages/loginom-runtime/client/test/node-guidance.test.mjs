@@ -41,7 +41,9 @@ test('each supported regression selection mode delivers complete import and outp
  assert.match(enter.guidance,/`mode:"enter"`, `linear_regression:\{statistics:"full"\}`/);
  assert.match(enter.guidance,/read\.ports:\[0,1\]/);
  assert.match(enter.guidance,/CSV прогнозов — `exports\.text` от порта 0/);
- assert.match(enter.guidance,/Сводка без SE\/t\/p: `statistics:"coefficients"`/);
+ assert.match(enter.guidance,/Сводка качества модели с F\/p — `statistics:"coefficients"`/);
+ assert.match(enter.guidance,/F\/p сводки \(порт 2\) не требует `full`/);
+ assert.match(enter.guidance,/SE\/t\/p\/95% границы \*\*коэффициентов\*\* — по запросу: `mode:"enter"`, `linear_regression:\{statistics:"full"\}` — порт 1/);
  assert.ok(Buffer.byteLength(await readFile(join(source.directory,'references/nodes/datamining.lin_regression.md')))<=6000);
 });
 
