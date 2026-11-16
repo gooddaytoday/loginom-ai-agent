@@ -10,6 +10,6 @@ workflow, несовпадение подписи, идёт другая опе�
 | Сценарий | Задача | Проверка |
 |---|---|---|
 | `node-delete` | 4 узла, удалить фильтр по просьбе, переподключить импорт к сортировке | один SUCCEEDED delete, CSV 6 строк по убыванию Amount, Save, cold без `transform.filter_data` |
-| `node-delete-refused` | удалить JS-узел во время 120-секундного выполнения | все ответы delete NOT_APPLIED, есть `NODE_OPERATION_RUNNING`; узел, CSV, Save, cold |
+| `node-delete-refused` | удалить JS-узел во время 60-секундного выполнения (меньше бюджета execute 120 с) | все ответы delete NOT_APPLIED, есть `NODE_OPERATION_RUNNING`; узел, CSV, Save, cold |
 
 `expected.json` заморожены до прогонов; oracle — стандартное сравнение run-check.

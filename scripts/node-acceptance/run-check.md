@@ -1261,7 +1261,7 @@ output.status deleted, no AMBIGUOUS), frozen sorted six-row CSV, Save, cold with
 `absent_node_types:["transform.filter_data"]` and stock cleanup.
 
 `node-delete-refused` (LAB-1721): approved `node-delete-refused/task.md` and only
-numbers.csv. The user asks to delete a JavaScript node while its 120-second
+numbers.csv. The user asks to delete a JavaScript node while its 60-second (below the 120 s default execute budget)
 execution runs. Every deletion reply must be NOT_APPLIED with effect_possible:false
 and at least one `NODE_OPERATION_RUNNING`; the node stays, its CSV, Save, cold and
 cleanup use stock checks. Expected/oracle never reach the model.
