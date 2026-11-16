@@ -662,7 +662,7 @@ test('native graph accepts decorative duplicate vertices but stops bounded scan 
     if(mode==='oversized'){assert.match(result.error.message,/scan element budget/);assert.ok(visits<=6001);}
     if(mode==='duplicate_port'){
       const message=result.error.message;
-      assert.match(message,/Duplicate actionable graph identifiers: MF;TF;Graph;Источник;Output_Data-0 x3 \{/,message);
+      assert.ok(message.includes('Duplicate actionable graph identifiers: '+page.prefix+';Graph;Источник;Output_Data-0 x3 {'),message);
       assert.match(message,/@10,10,20x20 block\/visible\//,message);assert.ok(message.length<=1700,message);
     }
   }
