@@ -1327,3 +1327,13 @@ with Close, then stock execution/export checks and confirmed package/logout clea
 порядок и NULL; Split/Fold не факторы. Сводка порта 2 в expected не входит;
 размеры выборок доступны в configuration.partition. CSV/Save/cold без Teach
 и cleanup штатные. Только task и CSV получает модель; oracle/expected приватны.
+
+Решение владельца 16.11 `logreg-partition-csv-by-name`: только CSV сценария
+`logreg-partition-sequential` сравнивается по техническим именам независимо
+от порядка колонок (`CSV_COLUMNS_BY_NAME_SCENARIOS`). Native порт0 при первом
+выполнении сохраняет RowID,X,Target, а после reopen+apply — X,Target,RowID
+(E:973/974 и F:1103/1104 против E:1505/F:1631). Набор и число колонок,
+значения, строки и их порядок, NULL и существующие проверки типов остаются
+строгими. Дубли/пропавшие/лишние имена и другие значения отказывают.
+Typed port/cold expected и oracle неизменны; остальные сценарии сохраняют
+свои прежние правила порядка CSV. Это не D76-исключение значений.
