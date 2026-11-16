@@ -6,6 +6,7 @@ import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from 
 import { compactActionResult } from '../lib/user-results.mjs';
 import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
+import {makeCapabilityCode} from '../lib/executor.mjs';
 
 test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
   for (const action of ['package.save_checkpoint', 'package.save_as']) {
@@ -798,6 +799,30 @@ async function restSavePage(modified, restReference = true) {
  page.click=async item=>{if(item.symbol==='native-save'){page.events.push('native_save');page.save();page.menu=false;return;}return click(item);};
  return page;
 }
+
+for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
+test('REST checkpoint retains the legacy path without catalog selectors: '+missing,async()=>{
+ const page=await restSavePage([true,true]);
+ const action=structuredClone(actions.get('package.save_checkpoint'));
+ action.selector_symbols=action.selector_symbols.filter(symbol=>!missing.includes(symbol));
+ const outcome=await page.execute(makeCapabilityCode(action,selectors,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},
+  {expected_build:build,storage_binding:page.storageBinding}));
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(outcome.output.reopened,false);assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
+ assert.equal(page.events.some(e=>e==='package_closed'||e==='package_reopened'),false);
+ assert.equal(outcome.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])
+test('REST Save refuses an empty continuation before writing: '+action,async()=>{
+ const page=await restSavePage([true,false]);
+ page.context.__loginomDockPreparationV1.receipts.clear();
+ const outcome=await run(page,action,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'FAILED',JSON.stringify(outcome));
+ assert.match(outcome.error.message,/continuation unavailable/i);
+ assert.equal(outcome.effect_possible,false);assert.equal(page.saveWrites,0);
+ assert.equal(page.events.includes('package_closed'),false);
+});
 
 for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false]])
 test('REST reference Save normalizes once after reopen: '+action+' '+modified,async()=>{

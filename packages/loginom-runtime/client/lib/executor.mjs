@@ -1543,6 +1543,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
     if (before.package_identity.read_only && normalizeStoredPath(before.package_identity.path) === before.path)
       throw new Error('The active package is read-only. Save a copy to an explicitly different package path.');
+    const normalizeRest = before.package_identity.rest_reference === true
+      && ['packages.close','packages.open'].every(symbol => task.action.selector_symbols.includes(symbol));
+    const continuationsBefore = keepOpen || normalizeRest ? await packageContinuations(before.workflow_ref) : [];
+    if (normalizeRest && !continuationsBefore.length) throw Error('Saved workflow continuation unavailable before Save');
     let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
     try {
       const admission = await page.evaluate(binding => {
@@ -1590,7 +1594,6 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
     } catch { arrangement.reason = 'arrangement_unconfirmed'; }
     record('package_arrangement', { ...arrangement, warning: true });
-    const continuationsBefore = keepOpen || before.package_identity.rest_reference ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
     if (!(await resolve('packages.save_as', {}, { cardinality: 'zeroOrOne' }))) await click('packages.menu');
@@ -1649,7 +1652,6 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const saveError = await resolve('message.error', {}, { cardinality: 'zeroOrOne', stable: false });
     if (saveError) throw new Error((await saveError.innerText()).slice(0, 500));
     record('save_flow_completed', { path: before.path });
-    const normalizeRest = before.package_identity.rest_reference === true;
     const normalizationStarted = Date.now();
     if (keepOpen && !normalizeRest) {
       const prefix = await ensureReady();
@@ -1785,7 +1787,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       const ends=elements.filter(e=>{const c=globalThis.Ext?.getCmp(e.id);return c?.el?.dom===e&&c?._node?.data?.node===workflowNode;});
       if(ends.length!==1)throw Error('Saved workflow breadcrumb unavailable');
       const crumbs=elements.slice(0,elements.indexOf(ends[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-      if(!previous.length||crumbs.length<3)throw Error('Saved workflow continuation unavailable');
+      if(crumbs.length<3)throw Error('Saved workflow continuation unavailable');
       const rebound=[];
       for(const prior of previous){
         if(prior.document_id!==prep.id||exact(prior.workflow_ref.tab_tid).length)throw Error('Saved workflow close was not confirmed');
