@@ -62,7 +62,7 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   'only none/standardize continuous predictors and native categorical target encoding are supported');
  const normalization=await configureLogRegressionNormalization(channel,p,{request,baseline});
  state=await observe('normalization','complete logistic normalizers after edit');
- if(normalization.source_status==='Не активировано'){
+ if(normalization.source_status==='Не активировано'&&!p.partition){
   await channel.perform({condition:'activate connected logistic input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
   state=await channel.observe({condition:'logistic input activated',readLogRegression:true,ready:s=>ready('normalization')(s)&&s.node_logregression.source_status!=='Не активировано'});
