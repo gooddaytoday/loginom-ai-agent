@@ -21,7 +21,7 @@ def expected(case):
     output = dict(output_node_type='export_input' if large else 'imports.text',
                   **({} if large else dict(output_port=0)), ordered=False, column_order='any',
                   columns=[dict(name=n, type=t, label_any=True) for n, t in
-                           ([('N', 'integer'), ('Total', 'integer')] if large else columns)],
+                           ([('N', 'integer'), ('Total', 'real')] if large else columns)],
                   rows=[dict(N=RECORDS, Total=RECORDS * (RECORDS + 1) // 2)] if large else rows,
                   export_destination='native-total.csv' if large else 'native-wide.csv')
     return dict(package_path='{{PACKAGE_PATH}}',

@@ -21,7 +21,7 @@
     },
     {
      "name": "Total",
-     "type": "integer",
+     "type": "real",
      "label_any": true
     }
    ],

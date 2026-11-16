@@ -30,6 +30,8 @@ for name in ['import-server-nodownload','import-server-wide']:
  if name=='import-server-nodownload':
   assert e['outputs'][0]['output_node_type']=='export_input'
   assert [n['type'] for n in e['nodes']]==['imports.text','exports.text']
+  assert [(c['name'],c['type']) for c in e['outputs'][0]['columns']]==[('N','integer'),('Total','real')]
+  assert [(c['name'],c['type']) for c in e['server_import']['columns']]==[('ID','integer'),('Amount','integer'),('Note','string')]
  subprocess.run([sys.executable,'-B',str(c['oracle']),'--case',name,'--check'],check=True)
  with tempfile.TemporaryDirectory() as directory:
   root=Path(directory);folder=root/'stage';folder.mkdir();workspace=root/'workspace';workspace.mkdir()
