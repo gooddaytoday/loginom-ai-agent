@@ -304,6 +304,12 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name in ['excel-import-multi', 'excel-import-parallel']:
+        src = REPO / 'docs/node-development/nodes/imports-excel/acceptance/excel-import-multi'
+        multi = name == 'excel-import-multi'
+        return dict(source=src, prompt=src / ('task.md' if multi else 'task-parallel.md'), data=src.parent / 'capabilities/fixtures', base=None,
+                    input_files=['sales-a.xlsx', 'sales-b.xlsx'], expected_name='expected-mask.json' if multi else 'expected-parallel.json',
+                    **(dict(lgd_initial='expected-list.json') if multi else {}), oracle=src / 'oracle.py', excel_multi=name)
     if name == 'excel-import-named':
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance/excel-import-named'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, excel_named_initial='expected-initial.json')
@@ -1055,6 +1061,32 @@ def check_text_parallel(replies):
     assert all(source.get('file_info') == 'Имя файла' for source in [before, after]), 'TEXT_PARALLEL_FILENAME_MISSING'
 
 
+def excel_imports(replies):
+    return [owner for _, reply in replies for owner, port in ports(reply)
+            if owner.get('status') == 'SUCCEEDED' and port.get('port') == 0
+            and owner.get('configuration', {}).get('readback', {}).get('kind') == 'excel_import']
+
+
+def check_excel_multi(replies, directory):
+    imports = excel_imports(replies)
+    assert len(imports) >= 2, 'EXCEL_MULTI_STAGES_MISSING'
+    assert len({owner['node']['node_id'] for owner in imports}) == 1, 'EXCEL_MULTI_IMPORT_RECREATED'
+    first, last = [owner['configuration']['readback']['source'] for owner in [imports[0], imports[-1]]]
+    assert first.get('source_path') == directory + '/sales-a.xlsx｜' + directory + '/sales-b.xlsx', 'EXCEL_MULTI_LIST_ORDER'
+    assert last.get('source_path') == directory + '/sales-*.xlsx', 'EXCEL_MULTI_NATIVE_MASK_MISSING'
+    assert all(s.get('parallel_processing') is False and s.get('sheet') == 'Data' for s in [first, last]), 'EXCEL_MULTI_SEQUENTIAL_SHEET'
+
+
+def check_excel_parallel(replies, directory):
+    imports = excel_imports(replies)
+    assert imports, 'EXCEL_PARALLEL_IMPORT_MISSING'
+    assert len({owner['node']['node_id'] for owner in imports}) == 1, 'EXCEL_PARALLEL_IMPORT_RECREATED'
+    source = imports[-1]['configuration']['readback']['source']
+    assert source.get('source_path') in [directory + '/sales-a.xlsx｜' + directory + '/sales-b.xlsx', directory + '/sales-b.xlsx｜' + directory + '/sales-a.xlsx',
+                                         directory + '/sales-*.xlsx'], 'EXCEL_PARALLEL_SOURCES'
+    assert source.get('parallel_processing') is True and source.get('max_threads') == '2', 'EXCEL_PARALLEL_TWO_THREADS_MISSING'
+
+
 def check_text_multi_file_list(replies):
     imports = [(owner, port) for _, reply in replies for owner, port in ports(reply)
                if owner.get('status') == 'SUCCEEDED'
@@ -1197,7 +1229,7 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node', *
         assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
         assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
             (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
-        tables.append(dict(actual=dict(node=identity, type='programming.javascript' if kind == 'javascript' else 'imports.text',
+        tables.append(dict(actual=dict(node=identity, type=dict(javascript='programming.javascript', excel_import='imports.excel').get(kind, 'imports.text'),
             label=owner.get('configuration', {}).get('readback', {}).get('node_title', {}).get('label'), output_port=0, data=port), expected=stage))
         previous = exports[-1]
     # Use the same typed full-table matcher as cold, including exact numeric and
@@ -2165,8 +2197,9 @@ class Runner:
                     file.unlink()
             self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
 
-    def text_mask_directory(self, login):
-        return login['package_directory'].rstrip('/') + '/' + self.out.name + '-mask'
+    def text_mask_directory(self, login, case=None):
+        # Excel C4 scenarios share a batch: each owns its own mask directory.
+        return login['package_directory'].rstrip('/') + '/' + self.out.name + ('-' + case if case else '') + '-mask'
 
     def fs_directory(self, case, login):
         return login['package_directory'].rstrip('/') + '/' + self.out.name + '-js-fs-' + case
@@ -2221,15 +2254,15 @@ class Runner:
 
     def source_dir(self, spec, login):
         # The one server directory whose paths the task receives for its sources.
-        if spec.get('text_mask'): return self.text_mask_directory(login)
+        if spec.get('text_mask') or spec.get('excel_multi'): return self.text_mask_directory(login, spec.get('excel_multi'))
         if spec.get('text_list_sources') or spec.get('seed_files'): return login['package_directory'].rstrip('/')
         # A space in the parent path is part of the owner's observed request.
         if spec.get('text_folder_masks'): return login['package_directory'].rstrip('/') + '/' + self.out.name + ' Silent Talk'
         return None
 
     def text_mask_inputs(self, spec, folder, login, build, *, late=False):
-        name = self.out.name + '-mask'
-        directory = self.text_mask_directory(login)
+        directory = self.text_mask_directory(login, spec.get('excel_multi'))
+        name = Path(directory).name
         files = [spec['data'] / 'variants/sales_2026-03.csv'] if late else [spec['data'] / f for f in spec['input_files']]
         books = [dict(fixture=str(f), destination=directory + '/' + f.name) for f in files]
         phase = 'text-mask-new-month-input' if late else 'text-mask-inputs'
@@ -2407,6 +2440,11 @@ class Runner:
         if spec.get('local_file'):
             if spec['attachment'] == 'file': command += ['--file', spec['local_file']]
             files = []  # No multi-GiB workspace copy, and no --file for the path case.
+        if spec.get('excel_multi'):
+            # Own fresh directory: a mask must match exactly these two books.
+            books = self.text_mask_inputs(spec, folder, login, build)
+            prompt += '\nИсходные книги уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
+            files = []
         if spec.get('text_mask'):
             self.current['new_month'] = 'NOT_RUN'
             books = self.text_mask_inputs(spec, folder, login, build)
@@ -3049,6 +3087,11 @@ class Runner:
         if spec.get('text_file_info'):
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_file_info(replies)
+        if spec.get('excel_multi') == 'excel-import-multi':
+            check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True, kind='excel_import')
+            check_excel_multi(replies, source_dir)
+        if spec.get('excel_multi') == 'excel-import-parallel':
+            check_excel_parallel(replies, source_dir)
         if spec.get('text_parallel'):
             check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_parallel(replies)

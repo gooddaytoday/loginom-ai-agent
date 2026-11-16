@@ -240,6 +240,15 @@ checks an ExcelPath-only update on the same Excel node, `/excel/source_path` in
 `configuration.bindings`, re-execution only via `{excel:{}}` or a reread, and cold
 reads the Excel W1 variable caption and mapping before execution.
 
+`excel-import-multi` and `excel-import-parallel` (Excel C4) use
+`imports-excel/acceptance/excel-import-multi`: the stage-0 tasks, the original
+capabilities `sales-a/b.xlsx` delivered into a fresh owned directory, and a stdlib
+OOXML oracle. `multi` checks the explicit list a→b (ordered, `multi.csv`) and then
+the native mask `sales-*.xlsx` on the SAME Import (row multiset, `mask.csv`), both
+sequential on sheet Data. `parallel` checks two threads with the row multiset.
+Stock Save, cold execution without configuration and cleanup apply.
+Only tasks and server paths reach the model.
+
 `acf-nonzero` uses the approved LAB-1144 edge task and
 fixtures under `research-autocorrelation/acceptance/edges`. Count12 on N8 must
 return all lags 0…7. The Fraction oracle stays private. Singleton is only an
