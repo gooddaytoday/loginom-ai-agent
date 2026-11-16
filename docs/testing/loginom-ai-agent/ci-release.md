@@ -179,7 +179,7 @@ gh release download v0.4.0 --dir ./release-assets
 bun script/update-feed.ts verify-public --assets ./release-assets --version 0.4.0 --channel stable --feed-base https://updates-loginom.s3.cloud.ru/ --github-base https://github.com/gooddaytoday/loginom-ai-agent/releases/download/v0.4.0/
 ```
 
-`sign-release` вызывается только при подготовке draft; `mirror-release --assets … --version … --channel stable|unstable` читает S3 endpoint/bucket/credentials из перечисленных env или явного `--config`. Старые `publish/promote/stage/status` изолированы обязательным флагом `--legacy` и сохранены для отдельного legacy-фида `<channel>/<version>/…`; к новой раскладке Desktop их не применять. CLI updater остаётся на своём прежнем контракте; CLI-архивы зеркалируются как release assets, новый CLI channel pointer не создаётся.
+`sign-release` вызывается только при подготовке draft; `mirror-release --assets … --version … --channel stable|unstable` читает S3 endpoint/bucket/credentials из перечисленных env или явного `--config`. `status --assets … --version … --channel … --feed-base …` проверяет новое зеркало без GitHub URL и без записи: подписи локального комплекта, побайтовое равенство указателей, SHA256 всех immutable assets и Cache-Control. Для него достаточно S3-ключа чтения в том же формате конфигурации; `--public-key` позволяет проверить отдельно подписанный тестовый комплект. Старые `publish/promote/stage` и `status --legacy` сохранены для отдельного legacy-фида `<channel>/<version>/…`; к новой раскладке Desktop их не применять. CLI updater остаётся на своём прежнем контракте; CLI-архивы зеркалируются как release assets, новый CLI channel pointer не создаётся.
 
 ### Проверки и границы приёмки
 

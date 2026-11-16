@@ -15,6 +15,11 @@ import type { AppUpdater } from "electron-updater/out/AppUpdater"
 import type { ProxyConfig } from "electron"
 
 export type UpdateChannel = "stable" | "unstable"
+declare const LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: string | null
+const updateKeys =
+  typeof LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY !== "undefined" && LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY
+    ? [LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY]
+    : UPDATE_PUBLIC_KEYS
 export type UpdateAdminPolicy = { updates?: "on" | "off"; channel?: UpdateChannel; feedUrl?: string }
 
 export function updateSettings(feed: string | null, preference: unknown, policy: UpdateAdminPolicy = {}) {
@@ -420,7 +425,7 @@ export function verifyUpdateManifest(
   raw: Buffer,
   signature: string,
   feed: string,
-  keys: readonly string[] = UPDATE_PUBLIC_KEYS,
+  keys: readonly string[] = updateKeys,
 ): SignedUpdateInfo {
   if (!verifyUpdateSignature(raw, signature, keys)) throw Error("LOGINOM_UPDATE_SIGNATURE_INVALID")
   const info = parseUpdateInfo(raw.toString("utf8"), "latest.yml", new URL(feed)) as SignedUpdateInfo
