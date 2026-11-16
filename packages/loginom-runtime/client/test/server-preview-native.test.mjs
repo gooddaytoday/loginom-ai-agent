@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 
-for(const button of ['available','missing'])test('server preview reads native format recognition before returning: '+button,()=>{
+for(const [button,kind] of [['available','storage'],['missing','storage'],['available','verified_delivery']])test('server preview reads native format recognition before returning: '+button+' '+kind,()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks','--input-type=module','-e',`
 import assert from 'node:assert/strict';
 import {mock} from 'node:test';
 const lib=${JSON.stringify(new URL('../lib/',import.meta.url).href)},href=name=>new URL(name,lib).href;
 const real=async name=>({...await import(href(name)+'?native-preview-real')});
 const owner={status:'observed',node:{tid:'N'},path:[{tid:'wf',label:'Scenario'}]};
-const path='/test/source.csv',button=process.argv[1],actions=[];
+const path='/test/source.csv',button=process.argv[1],kind=process.argv[2],actions=[];
 let stage='graph',detected=false,header=false;
 const field=value=>({status:'observed',truncated:false,value,input_ref:'input',display_ref:'display',owner_ref:'owner'});
 const state=options=>{
@@ -40,14 +40,17 @@ mock.module(href('node-procedure.mjs'),{exports:{...await real('node-procedure.m
 mock.module(href('node-graph-selection.mjs'),{exports:{...await real('node-graph-selection.mjs'),selectPreparedGraphNode:async()=>{}}});
 mock.module(href('node-wizard-open.mjs'),{exports:{...await real('node-wizard-open.mjs'),openPreparedWizard:async()=>{stage='text_import_file';}}});
 const {createTextImportNodeSupport}=await import(href('text-import-node.mjs'));
-const p={preview_only:true,source:{kind:'storage',server_source_ref:'source-one'},settings:{source:{source_path:path}}};
+const p=kind==='storage'?{preview_only:true,source:{kind:'storage',server_source_ref:'source-one'},settings:{source:{source_path:path}}}
+ :{preview_only:true,source:{kind:'verified_delivery',artifact_id:'artifact',upload_operation_id:'upload'},settings:{source:{encoding:'UTF-8'}}};
+const sha='a'.repeat(64),upload={operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:sha},outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,
+ output:{artifact_id:'artifact',destination:path,bytes:15,sha256:sha,server_copy_verification:{verification_id:'verification',status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:path,bytes:15,sha256:sha}}}};
 const request={target:{kind:'existing'},parameters:p,finish:'close',inputs:[],mappings:[],read:{ports:[]}};
 const operation={id:'preview',parameters:request,nodeApply:{request},nodeTargetAdapter:{observe:async()=>({})}};
 const driver=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation,onRecord:()=>{},now:Date.now,receiptOptions:()=>({}),
- execute:async()=>({rows:[['12','23.04.2026']],requested_records:25,rendered_only:true}),
+ execute:async()=>({rows:[['12','23.04.2026']],requested_records:25,rendered_only:true}),verifiedUploads:()=>[upload],
  resolveStorageSource:async()=>({verified:true,kind:'storage',server_source_ref:'source-one',destination:path})});
 const ctx={signal:new AbortController().signal,deadline:Date.now()+60000,document_id:'d',workflow_ref:{workflow_id:'w'},node:{node_id:'n'}};
-await driver.verifySource(p);await driver.openWizard(ctx);
+assert.equal((await driver.verifySource(p)).source.destination,path);await driver.openWizard(ctx);
 if(button==='missing'){
  await assert.rejects(driver.configureTextImport(ctx,p),/native import format detection available/);
  assert.ok(!actions.some(a=>a.ref==='detect'));
@@ -59,6 +62,6 @@ if(button==='missing'){
  assert.deepEqual(profile.columns.map(c=>c.type),['integer','datetime']);
  assert.equal(configured.source.fields.first_line_as_title.value,true);
 }
-`,button],{encoding:'utf8',timeout:30000});
+`,button,kind],{encoding:'utf8',timeout:30000});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
