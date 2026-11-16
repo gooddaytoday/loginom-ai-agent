@@ -324,10 +324,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.export_destination_conflict=refusal.verification==='text_export_conflict_rejected';
       }
-      const inputRefusal={'research.quality':'quality_input_validation_refused','research.duplicates':'duplicates_input_validation_refused','exports.excel':'excel_export_binding_refused'}[request.target.type];
+      const inputRefusal={'research.quality':'quality_input_validation_refused','research.duplicates':'duplicates_input_validation_refused','exports.excel':'excel_export_binding_refused','exports.text':'text_export_binding_refused'}[request.target.type];
       if(name==='input_mapping'&&inputRefusal&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
-        &&(request.target.type==='exports.excel'?refusal.settings_unchanged===false&&refusal.input_saved===true:refusal.settings_unchanged===true)
+        &&(['exports.excel','exports.text'].includes(request.target.type)?refusal.settings_unchanged===false&&refusal.input_saved===true:refusal.settings_unchanged===true)
         &&refusal.verification===inputRefusal){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
@@ -397,7 +397,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
-          &&(!(request.read.variable_ports?.length)||value.owner_verified===true&&typeof value.process_id==='string'&&typeof value.process_record_id==='string')
+          &&(value.status==='failed'||!(request.read.variable_ports?.length)||value.owner_verified===true&&typeof value.process_id==='string'&&typeof value.process_record_id==='string')
           &&(name!=='materialization_execute'||value.owner_verified===true) && ['completed','cancelled','failed'].includes(value.status)
           && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true)
           && (value.status!=='failed'||value.failure_verified===true&&value.output_refreshed===false

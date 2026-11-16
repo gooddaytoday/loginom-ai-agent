@@ -22,12 +22,16 @@ const modules={
  'executor/catalog/actions.json':JSON.stringify({actions:[]}),
  'executor/catalog/selectors.json':JSON.stringify({selectors:[]}),
 };
-async function seed(t,url){
+async function seed(t,url,nativeServer=false){
  const root=await mkdtemp(join(tmpdir(),'excel-seed-url-'));t.after(()=>rm(root,{recursive:true,force:true}));
- for(const [path,text] of Object.entries(modules)){const p=join(root,'runtime',path);await mkdir(join(p,'..'),{recursive:true});await writeFile(p,text);}
+ const fixtures={...modules,...(nativeServer?{
+  'client/lib/artifacts.mjs':`export {createArtifactStore} from ${JSON.stringify(new URL('../../../packages/loginom-runtime/client/lib/artifacts.mjs',import.meta.url).href)};`,
+  'client/lib/executor.mjs':`export const createActionRuntime=()=>({deliverArtifact:async()=>({state:'running',outcome:null}),artifactDeliveryStatus:()=>({state:'settled',outcome:{status:'SUCCEEDED',destination:'/worker/book.xlsx',upload_completion_verified:true,cleanup_complete:true}})});`,
+ }:{})};
+ for(const [path,text] of Object.entries(fixtures)){const p=join(root,'runtime',path);await mkdir(join(p,'..'),{recursive:true});await writeFile(p,text);}
  const config=join(root,'config.json'),fixture=join(root,'book.xlsx'),output=join(root,'out');
- await writeFile(fixture,'book');
- await writeFile(config,JSON.stringify({login:{url,username:'worker',password:'',package_directory:'/worker'},books:[{fixture,destination:'/worker/book.xlsx'}]}));
+ await writeFile(fixture,nativeServer?Buffer.alloc(20*1024*1024,120):'book');
+ await writeFile(config,JSON.stringify({login:{url,username:'worker',password:'',package_directory:'/worker'},books:[{fixture,destination:'/worker/book.xlsx'}],...(nativeServer?{native_server_import:true}:{})}));
  const run=spawnSync(process.execPath,[script,root,config,output],{encoding:'utf8'});
  assert.equal(run.status,0,run.stderr);
  return new URL(JSON.parse(await readFile(join(output,'result.json'),'utf8')).cleanup.prepared);
@@ -39,6 +43,10 @@ test('seed workspace prepare normalizes a pair URL without /app/ like loginBrows
 test('seed workspace prepare keeps a pair URL that already has /app/',async t=>{
  const prepared=await seed(t,'https://app.loginom.ai/app/');
  assert.equal(prepared.origin,'https://app.loginom.ai');assert.equal(prepared.pathname,'/app/');
+});
+test('native server fixture seeding admits twenty MiB and waits for asynchronous delivery completion',async t=>{
+ const prepared=await seed(t,'https://app.loginom.ai/app/',true);
+ assert.equal(prepared.pathname,'/app/');
 });
 
 test('native folder lookup scrolls the same virtual grid beyond DOM index 57 and verifies its row',async()=>{
