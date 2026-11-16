@@ -239,6 +239,11 @@ async function configureLogRegressionPartition(channel,p){
  const one=(s,tid,verb)=>{const es=s.ui.elements.filter(e=>(e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb));need(es.length===1,'partition control unavailable: '+tid);return es[0];};
  const act=async(key,action)=>channel.perform({condition:'configure logistic partition '+key,initialObservation:state,ready,identity:s=>s.prepared_node_context,
   resolve:s=>({...action,ref:one(s,s.wizard.root_tid+';LearnPartitionWizard;'+key,action.verb).ref})});
+ if(state.node_logregression.source_status==='Не активировано'){
+  await act('btnActivationPort',{verb:'click'});
+  state=await channel.observe({condition:'logistic partition input activated with row count',readLogRegression:true,
+   ready:s=>ready(s)&&s.node_logregression.source_status==='Вход активирован'&&Number.isSafeInteger(s.node_logregression.total_count)});
+ }
  need(state.node_logregression.disabled.train===false&&state.node_logregression.disabled.test===false,'partition percentages must be editable');
  if(state.node_logregression.values.sampling!==1){
   await act('pedSamplingMethod;ValueControl;trg_picker',{verb:'click'});

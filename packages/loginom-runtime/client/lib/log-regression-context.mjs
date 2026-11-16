@@ -77,7 +77,7 @@ export function readLogRegressionBrowser(prefix) {
    const c=exactValue(partitionBase+';'+path),value=c?.getValue();
    if(value!==undefined&&value!==''&&Number.isSafeInteger(Number(value))&&Number(value)>=0)counts[key]=Number(value);
   }
-  return {verified:true,kind:'partition',values,switches,disabled,sequence,...counts};
+  return {verified:true,kind:'partition',values,switches,disabled,sequence,...counts,source_status:exactValue(partitionBase+';txtActivationPortStatus')?.getValue()??null};
  }
 
  const normBase=prefix+';WizrdMCF;NormTuneWizard;',normRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(normBase.slice(0,-1))+']')];
