@@ -26,7 +26,7 @@ test('table-tree validates the complete declared schema and typed source before 
  const schema=nodes.filter(n=>n.source_field).map(n=>({name:n.source_field,type:n.type}));
  const port={sample_complete:true,row_count:3,schema,sample:Array.from({length:3},()=>schema.map(c=>({type:c.type,is_null:true,value:null})))};
  validateTableTreeSource(port,nodes);
- for(const change of [n=>n[2].path='/items/0/RowID',n=>n[1].is_array=false,n=>n[0].source_field='RowID',n=>n[2].type='datetime',n=>n[2].label='other',n=>n.push({...n[2]})]){
+ for(const change of [n=>n[2].path='/items/0/RowID',n=>n[1].is_array=false,n=>n[0].source_field='RowID',n=>n[2].type='unsupported',n=>n[2].label='other',n=>n.push({...n[2]})]){
   const bad=structuredClone(nodes);change(bad);assert.throws(()=>validateTreeConversionParameters({nodes:bad},'manual_structure',request));
  }
  assert.throws(()=>validateTableTreeSource({...port,schema:schema.map(c=>({...c,type:'string'}))},nodes));
@@ -41,6 +41,22 @@ test('serialization accepts only the approved settings and retains omitted exist
  for(const [key,value] of Object.entries({exclude_root:false,pretty:true,keys:'labels',multi_row:true,datetime:'local'}))assert.throws(()=>validateTreeConversionParameters({...p,[key]:value},'serialize',r));
  assert.throws(()=>validateTreeConversionParameters({},'serialize',r));
  validateTreeConversionParameters({},'serialize',{...r,target:{...r.target,kind:'existing'},inputs:[]});
+});
+test('table-tree preserves DateTime and Variant leaves without widening JSON serialization',async()=>{
+ const typed=[
+  {path:'',name:'Root',label:'Root',type:'object',is_array:false},
+  {path:'/items',name:'items',label:'items',type:'object',is_array:true},
+  ...['datetime','variant'].map((type,i)=>({path:'/items/'+['When','Value'][i],name:['When','Value'][i],label:['When','Value'][i],type,is_array:false,source_field:['When','Value'][i]})),
+ ];
+ validateTreeConversionParameters({nodes:typed},'manual_structure',request);
+ const schema=typed.filter(n=>n.source_field).map(n=>({name:n.source_field,type:n.type}));
+ validateTableTreeSource({sample_complete:true,row_count:3,sample:[[],[],[]],schema},typed);
+ assert.throws(()=>validateTableTreeSource({sample_complete:true,row_count:3,sample:[[],[],[]],schema:schema.map(c=>({...c,type:'string'}))},typed));
+ const port={port_kind:'tree',sample_complete:true,tree:{complete:true,schema:typed.map(n=>({...n,is_container:n.type==='object'}))}};
+ assert.throws(()=>validateSerializationTree(port),/dates and Variant/);
+ const implementation=await conversionImplementation(true);
+ const result=await implementation.readOutputs({readOutputPort:async()=>({output:port})},{ports:[0],sample_rows:10},{portExecution:{},execution:{execution_id:'exec'},receipt_id:'read'});
+ assert.equal(result.ports[0],port);
 });
 test('new types install their actual handlers and preserve the sorting/join keys schema',()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
@@ -88,9 +104,10 @@ test('existing table conversion retains its last verified settings after a later
  assert.equal((await driver.beforeTarget({deadline:Date.now()+10000})).verified,true);
 });
 
-test('replacement maps newly created unbound leaves without opening Clear Links confirmation',async()=>{
+for(const type of ['integer','datetime','variant'])test('replacement maps new '+type+' leaves without opening Clear Links confirmation',async()=>{
  const implementation=await conversionImplementation(true),wanted=structuredClone(nodes.slice(0,3));
- const tree={verified:true,inventory_complete:true,base:'W;',nodes:structuredClone(wanted).map(n=>({...n,...(n.source_field?{source_field:'old'}:{})})),source_fields:[{name:'RowID',type:'integer',tid:'source'}]};
+ wanted[2].type=type;const typeLabel={integer:'Целый',datetime:'Дата/Время',variant:'Переменный'}[type];
+ const tree={verified:true,inventory_complete:true,base:'W;',nodes:structuredClone(wanted).map(n=>({...n,...(n.source_field?{source_field:'old'}:{})})),source_fields:[{name:'RowID',type,tid:'source'}]};
  const state={prepared_node_context:{verified:true,surface:'wizard'},wizard:{stage:'table_tree',root_tid:'W'},node_tree:tree,ui:{elements:[]}};
  let selected='';const actions=[];
  const control=(tid,verbs=['click'])=>({tid,ref:tid,allowed_actions:verbs});
@@ -99,7 +116,7 @@ test('replacement maps newly created unbound leaves without opening Clear Links 
   state.ui.elements=[control('W;btnNext',['wizard_step']),control('W;btnAddChild'),control('source',['drag']),
    ...tree.nodes.flatMap(n=>[control(n.tid,['click','drag']),control(n.delete_tid)]),...(tree.delete_confirmation?[control('msgbox;tlb;yes')]:[])];
   if(tree.editor)state.ui.elements.push(...['edtName','edtDisplayName'].map(k=>control('EditDataTreeNodeDefForm;'+k,['fill','press'])),
-   ...['cbxDataType;trg_picker','cbxDataType;boundlist;Целый','chbIsContainer;DisplayEl','chbIsArray;DisplayEl','btnApply'].map(k=>control('EditDataTreeNodeDefForm;'+k)));
+   ...['cbxDataType;trg_picker','cbxDataType;boundlist;'+typeLabel,'chbIsContainer;DisplayEl','chbIsArray;DisplayEl','btnApply'].map(k=>control('EditDataTreeNodeDefForm;'+k)));
  };
  const channel={observe:async options=>{render();assert.ok(options.ready(state),options.condition);return structuredClone(state);},perform:async options=>{
   const a=options.resolve(state);actions.push(a);const e=tree.editor;
@@ -110,7 +127,7 @@ test('replacement maps newly created unbound leaves without opening Clear Links 
   else if(a.ref==='msgbox;tlb;yes'){tree.nodes=tree.nodes.filter(n=>n.path!==selected&&!n.path.startsWith(selected+'/'));delete tree.delete_confirmation;}
   else if(a.ref==='W;btnAddChild')tree.editor={add:true,name:'',label:'',type:'string',is_container:false,is_array:false};
   else if(a.verb==='fill')e[a.ref.endsWith(';edtName')?'name':'label']=a.text;
-  else if(a.ref.endsWith(';boundlist;Целый'))e.type='integer';
+  else if(a.ref.endsWith(';boundlist;'+typeLabel))e.type=type;
   else if(a.ref.endsWith(';chbIsContainer;DisplayEl'))e.is_container=!e.is_container;
   else if(a.ref.endsWith(';chbIsArray;DisplayEl'))e.is_array=!e.is_array;
   else if(a.ref.endsWith(';btnApply')){tree.nodes.push({path:selected+'/'+e.name,name:e.name,label:e.label,type:e.is_container?'object':e.type,is_array:e.is_array,...(!e.is_container?{source_field:''}:{})});delete tree.editor;}
