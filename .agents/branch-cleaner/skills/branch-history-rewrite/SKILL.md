@@ -93,11 +93,19 @@ silently restart from the new tip or overwrite it.
 - **Branch checked out:** in its owning worktree, require an empty porcelain
   status including untracked files and submodule changes, no unfinished Git
   operation, and `HEAD` attached to the expected branch at the original tip.
-  Detach there at the original tip using ordinary `git switch --detach` without
-  force. Recheck that no worktree owns the branch and its ref still matches;
+  Detach there at the original tip with
+  `git switch --no-overwrite-ignore --detach <original-tip>`, without force.
+  Recheck that no worktree owns the branch and its ref still matches;
   then perform the same compare-and-swap update. Switch that owning worktree
-  normally back to the branch, without force, and verify clean status, HEAD,
-  index, and working tree correspond to the prepared tip.
+  back with `git switch --no-overwrite-ignore <branch>`, without force, and
+  verify clean status, HEAD, index, and working tree correspond to the prepared tip.
+
+Clean porcelain status does not include ignored local files. Ordinary switching
+can overwrite them even without force; keep `--no-overwrite-ignore` on both
+switches. If a renamed or added path collides with an ignored file, stop and
+preserve that file, the prepared ref, and backup. If the final switch fails after
+the compare-and-swap, report that the branch ref is updated while the owning
+worktree remains detached; do not delete the local file to complete the switch.
 
 Never update a checked-out branch ref while leaving its index and files at the
 old commit. Never use `reset --hard`, forced checkout/switch, automatic stash,
