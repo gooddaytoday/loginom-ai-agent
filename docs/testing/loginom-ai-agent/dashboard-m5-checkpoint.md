@@ -1,20 +1,15 @@
 # Dashboard M5 — checkpoint
 
-- Пауза по просьбе владельца: 16 ноября 2026; ветка `m5-acceptance`, проверенный source `0e042947`. Task 4 и source/CI Task 5a приняты; Task 5b/M5 не завершены.
-- Исходная принятая M4 основа M5: `77c275a68f9152efd7f5203b0f6643f11923a8ef`; Tasks 0–3 приняты: Spec Approved / Quality Approved, mandatory 0.
-- Task 5b выполняется из чистого snapshot `0e0429470bb5c4761aeb43456501696d5a5f2beb`; [runbook M5](dashboard-m5.md) — канонический источник входов, точных сред и результатов.
-- Task 0: из предоставленного release и штатного installer подготовлен рабочий Loginom; лицензирование, HTTP/HTTPS/WSS/Integrator и installed Desktop/CLI проверены.
-- Task 1: installed Desktop → snapshot → real model draft → Allow once → Host JSON → ready/live4 PASS; `.lgp` не изменён, JSON без sample; native Close/Logout и actual runtime exit проверены раздельно.
-- Shell/server совпали с финальным dist; SRI, отдельный app-origin, private API и HTTP-only/HTTPS проверены без правок vendor index/client.json.
-- Task 2: обязательная уникальная публикация с точным sourceHash/HTML/assets и publisher cleanup, ошибки/сигналы/concurrency/client negatives PASS.
-- Task 3: ownership/lifecycle/Apache rollback, один переносимый архив, fresh offline Docker install/server и отдельный HTTPS client PASS; данные сохранены.
-- Task 4: один общий архив прошёл modern Docker/Podman server/client, rootless SELinux shared/private, MCS/durable/cron/rollback и Fedora reboot; технические пункты подтверждены.
-- Владелец 16 ноября принял проверенные современные стеки как нижнюю границу Dashboard; [точная политика](dashboard-m5.md#границы-поддержки-dashboard). Исходные нижние FAIL сохранены как история.
-- Общие минимумы вендора Loginom не изменены и не задают поддержку Dashboard; version guard или compatibility-механизм не добавлялся.
-- Отдельное ограничение: recurring client initial `IsPackageModified(...) !== false` до idle; причина неизвестна, финальные single-run PASS не являются исправлением.
-- Документационный остаток Task 4 синхронизирован; в рамках этого остатка новые source/installed-прогоны не выполнялись. Source/package/browser/size и адресные результаты — в runbook.
-- Итоговый независимый scoped gate Task 4 пройден: Spec ✅ / Quality Approved, mandatory 0 (`task-4-resume-review.md`). Полный M5 и whole-branch review ещё впереди.
-- Git переносит исходники и инструкции; архивы, VM, CA/SSH keys, credentials, лицензии и raw evidence остаются приватными. Перечень повторно получаемых входов — в runbook.
-- Task 5b: настоящий update 7.4.1→7.4.2/server0; `.lgp`/JSON/Users/ICF сохранены, gnclient host_id изменён native. Первый client Close FAIL сохранён; target-native копия после одного Save/client0, без product fix.
-- Task 5b Docker742: Desktop/CLI real model, Deny/Allow once, common no-auto/auto/no-access, Bfailed/oldAlive/Cready/manual rollback/live5 PASS. Native Save stalls и approved exact-config recovery сохранены отдельно. Change ports/cert + uninstall/preservation/native execute/Close/Logout PASS; CA snapshots/Studio/iframe все3 negative PASS, Host unknown/expired PASS; wrong-name Host и backend lookup открыты из-за Help initialize/network.
-- Безопасная точка: own VM штатно выключена, UI/CLI/runtime закрыты; Dashboard удалён, native сохранён. Fresh load не начат: non-root verifier не прочитал image0600. Далее root verification→fresh offline/new ports→Podman→CA/Host/model. Plain repeat-install rediscovery остаётся semantic question; PR/merge/release — отдельная команда.
+- Возобновлено владельцем 16 ноября 2026; ветка `m5-acceptance`. Tasks 0–4 и source/CI/build-context Task 5a приняты; Task 5b/M5 не завершены.
+- Принятая M4 основа: `77c275a68f9152efd7f5203b0f6643f11923a8ef`. Контракт — дизайн/план; точные входы, текущий source/архив и результаты — [runbook M5](dashboard-m5.md).
+- Tasks 0–1: штатная native-поставка, installed Desktop/CLI, real model/snapshot/draft/Allow once/Host JSON/ready/live4, native Close/Logout и actual runtime exit проверены раздельно; `.lgp` не менялся.
+- Tasks 2–3: publication/sourceHash/HTML/assets/cleanup, сигналы/concurrency/negatives, lifecycle/Apache rollback и portable archive/fresh offline Docker server/client PASS.
+- Task 4: общий архив modern Docker/Podman server/client, rootless SELinux shared/private, UID/MCS/durable/cron/rollback/reboot PASS. Итоговый scoped gate: Spec/Quality Approved, mandatory0.
+- Владелец принял проверенные современные стеки как нижнюю границу Dashboard; [точная политика](dashboard-m5.md#границы-поддержки-dashboard). Общие минимумы вендора и runtime version guards не менялись.
+- Исторический Task 5b исходной машины: настоящий update7.4.1→7.4.2, Desktop/CLI real model/permissions/common/local/downloaded/rollback/live5 PASS; change ports/cert и uninstall/preservation/native execute/Close/Logout PASS.
+- CA исторически: snapshot/Studio/iframe все3 negative PASS, Host unknown/expired PASS; Host wrong-name/backend lookup/trusted return открыты из-за Help initialize/network. Прежние Save stalls/recovery и cleanup FAIL не считаются исправленными.
+- Дома: независимая native-копия; fresh offline common archive/server/client PASS. Native change дал repeat RED; source fix и umask packaging fix приняты; normal original-flags и strict install/repeat без флагов дали server/client/live4/Close/Logout PASS предыдущего кандидата.
+- Текущий TLS pairing guard принят; mismatch/unparseable отказали без изменений, valid strict server PASS. Client core/live4 PASS, native Close/Logout FAIL оставил собственный disconnected writable пакет/lock; dirty неизвестен, сохранённые bytes прежние. Старая сессия исчезла до Admin action; no-flags install/server PASS, client exact RED на первоначальном non-false до idle. Одна попытка убрать раннюю проверку дала idle=true/finalclose=false; изменение откачено, source diff0. Следующий шаг — scoped post-failure наблюдение, без ослабления acceptance.
+- Builder one-job/exit0→Compose restart подтверждён source; отдельные исторические события недоступны, publication PASS. Dev Desktop/fullCLI .3 installed static gate PASS с обязательным Help input; реальные Help/Host/model ещё не проверены. Рабочий SSH недоступен; точные исходные Task5b private inputs не перенесены. Старые VM/диски и production сохранены.
+- Далее: safe own-session cleanup/диагноз→strict no-flags/Compose failure→installed clients/Podman→CA/Host/model→uninstall/whole-branch review. M6 implementation не начинать; push/PR/merge/release отдельно.
+- Git переносит исходники и инструкции; VM/архивы/credentials/CA/SSH keys/лицензии/raw evidence остаются вне Git. SDD ledger текущего плана сохраняется до завершения.
