@@ -224,7 +224,7 @@ test('crowded automatic placement chooses a bounded row beyond all observed draw
  assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
  assert.ok(f.state().clicks>0);assert.equal(f.state().open,false);
 });
-test('browser automatic placement retains overflow coordinates in its serialized evaluator',async()=>{
+test('browser automatic placement refuses an entirely occupied visible canvas',async()=>{
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'imports.text'},inputs:[]};
  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
  const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
@@ -232,7 +232,30 @@ test('browser automatic placement retains overflow coordinates in its serialized
  const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
  const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
- assert.deepEqual(structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000)),{x:80,y:728});
+ await assert.rejects(adapter.choosePosition(request,graph,Date.now()+10000),/no free visible canvas position/);
+});
+for(const cover of ['canvas','foreign','dialog'])test('LAB-1693 final4 automatic fallback stays reachable under '+cover,async()=>{
+ const recorded=JSON.parse(await readFile(new URL('./fixtures/auto-place-final4.json',import.meta.url),'utf8'));
+ const v=recorded.view,box={...v,right:v.x+v.width,bottom:v.y+v.height};
+ const occupied=recorded.rects.map(([x,y,width,height])=>({x,y,width,height,left:x,top:y,right:x+width,bottom:y+height}));
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(b=>({getBoundingClientRect:()=>b})),scrollLeft:v.scroll.x,scrollTop:v.scroll.y,contains:element=>cover==='dialog'&&element===hit,closest:()=>null};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:v.scale,translate:v.translate}}}}};
+ const hit=cover==='canvas'?canvas:{closest:()=>cover==='dialog'?{}:null};
+ const context={innerWidth:v.viewportWidth,innerHeight:v.viewportHeight,document:{elementFromPoint:(x,y)=>x>=v.x&&x<box.right&&y>=v.y&&y<box.bottom?hit:null},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ assert.deepEqual(nodePlacementPoint(v,recorded.refused),recorded.screen_point);
+ assert.deepEqual(nodePlacementOverflow(v,occupied,64,10000),recorded.refused);
+ for(const type of ['transform.union_data','exports.text']){
+  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type},inputs:[]};
+  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+  const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>code.includes('async function readGraph')?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+  const result=adapter.choosePosition(request,graph,Date.now()+10000);
+  if(cover!=='canvas'){await assert.rejects(result,/no free visible canvas position/);continue;}
+  const position=structuredClone(await result),point=nodePlacementPoint(v,position);
+  assert.deepEqual(position,recorded.suggested);
+  assert.ok(point.x>=v.x+8&&point.x<=box.right-8&&point.y>=v.y+8&&point.y<=box.bottom-8);
+  assert.equal(nodePlacementGap(v,point,occupied),true);
+  assert.equal(request.target.position,undefined);
+ }
 });
 test('overflow remains beyond occupied drawings under zoom, translation and scroll',()=>{
  for(const scale of [.5,1,2]){

@@ -836,7 +836,16 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,reco
           return position;
         }
         const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000,${clearance?112:0});
-        if(overflow&&(!${clearance}||(${nodePlacementGap.toString()})(view,(${nodePlacementPoint.toString()})(view,overflow),occupied)))return overflow;
+        if(overflow){
+          // Use the explicit-position refusal's bounded visible suggestion,
+          // rather than handing creation an overflow row it cannot reach.
+          const position=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000,0,overflow,point=>{
+            if(!(${nodePlacementGap.toString()})(view,point,occupied))return false;
+            const hit=document.elementFromPoint(point.x,point.y);
+            return !!hit&&(hit===e||e.contains(hit))&&!hit.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg');
+          });
+          if(position)return position;
+        }
         throw Error('target.position: no free visible canvas position or bounded model position; enlarge the canvas or supply an explicit position');
       })`,deadline);
     },
