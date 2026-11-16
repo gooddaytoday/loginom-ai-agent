@@ -12,7 +12,7 @@ export async function excelConfigureCapability(page,t,readContext){
  const binding={document_id:t.document_id,workflow_ref:t.workflow_ref,node:t.node};
  const root=t.workflow_ref.prefix+';WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
- let effect=false,waitingFor=null;
+ let effect=false,waitingFor=null,observedAuto;
  // One path, a U+FF5C-joined ordered list or one mask in the native input.
  const e=t.excel??{},want=e.source_paths?e.source_paths.join('｜'):e.source_mask??e.source_path,multi=want?.includes('｜')||want?.includes('*');
  const threadLabel=e.max_threads==='auto'?'Автоопределение':e.max_threads===undefined?undefined:String(e.max_threads);
@@ -21,7 +21,18 @@ export async function excelConfigureCapability(page,t,readContext){
    need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return b;};
   const wait=async(label,read)=>{try{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}}
    catch(error){if(/operation deadline exceeded$/.test(error.message))error.message+=' ['+label+']';throw error;}throw Error(label+' did not settle');};
-  const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
+  const quiet=()=>wait('wizard loading',()=>{
+   const masks=page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible');
+   if(observedAuto!=='Все')return masks.count().then(n=>n===0);
+   // All makes the mapping delete header permanently disabled. Its own native
+   // control mask is not a loading mask (native C8 probe, Loginom 7.4.2).
+   return masks.evaluateAll((es,tid)=>es.every(e=>{
+    const header=e.parentElement,c=header&&Ext.getCmp(header.id);
+    return e.classList.contains('x-mask')&&header.getAttribute('data-tid')===tid
+     &&document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']').length===1
+     &&header.classList.contains('x-item-disabled')&&c?.disabled===true&&c.el.dom===header;
+   }),root+';ColumnsMappingEngineOutputPortWizard;colTargetDelete');
+  });
   const point=(locator,settled)=>{
    waitingFor=String(locator);
    return wait('Excel control reachable: '+locator,async()=>{
@@ -138,7 +149,8 @@ export async function excelConfigureCapability(page,t,readContext){
    &&(named?typeof source.extend_range==='boolean':source.whole_sheet)&&source.blank_rows==='Импортировать','source settings differ');
   if(!t.inspect&&!t.preserve&&t.excel.named_range!==undefined)need(named&&source.named_range===t.excel.named_range&&source.extend_range===(t.excel.extend_range??false),'named range settings differ');
   await advance();await wait('Excel column page',()=>find(grid).isVisible());
-  if(!t.inspect&&!t.preserve)await choose(defs+'cbbAutoDetectColumnsMode;ValueControl','Нет');
+  const modes={none:'Нет',new:'Только новые',all:'Все'};
+  if(!t.inspect&&(!t.preserve||e.auto_detect!==undefined))await choose(defs+'cbbAutoDetectColumnsMode;ValueControl',modes[e.auto_detect??'none']);
   const types={integer:'Целый',real:'Вещественный',string:'Строковый',datetime:'Дата/Время',boolean:'Логический'};
   const read=async()=>{await quiet();await guard();return page.evaluate(({grid,root})=>{
    const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
@@ -154,7 +166,7 @@ export async function excelConfigureCapability(page,t,readContext){
     return {name:cells[0].textContent.trim(),label:cells[1].textContent.trim(),type:cells[2].textContent.trim(),data_kind:cells[3].textContent.trim(),used:checks[0].classList.contains('x-grid-checkcolumn-checked')};});
   },{grid,root});};
   let current=await read();
-  if(!t.inspect&&!t.preserve){
+  if(!t.inspect&&!t.preserve&&e.columns){
   need(current.length===t.excel.columns.length,'explicit columns must cover the whole worksheet schema');
   need(current.every((f,i)=>f.name===(t.excel.columns[i].source_name??t.excel.columns[i].name)||f.label===(t.excel.columns[i].source_name??t.excel.columns[i].name)),'source column names differ; use exact source_name headers');
   for(let i=0;i<t.excel.columns.length;i++){
@@ -184,11 +196,14 @@ export async function excelConfigureCapability(page,t,readContext){
    need(Object.keys(expected).every(k=>current[i][k]===expected[k]),'explicit column settings differ');
   }
   }
-  const auto=await find(defs+'cbbAutoDetectColumnsMode;ValueControl').locator('input').inputValue();need(auto==='Нет','LOGINOM_IMPORT_SCHEMA_CHANGED: automatic typing must be disabled');
+  const auto=await find(defs+'cbbAutoDetectColumnsMode;ValueControl').locator('input').inputValue();
+  observedAuto=auto;
+  need(Object.values(modes).includes(auto)&&(t.inspect||auto===modes[e.auto_detect??'none']),
+   'LOGINOM_IMPORT_SCHEMA_CHANGED: automatic column policy differs');
   await advance();await wait('Excel output mapping',()=>find(root+';ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn').isVisible());
   await advance();await wait('Excel completion page',()=>find(root+';DoneWizard').isVisible());
   const reverse=Object.fromEntries(Object.entries(types).map(([k,v])=>[v,k]));
-  return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source,auto_detect:'Нет',columns:current.map(f=>({...f,type:reverse[f.type]}))}};
+  return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source,auto_detect:auto,columns:current.map(f=>({...f,type:reverse[f.type]}))}};
  }catch(error){
   // Private failure evidence, journaled by node_step_completed. No gestures or
   // arbitrary field values: capture only this still-owned wizard's DOM controls.

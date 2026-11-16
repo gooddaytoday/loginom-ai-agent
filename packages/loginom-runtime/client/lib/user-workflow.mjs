@@ -8,7 +8,7 @@ export function userActionTool(tool) {
   p.action_key.enum=[...userActionKeys];
   if(p.action_keys)p.action_keys.items.enum=[...userActionKeys];
   copy.description=tool.name==='dock_action_run'
-    ? 'Save the completed scenario with package.save_checkpoint. Use package.save_as only when the user explicitly requests reopening the saved package; it closes and reopens the workflow. First request missing action parameters with dock_action_describe. Create and configure supported nodes through dock_node_apply.'
+    ? 'Save the completed scenario with package.save_checkpoint. REST connection references require Close/Open and at most one extra Save; the application rebinds issued workflow/node identities for continued work. Use package.save_as for explicitly requested reopen. Request missing parameters with dock_action_describe; create/configure nodes through dock_node_apply.'
     : 'List nodes with {}. Single: action_key alone; never combine action_key with a batch. Batch: action_keys/node_types, optional modes. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Cards contain parameter_schema and guidance from the prepared skill. Without modes get common guidance and guidance_modes; request selected modes for their rules before applying. Read-only.';
   return copy;
 }
@@ -120,10 +120,11 @@ export function createUserWorkflowBindings() {
         &&typeof outcome.destination==='string'&&outcome.destination.startsWith('/'))
         uploads.set(result.upload_operation_id,{artifact_id:artifact,destination:outcome.destination});
     },
-    remember({ document_id, workflow_ref }) {
+    remember({ document_id, workflow_ref, previous_workflow_ref }) {
       if (typeof document_id !== 'string' || !workflow_ref?.workflow_id || !Array.isArray(workflow_ref.navigation_path)) return;
       if(describedDocument!==document_id)described.clear();
       describedDocument=document_id;
+      if(previous_workflow_ref?.workflow_id)references.delete(key(document_id,previous_workflow_ref.workflow_id));
       references.set(key(document_id, workflow_ref.workflow_id), structuredClone(workflow_ref));
     },
     expandNodeDelete(request) {

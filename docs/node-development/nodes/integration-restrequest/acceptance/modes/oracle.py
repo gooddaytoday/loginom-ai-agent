@@ -64,9 +64,6 @@ def proposal(case):
             [{"Case": row["Case"], "ContentType": row["RequestContentType"],
               "Body": row["Body"], "HttpStatusCode": 200}
              for row in source("content-types.csv")])]
-        outputs[0]["rows"] += [{"Case": case, "ContentType": "text/plain",
-                                "Body": "LAB-976", "HttpStatusCode": 200}
-                               for case in ("response-plain", "response-any")]
     elif case == "url-modes":
         rows = []
         for mode in ("query", "segments", "replacement"):

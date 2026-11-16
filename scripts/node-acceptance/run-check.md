@@ -1,3 +1,23 @@
+`rest-query-variables` uses LAB-820 `variables/acceptance/task-rest-variables.md`
+without input files. The frozen initial/updated tables are checked separately
+against both downloaded CSVs. W1 snapshots prove integer limit/skip, stable
+source IDs and unchanged query bindings on the same REST. Cold uses the updated
+expectation and actual downloaded CSV. Oracle, fixture and expected stay private.
+`read_existing_output` reexecutes without configuring the REST node; its internal
+`schemas` are allowed only when every requested port exactly matches the output
+of the earlier successful, clean, completed source operation on the same REST.
+Connection/query/mapping edits remain `REST_QUERY_RECONFIGURED`.
+
+`rest-content-types` uses the reduced C5 `task-content-types.md`, only
+`content-types.csv` and `acceptance/modes/content-types/expected.json`.
+Two raw UTF-8 POST bodies (text/plain, application/xml) must produce two typed
+rows with echoed content type, unchanged body and actual HTTP status. The two
+GET response-MIME branches were removed to reserve at least 25% of the unchanged
+1800s model limit under the observed slower-REST timing; this case no longer
+claims live coverage of response MIME text/plain or */*.
+Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
+Only task and CSV reach the model; expected/oracle remain private.
+
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
@@ -19,6 +39,17 @@ and CSVs use frozen `expected-absolute-path.json` then `expected-relative-path.j
 SOURCE_DIR is bound by the existing harness. The same Import changes absolute
 to relative paths while retaining FileTime (datetime, non-NULL, comparison present).
 Stock Save, cold execution without configuration and cleanup apply.
+
+`excel-import-auto-none`, `excel-import-auto-new`, `excel-import-auto-columns`
+and `excel-import-auto-types` use the unchanged C8 capability tasks and original
+schema-ab/abd/bc or types-a/b XLSX fixtures. `auto-schema/oracle.py` registers
+the unchanged `cases` from the independent capability expected container and
+checks source hashes. Only tasks and original books reach the model. The main
+audit requires two complete typed executions on one Excel GUID and a path-only
+native policy patch, without manual column replacement. Stock CSV, Save and
+cold output checks apply; cold additionally reads the saved native policy,
+source, Data sheet and header settings through an owned wizard and cancels it
+without applying settings. Each attempt requires confirmed package close/logout.
 Only the business task and source paths reach the model.
 
 `text-parallel` uses the unchanged text-import `task-parallel.md`, original

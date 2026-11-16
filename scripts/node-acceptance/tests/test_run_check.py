@@ -23,6 +23,19 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_rest_content_types_keeps_plain_xml_bodies_in_two_rows(self):
+        case = runner.scenario('rest-content-types')
+        self.assertEqual(case['input_files'], ['content-types.csv'])
+        self.assertEqual(case['prompt'].name, 'task-content-types.md')
+        self.assertIsNone(case['base'])
+        expected = runner.expected_for(case, '/own/media.lgp')
+        self.assertEqual(expected['package_path'], '/own/media.lgp')
+        self.assertEqual(len(expected['outputs'][0]['rows']), 2)
+        self.assertEqual([r['ContentType'] for r in expected['outputs'][0]['rows']],
+                         ['text/plain', 'application/xml'])
+        self.assertEqual(expected['outputs'][0]['rows'][1]['Body'], '<order amount="17">Привет</order>')
+        self.assertTrue(case['oracle'].is_file())
+
     def test_only_read_scenarios_select_persistent_transport(self):
         for name in ['read-no-rerun-1', 'read-wait-running-1', 'row-filter-scalar']:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
@@ -191,9 +204,16 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         result = subprocess.run([sys.executable, '-B', case['oracle'], '--check', '--case', 'simulation'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_rest_query_variables_is_deferred_while_c4_remains_registered(self):
-        with self.assertRaisesRegex(ValueError, 'Unknown scenario: rest-query-variables'):
-            runner.scenario('rest-query-variables')
+    def test_rest_query_variables_preserves_two_frozen_phases(self):
+        case = runner.scenario('rest-query-variables')
+        self.assertEqual(case['input_files'], [])
+        self.assertEqual(case['export_count'], 2)
+        for initial, filename, values in [(True, 'expected-initial.json', [3, 2]), (False, 'expected.json', [5, 10])]:
+            expected = runner.rest_query_expected(case, '/own/query.lgp', initial=initial)
+            self.assertEqual(expected['outputs'], runner.read(case['source'] / filename)['outputs'])
+            variables = expected['variable_inventory']['outputs'][0]['variables']
+            self.assertEqual([v['value'] for v in variables], values)
+            self.assertTrue(all(v['type'] == 'integer' and v['label_any'] for v in variables))
         self.assertEqual(runner.scenario('rest-variables')['prompt'].name, 'task-variables.md')
         kit = runner.REPO / 'docs/node-development/variables/acceptance'
         for name in ('task-rest-variables.md', 'oracle.py', 'expected-initial.json', 'expected.json'):

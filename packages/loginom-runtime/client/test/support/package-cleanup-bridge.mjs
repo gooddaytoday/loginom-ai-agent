@@ -53,6 +53,7 @@ class ExternalClient {
         // After Save As reopened the package, only an Open binding of that
         // already active package can issue a receipt for its new tab.
         const o=JSON.parse(code.slice(code.lastIndexOf('(page, ')+7,-1));
+        if(o.bindOpenOnly&&this.f.bindingError)throw Error('Binding response lost');
         this.f.events.push('prepare:'+o.intent+(o.bindOpenOnly?':bind':''));
         if(o.bindOpenOnly)this.f.bindBudget={timeoutMs:o.timeoutMs,timeout:options?.timeout};
         value={...value,operation_id:o.operationId,created_draft:false,ownership_verified:false,effect_possible:false,
@@ -156,7 +157,15 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
       const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
-      if(f.reopen&&key==='package.save_as'){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
+      if((f.reopen&&key==='package.save_as')||f.normalized){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
+      if(f.normalized){
+        const continuations=[{document_id:'own-doc',workflow_ref:{workflow_id:'own-workflow',tab_tid:f.activeTab,prefix:'MF;TF-5',
+          navigation_path:['Server','Packages','Saved','Module','Workflow'].map((label,index,labels)=>({
+            tid:'MF;TF-5;cnrNaviMode;b.s_'+labels.slice(0,index+1).join('>'),label:index===0?'':label}))}}];
+        result.trace=[{event:'rest_package_normalization',modified_after:false},
+          {event:'save_continuations_observed',continuations,reopened:true,native_identity_verified:true}];
+        if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
+      }
       f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
     inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -577,6 +586,39 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
       assert.equal(f.cleanupOptions.documentId,'own-doc');assert.equal(f.cleanupOptions.account,'test-2');
     }
   }finally{try{await client?.close();await bridge?.close();}finally{await rm(directory,{recursive:true,force:true});}}
+});
+
+for(const profile of ['executor','user-v1'])for(const action of ['package.save_checkpoint','package.save_as'])for(const fault of ['none','transport','identity'])
+test('normalized Save keeps its successful receipt when workspace binding fails: '+profile+' '+action+' '+fault,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'normalized-save-bind-'));
+ const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+ const f=current={scenario:'normalized',events:[],saves:0,path,receipts:new Map(),catalog,normalized:true,
+  bindingError:fault==='transport',rebind:fault==='identity'?{workflow_ref:{workflow_id:'foreign-workflow'}}:{}};
+ const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+  metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
+ const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+  mode:'executor-replay',...(profile==='user-v1'?{resultProfile:profile}:{}),apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+  loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'},session);
+ const client=new AgentClient({name:'normalized-save-bind',version:'1'});
+ try{
+  const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+  await client.callTool({name:'dock_prepare',arguments:{}});
+  const reply=await client.callTool({name:'dock_action_run',arguments:{action_key:action,parameters:{path},operation_id:'own-save'}});
+  assert.notEqual(reply.isError,true,JSON.stringify(reply));
+  const parts=reply.content.filter(c=>c.type==='text'&&c.text.startsWith('{')).map(c=>JSON.parse(c.text));
+  assert.equal(parts[0].status,'SUCCEEDED');assert.equal(parts[0].operation_id,'own-save');assert.equal(f.saves,1);
+  const advice=parts.find(p=>p.kind==='dock_saved_package_workspace');assert.ok(advice);
+  if(fault==='none')assert.equal(advice.workflow_ref.workflow_id,'own-workflow');
+  else{
+   assert.equal(advice.state,'unbound');assert.match(advice.instruction,/do not repeat.*Save/i);
+   assert.equal(advice.next_step.tool,'dock_prepare');assert.equal(advice.next_step.arguments.intent,'existing_workflow');
+   assert.equal(advice.next_step.arguments.workflow_ref.document_id,'own-doc');
+   assert.equal(advice.next_step.arguments.workflow_ref.tab_tid,f.activeTab);
+   f.bindingError=false;f.rebind={};
+   const prepared=await client.callTool({name:advice.next_step.tool,arguments:advice.next_step.arguments});
+   assert.notEqual(prepared.isError,true,JSON.stringify(prepared));assert.equal(f.saves,1);
+  }
+ }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });
 
 // LAB-1331: Save As closes the package and reopens it in a new tab. Cleanup

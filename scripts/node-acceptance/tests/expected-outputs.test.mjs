@@ -284,6 +284,59 @@ function restQueryHistory(){
 test('REST query variables audit accepts integer snapshots and unchanged same-node execution',()=>{
  const {events,initial,final}=restQueryHistory();assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
 });
+function restQuerySchemaRead(ports=[0,1]){
+ const history=restQueryHistory(),source=history.events[7].result,request=history.events[10].request;
+ source.output.ports[0].schema=[{index:0,name:'RequestID',label:'Идентификатор запроса',type:'integer',data_kind:'Непрерывный'},
+  {index:1,name:'Response',label:'Ответ сервера',type:'string',data_kind:'Дискретный'}];
+ source.output.ports.push({port:1,schema:[{index:0,name:'RequestID',label:'Идентификатор запроса',type:'integer'},
+  {index:1,name:'ErrorCode',label:'Код завершения',type:'integer'},{index:2,name:'ErrorDesc',label:'Описание ошибки',type:'string'},
+  {index:3,name:'HttpStatusCode',label:'Код состояния HTTP',type:'integer'}]});
+ request.finish='execute';request.read={ports};
+ request.parameters.schemas=source.output.ports.filter(p=>ports.includes(p.port)).map(p=>({port:p.port,schema:structuredClone(p.schema)}));
+ return history;
+}
+for(const ports of [[0],[0,1],[1,0]])test('REST query audit accepts retained read schemas for ports '+ports,()=>{
+ const {events,initial,final}=restQuerySchemaRead(ports);
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const fault of ['missing source','future source','foreign source','failed source','unclean source','not executed source',
+ 'wrong name','wrong type','wrong label','wrong data kind','wrong index','reordered fields','duplicate port','missing port','unknown port','empty schemas',
+ 'null schema','extra schema property','wrong finish','configuration mode','missing read ports','ambiguous source port','bindings','connection','query','mappings'])
+test('REST query audit refuses unproven read schemas or real edits: '+fault,()=>{
+ const {events,initial,final}=restQuerySchemaRead(),r=events[10].request;
+ let source=events[7].result;
+ if(['foreign source','failed source','unclean source','not executed source'].includes(fault)){
+  source=structuredClone(source);source.operation_id='bad-source';r.parameters.source_operation_id='bad-source';
+  events.splice(10,0,{phase:'node_checkpoint',result:source});
+ }
+ if(fault==='missing source')r.parameters.source_operation_id='missing';
+ if(fault==='future source')r.parameters.source_operation_id='second';
+ if(fault==='foreign source')source.node={...source.node,node_id:'other'};
+ if(fault==='failed source')source.status='FAILED';
+ if(fault==='unclean source')source.cleanup_complete=false;
+ if(fault==='not executed source')source.execution.status='not_requested';
+ if(fault==='wrong name')r.parameters.schemas[0].schema[0].name='Other';
+ if(fault==='wrong type')r.parameters.schemas[0].schema[0].type='string';
+ if(fault==='wrong label')r.parameters.schemas[0].schema[0].label='Other';
+ if(fault==='wrong data kind')r.parameters.schemas[0].schema[0].data_kind='Дискретный';
+ if(fault==='wrong index')r.parameters.schemas[0].schema[0].index=1;
+ if(fault==='reordered fields')r.parameters.schemas[0].schema.reverse();
+ if(fault==='duplicate port')r.parameters.schemas[1]=structuredClone(r.parameters.schemas[0]);
+ if(fault==='missing port')r.parameters.schemas.pop();
+ if(fault==='unknown port')r.parameters.schemas[0].port=2;
+ if(fault==='empty schemas')r.parameters.schemas=[];
+ if(fault==='null schema')r.parameters.schemas[0].schema=null;
+ if(fault==='extra schema property')r.parameters.schemas[0].connection={name:'other'};
+ if(fault==='wrong finish')r.finish='done';
+ if(fault==='configuration mode')r.mode='request';
+ if(fault==='missing read ports')delete r.read;
+ if(fault==='ambiguous source port')source.output.ports.push(structuredClone(source.output.ports[0]));
+ if(fault==='bindings')r.bindings=[{name:'limit',source:'other'}];
+ if(fault==='connection')r.parameters.connection={name:'Other connection',base_url:'https://example.invalid/anything',method:'GET'};
+ if(fault==='query')r.parameters.query_parameters=[{name:'limit',field:'skip_text'},{name:'skip',field:'limit_text'}];
+ if(fault==='mappings')r.mappings=[{direction:'output',port:0,fields:[{source:{schema_id:'rest-output',field_id:'response'},name:'Other'}]}];
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_RECONFIGURED/);
+});
 test('REST query audit allows a new downstream Calculator after the initial REST response',()=>{
  const {events,initial,final}=restQueryHistory();
  events.splice(8,0,{phase:'node_apply_prepared',operation_id:'parse-initial',request:{
