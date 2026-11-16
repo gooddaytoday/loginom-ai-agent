@@ -83,6 +83,11 @@ def restore_source_modes(source):
 
 
 def scenario(name, case_root=None, *, cases=None):
+    if re.fullmatch(r'read-(?:no-rerun|wait-running)(?:-[123])?', name) and not case_root:
+        kind = 'read-wait-running' if name.startswith('read-wait') else 'read-no-rerun'
+        src = REPO / 'scripts/node-acceptance/scenarios' / kind
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    two_turn=kind, input_files=['rows.csv'], oracle=REPO / 'scripts/node-acceptance/read-output-oracle.py')
     if name in ['loop-pages-offline', 'loop-pages-rest'] and not cases and not case_root:
         node = REPO / 'docs/node-development/nodes/control-loop'
         offline = name == 'loop-pages-offline'
@@ -1139,6 +1144,59 @@ for(const stage of JSON.parse(readFileSync(0,'utf8')))
 """, str(REPO / 'scripts/node-acceptance/expected-outputs.mjs')],
         input=json.dumps(tables), text=True, capture_output=True, timeout=60)
     assert result.returncode == 0, 'TEXT_FOLDER_PORT_VALUES: ' + result.stderr[:2000]
+
+
+def check_read_turns(profile, folder, kind):
+    turns = [event for _, event in records(folder / 'turns.jsonl')]
+    assert [(t['turn'], t['event']) for t in turns] == [(1, 'submitted'), (1, 'completed'), (2, 'submitted'), (2, 'completed')], 'READ_TURN_BOUNDARIES'
+    assert len({t['cli_pid'] for t in turns}) == 1 and len({t['sessionID'] for t in turns if t['sessionID']}) == 1, 'READ_TURN_SESSION_CHANGED'
+    boundary = turns[2]['at']
+    events = [(str(log), line, event) for log in profile.rglob('execution-events.jsonl') for line, event in records(log)]
+    def after(event):
+        return datetime.fromisoformat(event['recorded_at'].replace('Z', '+00:00')).timestamp() >= boundary
+    requests = {e['operation_id']: e['request'] for _, _, e in events if e.get('phase') == 'node_apply_prepared'}
+    reads = [(path, line, e) for path, line, e in events if e.get('phase') == 'node_checkpoint' and after(e)
+             and requests.get(e['operation_id'], {}).get('mode') == 'read_existing_output'
+             and e.get('result', {}).get('status') == 'SUCCEEDED']
+    target_type = 'programming.javascript' if kind == 'read-wait-running' else 'transform.filter_data'
+    reads = [(p, n, e) for p, n, e in reads if requests[e['operation_id']]['target']['type'] == target_type]
+    assert reads, 'READ_SECOND_TURN_SNAPSHOT_MISSING'
+    path, line, read = reads[-1]
+    node, execution = read['result']['node'], read['result']['execution']['execution_id']
+    target_operations = {op for op, request in requests.items() if request['target']['type'] == target_type}
+    assert not any(after(e) and e.get('operation_id') in target_operations and e.get('phase') == 'node_apply_prepared'
+                   and e['request'].get('finish') == 'execute' for _, _, e in events), 'READ_SECOND_TURN_EXECUTE_REQUEST'
+    assert not any(after(e) and e.get('operation_id') in target_operations and e.get('phase') == 'node_step_prepared'
+                   and e.get('action', {}).get('verb') == 'execute_graph_node' for _, _, e in events), 'READ_SECOND_TURN_EXECUTE'
+    runtime_ids = {e['session_id'] for _, _, e in events if e.get('operation_id') in target_operations}
+    assert len(runtime_ids) == 1, 'READ_RUNTIME_CHANGED'
+    proof = dict(kind=kind, execution_id=execution, node=node, journal=path, line=line, turns=turns)
+    if kind == 'read-no-rerun':
+        assert any(not after(e) and e.get('phase') == 'node_checkpoint'
+                   and e.get('result', {}).get('execution', {}).get('execution_id') == execution
+                   and e['result'].get('status') == 'SUCCEEDED' for _, _, e in events), 'READ_EXECUTION_CHANGED'
+    else:
+        def snapshots(value):
+            if isinstance(value, dict):
+                if value.get('verified') is True and isinstance(value.get('processes'), list): yield value
+                for child in value.values(): yield from snapshots(child)
+            elif isinstance(value, list):
+                for child in value: yield from snapshots(child)
+        pending = []
+        for p, n, e in events:
+            if not after(e) or e.get('operation_id') not in target_operations: continue
+            for snapshot in snapshots(e):
+                ctx = snapshot.get('node_context', {})
+                if not ctx.get('verified') or any(ctx.get(k) != node[k] for k in ['document_id', 'workflow_id', 'node_id']): continue
+                for process in snapshot['processes']:
+                    group = process.get('process_id', '').split('.')[0]
+                    progress = process.get('progress_state', {})
+                    if execution == node['document_id']+':'+str(snapshot.get('root_id'))+':'+group and progress.get('verified') is True and progress.get('source') == 'native_progress_record' and progress.get('state') in ['not_started','running','not_responding']:
+                        pending.append(dict(journal=p, line=n, process_id=process['process_id']))
+        assert pending, 'READ_SAME_EXECUTION_PENDING_NOT_OBSERVED'
+        proof['pending'] = pending
+    write(folder / 'read-turn-proof.json', proof)
+    return execution
 
 
 def model_replies(events):
@@ -2419,10 +2477,34 @@ class Runner:
                 command += ['--file', target]
         (folder / 'task.md').write_text(prompt)
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
-        self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
+        if spec.get('two_turn'):
+            assert session is None, 'TWO_TURN_REQUIRES_FRESH_CHAT'
+            # Unique physical name prevents collisions with prior attempts (#1157).
+            source = workspace / 'rows.csv'
+            unique = workspace / (self.out.name + '-' + folder.parent.name + '-rows.csv')
+            shutil.copyfile(source, unique)
+            first = spec['prompt'].read_text().replace('{{SOURCE_PATH}}', str(unique)).replace('{{PACKAGE_PATH}}', package)
+            second = (src / 'task-second.md').read_text().replace('{{PACKAGE_PATH}}', package)
+            second = second.replace('result.csv', destinations[0])
+            second += '\n' + prompt[prompt.rfind('\nСохрани пакет как '):]
+            config_path = profile / 'config/loginom-ai-agent.json'
+            config = read(config_path)
+            config['model'] = 'openai/gpt-6.1-sol'
+            write(config_path, config)
+            (profile / 'state').mkdir(exist_ok=True)
+            write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={'openai/gpt-6.1-sol':'medium'}))
+            write(folder / 'two-turn.json', dict(executable=str(command[0]), workspace=str(workspace),
+                  profile=str(profile), folder=str(folder), prompts=[first, second], require_medium=True))
+            self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
+                       folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
+        else:
+            self.phase('model', command + ['--', prompt], folder, timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
         session = next(e['sessionID'] for _, e in events if e.get('sessionID'))
         replies = model_replies(events)
+        if spec.get('two_turn'):
+            self.current['execution_id'] = check_read_turns(profile, folder, spec['two_turn'])
+            self.current['two-turn'] = 'PASS'
         if spec.get('fs_case') == 'paths':
             assert any(save_confirmed(spec, reply, package) for _, reply in replies), 'FS_PATH_INITIAL_SAVE_MISSING'
             cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
