@@ -4,7 +4,8 @@ import {execFileSync} from 'node:child_process';
 import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {checkSupernodeGraph,checkSupernodeRun} from '../supernode-audit.mjs';
+import {checkSupernodeGraph,checkSupernodeRun,checkLoopForRun} from '../supernode-audit.mjs';
+import {createHash} from 'node:crypto';
 
 const graph={nodes:[{ref:{node_id:'input'},boundary_role:'input'},{ref:{node_id:'calc'},type:'transform.calculator'},
  {ref:{node_id:'output'},boundary_role:'output'}],links:[{source:'input',output:0,target:'calc',input:0},{source:'calc',output:0,target:'output',input:0}]};
@@ -128,4 +129,41 @@ test('variable body requires BOTH observed variable links and converter table ch
 
 test('variable-boundary kit matches its independent oracle',()=>{
  assert.match(execFileSync('python3',[new URL('variables/oracle.py',expectedDirectory).pathname,'--check'],{encoding:'utf8'}),/OK/);
+});
+
+test('FOR REST topology uses observed IDs when the private graph omits node types',()=>{
+ // live2a-rest main execution-events.jsonl:573,783–785: typed encoder receipt, untyped NW1 graph.
+ const ids=['input','output','calc','convert','encoder','rest'];
+ const g={nodes:ids.map(node_id=>({node_id,node_ref:{node_label:node_id},...(['input','output'].includes(node_id)?{boundary_role:node_id}:{})})),links:[
+  'MF;TF-1;Graph;input|Output_Var-0|convert|Input_Var-0','MF;TF-1;Graph;input|Output_Var-0|calc|Input_Var-1',
+  'MF;TF-1;Graph;convert|Output_Data-0|calc|Input_Data-0','MF;TF-1;Graph;calc|Output_Data-0|encoder|Input_Data-0',
+  'MF;TF-1;Graph;encoder|Output_Data-0|rest|Input_Data-2','MF;TF-1;Graph;rest|Output_Data-0|output|Input_Data-0']};
+ assert.equal(checkSupernodeGraph(g,'calc','convert','rest',['encoder']).calculator,'calc');
+ assert.throws(()=>checkSupernodeGraph(g,'calc','convert','rest',['foreign']),/LOCAL_LINKS/);
+ assert.throws(()=>checkSupernodeGraph({...g,links:g.links.slice(0,-1)},'calc','convert','rest',['encoder']),/LOCAL_LINKS/);
+ assert.throws(()=>checkSupernodeGraph({...g,links:g.links.map(e=>e.replace('rest|Input_Data-2','rest|Input_Data-0'))},'calc','convert','rest',['encoder']),/LOCAL_LINKS/);
+});
+
+test('FOR audit binds the URL encoder to its verified native target receipt',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'for-rest-audit-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const definitions=[{id:0,index:0,name:'Page',label:'Page',type:'integer',value:99,is_null:false},{id:1,index:1,name:'Limit',label:'Limit',type:'integer',value:2,is_null:false}];
+ const replies=[{kind:'supernode',node:{node_id:'body'},boundary:{input:{kind:'variables',port_guid:'vars',definitions}}},
+  {kind:'calculator',node:{node_id:'calc'}},{kind:'variables_to_table',node:{node_id:'convert'}},{kind:'rest_request',node:{node_id:'rest'}},
+  {kind:'loop',node:{node_id:'loop'},mode:'for',count:3,iteration_identifiers:true,body:{ref:{node_id:'body'}},variable:{port_guid:'vars',definition_id:0,name:'Page',type:'integer'}}];
+ const events=join(directory,'model.stdout'),journal=join(directory,'execution-events.jsonl');
+ const request={operation_id:'rest',target:{type:'integration.rest_request'},parameters:{query_parameters:[{name:'limit',field:'Limit'}]}};
+ await writeFile(events,[{type:'tool_use',part:{state:{status:'completed',input:request,output:'{}'}}},
+  ...replies.map(reply=>({type:'tool_use',part:{state:{status:'completed',output:JSON.stringify(reply)}}}))].map(e=>JSON.stringify(e)).join('\n'));
+ const nodes=['input','output','calc','convert','encoder','rest'].map(node_id=>({node_id,node_ref:{node_label:node_id},...(['input','output'].includes(node_id)?{boundary_role:node_id}:{})}));
+ const links=['input|Output_Var-0|convert|Input_Var-0','input|Output_Var-0|calc|Input_Var-1','convert|Output_Data-0|calc|Input_Data-0',
+  'calc|Output_Data-0|encoder|Input_Data-0','encoder|Output_Data-0|rest|Input_Data-2','rest|Output_Data-0|output|Input_Data-0'].map(s=>'MF;TF-1;Graph;'+s);
+ const target={phase:'node_phase_completed',operation_id:'rest-url-'+createHash('sha256').update('rest').digest('hex').slice(0,32),
+  receipt:{phase:'target',status:'verified',value:{target:{node:{type:'programming.javascript',ref:{node_id:'encoder'}}}}}};
+ const observed={phase:'node_observation_completed',outcome:{status:'SUCCEEDED',output:{nodes,links}}};
+ await writeFile(journal,[target,observed].map(e=>JSON.stringify(e)).join('\n'));
+ assert.equal((await checkLoopForRun(events,[journal])).status,'PASS');
+ for(const fault of [{...target,operation_id:'rest-url-foreign'},{...target,receipt:{...target.receipt,status:'failed'}}]){
+  await writeFile(journal,[fault,observed].map(e=>JSON.stringify(e)).join('\n'));
+  await assert.rejects(checkLoopForRun(events,[journal]),/LOOP_NESTED_OBSERVATION/);
+ }
 });

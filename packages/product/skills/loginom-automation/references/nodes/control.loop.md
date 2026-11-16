@@ -35,7 +35,8 @@ RequestID REST на каждой итерации начинается с 0. Res
 output 0 → «Переменные в таблицу» (columns) и ordinary variable input 0 Calculator;
 таблица преобразователя → Calculator → OutputNode либо REST → OutputNode.
 Формула читает `Var.Page`, а не поле Page. До REST выполни Calculator для полной
-схемы. Вернись в родительский workflow.
+схемы. Integer Limit/Skip передавай в query REST напрямую: кодирование штатное.
+Вернись в родительский workflow.
 
 Из readback Подмодели `boundary.input` возьми `port_guid` и `definitions[].id`
 выбранной переменной. При потере квитанции выполни ТУ ЖЕ Подмодель с

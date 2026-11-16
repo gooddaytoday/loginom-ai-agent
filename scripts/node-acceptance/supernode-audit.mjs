@@ -1,5 +1,6 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
 import {makeSupernodeConfigureCode} from '../../packages/loginom-runtime/client/lib/supernode-procedure.mjs';
 import {makeLoopSourceCode,makeLoopVendorCode} from '../../packages/loginom-runtime/client/lib/loop-procedure.mjs';
 import {selectPreparedGraphNode} from '../../packages/loginom-runtime/client/lib/node-graph-selection.mjs';
@@ -13,20 +14,21 @@ function* objects(value){
  if(!Array.isArray(value))yield value;
  for(const item of Object.values(value))yield* objects(item);
 }
-export function checkSupernodeGraph(graph,calculatorId,converterId,restId){
+export function checkSupernodeGraph(graph,calculatorId,converterId,restId,encoderIds=[]){
  need(Array.isArray(graph.nodes)&&Array.isArray(graph.links),'GRAPH_INCOMPLETE');
  const input=graph.nodes.filter(n=>n.boundary_role==='input'),output=graph.nodes.filter(n=>n.boundary_role==='output');
  const id=n=>n.ref?.node_id??n.node_id,label=n=>n.node_ref?.node_label??n.label;
  const calculator=graph.nodes.filter(n=>calculatorId?id(n)===calculatorId:n.type==='transform.calculator');
  need(input.length===1&&output.length===1&&calculator.length===1,'BOUNDARIES_AND_CALCULATOR');
  const edge=(source,target)=>graph.links.some(e=>typeof e==='string'
-  ?e.endsWith(';Graph;'+label(source)+'|Output_Data-0|'+label(target)+'|Input_Data-'+(target.type==='integration.rest_request'?2:0))
+  ?e.endsWith(';Graph;'+label(source)+'|Output_Data-0|'+label(target)+'|Input_Data-'+(id(target)===restId?2:0))
   :e.source===id(source)&&e.output===0&&e.target===id(target)&&e.input===0);
  const converters=graph.nodes.filter(n=>converterId?id(n)===converterId:n.type==='variables.to_table');
  if(converters.length){
-  const rest=restId&&graph.nodes.filter(n=>id(n)===restId&&n.type==='integration.rest_request');
+  const rest=restId&&graph.nodes.filter(n=>id(n)===restId);
+  const encoders=rest?.length===1?graph.nodes.filter(n=>encoderIds.includes(id(n))&&edge(calculator[0],n)&&edge(n,rest[0])):[];
   need(converters.length===1&&edge(converters[0],calculator[0])
-   &&(restId?rest.length===1&&edge(calculator[0],rest[0])&&edge(rest[0],output[0]):edge(calculator[0],output[0])),'LOCAL_LINKS');
+   &&(restId?rest.length===1&&(edge(calculator[0],rest[0])||encoders.length===1)&&edge(rest[0],output[0]):edge(calculator[0],output[0])),'LOCAL_LINKS');
   for(const target of [converters[0],calculator[0]])need((graph.variable_links??graph.links).some(e=>typeof e==='string'
    ?e.endsWith(';Graph;'+label(input[0])+'|Output_Var-0|'+label(target)+'|Input_Var-'+(target===calculator[0]?1:0))
    :e.source===id(input[0])&&e.target===id(target)&&e.kind==='variables'&&e.input===0&&e.output===0),'LOCAL_VARIABLE_LINKS');
@@ -51,7 +53,8 @@ export async function observeSupernodeSaved({execute,adapter,prepared,origin,ses
   need(result.status==='SUCCEEDED'&&result.cleanup_complete===true,'COLD_SAVED_VARIABLE_DEFINITIONS');
   variables=result.variable_boundary;await record({phase:'supernode_saved_definitions',node:nodes[0].ref,variables,settings_applied:false});
  }
- const graph=await navigate('enter',nodes[0].ref),topology=checkSupernodeGraph(graph,undefined,undefined,loopFor?graph.nodes.find(n=>n.type==='integration.rest_request')?.ref.node_id:undefined);
+ const graph=await navigate('enter',nodes[0].ref),topology=checkSupernodeGraph(graph,undefined,undefined,loopFor?graph.nodes.find(n=>n.type==='integration.rest_request')?.ref.node_id:undefined,
+  loopFor?graph.nodes.filter(n=>n.type==='programming.javascript').map(n=>n.ref.node_id):[]);
  await record({phase:'supernode_saved_nested_graph',graph,topology,settings_applied:false});
  const returned=await navigate('leave');
  need(returned.nodes.some(n=>n.type==='control.supernode'&&n.ref.node_id===nodes[0].ref.node_id),'COLD_CONTAINER_CHANGED');
@@ -140,10 +143,13 @@ export async function observeLoopForSaved({graph,prepared,execute,origin,channel
 }
 
 export async function checkLoopForRun(eventsFile,journalFiles=[]){
- const all=[];
+ const all=[],encoderOperations=new Set();
  for(const [index,line] of (await readFile(eventsFile,'utf8')).split('\n').entries()){
   let event;try{event=JSON.parse(line);}catch{continue;}
   if(event.type!=='tool_use'||event.part?.state?.status!=='completed')continue;
+  const request=event.part.state.input;
+  if(request?.target?.type==='integration.rest_request'&&request.parameters?.query_parameters?.length&&typeof request.operation_id==='string')
+   encoderOperations.add('rest-url-'+createHash('sha256').update(request.operation_id).digest('hex').slice(0,32));
   let reply;try{reply=JSON.parse(event.part.state.output);}catch{continue;}
   for(const value of objects(reply))all.push({line:index+1,value});
  }
@@ -160,12 +166,15 @@ export async function checkLoopForRun(eventsFile,journalFiles=[]){
   &&configuration.variable.definition_id===port.definitions[0].id&&configuration.variable.name==='Page','LOOP_VARIABLE_DEFINITIONS');
  need(containers.every(r=>JSON.stringify(r.value.boundary.input)===JSON.stringify(port)),'LOOP_DEFINITION_IDENTITY');
  need(loops.every(r=>r.value.body.ref.node_id===containers[0].value.node.node_id),'LOOP_BODY_IDENTITY');
- const topology=[];
+ const topology=[],encoderIds=new Set();
  for(const file of journalFiles)for(const [index,line] of (await readFile(file,'utf8')).split('\n').entries()){
   let event;try{event=JSON.parse(line);}catch{continue;}
+  const target=event.receipt?.value?.target?.node;
+  if(event.phase==='node_phase_completed'&&event.receipt?.phase==='target'&&event.receipt.status==='verified'
+   &&encoderOperations.has(event.operation_id)&&target?.type==='programming.javascript')encoderIds.add(target.ref.node_id);
   if(!['observation_completed','node_observation_completed'].includes(event.phase)||event.outcome?.status!=='SUCCEEDED')continue;
   const graph=event.outcome.output;if(!graph?.nodes?.some(n=>n.boundary_role==='input'))continue;
-  try{topology.push({file,line:index+1,...checkSupernodeGraph(graph,calculators[0].value.node.node_id,converters[0].value.node.node_id,rest[0]?.value.node.node_id)});}
+  try{topology.push({file,line:index+1,...checkSupernodeGraph(graph,calculators[0].value.node.node_id,converters[0].value.node.node_id,rest[0]?.value.node.node_id,[...encoderIds])});}
   catch(error){if(topology.length)throw error;}
  }
  need(topology.length>0,'LOOP_NESTED_OBSERVATION');

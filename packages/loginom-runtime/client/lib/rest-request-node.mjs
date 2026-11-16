@@ -37,7 +37,7 @@ export function restQueryEncoderRequest(request,deadline,now=Date.now()){
   mode:'script',parameters:{schema_mode:'declared',columns:fields.map(name=>({name,label:name,type:'string',data_kind:'Дискретный',usage:'Не задано'})),
    source_text:'import {InputTable,OutputTable} from "builtIn/Data";\n'
     +'for(let row=0;row<InputTable.RowCount;row++){\n OutputTable.Append();\n for(const name of '+JSON.stringify(fields)+'){\n'
-    +'  const value=InputTable.Get(row,name);\n  if(value!=null&&typeof value!=="string")throw Error("REST query/body values require raw string fields");\n  OutputTable.Set(name,value==null?null:name==='+JSON.stringify(request.parameters.body_field??null)+'?value:encodeURIComponent(value));\n }\n}\n'},
+    +'  const value=InputTable.Get(row,name);\n  const integer=name!=='+JSON.stringify(request.parameters.body_field??null)+'&&Number.isSafeInteger(value);\n  if(value!=null&&typeof value!=="string"&&!integer)throw Error("REST query values require raw strings or safe integers; body values require raw string fields");\n  OutputTable.Set(name,value==null?null:name==='+JSON.stringify(request.parameters.body_field??null)+'?value:encodeURIComponent(String(value)));\n }\n}\n'},
   mappings:[],finish:'execute',read:{ports:[],sample_rows:0,require_exact_numbers:false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }

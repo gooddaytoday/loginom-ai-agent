@@ -47,8 +47,9 @@ HttpStatusCode порта 1; выгрузи второй результат и �
 
 Полный GET URL без query допустим: `query_parameters:[]`, `inputs:[]`,
 finish execute; таблица и URL-кодировщик не нужны.
-Query из переменных: после variables.to_table преобразуй integer→string
-табличным Калькулятором; исходные limit/skip оставь integer.
+Query принимает string и целые в точном диапазоне JavaScript (±9007199254740991).
+После variables.to_table передавай integer limit/skip напрямую; URL-кодирование
+выполнит обработчик. Body по-прежнему только string; real/boolean не поддержаны.
 Если нужны лишь HTTP-статусы/ошибки, читай `read.ports:[1]`:
 HttpStatusCode, ErrorCode, ErrorDesc. Порт 0 — для тела/разбора.
 HTTP 200 не доказывает получение тела. Ограничивай ответ через select,

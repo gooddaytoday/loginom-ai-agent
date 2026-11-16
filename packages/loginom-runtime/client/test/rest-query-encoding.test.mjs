@@ -67,6 +67,18 @@ test('C1 query encoder preserves the complete UTF-8 body and NULL without encodi
  assert.deepEqual(child.parameters.columns.map(c=>c.name),['Key','Body']);
 });
 
+test('FOR query encoder accepts safe integer offsets, preserving strings, NULL and raw body types',()=>{
+ // live2a-rest execution-events.jsonl:777: integer Limit/Skip reached the string-only encoder.
+ const r=request();r.parameters.query_parameters=[{name:'limit',field:'Limit'},{name:'skip',field:'Skip'}];
+ const child=restQueryEncoderRequest(r,2500,1000);
+ assert.deepEqual(encode(child.parameters.source_text,[{Limit:2,Skip:0},{Limit:2,Skip:2},{Limit:2,Skip:4}]),
+  [{Limit:'2',Skip:'0'},{Limit:'2',Skip:'2'},{Limit:'2',Skip:'4'}]);
+ assert.deepEqual(encode(child.parameters.source_text,[{Limit:Number.MAX_SAFE_INTEGER,Skip:null}]),[{Limit:'9007199254740991',Skip:null}]);
+ for(const Limit of [1.5,NaN,Infinity,Number.MAX_SAFE_INTEGER+1,true,{}])assert.throws(()=>encode(child.parameters.source_text,[{Limit,Skip:0}]),/raw string/);
+ r.parameters.body_field='Body';
+ assert.throws(()=>encode(restQueryEncoderRequest(r,2500,1000).parameters.source_text,[{Limit:2,Skip:0,Body:3}]),/raw string/);
+});
+
 test('REST-generated codec preserves raw query values through URL parsing, including ampersands and UTF-8',()=>{
  const original=request(),before=structuredClone(original),child=restQueryEncoderRequest(original,2500,1000);
  const raw=['a b&я','x/y?','%26+#+=','😀\r\n','',null];
@@ -74,7 +86,7 @@ test('REST-generated codec preserves raw query values through URL parsing, inclu
  assert.deepEqual(rows.map(r=>r.Key===null?null:new URL('https://echo.test/?Key='+r.Key).searchParams.get('Key')),raw);
  assert.equal(rows[0].Key,'a%20b%26%D1%8F');
  assert.equal(rows[2].Key,'%2526%2B%23%2B%3D');
- assert.throws(()=>encode(child.parameters.source_text,[{Key:1}]),/raw string fields/);
+ assert.throws(()=>encode(child.parameters.source_text,[{Key:1.5}]),/raw string/);
  assert.deepEqual(original,before);
  assert.deepEqual(child.budgets,{configure_ms:1500,execute_ms:1500,total_ms:1500});
  assert.equal(child.finish,'execute');
