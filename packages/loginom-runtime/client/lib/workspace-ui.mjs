@@ -4962,7 +4962,7 @@ function readRenderedInputMapping(observation) {
               }
               observed=fresh;continue;
             }
-            if(observed.ui.dialogs.length||observed.ui.masks.some(m=>m.target_tid!==current.wizard.root_tid))break;
+            if(observed.ui.dialogs.length||observed.ui.masks.some(m=>m.target_tid!==current.wizard.root_tid)&&!ownedLoadingMask(observed))break;
             timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readCalculatorPreviewUi();
           }
           if(!owned(observed)||!accepted(observed))fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Owned calculator preview did not settle after one click; inspect before retry');

@@ -69,8 +69,9 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
   }
   const original=baseline;
   // An explicitly requested Expr1 uses the existing rename planner: the
-  // template becomes a requested expression instead of being deleted.
-  const discardTemplate=newNode&&removeDefault&&!parameters.expressions.some(e=>e.name.toLowerCase()==='expr1');
+  // template becomes a requested expression instead of being deleted. Reuse
+  // it at the 128-record reader bound too: add-before-delete needs one slot.
+  const discardTemplate=newNode&&removeDefault&&parameters.expressions.length<128&&!parameters.expressions.some(e=>e.name.toLowerCase()==='expr1');
   const resolved=newNode?[]:structuredClone(baseline),changes=[],rewritten=new Set();
   for(const [index,patch] of parameters.expressions.entries()) {
     const existing=patch.target.kind==='existing';
