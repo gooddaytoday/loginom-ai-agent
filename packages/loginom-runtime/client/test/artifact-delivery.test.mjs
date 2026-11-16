@@ -784,7 +784,7 @@ for(const cleanup of [true,false])test('large conflict offers byte verification 
   assert.equal(result.outcome.destination,f.artifact.upload.destination);
   assert.equal(result.outcome.sha256,f.artifact.sha256);
   assert.equal(result.outcome.next_step.tool,'loginom_dock_storage_source');
-  const steps=['loginom_dock_storage_source','loginom_dock_storage_download_start','loginom_dock_storage_download_wait','loginom_file_scan'];
+  const steps=['loginom_dock_storage_source','loginom_dock_storage_download_start','loginom_dock_storage_download_wait','loginom_file_profile','loginom_file_scan'];
   const at=steps.map(name=>result.outcome.next_step.instruction.indexOf(name));
   assert.ok(at.every((i,n)=>i>=0&&(n===0||i>at[n-1])),'chain names model-visible tools in order');
   assert.match(result.outcome.next_step.instruction,/sha256 of the local artifact in this outcome/);

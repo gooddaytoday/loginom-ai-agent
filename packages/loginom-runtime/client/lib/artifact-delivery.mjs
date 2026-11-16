@@ -310,8 +310,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     if(code==='UPLOAD_PATH_CONFLICT'){
      const localHash=typeof artifact.sha256==='string'&&/^[a-f0-9]{64}$/.test(artifact.sha256);
      Object.assign(job.outcome,{destination:artifact.upload.destination,upload_operation_id:job.uploadId,upload_submitted:false,...(localHash?{sha256:artifact.sha256}:{}),
-      next_step:{tool:'loginom_dock_storage_source',instruction:'Call loginom_dock_storage_source with this destination path, then loginom_dock_storage_download_start with its server_source_ref and loginom_dock_storage_download_wait with the same operation_id. Take the sha256 of the downloaded copy from loginom_file_scan'
-       +(localHash?' and compare it with sha256 of the local artifact in this outcome.':' and compare it with the sha256 of the local artifact file from loginom_file_scan.')
+      next_step:{tool:'loginom_dock_storage_source',instruction:'Call loginom_dock_storage_source with this destination path, then loginom_dock_storage_download_start with its server_source_ref and loginom_dock_storage_download_wait with the same operation_id. Run loginom_file_profile on the returned output.path, then loginom_file_scan with that profile_id for the sha256 of the downloaded copy'
+       +(localHash?', and compare it with sha256 of the local artifact in this outcome.':', and compare it with the sha256 of the local artifact file from loginom_file_profile and loginom_file_scan.')
        +' Only if the hashes match, use the verified server file as the import source. If they differ, stop and tell the user. Never overwrite or delete the server file.'}});
     }
     try{await acknowledge(job,'large_upload_'+job.status,{result:job.outcome});}catch{job.status='uncertain';job.phase='uncertain';job.error={code:'LOGINOM_UPLOAD_UNCERTAIN',message:'LOGINOM_UPLOAD_UNCERTAIN'};
