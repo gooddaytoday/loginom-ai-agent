@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { copyFile, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { generateKeyPairSync, sign } from "node:crypto"
@@ -44,17 +44,26 @@ test("only an explicitly built updater fixture trusts its baked key; runtime ove
       )
       if (config.exitCode) throw Error(config.stderr.toString())
       const define = JSON.parse(config.stdout.toString()) as Record<string, string>
-      const built = await Bun.build({
-        entrypoints: [join(import.meta.dir, "src/main/update-policy.ts")],
-        target: "bun",
-        format: "esm",
-        define,
-        external: ["electron-updater", "electron"],
-      })
-      if (!built.success) throw Error(built.logs.join("\n"))
-      const source = await built.outputs[0].text()
       const module = join(root, `${fixture ? "fixture" : "release"}.mjs`)
-      await writeFile(module, source)
+      // Keep compiler state independent of other Desktop tests and their module mocks.
+      const compiler = Bun.spawnSync(
+        [
+          process.execPath,
+          "--eval",
+          `
+          const built = await Bun.build({
+            entrypoints: [${JSON.stringify(join(import.meta.dir, "src/main/update-policy.ts"))}],
+            target: 'bun', format: 'esm', define: ${JSON.stringify(define)},
+            external: ['electron-updater', 'electron'],
+          });
+          if (!built.success) throw Error(built.logs.join('\\n'));
+          await Bun.write(${JSON.stringify(module)}, built.outputs[0]);
+        `,
+        ],
+        { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+      )
+      if (compiler.exitCode) throw Error(compiler.stderr.toString())
+      const source = await readFile(module, "utf8")
       const bytes = JSON.stringify(raw.toString("base64"))
       const signature = JSON.stringify(sign(null, raw, key.privateKey).toString("base64"))
       const probe = Bun.spawnSync(
