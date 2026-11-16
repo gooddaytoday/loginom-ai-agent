@@ -1,6 +1,6 @@
 import type { Reservation } from "./lease"
 import path from "node:path"
-import { readFileSync, readlinkSync, statfsSync } from "node:fs"
+import { lstatSync, readFileSync, readlinkSync, statfsSync } from "node:fs"
 import { readRootWitnessFile } from "./root-witness-file"
 import { validateWitnessSource, type WitnessSource } from "./witness-source"
 
@@ -15,6 +15,7 @@ export type RootPolicy = {
   batchUnit: string; campaignUnit: string; fixed: WitnessSource[]; server: WitnessSource
   slots: { id: string; profile: string; composite: WitnessSource; reservation: WitnessSource; registration: WitnessSource | null; receipts: WitnessSource[] }[]
   observer: { unit: string; binary: string; binarySha256: string; bundle: string; bundleSha256: string }
+  parkedCampaign?: { id: string; repairer: string; owner: WitnessSource; journal: WitnessSource; manifest: WitnessSource }
 }
 export type RootWitness = {
   version: 1; kind: "root-terminality"; policySha256: string; invocation: string
@@ -35,7 +36,9 @@ function source(v: unknown): v is WitnessSource {
 }
 export function parseRootPolicy(value: unknown): RootPolicy {
   const v = value
-  if (!keys(v, "version commandId source qualification owner host controllerLock ownerFile slotsFile binary cliSha256 stateDir batchUnit campaignUnit fixed server slots observer") ||
+  const parked = !!v && typeof v === "object" && "parkedCampaign" in v
+  if (!keys(v, "version commandId source qualification owner host controllerLock ownerFile slotsFile binary cliSha256 stateDir batchUnit campaignUnit fixed server slots observer" +
+      (parked ? " parkedCampaign" : "")) ||
     v.version !== 1 || !uuid(v.commandId) || typeof v.source !== "string" || !/^[a-f0-9]{40}$/.test(v.source) || !sha(v.qualification) ||
     !keys(v.owner, "bootId pid starttime uid") || !uuid(v.owner.bootId) || !integer(v.owner.pid) || !v.owner.pid || !integer(v.owner.uid) || !decimal(v.owner.starttime) ||
     !keys(v.host, "pid mnt time user kernelNotes") || !sha(v.host.kernelNotes) || !["pid", "mnt", "time", "user"].every(k =>
@@ -46,10 +49,16 @@ export function parseRootPolicy(value: unknown): RootPolicy {
       absolute(s.profile) && source(s.composite) && source(s.reservation) && (s.registration === null || source(s.registration)) &&
       Array.isArray(s.receipts) && s.receipts.every(source)) ||
     !keys(v.observer, "unit binary binarySha256 bundle bundleSha256") || !unit(v.observer.unit) || !absolute(v.observer.binary) ||
-    !absolute(v.observer.bundle) || !sha(v.observer.binarySha256) || !sha(v.observer.bundleSha256)) throw Error("ROOT_POLICY_INVALID")
+    !absolute(v.observer.bundle) || !sha(v.observer.binarySha256) || !sha(v.observer.bundleSha256) ||
+    parked && (!keys(v.parkedCampaign, "id repairer owner journal manifest") || typeof v.parkedCampaign.id !== "string" ||
+      !/^[a-zA-Z0-9_-]+$/.test(v.parkedCampaign.id) || typeof v.parkedCampaign.repairer !== "string" || !v.parkedCampaign.repairer.trim() ||
+      !source(v.parkedCampaign.owner) || !source(v.parkedCampaign.journal) || !source(v.parkedCampaign.manifest))) throw Error("ROOT_POLICY_INVALID")
   const policy = v as RootPolicy
   if (new Set(policy.slots.map(s => s.id)).size !== policy.slots.length || new Set(policy.slots.map(s => s.profile)).size !== policy.slots.length ||
-    !policy.fixed.some(s => s.file === policy.slotsFile) || policy.slots.some(s => s.registration && s.registration.file !== `${s.profile}.process-group`))
+    !policy.fixed.some(s => s.file === policy.slotsFile) || policy.slots.some(s => s.registration && s.registration.file !== `${s.profile}.process-group`) ||
+    policy.parkedCampaign && (policy.parkedCampaign.owner.file !== policy.ownerFile ||
+      policy.parkedCampaign.journal.file !== path.join(path.dirname(policy.ownerFile), policy.parkedCampaign.id, "journal.json") ||
+      policy.parkedCampaign.manifest.file !== path.join(path.dirname(policy.ownerFile), policy.parkedCampaign.id, "manifest.json")))
     throw Error("ROOT_POLICY_INVALID")
   return policy
 }
@@ -84,10 +93,35 @@ export function assertWitnessHost(policy: RootPolicy) {
 export function assertFixedSources(policy: RootPolicy) {
   policy.fixed.forEach(validateWitnessSource)
   for (const slot of policy.slots) slot.receipts.forEach(validateWitnessSource)
+  if (policy.parkedCampaign)
+    [policy.parkedCampaign.owner, policy.parkedCampaign.journal, policy.parkedCampaign.manifest].forEach(validateWitnessSource)
+}
+
+export function assertCampaignOwner(policy: RootPolicy) {
+  if (!policy.parkedCampaign) {
+    try { lstatSync(policy.ownerFile); throw Error("ROOT_WITNESS_OWNER_PRESENT") }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error }
+    return
+  }
+  const parked = policy.parkedCampaign
+  validateWitnessSource(parked.owner)
+  validateWitnessSource(parked.journal)
+  validateWitnessSource(parked.manifest)
+  const owner: unknown = JSON.parse(readFileSync(parked.owner.file, "utf8"))
+  const journal = JSON.parse(readFileSync(parked.journal.file, "utf8")) as Record<string, unknown> | null
+  const manifest = JSON.parse(readFileSync(parked.manifest.file, "utf8")) as Record<string, unknown> | null
+  if (!keys(owner, "campaignId") || owner.campaignId !== parked.id || !journal || typeof journal !== "object" || Array.isArray(journal) ||
+    !manifest || typeof manifest !== "object" || Array.isArray(manifest) || journal.campaignId !== parked.id || manifest.id !== parked.id ||
+    typeof manifest.server !== "string" || journal.server !== manifest.server || typeof manifest.executor !== "string" || journal.executor !== manifest.executor ||
+    journal.manifestHash !== digest(JSON.stringify(manifest)) || journal.repairing !== true || journal.repairer !== parked.repairer ||
+    !Array.isArray(journal.batches) || journal.batches.length !== 0 || !Array.isArray(journal.attempts) || journal.attempts.length !== 0 ||
+    journal.startedAttempts !== undefined && journal.startedAttempts !== 0 || journal.final !== undefined ||
+    journal.published !== undefined && journal.published !== false) throw Error("ROOT_WITNESS_CAMPAIGN_SCOPE")
 }
 
 export function assertStandalonePolicy(policy: RootPolicy) {
   assertFixedSources(policy)
+  assertCampaignOwner(policy)
   validateWitnessSource(policy.server)
   const server = JSON.parse(readFileSync(policy.server.file, "utf8")) as Reservation
   if (server.state !== "retained" || server.commandId !== policy.commandId || JSON.stringify(server.owner) !== JSON.stringify(policy.owner) ||

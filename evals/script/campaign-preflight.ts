@@ -6,7 +6,9 @@ import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { loadTasks, agentInputsHash, rubricHash, taskTimeoutMs } from "../src/task"
 import { loadSlots } from "../src/slots"
 import { readServerIdentity } from "../src/parallel-pair"
-import { requireResourceBudgetScopes, validResourceBound } from "../src/parallel-resource-budget"
+import { requireResourceBudgetScopes, requireFilesystemBudget, validResourceBound } from "../src/parallel-resource-budget"
+import { dockSkillRevision } from "../src/preflight"
+import { loadResourceContainers, sampleHostResources, sampleServerFilesystems } from "../src/parallel-resources"
 import { campaignEnvironment } from "./run-campaign"
 import type { CampaignManifest, CampaignServerConfig } from "./run-campaign"
 
@@ -35,7 +37,7 @@ export async function campaignPreflight(manifestFile: string, serverFile: string
     throw Error("SELECTION_INVALID")
   const env = { ...process.env, ...campaignEnvironment(manifest, server) }
   const pins = await readLeaseReceipt(server.experimentPinsFile) as {
-    sourceSha: string; cli: string; cliBinarySha256: string; public_models_sha256: string
+    sourceSha: string; cli: string; cliBinarySha256: string; public_models_sha256: string; dockSkillRevision?: string
   }
   const corpus = await readLeaseReceipt(server.corpusPinsFile) as {
     sourceSha: string; groups: { group: string; dir: string; tasks: {
@@ -79,6 +81,22 @@ export async function campaignPreflight(manifestFile: string, serverFile: string
     containers: [{ role: "server", id: identity.containerId, startedAt: identity.startedAt },
       { role: "studio", id: identity.studioContainerId, startedAt: identity.studioStartedAt }],
   })
+  const dockRevision = await dockSkillRevision(config.dock)
+  if (pins.dockSkillRevision !== undefined && dockRevision !== pins.dockSkillRevision) throw Error("DOCK_SKILL_REVISION_CHANGED")
+  const paths = [...new Set([slots.controller.stateDir, ...slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])])]
+  const hostStorage = await sampleHostResources(paths)
+  const containers = await loadResourceContainers(slots)
+  const target = containers?.find(container => container.role === "server" && container.id === identity.containerId)
+  if (!target) throw Error("RESOURCE_PAIR_UNVERIFIED")
+  const serverStorage = await sampleServerFilesystems(target)
+  if (!serverStorage.epoch_stable || serverStorage.inspect?.started_at !== identity.startedAt) throw Error("RESOURCE_RESERVE_UNCONFIRMED")
+  const storage = [
+    ...hostStorage.filesystems.map(file => ({ scope: `filesystem:${file.path}`, available_bytes: file.capacity?.available_bytes ?? null,
+      available_inodes: file.capacity?.available_inodes ?? null })),
+    ...serverStorage.filesystems.map(file => ({ scope: `container:${identity.containerId}:${identity.startedAt}:filesystem:${file.path}`,
+      available_bytes: file.capacity?.available_bytes ?? null, available_inodes: file.capacity?.available_inodes ?? null })),
+  ]
+  requireFilesystemBudget(bounds, storage)
   const memory = await Bun.file("/proc/meminfo").text()
   const memoryAvailable = Number(memory.match(/^MemAvailable:\s+(\d+) kB$/m)?.[1]) * 1024
   const swapFree = Number(memory.match(/^SwapFree:\s+(\d+) kB$/m)?.[1]) * 1024
@@ -94,7 +112,7 @@ export async function campaignPreflight(manifestFile: string, serverFile: string
   const record = { ready: true, observedAt: new Date().toISOString(), selection: { corpus: args[0], ids, round, parallel },
     sourceSha: pins.sourceSha, harnessSha: server.acceptedHarness, cliBinarySha256: pins.cliBinarySha256,
     agent: { model: config.agent.model, variant: config.agent.variant }, judge: { model: config.judge.model, reasoning: config.judge.reasoning },
-    taskHashes, identity, auth, memoryAvailable, swapFree, resourceBudgetFile: server.resourceBudgetFile,
+    taskHashes, identity, auth, storage, dockRevision, memoryAvailable, swapFree, resourceBudgetFile: server.resourceBudgetFile,
     resourceBudgetSha256: new Bun.CryptoHasher("sha256").update(budgetBytes).digest("hex") }
   const evidence = path.join(server.stateRoot, manifest.id, `preflight-${crypto.randomUUID()}.json`)
   await mkdir(path.dirname(evidence), { recursive: true, mode: 0o700 })

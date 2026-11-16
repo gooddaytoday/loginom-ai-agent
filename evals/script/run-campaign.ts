@@ -1,4 +1,5 @@
 import path from "node:path"
+import { hostname } from "node:os"
 import { mkdir, open, readdir, realpath, rename, stat, unlink } from "node:fs/promises"
 import { parseArgs } from "node:util"
 import { isQualityResult, type AttemptResult } from "../src/report"
@@ -21,6 +22,7 @@ export type CampaignManifest = {
 type Batch = { id: string; keys: CampaignKey[]; resultsDir: string; invocationBefore: string; started: boolean; accounted?: boolean; startedAttempts?: number }
 type AccountedAttempt = {
   key: CampaignKey; resultFile: string; status: string; counted: boolean; pass: boolean | null; score: number | null; cleanupConfirmed: boolean
+  unscored?: string
   resources?: { status: string; codes: string[] }
   completedAt?: number
   cleanupVerification?: string
@@ -58,7 +60,7 @@ export function campaignEnvironment(manifest: CampaignManifest, config: { slotsF
     EVAL_SLOTS_FILE: config.slotsFile, EVAL_RESOURCE_BUDGET_FILE: config.resourceBudgetFile }
 }
 
-type PublisherConfig = { stateDir: string; multica: { url: string; workspace: string; issueId: string; tokenFile: string } }
+type PublisherConfig = { stateDir: string; multica: { url: string; workspace: string; issueId: string; tokenFile: string; archiveMode?: "private" } }
 async function campaignFetch(config: PublisherConfig, endpoint: string, method = "GET", body?: object | FormData) {
   const token = (await Bun.file(config.multica.tokenFile).text()).trim()
   const url = new URL(endpoint, config.multica.url)
@@ -206,9 +208,10 @@ async function deliverCampaign(manifest: CampaignManifest, journal: CampaignJour
     ...(journal.snapshotObservedAt === undefined ? [] : [`<!-- eval-snapshot-observed:${new Date(journal.snapshotObservedAt).toISOString()} -->`, `Последнее наблюдение: ${new Date(journal.snapshotObservedAt).toISOString()}. Текущее состояние ресурсов хоста не подтверждено.`]),
     ...(journal.final === "partial" ? ["Частичный итог по последним известным данным. Непроверенные ресурсы остаются неподтверждёнными."] : []), "",
     ...manifest.keys.map(key => {
-      const attempt = journal.attempts.find(item => item.counted && keyId(item.key) === keyId(key))
-      return `- ${keyId(key)}: ${attempt ? `${attempt.pass ? "PASS" : "FAIL"}; cleanup=${attempt.cleanupConfirmed ? "подтверждён" : "не подтверждён"}; ресурсы=${attempt.resources?.status ?? "incomplete"}; ${attempt.resources?.codes.join(", ") ?? "RESOURCE_EVIDENCE_MISSING"}` : "не измерено"}`
-    }), "", `Учтено ${journal.attempts.filter(item => item.counted).length}/${manifest.keys.length}; PASS ${journal.attempts.filter(item => item.counted && item.pass).length}; FAIL ${journal.attempts.filter(item => item.counted && item.pass === false).length}.`, "",
+      const attempt = journal.attempts.find(item => (item.counted || item.unscored) && keyId(item.key) === keyId(key))
+      return `- ${keyId(key)}: ${attempt ? `${attempt.unscored ? `исполнено без оценки (${attempt.unscored})` : attempt.pass ? "PASS" : "FAIL"}; cleanup=${attempt.cleanupConfirmed ? "подтверждён" : "не подтверждён"}; ресурсы=${attempt.resources?.status ?? "incomplete"}; ${attempt.resources?.codes.join(", ") ?? "RESOURCE_EVIDENCE_MISSING"}` : "не измерено"}`
+    }), "", `Учтено ${journal.attempts.filter(item => item.counted).length}/${manifest.keys.length}; PASS ${journal.attempts.filter(item => item.counted && item.pass).length}; FAIL ${journal.attempts.filter(item => item.counted && item.pass === false).length}.`,
+    ...(journal.attempts.some(item => item.unscored) ? [`Исполнено без оценки ${journal.attempts.filter(item => item.unscored).length}; не исполнено ${manifest.keys.filter(key => !journal.attempts.some(item => (item.counted || item.unscored) && keyId(item.key) === keyId(key))).length}.`] : []), "",
     "Архив: доставка ожидается; её состояние проверяется отдельно от результата измерений.", "",
     `[@${manifest.executor}](mention://agent/${journal.executorAgentId}), опубликуй отдельный финальный ответ на этот комментарий.`,
     `Перед ответом проверь отсутствие собственного ответа с точным маркером <!-- eval-executor-final:${manifest.id} -->.`,
@@ -238,35 +241,54 @@ async function deliverCampaign(manifest: CampaignManifest, journal: CampaignJour
     await rename(temporary, archive)
   }
   const archiveHash = digest(await Bun.file(archive).arrayBuffer())
-  const attachments = await campaignRequest(config, `${endpoint}/attachments`) as { id: string; filename: string }[]
-  const matching = attachments.filter(item => item.filename === path.basename(archive))
-  for (const attachment of matching) {
-    if (digest(await (await campaignFetch(config, `/api/attachments/${attachment.id}/download`)).arrayBuffer()) === archiveHash)
-      journal.attachmentId = attachment.id
-  }
-  if (!journal.attachmentId) {
-    const form = new FormData()
-    form.set("issue_id", config.multica.issueId)
-    form.set("file", Bun.file(archive), path.basename(archive))
-    const uploaded = await campaignRequest(config, "/api/upload-file", "POST", form) as { id: string }
-    if (!uploaded.id) throw Error("CAMPAIGN_ATTACHMENT_NOT_PERSISTED")
-    journal.attachmentId = uploaded.id
-    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
-  }
-  if (digest(await (await campaignFetch(config, `/api/attachments/${journal.attachmentId}/download`)).arrayBuffer()) !== archiveHash)
-    throw Error("CAMPAIGN_ATTACHMENT_READBACK")
-  const attached = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
-  const reportComment = attached.find(item => item.id === journal.reportCommentId)
-  if (!reportComment) throw Error("CAMPAIGN_REPORT_READBACK")
-  if (!reportComment.attachments?.some(item => item.id === journal.attachmentId)) {
-    const preview = await campaignRequest(config, `${endpoint}/comments/trigger-preview`, "POST", {
-      content: reportComment.content, editing_comment_id: reportComment.id }) as { agents: { id: string }[] }
-    await campaignRequest(config, `/api/comments/${reportComment.id}`, "PUT", { content: reportComment.content,
-      content_base: reportComment.content, expected_revision: reportComment.revision,
-      attachment_ids: [...reportComment.attachments?.map(item => item.id) ?? [], journal.attachmentId], suppress_agent_ids: preview.agents.map(agent => agent.id) })
-    const persisted = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
-    if (!persisted.some(item => item.id === reportComment.id && item.attachments?.some(attachment => attachment.id === journal.attachmentId)))
+  if (config.multica.archiveMode === "private") {
+    const bytes = (await Bun.file(archive).stat()).size
+    const archiveMarker = `<!-- eval-archive:${manifest.id}:${archiveHash} -->`
+    const content = [archiveMarker, "Архив сохранён в приватном каталоге runner.",
+      `Host: ${hostname()}`, `Путь: ${archive}`, `Размер: ${bytes} байт`, `SHA256: ${archiveHash}`,
+      "Файл прочитан, хеш проверен.", ""].join("\n")
+    const comments = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+    const previous = comments.find(item => item.content.includes(archiveMarker))
+    if (previous?.content !== content) {
+      const preview = await campaignRequest(config, `${endpoint}/comments/trigger-preview`, "POST", {
+        content, ...(previous ? { editing_comment_id: previous.id } : {}) }) as { agents: { id: string }[] }
+      await campaignRequest(config, previous ? `/api/comments/${previous.id}` : `${endpoint}/comments`, previous ? "PUT" : "POST", {
+        content, suppress_agent_ids: preview.agents.map(agent => agent.id),
+        ...(previous ? { content_base: previous.content, expected_revision: previous.revision } : { parent_id: comment.id }) })
+    }
+    const readback = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+    if (!readback.some(item => item.content === content && item.parent_id === comment.id)) throw Error("CAMPAIGN_ARCHIVE_METADATA_READBACK")
+  } else {
+    const attachments = await campaignRequest(config, `${endpoint}/attachments`) as { id: string; filename: string }[]
+    const matching = attachments.filter(item => item.filename === path.basename(archive))
+    for (const attachment of matching) {
+      if (digest(await (await campaignFetch(config, `/api/attachments/${attachment.id}/download`)).arrayBuffer()) === archiveHash)
+        journal.attachmentId = attachment.id
+    }
+    if (!journal.attachmentId) {
+      const form = new FormData()
+      form.set("issue_id", config.multica.issueId)
+      form.set("file", Bun.file(archive), path.basename(archive))
+      const uploaded = await campaignRequest(config, "/api/upload-file", "POST", form) as { id: string }
+      if (!uploaded.id) throw Error("CAMPAIGN_ATTACHMENT_NOT_PERSISTED")
+      journal.attachmentId = uploaded.id
+      await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+    }
+    if (digest(await (await campaignFetch(config, `/api/attachments/${journal.attachmentId}/download`)).arrayBuffer()) !== archiveHash)
       throw Error("CAMPAIGN_ATTACHMENT_READBACK")
+    const attached = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+    const reportComment = attached.find(item => item.id === journal.reportCommentId)
+    if (!reportComment) throw Error("CAMPAIGN_REPORT_READBACK")
+    if (!reportComment.attachments?.some(item => item.id === journal.attachmentId)) {
+      const preview = await campaignRequest(config, `${endpoint}/comments/trigger-preview`, "POST", {
+        content: reportComment.content, editing_comment_id: reportComment.id }) as { agents: { id: string }[] }
+      await campaignRequest(config, `/api/comments/${reportComment.id}`, "PUT", { content: reportComment.content,
+        content_base: reportComment.content, expected_revision: reportComment.revision,
+        attachment_ids: [...reportComment.attachments?.map(item => item.id) ?? [], journal.attachmentId], suppress_agent_ids: preview.agents.map(agent => agent.id) })
+      const persisted = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+      if (!persisted.some(item => item.id === reportComment.id && item.attachments?.some(attachment => attachment.id === journal.attachmentId)))
+        throw Error("CAMPAIGN_ATTACHMENT_READBACK")
+    }
   }
   await syncCampaignIssue(manifest, journal, config)
   if (journal.executorResponseCommentId) {
@@ -373,7 +395,8 @@ async function requireCampaignTaskPins(manifest: CampaignManifest, key: Campaign
     throw Error("CAMPAIGN_CORPUS_PINS_CHANGED")
   const saved = await Bun.file(path.join(runDir, "config.json")).json()
   for (const [name, value] of [["EVAL_CLI_MODE", saved.agent?.cliMode], ["EVAL_CLI_BIN", saved.agent?.cliBin],
-    ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant]] as const)
+    ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant],
+    ["EVAL_AGENT_SERVICE_TIER", saved.agent?.serviceTier]] as const)
     if (manifest.pins[name] !== undefined && manifest.pins[name] !== value) throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
   return { tasksDir, saved }
 }
@@ -496,11 +519,14 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             pendingJudge ??= { key, resultFile }
           }
           const counted = resources.status !== "failed" && (key.corpus === "node" ? node?.code !== undefined && node.code !== 2 : isQualityResult(result))
+          const unscored = String(manifest.pins.EVAL_JUDGE_TRANSPORT_RESERVE) === "1" && key.corpus !== "node" && result.judge_status === "unscored" &&
+            [2, 3].includes(result.judge_attempts) && result.pass === null && !result.judge_cleanup_unconfirmed && !result.harness_error &&
+            result.failure_kind !== "provider" && Boolean(result.package_path) ? result.judge_summary ?? "JUDGE_BUDGET_EXHAUSTED" : undefined
           const completedAt = awaitingJudge && result.judge_status === "skipped" ? undefined
             : completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
               ? Math.min(now, completion.completedAt!) : unit.active ? undefined : Math.min(now, Math.floor((await stat(resultFile)).mtimeMs))
           const entry = { key, resultFile, status: result.status, counted, pass: node && node.code !== 2 ? node.verdict === "PASS" : result.pass, score: result.score, resources,
-            completedAt,
+            completedAt, ...(unscored ? { unscored } : {}),
             cleanupConfirmed: !awaitingJudge && !result.judge_cleanup_unconfirmed && result.environment_cleanup?.status === "confirmed" &&
               cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
           const index = journal.attempts.findIndex(attempt => attempt.resultFile === resultFile)
@@ -530,7 +556,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
   }
   const completed = journal.attempts.filter(entry => batch && entry.resultFile.startsWith(batch.resultsDir + path.sep) && entry.completedAt !== undefined).map(entry => {
     const prior = previous.attempts.find(attempt => attempt.resultFile === entry.resultFile)
-    return { entry, order: completions.get(entry.resultFile)?.completionOrder, priorCounted: prior?.completedAt === undefined ? undefined : prior.counted }
+    return { entry, order: completions.get(entry.resultFile)?.completionOrder, priorCounted: prior?.completedAt === undefined ? undefined : prior.counted || Boolean(prior.unscored) }
   }).sort((a, b) => a.entry.completedAt! - b.entry.completedAt! || (a.order ?? 0) - (b.order ?? 0))
   const recovered = completed.some(item => item.priorCounted === false && item.entry.counted)
   if (recovered) {
@@ -539,8 +565,8 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     journal.consecutiveErrors = Math.max(0, journal.consecutiveErrors - priorErrors)
   }
   for (const { entry } of recovered ? completed : completed.filter(item => item.priorCounted === undefined)) {
-    journal.consecutiveErrors = entry.counted ? 0 : journal.consecutiveErrors + 1
-    if (entry.counted) journal.lastProgressAt = Math.max(journal.lastProgressAt, entry.completedAt!)
+    journal.consecutiveErrors = entry.counted || entry.unscored ? 0 : journal.consecutiveErrors + 1
+    if (entry.counted || entry.unscored) journal.lastProgressAt = Math.max(journal.lastProgressAt, entry.completedAt!)
     if (journal.consecutiveErrors >= campaignLimits(manifest).consecutiveErrors) journal.blocker ??= "CONSECUTIVE_INFRASTRUCTURE_ERRORS"
   }
   if (journal.blocker?.startsWith("NO_PROGRESS_LIMIT") || now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
@@ -550,7 +576,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     return { journal, action: "finalize" as const, next: [] }
   }
   if (unit.active) return { journal, action: "wait" as const, next: [] }
-  const missing = manifest.keys.filter(key => !journal.attempts.some(attempt => attempt.counted && keyId(attempt.key) === keyId(key)))
+  const missing = manifest.keys.filter(key => !journal.attempts.some(attempt => (attempt.counted || attempt.unscored) && keyId(attempt.key) === keyId(key)))
   if (pendingJudge) return journal.repairing || journal.blocker
     ? { journal, action: "blocked" as const, next: [] }
     : { journal, action: "judge" as const, next: [], pendingJudge }
@@ -563,7 +589,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
   if (journal.repairing || journal.blocker) return { journal, action: "blocked" as const, next: [] }
   if (pending) return { journal, action: "launch" as const, next: pending }
   if (!missing.length) {
-    journal.final = "full"
+    journal.final = journal.attempts.some(attempt => attempt.unscored) ? "partial" : "full"
     return { journal, action: "finalize" as const, next: [] }
   }
   const first = missing[0]!
@@ -577,7 +603,7 @@ export type CampaignServerConfig = {
   acceptedHarness: string; slotsFile: string; experimentPinsFile: string; corpusPinsFile: string
   resourceBudgetFile: string; preflightCommand: string[]; verifyCommand: string[]
   corpora: Record<string, { entrypoint: string; tasks: string }>
-  multica: { url: string; workspace: string; tokenFile: string }
+  multica: { url: string; workspace: string; tokenFile: string; archiveMode?: "private" }
 }
 
 async function prepareGeneration(manifest: CampaignManifest, config: CampaignServerConfig) {
@@ -946,7 +972,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
           await writeLeaseReceipt(journalFile, previous)
           throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
         }
-        const next = manifest.keys.filter(key => !previous.attempts.some(attempt => attempt.counted && keyId(attempt.key) === keyId(key)))
+        const next = manifest.keys.filter(key => !previous.attempts.some(attempt => (attempt.counted || attempt.unscored) && keyId(attempt.key) === keyId(key)))
         if (!previous.final && next.length) {
           const first = next[0]!
           await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile, first.corpus,

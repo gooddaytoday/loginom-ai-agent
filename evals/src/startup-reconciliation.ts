@@ -133,7 +133,16 @@ export async function readStartupManagement(input: { stateDir: string; commandId
     : path.join(input.stateDir, `management-${input.commandId}-${input.slotId}`)
   const names = await readdir(root).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return []; throw error })
   let processes: ProcessCleanup | undefined
-  for (const name of names) processes = await reconcileStartupCleanup(path.join(root, name, "cleanup.json"), input.producerPid, input.recovery)
+  for (const name of names) {
+    const browser = /^browser-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(name)
+    const receipt = path.join(root, name, browser ? "browser-readiness.json" : "cleanup.json")
+    if (browser) {
+      const saved = await readLeaseReceipt(receipt) as { processes?: ProcessCleanup }
+      if (saved.processes?.lifetime?.owner?.kind !== "admin" || saved.processes.lifetime.owner.id !== "browser-readiness")
+        throw new EvalFailure("STARTUP_BROWSER_OWNERSHIP_UNCONFIRMED", 2)
+    }
+    processes = await reconcileStartupCleanup(receipt, input.producerPid, input.recovery)
+  }
   return processes
 }
 

@@ -27,6 +27,7 @@ async function calibrateBody(config: EvalConfig, corpusDir: string, signal: Abor
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
   const judgeAttempt = createJudgeGate()
   const settings: JudgeSettings = {
+    transportReserve: config.judge.transportReserve,
     command: config.judge.command,
     model: config.judge.model,
     reasoning: config.judge.reasoning,

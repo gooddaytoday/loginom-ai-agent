@@ -10,11 +10,12 @@ import { agentInputsHash, loadTasks, rubricHash } from "../../src/task"
 import { judgeInfo } from "../../src/judge"
 import { evaluationContractHash } from "../../src/evaluation"
 
-export async function pendingJudgeFixture(root: string) {
+export async function pendingJudgeFixture(root: string, transportReserve = false) {
   const fixture = await parallelFixture(root)
   const slots = path.join(root, "slots.json"), trace = path.join(root, "judge.jsonl"), probe = path.join(root, "version.json")
   await writeLeaseReceipt(slots, fixture.slots)
   const env = { EVAL_RESULTS_DIR: path.join(root, "results"), EVAL_WORKSPACE_ROOT: path.join(root, "workspace"),
+    EVAL_JUDGE_TRANSPORT_RESERVE: transportReserve ? "1" : "0",
     JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: `${process.execPath} ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --gate-log ${trace} --version-home-file ${probe}` }
   const tasksDir = path.join(root, "tasks")
   await cp(path.join(evalsRoot, "tasks/group-sum-qty"), path.join(tasksDir, "group-sum-qty"), { recursive: true })

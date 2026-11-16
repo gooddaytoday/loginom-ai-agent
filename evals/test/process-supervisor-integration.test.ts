@@ -169,3 +169,18 @@ async function nativeBrowser(root: string, name: string, owner: ProcessOwner, ru
   } catch (error) { await stop(); throw error }
   finally { clearTimeout(timer) }
 }
+
+test.skipIf(!process.env.EVAL_PROCESS_CANDIDATE_RECEIPT)("installed browser readiness uses the measurement sandbox and preserves native cleanup evidence", async () => {
+  const { checkIsolatedBrowser } = await import("../src/preflight")
+  const receipt = await readLeaseReceipt(process.env.EVAL_PROCESS_CANDIDATE_RECEIPT!) as { binary: string }
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-browser-readiness-"))
+  const profile = path.join(root, "profile"), evidence = path.join(root, "evidence")
+  await mkdir(profile, { mode: 0o700 })
+  try {
+    const proof = await checkIsolatedBrowser({ mode: "binary", cmd: [receipt.binary], cwd: root,
+      env: { LOGINOM_AI_AGENT_CLI_PROFILE: profile, LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "false" }, cleanupDir: evidence })
+    expect(proof.ready).toBe(true)
+    const outcome = await readLeaseReceipt(path.join(proof.evidence!, "browser-readiness.json")) as { ready: boolean; processes: { status: string } }
+    expect(outcome).toMatchObject({ ready: true, processes: { status: "confirmed" } })
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 90_000)

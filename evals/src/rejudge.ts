@@ -7,7 +7,7 @@ import { agentInputsHash, loadTasks, rubricHash } from "./task"
 import type { AgentRun } from "./cli"
 import { parseArtifactSource } from "./artifact"
 import { preflight } from "./preflight"
-import { createJudgeGate, judgeInfo, judgedFields, type JudgeInfo, type JudgeSettings } from "./judge"
+import { createJudgeGate, judgeInfo, judgedFields, recoverJudgeOutcome, type JudgeInfo, type JudgeSettings } from "./judge"
 import { aggregate, aggregateTask, isQualityResult, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
 import { describe, installSigint } from "./run"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
@@ -22,20 +22,26 @@ export async function readPendingJudge(config: EvalConfig, resultFile: string) {
   const result = await readLeaseReceipt(resultFile) as AttemptResult
   if (result.task_id !== path.basename(path.dirname(dir)) || !Number.isSafeInteger(result.attempt) || result.attempt < 1 || String(result.attempt) !== path.basename(dir))
     throw new EvalFailure("PENDING_JUDGE_IDENTITY", 2)
-  const complete = isQualityResult(result)
+  const complete = isQualityResult(result) || config.judge.transportReserve && result.judge_status === "unscored" &&
+    [2, 3].includes(result.judge_attempts) && result.pass === null && !result.judge_cleanup_unconfirmed
   if (complete) return { runDir, dir, result, complete: true as const }
-  if (result.judge_status === "skipped" && (result.judge_attempts !== 0 || await Bun.file(path.join(dir, "judge/verdict.json")).exists()))
+  const recoveringThird = config.judge.transportReserve && result.judge_attempts === 3
+  if (!recoveringThird && result.judge_status === "skipped" && (result.judge_attempts !== 0 || await Bun.file(path.join(dir, "judge/verdict.json")).exists()))
     throw new EvalFailure("PENDING_JUDGE_OUTCOME_UNCONFIRMED", 2)
   if (!["skipped", "error"].includes(result.judge_status) || !["completed", "failed", "timeout"].includes(result.status) ||
     result.harness_error || result.failure_kind === "provider" || result.interrupted || !result.package_path || result.judge_cleanup_unconfirmed)
     throw new EvalFailure("PENDING_JUDGE_GENERATION_UNCONFIRMED", 2)
-  if (result.judge_attempts !== 0 && result.judge_attempts !== 1 && result.judge_attempts !== 2) throw new EvalFailure("PENDING_JUDGE_BUDGET", 2)
-  if (result.judge_attempts === 2) throw new EvalFailure("Judge invocation budget exhausted", 2)
+  if (![0, 1, 2].includes(result.judge_attempts) && !recoveringThird) throw new EvalFailure("PENDING_JUDGE_BUDGET", 2)
+  if (result.judge_attempts === 2 && (!config.judge.transportReserve || result.judge_transport_error !== true))
+    throw new EvalFailure("Judge invocation budget exhausted", 2)
+  if (result.judge_attempts === 2 && await Bun.file(path.join(dir, "judge/verdict.json")).exists())
+    throw new EvalFailure("PENDING_JUDGE_OUTCOME_UNCONFIRMED", 2)
   const saved = await Bun.file(path.join(runDir, "config.json")).json() as Pick<EvalConfig, "only" | "tasksDir" | "skipJudge" | "passThreshold" | "judgeTimeoutMs"> &
     { agent_inputs_hash: string; rubric_hash: string; judge: JudgeInfo | null }
   if (saved.skipJudge !== false || typeof saved.tasksDir !== "string" || !path.isAbsolute(saved.tasksDir) || !saved.judge?.codex_version ||
     saved.passThreshold !== config.passThreshold || saved.judgeTimeoutMs !== config.judgeTimeoutMs ||
-    saved.judge.model !== config.judge.model || saved.judge.reasoning !== config.judge.reasoning)
+    saved.judge.model !== config.judge.model || saved.judge.reasoning !== config.judge.reasoning ||
+    (saved.judge.transport_reserve === 1) !== config.judge.transportReserve)
     throw new EvalFailure("PENDING_JUDGE_PINS_CHANGED", 2)
   const tasks = await loadTasks(saved.tasksDir, saved.only)
   const task = tasks.find(task => task.id === result.task_id)
@@ -46,13 +52,20 @@ export async function readPendingJudge(config: EvalConfig, resultFile: string) {
   if (!(await Array.fromAsync(new Bun.Glob("unpacked/Unit_*/Unit.xml").scan(artifactDir))).length) throw new EvalFailure("PENDING_JUDGE_ARTIFACT_MISSING", 2)
   const run = await Bun.file(path.join(dir, "run.json")).json() as AgentRun
   const prompt = await Bun.file(path.join(dir, "prompt.txt")).text()
-  return { runDir, dir, result, complete: false as const, saved, task, artifactDir, run, prompt, judgeAttemptsUsed: result.judge_attempts as 0 | 1 }
+  const recovered = recoveringThird ? await recoverJudgeOutcome({ task, artifactDir, outDir: path.join(dir, "judge"),
+    judge: { ...config.judge, timeoutMs: config.judgeTimeoutMs, passThreshold: config.passThreshold } }) : undefined
+  return { runDir, dir, result, complete: false as const, saved, task, artifactDir, run, prompt, recovered, judgeAttemptsUsed: result.judge_attempts as 0 | 1 | 2 }
 }
 
 export async function finishPendingJudge(config: EvalConfig, resultFile: string, onRunDirectory?: (directory: string) => Promise<void>) {
   const pending = await readPendingJudge(config, resultFile)
   if (pending.complete) return { code: pending.result.judge_cleanup_unconfirmed ? 1 : 0, runDir: pending.runDir, judgeCleanupConfirmed: !pending.result.judge_cleanup_unconfirmed }
   const result = pending.result
+  if (pending.recovered) {
+    Object.assign(result, judgedFields(pending.recovered))
+    await writeLeaseReceipt(resultFile, result)
+    return { code: 0, runDir: pending.runDir, judgeCleanupConfirmed: true }
+  }
   const controller = new AbortController(), removeSigint = installSigint(controller)
   try {
     await onRunDirectory?.(pending.runDir)
@@ -64,6 +77,7 @@ export async function finishPendingJudge(config: EvalConfig, resultFile: string,
     const judged = await createJudgeGate()({ task: pending.task, run: pending.run, prompt: pending.prompt, artifactDir: pending.artifactDir,
       outDir: path.join(pending.dir, "judge"), signal: controller.signal,
       judge: { ...config.judge, timeoutMs: pending.saved.judgeTimeoutMs, passThreshold: pending.saved.passThreshold }, judgeAttemptsUsed: pending.judgeAttemptsUsed,
+      judgeTransportError: result.judge_transport_error,
       saveJudgeFields: async fields => {
         Object.assign(result, fields)
         await writeLeaseReceipt(resultFile, result)
@@ -74,7 +88,7 @@ export async function finishPendingJudge(config: EvalConfig, resultFile: string,
         error: !judged.ok ? judged.error : null },
     } : {})
     await writeLeaseReceipt(resultFile, result)
-    return { code: judged.ok ? 0 : 1, runDir: pending.runDir, judgeCleanupConfirmed: !cleanupUnconfirmed }
+    return { code: judged.ok || result.judge_status === "unscored" ? 0 : 1, runDir: pending.runDir, judgeCleanupConfirmed: !cleanupUnconfirmed }
   } finally { removeSigint() }
 }
 
@@ -98,6 +112,7 @@ export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?
     await cp(path.join(runDir, "summary.json"), path.join(runDir, "summary.prev.json"))
     const judgeAttempt = createJudgeGate()
     const settings: JudgeSettings = {
+      transportReserve: config.judge.transportReserve,
       command: config.judge.command,
       model: config.judge.model,
       reasoning: config.judge.reasoning,

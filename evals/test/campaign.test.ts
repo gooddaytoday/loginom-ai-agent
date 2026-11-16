@@ -8,6 +8,7 @@ import { campaignEnvironment, campaignTick, prepareCampaignBatch, publishCampaig
 import { pendingJudgeFixture } from "./helpers/pending-judge"
 import { runOfflineJudge } from "../src/judge-environment"
 import { loadConfig } from "../src/config"
+import { judgeTask } from "../src/judge"
 
 async function admitRun(runDir: string, taskIds: string[]) {
   const commandJournal = path.join(runDir, "native-command.json")
@@ -15,6 +16,109 @@ async function admitRun(runDir: string, taskIds: string[]) {
     attempts: taskIds.map(taskId => ({ taskId, attempt: 1, purpose: "measurement" })) })
   await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
 }
+
+test("pending judge resumes its transport reserve once and a terminal unscored result is not retried", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-transport-pending-"))
+  try {
+    const fixture = await pendingJudgeFixture(root, true)
+    const prior = { ...fixture.original.result, judge_status: "error", judge_attempts: 2, judge_transport_error: true }
+    await writeLeaseReceipt(fixture.resultFile, prior)
+    expect(await runOfflineJudge(fixture.config, fixture.fixture.lockRoot, fixture.resultFile)).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+    expect(await Bun.file(fixture.resultFile).json()).toMatchObject({ judge_status: "scored", judge_attempts: 3 })
+    const trace = await Bun.file(fixture.trace).text()
+    await writeLeaseReceipt(fixture.resultFile, { ...prior, judge_attempts: 3 })
+    expect(await runOfflineJudge(fixture.config, fixture.fixture.lockRoot, fixture.resultFile)).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+    expect(await Bun.file(fixture.resultFile).json()).toMatchObject({ judge_status: "scored", judge_attempts: 3 })
+    expect(await Bun.file(fixture.trace).text()).toBe(trace)
+    await writeLeaseReceipt(fixture.resultFile, { ...prior, judge_status: "unscored", judge_attempts: 3, pass: null })
+    expect(await runOfflineJudge(fixture.config, fixture.fixture.lockRoot, fixture.resultFile)).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+    expect(await Bun.file(fixture.trace).text()).toBe(trace)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("pending judge adopts its third durable outcome after a crash and continues the campaign", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-third-crash-"))
+  try {
+    const fixture = await pendingJudgeFixture(root, true)
+    const dir = path.dirname(fixture.resultFile)
+    const command = path.join(root, "transport.ts"), calls = path.join(root, "calls")
+    await Bun.write(command, `await Bun.write(${JSON.stringify(calls)}, "third"); console.error("stream disconnected before completion: Transport error: network error: error decoding response body"); process.exit(1)`)
+    const saved = await Bun.file(path.join(fixture.runDir, "config.json")).json()
+    const { loadTasks } = await import("../src/task")
+    const tasks = await loadTasks(saved.tasksDir, saved.only)
+    const run = await Bun.file(path.join(dir, "run.json")).json()
+    const result = { ...fixture.original.result, judge_status: "error", judge_attempts: 2, judge_transport_error: true }
+    const judged = await judgeTask({ task: tasks[0]!, run, artifactDir: path.join(dir, "artifact"), prompt: await Bun.file(path.join(dir, "prompt.txt")).text(),
+      outDir: path.join(dir, "judge"), judge: { ...fixture.config.judge, command: [process.execPath, command],
+        timeoutMs: fixture.config.judgeTimeoutMs, passThreshold: fixture.config.passThreshold }, judgeAttemptsUsed: 2, judgeTransportError: true,
+      saveJudgeFields: async fields => { Object.assign(result, fields); await writeLeaseReceipt(fixture.resultFile, result) } })
+    expect(judged).toMatchObject({ ok: false, attempts: 3 })
+    // Simulate losing the caller before it persists judgedFields.
+    expect(await Bun.file(fixture.resultFile).json()).toMatchObject({ judge_status: "error", judge_attempts: 3 })
+    const before = await Bun.file(calls).text()
+    const outcomeFile = path.join(dir, "judge-processes-3/outcome.json")
+    const outcome = await Bun.file(outcomeFile).json()
+    await writeLeaseReceipt(outcomeFile, { ...outcome, cleanupConfirmed: false })
+    await expect(runOfflineJudge(fixture.config, fixture.fixture.lockRoot, fixture.resultFile)).rejects.toThrow("PENDING_JUDGE_OUTCOME_UNCONFIRMED")
+    expect(await Bun.file(fixture.resultFile).json()).toMatchObject({ judge_status: "error", judge_attempts: 3 })
+    await writeLeaseReceipt(outcomeFile, outcome)
+    expect(await runOfflineJudge(fixture.config, fixture.fixture.lockRoot, fixture.resultFile)).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+    expect(await Bun.file(fixture.resultFile).json()).toMatchObject({ judge_status: "unscored", judge_attempts: 3, pass: null })
+    expect(await Bun.file(calls).text()).toBe(before)
+    const key = { corpus: "ordinary", taskId: result.task_id, round: 1 }, next = { ...key, taskId: "next" }
+    const commandJournal = path.join(fixture.runDir, "command.json")
+    await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir: fixture.runDir,
+      attempts: [{ taskId: key.taskId, attempt: 1, purpose: "measurement" }] })
+    await writeLeaseReceipt(path.join(fixture.runDir, "config.json"), { ...saved, commandJournal })
+    await writeLeaseReceipt(fixture.resultFile, { ...await Bun.file(fixture.resultFile).json(), environment_cleanup: { status: "confirmed", evidence: "cleanup.json" } })
+    await writeLeaseReceipt(path.join(dir, "cleanup.json"), { processes: { status: "confirmed" }, nextAdmissionAllowed: true })
+    const manifest: CampaignManifest = { id: "crash", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1, keys: [key, next], pins: { EVAL_JUDGE_TRANSPORT_RESERVE: "1" } }
+    const state: CampaignJournal = { manifestHash: "fixture", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+      repairing: false, repairer: null, batches: [{ id: "first", keys: [key], resultsDir: path.dirname(fixture.runDir), invocationBefore: "before", started: true }], attempts: [], lastProgressAt: Date.now(), consecutiveErrors: 0 }
+    expect((await campaignTick(manifest, state, { active: false, invocation: "done", exitCode: 1 })).next).toEqual([next])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("campaign continues after exhausted judging and publishes partial after all remaining keys", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-unscored-campaign-"))
+  try {
+    const keys = ["unscored", "fail", "pass"].map(taskId => ({ corpus: "ordinary", taskId, round: 1 }))
+    const manifest: CampaignManifest = { id: "unscored", server: "runner2", executor: "EvalBaseline", parallel: 2, batchSize: 2,
+      keys, pins: { EVAL_JUDGE_TRANSPORT_RESERVE: "1" } }
+    const runDir = path.join(root, "first/run")
+    await mkdir(path.join(runDir, "unscored/1"), { recursive: true })
+    await writeLeaseReceipt(path.join(runDir, "unscored/1/result.json"), { ...emptyResult("unscored", 1, false), status: "completed",
+      package_path: "/artifact.lgp", judge_status: "unscored", judge_attempts: 3, judge_summary: "Transport budget exhausted",
+      environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } })
+    await writeLeaseReceipt(path.join(runDir, "unscored/1/cleanup.json"), { processes: { status: "confirmed" }, nextAdmissionAllowed: true })
+    await admitRun(runDir, ["unscored"])
+    const state: CampaignJournal = { manifestHash: "fixture", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+      repairing: false, repairer: null, batches: [{ id: "first", keys: [keys[0]!], resultsDir: path.dirname(runDir), invocationBefore: "before", started: true }],
+      attempts: [], lastProgressAt: Date.now(), consecutiveErrors: 0 }
+    const unit = { active: false, invocation: "done", exitCode: 1 }
+    const first = await campaignTick(manifest, state, unit)
+    expect(first.action).toBe("start")
+    expect(first.next).toEqual(keys.slice(1))
+    const replay = await campaignTick(manifest, first.journal, unit)
+    expect(replay.next).toEqual(keys.slice(1))
+    const second = path.join(root, "second/run")
+    for (const key of keys.slice(1)) {
+      await mkdir(path.join(second, key.taskId, "1"), { recursive: true })
+      await writeLeaseReceipt(path.join(second, key.taskId, "1/result.json"), { ...emptyResult(key.taskId, 1, false), status: "completed",
+        judge_status: "scored", score: key.taskId === "pass" ? 100 : 0, pass: key.taskId === "pass",
+        environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } })
+      await writeLeaseReceipt(path.join(second, key.taskId, "1/cleanup.json"), { processes: { status: "confirmed" }, nextAdmissionAllowed: true })
+    }
+    await admitRun(second, ["fail", "pass"])
+    replay.journal.batches.push({ id: "second", keys: keys.slice(1), resultsDir: path.dirname(second), invocationBefore: "done", started: true })
+    const final = await campaignTick(manifest, replay.journal, { ...unit, invocation: "second" })
+    expect(final.action).toBe("finalize")
+    expect(final.journal.final).toBe("partial")
+    expect(final.journal.attempts.filter(attempt => attempt.counted)).toHaveLength(2)
+    expect(final.journal.attempts.filter(attempt => attempt.unscored)).toHaveLength(1)
+    expect(final.journal.startedAttempts).toBe(3)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 async function initialCommandFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-initial-command-"))

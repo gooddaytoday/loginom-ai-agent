@@ -2,7 +2,20 @@ import { expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { terminalCensus } from "../src/terminal-census"
+import { initializeTerminalCensus, terminalCensus } from "../src/terminal-census"
+
+test("initialization reads every group identity without issuing a terminality proof", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "terminal-init-"))
+  try {
+    for (const pid of [25, 26]) {
+      mkdirSync(path.join(root, String(pid)))
+      writeFileSync(path.join(root, `${pid}/stat`), `${pid} (worker) ${["S", ...Array(18).fill("0"), "100", "0"].join(" ")}\n`)
+    }
+    expect(initializeTerminalCensus(root)).toBeUndefined()
+    writeFileSync(path.join(root, "26/stat"), "unreadable identity\n")
+    expect(() => initializeTerminalCensus(root)).toThrow("TERMINAL_CENSUS_IDENTITY")
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
 
 test("kernel flag excludes kernel threads, while identically named userspace still blocks", () => {
   const root = mkdtempSync(path.join(tmpdir(), "terminal-kernel-"))

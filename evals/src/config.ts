@@ -63,6 +63,9 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     !campaignControl.slice(0, 2).every(value => typeof value === "string" && path.isAbsolute(value)) || !/^[a-f0-9]{64}$/.test(campaignControl[2] ?? "")))
     throw new EvalFailure("EVAL_CAMPAIGN_CONTROL: требуются journal/lock с абсолютными путями, manifest SHA-256 и состояние admissions", 2)
   const providerId = env.EVAL_AGENT_PROVIDER_ID
+  if (env.EVAL_AGENT_SERVICE_TIER !== undefined && (env.EVAL_AGENT_SERVICE_TIER !== "default" ||
+    !env.EVAL_AGENT_MODEL?.startsWith("openai/") || providerId))
+    throw new EvalFailure("EVAL_AGENT_SERVICE_TIER: поддерживается default штатного OpenAI", 2)
   return {
     parallel,
     campaign: campaignValues[0] === undefined ? undefined : { consecutiveErrors: Number(campaignValues[0]), errorLimit: Number(campaignValues[1]),
@@ -108,6 +111,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
     agent: {
       model: required("EVAL_AGENT_MODEL", !agentless) || "fake/fake-model",
       variant: env.EVAL_AGENT_VARIANT?.trim() || "default",
+      serviceTier: env.EVAL_AGENT_SERVICE_TIER,
       cliMode: mode,
       cliBin: env.EVAL_CLI_BIN,
       bundle: path.resolve(evalsRoot, env.EVAL_CLI_BUNDLE ?? ".bundle"),
@@ -125,6 +129,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
       ? `dir:${path.join(evalsRoot, "fixtures", "storage")}`
       : (env.EVAL_ARTIFACT_SOURCE ?? "docker"),
     judge: {
+      transportReserve: env.EVAL_JUDGE_TRANSPORT_RESERVE === "1",
       command: (env.EVAL_JUDGE_COMMAND ?? "codex").split(" ").filter(Boolean),
       model: required("JUDGE_MODEL", needsJudge),
       reasoning: env.JUDGE_REASONING ?? "high",

@@ -140,22 +140,42 @@ export async function readDeliveredStorage(attemptDirs: string[], username: stri
       if (error.code === "ENOENT") return ""
       throw error
     })
+    const inputs = await readLeaseReceipt(path.join(directory, "input-files.json")).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return []
+      throw error
+    }) as { path: string; bytes: number; sha256: string }[]
     return text.split("\n").filter(line => line.trim()).flatMap(line => {
-      const event = JSON.parse(line) as { type?: string; part?: { tool?: string; state?: { status?: string; output?: string } } }
-      if (event?.type !== "tool_use" || event.part?.tool !== "loginom_dock_artifact_deliver" ||
-        event.part.state?.status !== "completed" || typeof event.part.state.output !== "string") return []
+      const event = JSON.parse(line) as { type?: string; part?: { tool?: string; state?: {
+        status?: string; input?: { local_package_path?: string }; output?: string
+      } } }
+      if (event?.type !== "tool_use" || !["loginom_dock_artifact_deliver", "loginom_dock_prepare"].includes(event.part?.tool ?? "") ||
+        event.part?.state?.status !== "completed" || typeof event.part.state.output !== "string") return []
       const receipt = JSON.parse(event.part.state.output) as { state?: string; status?: string; cleanup_complete?: boolean;
-        output?: { status?: string; destination?: string; bytes?: number; sha256?: string; upload_completion_verified?: boolean; cleanup_complete?: boolean } }
-      const output = receipt?.output
-      if (receipt?.state !== "settled" || receipt.status !== "SUCCEEDED" || receipt.cleanup_complete !== true ||
-        output?.status !== "SUCCEEDED" || output.cleanup_complete !== true || output.upload_completion_verified !== true ||
-        typeof output.destination !== "string" || typeof output.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(output.sha256) ||
+        prepared?: boolean; workspace?: { status?: string; package_ref?: { path?: string } };
+        output?: StorageDelivery; local_package_upload?: StorageDelivery }
+      const local = event.part.tool === "loginom_dock_prepare"
+      const output = local ? receipt.local_package_upload : receipt.output
+      const sha256 = local ? output?.source_sha256 : output?.sha256
+      if (output?.status !== "SUCCEEDED" || output.cleanup_complete !== true || output.upload_completion_verified !== true ||
+        typeof output.destination !== "string" || typeof sha256 !== "string" || !/^[a-f0-9]{64}$/.test(sha256) ||
         !Number.isSafeInteger(output.bytes) || output.bytes! < 0) return []
+      if (local) {
+        if (receipt.prepared !== true || receipt.workspace?.status !== "READY" || receipt.workspace.package_ref?.path !== output.destination ||
+          output.bytes_source !== "native_file_store" ||
+          Object.hasOwn(output, "source_unchanged_verified") && output.source_unchanged_verified !== true ||
+          !Array.isArray(inputs) || !inputs.some(input => input.path === event.part?.state?.input?.local_package_path &&
+            input.bytes === output.bytes && input.sha256 === sha256)) return []
+      } else if (receipt.state !== "settled" || receipt.status !== "SUCCEEDED" || receipt.cleanup_complete !== true) return []
       const name = path.posix.basename(output.destination)
       return /^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/.test(name) && output.destination === `/${username}/${name}`
-        ? [{ name, bytes: output.bytes!, sha256: output.sha256 }] : []
+        ? [{ name, bytes: output.bytes!, sha256 }] : []
     })
   }))).flat()
+}
+
+type StorageDelivery = {
+  status?: string; destination?: string; bytes?: number; sha256?: string; source_sha256?: string;
+  bytes_source?: string; source_unchanged_verified?: boolean; upload_completion_verified?: boolean; cleanup_complete?: boolean
 }
 
 export function requireServerFilesClosed(observed: {

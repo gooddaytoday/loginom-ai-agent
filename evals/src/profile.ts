@@ -13,6 +13,7 @@ import { writeLeaseReceipt } from "./lease"
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; hasPassword?: boolean; url?: string; username?: string }
 
 // Native CLI reports password presence; legacy clients report their MCP key.
+// Empty passwords are valid only when they match the expected configuration.
 const passwordMatches = (view: View, expected?: boolean) => view.hasPassword === undefined ||
   typeof view.hasPassword === "boolean" && (expected === undefined || view.hasPassword === expected)
 const connectionConfigured = (view: View, expected?: boolean) => passwordMatches(view, expected) &&
@@ -277,7 +278,7 @@ function parseJson(text: string): unknown {
   }
 }
 
-export function agentConfigJson(config: EvalConfig) {
+export function agentConfigJson(config: EvalConfig): { permission: Record<string, string>; provider?: Record<string, unknown> } {
   const provider = config.agent.provider
   return {
     permission: { "loginom_*": "allow" },
@@ -307,7 +308,9 @@ export function agentConfigJson(config: EvalConfig) {
             },
           },
         }
-      : {}),
+      : config.agent.serviceTier ? { provider: { openai: { models: {
+          [config.agent.model.slice("openai/".length)]: { options: { serviceTier: config.agent.serviceTier } },
+        } } } } : {}),
   }
 }
 
@@ -447,6 +450,10 @@ async function checkStarting(command: AgentCommand, exitCode: 1 | 2) {
     receipt?.ok !== true || receipt.code !== "LOGINOM_CONNECTION_VALID" || receipt.help?.state !== "ready")
     throw new EvalFailure("loginom check не подтвердил готовность Help в текущем CLI-процессе", exitCode)
   await assertProfileSettled(command.env.LOGINOM_AI_AGENT_CLI_PROFILE!)
+  if (command.mode === "binary") {
+    const { checkIsolatedBrowser } = await import("./preflight")
+    await checkIsolatedBrowser(command)
+  }
   if (result.evidenceDir) await Bun.write(path.join(result.evidenceDir, "connection-check.json"),
     JSON.stringify({ ok: receipt.ok, code: receipt.code, help: { state: receipt.help.state } }, null, 2))
   return result

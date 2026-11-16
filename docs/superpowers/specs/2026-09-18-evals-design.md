@@ -1,5 +1,47 @@
 # Eval-прогоны Loginom AI Agent: дизайн MVP
 
+## Root-witness для приостановленной подготовки — 2026-11-13
+
+Root policy может явно закрепить `parkedCampaign` с ID, repairer и точными
+`WitnessSource` для owner, journal и manifest. Owner остаётся в каноническом
+`stateRoot/owner.json`, journal и manifest принадлежат этому же ID в stateRoot.
+Допуск требует matching owner, совпадения manifestHash с сериализованным
+manifest, `repairing=true` с ожидаемым repairer, пустых batches/attempts и нуля
+startedAttempts. Final или published не допускаются. Исходная native-команда
+остаётся unactivated preparation без измерений, оба unit должны быть inactive.
+
+Те же bindings проверяются под controllerLock до и после root census, затем
+при native consumption. Изменение, подмена или исчезновение owner/journal/
+manifest закрывает допуск. Политика без parkedCampaign сохраняет прежнее
+требование отсутствующего owner. Счётчик рождения процессов, host provenance,
+native leases, исходные failed receipts и ограничения root-witness сохраняются.
+
+## Автономный запуск и резерв судьи — 2026-11-13
+
+Новые кампании запускает EvalOps из одной карточки через установленный
+`script/launch-campaign.ts`. Request закрепляет условия, UUID карточки задаёт
+единственный ID кампании. Manifest, два scoped wakeup, исходный clock и
+receipts сохраняются при повторе. Native reserve/prepare/verify и systemd
+контроллер остаются владельцами допуска и очистки.
+
+Pin `EVAL_JUDGE_TRANSPORT_RESERVE=1` разрешает один третий вызов судьи после
+подтверждённого транспортного отказа без вердикта при подтверждённой очистке.
+Отсутствие pin сохраняет исторические два вызова и прежний hash контракта.
+Новая политика включается в `evaluation_contract_hash`.
+
+`judge_status=unscored` означает исполненную генерацию с исчерпанной оценкой.
+`score` и `pass` равны null. Этот ключ сохраняется в журнале, исключается из
+pending и missing при tick/resume, остальные ключи выполняются. По завершении
+публикуется partial с отдельными числами оценённых, исполненных без оценки и
+не исполненных ключей. Счётчик вызовов записывается до spawn. После третьего
+вызова долговечный outcome связывает cleanup, артефакт, вердикт и условия
+судьи; восстановление принимает доказанный исход без четвёртого вызова.
+
+При `multica.archiveMode=private` принимается полный архив на runner с
+read-back метаданных host/path/bytes/SHA256 после полного чтения файла.
+В этом режиме `published=true` и `in_review` требуют проверенного архива и
+адресного ответа исполнителя. Остальные конфигурации сохраняют доставку вложения.
+
 ## Завершение автономной кампании — 2026-10-27
 
 Для автономного controller этот раздел имеет приоритет над прежними
@@ -13,7 +55,7 @@
   `<!-- eval-handoff:CAMPAIGN -->`. Единственный агент из `manifest.executor`
   разрешается через `GET /api/agents` workspace; `executorAgentId` сохраняется
   до POST, `reportCommentId` — после подтверждения публикации.
-- Отдельный финальный ответ EvalRunner обязателен. Засчитывается только
+- Отдельный финальный ответ назначенного исполнителя обязателен. Засчитывается только
   comment с `author_type=agent`, `author_id=executorAgentId`,
   `parent_id=reportCommentId` и `<!-- eval-executor-final:CAMPAIGN -->`.
   После read-back ID хранится в `executorResponseCommentId`; машинный итог

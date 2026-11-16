@@ -325,3 +325,27 @@ test("the existing deadline raises one repair event for a missing executor reply
     expect(fixture.issue.status).toBe("in_review")
   } finally { await fixture.close() }
 })
+
+test("private archive is verified on runner and delivered without upload or a second executor run", async () => {
+  const fixture = await publishingFixture()
+  try {
+    fixture.journal.final = "full"
+    fixture.journal.cleanupVerified = true
+    fixture.controls.autoReply = true
+    fixture.controls.failUpload = true
+    const config = { ...fixture.config, multica: { ...fixture.config.multica, archiveMode: "private" as const } }
+    await publishCampaign(fixture.manifest, fixture.journal, config)
+    expect(fixture.journal.published).toBe(true)
+    expect(fixture.attachments).toHaveLength(0)
+    expect(fixture.controls.unwantedAgentRuns).toBe(0)
+    const metadata = fixture.comments.find(comment => comment.content.includes("<!-- eval-archive:publication:"))
+    expect(metadata?.parent_id).toBe(fixture.journal.reportCommentId)
+    expect(metadata?.content).toContain("SHA256:")
+    const archive = metadata!.content.split("\n").find(line => line.startsWith("Путь: "))!.slice(6)
+    const bytes = await Bun.file(archive).arrayBuffer()
+    expect(metadata!.content).toContain(String(bytes.byteLength))
+    expect(metadata!.content).toContain(new Bun.CryptoHasher("sha256").update(bytes).digest("hex"))
+    expect(fixture.issue.status).toBe("in_review")
+    expect(fixture.wakeups.filter(wakeup => wakeup.enabled).map(wakeup => wakeup.id)).toEqual(["other-campaign"])
+  } finally { await fixture.close() }
+})

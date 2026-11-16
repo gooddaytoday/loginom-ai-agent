@@ -3,7 +3,7 @@
 ## Автономные кампании
 
 Текущие команды, standing/wakeup инструкции EvalOps и обязательный отдельный
-финальный ответ EvalRunner — в [runbook](docs/autonomous-campaigns.md).
+финальный ответ назначенного исполнителя — в [runbook](docs/autonomous-campaigns.md).
 Обычные batches ведёт существующая служба; default periodic новых кампаний
 задаёт только runbook, действующий интервал — поручение и scoped wakeups.
 Итог публикуется до архива; periodic отключается после read-back итога,

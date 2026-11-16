@@ -34,3 +34,17 @@ export function validResourceBound(value: unknown): value is ResourceBound {
     [bound.minimum, bound.maximum].every(value => value === null || typeof value === "number" && Number.isFinite(value) && value >= 0) &&
     (bound.minimum !== null || bound.maximum !== null) && (bound.minimum === null || bound.maximum === null || Number(bound.minimum) <= Number(bound.maximum))
 }
+
+export function requireFilesystemBudget(bounds: readonly ResourceBound[], observations: {
+  scope: string; available_bytes: number | null; available_inodes: number | null
+}[]) {
+  for (const bound of bounds.filter(bound => bound.scope.includes("filesystem:") &&
+    ["available_bytes", "available_inodes"].includes(bound.metric))) {
+    const matches = observations.filter(value => value.scope === bound.scope)
+    const metric = bound.metric as "available_bytes" | "available_inodes"
+    const value = matches.length === 1 ? matches[0]![metric] : null
+    if (value === null || !Number.isSafeInteger(value) || value < 0) throw new EvalFailure("RESOURCE_RESERVE_UNCONFIRMED", 2)
+    if (bound.minimum !== null && value < bound.minimum || bound.maximum !== null && value > bound.maximum)
+      throw new EvalFailure("RESOURCE_RESERVE_LOW", 2)
+  }
+}

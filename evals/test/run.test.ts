@@ -3,6 +3,7 @@ import os from "node:os"
 import path from "node:path"
 import { cp, mkdir, mkdtemp, readdir, rm, symlink, lstat } from "node:fs/promises"
 import { parseArtifactSource } from "../src/artifact"
+import { readLeaseReceipt } from "../src/lease"
 import { agentCommand } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
 import { gitInfo } from "../src/preflight"
@@ -128,6 +129,10 @@ test("runAttempt: paths сохраняет вложенные входы без 
     expect(args).not.toContain("--file")
     expect(args.at(-1)).not.toContain("{{INPUT_ROOT}}")
     expect(await Bun.file(path.join(directory, "results/group-sum-qty/1/inputs.json")).json()).toMatchObject({ passed: true })
+    expect(await readLeaseReceipt(path.join(directory, "results/group-sum-qty/1/input-files.json"))).toEqual(await Promise.all(inputs.map(async rel => ({
+      path: path.join(workdir, rel), bytes: Bun.file(path.join(root, rel)).size,
+      sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(path.join(root, rel)).bytes()).digest("hex"),
+    }))))
     for (const rel of inputs) {
       expect(args.at(-1)).toContain(path.join(workdir, rel))
       expect(await Bun.file(path.join(workdir, rel)).text()).toBe(await Bun.file(path.join(root, rel)).text())

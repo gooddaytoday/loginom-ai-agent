@@ -522,6 +522,13 @@ test("agentConfigJson: разрешает loginom_* и описывает OpenAI
   expect(Object.keys(json.provider.xiaomi?.models ?? {})).toEqual(["mimo"])
 })
 
+test("agentConfigJson pins the requested OpenAI default tier", () => {
+  const config = loadConfig(["--dry-run"], { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_SERVICE_TIER: "default" })
+  expect(agentConfigJson(config)).toMatchObject({ provider: { openai: { models: { "gpt-6.1-sol": { options: { serviceTier: "default" } } } } } })
+  expect(config.agent.serviceTier).toBe("default")
+  expect(() => loadConfig(["--dry-run"], { EVAL_AGENT_MODEL: "openai/gpt-6.1-sol", EVAL_AGENT_SERVICE_TIER: "priority" })).toThrow("EVAL_AGENT_SERVICE_TIER")
+})
+
 test("ensureProfile: unconfigured при существующем cli-profile.json запускает setup", async () => {
   const file = await stateFile({ state: "unconfigured", hasApiKey: false })
   const { config, command, profileDir } = await fakeProfile({ EVAL_FAKE_STATE_FILE: file })
@@ -709,6 +716,119 @@ test("verifyProfile checks a starting standalone host without setup or recovery"
     expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
     expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
   } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
+test.each([true, false])("native status schema: configured password flag %s preserves real readiness checks", async hasPassword => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a", password: hasPassword ? "synthetic-password" : "" } }
+  const state = path.join(context.profileDir, "view.json"), check = path.join(context.profileDir, "check.json"), calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  const view = { revision: 1, generation: 1, state: "starting", hasPassword, url: config.loginom.url, username: config.loginom.username, browser: { state: "unknown" } }
+  try {
+    await Bun.write(state, JSON.stringify(view))
+    await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } } }))
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect((await recoverIfNeeded(command, 1, Boolean(config.loginom.password))).view.state).toBe("starting")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "status", "check", "status", "check"])
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+    expect(await Bun.file(state).json()).toEqual(view)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test.each([
+  { name: "Help still starting", receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "starting" } }, error: "loginom check не подтвердил" },
+  { name: "browser failed", receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" }, browser: { state: "failed" } }, error: "LOGINOM_BROWSER_NOT_READY" },
+])("native status schema: %s remains blocked by actual check", async value => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, password: "synthetic-password" } }
+  const state = path.join(config.profileDir, "view.json"), check = path.join(config.profileDir, "check.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "starting", hasPassword: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(check, JSON.stringify({ receipt: value.receipt }))
+    await expect(verifyProfile(config, command)).rejects.toThrow(value.error)
+    await expect(recoverIfNeeded(command, 1, true)).rejects.toThrow(value.error)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test.each([
+  { name: "legacy explicit missing key", fields: { hasApiKey: false, hasPassword: true } },
+  { name: "missing credential schema", fields: {} },
+  { name: "malformed native flag", fields: { hasPassword: "yes" } },
+  { name: "legacy true with malformed native flag", fields: { hasApiKey: true, hasPassword: "yes" } },
+  { name: "legacy true with missing expected password", fields: { hasApiKey: true, hasPassword: false } },
+  { name: "wrong endpoint", fields: { hasPassword: true, url: "http://127.0.0.1:1/app/" } },
+  { name: "pending recovery", fields: { hasPassword: true, recoveries: ["pending"] } },
+  { name: "failed host", fields: { hasPassword: true, failure: "LOGINOM_RUNTIME_START_FAILED" } },
+  { name: "nonzero status", fields: { hasPassword: true, exitCode: 2 } },
+])("native status schema: %s cannot pass profile verification", async value => {
+  const context = await fakeProfile(), config = { ...context.config, loginom: { ...context.config.loginom, password: "expected-password-canary" } }, state = path.join(context.profileDir, "view.json"), calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "ready", url: config.loginom.url, username: config.loginom.username, ...value.fields }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_NOT_PREPARED")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test.each([true, false])("native status schema: ready password mismatch refuses without a readiness call, expected=%s", async expected => {
+  const context = await fakeProfile(), config = { ...context.config, loginom: { ...context.config.loginom, password: expected ? "expected-password-canary" : "" } }
+  const state = path.join(config.profileDir, "view.json"), calls = path.join(config.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "ready", hasPassword: !expected, url: config.loginom.url, username: config.loginom.username }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_NOT_PREPARED")
+    await expect(recoverIfNeeded(command, 1, expected)).rejects.toThrow("PROFILE_NOT_PREPARED")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "status"])
+    expect(await Bun.file(path.join(config.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(config.profileDir, { recursive: true, force: true }) }
+})
+
+test.each([true, false])("native status schema: ensure repairs password mismatch through setup, expected=%s", async expected => {
+  const context = await fakeProfile(), config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"), loginom: { ...context.config.loginom, password: expected ? "expected-password-canary" : "" } }
+  const state = path.join(config.profileDir, "view.json"), setup = path.join(config.profileDir, "setup.json"), calls = path.join(config.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  const saved = { state: "ready", hasPassword: expected, url: config.loginom.url, username: config.loginom.username }
+  try {
+    await Bun.write(state, JSON.stringify({ ...saved, hasPassword: !expected }))
+    await Bun.write(setup, JSON.stringify({ reply: saved, state: saved }))
+    expect(await ensureProfile(config, command)).toEqual({ fresh: true })
+    expect(await Bun.file(state).json()).toEqual(saved)
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "setup", "status"])
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect((await Bun.file(calls).text())).not.toContain("expected-password-canary")
+  } finally { await rm(config.profileDir, { recursive: true, force: true }) }
+})
+
+test("native status schema: malformed password flag refuses before setup/config replacement", async () => {
+  const context = await fakeProfile(), config = context.config, state = path.join(config.profileDir, "view.json"), settings = path.join(config.profileDir, "config/loginom-ai-agent.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, hasPassword: "yes", url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(settings, "preserve-settings")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_STATUS_INVALID")
+    expect(await Bun.file(settings).text()).toBe("preserve-settings")
+    expect(await Bun.file(path.join(config.profileDir, "setup-called")).exists()).toBe(false)
+    await expect(recoverIfNeeded(command, 1, false)).rejects.toThrow("PROFILE_NOT_PREPARED")
+  } finally { await rm(config.profileDir, { recursive: true, force: true }) }
+})
+
+test.each(["reply", "readback"])("native status schema: setup password %s mismatch prevents config replacement", async fault => {
+  const context = await fakeProfile(), config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"), loginom: { ...context.config.loginom, password: "expected-password-canary" } }
+  const state = path.join(config.profileDir, "view.json"), setup = path.join(config.profileDir, "setup.json"), settings = path.join(config.profileDir, "config/loginom-ai-agent.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup } }
+  const saved = { state: "ready", hasPassword: true, url: config.loginom.url, username: config.loginom.username }
+  try {
+    await Bun.write(state, JSON.stringify({ ...saved, hasPassword: false }))
+    await Bun.write(setup, JSON.stringify({ reply: { ...saved, hasPassword: fault !== "reply" }, state: { ...saved, hasPassword: fault !== "readback" } }))
+    await Bun.write(settings, "preserve-settings")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_PASSWORD_MISMATCH")
+    expect(await Bun.file(settings).text()).toBe("preserve-settings")
+  } finally { await rm(config.profileDir, { recursive: true, force: true }) }
 })
 
 test("verifyProfile accepts the native schema annotation while preserving permissions and file bytes", async () => {

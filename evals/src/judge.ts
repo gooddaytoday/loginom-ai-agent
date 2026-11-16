@@ -10,6 +10,7 @@ import { checkOracle } from "./oracle"
 import { superviseProcess } from "./process-supervisor"
 import { runJudgeUnit } from "./judge-unit"
 import type { AttemptResult } from "./report"
+import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
 export const verdictSchemaFile = path.join(evalsRoot, "src", "verdict.schema.json")
@@ -27,6 +28,7 @@ export type JudgeSettings = {
   passThreshold: number
   env?: Record<string, string>
   systemd?: boolean
+  transportReserve?: boolean
 }
 type RunView = Pick<AgentRun, "finalText" | "tools" | "nodeReceipts" | "nodeReceiptsDropped">
 
@@ -78,13 +80,14 @@ function parseJson(text: string): unknown {
   }
 }
 
-export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env" | "systemd"> }, signal?: AbortSignal) {
+export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env" | "systemd" | "transportReserve"> }, signal?: AbortSignal) {
   const version = await judgeVersion(config.judge, signal)
   return {
     backend: "codex" as const,
     codex_version: version.exitCode === 0 ? version.stdout.trim() : null,
     model: config.judge.model,
     reasoning: config.judge.reasoning,
+    ...(config.judge.transportReserve ? { transport_reserve: 1 as const } : {}),
     prompt_sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(judgePromptFile).bytes()).digest("hex"),
     schema_sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(verdictSchemaFile).bytes()).digest("hex"),
   }
@@ -205,29 +208,31 @@ export async function judgeTask(input: {
   signal?: AbortSignal
   checklist?: ChecklistItem[]
   judgeAttemptsUsed?: 0 | 1 | 2
-  saveJudgeFields?: (fields: Partial<Pick<AttemptResult, "judge_attempts" | "judge_status" | "score" | "pass" | "structural_score" |
+  judgeTransportError?: boolean
+  saveJudgeFields?: (fields: Partial<Pick<AttemptResult, "judge_attempts" | "judge_status" | "judge_transport_error" | "score" | "pass" | "structural_score" |
     "judge_confidence" | "judge_summary" | "checklist" | "oracle_pass" | "oracle_error">>) => Promise<void>
 }) {
   return judgeInvocation(input)
 }
 
 async function judgeInvocation(input: Parameters<typeof judgeTask>[0], admit?: () => void) {
-  if (input.judgeAttemptsUsed === 2) return { ok: false as const, error: "Judge invocation budget exhausted", attempts: 2 as const }
+  if (input.judgeAttemptsUsed === 2 && (!input.judge.transportReserve || !input.judgeTransportError))
+    return { ok: false as const, error: "Judge invocation budget exhausted", attempts: 2 as const, exhausted: input.judge.transportReserve === true }
   const checklist = input.checklist ?? input.task.checklist
   const checked = input.run ? await checkOracle(input.task, input.artifactDir) : { passed: null, error: null }
   const oracle = { oracle_pass: checked.passed, oracle_error: checked.error }
   await prepareJudgeDir({ ...input, dir: input.outDir, checklist })
   admit?.()
-  const firstAttempt = input.judgeAttemptsUsed === 1 ? 2 : 1
-  await input.saveJudgeFields?.({ judge_attempts: firstAttempt })
-  const first = await invoke(input, checklist, firstAttempt, oracle)
-  if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: firstAttempt }
-  if (firstAttempt === 2 || input.signal?.aborted || "cleanupUnconfirmed" in first) return { ...first, ok: false as const, error: first.error, ...oracle, attempts: firstAttempt }
-  await input.saveJudgeFields?.({ judge_attempts: 2 })
-  const second = await invoke(input, checklist, 2, oracle)
-  return second.ok
-    ? { ...second, pass: second.pass && checked.passed !== false, ...oracle, attempts: 2 as const }
-    : { ...second, ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
+  for (let attempt = (input.judgeAttemptsUsed ?? 0) + 1; attempt <= 3; attempt++) {
+    await input.saveJudgeFields?.({ judge_attempts: attempt, judge_transport_error: false })
+    const result = await invoke(input, checklist, attempt, oracle)
+    if (result.ok) return { ...result, pass: result.pass && checked.passed !== false, ...oracle, attempts: attempt }
+    const transport = "transportError" in result && result.transportError === true
+    if (input.signal?.aborted || "cleanupUnconfirmed" in result) return { ...result, ...oracle, attempts: attempt }
+    if (attempt === 1 || attempt === 2 && input.judge.transportReserve && transport) continue
+    return { ...result, ...oracle, attempts: attempt, exhausted: input.judge.transportReserve === true }
+  }
+  throw Error("JUDGE_BUDGET_INVALID")
 }
 export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0; cleanupUnconfirmed?: true }
 
@@ -279,10 +284,11 @@ export function judgedFields(judged: Judged) {
     }
   return {
     ...("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed ? { judge_cleanup_unconfirmed: true } : {}),
+    judge_transport_error: "transportError" in judged && judged.transportError === true,
     score: null,
     structural_score: null,
-    pass: "oracle_pass" in judged && judged.oracle_pass === false ? false : null,
-    judge_status: "error" as const,
+    pass: "exhausted" in judged && judged.exhausted ? null : "oracle_pass" in judged && judged.oracle_pass === false ? false : null,
+    judge_status: "exhausted" in judged && judged.exhausted ? "unscored" as const : "error" as const,
     judge_attempts: judged.attempts,
     judge_confidence: null,
     judge_summary: judged.error,
@@ -295,13 +301,14 @@ export function judgedFields(judged: Judged) {
 async function invoke(
   input: Parameters<typeof judgeTask>[0],
   checklist: ChecklistItem[],
-  attempt: 1 | 2,
+  attempt: number,
   oracle: { oracle_pass: boolean | null; oracle_error: string | null },
 ) {
   const verdictPath = path.join(input.outDir, "verdict.json")
   await rm(verdictPath, { force: true })
   const processDir = path.join(path.dirname(input.outDir), `judge-processes-${attempt}`)
   await mkdir(processDir, { recursive: true, mode: 0o700 })
+  const artifactSha256 = input.judge.transportReserve ? await judgeArtifactHash(input.artifactDir) : undefined
   const supervised = await runJudge({
     cmd: judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
     cwd: input.outDir, env: judgeEnvironment(input.judge.env),
@@ -311,10 +318,18 @@ async function invoke(
     owner: { kind: "judge", id: input.outDir },
   }, input.judge)
   try {
+    if (input.judge.transportReserve) await writeLeaseReceipt(path.join(processDir, "outcome.json"), {
+      version: 1, attempt, judgeDir: input.outDir, artifactSha256,
+      verdictSha256: await judgeVerdictHash(verdictPath), exitCode: supervised.exitCode,
+      cleanupConfirmed: supervised.cleanupConfirmed,
+      judge: { model: input.judge.model, reasoning: input.judge.reasoning, timeoutMs: input.judge.timeoutMs, passThreshold: input.judge.passThreshold },
+    })
     if (!supervised.cleanupConfirmed) return { ok: false as const,
       error: `Judge process cleanup unconfirmed: ${supervised.cleanupError ?? "unknown"}`, cleanupUnconfirmed: true }
     const exitCode = supervised.exitCode
-    if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
+    if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}`,
+      transportError: !supervised.timedOut && !supervised.interrupted && !(await Bun.file(verdictPath).exists()) &&
+        /stream disconnected before completion: Transport error: network error:|TLS handshake timeout|connection reset by peer/.test(supervised.stderr + "\n" + supervised.stdout) }
     const file = Bun.file(verdictPath)
     if (!(await file.exists())) return { ok: false as const, error: "verdict.json не создан" }
     const verdict = parseVerdict(await file.text())
@@ -330,6 +345,40 @@ async function invoke(
       })
     }))
   }
+}
+
+async function judgeArtifactHash(directory: string) {
+  const files = (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: directory, onlyFiles: true }))).sort()
+  const hasher = new Bun.CryptoHasher("sha256")
+  for (const file of files) {
+    const bytes = await Bun.file(path.join(directory, file)).bytes()
+    hasher.update(JSON.stringify([file, bytes.length])).update(bytes)
+  }
+  return hasher.digest("hex")
+}
+
+async function judgeVerdictHash(file: string) {
+  return await Bun.file(file).exists() ? new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") : null
+}
+
+export async function recoverJudgeOutcome(input: { task: Task; artifactDir: string; outDir: string;
+  judge: Pick<JudgeSettings, "model" | "reasoning" | "timeoutMs" | "passThreshold"> }) {
+  const outcome = await readLeaseReceipt(path.join(path.dirname(input.outDir), "judge-processes-3/outcome.json")).catch(() => undefined) as
+    { version?: number; attempt?: number; judgeDir?: string; artifactSha256?: string; verdictSha256?: string | null; exitCode?: number; cleanupConfirmed?: boolean;
+      judge?: { model?: string; reasoning?: string; timeoutMs?: number; passThreshold?: number } } | undefined
+  if (!outcome || outcome.version !== 1 || outcome.attempt !== 3 || outcome.judgeDir !== input.outDir || outcome.cleanupConfirmed !== true ||
+    !Number.isSafeInteger(outcome.exitCode) || outcome.artifactSha256 !== await judgeArtifactHash(input.artifactDir) ||
+    outcome.judge?.model !== input.judge.model || outcome.judge.reasoning !== input.judge.reasoning ||
+    outcome.judge.timeoutMs !== input.judge.timeoutMs || outcome.judge.passThreshold !== input.judge.passThreshold ||
+    outcome.verdictSha256 !== await judgeVerdictHash(path.join(input.outDir, "verdict.json")))
+    throw new EvalFailure("PENDING_JUDGE_OUTCOME_UNCONFIRMED", 2)
+  const checked = await checkOracle(input.task, input.artifactDir)
+  const oracle = { oracle_pass: checked.passed, oracle_error: checked.error }
+  const verdict = outcome.exitCode === 0 && outcome.verdictSha256 !== null
+    ? parseVerdict(await Bun.file(path.join(input.outDir, "verdict.json")).text()) : undefined
+  const scored = verdict ? scoreVerdict(input.task.checklist, verdict, input.judge.passThreshold) : undefined
+  if (scored?.ok && verdict) return { ...scored, verdict, ...oracle, pass: scored.pass && checked.passed !== false, attempts: 3 }
+  return { ok: false as const, error: "JUDGE_BUDGET_EXHAUSTED", exhausted: true, attempts: 3, ...oracle }
 }
 
 async function runJudge(input: Parameters<typeof superviseProcess>[0] & { timeoutMs: number; stdin?: string },

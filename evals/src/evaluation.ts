@@ -16,6 +16,7 @@ export function evaluationContractHash(input: { rubric_hash: string; judge: RunS
       backend: input.judge.backend, codex_version: input.judge.codex_version,
       model: input.judge.model, reasoning: input.judge.reasoning,
       prompt_sha256: input.judge.prompt_sha256, schema_sha256: input.judge.schema_sha256,
+      ...(input.judge.transport_reserve === 1 ? { transport_reserve: 1 } : {}),
     } : null,
     pass_threshold: input.pass_threshold,
   })).digest("hex")

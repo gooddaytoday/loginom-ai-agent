@@ -74,7 +74,9 @@ test.skipIf(!available)("checkIsolatedLoginom: чистый сервер при�
     await Bun.write(components, '<ComponentSettings><Item Guid="70a6c99d-a725-4309-b05c-898c8072c3cd"><Settings Disabled="true"/></Item></ComponentSettings>')
     await Bun.$`docker cp ${components} ${`${container}:/workdir/Components.cfg`}`.quiet()
     await expect(checkIsolatedLoginom(source)).rejects.toThrow("alias")
-    network = (await Bun.$`docker network create --driver bridge ${path.basename(dir)}`.quiet()).text().trim()
+    // A shared daemon can exhaust automatic pools while retaining historical eval networks.
+    const subnet = process.env.EVAL_TEST_DOCKER_SUBNET ? ["--subnet", process.env.EVAL_TEST_DOCKER_SUBNET] : []
+    network = (await Bun.$`docker network create --driver bridge ${subnet} ${path.basename(dir)}`.quiet()).text().trim()
     await Bun.$`docker network disconnect none ${container}`.quiet()
     await Bun.$`docker network connect --alias loginom-server-7.4.2-test ${network} ${container}`.quiet()
     await checkIsolatedLoginom(source)

@@ -2,17 +2,16 @@ import path from "node:path"
 import { closeSync, constants, fstatSync, fchmodSync, fsyncSync, lstatSync, openSync, readFileSync, readdirSync, readlinkSync, realpathSync, writeFileSync } from "node:fs"
 import { dlopen } from "bun:ffi"
 import { tryCampaignLock } from "./campaign-lock"
-import { terminalCensus } from "./terminal-census"
+import { initializeTerminalCensus, terminalCensus } from "./terminal-census"
 import { validateWitnessSource } from "./witness-source"
-import { assertFixedSources, assertStandalonePolicy, assertWitnessHost, digest, loadRootPolicy, parseRootWitness, witnessRoot, type RootPolicy, type RootWitness } from "./root-terminality-policy"
+import { assertCampaignOwner, assertFixedSources, assertStandalonePolicy, assertWitnessHost, digest, loadRootPolicy, parseRootWitness, witnessRoot, type RootPolicy, type RootWitness } from "./root-terminality-policy"
 
 export async function requireInactiveUnits(policy: RootPolicy) {
   for (const unit of [policy.batchUnit, policy.campaignUnit]) {
     const properties = await unitProperties(unit)
     if (properties.ActiveState !== "inactive" || properties.MainPID !== "0") throw Error("ROOT_WITNESS_UNIT_BUSY")
   }
-  try { lstatSync(policy.ownerFile); throw Error("ROOT_WITNESS_OWNER_PRESENT") }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error }
+  assertCampaignOwner(policy)
 }
 export async function publishRootTerminality(commandId: string) {
   if (process.getuid?.() !== 0 || process.geteuid?.() !== 0) throw Error("ROOT_PUBLISHER_REQUIRED")
@@ -60,6 +59,7 @@ export async function publishRootTerminality(commandId: string) {
     }
     // Libraries and native lock initialization are complete before the fence.
     // Only this independently root-provisioned invocation is exempt, never callers.
+    initializeTerminalCensus("/proc")
     const self = identity(process.pid), threads = threadIdentities()
     const census = terminalCensus("/proc", policy.owner.starttime, [self])
     if (JSON.stringify(threads) !== JSON.stringify(threadIdentities()) || JSON.stringify(self) !== JSON.stringify(identity(process.pid)) ||

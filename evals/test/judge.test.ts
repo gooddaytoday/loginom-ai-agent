@@ -852,6 +852,53 @@ test("judgeTask: постоянный отказ → error после двух �
   expect(await judgeFixture({ FAKE_CODEX_VERDICT: "invalid" })).toMatchObject({ ok: false, attempts: 2 })
 })
 
+test("judgeTask uses one transport reserve and persists its admission before invocation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "eval-judge-reserve-"))
+  try {
+    const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+    const artifact = await fixtureArtifact()
+    const command = path.join(root, "judge.ts")
+    const counter = path.join(root, "count")
+    await Bun.write(command, `const f=${JSON.stringify(counter)}; const n=Number(await Bun.file(f).text().catch(()=>"0"))+1; await Bun.write(f,String(n)); if(n<3){console.error("stream disconnected before completion: Transport error: network error: error decoding response body");process.exit(1)}; await import(${JSON.stringify(path.join(evalsRoot, "fixtures/fake-codex.ts"))});`)
+    const admissions: number[] = []
+    const result = await judgeTask({ task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(root, "judge"),
+      judge: { ...settings(), command: [process.execPath, command], transportReserve: true },
+      saveJudgeFields: async fields => {
+        if (fields.judge_attempts) {
+          expect(Number(await Bun.file(counter).text().catch(() => "0"))).toBeLessThanOrEqual(fields.judge_attempts)
+          admissions.push(fields.judge_attempts)
+        }
+      } })
+    expect(result).toMatchObject({ ok: true, attempts: 3, pass: true })
+    expect(admissions).toContain(3)
+    expect(await Bun.file(counter).text()).toBe("3")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("transport reserve is explicit in config and judge contract", async () => {
+  const configured = loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge, EVAL_JUDGE_TRANSPORT_RESERVE: "1" })
+  expect(configured.judge.transportReserve).toBe(true)
+  expect(await judgeInfo(configured)).toMatchObject({ transport_reserve: 1 })
+  expect(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake" }).judge.transportReserve).toBe(false)
+})
+
+test.each(["transport", "invalid", "verdict-and-error"])("judge reserve preserves terminal unscored outcome for %s", async mode => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "eval-judge-exhausted-"))
+  try {
+    const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+    const artifact = await fixtureArtifact()
+    const command = path.join(root, "judge.ts")
+    await Bun.write(command, mode === "transport"
+      ? 'console.error("stream disconnected before completion: Transport error: network error: error decoding response body"); process.exit(1)'
+      : `await import(${JSON.stringify(path.join(evalsRoot, "fixtures/fake-codex.ts"))}); ${mode === "verdict-and-error" ? 'console.error("connection reset by peer"); process.exit(1)' : ""}`)
+    const result = await judgeTask({ task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(root, "judge"),
+      judge: { ...settings(mode === "invalid" ? { FAKE_CODEX_VERDICT: "invalid" } : {}), command: [process.execPath, command], transportReserve: true } })
+    expect(result).toMatchObject({ ok: false, attempts: mode === "transport" ? 3 : 2 })
+    expect(judgedFields(result)).toMatchObject({ judge_status: "unscored", pass: null, score: null })
+    if (mode === "verdict-and-error") expect(await Bun.file(path.join(root, "judge/verdict.json")).exists()).toBe(true)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("judgeTask: доказанный провал oracle учитывается в pass_rate даже при отказе судьи", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-judge-oracle-error-"))
   const artifact = await fixtureArtifact()

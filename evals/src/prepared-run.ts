@@ -310,7 +310,7 @@ export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = fals
     interrupted_cleanup: measured.some(attempt => attempt.interrupted) ? { recovered: false } : null, stopped_reason: stopped,
     slots: environment.slots.map(lease => ({ ...lease.slot, liveQualified: true, state: contexts.find(context => context.lease === lease)?.confirmed ? "closed" : "quarantined",
       lease_receipt: lease.receipt, cleanup_receipt: contexts.find(context => context.lease === lease)?.cleanup, storage_root: `${file.server.storageRoot}/${lease.slot.username}` })),
-    agent: { cli_mode: config.agent.cliMode, model: config.agent.model, variant: config.agent.variant,
+    agent: { cli_mode: config.agent.cliMode, model: config.agent.model, variant: config.agent.variant, requested_service_tier: config.agent.serviceTier,
       git_sha: metadata.agent?.sourceCommit ?? null, dirty: metadata.agent?.sourceDirty ?? null, cli_version: metadata.agent?.cliVersion ?? null,
       binary_path: metadata.agent?.binaryPath ?? null, binary_sha256: metadata.agent?.binarySha256 ?? null,
       source_commit: metadata.agent?.sourceCommit ?? null, source_dirty: metadata.agent?.sourceDirty ?? null, source_tree_sha256: metadata.agent?.sourceTreeSha256 ?? null },

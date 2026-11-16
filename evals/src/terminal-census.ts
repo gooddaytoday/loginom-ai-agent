@@ -1,6 +1,13 @@
 import { readFileSync, readdirSync } from "node:fs"
 import path from "node:path"
 
+/** Prime synchronous observation/JIT before the publisher snapshots its threads.
+ * This read-only pass issues no proof; the subsequent census retains its fence. */
+export function initializeTerminalCensus(root: string) {
+  for (const name of readdirSync(root).filter(name => /^[1-9][0-9]*$/.test(name)))
+    groupIdentity(root, Number(name))
+}
+
 /** Pure observation, NOT an authenticated proof. The root publisher must establish
  * host proc/tick provenance and independently provision the finite exemptions.
  * No processes, threads, signals or retry are created by this function. */

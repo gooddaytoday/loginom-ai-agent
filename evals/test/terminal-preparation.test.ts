@@ -6,7 +6,7 @@ test("an untrusted terminal receipt cannot authorize cleanup", async () => {
     .rejects.toThrow("TERMINAL_PREPARATION_UNTRUSTED")
 })
 
-import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, rename, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -120,3 +120,85 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("dead producer does not auth
     await rm(root,{recursive:true,force:true})
   }
 },30000)
+
+for (const operation of ["prepare", "verify"] as const) test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")(`standalone ${operation} recovers an untouched slot only after its exact native unit exits`, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-terminal-standalone-")), f = await parallelFixture(root)
+  const unit = `evals-terminal-standalone-${crypto.randomUUID()}.service`, commandId = crypto.randomUUID()
+  const source = path.join(f.slots.controller.stateDir, `${operation}-command-${commandId}.json`)
+  const ready = path.join(root, "ready"), finish = path.join(root, "finish")
+  const identity = { containerId: "a".repeat(64), startedAt: "old", studioContainerId: "b".repeat(64), studioStartedAt: "old", serverEpoch: "c".repeat(64), configurationHash: "d".repeat(64) }
+  let environment: Awaited<ReturnType<typeof reopenEnvironmentLeases>>
+  const script = `
+    const {captureUnitBinding}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/process-supervisor.ts"))});
+    const {writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+    const {management}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/profile.ts"))});
+    const {observeTerminalPreparation}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/terminal-preparation.ts"))});
+    const binding=await captureUnitBinding();
+    await writeLeaseReceipt(${JSON.stringify(source)},{version:2,kind:"unactivated-preparation",commandId:${JSON.stringify(commandId)},identity:${JSON.stringify(identity)},phase:"unactivated",slotIds:["a","b"],unitBinding:binding});
+    const environment=await acquireEnvironmentLeases(${JSON.stringify(f.slots)},2,${JSON.stringify(identity)},${JSON.stringify(source)},${JSON.stringify(f.lockRoot)});
+    const result=await management({mode:"fake",cmd:[process.execPath,"-e","process.exit(1)"],cwd:${JSON.stringify(root)},env:{PATH:process.env.PATH},cleanupDir:${JSON.stringify(path.join(f.slots.controller.stateDir, `management-${commandId}-a`))}},["loginom","status"]);
+    if(result.exitCode!==1||result.processCleanup.status!=="confirmed")throw Error("standalone fixture preparation mismatch");
+    let liveRefused=false;
+    try { await observeTerminalPreparation(environment.server,environment.slots.find(slot=>slot.slot.id==="b")); }
+    catch(error) { if(error.message!=="TERMINAL_PREPARATION_UNIT_BUSY")throw error;liveRefused=true; }
+    await writeLeaseReceipt(${JSON.stringify(ready)},{binding,owner:environment.server.reservation.owner,liveRefused});
+    while(!await Bun.file(${JSON.stringify(finish)}).exists())await Bun.sleep(20);
+    await Promise.all([environment.server.close(),...environment.slots.map(slot=>slot.close())]);process.exit(1);
+  `
+  try {
+    const launch = Bun.spawn(["systemd-run", "--user", "--quiet", `--unit=${unit}`, "--property=Delegate=no", process.execPath, "-e", script],
+      { stdout: "ignore", stderr: "pipe" })
+    expect(await launch.exited).toBe(0)
+    const deadline = Date.now() + 15000
+    while (!await Bun.file(ready).exists()) { if (Date.now() > deadline) throw Error("standalone fixture not ready"); await Bun.sleep(25) }
+    expect((await Bun.file(ready).json()).liveRefused).toBe(true)
+    await Bun.write(finish, "exit")
+    while ((await Bun.$`systemctl --user show ${unit} --property=ActiveState --value`.quiet()).text().trim() !== "failed") {
+      if (Date.now() > deadline) throw Error("standalone fixture did not exit")
+      await Bun.sleep(25)
+    }
+    environment = await reopenEnvironmentLeases(f.slots, identity, f.lockRoot)
+    const slot = environment!.slots.find(slot => slot.slot.id === "b")!
+    const proof = await observeTerminalPreparation(environment!.server, slot)
+    expect(proof.kind).toBe("terminal-preparation")
+    expect(proof.passes).toHaveLength(2)
+    expect("capture_complete" in proof).toBe(false)
+    await validateTerminalPreparation(proof, environment!.server, slot)
+    await expect(observeTerminalPreparation(environment!.server, environment!.slots.find(slot => slot.slot.id === "a")!))
+      .rejects.toThrow("TERMINAL_PREPARATION_PATH_PRESENT")
+    await expect(cleanupSlotStorage(f.slots, environment!.server, slot, { identity } as never, proof, ["foreign"]))
+      .rejects.toThrow("TERMINAL_PREPARATION_SCOPE")
+    const command = await Bun.file(source).json()
+    for (const change of [{ attempts: [] }, { attempts: null }, { attempts: [{ slotId: "b" }] }, { runDir: root }, { phase: "released" }]) {
+      await writeLeaseReceipt(source, { ...command, ...change })
+      await expect(observeTerminalPreparation(environment!.server, slot)).rejects.toThrow("TERMINAL_PREPARATION_SOURCE_INELIGIBLE")
+    }
+    await writeLeaseReceipt(source, command)
+    const moved = `${f.slots.controller.stateDir}-moved`
+    await rename(f.slots.controller.stateDir, moved)
+    await symlink(moved, f.slots.controller.stateDir, "dir")
+    try {
+      await expect(validateTerminalPreparation(proof, environment!.server, slot)).rejects.toThrow("LEASE_NOT_HELD")
+    } finally { await rm(f.slots.controller.stateDir); await rename(moved, f.slots.controller.stateDir) }
+    const management = path.join(f.slots.controller.stateDir, `management-${commandId}-b`)
+    await symlink(path.join(root, "missing"), management)
+    try {
+      await expect(validateTerminalPreparation(proof, environment!.server, slot)).rejects.toThrow("TERMINAL_PREPARATION_PATH_PRESENT")
+    } finally { await rm(management) }
+    const appeared = (async () => { await Bun.sleep(75); await mkdir(management) })()
+    try {
+      await expect(validateTerminalPreparation(proof, environment!.server, slot)).rejects.toThrow("TERMINAL_PREPARATION_PATH_PRESENT")
+    } finally { await appeared; await rm(management, { recursive: true }) }
+    const mutation = (async () => { await Bun.sleep(75); await writeLeaseReceipt(source, { ...command, phase: "released" }) })()
+    try {
+      await expect(observeTerminalPreparation(environment!.server, slot)).rejects.toThrow("TERMINAL_PREPARATION_SOURCE_CHANGED")
+    } finally { await mutation; await writeLeaseReceipt(source, command) }
+  } finally {
+    await Promise.all([environment?.server.close(), ...environment?.slots.map(slot => slot.close()) ?? []])
+    await Bun.write(finish, "exit")
+    await Bun.$`systemctl --user stop ${unit}`.quiet().nothrow()
+    await Bun.$`systemctl --user reset-failed ${unit}`.quiet().nothrow()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30000)

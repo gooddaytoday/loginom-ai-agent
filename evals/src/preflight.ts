@@ -5,12 +5,13 @@ import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { EvalFailure } from "./fail"
 import { assertIsolatedStorageEmpty, listStorage, type ArtifactSource } from "./artifact"
-import { agentCommand, runAgent } from "./cli"
+import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { superviseProcess } from "./process-supervisor"
 import { judgeEnvironment, judgeVersion, type JudgeSettings } from "./judge"
 import type { SlotFile, SlotLease } from "./slots"
-import { readLeaseReceipt } from "./lease"
+import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
+import { redactKnownSecrets } from "./output-redaction"
 import { readUserOwnership, readUserPreparation } from "./user-environment"
 import { inspectUserStorage } from "./parallel-pair"
 
@@ -163,6 +164,35 @@ export async function agentInfo(config: EvalConfig) {
     sourceDirty: typeof metadata?.sourceDirty === "boolean" ? metadata.sourceDirty : null,
     sourceTreeSha256: typeof metadata?.sourceTreeSha256 === "string" ? metadata.sourceTreeSha256 : null,
   }
+}
+
+export async function checkIsolatedBrowser(command: AgentCommand) {
+  const runtime = await verifyAdminRuntime(command.cmd[0]!)
+  const profileDir = command.env.LOGINOM_AI_AGENT_CLI_PROFILE!
+  const workdir = await mkdtemp(path.join(path.dirname(profileDir), ".browser-readiness-"))
+  const directory = path.join(profileDir, "loginom/runtime/readiness/attempts", crypto.randomUUID())
+  const script = path.join(workdir, "check-browser.mjs")
+  await Bun.write(script, Bun.file(path.join(evalsRoot, "fixtures/check-isolated-browser.mjs")))
+  const boundary = await sandboxCommand({ cmd: command.cmd, profileDir, workdir, env: command.env })
+  const cmd = [runtime.node, script, runtime.resources, runtime.browser, directory]
+  const sandbox = [...boundary.cmd.slice(0, boundary.cmd.lastIndexOf("--") + 1), ...cmd]
+  const outDir = command.cleanupDir ? path.join(command.cleanupDir, `browser-${crypto.randomUUID()}`) : undefined
+  if (outDir) await mkdir(outDir, { mode: 0o700, recursive: true })
+  const result = await superviseProcess({ cmd, sandbox, cwd: workdir,
+    env: { ...boundary.env, LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources }, profileDir, outDir,
+    captureSecrets: command.cleanupSecrets, timeoutMs: 45_000, owner: { kind: "admin", id: "browser-readiness" } })
+  const ready = result.exitCode === 0 && !result.timedOut && !result.interrupted && !result.sandboxError &&
+    result.stdout.trim() === "BROWSER_READY" && result.processCleanup.status === "confirmed" &&
+    result.processCleanup.capture_complete && Boolean(result.processCleanup.browserBindings?.length)
+  const diagnostic = redactKnownSecrets({ ready, exitCode: result.exitCode, timedOut: result.timedOut,
+    sandboxError: result.sandboxError, stderr: result.stderr, processes: result.processCleanup }, command.cleanupSecrets ?? [])
+  if (outDir) await writeLeaseReceipt(path.join(outDir, "browser-readiness.json"), diagnostic)
+  if (result.processCleanup.status === "confirmed") {
+    await rm(workdir, { recursive: true })
+    await rm(directory, { recursive: true, force: true })
+  }
+  if (!ready) throw new EvalFailure(`LOGINOM_BROWSER_NOT_READY${outDir ? `; evidence=${outDir}` : ""}`, 2)
+  return { ready: true as const, manifestHash: runtime.manifestHash, ...(outDir ? { evidence: outDir } : {}) }
 }
 
 export async function verifyAdminRuntime(binary: string) {

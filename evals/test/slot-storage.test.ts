@@ -270,3 +270,37 @@ test("delivery cleanup does not claim incomplete, failed, unrelated or escaping 
     await expect(readDeliveredStorage([root], "eval-a")).rejects.toThrow()
   } finally { await rm(root, { recursive: true }) }
 })
+
+test("local package prepare cleanup claims only the exact verified pinned input", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-package-upload-"))
+  const sha256 = "a".repeat(64), source = path.join(root, "workspace/data/sales.lgp")
+  const receipt = { prepared: true, workspace: { status: "READY", package_ref: { path: "/eval-a/upload.lgp" } },
+    local_package_upload: { status: "SUCCEEDED", destination: "/eval-a/upload.lgp", bytes: 13, source_sha256: sha256,
+      source_unchanged_verified: true, bytes_source: "native_file_store", upload_completion_verified: true, cleanup_complete: true } }
+  const write = (body: unknown, localPackagePath = source) => Bun.write(path.join(root, "events.jsonl"), JSON.stringify({
+    type: "tool_use", part: { tool: "loginom_dock_prepare", state: { status: "completed",
+      input: { local_package_path: localPackagePath }, output: JSON.stringify(body) } },
+  }) + "\n")
+  try {
+    await writeLeaseReceipt(path.join(root, "input-files.json"), [{ path: source, bytes: 13, sha256 }])
+    await write(receipt)
+    expect(await readDeliveredStorage([root], "eval-a")).toEqual([{ name: "upload.lgp", bytes: 13, sha256 }])
+    expect(await readDeliveredStorage([root], "eval-b")).toEqual([])
+    for (const changed of [
+      { ...receipt, prepared: false },
+      { ...receipt, workspace: { ...receipt.workspace, package_ref: { path: "/eval-a/other.lgp" } } },
+      { ...receipt, local_package_upload: { ...receipt.local_package_upload, source_sha256: "b".repeat(64) } },
+      { ...receipt, local_package_upload: { ...receipt.local_package_upload, bytes: 14 } },
+      { ...receipt, local_package_upload: { ...receipt.local_package_upload, source_unchanged_verified: false } },
+      { ...receipt, local_package_upload: { ...receipt.local_package_upload, bytes_source: "unverified" } },
+    ]) {
+      await write(changed)
+      expect(await readDeliveredStorage([root], "eval-a")).toEqual([])
+    }
+    await write(receipt, path.join(root, "foreign.lgp"))
+    expect(await readDeliveredStorage([root], "eval-a")).toEqual([])
+    await write(receipt)
+    await rm(path.join(root, "input-files.json"))
+    expect(await readDeliveredStorage([root], "eval-a")).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})

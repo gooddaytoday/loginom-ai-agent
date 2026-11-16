@@ -69,6 +69,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
   const judge = config.skipJudge ? null : await judgeInfo(config, controller.signal)
   const settings: JudgeSettings | undefined = judge
     ? {
+        transportReserve: config.judge.transportReserve,
         command: config.judge.command,
         model: config.judge.model,
         reasoning: config.judge.reasoning,
@@ -160,6 +161,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
       dirty: config.agent.cliMode === "binary" ? environment.agent?.sourceDirty ?? null : environment.git?.dirty ?? null,
       model: config.agent.model,
       variant: config.agent.variant,
+      requested_service_tier: config.agent.serviceTier,
       cli_version: environment.agent?.cliVersion ?? null,
       binary_path: environment.agent?.binaryPath ?? null,
       binary_sha256: environment.agent?.binarySha256 ?? null,
@@ -264,6 +266,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
       return dest
     }),
   )
+  if (task.inputMode) await writeLeaseReceipt(path.join(outDir, "input-files.json"), await Promise.all(files.map(async file => ({
+    path: file, bytes: Bun.file(file).size, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex"),
+  }))))
   const name = `eval-${input.runId}-${task.id}-${attempt}`
   const inputHash = task.inputMode ? await agentInputsHash([{ ...task, dir: workdir }]) : undefined
   const packagePath = `/${config.loginom.username}/${name}.lgp`

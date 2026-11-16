@@ -4,7 +4,7 @@ import type { AgentRun } from "./cli"
 import { assessParallelLimits } from "./parallel-acceptance"
 
 export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_artifact" | "harness_error" | "infra_error"
-export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error"
+export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error" | "unscored"
 export type FailureKind = "permission" | "recovery" | "cancelled" | "provider" | "tool" | "other"
 
 export type EnvironmentCleanup = {
@@ -53,6 +53,7 @@ export type AttemptResult = {
   oracle_error?: string | null
   judge_status: JudgeStatus
   judge_attempts: number
+  judge_transport_error?: boolean
   judge_cleanup_unconfirmed?: boolean
   judge_confidence: string | null
   judge_summary: string | null
@@ -177,11 +178,11 @@ export type RunSummary = {
   stopped_reason: string | null
   agent: {
     cli_mode: string; git_sha: string | null; dirty: boolean | null; model: string
-    variant?: string; cli_version?: string | null; binary_path?: string | null; binary_sha256?: string | null
+    variant?: string; requested_service_tier?: string; cli_version?: string | null; binary_path?: string | null; binary_sha256?: string | null
     source_commit?: string | null; source_dirty?: boolean | null; source_tree_sha256?: string | null
   }
   harness?: { git_sha: string | null; dirty: boolean | null }
-  judge: { backend: "codex"; codex_version: string | null; model: string; reasoning: string; prompt_sha256: string; schema_sha256?: string } | null
+  judge: { backend: "codex"; codex_version: string | null; model: string; reasoning: string; prompt_sha256: string; schema_sha256?: string; transport_reserve?: 1 } | null
   dock: { skill_revision: string | null; skill_revisions?: string[]; action_manifest_sha256: string[] }
   loginom: { image_digest: string | null; container: string | null; storage_dir: string | null }
   agent_inputs_hash: string

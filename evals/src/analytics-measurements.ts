@@ -394,14 +394,14 @@ export async function prejournalBudgetRetrySources(input: {
     refusals[0]!._SYSTEMD_CGROUP !== binding.cgroup ||
     !journal.some(row => row._PID === "1" && row._UID === "0" && row.UNIT === binding.unit && row.EXIT_CODE === "exited" && row.EXIT_STATUS === "1")) return fail()
   // Only the reviewed source boundary that reads the private budget before native admission.
-  const boundaries: Record<string, string> = {
-    "evals/src/prepared-run.ts": "7ca3634462b0c4522bc18cba8006e881c547ca5f751a5cad13869fcce7c6d329",
-    "evals/src/lease.ts": "ca5344f927acdfd140718bbc5ac006eb1291081414891116caf5c6d8715a81a8",
+  const boundaries: Record<string, string[]> = {
+    "evals/src/prepared-run.ts": ["7ca3634462b0c4522bc18cba8006e881c547ca5f751a5cad13869fcce7c6d329", "50e6ab50ec1722f1a91535da2d8da85af877e6d3937c55c2035087b99eb515e9"],
+    "evals/src/lease.ts": ["ca5344f927acdfd140718bbc5ac006eb1291081414891116caf5c6d8715a81a8"],
   }
   const executionSources = proof.executionSources as (FilePin & { repositoryPath: string })[]
   if (!Array.isArray(executionSources) || executionSources.length !== 2 || new Set(executionSources.map(ref => ref.repositoryPath)).size !== 2) return fail()
   for (const ref of executionSources) {
-    if (boundaries[ref.repositoryPath] !== ref.sha256) return fail()
+    if (!boundaries[ref.repositoryPath]?.includes(ref.sha256)) return fail()
     const blob = Bun.spawn(["git", "show", proof.sourceRevision + ":" + ref.repositoryPath], {
       cwd: path.resolve(import.meta.dir, "../.."), stdout: "pipe", stderr: "ignore", timeout: 10000,
     })

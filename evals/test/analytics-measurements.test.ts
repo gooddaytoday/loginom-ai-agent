@@ -5,7 +5,7 @@ import path from "node:path"
 import { auditMeasurement, exclusiveFact, freezeMeasurementInputs, measurementState, snapshotActor, validateManifest } from "../src/analytics-measurements"
 import { evalsRoot } from "../src/config"
 
-async function budgetRefusalFixture() {
+async function budgetRefusalFixture(revision?: string) {
   const root = await mkdtemp(path.join(os.tmpdir(), "budget-refusal-"))
   const write = async (file: string, value: unknown) => {
     await Bun.write(file, typeof value === "string" ? value : JSON.stringify(value))
@@ -27,7 +27,7 @@ async function budgetRefusalFixture() {
   const budgetSha256 = (await pin(budgetFile)).sha256, manifestHash = "b".repeat(64)
   await write(entryFile, { manifestHash, job: job.id, binding })
   await write(intentFile, { manifestHash, job: job.id, unit: job.unit, resultsDir: job.resultsDir })
-  const sourceRevision = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: path.dirname(evalsRoot) }).stdout.toString().trim()
+  const sourceRevision = revision ?? Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: path.dirname(evalsRoot) }).stdout.toString().trim()
   const sourceFile = path.join(root, "source-pins.json"), metadataFile = path.join(root, "original-metadata.json"),
     journalFile = path.join(root, "journal.jsonl")
   await write(sourceFile, { sourceRevision, manifestSha256: manifestHash, pins: { resourceBudgetSha256: budgetSha256 } })
@@ -72,6 +72,22 @@ test("prejournal budget refusal uses original evidence across authorization rest
     await f.write(f.metadataFile, { changed: true })
     await expect(verifyMeasurementRetryProof(authorization, f.input.manifestHash, f.job.id, 1)).rejects.toThrow("RETRY_EVIDENCE_CHANGED")
     await expect(prejournalBudgetRetrySources(f.input)).rejects.toThrow()
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("prejournal refusal accepts the previously reviewed source revision", async () => {
+  const { prejournalBudgetRetrySources } = await import("../src/analytics-measurements")
+  const f = await budgetRefusalFixture("0f87cf26cdc39889901d56a50006e366cbba7e13")
+  try {
+    expect((await prejournalBudgetRetrySources(f.input)).map(source => source.file)).toContain(f.metadataFile)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("prejournal refusal rejects an unreviewed source revision even with matching evidence", async () => {
+  const { prejournalBudgetRetrySources } = await import("../src/analytics-measurements")
+  const f = await budgetRefusalFixture("77e63d68cb06578c21797efc6e6271818cbb85db")
+  try {
+    await expect(prejournalBudgetRetrySources(f.input)).rejects.toThrow("PREJOURNAL_BUDGET_REFUSAL_UNCONFIRMED")
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
