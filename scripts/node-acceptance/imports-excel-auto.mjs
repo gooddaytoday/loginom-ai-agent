@@ -16,7 +16,10 @@ export function checkExcelAutoMain(expected,events){
   &&typed(r,expected.outputs[0]));
  if(!initial||!final||!['document_id','workflow_id','node_id'].every(k=>initial.node[k]===final.node[k]))throw Error('EXCEL_AUTO_SAME_NODE_TYPED_ROUNDS');
  const requests=events.filter(e=>e.phase==='node_apply_prepared').map(e=>e.request);
- if(requests.filter(r=>r.target?.type==='imports.excel'&&r.target.kind==='new').length!==1
+ const refusedWithoutEffect=new Set(events.filter(e=>e.phase==='completed'&&e.action_key==='node.apply'
+  &&typeof e.operation_id==='string'&&e.operation_id.length>0&&e.outcome?.status==='NOT_APPLIED'&&e.outcome.effect_possible===false).map(e=>e.operation_id));
+ if(events.filter(e=>e.phase==='node_apply_prepared'&&e.request.target?.type==='imports.excel'
+  &&e.request.target.kind==='new'&&!refusedWithoutEffect.has(e.operation_id)).length!==1
   ||requests.some(r=>!['imports.excel','exports.text'].includes(r.target?.type)))throw Error('EXCEL_AUTO_SUBSTITUTE_NODE');
  const mode={'Нет':'none','Только новые':'new','Все':'all'}[policy.mode];
  const patches=requests.filter(r=>r.target?.type==='imports.excel'&&r.target.kind==='existing'

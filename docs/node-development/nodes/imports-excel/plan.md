@@ -334,3 +334,20 @@ C8 утвердить семантику Нет/Только новые/Все �
 Каждый цикл — один PR, порядок: C7 (имя из переменной), C4 (список/маска/потоки),
 затем C8 и C5. C6 XLSM **отложен**: требует правки `packages/opencode`.
 C9 XLS — ограничение 7.4.2; C10 HTTP/Basic — нет стенда.
+## C8 follow-up: native output-port Done
+
+Before the third build, the failed production observations at
+`final-r3-none/execution-events.jsonl:137,211` showed enabled, point-observed
+Done, no masks, a verified complete native mapping and a GUID-bound output0.
+`wizard.port_context.status` remained `unobserved`, so no `finish_wizard`
+action was granted. Excel was missing from the existing output-folder toolbar
+overflow type list. Add only its native icon to that list; retain the same
+opening receipt, port/index/GUID, ancestry, visibility and duplicate guards.
+The existing overflow test matrix now covers Excel and failed before this fix.
+Other node types and the detection modes' deferred mapping path are unchanged.
+
+The C8 audit also excludes a prepared creation request only when its matching
+completed `node.apply` receipt proves `NOT_APPLIED` and `effect_possible=false`.
+An ambiguous, unmatched, incomplete or possibly effective attempt still counts.
+This has positive and negative tests; canonical expected data is unchanged.
+

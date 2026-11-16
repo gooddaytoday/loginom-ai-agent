@@ -34,3 +34,14 @@ test('C8 main audit needs two typed rounds on the same node and a native path-on
   const changed=events();mutate(changed);assert.throws(()=>checkExcelAutoMain(expected,changed));
  }
 });
+
+test('C8 audit ignores a completed refused request only when it proves no effect',()=>{
+ const withRefusal=()=>[...events(),
+  {phase:'node_apply_prepared',operation_id:'refused-upload',request:{target:{type:'imports.excel',kind:'new'}}},
+  {phase:'completed',action_key:'node.apply',operation_id:'refused-upload',outcome:{status:'NOT_APPLIED',effect_possible:false}}];
+ assert.equal(checkExcelAutoMain(expected,withRefusal()).status,'PASS');
+ for(const mutate of [e=>e.at(-1).outcome.effect_possible=true,e=>e.at(-1).outcome.status='AMBIGUOUS',
+  e=>delete e.at(-1).outcome.effect_possible,e=>e.at(-1).operation_id='different',e=>e.pop()]){
+  const e=withRefusal();mutate(e);assert.throws(()=>checkExcelAutoMain(expected,e),/EXCEL_AUTO_SUBSTITUTE_NODE/);
+ }
+});
