@@ -1,0 +1,24 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [{"type":"imports.text"},{"type":"transform.collapse_columns"},{"type":"transform.sorting"},{"type":"exports.text"}],
+  "outputs": [{
+    "output_node_type": "transform.sorting", "output_port": 0,
+    "ordered": true, "column_order": "exact",
+    "columns": [
+      {"name":"RowID","type":"integer","label_any":true},
+      {"name":"Names","type":"string","label_any":true},
+      {"name":"Values","type":"variant","label_any":true}
+    ],
+    "rows": [
+      {"RowID":3,"Names":"IntValue","Values":null},
+      {"RowID":3,"Names":"RealValue","Values":null},
+      {"RowID":3,"Names":"TextValue","Values":null},
+      {"RowID":2,"Names":"IntValue","Values":{"cell_type":"integer","value":2}},
+      {"RowID":2,"Names":"RealValue","Values":{"cell_type":"real","value":2.5}},
+      {"RowID":1,"Names":"RealValue","Values":{"cell_type":"real","value":3.5}},
+      {"RowID":1,"Names":"IntValue","Values":{"cell_type":"integer","value":10}},
+      {"RowID":1,"Names":"TextValue","Values":{"cell_type":"string","value":"text"}},
+      {"RowID":2,"Names":"TextValue","Values":{"cell_type":"string","value":"word"}}
+    ]
+  }]
+}

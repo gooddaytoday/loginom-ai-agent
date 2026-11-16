@@ -1073,6 +1073,14 @@ Case меняет регистр true→false; threads — максимум 1→
 Cold читает сохранённые ключи и literal максимум, закрывает мастер через Cancel,
 затем штатно выполняет сохранённый узел без настройки; Save/cleanup обязательны.
 
+`sorting-variant` uses the approved sorting `modes/task-variant.md` and only
+`fixtures/variant-wide.csv`. Scalar Import and Collapse retain all nine rows,
+including three NULLs. Frozen `expected-variant.json` is checked against the
+independent oracle; two executions of the same Sorting preserve exact native
+integer/real/string subtypes, Values/RowID/Names keys and disabled locale/case.
+Both ordered full typed outputs and CSVs, Save, cold without configuration and
+cleanup are required. Only task and CSV reach the model.
+
 `text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
 задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
 Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
