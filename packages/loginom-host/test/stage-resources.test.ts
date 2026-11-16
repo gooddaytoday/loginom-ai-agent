@@ -12,13 +12,13 @@ import { removeFixture } from "./remove-fixture"
 test("resource staging selects the signed action catalog for the target platform", () => {
   expect(actionCatalogForPlatform("linux")).toEqual({
     actionManifestUri:
-      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-linux-candidate/manifest.json",
-    actionManifestSha256: "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-linux-candidate/manifest.json",
+    actionManifestSha256: "118ee37cccf1a80fafa628b370786da9f9e753308c064ac460f83b40f98e8716",
   })
   expect(actionCatalogForPlatform("win32")).toEqual({
     actionManifestUri:
-      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-windows-candidate/manifest.json",
-    actionManifestSha256: "174258527893d1d8d5491407630b33ffdeef677aa83ad686945cc000f819beb8",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-windows-candidate/manifest.json",
+    actionManifestSha256: "0ac3ebe8ca6036012c521f2c4e70661c65ee3d073dfd2cd8d26f418a77e1c05d",
   })
   expect(() => actionCatalogForPlatform("freebsd")).toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")
 })
@@ -30,8 +30,8 @@ test("native catalog selection retains Linux pins and admits only the reviewed m
   })
   expect(catalogForTarget("darwin-arm64")).toEqual({
     actionManifestUri:
-      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.09.14-rc6-macos-candidate/manifest.json",
-    actionManifestSha256: "d26ce18ab9ef3285d5bac7aff1d17d4968defb1d41ebd7cbbda8d9cbede07255",
+      "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-macos-candidate/manifest.json",
+    actionManifestSha256: "da96c141cdf7df26680ff5a3ef026b6fc6d7b3473e684e26d4b083ba197c4b09",
   })
   expect(catalogForTarget("win32-x64")).toEqual(actionCatalogForPlatform("win32"))
   expect(() => catalogForTarget("darwin-x64")).toThrow("LOGINOM_NATIVE_RESOURCES_UNAVAILABLE")

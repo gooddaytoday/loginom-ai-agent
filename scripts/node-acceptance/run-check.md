@@ -1,3 +1,13 @@
+`rest-query-variables` uses LAB-820 `variables/acceptance/task-rest-variables.md`
+without input files. The frozen initial/updated tables are checked separately
+against both downloaded CSVs. W1 snapshots prove integer limit/skip, stable
+source IDs and unchanged query bindings on the same REST. Cold uses the updated
+expectation and actual downloaded CSV. Oracle, fixture and expected stay private.
+`read_existing_output` reexecutes without configuring the REST node; its internal
+`schemas` are allowed only when every requested port exactly matches the output
+of the earlier successful, clean, completed source operation on the same REST.
+Connection/query/mapping edits remain `REST_QUERY_RECONFIGURED`.
+
 `rest-content-types` uses the reduced C5 `task-content-types.md`, only
 `content-types.csv` and `acceptance/modes/content-types/expected.json`.
 Two raw UTF-8 POST bodies (text/plain, application/xml) must produce two typed

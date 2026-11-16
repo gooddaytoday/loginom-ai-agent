@@ -138,7 +138,8 @@ async function prepareWorkspace(page, options) {
     if(mode==='identity')return {document_id:state.id,blocked:blockers.length>0,
       loginom_account:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName??null};
     const request = JSON.stringify({session:options.sessionId,intent:options.intent,packagePath:options.packagePath,workflowRef:options.workflowRef});
-    const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab && r.phase==='verified') : null;
+    const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab && r.phase==='verified')
+      : options.bindOpenOnly ? [...state.receipts.values()].find(r=>r.phase==='verified'&&r.tab===tab&&r.packageNode===packageNode&&JSON.stringify(r.crumbs)===JSON.stringify(crumbs)) : null;
     const receipt = state.receipts.get(options.operationId);
     if (receipt && receipt.request !== request) return {error:'OPERATION_CONFLICT'};
     if (mode==='reserve' && receipt?.preserved.some(item=>!tabs.includes(item.tab)

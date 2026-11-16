@@ -8,7 +8,7 @@ export function makeSavedPackageStateCode(options) {
  const url=new URL(loginomUrl);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('Invalid saved package origin');
  return `async page=>page.evaluate(${readSavedPackageState.toString()},${JSON.stringify({sessionId,documentId,account,packagePath,origin:url.origin,loginomBuild})})`;
 }
-function readSavedPackageState(o) {
+export function readSavedPackageState(o) {
  return (async()=>{
   const app=globalThis.bg?.app,f=app?.Application?.FInstance?.FMainForm,m=f?.FMapTree,prep=globalThis.__loginomDockPreparationV1;
   const need=(v,message)=>{if(!v)throw Error(message);};

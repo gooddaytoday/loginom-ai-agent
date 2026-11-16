@@ -204,9 +204,16 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
         result = subprocess.run([sys.executable, '-B', case['oracle'], '--check', '--case', 'simulation'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_rest_query_variables_is_deferred_while_c4_remains_registered(self):
-        with self.assertRaisesRegex(ValueError, 'Unknown scenario: rest-query-variables'):
-            runner.scenario('rest-query-variables')
+    def test_rest_query_variables_preserves_two_frozen_phases(self):
+        case = runner.scenario('rest-query-variables')
+        self.assertEqual(case['input_files'], [])
+        self.assertEqual(case['export_count'], 2)
+        for initial, filename, values in [(True, 'expected-initial.json', [3, 2]), (False, 'expected.json', [5, 10])]:
+            expected = runner.rest_query_expected(case, '/own/query.lgp', initial=initial)
+            self.assertEqual(expected['outputs'], runner.read(case['source'] / filename)['outputs'])
+            variables = expected['variable_inventory']['outputs'][0]['variables']
+            self.assertEqual([v['value'] for v in variables], values)
+            self.assertTrue(all(v['type'] == 'integer' and v['label_any'] for v in variables))
         self.assertEqual(runner.scenario('rest-variables')['prompt'].name, 'task-variables.md')
         kit = runner.REPO / 'docs/node-development/variables/acceptance'
         for name in ('task-rest-variables.md', 'oracle.py', 'expected-initial.json', 'expected.json'):
