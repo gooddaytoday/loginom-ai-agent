@@ -9,10 +9,16 @@ import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {javascriptCodeReadback} from '../lib/javascript-code-node.mjs';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
+import {existingOutputExecution} from '../lib/node-execution-evidence.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const schema=[{index:0,name:'value',label:'Value',type:'real'}];
 const source=()=>({parameters:{contract_revision:'1.0.0',target:{type:'transform.calculator',label:'Calculation'},workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;path',label:'Scenario'}]}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}});
-const args={operation_id:'read',source_operation_id:'created',read:{sample_rows:100,require_exact_numbers:true}};
+const args={operation_id:'read',source_operation_id:'created',execution:'execute',read:{sample_rows:100,require_exact_numbers:true}};
+test('output reading preserves the current execution unless Execute is explicitly requested',()=>{
+ const current=buildNodeReadRequest({...args,execution:undefined},source());
+ assert.equal(current.parameters.execution_policy,'existing');
+ assert.equal(buildNodeReadRequest({...args,execution:'execute'},source()).parameters.execution_policy,'execute');
+});
 const handlers=new Map([['transform.calculator',{revision:'1',modes:['expression'],validate(){throw Error('Configuration validation must not run');},configure(){throw Error('Configuration must not run');},configurationReadback(){throw Error('No configuration readback');}}]]);
 for(const fault of [null,'cleanup','owner','transport','journal'])test('cancelled JavaScript reread releases only confirmed owned cleanup: '+fault,async()=>{
  const request=buildNodeReadRequest(args,source()),operation={id:'read'},controller=new AbortController(),calls=[];
@@ -44,21 +50,47 @@ test('JavaScript reread admits release only at read, preserving the finish refus
  assert.deepEqual(driver.releasePendingPhases,['read']);
  return assert.rejects(()=>driver.releasePending({pending:{phase:'finish'}}),/stopped output-read/);
 });
-function portReadFixture(request,output){
- const calls=[];let tableActions=0;
+function portReadFixture(request,output,snapshots){
+ const calls=[];let tableActions=0,launches=0;
  const execution={verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'fresh',process_id:'1.1',process_record_id:'child'};
  const table=()=>{tableActions++;throw Error('Reread must not open Table or wizards');};
- const channel={async readOutputPort(options){calls.push(options);return {output};},observe:table,perform:table};
+ const channel={async readExistingProcesses(){return structuredClone(snapshots.length>1?snapshots.shift():snapshots[0]);},
+  async readOutputPort(options){calls.push(options);return {output};},observe:table,perform:table};
  const create=vm.runInNewContext('('+createNodeReadDrivers.toString()+')',{
   createNodeProcedure:()=>channel,createNodeExecutionProcedure:()=>({async prepare(){},async waitCompleted(){return execution;}}),
-  finishConfiguredGraph:async()=>({verified:true,cleanup_complete:true,execution_id:'fresh'}),
+  finishConfiguredGraph:async()=>{launches++;return {verified:true,cleanup_complete:true,execution_id:'fresh'};},
   need:(ok,message)=>{if(!ok)throw Error(message);},verified:value=>({verified:true,cleanup_complete:true,...value}),
-  alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution,resolveCrossTableSchema,openNewOutputTable:table,
+  alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution,resolveCrossTableSchema,openNewOutputTable:table,existingOutputExecution,setTimeout,
  });
- const driver=create({operation:{id:'read',parameters:request},now:()=>1},{});
- const ctx={node,execution:{execution_id:'fresh'},portExecution:{execution_id:'foreign-shell'},receipt_id:'read',deadline:1000};
- return {async run(){await driver.finishGraph('execute',ctx);await driver.waitExecution(ctx);return driver.readOutput(request.read,ctx);},calls,execution,get tableActions(){return tableActions;}};
+ const driver=create({operation:{id:'read',parameters:request,nodeApply:{}},now:()=>1},{});
+ const ctx={node,execution:{execution_id:output?.execution_id??'fresh'},portExecution:{execution_id:'foreign-shell'},receipt_id:'read',deadline:1000};
+ return {async run(){if(snapshots)await driver.beforeTarget(ctx);await driver.finishGraph('execute',ctx);await driver.waitExecution(ctx);return driver.readOutput(request.read,ctx);},calls,execution,
+  get tableActions(){return tableActions;},get launches(){return launches;}};
 }
+function nativeExecution({running=false,active=true}={}){
+ const progress_state={verified:true,source:'native_progress_record',state:running?'running':'completed'};
+ return {verified:true,show_completed:true,inventory_complete:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},
+  native_state:{active,running,locked:running},processes:[
+   {process_id:'1',record_id:'group',parent_id:null,error:false,children_loaded:true,progress_state},
+   {process_id:'1.1',record_id:'child',parent_id:'1',error:false,progress_state,
+    owner:{verified:true,node_id:node.node_id,source:'native_process_model_identity'}}]};
+}
+for(const running of [false,true])test('production current-output read '+(running?'waits for native completion':'preserves execution')+' without Execute or wizard',async()=>{
+ const request=buildNodeReadRequest({...args,execution:undefined},source());
+ const output={port:0,port_guid:'p',fresh:true,execution_id:'doc:root:1',schema,sample_complete:true};
+ const snapshots=running?[nativeExecution({running:true}),nativeExecution()]:[nativeExecution()];
+ const f=portReadFixture(request,output,snapshots),result=await f.run();
+ assert.equal(result.execution_id,'doc:root:1');assert.equal(f.calls[0].execution.process_record_id,'child');
+ assert.equal(f.launches,0);assert.equal(f.tableActions,0);
+});
+test('native current-output proof refuses stale, cancelled, missing and foreign process evidence',()=>{
+ for(const change of [s=>s.native_state.active=false,s=>s.processes[1].owner.node_id='foreign',
+  s=>s.processes[1].error=true,s=>s.processes[0].progress_state.state='cancelled',
+  s=>s.processes[1].progress_state.verified=false,s=>s.root_id='',s=>s.node_context.node_id='foreign',
+  s=>s.processes.push({...s.processes[1],process_id:'1.2',record_id:'duplicate'})]){
+  const s=nativeExecution();change(s);assert.throws(()=>existingOutputExecution(s,node));
+ }
+});
 test('production reread uses its own completed execution and retained mapping without Table',async()=>{
  const request=buildNodeReadRequest(args,source());
  request.parameters.schemas[0].schema[0].data_kind='Непрерывный';

@@ -111,7 +111,7 @@ export function buildNodeReadRequest(args,source,{saves=[]}={}){
  if(javascript)need(readback?.kind==='javascript', 'JavaScript output reread requires source-bound admission');
  const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.port_kind==='tree'?p.tree.schema:p.schema}))??[];
  // A verified local configuration retains the full mapping even when the
- // original operation requested no preview. Fresh execution and table-schema
+ // original operation requested no preview. Native freshness and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
  const crossPolicy=retainCrossTableReadPolicy(source,args.source_operation_id);
  const retained=request.target.type==='transform.cross_table'||previews.length===0&&node.output?.variable_ports?.length?[]:retainedMappingSchemas(node,args.source_operation_id,request.target.type);
@@ -129,15 +129,15 @@ export function buildNodeReadRequest(args,source,{saves=[]}={}){
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:node.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
   target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(node.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
    ...(crossPolicy?{cross_table_policy:crossPolicy}:{}),
    ...(javascript?{javascript_source:javascriptReadSourceBinding(readback.source)}:{})},
   mappings:[],finish:'execute',read:{ports:structuredClone(ports),...(variablePorts.length?{variable_ports:structuredClone(variablePorts)}:{}),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 // A browser recovery receipt carries only runtime-proven release facts and the
-// model's attested settings. No schema is trusted from it: the read executes the
-// node fresh and returns the observed output schema as its own evidence.
+// model's attested settings. No schema is trusted from it: the read requires
+// native freshness and returns the observed output schema as its own evidence.
 function buildRecoveredReadRequest(args,receipt){
  const request=receipt.request;
  need(receipt.status==='continuable'&&receipt.facts?.includes('node_released_on_quiet_graph')&&receipt.node&&request?.target
@@ -148,7 +148,7 @@ function buildRecoveredReadRequest(args,receipt){
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:receipt.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
   target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(receipt.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,observed_schema:true,
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',observed_schema:true,
    schemas:ports.map(port=>({port,schema:null}))},
   mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
@@ -166,7 +166,8 @@ export function nodeReadHandler(handler){
     'Existing-output reads cannot create nodes, configure ports or export files');
    const javascript=request.target.type==='programming.javascript';
    const observed=parameters?.observed_schema===true;
-   need(parameters&&Object.keys(parameters).sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
+   need(parameters&&['existing','execute'].includes(parameters.execution_policy)
+    &&Object.keys(parameters).filter(k=>k!=='execution_policy').sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
     &&typeof parameters.source_operation_id==='string'
     &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&(parameters.schemas.length>0||request.read.variable_ports?.length>0),
     'Verified local output schemas required');

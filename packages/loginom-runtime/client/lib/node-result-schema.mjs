@@ -19,7 +19,7 @@ const javascriptNativeError=object({kind:values('javascript_wizard'),stage:value
  ['kind','stage','node','source_sha256','tooltip','tooltip_truncated','dialog_text','dialog_text_truncated','dialog_closed','error_class','location']);
 const error=object({code:str,message:str,cause:object({code:str,message:str}),native:javascriptNativeError},['code','message']);
 const phase=values('validate','source','workflow','target','input_mapping','open','configure','node_finish','materialization_start','materialization_execute','output_mapping','finish','execute','read');
-const execution={anyOf:[object({status:values('not_requested','pending','completed','cancelled','unknown'),execution_id:nullable(str),stop_verified:bool},['status','execution_id']),
+const execution={anyOf:[object({status:values('not_requested','pending','completed','cancelled','unknown'),execution_id:nullable(str),stop_verified:bool,waited_ms:integer},['status','execution_id']),
  object({status:values('failed'),execution_id:str,failure_verified:{type:'boolean',const:true},root_id:str,group_id:str,group_record_id:str})]};
 const receipt=object({phase,receipt_id:str,status:values('pending','verified','not_requested'),effect_possible:bool});
 const legacyCell=object({type:str,is_null:bool,value:{type:['string','number','boolean','null']},decimal:str,

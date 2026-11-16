@@ -270,6 +270,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const channel = {
     // Private cleanup proofs must use the same clock as this procedure's deadline.
     now,
+    async readExistingProcesses() {
+      checkBudget();
+      if(!preparedNodeContext)throw Error('Prepared node required for existing execution read');
+      const result=await execute(makeNodeProcessContextCode(preparedNodeContext,{existingOutput:true}),
+        {timeout:Math.max(5000,operation.deadline-now()+5000)});
+      await entry('node_existing_execution_observed',{outcome:structuredClone(result)});
+      return result;
+    },
     async readOutputPort(request) {
       checkBudget();
       const readType=(operation.nodeApply?.request??operation.parameters)?.target?.type;

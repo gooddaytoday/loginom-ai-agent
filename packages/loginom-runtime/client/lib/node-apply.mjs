@@ -223,6 +223,14 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(name==='target'&&request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing'
+        &&refusal?.verification==='existing_output_read_only'&&refusal.phase===name
+        &&refusal.effect_possible===false&&refusal.cleanup_complete===true
+        &&['document_id','workflow_id','node_id'].every(k=>refusal.node?.[k]===request.target.ref[k])){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.existing_read_refusal=true;
+      }
       if(name==='read'&&request.target.type==='programming.javascript'
         &&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&(verifiedJavascriptUiReadRefusal(refusal,state.node,state.execution,request.read)
@@ -589,6 +597,10 @@ export async function applyNode({request, operation, handlers, drivers, record,
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
+      ...(state.existing_read_refusal?{next_step:{tool:'dock_node_read',original_operation_id:operation.id,
+        instruction:error.code==='NODE_EXECUTION_RUNNING'
+         ?'The native server execution is still running. To wait again, use a NEW operation_id and source_operation_id:"'+request.parameters.source_operation_id+'" without execution:"execute". No Execute was sent.'
+         :'Current output freshness could not be proved. No Execute was sent. Explain the reason and ask whether to execute; only an explicit request permits execution:"execute".'}}:{}),
       ...(state.javascript_wizard_refusal&&state.verified_refusal?{configuration:{status:'discarded'},
         checkpoint_kind:'local_node_failed',persisted_package_verified:false}:{}),
       ...(state.verified_refusal&&state.cleanup_complete&&!state.pending&&state.node
@@ -614,7 +626,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         instruction:'FS/Fetch scripts need declared output columns before execution. Submit a NEW operation_id: configure a NEW JavaScript node with parameters.schema_mode:"declared" and complete columns, retaining the intended source and inputs, then finish:"execute". Existing-node requests cannot change schema mode. Alternatively configure the SAME target with finish:"done", read:{ports:[],sample_rows:0,require_exact_numbers:false} and no coverage. Other import admission rules still apply.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:state.existing_read_refusal?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }

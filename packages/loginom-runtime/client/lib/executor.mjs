@@ -2,7 +2,7 @@ import {browserFailureCategory,browserFailureDetails,operationFailureDiagnostic}
 import {createRedactor} from './redact.mjs';
 import {journalCopy} from './execution-journal.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix,createServerSourceRegistry,createServerDownloadRegistry,serverDownloadTools,storageListPattern,listStorageDirectory} from './storage-policy.mjs';
-import {buildNodeReadRequest} from './node-read-contract.mjs';
+import {buildNodeReadRequest,NODE_READ_MODE} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
@@ -3859,11 +3859,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 // Bind the freshly reopened native graph before a schema
                 // preflight reads its source port. Workflow activation alone
                 // does not establish the embedded node-context identity.
+                const existingRead=request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing';
+                if(existingRead)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
                 const sourceGraph=await operation.nodeTargetAdapter.observe(graph,ctx.deadline,ctx.signal);
                 if(sourceGraph?.complete!==true||sourceGraph.document_id!==graph.document_id
                   ||JSON.stringify(sourceGraph.workflow_ref)!==JSON.stringify(graph.workflow_ref))
                   throw Error('Complete owned graph required before node preflight');
-                preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
+                if(!existingRead)preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
               }
             };
             try{

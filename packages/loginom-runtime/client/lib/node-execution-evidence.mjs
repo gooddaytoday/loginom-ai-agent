@@ -16,6 +16,30 @@ function inventory(snapshot,node,rootId) {
   return ps;
 }
 
+// A read does not need a new launch or Show Node gesture. Use the same native
+// ModelNode identity that the direct port reader independently checks again.
+export function existingOutputExecution(snapshot,node) {
+  const ps=inventory(snapshot,node),state=snapshot.native_state;
+  requireValue(snapshot.node_context.surface==='graph'&&state
+    &&typeof state.running==='boolean'&&typeof state.locked==='boolean','Native node activity is unproved');
+  const own=ps.filter(p=>p.owner?.verified===true&&p.owner.node_id===node.node_id
+    &&p.owner.source==='native_process_model_identity');
+  requireValue(own.length>0,'No native execution record belongs to this node');
+  const last=own.reduce((a,b)=>BigInt(a.process_id.split('.')[0])>BigInt(b.process_id.split('.')[0])?a:b);
+  const groupId=last.process_id.split('.')[0],group=ps.find(p=>p.parent_id===null&&p.process_id===groupId);
+  requireValue(own.filter(p=>p.process_id.startsWith(groupId+'.')).length===1&&group,'Latest native execution is ambiguous');
+  for(const p of [last,group])requireValue(p.progress_state?.verified===true
+    &&p.progress_state.source==='native_progress_record'&&p.error===false
+    &&['not_started','running','not_responding','completed'].includes(p.progress_state.state),
+    'Latest native execution failed, was cancelled or has unknown progress');
+  const pending=state.running||state.locked||[last,group].some(p=>p.progress_state.state!=='completed');
+  if(!pending)requireValue(state.active===true&&group.children_loaded===true,'Node output is inactive or stale; execute only on explicit request');
+  return {verified:true,owner_verified:true,cleanup_complete:true,effect_possible:false,
+    status:pending?'pending':'completed',execution_id:node.document_id+':'+snapshot.root_id+':'+groupId,
+    root_id:snapshot.root_id,group_id:groupId,group_record_id:group.record_id,
+    process_id:last.process_id,process_record_id:last.record_id};
+}
+
 // A browser-local process ID alone is not an execution identity. Retain the
 // complete pre-launch inventory, native root incarnation and prepared node.
 export function captureExecutionBaseline(snapshot,node) {
