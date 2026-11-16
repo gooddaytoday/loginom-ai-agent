@@ -523,11 +523,16 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
                     data=src / 'data', base=None, export_count=2, input_files=data,
                     expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
-    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights', 'ungroup-seasonal']:
+    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights', 'ungroup-seasonal',
+                'ungroup-seasonal-zero', 'ungroup-seasonal-null', 'ungroup-seasonal-empty-support', 'ungroup-seasonal-empty-totals']:
         node = REPO / 'docs/node-development/nodes/transform-ungroupdata'
         task, expected, inputs, count = {
             'ungroup-weights': ('task-weights.md', 'expected-weights.json', ['weights-totals.csv', 'weights-support.csv'], 2),
             'ungroup-seasonal': ('task-seasonal.md', 'expected-seasonal.json', ['seasonal-totals.csv', 'seasonal-constant-support.csv'], 2),
+            'ungroup-seasonal-zero': ('task-seasonal-zero.md', 'expected-seasonal-zero.json', ['seasonal-totals.csv', 'seasonal-zero-support.csv'], 2),
+            'ungroup-seasonal-null': ('task-seasonal-null.md', 'expected-seasonal-null.json', ['seasonal-totals.csv', 'seasonal-null-support.csv'], 2),
+            'ungroup-seasonal-empty-support': ('task-seasonal-empty-support.md', 'expected-seasonal-empty-support.json', ['seasonal-totals.csv', 'seasonal-empty-support.csv'], 0),
+            'ungroup-seasonal-empty-totals': ('task-seasonal-empty-totals.md', 'expected-seasonal-empty-totals.json', ['seasonal-empty-totals.csv', 'seasonal-constant-support.csv'], 0),
             'ungroup-shares': ('task.md', 'expected.json', ['totals.csv', 'shares.csv'], 1),
             'ungroup-null': ('task-null.md', 'expected-null.json', ['null-totals.csv', 'edge-shares.csv'], 1),
             'ungroup-empty': ('task-empty.md', 'expected-empty.json', ['empty-totals.csv', 'edge-shares.csv'], 1),
@@ -535,7 +540,7 @@ def scenario(name, case_root=None, *, cases=None):
         }[name]
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
-                    input_files=inputs, export_count=count, **({'oracle': node / 'acceptance' / {'ungroup-weights': 'oracle-weights.py', 'ungroup-seasonal': 'oracle-seasonal.py'}[name]} if name in ('ungroup-weights', 'ungroup-seasonal') else {}))
+                    input_files=inputs, export_count=count, **({'oracle': node / 'acceptance' / ('oracle-seasonal.py' if name.startswith('ungroup-seasonal') else 'oracle-weights.py')} if name == 'ungroup-weights' or name.startswith('ungroup-seasonal') else {}))
     if name in ['corr-ranks', 'corr-discrete']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
         return dict(source=src, prompt=src / ('task-discrete.md' if name=='corr-discrete' else 'task-ranks.md'), data=src / 'fixtures', base=None,

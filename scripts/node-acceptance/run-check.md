@@ -1109,6 +1109,16 @@ seasonal-constant-support.csv передаются модели; Fraction oracle
 доверительных границ (исключены в соответствии полей), порт 1 целиком; повтор
 Execute, native типы и порядок, два CSV, Save/cold/cleanup.
 
+`ungroup-seasonal-zero` и `ungroup-seasonal-null`: те же штатные проверки двух
+портов и CSV, Save, cold Execute без настройки и cleanup. Исходные
+`task-seasonal-{zero,null}.md` и соответствующие CSV — единственные входы
+модели; наблюдённые expected утверждены решением `v040-scope-expansion`.
+Zero проверяет 4/2 строки, null — 0/0 с полной схемой, без подмены NULL нулями.
+`ungroup-seasonal-empty-support` и `ungroup-seasonal-empty-totals` проверяют
+явный отказ с понятной причиной, Save и cleanup; успешная пустая выгрузка
+не считается распределением. Expected отказа фиксируется до прогонов;
+CSV и cold для отказа не требуются. Oracle/expected остаются вне модели.
+
 `clustering-gmeans`: утверждённый `v040/task-g-means.md`, только probe.csv.
 Автоподбор 2…4 / порог 1 / seed 42 / none, два исполнения того же узла.
 Оба typed-порта: точное покрытие входа, Cluster как метка, центры как средние,

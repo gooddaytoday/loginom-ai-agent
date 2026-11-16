@@ -411,11 +411,11 @@ class RunCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
             self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
 
-    def refusal_run(self, root, variant=None):
+    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None):
         case = root / 'cases/safe-refusal'
         (case / 'data').mkdir(parents=True)
         (case / 'task.md').write_text('Обработай недоступный тип данных.')
-        expected = dict(nodes=[], outputs=[], refusal=dict(text='Не могу: этот тип данных не поддерживается.'))
+        expected = dict(nodes=[], outputs=[], refusal=dict(text=expected_text or 'Не могу: этот тип данных не поддерживается.'))
         if variant == 'import node': expected['nodes'] = [dict(type='imports.text')]
         if variant == 'invalid oracle': expected['refusal']['text'] = ' '
         if variant == 'conflicting oracle': expected['rejection'] = dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data')
@@ -462,7 +462,7 @@ class RunCheckTests(unittest.TestCase):
             if variant == 'csv': (profile / 'unexpected.csv').write_text('result\n1\n')
             if variant != 'answer':
                 events.append(dict(type='text', sessionID='session', part=dict(text=(
-                    'Готово.' if variant == 'explanation' else 'Не могу: этот тип данных не поддерживается.'))))
+                    'Готово.' if variant == 'explanation' else answer or 'Не могу: этот тип данных не поддерживается.'))))
             (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
             runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=variant != 'cleanup', logged_out=True))
             if variant != 'ack': runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
@@ -483,6 +483,25 @@ class RunCheckTests(unittest.TestCase):
             self.assertIn('expected refusal', result['cold'])
             self.assertNotIn('Выгрузи', (folder / 'task.md').read_text())
             self.assertNotIn('не поддерживается', (folder / 'task.md').read_text())
+
+    def test_seasonal_refusal_accepts_observed_input_reason_with_either_initial_case(self):
+        node = runner.REPO / 'docs/node-development/nodes/transform-ungroupdata/acceptance'
+        for kind in ['support', 'totals']:
+            expected = runner.read(node / ('expected-seasonal-empty-' + kind + '.json'))['refusal']['text']
+            for reason in ['пустой вход', 'Пустой вход']:
+                with self.subTest(kind=kind, reason=reason), tempfile.TemporaryDirectory() as directory:
+                    result, _, _ = self.refusal_run(Path(directory), expected_text=expected,
+                                                   answer=reason + ': seasonal-empty-' + kind + '.csv')
+                    self.assertEqual(result['status'], 'PASS', result)
+
+    def test_seasonal_refusal_rejects_input_read_error_without_empty_reason(self):
+        for kind in ['support', 'totals']:
+            expected = runner.expected_for(runner.scenario('ungroup-seasonal-empty-' + kind), '/test/refusal.lgp')
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                result, _, _ = self.refusal_run(Path(directory), expected_text=expected['refusal']['text'],
+                                               answer='входной файл не прочитан')
+                self.assertEqual(result['status'], 'FAIL', result)
+                self.assertEqual(result['failure_class'], 'REFUSAL_NOT_REPORTED', result)
 
     def test_private_refusal_allows_only_declared_input_imports(self):
         with tempfile.TemporaryDirectory() as directory:
