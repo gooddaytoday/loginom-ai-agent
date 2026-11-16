@@ -83,6 +83,22 @@ an intentional new recovery ref, not permission to alter other existing refs.
 
 ## Replace the branch without stale worktree state
 
+Before starting replacement, establish exclusive control over the target branch
+and its worktree ownership for the entire sequence: ownership inspection,
+detach if needed, compare-and-swap, reattachment, and final verification. A
+standalone clone under a single controlled operator or an exclusive window
+provided by the repository owner or orchestrator is an adequate basis only when
+other sessions, IDEs, agents, and automation cannot concurrently check out or
+update this branch. A linked worktree alone is not an isolated repository.
+
+If that exclusive control cannot be established, do not start replacement or
+change the target ref. Keep the prepared ref and verified backup, and report
+the missing exclusive window. Auditing and preparation may still proceed.
+`git worktree lock`, a private lock file, a process snapshot, and repeated
+ownership checks do not prevent ordinary Git commands in another worktree;
+do not treat them as proof of exclusivity. The compare-and-swap protects the ref
+value, not worktree ownership.
+
 Use `git worktree list --porcelain` to identify whether and where the original
 branch is checked out. Recheck its ref against the fixed original tip immediately
 before replacement. If it moved, retain the prepared result and backup; never
