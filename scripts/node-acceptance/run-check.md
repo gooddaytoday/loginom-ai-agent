@@ -681,6 +681,16 @@ is derived from the independent `expected.json` case `indices`: one Tree-to-Tabl
 table with the native global index column (`name_any`, native 7.4.2 position:
 first column of the array branch), CSV, Save, cold.
 
+`tree-to-table-typed` (LAB-1699) uses `trees-treetodata/acceptance/modes/task-typed.md`
+with the same prepared TypedSource package, seed, rows.csv and input.json as
+`table-tree-dates-variant`. The model builds the When/Value tree and converts it
+with `trees.to_table`. Private `expected-typed-run.json` is the pair oracle's
+`tree_to_table_typed_projection` (checked by `oracle.py --check`): one ordered
+table When DateTime (civil milliseconds) and Value Variant with native subtypes
+integer `9007199254740993`/boolean false/string "", label_any, its CSV, Save and
+cold (exact typed Variant port read). The CSV compares Variant integers as
+numbers; Int64 exactness is proven only by the typed read.
+
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
    column types, rows and order policy. Keep oracle values out of the prompt.

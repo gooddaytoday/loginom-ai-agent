@@ -40,3 +40,10 @@ LAB-1112 (решение владельца): **позиция индекса �
 (база 0) считает oracle. Групповой случай (несколько документов JSON) из цикла
 снят: Loginom строит из нескольких строк корень-массив, это отдельный цикл.
 Сценарий `trees-to-table-indices` использует только `fixtures/modes/documents.csv`.
+
+LAB-1699: `task-typed.md` — листья DateTime и Variant из подготовленного R4
+источника (`trees-datatotree/fixtures/modes/typed-source.lgp`), сценарий
+`tree-to-table-typed`. `expected-typed-run.json` строит
+`tree_to_table_typed_projection` общего oracle пары; `oracle.py --check`
+сверяет файл. Variant NULL источник не даёт: native Свёртка с пропуском NULL
+отбрасывает пустые ячейки.

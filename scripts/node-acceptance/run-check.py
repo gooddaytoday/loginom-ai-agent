@@ -456,6 +456,14 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['rows.csv', 'input.json'], seed_files=['lab1685-types.csv'],
                     source_package=node / 'fixtures/modes/typed-source.lgp', prepared_table_source='TypedSource', base=None, external=True,
                     tree_only=True, expected_name='expected-dates-variant.json', oracle=src / 'oracle.py')
+    if name == 'tree-to-table-typed':
+        # LAB-1699: the R4 typed source and tree, then native Tree to Table with its CSV.
+        node = REPO / 'docs/node-development/nodes/trees-datatotree'
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-typed.md', data=node / 'fixtures/modes',
+                    input_files=['rows.csv', 'input.json'], seed_files=['lab1685-types.csv'],
+                    source_package=node / 'fixtures/modes/typed-source.lgp', prepared_table_source='TypedSource', base=None, external=True,
+                    expected_name='expected-typed-run.json', oracle=src / 'oracle.py')
     if name in ['tree-dates', 'tree-scalar-arrays', 'tree-variant']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         src = node / 'acceptance/typed'
