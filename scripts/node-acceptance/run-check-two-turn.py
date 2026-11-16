@@ -69,6 +69,20 @@ def pending_execution(profile):
     return None
 
 
+def shutdown_signature(profile, exit_code, complete):
+    """Owner waiver 2026-11-16: only the known late ACK, after real cleanup."""
+    if exit_code != 1 or not complete: return None
+    cleanups = [json.loads(p.read_text()) for p in profile.rglob('package-cleanup.json')]
+    acks = [json.loads(p.read_text()) for p in profile.rglob('runtime-close-*.json')]
+    if not cleanups or not all(c.get('status') == 'SUCCEEDED' and c.get('package_closed') is True
+       and c.get('logged_out') is True and c.get('unsaved_changes_discarded') is False for c in cleanups): return None
+    def known(a):
+        return a.get('closed_ack') is False and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0 and a.get('exit_signal') is None
+    if not acks or not any(known(a) for a in acks) or not all(a.get('closed_ack') is True or known(a) for a in acks): return None
+    return dict(kind='known_two_turn_shutdown_ack_timeout', cleanup_confirmed=True, runtime_exit=0,
+                failed_ack_count=sum(known(a) for a in acks))
+
+
 def run(config):
     folder, profile = Path(config['folder']), Path(config['profile'])
     master, slave = pty.openpty()
@@ -167,7 +181,9 @@ def run(config):
             print(json.dumps(dict(type='tool_use' if part['type'] == 'tool' else 'text',
                                   sessionID=part['sessionID'], part=part), ensure_ascii=False), flush=True)
     if error: raise error
-    assert child.returncode == 0 and completed_turn(messages, 2), 'TWO_TURN_INCOMPLETE'
+    signature = shutdown_signature(profile, child.returncode, completed_turn(messages, 2))
+    if signature: (folder / 'shutdown-signature.json').write_text(json.dumps(signature) + '\n')
+    assert (child.returncode == 0 or signature) and completed_turn(messages, 2), 'TWO_TURN_INCOMPLETE'
 
 
 if __name__ == '__main__':

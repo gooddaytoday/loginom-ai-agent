@@ -601,7 +601,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
       ...(state.existing_read_refusal?{next_step:{tool:'dock_node_read',original_operation_id:operation.id,
         instruction:error.code==='NODE_EXECUTION_RUNNING'
-         ?'The native server execution is still running. To wait again, use a NEW operation_id and source_operation_id:"'+request.parameters.source_operation_id+'" without execution:"execute". No Execute was sent.'
+         ?'The native server execution is still running. To wait again, use a NEW operation_id and source_operation_id:"'+request.parameters.source_operation_id+'" to repeat the wait and read the same output.'
          :'Current output freshness could not be proved. No Execute was sent. Explain the reason and ask whether to execute; only an explicit request permits execution:"execute".'}}:{}),
       ...(state.javascript_wizard_refusal&&state.verified_refusal?{configuration:{status:'discarded'},
         checkpoint_kind:'local_node_failed',persisted_package_verified:false}:{}),

@@ -24,6 +24,8 @@ export function existingOutputExecution(snapshot,node) {
     &&typeof state.running==='boolean'&&typeof state.locked==='boolean','Native node activity is unproved');
   const own=ps.filter(p=>p.owner?.verified===true&&p.owner.node_id===node.node_id
     &&p.owner.source==='native_process_model_identity');
+  const waiting=()=>({verified:true,owner_verified:true,cleanup_complete:true,effect_possible:false,status:'pending',execution_id:null});
+  if(!own.length&&(state.running||state.locked))return waiting();
   requireValue(own.length>0,'No native execution record belongs to this node');
   const last=own.reduce((a,b)=>BigInt(a.process_id.split('.')[0])>BigInt(b.process_id.split('.')[0])?a:b);
   const groupId=last.process_id.split('.')[0],group=ps.find(p=>p.parent_id===null&&p.process_id===groupId);
@@ -33,6 +35,7 @@ export function existingOutputExecution(snapshot,node) {
     &&['not_started','running','not_responding','completed'].includes(p.progress_state.state),
     'Latest native execution failed, was cancelled or has unknown progress');
   const pending=[last,group].some(p=>p.progress_state.state!=='completed');
+  if(!pending&&(state.running||state.locked))return waiting();
   if(!pending)requireValue(state.active===true&&!state.running&&!state.locked&&group.children_loaded===true,
     'Node output is inactive, locked or stale; no native running execution is proved; execute only on explicit request');
   return {verified:true,owner_verified:true,cleanup_complete:true,effect_possible:false,

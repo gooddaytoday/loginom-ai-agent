@@ -131,6 +131,23 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
             self.assertEqual(turns[3]['execution_ids'],['native-1','native-2'])
             if kind=='read-wait-running': self.assertEqual(turns[2]['native_execution']['execution_id'],'doc:root:1')
 
+    def test_two_turn_known_ack_signature_requires_complete_cleanup_and_actual_exit(self):
+        spec=importlib.util.spec_from_file_location('read_transport',runner.REPO/'scripts/node-acceptance/run-check-two-turn.py')
+        transport=importlib.util.module_from_spec(spec);spec.loader.exec_module(transport)
+        with tempfile.TemporaryDirectory() as directory:
+            profile=Path(directory)
+            cleanup=dict(status='SUCCEEDED',package_closed=True,logged_out=True,unsaved_changes_discarded=False)
+            ack=dict(closed_ack=False,request_error='LOGINOM_RUNTIME_TIMEOUT',exit_code=0,exit_signal=None)
+            def put(c=cleanup,a=ack):
+                runner.write(profile/'package-cleanup.json',c);runner.write(profile/'runtime-close-1.json',a)
+            put(); self.assertIsNotNone(transport.shutdown_signature(profile,1,True))
+            self.assertIsNone(transport.shutdown_signature(profile,1,False))
+            self.assertIsNone(transport.shutdown_signature(profile,130,True))
+            for patch in [dict(package_closed=False),dict(logged_out=False),dict(unsaved_changes_discarded=True),dict(status='FAILED')]:
+                put(dict(cleanup,**patch));self.assertIsNone(transport.shutdown_signature(profile,1,True))
+            for patch in [dict(exit_code=1),dict(exit_signal='SIGTERM'),dict(request_error='OTHER')]:
+                put(a=dict(ack,**patch));self.assertIsNone(transport.shutdown_signature(profile,1,True))
+
     def test_transcript_polling_closes_database_descriptors(self):
         import sqlite3
         spec=importlib.util.spec_from_file_location('read_transport',runner.REPO/'scripts/node-acceptance/run-check-two-turn.py')

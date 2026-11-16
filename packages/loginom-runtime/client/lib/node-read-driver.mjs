@@ -44,26 +44,30 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    const started=now();let pinned;
    const refuse=(code,message)=>{
     const error=Object.assign(Error(message),{code});
-    error.nodePhaseRefusal={phase:ctx.receipt_id.split(':').at(-1),status:'FAILED',effect_possible:false,cleanup_complete:true,
+    error.nodePhaseRefusal={phase:ctx.receipt_id?.split(':').at(-1)??'source',status:'FAILED',effect_possible:false,cleanup_complete:true,
      verification:'existing_output_read_only',node:request.target.ref};
     throw error;
    };
+   const pending=()=>{operation.nodeApply.execution={status:'pending',execution_id:execution?.execution_id??null,waited_ms:Math.floor(now()-started)};};
+   const timeout=()=>{pending();refuse('NODE_EXECUTION_RUNNING',
+    'Execution is still running; waited '+Math.floor((now()-started)/1000)+' seconds. No Execute was sent. Repeat the read to wait again.');};
    for(;;){
+    if(now()>=ctx.deadline)timeout();
     const snapshot=initial??await channel.readExistingProcesses();initial=undefined;
     // Completion can change FLocked between the two native identity reads.
     // Discard that mixed snapshot, retaining the original deadline.
-    if(snapshot.reason!=='node_context_changed'){
+    const transient=snapshot.verified!==true&&['node_context_changed','console_store','process_root','console_not_ready'].includes(snapshot.reason);
+    if(!transient){
      try{execution=existingOutputExecution(snapshot,request.target.ref);}
      catch(error){refuse('NODE_OUTPUT_NOT_FRESH',String(error.message)+'. No Execute was sent. Ask whether to execute the node.');}
-     const identity=JSON.stringify([execution.execution_id,execution.process_record_id]);
-     if(pinned&&pinned!==identity)refuse('NODE_OUTPUT_NOT_FRESH','The native running execution was replaced. No Execute was sent.');
+     const identity=execution.execution_id?JSON.stringify([execution.execution_id,execution.process_record_id]):null;
+     if(pinned&&identity&&pinned!==identity)refuse('NODE_OUTPUT_NOT_FRESH','The native running execution was replaced. No Execute was sent.');
      if(execution.status==='completed')return verified({settings_changed:false,execution_started:false,execution_id:execution.execution_id});
-     pinned=identity;
-     operation.nodeApply.execution={status:'pending',execution_id:execution.execution_id,waited_ms:Math.floor(now()-started)};
+     if(identity)pinned=identity;
     }
-    if(now()+1000>=ctx.deadline)refuse('NODE_EXECUTION_RUNNING',
-     'Execution is still running; waited '+Math.floor((now()-started)/1000)+' seconds. No Execute was sent. Repeat the read to wait again.');
-    signal?.throwIfAborted();await new Promise(resolve=>setTimeout(resolve,1000));
+    pending();
+    if(now()>=ctx.deadline)timeout();
+    signal?.throwIfAborted();await new Promise(resolve=>setTimeout(resolve,Math.min(1000,ctx.deadline-now())));
    }
 
  };
@@ -79,7 +83,8 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    ?{source_kind:unchangedImport?'unchanged_existing_'+(request.target.type==='imports.excel'?'excel':'text')+'_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
    :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id});
   },
-  ...(existing?{beforeTarget:ctx=>waitExisting(ctx)}:javascript?{async beforeTarget(ctx){
+  ...((existing||javascript)?{async beforeTarget(ctx){
+   if(existing){const waited=await waitExisting(ctx);if(!javascript)return waited;}
    enter({...ctx,node:request.target.ref});
    sourceReceipt=await withJavascriptSourcePolicyBoundary({phase:'target',owner,deadline:ctx.deadline,record:onRecord},
     ()=>sourceAdmission(ctx).admit({}));
@@ -174,7 +179,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    }
    return verified({effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',
     execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,
-    ...(javascript&&!existing?{javascript_source:{...request.parameters.javascript_source,
+    ...(javascript?{javascript_source:{...request.parameters.javascript_source,
      source_operation_id:request.parameters.source_operation_id,settings_sha256:sourceReceipt.settings_sha256,
      policy:sourceReceipt.effective_source.policy}}:{})});
   },

@@ -192,7 +192,11 @@ the existing node, cold execution without configuration and cleanup use stock
 checks. Only the business task and CSV reach the model.
 
 `read-no-rerun[-1..3]` and `read-wait-running[-1..3]` are the owner-approved
-`run-check-two-turn` mode (LAB-1720, 2026-11-16). Only these cases use one
+`run-check-two-turn` mode (LAB-1720, 2026-11-16). Owner review permits the known post-turn-two
+`closed_ack=false` / `LOGINOM_RUNTIME_TIMEOUT` signature only when the runtime
+exits 0, both turns complete, package cleanup succeeds, logout is confirmed and
+no unsaved changes are discarded. It is recorded in `shutdown-signature.json`;
+other shutdown failures remain failures. Only these cases use one
 interactive CLI process for both prompts, one chat, and one runtime. The package
 stays open between prompts. The transcript database is read without modification;
 its actual tool parts feed the stock CSV/Save/cold/cleanup checks. No oracle or

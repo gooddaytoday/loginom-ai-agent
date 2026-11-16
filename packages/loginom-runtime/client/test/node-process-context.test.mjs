@@ -139,3 +139,12 @@ test('buffered split-grid cells may be rendered before their expander is annotat
  assert.equal(group.process_tid,'ConsoleForm;ProgressForm;colProcess_1');
  assert.equal(group.expander_tid,null);assert.equal(group.expanded,null);
 });
+
+test('existing-output mask is temporary and never admits the hidden process cache',async()=>{
+ const f=fixture(),model={};f.nodes.push({FGuid:'node',data:model,FStatus:1,FRunning:true,FLocked:true});
+ f.child.data.ModelNode=model;f.left.hidden=true;f.right.hidden=true;
+ const mask=f.el('mask');f.masks.push(mask);
+ const blocked=await readNodeProcesses(f.page,{},f.readNode,false,true);
+ assert.equal(blocked.verified,false);assert.equal(blocked.reason,'console_not_ready');assert.equal(blocked.processes,undefined);
+ f.masks.length=0;assert.equal((await readNodeProcesses(f.page,{},f.readNode,false,true)).verified,true);
+});

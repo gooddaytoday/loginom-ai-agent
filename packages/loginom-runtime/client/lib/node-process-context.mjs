@@ -28,9 +28,9 @@ export async function readNodeProcesses(page,binding,readNode=readPreparedNodeCo
     if(checked===unchecked)return fail('completed_filter_ambiguous');
     const visible=e=>e.getBoundingClientRect().width>0 && e.getBoundingClientRect().height>0 && getComputedStyle(e).visibility!=='hidden' && getComputedStyle(e).display!=='none';
     const consoleVisible=visible(body[0])&&visible(right[0]);
-    // Only the error-toast proof may inspect this already bound hidden cache.
-    // Hidden records never establish rendered controls or authorize a gesture.
-    if(!existingOutput&&(!consoleVisible&&!errorToast||[...document.querySelectorAll('.x-mask-msg,.bg-mask-message')].some(visible)))return fail('console_not_ready');
+    // Existing-output and error-toast proofs may inspect the bound hidden cache.
+    // A visible mask is transient and never authorizes cached evidence or gestures.
+    if([...document.querySelectorAll('.x-mask-msg,.bg-mask-message')].some(visible)||!existingOutput&&!consoleVisible&&!errorToast)return fail('console_not_ready');
     const nativeRows=[...body[0].querySelectorAll('table.x-grid-item')],nativeRight=[...right[0].querySelectorAll('table.x-grid-item')];
     if(nativeRows.length>200||nativeRight.length>200)return fail('render_bound');
     const processes=[],seen=new Set();let visited=0;

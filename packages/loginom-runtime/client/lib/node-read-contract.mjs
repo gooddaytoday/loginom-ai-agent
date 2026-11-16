@@ -132,7 +132,7 @@ export function buildNodeReadRequest(args,source,{saves=[]}={}){
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:node.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
-  target:{kind:'existing',type:request.target.type,ref:structuredClone(node.node)},inputs:[],
+  target:{kind:'existing',type:request.target.type,...(args.execution==='execute'&&request.target.label!==undefined?{label:request.target.label}:{}),ref:structuredClone(node.node)},inputs:[],
   mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
    ...(crossPolicy?{cross_table_policy:crossPolicy}:{}),
    ...(javascript?{javascript_source:javascriptReadSourceBinding(readback.source)}:{})},
@@ -151,7 +151,7 @@ function buildRecoveredReadRequest(args,receipt){
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:receipt.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
-  target:{kind:'existing',type:request.target.type,ref:structuredClone(receipt.node)},inputs:[],
+  target:{kind:'existing',type:request.target.type,...(args.execution==='execute'&&request.target.label!==undefined?{label:request.target.label}:{}),ref:structuredClone(receipt.node)},inputs:[],
   mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',observed_schema:true,
    schemas:ports.map(port=>({port,schema:null}))},
   mappings:[],finish:args.execution==='execute'?'execute':'done',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},

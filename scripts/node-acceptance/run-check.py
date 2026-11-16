@@ -2853,7 +2853,9 @@ class Runner:
         cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
         acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
-        assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+        known_ack = spec.get('two_turn') and (folder / 'shutdown-signature.json').exists() and read(folder / 'shutdown-signature.json').get('kind') == 'known_two_turn_shutdown_ack_timeout'
+        assert acks and all(a.get('closed_ack') is True or known_ack and a.get('closed_ack') is False and a.get('request_error') == 'LOGINOM_RUNTIME_TIMEOUT' and a.get('exit_code') == 0 and a.get('exit_signal') is None for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
+        if known_ack: self.current['shutdown-signature'] = 'known_two_turn_shutdown_ack_timeout; cleanup confirmed'
         self.current['cleanup'] = 'main PASS'
         if spec.get('text_folder_masks'):
             self.current.update(folder_source_metrics(events))
