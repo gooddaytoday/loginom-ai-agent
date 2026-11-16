@@ -37,8 +37,8 @@ header=names, bom=false, LF, десятичная точка, пустой NULL,
 
 Имя файла из переменной: вместо `destination` передай
 `file_name_variable:{kind:"variable",name:"ReportFile"}`. Источник — выполненный
-Калькулятор переменных, где строка ReportFile — полный путь в папке экспорта (дату и имя
-собери формулой там же). Подключи `variable_inputs:[{source:<его ref>,output:0,input:0,kind:"variables"}]`.
+Калькулятор переменных, где строка ReportFile — полный путь в папке экспорта, например
+`"<папка>/report-" + ReportDate + ".csv"` (входную переменную пиши без `Var.`). Подключи `variable_inputs:[{source:<его ref>,output:0,input:0,kind:"variables"}]`.
 Для новой даты измени и выполни тот же Калькулятор, затем тот же Export
 (`target.kind=existing`, `parameters:{}`): привязка сохраняется, файл пишется по новому
 пути, прежний остаётся. Не создавай второй Export и не подставляй литерал пути.
