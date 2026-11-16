@@ -1,6 +1,6 @@
 import { $ } from "bun"
 import { buildPhase } from "./build-phase"
-import { useBunBaseline, verifyBunBaselineArchive } from "./native-resource-candidates"
+import { downloadBunBaselineArchive, useBunBaseline } from "./native-resource-candidates"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
@@ -58,10 +58,7 @@ if (baseline && process.env.LOGINOM_CLI_BASELINE_CHILD !== "1") {
   try {
     const url = `https://github.com/oven-sh/bun/releases/download/bun-v${bunNotice.version}`
     const target = `bun-${process.platform === "win32" ? "windows" : "linux"}-x64-baseline`
-    const response = await fetch(`${url}/${target}.zip`)
-    if (!response.ok) throw Error("LOGINOM_BUN_DOWNLOAD_FAILED")
-    const archive = Buffer.from(await response.arrayBuffer())
-    verifyBunBaselineArchive(archive, process.platform as "linux" | "win32")
+    const archive = await downloadBunBaselineArchive(`${url}/${target}.zip`, process.platform as "linux" | "win32")
     await Bun.write(join(runtime, "bun.zip"), archive)
     if (process.platform === "win32") await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
     if (process.platform === "linux") await $`/usr/bin/unzip -q ${join(runtime, "bun.zip")} -d ${runtime}`
