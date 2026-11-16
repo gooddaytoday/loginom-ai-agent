@@ -1,11 +1,3 @@
-`sorting-variant` uses the approved sorting `modes/task-variant.md` and only
-`fixtures/variant-wide.csv`. Scalar Import and Collapse retain all nine rows,
-including three NULLs. Frozen `expected-variant.json` is checked against the
-independent oracle; two executions of the same Sorting preserve exact native
-integer/real/string subtypes, Values/RowID/Names keys and disabled locale/case.
-Both ordered full typed outputs and CSVs, Save, cold without configuration and
-cleanup are required. Only task and CSV reach the model.
-
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
@@ -1053,6 +1045,14 @@ Control не подменяется обычным входом. Только ta
 Case меняет регистр true→false; threads — максимум 1→2; auto — 2→0.
 Cold читает сохранённые ключи и literal максимум, закрывает мастер через Cancel,
 затем штатно выполняет сохранённый узел без настройки; Save/cleanup обязательны.
+
+`sorting-variant` uses the approved sorting `modes/task-variant.md` and only
+`fixtures/variant-wide.csv`. Scalar Import and Collapse retain all nine rows,
+including three NULLs. Frozen `expected-variant.json` is checked against the
+independent oracle; two executions of the same Sorting preserve exact native
+integer/real/string subtypes, Values/RowID/Names keys and disabled locale/case.
+Both ordered full typed outputs and CSVs, Save, cold without configuration and
+cleanup are required. Only task and CSV reach the model.
 
 `text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
 задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
