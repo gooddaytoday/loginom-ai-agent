@@ -58,3 +58,53 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
     }
   });
 }
+
+test('private browser cancellation settles when CDP detach is never answered', {
+  skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
+  timeout: 15000,
+}, async t => {
+  // Deterministic form of the CI race: the browser closes while the login
+  // network tracker's Target.detachFromTarget never gets an answer.
+  const directory = await mkdtemp(join(tmpdir(), 'login-cancellation-detach-'));
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const http = createServer(async (request, response) => {
+    if (request.url.startsWith('/app/')) { entered.resolve(); await release.promise; }
+    response.end('released');
+  });
+  await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
+  const controller = new AbortController();
+  let detaches = 0;
+  const login = loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER, profile:join(directory,'browser'),
+    candidate:{url:`http://127.0.0.1:${http.address().port}/app/`, username:'user',password:''},
+    headless:true, signal:AbortSignal.any([controller.signal, t.signal]),
+    onContextCreated: context => {
+      const newCDPSession = context.newCDPSession.bind(context);
+      context.newCDPSession = async page => {
+        const session = await newCDPSession(page);
+        session.detach = () => { detaches++; return new Promise(() => {}); };
+        return session;
+      };
+    }});
+  void login.catch(() => {});
+  t.after(async () => {
+    controller.abort(Error('LOGINOM_HOST_CLOSED'));
+    release.resolve();
+    http.closeAllConnections();
+    await new Promise(resolve => http.close(resolve));
+    // Never let an unsettled login hold the runner past this test.
+    await Promise.race([login.catch(() => {}), new Promise(resolve => setTimeout(resolve, 5000).unref())]);
+    await rm(directory,{recursive:true,force:true});
+  });
+  let timer;
+  try {
+    await Promise.race([entered.promise, login.then(() => { throw Error('LOGIN_FINISHED_BEFORE_FIXTURE'); })]);
+    controller.abort(Error('LOGINOM_HOST_CLOSED'));
+    await assert.rejects(Promise.race([login, new Promise((_, reject) => {
+      timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), 2000);
+    })]), /LOGINOM_HOST_CLOSED/);
+    assert.equal(detaches, 1);
+  } finally {
+    clearTimeout(timer);
+  }
+});
