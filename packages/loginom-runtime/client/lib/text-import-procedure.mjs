@@ -472,6 +472,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     ...(parameters.analysis?{analysis:parameters.analysis}:{})};
   const requested=structuredClone(parameters);
   // Serialize only after validation; preflight verifies every path separately.
+  // Later initial-settings checks read the requested list or mask, not this join.
   if(parameters.source?.source_paths){parameters.source.source_path=textImportSourcePaths(parameters.source).join('｜');delete parameters.source.source_paths;}
   if(Object.hasOwn(parameters.source??{},'source_mask')){parameters.source.source_path=textImportSourceMask(parameters.source);delete parameters.source.source_mask;}
   requireValue(owner?.status === 'observed' && owner.node?.tid && owner.path?.length, 'An observed wizard owner is required');
@@ -619,7 +620,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     }
     // Validate the format now; data kinds still await the parsed definitions
     // after explicit format changes. No value comes from another operation.
-    validateInitialExistingImportSettings(parameters,initialSourcePath,true);
+    validateInitialExistingImportSettings({...parameters,source:requested.source},initialSourcePath,true);
     if(!['delimiter','decimal_separator','null_marker','text_qualifier'].every(k=>Object.hasOwn(parameters.format,k)))
       throw new ImportInitialSettingsError('Format parameters are incomplete');
   }
@@ -725,7 +726,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
         const field=parsed.fields.find(f=>f.name===(c.source_name??c.name));
         return Object.hasOwn(c,'data_kind')?c:{...c,data_kind:field.data_kind};
       });
-      validateInitialExistingImportSettings(parameters,initialSourcePath);
+      validateInitialExistingImportSettings({...parameters,source:requested.source},initialSourcePath);
     }
     if(autoTypesRequested(parameters)) {
       parameters.columns=mergeImportColumnPatch(parsed.fields,parameters.columns??[]);

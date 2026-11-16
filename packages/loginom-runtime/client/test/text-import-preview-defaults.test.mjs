@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configureTextImportPatch,ImportInitialSettingsError} from '../lib/text-import-procedure.mjs';
 
-function fixture({omit=[],preview=true,path='/own/data.csv',sourceName='Amount',qualifier='Двойная кавычка (")',twoColumns=false}={}) {
+function fixture({omit=[],preview=true,path='/own/data.csv',verified='/own/data.csv',sourceKey='source_path',sourceName='Amount',qualifier='Двойная кавычка (")',twoColumns=false}={}) {
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'scenario',label:'Scenario'}]};
- const source={source_path:'',connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true};
+ const source={source_path:'',connection:'Server',encoding:'UTF-8 (65001)',rows_to_skip:'0',first_line_as_title:true,parallel_processing:true};
  const format={delimiter:'Точка с запятой',decimal_separator:'Точка (.)',null_marker:'?',text_qualifier:qualifier};
  const column={name:'Amount',label:'Сумма',type:'real',data_kind:'Непрерывный',used:true};
  const columns=[column,...(twoColumns?[{name:'Region',label:'Регион',type:'string',data_kind:'Дискретный',used:true}]:[])];
- const settings={source:{source_path:path,encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
+ const settings={source:{[sourceKey]:path,encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
   format:{delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'},columns:[{...column,source_name:sourceName}]};
  if(twoColumns)settings.columns.unshift({...columns[1]});
  for(const key of omit)delete (key==='data_kind'?settings.columns[0]:settings.format)[key];
@@ -27,10 +27,11 @@ function fixture({omit=[],preview=true,path='/own/data.csv',sourceName='Amount',
    else if(action.verb==='fill')source[action.ref]=action.text;
    else if(action.verb==='press')assert.equal(action.key,'Tab');
    else if(action.verb==='set_wizard_field')format[action.ref]=action.text;
+   else if(action.verb==='set_checked')source[action.ref]=action.checked;
    else assert.fail(JSON.stringify(action));
   }};
  channel.perform=async options=>{const s=options.initialObservation??state();assert.ok(options.ready(s));return channel.act(options.resolve(s));};
- return {settings,actions,run:()=>configureTextImportPatch(channel,settings,owner,'/own/data.csv')};
+ return {settings,actions,run:()=>configureTextImportPatch(channel,settings,owner,verified),source};
 }
 
 for(const omit of [['text_qualifier'],['data_kind'],['delimiter','decimal_separator','null_marker','text_qualifier','data_kind']])
@@ -68,4 +69,14 @@ test('explicit model values including empty strings are preserved',async()=>{
  const result=await f.run();
  assert.equal(result.format.fields.text_qualifier.value,'');assert.equal(result.format.fields.null_marker.value,'');
  assert.equal(result.columns[0].data_kind,f.settings.columns[0].data_kind);
+});
+// LAB-1766: list and mask sources are serialized into the native path field;
+// the first form after preview must validate the model's own source keys.
+for(const [sourceKey,path,verified] of [
+ ['source_paths',['/own/a.csv','/own/b.csv'],'/own/a.csv｜/own/b.csv'],
+ ['source_mask','/own/run/sales_*.csv','/own/run/sales_*.csv']])
+test('first configuration after preview accepts '+sourceKey,async()=>{
+ const f=fixture({omit:['text_qualifier'],path,verified,sourceKey}),original=structuredClone(f.settings),result=await f.run();
+ assert.equal(result.verified,true);assert.equal(f.source.source_path,verified);
+ assert.deepEqual(f.settings,original,'caller settings stay unchanged');
 });
