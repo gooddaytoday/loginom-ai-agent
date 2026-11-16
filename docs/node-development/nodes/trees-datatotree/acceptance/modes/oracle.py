@@ -79,6 +79,11 @@ def proposals(slug):
             empty = csv.DictReader(source)
             assert empty.fieldnames == list(rows[0]) and list(empty) == []
         assert len(rows) == len(f['variant_cells']) == 3
+        with (NODES / slug / 'fixtures/modes/lab1685-types.csv').open(newline='', encoding='utf-8') as source:
+            seed = list(csv.DictReader(source))
+        assert seed == [dict(When=r['When'], IntegerValue=r['Value'] if i == 0 else '?',
+                             BooleanValue='false' if i == 1 else '?', StringValue='' if i == 2 else '?')
+                        for i, r in enumerate(rows)], 'typed source seed differs from the independent input'
         scalar = [dict(Code=r['Code'], Qty=None if r['Qty'] == '?' else int(r['Qty'])) for r in rows]
         groups = {}
         for r, item in zip(rows, scalar):
@@ -199,6 +204,25 @@ def result(slug):
                 cases=cases,**({'boundary_proposals':limits} if limits else {}))
 
 
+def dates_variant_projection():
+    output = next(c['output'] for c in proposals(SLUGS[0]) if c['id'] == 'dates-variant')
+    document = output['document']
+    def variants(node):
+        if node.pop('schema_type', None) == 'variant':
+            node['cell_type'], node['type'] = node['type'], 'variant'
+        for child in node.get('children', []):
+            variants(child)
+    variants(document)
+    return dict(package_path='{{PACKAGE_PATH}}',
+                nodes=[dict(type=t, label_any=True) for t in
+                       ['imports.text', 'transform.collapse_columns', 'trees.from_table']],
+                outputs=[], tree_outputs=[dict(output_node_type='trees.from_table', output_port=0,
+                    port_kind='tree', ordered=True, tolerance=dict(abs=0, rel=0),
+                    schema_field_order=['items'], item_field_order=['When', 'Value'],
+                    schema_types={'/items':'object_array', '/items/When':'datetime', '/items/Value':'variant'},
+                    document=document)])
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--check', action='store_true')
@@ -212,4 +236,7 @@ if __name__ == '__main__':
             assert target.read_text(encoding='utf-8') == text, str(target)
         else:
             target.write_text(text, encoding='utf-8')
+        if args.check and slug == SLUGS[0]:
+            projection = target.with_name('expected-dates-variant.json')
+            assert json.loads(projection.read_text(encoding='utf-8')) == dates_variant_projection(), str(projection)
         print(slug + ': ' + str(len(output['cases'])) + ' independent proposals; native not_checked')
