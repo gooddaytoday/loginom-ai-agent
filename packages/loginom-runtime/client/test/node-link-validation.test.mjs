@@ -41,6 +41,12 @@ for(const mode of ['delayed','rejected','expired','foreign','marker','cancelled'
  if(mode==='delayed')assert.ok(page.clock-start>=20000);
  if(mode==='expired')assert.match(result.error.message,/deadline/);
  if(mode==='cancelled')assert.match(result.error.message,/cancelled/);
+ if(mode==='marker'){
+  const diagnostic=page[Symbol.for('loginom-dock.node-target-link-diagnostic')];
+  assert.equal(diagnostic.after.state,'ready');assert.equal(diagnostic.after.target_ready,false);
+  assert.deepEqual(diagnostic.before.point,diagnostic.after.point);
+  assert.doesNotMatch(JSON.stringify(result),/marker_cell|target_cell_id|node-target-link-diagnostic/);
+ }
 });
 
 test('REST service links retain native cached compatibility and marker ownership',async()=>{const f=fixture(true,'connection');assert.equal((await f.read()).state,'ready');f.handler.marker.validState=null;assert.equal((await f.read()).target_ready,false);f.diagram.FHandlers.FConnectionHandler.FDelegationHandler.FMouseDown=false;await assert.rejects(f.read(),/owner/);});

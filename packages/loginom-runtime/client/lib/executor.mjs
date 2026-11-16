@@ -782,8 +782,11 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     if(value!==undefined&&value!==null&&typeof value!=='boolean')throw Error('Unknown link validation state');
     const box=target.element.getBoundingClientRect();
     if(!(box.width>0&&box.height>0))throw Error('Link validation target is hidden');
+    const cellId=cell=>typeof cell?.id==='string'&&/^[0-9a-f_-]{1,128}$/i.test(cell.id)?cell.id:null;
     return {state:value===true?'ready':value===false?'rejected':'pending',
       point:{x:box.x+box.width/2,y:box.y+box.height/2},
+      marker_cell:{id:cellId(handler.marker?.validState?.cell),target:handler.marker?.validState?.cell===target.port.FCell},
+      target_cell_id:cellId(target.port.FCell),
       target_ready:handler.error==null&&handler.marker?.validState?.cell===target.port.FCell};
   },{context,parameters});
 }
@@ -1316,7 +1319,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           // mxGraph refreshes the marker after the asynchronous result arrived.
           await interact(()=>page.mouse.move(validation.point.x,validation.point.y),true);
           const settled=await interact(()=>readLinkValidation(page,task.node_target_context,task.parameters));
-          if(settled.state!=='ready'||!settled.target_ready)throw Error('Validated link target is no longer ready');
+          if(settled.state!=='ready'||!settled.target_ready){
+            // Private, single-entry evidence; never add native IDs to the reply.
+            page[Symbol.for('loginom-dock.node-target-link-diagnostic')]={operation_id:task.operation_id,before:validation,after:settled};
+            throw Error('Validated link target is no longer ready');
+          }
           record('link_validation_settled',{attempt:attempt+1});
         }:undefined });
       await wait(150);
@@ -2188,7 +2195,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const targetAdapter=operation=>nodeTargetAdapterFactory({execute:async(code,options)=>{
     const wrapped='async page => {const base={action_key:"node.target.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",output:{},error:{code:"NODE_TARGET_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
     const response=await execute(wrapped,options);if(response.status!=='SUCCEEDED')throw new Error(response.error?.message??'Node target transport failed');return response.output.value;
-  },pinned,origin:targetOrigin,build:targetBuild});
+  },pinned,origin:targetOrigin,build:targetBuild,record:nodeTargetRecord});
   const nodeApplyOutcome=(operation,result)=>({status:result.status,action_key:'node.apply',
     action_revision:operation.action.revision,operation_id:operation.id,
     phase:result.status==='SUCCEEDED'?'node_ready':result.checkpoint_kind==='local_node_released'?'node_released':result.pending_phase??'node_incomplete',

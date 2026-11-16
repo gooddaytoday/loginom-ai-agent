@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { prepareNodeTarget, verifyNodeTargetEffect } from '../lib/node-target.mjs';
 import { describeNodeTypes, validateNodeTargetRequest } from '../lib/node-contracts.mjs';
+import {journalCopy} from '../lib/execution-journal.mjs';
 const ref = id => ({ document_id: 'doc', workflow_id: 'wf', node_id: id });
 const workflow = { workflow_id: 'wf', tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', prefix: 'MF;TF-1', navigation_path: [{tid:'path',label:'Scenario'}] };
 const source = { ref: ref('source'), type: 'imports.text', label: 'Source', position: {x:8,y:8}, inputs: [], outputs: [0] };
@@ -41,6 +42,21 @@ function fixture() {
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
 }
+test('failed native marker records fresh topology privately without node labels or URLs',async()=>{
+ const f=fixture();f.graph.nodes[0].label='https://private.invalid/?token=secret';
+ const mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  if(effect.kind!=='connect')return mutate(effect);
+  f.graph.nodes[1].position.x+=8;
+  return {status:'AMBIGUOUS',cleanup_complete:true,effect_possible:true,error:{message:'Validated link target is no longer ready'}};
+ };
+ const r=await prepareNodeTarget({request:request(),operation:f.operation,adapter:f.adapter,record:async e=>{f.events.push(e);return journalCopy(e);}}),event=f.events.find(e=>e.phase==='node_target_link_graph_refused');
+ assert.equal(r.status,'AMBIGUOUS',JSON.stringify(r));assert.match(r.error,/Graph effect needs reconciliation/);
+ assert.equal(event.after.nodes[1].position.x,event.before.nodes[1].position.x+8);
+ assert.deepEqual(event.after.links,[]);
+ assert.doesNotMatch(JSON.stringify(event),/https:|private.invalid|secret/);
+ assert.doesNotMatch(JSON.stringify(r),/label_digest|node_target_link_graph_refused/);
+});
 for(const uncertain of [-1,0,1])test('variable union first native caption change never repeats a connection, uncertain='+uncertain,async()=>{
  const f=fixture();f.graph.nodes[0].variable_outputs=[{kind:'variables',port:0,port_guid:'source-var'}];
  f.graph.nodes.push({...structuredClone(f.graph.nodes[0]),ref:ref('right'),label:'Right'});
