@@ -40,15 +40,17 @@ test('lists and masks refuse ambiguous sources, threads without parallel reading
  assert.throws(()=>validateExcelParameters(structuredClone({...mask,source_switch:{profile_id:'p',save_operation_id:'s'}}),'xlsx',{...request,target:{kind:'existing',type:'imports.excel'}}),/binding or source_switch/);
 });
 
-function wizard(excel,{parallel=false,threads='Автоопределение'}={}){
+function wizard(excel,{parallel=false,threads='Автоопределение',saved='/own/in/old.xlsx'}={}){
  const root='MF;TF;WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
  const check=file+'chkParallelProcessing;ValueControl',combo=file+'cbbMaxThreadCount;ValueControl';
- let stage=0,target,open=null;const clicks=[],fills=[];
- const values=new Map([[file+'edtFileName;ValueControl','/own/in/old.xlsx'],[file+'cbbTableNamingMethod;ValueControl','По имени'],[file+'cbbTableName;ValueContainer;cbx','Data'],
+ let stage=0,target,open=null;const clicks=[],fills=[],presses=[];
+ const values=new Map([[file+'edtFileName;ValueControl',saved],[file+'cbbTableNamingMethod;ValueControl','По имени'],[file+'cbbTableName;ValueContainer;cbx','Data'],
   [file+'cbbActionBlankRow;ValueControl','Импортировать'],[file+'edtTitleRowCount;ValueControl','1'],[defs+'cbbAutoDetectColumnsMode;ValueControl','Нет'],[combo,threads]]);
  const fields=['Id','Amount'].map(name=>({name,label:name,type:'Целый',data_kind:'Непрерывный',used:true}));
  const locator=tid=>({count:async()=>tid==='masks'?0:1,locator:()=>locator(tid),getByRole:(_,{name})=>locator(combo+';boundlist;'+name),
-  inputValue:async()=>values.get(tid)??'',fill:async v=>{fills.push([tid,String(v)]);values.set(tid,String(v));},press:async()=>{},
+  // Native filename field: a plain fill keeps a saved U+FF5C list and appends.
+  inputValue:async()=>values.get(tid)??'',fill:async v=>{fills.push([tid,String(v)]);values.set(tid,(String(values.get(tid)??'').includes('｜')?values.get(tid):'')+String(v));},
+  press:async key=>{presses.push([tid,key]);if(key==='Backspace'&&presses.at(-2)?.[1]==='Control+A')values.set(tid,'');},
   evaluate:async fn=>{const code=fn.toString();if(code.includes('getBoundingClientRect')){target=tid;return{x:1,y:1};}
    if(code.includes('x-form-cb-checked'))return tid===check?parallel:true;return true;},
   isVisible:async()=>tid===root+';btnError'?false:tid===file+'edtFileName;ValueControl'?stage===0:tid===file+'edtFileName;VariableControl'?false
@@ -78,6 +80,11 @@ test('a mask with two threads enables parallel reading before choosing the threa
  assert.ok(at(w.check+';DisplayEl')>=0&&at(w.check+';DisplayEl')<at(w.combo+';trg_picker')&&at(w.combo+';trg_picker')<at(w.combo+';boundlist;2'));
  assert.equal(r.configuration.source.parallel_processing,true);
  assert.equal(r.configuration.source.max_threads,'2');
+});
+test('the SAME node replaces its saved list with the mask, not appending it',async()=>{
+ const w=wizard(mask.excel,{saved:'/own/in/sales-a.xlsx｜/own/in/sales-b.xlsx'}),r=await w.run();
+ assert.equal(r.verified,true,r.error);
+ assert.equal(r.configuration.source.source_path,'/own/in/sales-*.xlsx');
 });
 test('one workbook keeps the saved parallel setting untouched',async()=>{
  const w=wizard({source_path:'/own/in/sales-a.xlsx',sheet_name:'Data',header_rows:1,columns},{parallel:true}),r=await w.run();

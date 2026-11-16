@@ -19,7 +19,8 @@ export async function excelConfigureCapability(page,t,readContext){
  try{
   const guard=async()=>{remaining();const b=await readContext(page,binding);need(b.verified&&b.surface==='wizard'&&b.node_id===t.node.node_id,'owned wizard changed');
    need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return b;};
-  const wait=async(label,read)=>{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}throw Error(label+' did not settle');};
+  const wait=async(label,read)=>{try{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}}
+   catch(error){if(/operation deadline exceeded$/.test(error.message))error.message+=' ['+label+']';throw error;}throw Error(label+' did not settle');};
   const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
   const point=(locator,settled)=>{
    waitingFor=String(locator);
@@ -36,7 +37,8 @@ export async function excelConfigureCapability(page,t,readContext){
    }).then(p=>{waitingFor=null;return p;});
   };
   const click=async(locator,double=false,settled)=>{await quiet();await guard();const p=await point(locator,settled);if(p.selected)return;effect=true;if(double)await page.mouse.dblclick(p.x,p.y);else await page.mouse.click(p.x,p.y);};
-  const fill=async(locator,value)=>{await quiet();await guard();await point(locator);effect=true;await locator.fill(String(value));await locator.press('Tab');await wait('field readback',()=>locator.inputValue().then(v=>v===String(value)));};
+  // A saved U+FF5C list survives a plain fill (the mask is appended): clear first.
+  const fill=async(locator,value,clear)=>{await quiet();await guard();await point(locator);effect=true;if(clear){await locator.press('Control+A');await locator.press('Backspace');}await locator.fill(String(value));await locator.press('Tab');await wait('field readback',()=>locator.inputValue().then(v=>v===String(value)));};
   const choose=async(owner,value,optionTid)=>{
    const input=find(owner).locator('input:not([type="hidden"])');
    if(await input.inputValue()===value)return;
@@ -78,7 +80,7 @@ export async function excelConfigureCapability(page,t,readContext){
    }
   }else{
   const pathInput=find(file+'edtFileName;ValueControl').locator('input');
-  if(await pathInput.inputValue()!==want)await fill(pathInput,want);
+  if(await pathInput.inputValue()!==want)await fill(pathInput,want,true);
   }
   if(!t.preserve||t.excel.sheet_name!==undefined){
   await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.named_range!==undefined?'Именованный диапазон':t.excel.sheet_name===undefined?'По номеру':'По имени');
