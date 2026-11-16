@@ -3628,7 +3628,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     verifyDeliveredArtifact:options=>runtime.verifyArtifact({...options,discover:true,compareExisting:true}),
     // Private entry point for the node.apply shell (03). No new public MCP
     // action: the graph phase shares this runtime's gate, IDs and journal.
-    async runNodeTarget(request,{operationId,signal,resume=false}={}) {
+    async runNodeTarget(request,{operationId,signal,resume=false,actionKey='node.target.internal'}={}) {
       signal?.throwIfAborted();checkId(operationId);validateNodeTargetRequest(request);
       if(running)throw new Error('Another Dock action is still running');
       const signature=fingerprint('node.target.internal',request);
@@ -3647,7 +3647,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }
       running=true;
       try{
-        if(!operation){operation={id:operationId,signature,parameters:structuredClone(request),action:{action_key:'node.target.internal',capability:'node.target.internal',revision:'1'}};
+        if(!operation){operation={id:operationId,signature,parameters:structuredClone(request),action:{action_key:actionKey,capability:'node.target.internal',revision:'1'}};
           operation.nodeTargetAdapter=targetAdapter(operation);
           operation.checkpoint={workflow_ref:request.workflow_ref,document_id:request.document_id};
         }
@@ -3663,6 +3663,41 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
         return structuredClone(outcome);
       }finally{running=false;}
+    },
+    // Public deletion of one node of the prepared workflow. It reuses the
+    // journaled node target phase; a busy session refuses before any gesture.
+    async deleteNode(args,{signal}={}) {
+      signal?.throwIfAborted();checkId(args.operation_id);
+      const request={document_id:args.document_id,workflow_ref:args.workflow_ref,
+        target:{kind:'delete',ref:args.node,...(args.label!==undefined?{label:args.label}:{})},inputs:[]};
+      validateNodeTargetRequest(request);
+      const id=args.operation_id,known=operations.get(id);
+      const settled=(outcome,next)=>({operation_id:id,attempt:1,state:'settled',
+        outcome:{...outcome,action_key:'node.delete',...(next?{next_step:next}:{})}});
+      const active=nodeJobs.active;
+      if(nodeJobs.busy||sourceReads.busy||sourceReads.unsettled||delivery.busy||delivery.blocksMutations||running
+        ||nodeJobs.unsettled||pending&&pending!==known||storageNavigating||serverDownloads?.unsettled)
+        return settled({status:'NOT_APPLIED',operation_id:id,phase:'preconditions',effect_possible:false,cleanup_complete:true,
+          output:{node:null,package_saved:false,warnings:['Nothing was deleted: the node graph was not touched.']},
+          error:{code:'NODE_OPERATION_RUNNING',message:(active?'Node operation '+active.operation_id+' is still running':'Another Dock operation is running or unresolved')
+            +'; deletion is refused while it runs and was not attempted.'}},
+          {tool:'dock_node_wait',...(active?{arguments:{operation_id:active.operation_id}}:{}),
+            instruction:'Do not retry deletion while the operation runs. Report the refusal; delete later only if the user still asks after it settles, with a NEW operation_id.'});
+      let outcome=await runtime.runNodeTarget(request,{operationId:id,signal,actionKey:'node.delete'});
+      const operation=operations.get(id);
+      if(known&&outcome.status==='AMBIGUOUS'&&operation&&pending===operation&&!operation.targetPhase?.pending&&operation.cleanupConfirmed)
+        outcome=await runtime.runNodeTarget(request,{operationId:id,signal,resume:true,actionKey:'node.delete'});
+      const result=outcome.output??{};
+      const deleted=result.deleted_node;
+      return settled({...outcome,output:{node:null,package_saved:false,
+        warnings:outcome.status==='SUCCEEDED'&&deleted?['Deleted node '+JSON.stringify(deleted.label)+' ('+deleted.type+') with '
+          +(result.removed_links.length+result.removed_variable_links.length+result.removed_service_links.length)
+          +' own link(s); other nodes and links are unchanged. The package is not saved: use package.save_checkpoint.']
+          :outcome.status==='NOT_APPLIED'?['Nothing was deleted: '+String(result.error??'precondition refused')]:[],
+        ...(deleted?{output:{status:'deleted'},deleted_node:deleted}:{})}},
+        outcome.status==='SUCCEEDED'?null:outcome.status==='NOT_APPLIED'
+          ?{tool:'dock_node_delete',instruction:'Nothing was deleted. Do not repeat the same request; report the reason to the user.'}
+          :{tool:'dock_node_delete',instruction:'Deletion is unresolved. Repeat dock_node_delete with the SAME operation_id and arguments to reconcile; never start a new deletion of this node.'});
     },
     // Host-only until the complete real drivers pass admission. All child
     // phases own the same runtime gate; they cannot re-enter public run/act.
@@ -4034,7 +4069,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
   const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply']);
-  const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
+  const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
       if((storageNavigating||serverDownloads?.unsettled)&&!['serverDownload','cleanupServerCache'].includes(name)){

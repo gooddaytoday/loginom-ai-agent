@@ -54,6 +54,19 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
       &&same(after.rest_connection_links??[],before.rest_connection_links.filter(e=>e!==service[0]))
       &&same(keep(before,[]),keep(after,[]))?{}:null;
   }
+  if(kind==='delete_node'){
+    // Exactly this node and its own edges disappear. A foreign tid may vanish
+    // only as the node's own native REST/DB service edge; others must remain.
+    const id=p.ref.node_id,touches=e=>e.source===id||e.target===id;
+    if(before.nodes.filter(n=>n.ref.node_id===id).length!==1||after.nodes.some(n=>n.ref.node_id===id))return null;
+    const service=(before.rest_connection_links??[]).filter(touches),gone=service.map(e=>e.tid);
+    const rest=g=>(g.rest_connection_links??[]).filter(e=>!touches(e));
+    const remaining=g=>({nodes:g.nodes.filter(n=>n.ref.node_id!==id).map(domainNode),links:g.links.filter(e=>!touches(e)),
+      variable_links:(g.variable_links??[]).filter(e=>!touches(e))});
+    return same(after.foreign_links,before.foreign_links.filter(tid=>!gone.includes(tid)))&&same(rest(after),rest(before))
+      &&![...after.links,...after.variable_links??[],...after.rest_connection_links??[]].some(touches)&&same(remaining(before),remaining(after))
+      ?{removed_links:before.links.filter(touches),removed_variable_links:(before.variable_links??[]).filter(touches),removed_service_links:service}:null;
+  }
   if(!same(after.foreign_links,before.foreign_links))return null;
   if(kind==='add_variable_input'){
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
@@ -270,6 +283,31 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       if (!same(state.final_graph, graph)) throw new Error('Completed node target has changed');
       await commit();
       return { ...structuredClone(state.result), replayed: true };
+    }
+    if(request.target.kind==='delete'){
+      // All refusals precede the one native deletion gesture; it is never repeated.
+      const ref=request.target.ref;
+      if(!state.baseline){
+        const owned=graph.nodes.filter(n=>n.ref.node_id===ref.node_id);
+        if(owned.length!==1)throw Error('Node to delete is absent or its identity is ambiguous; nothing was deleted');
+        const target=owned[0];
+        if(request.target.label!==undefined&&target.label!==request.target.label)throw Error('Node to delete has a different caption; nothing was deleted');
+        if(target.locked)throw Error('Node to delete is locked or executing; nothing was deleted');
+        if(target.boundary_role!==undefined||['control.supernode_output','bg-vendor-icon-nullvendor'].includes(target.type))
+          throw Error('Service boundary node of a Supernode or Loop cannot be deleted; nothing was deleted');
+        if(!graph.interaction_ready)throw Error('Graph is not ready for node deletion; nothing was deleted');
+        state.baseline=structuredClone(graph);await commit();
+      }
+      const deleted=node(state.baseline,ref.node_id);
+      if(!state.receipts.some(r=>r.kind==='delete_node'))graph=await change('delete_node',{ref},(before,after)=>
+        !!verifyNodeTargetEffect({kind:'delete_node',parameters:{ref},before},after,adapter.positionMatches));
+      const proof=verifyNodeTargetEffect({kind:'delete_node',parameters:{ref},before:state.baseline},graph,adapter.positionMatches);
+      if(!proof)throw Error('Graph effect needs reconciliation');
+      state.completed=true;state.final_graph=structuredClone(graph);
+      state.result={status:'SUCCEEDED',phase:'target_deleted',node:null,
+        deleted_node:{ref:deleted.ref,type:deleted.type,label:deleted.label},...proof,
+        effects:state.receipts.map(({id,kind,verified})=>({id,kind,verified})),configured:false,executed:false,package_saved:false};
+      await commit();return structuredClone(state.result);
     }
     if (!state.baseline) {
      for(let refresh=0;;refresh++){
