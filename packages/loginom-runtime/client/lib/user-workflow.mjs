@@ -31,8 +31,14 @@ export function userActionInventory(value) {
   return copy;
 }
 export function userNodeTool(tool) {
-  if (!['dock_node_apply', 'dock_node_resume', 'dock_node_read'].includes(tool.name)) return tool;
+  if (!['dock_node_apply', 'dock_node_resume', 'dock_node_read', 'dock_node_delete'].includes(tool.name)) return tool;
   const copy = structuredClone(tool);
+  if(tool.name==='dock_node_delete'){
+    // Same compact workflow identity as dock_node_apply; the bridge expands it.
+    const workflow=copy.inputSchema.properties.workflow_ref;
+    workflow.properties={workflow_id:workflow.properties.workflow_id};workflow.required=['workflow_id'];
+    return copy;
+  }
   if(tool.name==='dock_node_read'){
     for(const branch of copy.inputSchema.oneOf)delete branch.properties.budget_ms;
     delete copy.inputSchema.properties.budget_ms;
@@ -119,6 +125,11 @@ export function createUserWorkflowBindings() {
       if(describedDocument!==document_id)described.clear();
       describedDocument=document_id;
       references.set(key(document_id, workflow_ref.workflow_id), structuredClone(workflow_ref));
+    },
+    expandNodeDelete(request) {
+      const ref=references.get(key(request.document_id,request.workflow_ref?.workflow_id));
+      if(!ref)throw Error('UNKNOWN_PREPARED_WORKFLOW: use document_id and workflow_id issued together by successful dock_prepare. Nothing was deleted.');
+      return {...request,workflow_ref:structuredClone(ref)};
     },
     expandNodeRead(request) {
       // The compact schema rejects caller budgets before this expansion.

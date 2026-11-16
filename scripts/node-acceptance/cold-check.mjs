@@ -321,6 +321,8 @@ page = context.pages()[0]
       await record({phase:'n18_saved_javascript_step',...proof});
     }else if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
+  // A deleted node must stay absent from the saved graph.
+  for(const type of expected.absent_node_types??[])if(graph.nodes.some(node=>node.type===type))throw Error(`COLD_NODE_TYPE_PRESENT:${type}`)
 
   const reads=expectedOutputs.length===0&&(Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0
    ||state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0)
