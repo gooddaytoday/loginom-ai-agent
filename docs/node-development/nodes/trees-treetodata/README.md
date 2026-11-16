@@ -15,7 +15,7 @@ Runtime в этом docs-PR не изменён, новые PASS не заявл
 
 Зарегистрирован `trees.to_table` / `selected_nodes`. Выбранная ветвь дерева в таблицу; поля/пути, повторение родителей on/off; типы, NULL, boolean, empty и Int64 сохраняются. Листья DateTime и Variant (LAB-1699, `tree-to-table-typed`) дают колонки тех же типов; Variant читается с native подтипом.
 
-Ограничения: Принят только ограниченный срез пары JSON→tree→table; расширенная матрица подплана не подтверждена; чтение дерева ≤256 узлов / depth16 / 1 MiB.
+Ограничения: Variant NULL в листе не покрыт приёмкой (источник R4 его не даёт); CSV допускает D76 `midnight_date` (`d76-tree-to-table`). Принят только ограниченный срез пары JSON→tree→table; расширенная матрица подплана не подтверждена; чтение дерева ≤256 узлов / depth16 / 1 MiB.
 
 Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [tree-node.mjs](../../../../packages/loginom-runtime/client/lib/tree-node.mjs):1–136; [tree-parameters.mjs](../../../../packages/loginom-runtime/client/lib/tree-parameters.mjs):1–86; [trees.to_table.md](../../../../packages/product/skills/loginom-automation/references/nodes/trees.to_table.md):1–49. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
 

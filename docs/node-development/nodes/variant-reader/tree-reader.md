@@ -234,7 +234,10 @@ Native-наблюдение — первый прогон `tree-to-table-typed` 
 When DataType datetime и Value Variant, 3 строки. When — civil
 2026-11-07T12:34:56.789 / 2026-11-08T00:00:00.001 без сдвига пояса;
 Value — integer 9007199254740993 (тег 20, signed Int64), boolean false (11),
-string "" (8). Совпало с `expected-typed-run.json`. Текстовый экспорт по
-умолчанию записал 00:00:00.001 датой `2026-11-08` (D76 `midnight_date`),
-поэтому задание называет формат CSV. Variant NULL источник R4 не даёт.
+string "" (8). Совпало с `expected-typed-run.json`. Текстовый экспорт
+записал 00:00:00.001 датой `2026-11-08` и по умолчанию (a1), и с применённой
+маской `yyyy/mm/dd`, `-`, `hh:nn:ss.zzz` (b1, readback `execution-events.jsonl:1201`).
+Решение владельца `d76-tree-to-table`: для `tree-to-table-typed` это учтённая
+форма D76 `midnight_date` только в CSV; чтение порта и cold строгие.
+Ограничение: Variant NULL не покрыт — Свёртка источника R4 отбрасывает NULL.
 

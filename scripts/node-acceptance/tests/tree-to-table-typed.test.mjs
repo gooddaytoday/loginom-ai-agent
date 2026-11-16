@@ -24,3 +24,29 @@ assert 'oracle' not in c['prompt'].read_text() and 'expected' not in c['prompt']
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
+
+test('tree-to-table typed CSV accepts only the counted D76 midnight date observed in LAB-1699 b1',()=>{
+ const result=spawnSync('python3',['-B','-c',`import csv,importlib.util,tempfile
+from pathlib import Path
+s=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+o=r.expected_for(r.scenario('tree-to-table-typed'),'/owned/tree.lgp')['outputs'][0]
+observed=[['2026-11-07 12:34:56.789','9007199254740993'],['2026-11-08','False'],['2026-11-07 12:34:56.789','']]
+with tempfile.TemporaryDirectory() as d:
+    p=Path(d)/'out.csv'
+    def check(rows,scenario='tree-to-table-typed'):
+        with p.open('w',newline='',encoding='utf-8') as stream:
+            writer=csv.writer(stream,lineterminator='\\n');writer.writerow(['When','Value']);writer.writerows(rows)
+        counts=dict(negative_zero=0,midnight_date=0)
+        r.check_csv(p,o,scenario_name=scenario,d76=counts)
+        return counts
+    assert check(observed)==dict(negative_zero=0,midnight_date=1)
+    assert check([observed[0],['2026-11-08 00:00:00.001','False'],observed[2]])==dict(negative_zero=0,midnight_date=0)
+    for scenario,index,value in [('trees-to-table-indices',1,'2026-11-08'),('tree-to-table-typed',1,'2026-11-09'),
+                                 ('tree-to-table-typed',0,'2026-11-07'),('tree-to-table-typed',1,'2026-11-08 00:00:00.000')]:
+        rows=[row[:] for row in observed];rows[index][0]=value
+        try: check(rows,scenario);raise SystemExit('unexpected acceptance: '+str((scenario,index,value)))
+        except AssertionError as error: assert str(error)=='CSV_VALUES_OR_ORDER',str(error)
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});

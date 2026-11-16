@@ -688,10 +688,13 @@ with `trees.to_table`. Private `expected-typed-run.json` is the pair oracle's
 `tree_to_table_typed_projection` (checked by `oracle.py --check`): one ordered
 table When DateTime (civil milliseconds) and Value Variant with native subtypes
 integer `9007199254740993`/boolean false/string "", label_any, its CSV, Save and
-cold (exact typed Variant port read). The task names the CSV When format
-`yyyy-mm-dd hh:nn:ss.zzz`: the default writer prints 00:00:00.001 as a date
-(D76 `midnight_date`, not extended here). The CSV compares Variant integers as
-numbers; Int64 exactness is proven only by the typed read.
+cold (exact typed Variant port read). Even with the requested CSV When format
+`yyyy-mm-dd hh:nn:ss.zzz` applied (readback), the native writer prints
+2026-11-08T00:00:00.001 as `2026-11-08` (LAB-1699 a1/b1). Owner decision
+`d76-tree-to-table`: this is the counted D76 `midnight_date` form only, CSV
+status «PASS с ограничением платформы D76»; port read and cold stay exact.
+The CSV compares Variant integers as numbers; Int64 exactness is proven only
+by the typed read. Variant NULL is not covered (the R4 Collapse drops NULL).
 
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with

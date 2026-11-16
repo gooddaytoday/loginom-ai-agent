@@ -45,5 +45,6 @@ LAB-1699: `task-typed.md` — листья DateTime и Variant из подгот
 источника (`trees-datatotree/fixtures/modes/typed-source.lgp`), сценарий
 `tree-to-table-typed`. `expected-typed-run.json` строит
 `tree_to_table_typed_projection` общего oracle пары; `oracle.py --check`
-сверяет файл. Variant NULL источник не даёт: native Свёртка с пропуском NULL
-отбрасывает пустые ячейки.
+сверяет файл. Ограничение: Variant NULL не покрыт — native Свёртка с
+пропуском NULL отбрасывает пустые ячейки. CSV: полночь с мс пишется датой,
+учитывается как D76 `midnight_date` (решение `d76-tree-to-table`).
