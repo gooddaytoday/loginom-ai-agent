@@ -49,7 +49,7 @@ apply на ЕГО существующий ref, `inputs:[{source:<Calculator>,ou
 <!-- mode: variable_boundary -->
 Один переменный input 0, один табличный output 0, без табличного входа:
 `boundary.input:{kind:"variables",name:"Params",label:"Параметры",definitions:[{name:"Page",type:"integer",value:99},{name:"Limit",type:"integer",value:2}]}`;
-`boundary.output` — таблица, как выше. Только непустые integer-определения без NULL;
+`boundary.output:{kind:"table",name:"Output",label:"Результат"}`. Только непустые integer-определения без NULL;
 имя переменной также её метка. Внешний источник не нужен.
 InputNode variable output 0 → «Переменные в таблицу» (columns) и обычный вход
 переменных Calculator через `variable_inputs` (kind:variables,input:0).

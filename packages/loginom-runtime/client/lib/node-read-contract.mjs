@@ -41,8 +41,8 @@ function retainedMappingSchemas(node,sourceId,type){
  const r=node.configuration?.readback;
  if(!r)return [];
  const javascript=r.kind==='javascript';
- if(type==='control.loop')need(r.kind==='loop'&&r.mode==='group_rows'&&r.group_size===1
-  &&r.parallel===false&&r.iteration_identifiers===false&&r.ignore_errors===false&&r.save_configuration===false
+ if(type==='control.loop')need(r.kind==='loop'&&(r.mode==='group_rows'&&r.group_size===1&&r.iteration_identifiers===false||r.mode==='for'&&Number.isSafeInteger(r.count)&&r.count>0&&r.variable?.type==='integer'&&typeof r.iteration_identifiers==='boolean')
+  &&r.parallel===false&&r.ignore_errors===false&&r.save_configuration===false
   &&r.body?.ref?.document_id===node.node.document_id&&r.body.ref.workflow_id===node.node.workflow_id,
  'Invalid parameters.source_operation_id: supported Loop configuration required');
  // REST retains connection settings at Done, not an output-mapping wizard.

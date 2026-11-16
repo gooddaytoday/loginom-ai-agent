@@ -5687,13 +5687,18 @@
       "name": "Цикл",
       "slug": "control-loop",
       "legacy_subplan": null,
-      "queue_class": "backlog",
-      "handler": null,
+      "queue_class": "implemented",
+      "handler": {
+        "type": "control.loop",
+        "modes": ["group_rows", "for"],
+        "source": "../../packages/loginom-runtime/client/lib/loop-node.mjs",
+        "parameters_source": "../../packages/loginom-runtime/client/lib/loop-parameters.mjs"
+      },
       "card": "nodes/control-loop/README.md",
       "initial_scope": "Ограниченный счётный цикл с наблюдаемым числом итераций, границами состояния и штатной остановкой.",
       "scope_basis": "engineering_proposal_requires_live_confirmation",
       "limitations": [
-        "Полного зарегистрированного обработчика нет; присутствие в Help/палитре не означает поддержку."
+        "Реализованы group_rows и FOR по integer-переменной; fixed_count/group_keys и постусловие не поддержаны."
       ],
       "prerequisites": [
         "accepted_base",
@@ -5708,7 +5713,7 @@
       },
       "readiness": {
         "implementation": {
-          "status": "not_implemented",
+          "status": "implemented",
           "evidence": [
             "runtime-registry",
             "historical-roadmap"
@@ -5739,7 +5744,7 @@
       },
       "next_action": "Подплан готов к назначению карточкой Multica по разделу 0: сначала этап 0 (живое исследование); общие изменения, перечисленные в подплане, — по решению владельца.",
       "plan": "nodes/control-loop/plan.md",
-      "plan_status": "discovery_required"
+      "plan_status": "reverification_required"
     },
     {
       "component_id": "component.control.ReferenceNode",
