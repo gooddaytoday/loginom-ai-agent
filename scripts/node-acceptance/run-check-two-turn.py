@@ -3,6 +3,7 @@
 Only reads the CLI transcript database; all Loginom actions remain product actions.
 """
 import fcntl
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -20,7 +21,7 @@ import time
 def transcript(profile):
     database = profile / 'data/loginom-ai-agent.db'
     if not database.exists(): return [], []
-    with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as db:
+    with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as db:
         messages = [dict(json.loads(data), id=id, sessionID=session) for id, session, data in
                     db.execute('select id,session_id,data from message order by time_created,id')]
         parts = [dict(json.loads(data), id=id, sessionID=session, messageID=message) for id, session, message, data in
@@ -52,10 +53,20 @@ def run(config):
         raise KeyboardInterrupt
     signal.signal(signal.SIGINT, interrupted)
     signal.signal(signal.SIGTERM, interrupted)
-    def boundary(kind):
+    def boundary(kind, parts=()):
+        execution_ids = set()
+        def visit(value):
+            if isinstance(value, dict):
+                if isinstance(value.get('execution_id'), str): execution_ids.add(value['execution_id'])
+                for child in value.values(): visit(child)
+            elif isinstance(value, list):
+                for child in value: visit(child)
+        for part in parts:
+            try: visit(json.JSONDecoder().raw_decode(part.get('state', {}).get('output', ''))[0])
+            except (ValueError, TypeError): pass
         with (folder / 'turns.jsonl').open('a') as out:
             out.write(json.dumps(dict(event=kind, turn=turn, sessionID=session, cli_pid=child.pid,
-                                      at=time.time()), ensure_ascii=False) + '\n')
+                                      execution_ids=sorted(execution_ids), at=time.time()), ensure_ascii=False) + '\n')
     boundary('submitted')
     try:
         with (folder / 'terminal.log').open('wb') as terminal:
@@ -86,9 +97,9 @@ def run(config):
                         if message.get('role') == 'user':
                             assert message.get('model') == dict(providerID='openai', modelID='gpt-6.1-sol', variant='medium'), 'TWO_TURN_MODEL_VARIANT_CHANGED'
                 if not completed_turn(messages, turn): continue
-                boundary('completed')
+                boundary('completed', parts)
                 if turn == 1:
-                    turn = 2; boundary('submitted')
+                    turn = 2; boundary('submitted', parts)
                     # Bracketed paste keeps newlines inside this one user message.
                     os.write(master, b'\x1b[200~' + config['prompts'][1].encode() + b'\x1b[201~')
                     time.sleep(.2)

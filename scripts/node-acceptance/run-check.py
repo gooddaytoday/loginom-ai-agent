@@ -2845,7 +2845,7 @@ class Runner:
                 matched_trees += 1
             assert matched_trees, 'TREE_SELECTED_READ_MISSING'
             self.current['tree-read'] = 'PASS'
-        cleanups = [read(p) for p in profile.rglob('saved-package-cleanup.json')]
+        cleanups = [read(p) for p in profile.rglob('package-cleanup.json' if spec.get('two_turn') else 'saved-package-cleanup.json')]
         acks = [read(p) for p in profile.rglob('runtime-close-*.json')]
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'

@@ -95,6 +95,7 @@ db.execute('create table part(id text,session_id text,message_id text,data text,
 def turn(n):
  db.execute('insert into message values(?,?,?,?)',(f'u{n}','chat',json.dumps(dict(role='user')),n*2))
  db.execute('insert into message values(?,?,?,?)',(f'a{n}','chat',json.dumps(dict(role='assistant',parentID=f'u{n}',finish='stop',time=dict(completed=time.time()))),n*2+1))
+ db.execute('insert into part values(?,?,?,?,?)',(f'p{n}','chat',f'a{n}',json.dumps(dict(type='tool',state=dict(status='completed',output=json.dumps(dict(execution=dict(execution_id=f'native-{n}')))))),n))
  db.commit()
 turn(1)
 assert 'second' in sys.stdin.readline()
@@ -109,6 +110,21 @@ assert '/exit' in sys.stdin.readline()
             turns=[e for _,e in runner.records(root/'turns.jsonl')]
             self.assertEqual([(t['turn'],t['event']) for t in turns],[(1,'submitted'),(1,'completed'),(2,'submitted'),(2,'completed')])
             self.assertEqual(len({t['cli_pid'] for t in turns}),1)
+            self.assertEqual(turns[1]['execution_ids'],['native-1'])
+            self.assertEqual(turns[3]['execution_ids'],['native-1','native-2'])
+
+    def test_transcript_polling_closes_database_descriptors(self):
+        import sqlite3
+        spec=importlib.util.spec_from_file_location('read_transport',runner.REPO/'scripts/node-acceptance/run-check-two-turn.py')
+        transport=importlib.util.module_from_spec(spec);spec.loader.exec_module(transport)
+        with tempfile.TemporaryDirectory() as directory:
+            profile=Path(directory);(profile/'data').mkdir()
+            db=sqlite3.connect(profile/'data/loginom-ai-agent.db')
+            db.executescript('create table message(id text,session_id text,data text,time_created integer); create table part(id text,session_id text,message_id text,data text,time_created integer);')
+            db.close()
+            before=len(list(Path('/proc/self/fd').iterdir()))
+            for _ in range(1100): self.assertEqual(transport.transcript(profile),([],[]))
+            self.assertLessEqual(len(list(Path('/proc/self/fd').iterdir())),before+2)
 
     def test_rest_simulation_uses_frozen_fixture_and_keeps_oracle_private(self):
         case = runner.scenario('rest-simulation')
