@@ -10,7 +10,7 @@ CSV прогнозов — `exports.text` от порта 0, `inputs:[{source:re
 <!-- mode: enter apply -->
 `enter` (пере)обучает. Прогноз новых данных: `mode:"apply"` того же обученного Enter-узла, прежние `input_fields`/`target_field`, `inputs:[]`, `finish:"execute"`; модель/настройки сохраняются без Teach.
 Последовательное обучение/тест — Enter, `linear_regression.partition:{method:"sequential",train_count:16,test_count:2}`. Размеры в строках: первые 16 обучают, следующие 2 только прогнозируются.
-Полная статистика: `mode:"enter"`, `linear_regression:{statistics:"full"}` — порт 1, девять native-столбцов с SE/t/p/95% границами и NULL. По умолчанию `statistics:"coefficients"`: Name и Y_coefficients.
+Полная статистика: `mode:"enter"`, `linear_regression:{statistics:"full"}` — порт 1, девять native-столбцов с SE/t/p/95% границами и NULL. По умолчанию `statistics:"coefficients"`: Name и Y_coefficients. Сводка без SE/t/p: `statistics:"coefficients"`.
 Категории: дискретная строка в `input_fields` и `linear_regression:{statistics:"full",normalization:[{field:"Category",method:"indicator",reference:"first"}]}`. Первый элемент native-списка — опорный, с видимым нулевым коэффициентом. Name повторяется; категории различает UniqueValues (string). Только Enter, без apply/других опорных значений; числовые поля не нормализуются.
 <!-- /mode -->
 
