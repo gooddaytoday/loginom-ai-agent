@@ -83,7 +83,9 @@ test('table reread uses only its confirmed Save continuation through the browser
  const saved=await runtime.run('package.save_checkpoint',{path:'/user/report.lgp',conflict_policy:'fail'},{operationId:'save'});
  assert.equal(saved.status,save.status,JSON.stringify(saved));
  f.crumb.textContent='Saved';f.crumb.getAttribute=()=>next.navigation_path.at(-1).tid;
- graphLabel='Renamed report';
+ // This fixture exercises workflow continuation, not a native rename gesture.
+ // Existing reads must preserve a changed caption; Execute retains its old label.
+ graphLabel=execution==='existing'?'Renamed report':'Report';
  await runtime.startNodeRead({operation_id:'reread',source_operation_id:'initial',execution});
  const result=await runtime.waitNodeApply('reread',{timeoutMs:1000});
  assert.equal(result.outcome.status,fault?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(result));
