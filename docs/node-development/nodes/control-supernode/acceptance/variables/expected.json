@@ -1,0 +1,52 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "control.supernode"
+    }
+  ],
+  "supernode_variables": [
+    {
+      "name": "Page",
+      "type": "integer",
+      "value": 99
+    },
+    {
+      "name": "Limit",
+      "type": "integer",
+      "value": 2
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "control.supernode",
+      "output_port": 0,
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Skip",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Page",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Limit",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Skip": 198,
+          "Page": 99,
+          "Limit": 2
+        }
+      ]
+    }
+  ]
+}

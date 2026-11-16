@@ -204,7 +204,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Фильтр строк и переменные | `transform.filter_data` / conditions, row_number | [читать](references/nodes/transform.filter_data.md) |
 | Ветвь по переменной, «Иначе» | `control.condition` / ports, variable_branch | [читать](references/nodes/control.condition.md) |
 |Цикл|`control.loop` /group_rows|[читать](references/nodes/control.loop.md)|
-|Подмодель|`control.supernode` /tabular_boundary|[читать](references/nodes/control.supernode.md)|
+|Подмодель|`control.supernode` /tabular_boundary, variable_boundary|[читать](references/nodes/control.supernode.md)|
 |Выход Подмодели|`control.supernode_output`|[читать](references/nodes/control.supernode_output.md)|
 | Группировка | `transform.group_data` / aggregate | [читать](references/nodes/transform.group_data.md) |
 |Таблица→переменные|`variables.from_table` / aggregate|[читать](references/nodes/variables.from_table.md)|

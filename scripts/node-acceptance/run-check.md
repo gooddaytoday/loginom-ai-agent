@@ -1073,6 +1073,14 @@ Case меняет регистр true→false; threads — максимум 1→
 Cold читает сохранённые ключи и literal максимум, закрывает мастер через Cancel,
 затем штатно выполняет сохранённый узел без настройки; Save/cleanup обязательны.
 
+`sorting-variant` uses the approved sorting `modes/task-variant.md` and only
+`fixtures/variant-wide.csv`. Scalar Import and Collapse retain all nine rows,
+including three NULLs. Frozen `expected-variant.json` is checked against the
+independent oracle; two executions of the same Sorting preserve exact native
+integer/real/string subtypes, Values/RowID/Names keys and disabled locale/case.
+Both ordered full typed outputs and CSVs, Save, cold without configuration and
+cleanup are required. Only task and CSV reach the model.
+
 `text-auto-types` и `text-auto-update` (Импорт из текстового файла, цикл 1) используют
 задания и expected из `docs/node-development/nodes/text-import/acceptance/extended`.
 Модели передаются только задание и `typed.csv` (для update — ещё `typed-update.csv`);
@@ -1252,6 +1260,15 @@ keeps RequestID=0 per iteration and the exact 98-byte httpbin response including
 its final LF. Both require full typed reads, CSV, Save, cold execution without
 configuration and confirmed cleanup. Only task and CSV reach the model; oracle
 and expected remain private. Regression: supernode-calc and rest-get-plain once.
+
+`supernode-vars` uses control-supernode/acceptance/variables/task.md without input
+files. Its independent oracle checks the original Page=99, Limit=2 body: Skip=198,
+exact integer Skip/Page/Limit order, full typed output and downloaded CSV.
+The existing Supernode audit requires InputNode variable links to both converter
+and Calculator, converter table → Calculator → OutputNode, and retained integer
+definition IDs/values and input-port GUID across Save/cold. Only task reaches
+the model; no Loop or XML oracle is involved. Cold uses owned port inspection
+with Close, then stock execution/export checks and confirmed package/logout cleanup.
 
 `node-delete` (LAB-1721): approved `graph/node-delete/acceptance/node-delete/task.md`
 and only sales.csv. Four nodes Import → Row Filter «Крупные продажи» → Sorting →
