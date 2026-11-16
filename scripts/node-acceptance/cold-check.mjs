@@ -204,7 +204,7 @@ page = context.pages()[0]
     Date.now() + 30_000,
   )
   if(expected.nodes.some(n=>n.type==='control.supernode')&&expected.outputs.some(o=>o.output_node_type==='control.supernode'))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
-   platform:compatibilityPlatform,makeWorkspacePrepareCode,record});
+   platform:compatibilityPlatform,makeWorkspacePrepareCode,record,expected});
   await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
@@ -489,7 +489,7 @@ page = context.pages()[0]
    data=read.output;
   }
   // Variant cells have no exact table-visualizer proof; read them through the completed port.
-  const variantPortRead=['transform.replace_columns','transform.group_data'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
+  const variantPortRead=['transform.replace_columns','transform.group_data','transform.sorting'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
   if(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
@@ -634,6 +634,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
     ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
     ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),
     ...(state.bindingInventory?{binding_inventory:state.bindingInventory}:{}),
