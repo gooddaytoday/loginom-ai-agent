@@ -80,7 +80,8 @@ export async function excelConfigureCapability(page,t,readContext){
    }
   }else{
   const pathInput=find(file+'edtFileName;ValueControl').locator('input');
-  if(await pathInput.inputValue()!==want)await fill(pathInput,want,true);
+  const saved=await pathInput.inputValue();
+  if(saved!==want)await fill(pathInput,want,saved.includes('｜'));
   }
   if(!t.preserve||t.excel.sheet_name!==undefined){
   await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.named_range!==undefined?'Именованный диапазон':t.excel.sheet_name===undefined?'По номеру':'По имени');
