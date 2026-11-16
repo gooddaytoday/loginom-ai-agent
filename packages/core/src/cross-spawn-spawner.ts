@@ -388,17 +388,38 @@ export const make = Effect.gen(function* () {
                 if (code !== 0 && Predicate.isNotNull(code)) return yield* Effect.ignore(kill(killGroup))
                 return yield* Effect.void
               }
+              // Exit can precede close indefinitely when inherited stdio stays open.
+              // Bound only the drain after exit; a live process must still be killed and reaped.
+              const exited = Effect.callback<void>((resume) => {
+                if (proc.exitCode !== null || proc.signalCode !== null) return resume(Effect.void)
+                const onExit = () => resume(Effect.void)
+                proc.once("exit", onExit)
+                return Effect.sync(() => {
+                  proc.off("exit", onExit)
+                })
+              })
+              const closed = Deferred.await(signal).pipe(
+                Effect.timeoutOrElse({
+                  duration: "2 seconds",
+                  orElse: () =>
+                    Effect.sync(() => {
+                      for (const stream of proc.stdio) stream?.destroy()
+                    }),
+                }),
+                Effect.asVoid,
+              )
+              if (proc.exitCode !== null || proc.signalCode !== null) return yield* closed
               const send = (s: NodeJS.Signals) =>
                 Effect.catch(killGroup(command, proc, s), () => killOne(command, proc, s))
               const sig = command.options.killSignal ?? "SIGTERM"
-              const attempt = send(sig).pipe(Effect.andThen(Deferred.await(signal)), Effect.asVoid)
+              const attempt = send(sig).pipe(Effect.andThen(exited))
               const escalated = command.options.forceKillAfter
                 ? Effect.timeoutOrElse(attempt, {
                     duration: command.options.forceKillAfter,
-                    orElse: () => send("SIGKILL").pipe(Effect.andThen(Deferred.await(signal)), Effect.asVoid),
+                    orElse: () => send("SIGKILL").pipe(Effect.andThen(exited)),
                   })
                 : attempt
-              return yield* Effect.ignore(escalated)
+              return yield* Effect.ignore(escalated.pipe(Effect.andThen(closed)))
             }),
           )
 

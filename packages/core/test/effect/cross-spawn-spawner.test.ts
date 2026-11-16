@@ -229,6 +229,49 @@ describe("cross-spawn spawner", () => {
   })
 
   describe("process control", () => {
+    fx.live(
+      "releases an exited process while inherited stdio prevents close",
+      Effect.gen(function* () {
+        if (process.platform === "win32") return
+
+        const tmp = yield* Effect.acquireRelease(
+          Effect.promise(() => tmpdir()),
+          (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+        )
+        const marker = path.join(tmp.path, "descendant")
+        const descendant = yield* Effect.acquireRelease(
+          Effect.sync(() => ({ pid: 0 })),
+          (child) =>
+            Effect.sync(() => {
+              if (child.pid && alive(child.pid)) process.kill(child.pid, "SIGKILL")
+            }),
+        )
+        const released = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const handle = yield* js(
+              [
+                'const { spawn } = require("node:child_process")',
+                'const fs = require("node:fs")',
+                'const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 8000)"], { detached: true, stdio: ["ignore", 1, 2] })',
+                "child.unref()",
+                `fs.writeFileSync(${JSON.stringify(marker)}, String(child.pid))`,
+                "setInterval(() => {}, 1000)",
+              ].join("; "),
+            )
+            while (!descendant.pid) {
+              descendant.pid = Number(yield* Effect.promise(() => fs.readFile(marker, "utf8").catch(() => "0")))
+              if (!descendant.pid) yield* Effect.sleep("10 millis")
+            }
+            return { pid: Number(handle.pid), started: Date.now() }
+          }),
+        )
+        expect(yield* Effect.promise(() => gone(released.pid))).toBe(true)
+        expect(Date.now() - released.started).toBeLessThan(4_000)
+        expect(alive(descendant.pid)).toBe(true)
+      }),
+      15_000,
+    )
+
     fx.effect(
       "kills a running process",
       Effect.gen(function* () {
