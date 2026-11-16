@@ -317,6 +317,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name in ['import-server-nodownload', 'import-server-wide']:
+        src = REPO / 'scripts/node-acceptance/scenarios' / name
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    external=True, native_server_import=True, text_list_sources=True,
+                    input_files=['large.csv' if name == 'import-server-nodownload' else 'transactions.txt'],
+                    oracle=src.parent / 'import-server-oracle.py')
     if name == 'text-autodetect-types':
         root = REPO / 'docs/node-development/nodes/text-import/acceptance/autodetect'
         return dict(source=root, prompt=root / 'task.md', data=root / 'data', base=None,
@@ -2193,7 +2199,9 @@ class Runner:
                     for item in value.values(): destinations(item)
                 if isinstance(value, list):
                     for item in value: destinations(item)
-            for journal in folder.glob('*/model.stdout'):
+            # Native server fixtures have one exact, privately seeded name;
+            # an exported CSV can have identical bytes without being an upload.
+            for journal in ([] if self.current.get('native_server_fixture') else folder.glob('*/model.stdout')):
                 for _, event in records(journal):
                     part = event.get('part', {})
                     state = part.get('state', {})
@@ -2202,7 +2210,8 @@ class Runner:
                     except (ValueError, TypeError): continue
                     destinations(reply)
             config = folder / 'dataset-cleanup-config.json'
-            write(config, dict(login=login, names=sorted(names)))
+            write(config, dict(login=login, names=sorted(names),
+                               **(dict(native_server_import=True) if self.current.get('native_server_fixture') else {})))
             self.phase('dataset-cleanup', [build / 'resources/loginom/bin/node',
                        REPO / 'scripts/node-acceptance/d87-cleanup.mjs', build / 'resources/loginom',
                        config, folder / 'dataset-cleanup'], folder, timeout=180)
@@ -2299,6 +2308,19 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('native_server_import'):
+            spec['data'] = folder / 'server-inputs'
+            source = spec['data'] / spec['input_files'][0]
+            name = 'native-import-' + hashlib.sha256(str(folder).encode()).hexdigest()[:20] + source.suffix
+            owned = source.with_name(name)
+            self.current.update(dataset=str(owned), native_server_fixture=True)
+            self.phase('server-inputs', [sys.executable, '-B', spec['oracle'], '--generate', spec['data'],
+                       '--case', case], folder, timeout=60)
+            source.rename(owned)
+            prompt = prompt.replace(source.name, owned.name)
+            spec['input_files'] = [owned.name]
+            (folder.parent / 'fixtures').mkdir(exist_ok=True)
+            write(folder.parent / 'fixtures/manifest.json', dict(bytes=owned.stat().st_size))
         if spec.get('prepared_table_source'):
             prompt += f'\nПодготовка источника: новый собственный пакет уже создан для этой попытки по пути {package}. Открой его; исходная таблица {spec["prepared_table_source"]} содержит запрошенные When и Value с заданными native типами. Не заменяй её новым импортом rows.csv: CSV служит описанием исходных строк.'
         if spec.get('fs_case'):
@@ -2485,7 +2507,8 @@ class Runner:
             # the existing verified delivery protocol, rejecting unequal files.
             seeds = [spec['data'] / name for name in spec['seed_files']] if spec.get('seed_files') else files
             books = [dict(fixture=str(f), destination=source_dir + '/' + f.name) for f in seeds]
-            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books))
+            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books,
+                  **(dict(native_server_import=True) if spec.get('native_server_import') else {})))
             self.phase('text-list-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
                        build / 'resources/loginom', folder / 'text-list-inputs.json', folder / 'text-list-inputs'], folder, timeout=300)
             prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
@@ -3124,6 +3147,22 @@ class Runner:
             formats = [owner['configuration']['readback']['format'] for _, reply in replies for owner, _ in ports(reply)
                        if owner.get('status') == 'SUCCEEDED' and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
             assert formats and formats[0].get('variant_as_general_type') is True and formats[-1].get('variant_as_general_type') is False, 'TEXT_VARIANT_TOGGLE_READBACK'
+        if spec.get('native_server_import'):
+            calls = [event['part'] for _, event in events if event.get('type') == 'tool_use']
+            if case == 'import-server-nodownload':
+                assert not any(re.search(r'storage_download|artifact_deliver|file_(?:profile|scan|sample)',
+                                         call.get('tool', '')) for call in calls), 'SERVER_IMPORT_DOWNLOADED_OR_DELIVERED'
+            imports = [(owner, port) for _, reply in replies for owner, port in ports(reply)
+                       if owner.get('status') == 'SUCCEEDED'
+                       and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'
+                       and port.get('port') == 0]
+            assert imports, 'SERVER_IMPORT_PORT_MISSING'
+            wanted = read(src / 'expected.json')['server_import']
+            assert any(port_path(owner, port) and port.get('row_count') == wanted['records']
+                       and [(c.get('name'), c.get('type')) for c in port.get('schema', [])]
+                       == [(c['name'], c['type']) for c in wanted['columns']]
+                       for owner, port in imports), 'SERVER_IMPORT_COUNT_OR_TYPES'
+            self.current['native_server_import'] = 'PASS'
         if spec.get('text_update'):
             check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):
