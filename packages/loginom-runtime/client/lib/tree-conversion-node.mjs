@@ -83,7 +83,7 @@ export function createTreeConversionNodeSupport(config,{table}){
       await observe('conversion node label');if(s.node_tree.editor.label!==node.label)await fill('EditDataTreeNodeDefForm;edtDisplayName',node.label);
       if(node.type!=='object'){
        await act('EditDataTreeNodeDefForm;cbxDataType;trg_picker');
-       await act('EditDataTreeNodeDefForm;cbxDataType;boundlist;'+{integer:'Целый',real:'Вещественный',string:'Строковый',boolean:'Логический'}[node.type]);
+       await act('EditDataTreeNodeDefForm;cbxDataType;boundlist;'+{integer:'Целый',real:'Вещественный',string:'Строковый',boolean:'Логический',datetime:'Дата/Время',variant:'Переменный'}[node.type]);
       }
       for(const [key,wanted] of [['chbIsContainer',node.type==='object'],['chbIsArray',node.is_array]]){
        await observe('conversion node flags');const actual=key==='chbIsContainer'?s.node_tree.editor.is_container:s.node_tree.editor.is_array;
@@ -122,7 +122,7 @@ export function createTreeConversionNodeSupport(config,{table}){
   async readOutputs(channel,read,ctx){
    need(same(read.ports,[0]),'Conversion reads output 0');
    const {output}=await channel.readOutputPort({port:0,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:true});
-   if(table)validateSerializationTree(output);
+   if(table)validateSerializationTree(output,true);
    else need(output.port_kind!=='tree'&&output.sample_complete===true&&output.row_count===1&&output.schema?.length===1&&output.schema[0].type==='string','Serialization requires the complete one-row JSON string');
    return {verified:true,cleanup_complete:true,effect_possible:true,status:'complete',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]};
   },
