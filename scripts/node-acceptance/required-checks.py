@@ -140,7 +140,7 @@ RULES = (
       'tree-null-leaves', 'tree-nested-records', 'tree-empty-containers', 'tree-dates', 'tree-scalar-arrays',
       'table-tree-dates-variant')),
     ((C + 'exports-excel-*.mjs', 'scripts/node-acceptance/exports-excel*.mjs'), ('live-ui',), ('exports-excel', 'excel-export-xls', 'excel-export-numeric', 'excel-export-replace')),
-    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named', 'excel-import-binding')),
+    ((C + 'imports-excel-*.mjs', 'docs/node-development/nodes/imports-excel/acceptance/**', 'scripts/node-acceptance/imports-excel-named.mjs'), ('live-ui',), ('excel-import-sheet', 'excel-import-wide', 'excel-import-single', 'excel-import-columns', 'excel-import-headers', 'excel-import-boolean', 'excel-import-named', 'excel-import-binding', 'excel-import-multi', 'excel-import-parallel')),
     ((C + 'lgd-*.mjs', 'docs/node-development/nodes/imports-lgd/acceptance/**',
       'docs/node-development/nodes/exports-lgd/acceptance/**'), ('live-ui', 'cold-export'),
      ('lgd-import', 'lgd-properties', 'lgd-corrupt', 'lgd-export')),
