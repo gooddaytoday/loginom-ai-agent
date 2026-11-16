@@ -307,9 +307,15 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     job.status=!cleanup?'uncertain':cancelled?'cancelled':'failed';job.phase=job.status;
     const code=!cleanup?'LOGINOM_UPLOAD_UNCERTAIN':cancelled?'LOGINOM_UPLOAD_CANCELLED':error.code==='UPLOAD_PATH_CONFLICT'?'UPLOAD_PATH_CONFLICT':error.message==='LOGINOM_FILE_CHANGED'?'LOGINOM_FILE_CHANGED':'LOGINOM_UPLOAD_FAILED';
     job.error={code,message:code};job.outcome={status:cleanup?'FAILED':'AMBIGUOUS',code,cleanup_complete:cleanup,effect_possible:!cleanup,upload_completion_verified:false};
-    if(code==='UPLOAD_PATH_CONFLICT')Object.assign(job.outcome,{destination:artifact.upload.destination,upload_operation_id:job.uploadId,upload_submitted:false,
-     next_step:{tool:'dock_storage_download_start',instruction:'Observe the existing destination file with dock_storage_source, then use storage_download_start and wait to compare its sha256 with the local artifact. Only if the hashes match, use the verified server file as the import source. Do not overwrite it.'}});
-    try{await acknowledge(job,'large_upload_'+job.status,{result:job.outcome});}catch{job.status='uncertain';job.phase='uncertain';job.error={code:'LOGINOM_UPLOAD_UNCERTAIN',message:'LOGINOM_UPLOAD_UNCERTAIN'};job.outcome={...job.outcome,status:'AMBIGUOUS',code:'LOGINOM_UPLOAD_UNCERTAIN',cleanup_complete:false,effect_possible:true};}
+    if(code==='UPLOAD_PATH_CONFLICT'){
+     const localHash=typeof artifact.sha256==='string'&&/^[a-f0-9]{64}$/.test(artifact.sha256);
+     Object.assign(job.outcome,{destination:artifact.upload.destination,upload_operation_id:job.uploadId,upload_submitted:false,...(localHash?{sha256:artifact.sha256}:{}),
+      next_step:{tool:'loginom_dock_storage_source',instruction:'Call loginom_dock_storage_source with this destination path, then loginom_dock_storage_download_start with its server_source_ref and loginom_dock_storage_download_wait with the same operation_id. Take the sha256 of the downloaded copy from loginom_file_scan'
+       +(localHash?' and compare it with sha256 of the local artifact in this outcome.':' and compare it with the sha256 of the local artifact file from loginom_file_scan.')
+       +' Only if the hashes match, use the verified server file as the import source. If they differ, stop and tell the user. Never overwrite or delete the server file.'}});
+    }
+    try{await acknowledge(job,'large_upload_'+job.status,{result:job.outcome});}catch{job.status='uncertain';job.phase='uncertain';job.error={code:'LOGINOM_UPLOAD_UNCERTAIN',message:'LOGINOM_UPLOAD_UNCERTAIN'};
+     const {next_step:_,...retained}=job.outcome;job.outcome={...retained,status:'AMBIGUOUS',code:'LOGINOM_UPLOAD_UNCERTAIN',cleanup_complete:false,effect_possible:true};}
     return snapshot(job);
    }
    // A known Skip wrote nothing. If its current bytes cannot be compared,

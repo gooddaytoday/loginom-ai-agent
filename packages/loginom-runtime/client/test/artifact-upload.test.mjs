@@ -309,12 +309,12 @@ test('delivery-owned recovery names public delivery continuation instead of hidd
  assert.equal(resume.arguments.operation_id,'delivery');
 });
 
-for(const fault of [null,'owner','phase','effect','cleanup','submission','code'])test('large runtime propagates only an owned no-effect path conflict: '+fault,async()=>{
+for(const fault of [null,'owner','revision','phase','effect','cleanup','submission','code'])test('large runtime propagates only an owned no-effect path conflict: '+fault,async()=>{
  const f=fixture();f.artifact.bytes=17*1024*1024;f.artifact.upload.overwrite='reject';
  const rt=runtime(f.page,{artifactStore:f.store,getStorageBinding:()=>({document_id:'prep',loginom_account:'operator'}),
   onRecord:async e=>e,execute:async code=>{
    if(!code.includes('largeUploadNative'))return f.page.execute(code);
-   return {status:'FAILED',action_key:'artifact.large.native',action_revision:'1',operation_id:fault==='owner'?'other':'conflict',
+   return {status:'FAILED',action_key:'artifact.large.native',action_revision:fault==='revision'?'2':'1',operation_id:fault==='owner'?'other':'conflict',
     phase:fault==='phase'?'poll':'bind',effect_possible:fault==='effect',cleanup_complete:fault!=='cleanup',
     output:{conflict_rejected:true,upload_submitted:fault==='submission'},error:{code:fault==='code'?'LOGINOM_UPLOAD_UNCERTAIN':'UPLOAD_PATH_CONFLICT'}};
   }});
