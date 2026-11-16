@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import test from 'node:test';
+
+test('native server cases seed full files privately and retain CSV/Save/cold expectations',()=>{
+ const result=spawnSync('python3',['-B','-c',`
+import csv, importlib.util, json, runpy, subprocess, sys, tempfile
+from pathlib import Path
+from unittest.mock import patch
+s=importlib.util.spec_from_file_location('runner','scripts/node-acceptance/run-check.py')
+r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+for name in ['import-server-nodownload','import-server-wide']:
+ c=r.scenario(name);e=r.expected_for(c,'/own/test.lgp')
+ assert e==r.expected_for(c,'/own/test.lgp',cold=True)
+ subprocess.run([sys.executable,'-B',str(c['oracle']),'--case',name,'--check'],check=True)
+ with tempfile.TemporaryDirectory() as directory:
+  root=Path(directory);folder=root/'stage';folder.mkdir();workspace=root/'workspace';workspace.mkdir()
+  instance=r.Runner.__new__(r.Runner)
+  instance.out,instance.env,instance.options,instance.current=root,{},{},{}
+  def phase(phase,command,*args,**kwargs):
+   if phase=='server-inputs': subprocess.run(list(map(str,command)),check=True)
+   if phase=='model':
+    assert not list(workspace.iterdir()),'Server fixture leaked to model workspace'
+    assert '--file' not in command,'Server fixture became an attachment'
+    assert '/own/'+c['input_files'][0] in command[-1]
+    raise InterruptedError
+  with patch.object(instance,'phase',side_effect=phase):
+   try: instance.model(name,folder,root/'profile',workspace,'/own/test.lgp',{'package_directory':'/own'},root/'build')
+   except InterruptedError: pass
+   else: raise AssertionError('Model not reached')
+  path=Path(instance.current['dataset'])
+  with path.open(newline='') as handle:
+   rows=csv.reader(handle,delimiter=',' if name.endswith('nodownload') else '\\t')
+   header=next(rows);count=sum(1 for _ in rows)
+  assert count==e['server_import']['records']
+  assert header==[col['name'] for col in e['server_import']['columns']]
+  assert json.loads((root/'fixtures/manifest.json').read_text())['bytes']==path.stat().st_size
+  assert len(header)==(3 if name.endswith('nodownload') else 13)
+`],{encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});

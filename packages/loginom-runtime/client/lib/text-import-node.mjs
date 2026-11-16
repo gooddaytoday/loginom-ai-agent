@@ -38,16 +38,17 @@ export function serverPreviewProfile({source,format,columns,preview}) {
   const profile={format:'csv',coverage:'preview',status:'partial',encoding:{name:settings.encoding,basis:'wizard_display'},
     dialect,columns:columns.slice(0,8).map(c=>({index:c.index,name:c.name,label:c.label,type:c.type,data_kind:c.data_kind,used:c.used})),
     column_count:columns.length,columns_omitted:Math.max(0,columns.length-8),
-    preview:{...preview,rows:preview.rows.slice(0,25).map(row=>row.slice(0,8))},
+    ...(columns.length>8?{column_names:columns.slice(0,64).map(c=>c.name),column_names_omitted:Math.max(0,columns.length-64)}:{}),
+    preview:{...preview,rows:preview.rows.slice(0,25).map(row=>row.slice(0,8)),
+      observed_records:Math.min(25,preview.rows.length),complete:false},
     limitations:['wizard_preview_only','rendered_display_values','no_full_count','no_sha256','rare_types_not_validated']};
   // Leave room for the compact control receipt and both MCP JSON copies.
   while(Buffer.byteLength(JSON.stringify(profile),'utf8')>2200){
-    if(profile.preview.rows.length){profile.preview.rows.pop();continue;}
+    if(profile.preview.rows.length){profile.preview.rows.pop();profile.preview.observed_records=profile.preview.rows.length;continue;}
     if(profile.columns.length){profile.columns.pop();profile.columns_omitted++;continue;}
+    if(profile.column_names?.length){profile.column_names.pop();profile.column_names_omitted++;continue;}
     throw Error('Server preview metadata exceeds the profile budget');
   }
-  profile.preview.observed_records=profile.preview.rows.length;
-  profile.preview.complete=false;
   return profile;
 }
 
