@@ -905,7 +905,16 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       const actionable=tids.filter(t=>{charge();const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body)
         || labels.some(label=>body===label || body===label+';Label;Label' || body===label+';Setting'
           || body.startsWith(label+';') && /;(?:Input|Output)_[^;]+$/.test(body));});
-      if(new Set(actionable).size!==actionable.length)throw new Error('Duplicate actionable graph identifiers');
+      const seen=new Set(),duplicates=[];for(const t of actionable){if(seen.has(t)&&!duplicates.includes(t))duplicates.push(t);seen.add(t);}
+      // Name the first duplicates with owner chain, geometry and style so a
+      // live refusal is diagnosable from the journal alone. Still a refusal.
+      if(duplicates.length){
+        const describe=e=>{const b=e.getBoundingClientRect(),s=getComputedStyle(e),chain=[];
+          for(let p=e.parentElement;p && p!==element && chain.length<3;p=p.parentElement){charge();const t=p.getAttribute?.('data-tid');if(t)chain.push(t.startsWith(native)?'~'+t.slice(native.length):t);}
+          return `${String(e.tagName??'?').toLowerCase()}@${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)}x${Math.round(b.height)} ${s.display}/${s.visibility}/${s.opacity??''} <${chain.join('<')}`;};
+        throw new Error(('Duplicate actionable graph identifiers: '+duplicates.slice(0,3).map(t=>{const items=graph.filter(e=>e.getAttribute('data-tid')===t);
+          return t+' x'+items.length+' {'+items.slice(0,2).map(describe).join('; ')+'}';}).join(' | ')).slice(0,1600));
+      }
       return {native_prefix:native,nodes:labels.map(label=>({label,ports:tids.filter(t=>t.startsWith(native+label+';') && /;(?:Input|Output)_[^;]+$/.test(t)).sort()})),
         links:tids.filter(t=>{const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body);}).sort()};
     },prefix);

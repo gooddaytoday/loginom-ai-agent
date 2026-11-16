@@ -401,6 +401,12 @@ Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
 Only the task and `fixtures/variables.csv` reach the model. The update task
 changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 
+`calculator-vars-saveas` (LAB-1729) uses `scenarios/calculator-vars-saveas/task.md`: the
+same Calculator Var.Amount task (value 11), then Save As with reopen and continued work
+in the reopened package. Checks `calculator/acceptance/expected.json`, stock CSV/Save/cold,
+a confirmed `save_as` receipt with `reopened:true` and an accepted
+`reopened_package_cleanup_binding` for the saved path (#986 cleanup branch).
+
 `calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
 `modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
 
