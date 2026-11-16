@@ -343,14 +343,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ["0.4.0", "0.4.1"]
+        include:
+          - { version: "0.4.0", fixture: true, kind: fixture }
+          - { version: "0.4.1", fixture: true, kind: fixture }
+          - { version: "0.4.0", fixture: false, kind: manual }
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       LOGINOM_AI_AGENT_CHANNEL: prod
       LOGINOM_AI_AGENT_VERSION: ${{ matrix.version }}
-      LOGINOM_AI_AGENT_UPDATE_TEST_BUILD: "1"
-      LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: ${{ inputs.updater-public-key }}
+      LOGINOM_AI_AGENT_UPDATE_TEST_BUILD: ${{ matrix.fixture && '1' || '0' }}
+      LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: ${{ matrix.fixture && inputs.updater-public-key || '' }}
       LOGINOM_AI_AGENT_UPDATE_FEED: "https://updates-loginom.s3.cloud.ru/dryrun-040/"
       LOGINOM_AI_AGENT_UPDATE_GITHUB_API: ""
       LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: ""
@@ -371,7 +374,7 @@ jobs:
       - name: Build isolated updater fixture
         shell: pwsh
         run: |
-          if (-not $env:LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY) { throw "Fixture public key required" }
+          if ($env:LOGINOM_AI_AGENT_UPDATE_TEST_BUILD -eq '1' -and -not $env:LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY) { throw "Fixture public key required" }
           & ./script/build-windows.ps1 -Product Desktop -OutputDirectory "$env:RUNNER_TEMP/updater" -NodeSource $env:LOGINOM_AI_AGENT_NODE_SOURCE -BrowserSource $env:LOGINOM_AI_AGENT_BROWSER_SOURCE -Channel prod
       - name: Verify fixture source and installed payload
         shell: pwsh
@@ -389,11 +392,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Installed smoke regression failed" }
           & ./packages/desktop/test/loginom/windows-installed-smoke.ps1 -Installer $installer.FullName -RunRoot "$env:RUNNER_TEMP/updater/smoke" -ExpectedVersion $env:LOGINOM_AI_AGENT_VERSION -Channel prod -AllowServer -KeepProxy
           if ($LASTEXITCODE -ne 0) { throw "Installed fixture smoke failed" }
-          @{ commit=$env:GITHUB_SHA; version=$env:LOGINOM_AI_AGENT_VERSION; fixture=$true; sha256=(Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); bytes=$installer.Length; publicKey=$env:LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/updater/fixture.json" -Encoding utf8
+          @{ commit=$env:GITHUB_SHA; version=$env:LOGINOM_AI_AGENT_VERSION; fixture=($env:LOGINOM_AI_AGENT_UPDATE_TEST_BUILD -eq '1'); sha256=(Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); bytes=$installer.Length; publicKey=$env:LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/updater/fixture.json" -Encoding utf8
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: loginom-updater-fixture-${{ matrix.version }}
+          name: loginom-updater-${{ matrix.kind }}-${{ matrix.version }}
           path: |
             ${{ runner.temp }}/updater/desktop/*-win-x64.exe
             ${{ runner.temp }}/updater/fixture.json
