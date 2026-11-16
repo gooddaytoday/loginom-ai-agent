@@ -34,7 +34,7 @@ NULL отдельно от пустой строки, false и нуля. `trees.
 Даты `trees.from_json` — `YYYY-MM-DDThh:mm:ss`:
 лист `datetime`, типизированный NULL, civil `YYYY-MM-DDTHH:MM:SS.mmm`,
 `precision:"millisecond"`, `representation:"local_datetime"`. Не сдвигай время
-через UTC. `trees.to_table` даты пока не принимает.
+через UTC. `trees.to_table` даёт из них колонку DateTime.
 
 Смешанные скаляры одного поля дают лист `variant`: `cell_type`
 сохраняет подтип integer/real/string/boolean/datetime/null, `precision:"exact_native"`
