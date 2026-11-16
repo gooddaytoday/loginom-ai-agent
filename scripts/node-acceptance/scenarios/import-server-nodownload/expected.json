@@ -11,7 +11,6 @@
  "outputs": [
   {
    "output_node_type": "export_input",
-   "output_port": 0,
    "ordered": false,
    "column_order": "any",
    "columns": [

@@ -3,6 +3,19 @@ import {spawnSync} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
 import {runInNewContext} from 'node:vm';
 import test from 'node:test';
+import {parseExpectedOutputs} from '../expected-outputs.mjs';
+
+test('native server cold oracles pass the production parser after destination binding',async()=>{
+ for(const name of ['import-server-nodownload','import-server-wide']){
+  const expected=JSON.parse(await readFile(new URL('../scenarios/'+name+'/expected.json',import.meta.url),'utf8'));
+  expected.package_path='/own/run.lgp';
+  for(const output of expected.outputs){
+   if(output.output_node_type==='export_input')output.export_destination='/own/'+output.export_destination;
+   else delete output.export_destination;
+  }
+  assert.doesNotThrow(()=>parseExpectedOutputs(expected),name);
+ }
+});
 
 test('native server cases seed full files privately and retain CSV/Save/cold expectations',()=>{
  const result=spawnSync('python3',['-B','-c',`
