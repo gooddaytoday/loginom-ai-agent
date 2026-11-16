@@ -102,12 +102,13 @@ export async function configureSupernodeVariablesBrowser(page,t,readNode,openPor
  };
 
  const guard=async(dialog=false)=>{
+  for(;;){
   remaining();const n=await readNode(page,b);need(n.verified&&n.surface==='wizard'&&n.input_port?.port===0,'owned variable wizard required');
   const values=await inspect();
   if(draft){need(values.definitions.length===retained.definitions.length+1&&values.port_guid===retained.port_guid
    &&retained.definitions.every((d,i)=>JSON.stringify(d)===JSON.stringify(values.definitions[i])),'retained definitions changed during Add');
    draft.id??=values.definitions.at(-1).id;}
-  need(await page.evaluate(({root,dialog})=>{
+  if(await page.evaluate(({root,dialog})=>{
    const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
    const roots=exact(root),ds=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible),edit=exact('EditTuneVariableForm').filter(visible);
    const active=edit.length===1&&Ext.getCmp(edit[0].id);
@@ -118,7 +119,11 @@ export async function configureSupernodeVariablesBrowser(page,t,readNode,openPor
      &&roots[0]?.contains(parent)&&c?.el.dom===parent&&c.disabled===true);
    });
    return !masks.length&&(dialog?edit.length===1&&ds.length===1&&ds[0]===edit[0]&&Ext.getCmp(edit[0].id)?.$className==='bg.wizards.variables.view.EditVariableForm':!ds.length);
-  },{root,dialog}),'foreign dialog or mask');
+  },{root,dialog}))return;
+  // An applied editor can disappear before its native modal mask retires.
+  // Recheck the same owner and definitions; never act through that mask.
+  await page.waitForTimeout(Math.min(100,remaining()));
+  }
  };
  const click=async(tid,dialog=false)=>{await guard(dialog);need(await at(tid).count()===1,'unique control required');await at(tid).click({trial:true,timeout:remaining()});await guard(dialog);effect=true;await at(tid).click({timeout:remaining()});};
  try{

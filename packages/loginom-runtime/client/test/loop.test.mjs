@@ -9,10 +9,26 @@ import {validateActionParameters} from '../lib/action-catalog.mjs';
 import {selectLoopBodyRecord,loopSettingsSupported,readLoopSourceBrowser} from '../lib/loop-procedure.mjs';
 import vm from 'node:vm';
 import {loopConfigurationReadback} from '../lib/loop-readback.mjs';
+import {createLoopNodeSupport} from '../lib/loop-node.mjs';
 
 const body={document_id:'doc',workflow_id:'wf',node_id:'body'};
 const request={operation_id:'loop',contract_revision:'1.0.0',document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},target:{kind:'new',type:'control.loop'},inputs:[],parameters:{body},mode:'group_rows',mappings:[],finish:'done',read:{ports:[],sample_rows:0,require_exact_numbers:true},budgets:{configure_ms:60000,execute_ms:60000,total_ms:180000}};
 const forParameters={body,count:3,variable:{port_guid:'input-guid',definition_id:7},iteration_identifiers:true};
+test('FOR preflight accepts the observed NW1 variable port object, never an ordinal or control port',async()=>{
+ // live1 main execution-events.jsonl:632–635: NW1 variable_inputs are objects.
+ const port={kind:'variables',port:0,port_guid:'input-guid',native_index:0};
+ const node={ref:body,type:'control.supernode',inputs:[],outputs:[0],variable_inputs:[port],variable_outputs:[],other_ports:['Input_Var-0']};
+ for(const inputs of [[port],[0],[{...port,kind:'control'}],[{...port,port:1}],[{...port,port_guid:'foreign'}],[port,{...port,port:1}]]){
+  let calls=0;
+  const operation={parameters:{...request,mode:'for',parameters:forParameters},nodeTargetAdapter:{observe:async()=>({complete:true,nodes:[{...node,variable_inputs:inputs}]})}};
+  const driver=createLoopNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'}).nodeApplyDriverFactory({operation,execute:async()=>{
+   calls++;return calls===1?{status:'SUCCEEDED',cleanup_complete:true,variable_boundary:{port_guid:'input-guid',kind:'variables',native_index:0,definitions:[{id:7,index:0,name:'Page',type:'integer',value:99,is_null:false}]}}:{mode:'for',ports:[]};
+  }});
+  const run=()=>driver.verifySource({}, {deadline:Date.now()+60000});
+  if(inputs[0]===port&&inputs.length===1){assert.equal((await run()).verified,true);assert.equal(calls,2);}
+  else{await assert.rejects(run,/Supernode/);assert.equal(calls,0,'unsupported port must refuse before opening a source wizard');}
+ }
+});
 test('FOR reaches the production handler with an observed variable definition identity',()=>{
  const handlers=createCandidateNodeSupport({}).nodeApplyHandlers;
  const r={...request,mode:'for',parameters:forParameters};

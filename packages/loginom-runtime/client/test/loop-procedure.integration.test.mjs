@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
 import vm from 'node:vm';
 import {configureLoopBrowser,selectLoopBodyRecord,loopSettingsSupported,readSavedLoopForBrowser} from '../lib/loop-procedure.mjs';
+import {configureSupernodeVariablesBrowser} from '../lib/supernode-procedure.mjs';
 
 const root='MF;TF-1;WizrdMCF',first=root+';LoopNodeWizard',params=root+';LoopParamsWizard';
 async function fixture(t,{loading=false,unrendered=false,mask=false,dialog=false,disabledGrid=false,foreignMask=false,forMode=false,identifiers=true}={}){
@@ -119,4 +120,39 @@ test('saved FOR inspection reads persisted count, native variable and identifier
   parameters:{count:3,iteration_identifiers:true,variable:{port_guid:'input',definition_id:7}}});
  assert.equal(saved.count,3);assert.equal(saved.variable.definition_id,7);assert.equal(saved.variable.name,'Page');assert.equal(saved.iteration_identifiers,true);
  assert.equal((await f.page.evaluate(()=>gestures.length))-before,1,'only Next, without reconfiguration');
+});
+
+test('saved FOR inspection awaits the complete native variable store on PageEnter',async t=>{
+ const f=await fixture(t,{forMode:true}),out=await f.run();assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));
+ await f.page.evaluate(()=>{
+  const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+  const p=c.FWizardItems.FItems.find(i=>i.FWizard.constructor.name==='LoopParamsWizard').FWizard;
+  const store=p.FInputVariablesStore,combo=p.FItems.cbxLoopVariable,records=store.getData().items,selected=combo.getSelection(),readyAt=Date.now()+600;
+  store.getData=()=>({items:Date.now()>=readyAt?records:[]});store.getCount=()=>Date.now()>=readyAt?records.length:0;
+  combo.getSelection=()=>Date.now()>=readyAt?selected:null;
+ });
+ const saved=await readSavedLoopForBrowser(f.page,{binding:{workflow_ref:{prefix:'MF;TF-1'}},deadline:Date.now()+10000,
+  source:{variables:{port_guid:'input',definitions:[{id:7,name:'Page',type:'integer',value:99}]}},
+  parameters:{count:3,iteration_identifiers:true,variable:{port_guid:'input',definition_id:7}}});
+ assert.equal(saved.variable.name,'Page');assert.equal(saved.count,3);
+});
+
+for(const transient of [true,false])test('variable boundary waits for a retiring editor mask, preserving foreign blockers: '+transient,async t=>{
+ // live1-repeat execution-events.jsonl:78: Page=99 was applied before its mask retired.
+ const f=await fixture(t),page=f.page;
+ await page.setContent(`<div data-tid="${root}" style="display:none"><button data-tid="${root};btnClose">Close</button></div><div class="x-mask" style="display:none">pending</div>`);
+ await page.evaluate(root=>{
+  window.graph=true;window.closes=0;
+  document.querySelector('[data-tid='+JSON.stringify(root+';btnClose')+']').onclick=()=>{window.closes++;window.graph=true;document.querySelector('[data-tid='+JSON.stringify(root)+']').style.display='none';};
+ },root);
+ const readNode=()=>page.evaluate(()=>({verified:true,surface:window.graph?'graph':'wizard',node_id:'node',...(!window.graph?{input_port:{port:0}}:{})}));
+ const openPort=async()=>{
+  await page.evaluate(({root,transient})=>{window.graph=false;document.querySelector('[data-tid='+JSON.stringify(root)+']').style.display='block';document.querySelector('.x-mask').style.display='block';if(transient)setTimeout(()=>document.querySelector('.x-mask').style.display='none',350);},{root,transient});
+  return {status:'SUCCEEDED',effect_possible:true};
+ };
+ const readVariables=()=>({port_guid:'input',kind:'variables',native_index:0,definitions:[{id:7,index:0,name:'Page',label:'Page',type:'integer',value:99,is_null:false}]});
+ const out=await configureSupernodeVariablesBrowser(page,{binding:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},operation_id:'read',deadline:Date.now()+(transient?10000:1200),parameters:{read_only:true,definitions:[{value:99,type:'integer',name:'Page'}]}},readNode,openPort,readVariables);
+ assert.equal(out.status,transient?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(out));
+ assert.equal(await page.evaluate(()=>window.closes),transient?1:0);
+ if(transient)assert.equal(out.variable_boundary.definitions[0].id,7);
 });

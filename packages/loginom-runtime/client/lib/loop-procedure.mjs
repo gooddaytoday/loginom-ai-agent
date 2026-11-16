@@ -224,6 +224,16 @@ export async function readSavedLoopForBrowser(page,t){
  const remaining=()=>Math.max(1,t.deadline-Date.now());
  await at(root+';btnNext').click({timeout:remaining()});
  await at(params).waitFor({state:'visible',timeout:remaining()});
+ // PageEnterAsync populates the native store after the card becomes visible.
+ // Wait for its complete selected record before certifying saved settings.
+ await page.waitForFunction(({params,count})=>{
+  const c=globalThis.bg?.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+  const p=c?.FWizardItems.FItems.find(i=>i.FWizard.constructor.name==='LoopParamsWizard')?.FWizard;
+  const store=p?.FInputVariablesStore,records=store?.getData()?.items,selected=p?.FItems.cbxLoopVariable.getSelection();
+  const visible=e=>e.checkVisibility({checkVisibilityCSS:true}),root=document.querySelector('[data-tid='+JSON.stringify(params)+']');
+  return root&&visible(root)&&!Array.from(document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')).some(visible)
+   &&store&&!store.isLoading()&&records?.length===count&&store.getCount()===count&&records.includes(selected);
+ },{params,count:t.source.variables.definitions.length},{timeout:remaining()});
  return page.evaluate(({params,source,parameters})=>{
   const need=(v,m)=>{if(!v)throw Error('Loop saved FOR: '+m);};
   const exact=tid=>document.querySelector('[data-tid='+JSON.stringify(params+';'+tid)+']');

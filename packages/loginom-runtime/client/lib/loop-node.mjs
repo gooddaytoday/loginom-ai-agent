@@ -37,9 +37,12 @@ export function createLoopNodeSupport(config){
   const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline);
   const source=graph.nodes.filter(n=>n.ref.node_id===r.parameters.body.node_id);
   const variable=r.mode==='for';
+  const input=source[0]?.variable_inputs?.[0];
+  const variableBoundary=source[0]?.variable_inputs?.length===1&&input?.kind==='variables'&&input.port===0
+   &&input.native_index===0&&input.port_guid===r.parameters.variable?.port_guid;
   if(!graph.complete||source.length!==1||source[0].type!=='control.supernode'||JSON.stringify(source[0].inputs)!==(variable?'[]':'[0]')
-   ||JSON.stringify(source[0].outputs)!=='[0]'||(variable?JSON.stringify(source[0].variable_inputs)!=='[0]':source[0].variable_inputs?.length)||source[0].variable_outputs?.length
-   ||source[0].input_kinds?.some(k=>k!=='data')||source[0].output_kinds?.some(k=>k!=='data'))throw Error('Loop: same-workflow one-table Supernode required before mutation');
+   ||JSON.stringify(source[0].outputs)!=='[0]'||(variable?!variableBoundary:source[0].variable_inputs?.length)||source[0].variable_outputs?.length
+   ||source[0].input_kinds?.some(k=>k!=='data')||source[0].output_kinds?.some(k=>k!=='data'))throw Error('Loop: same-workflow Supernode with the requested boundary required before mutation');
   let variables;
   if(variable){
    const observed=await options.execute(makeSupernodeConfigureCode({document_id:r.document_id,workflow_ref:r.workflow_ref,node:r.parameters.body},{origin:config.targetOrigin,build:config.targetBuild,operation_id:r.operation_id+':body',deadline:ctx.deadline,parameters:{definitions:null,read_only:true}}),{timeout:Math.max(1000,ctx.deadline-Date.now())});
