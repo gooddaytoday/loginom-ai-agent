@@ -47,3 +47,10 @@ for(const route of ['apply','read'])test('Grouping exact read preserves Variant 
  assert.equal(Object.hasOwn(request,'variantEmptyIsNull'),false);
  assert.equal(Object.hasOwn(await dispatched('transform.group_data',false,route),'typedVariants'),false);
 });
+
+for(const route of ['apply','read'])test('Sorting exact read preserves Variant subtypes: '+route,async()=>{
+ const request=await dispatched('transform.sorting',true,route);
+ assert.equal(request.typedVariants,true);
+ assert.equal(Object.hasOwn(request,'variantEmptyIsNull'),false);
+ assert.equal(Object.hasOwn(await dispatched('transform.sorting',false,route),'typedVariants'),false);
+});

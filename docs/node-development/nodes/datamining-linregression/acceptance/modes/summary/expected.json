@@ -244,7 +244,7 @@
         "node": {
           "type": "datamining.lin_regression"
         },
-        "port": 2,
+        "port": 0,
         "ordered": true,
         "variables": [
           {
