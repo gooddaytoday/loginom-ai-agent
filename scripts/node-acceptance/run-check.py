@@ -66,6 +66,10 @@ def write(path, value):
     temporary.replace(path)
 
 
+def daemon_pid():
+    return json.loads(subprocess.check_output(['multica', 'daemon', 'status', '--output', 'json']))['pid']
+
+
 def git(*args, cwd=REPO):
     return subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
 
@@ -1176,6 +1180,7 @@ def check_read_turns(profile, folder, kind):
                    and e.get('result', {}).get('execution', {}).get('execution_id') == execution
                    and e['result'].get('status') == 'SUCCEEDED' for _, _, e in events), 'READ_EXECUTION_CHANGED'
     else:
+        assert turns[2].get('native_execution', {}).get('execution_id') == execution, 'READ_NATIVE_EXECUTION_CHANGED'
         def snapshots(value):
             if isinstance(value, dict):
                 if value.get('verified') is True and isinstance(value.get('processes'), list): yield value
@@ -2494,7 +2499,7 @@ class Runner:
             (profile / 'state').mkdir(exist_ok=True)
             write(profile / 'state/model.json', dict(recent=[], favorite=[], variant={'openai/gpt-6.1-sol':'medium'}))
             write(folder / 'two-turn.json', dict(executable=str(command[0]), workspace=str(workspace),
-                  profile=str(profile), folder=str(folder), prompts=[first, second], require_medium=True))
+                  profile=str(profile), folder=str(folder), kind=spec['two_turn'], prompts=[first, second], require_medium=True, daemon_pid=daemon_pid()))
             self.phase('model', [sys.executable, '-B', REPO / 'scripts/node-acceptance/run-check-two-turn.py',
                        folder / 'two-turn.json'], folder, timeout=1800, env=env, cwd=workspace)
         else:

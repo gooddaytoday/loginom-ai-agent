@@ -35,7 +35,7 @@ class RunCheckTests(unittest.TestCase):
                 def phase(phase_name, command, *args, **kwargs):
                     calls.append((phase_name, command))
                     if phase_name == 'model': raise InterruptedError
-                with patch.object(instance, 'phase', side_effect=phase):
+                with patch.object(instance, 'phase', side_effect=phase), patch.object(runner, 'daemon_pid', return_value=1):
                     with self.assertRaises(InterruptedError):
                         instance.model(name, folder, profile, workspace, '/own/run.lgp',
                                        {'package_directory':'/own/'}, root/'build')
@@ -58,6 +58,7 @@ class RunCheckTests(unittest.TestCase):
                 root=Path(directory); profile=root/'profile'; profile.mkdir()
                 turns=[dict(turn=t,event=e,at=a,cli_pid=123,sessionID='chat') for t,e,a in
                        [(1,'submitted',1),(1,'completed',2),(2,'submitted',3),(2,'completed',6)]]
+                if kind.endswith('running'): turns[2]['native_execution']=dict(execution_id='doc:root:1')
                 (root/'turns.jsonl').write_text(''.join(json.dumps(t)+'\n' for t in turns))
                 node=dict(document_id='doc',workflow_id='wf',node_id='node')
                 def event(phase, at, **kw):
@@ -84,11 +85,18 @@ class RunCheckTests(unittest.TestCase):
                     with self.assertRaisesRegex(AssertionError,'EXECUTION_CHANGED'): runner.check_read_turns(profile,root,kind)
 
     def test_real_pty_transport_keeps_one_process_and_chat(self):
+        self.check_pty_transport('read-no-rerun')
+
+    def test_real_pty_waits_for_owned_native_start_before_second_turn(self):
+        self.check_pty_transport('read-wait-running')
+
+    def check_pty_transport(self, kind):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); profile=root/'profile'; (profile/'data').mkdir(parents=True)
             fake=root/'fake-cli'
-            fake.write_text('''#!/usr/bin/env python3
-import json,os,sqlite3,sys,time
+            fake.write_text(r'''#!/usr/bin/env python3
+import json,os,sqlite3,sys,time,tty,select,pathlib,datetime
+tty.setraw(sys.stdin.fileno())
 db=sqlite3.connect(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE']+'/data/loginom-ai-agent.db')
 db.execute('create table message(id text,session_id text,data text,time_created integer)')
 db.execute('create table part(id text,session_id text,message_id text,data text,time_created integer)')
@@ -98,12 +106,21 @@ def turn(n):
  db.execute('insert into part values(?,?,?,?,?)',(f'p{n}','chat',f'a{n}',json.dumps(dict(type='tool',state=dict(status='completed',output=json.dumps(dict(execution=dict(execution_id=f'native-{n}')))))),n))
  db.commit()
 turn(1)
-assert 'second' in sys.stdin.readline()
+if sys.argv[-1]=='read-wait-running':
+ assert not select.select([sys.stdin],[],[],.4)[0], 'second prompt arrived before native execution'
+ p=pathlib.Path(os.environ['LOGINOM_AI_AGENT_CLI_PROFILE'])/'execution-events.jsonl'
+ pending=dict(verified=True,root_id='root',node_context=dict(verified=True,document_id='doc',node_id='node'),processes=[dict(process_id='1.1',owner=dict(verified=True,source='native_process_model_identity',node_id='node'),progress_state=dict(verified=True,source='native_progress_record',state='running'))])
+ events=[dict(phase='node_apply_prepared',operation_id='js',request=dict(target=dict(type='programming.javascript'))),dict(operation_id='js',recorded_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),outcome=dict(output=dict(node_processes=pending)))]
+ p.write_text(''.join(json.dumps(e)+'\n' for e in events))
+data=b''
+while b'\r' not in data: data+=os.read(sys.stdin.fileno(),4096)
+assert b'second' in data
 turn(2)
-assert '/exit' in sys.stdin.readline()
+data=b''
+while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
 ''')
             fake.chmod(0o755)
-            config=dict(executable=str(fake),workspace=str(root),folder=str(root),profile=str(profile),prompts=['first','second'])
+            config=dict(executable=str(fake),workspace=str(root),folder=str(root),profile=str(profile),kind=kind,prompts=[kind,'second'],daemon_pid=1)
             runner.write(root/'transport.json',config)
             result=subprocess.run([sys.executable,str(runner.REPO/'scripts/node-acceptance/run-check-two-turn.py'),str(root/'transport.json')],env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile)),capture_output=True,text=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
@@ -112,6 +129,7 @@ assert '/exit' in sys.stdin.readline()
             self.assertEqual(len({t['cli_pid'] for t in turns}),1)
             self.assertEqual(turns[1]['execution_ids'],['native-1'])
             self.assertEqual(turns[3]['execution_ids'],['native-1','native-2'])
+            if kind=='read-wait-running': self.assertEqual(turns[2]['native_execution']['execution_id'],'doc:root:1')
 
     def test_transcript_polling_closes_database_descriptors(self):
         import sqlite3
@@ -125,6 +143,23 @@ assert '/exit' in sys.stdin.readline()
             before=len(list(Path('/proc/self/fd').iterdir()))
             for _ in range(1100): self.assertEqual(transport.transcript(profile),([],[]))
             self.assertLessEqual(len(list(Path('/proc/self/fd').iterdir())),before+2)
+
+    def test_native_gate_never_reuses_completed_foreign_or_old_frames(self):
+        spec=importlib.util.spec_from_file_location('read_transport',runner.REPO/'scripts/node-acceptance/run-check-two-turn.py')
+        transport=importlib.util.module_from_spec(spec);spec.loader.exec_module(transport)
+        with tempfile.TemporaryDirectory() as directory:
+            profile=Path(directory);journal=profile/'execution-events.jsonl'
+            request=dict(phase='node_apply_prepared',operation_id='js',request=dict(target=dict(type='programming.javascript')))
+            process=dict(process_id='1.1',owner=dict(verified=True,source='native_process_model_identity',node_id='node'),progress_state=dict(verified=True,source='native_progress_record',state='running'))
+            snapshot=dict(verified=True,root_id='root',node_context=dict(verified=True,document_id='doc',node_id='node'),processes=[process])
+            event=dict(operation_id='js',recorded_at=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),outcome=dict(output=dict(node_processes=snapshot)))
+            def save(extra=[]): journal.write_text(''.join(json.dumps(e)+'\n' for e in [request,event,*extra]))
+            save();self.assertEqual(transport.pending_execution(profile)['execution_id'],'doc:root:1')
+            process['owner']['node_id']='foreign';save();self.assertIsNone(transport.pending_execution(profile))
+            process['owner']['node_id']='node'
+            completed=copy.deepcopy(event);completed['outcome']['output']['node_processes']['processes'][0]['progress_state']['state']='completed'
+            save([completed]);self.assertIsNone(transport.pending_execution(profile))
+            event['recorded_at']='1970-01-01T00:00:00Z';save();self.assertIsNone(transport.pending_execution(profile))
 
     def test_rest_simulation_uses_frozen_fixture_and_keeps_oracle_private(self):
         case = runner.scenario('rest-simulation')

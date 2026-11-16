@@ -203,10 +203,13 @@ turn must contain a separate successful current-output read, with no new Execute
 request for that node. The no-rerun case must retain the first turn's execution_id.
 The wait case must observe native pending progress for the same root/group during
 the second turn and then read that completed execution; a completed-only smoke
-does not pass. Both use independent integer-row oracles and stock cold execution.
+does not pass. After the first model reply, its second prompt is held until a fresh
+native process record proves the requested node is running; merely starting an
+asynchronous configuration job is insufficient. That native execution_id is also
+recorded on the turn boundary. Both use independent integer-row oracles and stock cold execution.
 The no-rerun case filters a six-row CSV; its physical input name includes run and
 attempt names to avoid collisions with previous uploads (#1157). The wait case
-uses a zero-input native JavaScript node computing three rows after 180 seconds,
+uses a zero-input native JavaScript node computing three rows after 90 seconds,
 so the execution window is reproducible without a large-file upload or simulated
 process state. It neither intercepts nor modifies Loginom internals.
 
