@@ -300,7 +300,7 @@ test('T3: the same phase failing again after a recovery is continued through a f
 
   const read = buildNodeReadRequest({ operation_id: 'reread', source_operation_id: 'apply-2:br2' },
     f.events.find(e => e.phase === 'browser_recovery_receipt' && e.receipt.id === 'apply-2:br2').receipt);
-  assert.deepEqual(read.parameters, { source_operation_id: 'apply-2:br2', observed_schema: true, schemas: [{ port: 0, schema: null }] });
+  assert.deepEqual(read.parameters, { source_operation_id: 'apply-2:br2', execution_policy: 'existing', observed_schema: true, schemas: [{ port: 0, schema: null }] });
   assert.deepEqual(read.target, { kind: 'existing', type: 'imports.text', label: undefined, ref: node });
   const reader = nodeReadHandler({ revision: '1', modes: ['delimited'] });
   reader.validate(read.parameters, 'read_existing_output', read);

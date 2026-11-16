@@ -17,6 +17,7 @@ const args={operation_id:'read',source_operation_id:'created',execution:'execute
 test('output reading preserves the current execution unless Execute is explicitly requested',()=>{
  const current=buildNodeReadRequest({...args,execution:undefined},source());
  assert.equal(current.parameters.execution_policy,'existing');
+ assert.equal(current.finish,'done');
  assert.equal(buildNodeReadRequest({...args,execution:'execute'},source()).parameters.execution_policy,'execute');
 });
 const handlers=new Map([['transform.calculator',{revision:'1',modes:['expression'],validate(){throw Error('Configuration validation must not run');},configure(){throw Error('Configuration must not run');},configurationReadback(){throw Error('No configuration readback');}}]]);
@@ -62,10 +63,11 @@ function portReadFixture(request,output,snapshots){
   need:(ok,message)=>{if(!ok)throw Error(message);},verified:value=>({verified:true,cleanup_complete:true,...value}),
   alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution,resolveCrossTableSchema,openNewOutputTable:table,existingOutputExecution,setTimeout,
  });
- const driver=create({operation:{id:'read',parameters:request,nodeApply:{}},now:()=>1},{});
- const ctx={node,execution:{execution_id:output?.execution_id??'fresh'},portExecution:{execution_id:'foreign-shell'},receipt_id:'read',deadline:1000};
- return {async run(){if(snapshots)await driver.beforeTarget(ctx);await driver.finishGraph('execute',ctx);await driver.waitExecution(ctx);return driver.readOutput(request.read,ctx);},calls,execution,
-  get tableActions(){return tableActions;},get launches(){return launches;}};
+ const operation={id:'read',parameters:request,nodeApply:{}};
+ const driver=create({operation,now:()=>1},{});
+ const ctx={node,document_id:'doc',workflow_ref:request.workflow_ref,execution:{execution_id:output?.execution_id??'fresh'},portExecution:{execution_id:'foreign-shell'},receipt_id:'read:target',deadline:2000};
+ return {async run(){if(snapshots)await driver.beforeTarget(ctx);await driver.finishGraph(request.finish,ctx);await driver.waitExecution(ctx);return driver.readOutput(request.read,ctx);},calls,execution,
+  driver,operation,get tableActions(){return tableActions;},get launches(){return launches;}};
 }
 function nativeExecution({running=false,active=true}={}){
  const progress_state={verified:true,source:'native_progress_record',state:running?'running':'completed'};
@@ -90,6 +92,18 @@ test('native current-output proof refuses stale, cancelled, missing and foreign 
   s=>s.processes.push({...s.processes[1],process_id:'1.2',record_id:'duplicate'})]){
   const s=nativeExecution();change(s);assert.throws(()=>existingOutputExecution(s,node));
  }
+});
+for(const active of [true,false])test('production current-output lifecycle '+(active?'reads with Done':'settles stale refusal')+' without a launch',async()=>{
+ const request=buildNodeReadRequest({...args,execution:undefined},source());
+ const output={port:0,port_guid:'p',fresh:true,execution_id:'doc:root:1',schema,sample_complete:true};
+ const f=portReadFixture(request,output,[nativeExecution({active})]);delete f.operation.nodeApply;
+ const result=await applyNode({request,operation:f.operation,handlers,drivers:{...f.driver,
+  prepareTarget:async(_,ctx)=>{await f.driver.beforeTarget(ctx);return {verified:true,cleanup_complete:true,node};}},
+  record:async e=>structuredClone(e),now:()=>1});
+ assert.equal(result.status,active?'SUCCEEDED':'FAILED',JSON.stringify(result));
+ assert.equal(result.cleanup_complete,true);assert.equal(f.launches,0);assert.equal(f.tableActions,0);
+ if(active){assert.equal(result.execution.execution_id,'doc:root:1');assert.equal(result.configuration.status,'not_requested');}
+ else{assert.equal(result.pending_phase,null);assert.equal(result.error.code,'NODE_OUTPUT_NOT_FRESH');assert.match(result.next_step.instruction,/explicit request/);}
 });
 test('production reread uses its own completed execution and retained mapping without Table',async()=>{
  const request=buildNodeReadRequest(args,source());

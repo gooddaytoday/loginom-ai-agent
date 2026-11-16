@@ -90,8 +90,8 @@ export function validateNodeApplyRequest(request, handlers) {
     && typeof request.read.require_exact_numbers==='boolean', 'Invalid output read request');
   if(request.read.variable_ports!==undefined)requireValue(Array.isArray(request.read.variable_ports)&&request.read.variable_ports.length<=16
     &&new Set(request.read.variable_ports).size===request.read.variable_ports.length&&request.read.variable_ports.every(p=>Number.isInteger(p)&&p>=0&&p<100)
-    &&(request.finish==='execute'||request.target.type==='variables.user'||request.read.variable_ports.length===0),'Invalid variable output read request');
-  requireValue(request.finish==='execute' || request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
+    &&(request.finish==='execute'||request.mode===NODE_READ_MODE||request.target.type==='variables.user'||request.read.variable_ports.length===0),'Invalid variable output read request');
+  requireValue(request.finish==='execute'||request.mode===NODE_READ_MODE||request.read.ports.length===0, 'Invalid parameters.read.ports: Done and Close require an empty list; choose finish=execute to read fresh output');
   object(request.budgets, ['configure_ms','execute_ms','total_ms']);
   requireValue(Object.values(request.budgets).every(v=>Number.isInteger(v) && v>=1 && v<=1800000)
     && request.budgets.total_ms>=Math.max(request.budgets.configure_ms,request.budgets.execute_ms), 'Invalid node budgets');
@@ -223,7 +223,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
-      if(name==='target'&&request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing'
+      if(['source','target','read'].includes(name)&&request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing'
         &&refusal?.verification==='existing_output_read_only'&&refusal.phase===name
         &&refusal.effect_possible===false&&refusal.cleanup_complete===true
         &&['document_id','workflow_id','node_id'].every(k=>refusal.node?.[k]===request.target.ref[k])){
@@ -393,6 +393,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     return value;
   };
   const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true||isUnchangedTransformExecution(request,handler);
+  const existingOutputRead=request.mode===NODE_READ_MODE&&request.parameters.execution_policy==='existing';
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
@@ -486,7 +487,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       ?drivers.finishGraph(request.finish,ctx):drivers.finish(request.finish,ctx),{verify:value=>{
       requireValue(value.mode===request.finish, 'Wrong wizard finish mode');
       if(readingOnly)requireValue(value.settings_applied===false,'Output read must not apply node settings');
-      if(request.finish==='execute')requireValue(id(value.execution_id)
+      if(existingOutputRead)requireValue(value.execution_started===false&&id(value.execution_id),'Current-output reading must preserve its native execution without Execute');
+      else if(request.finish==='execute')requireValue(id(value.execution_id)
         &&(!materialize||value.execution_id!==state.execution.execution_id), 'A fresh execution identity is required');
       else if(request.target.type==='programming.javascript'&&request.finish==='done'){
         // Loginom does not expose whether Done ran internal work. The owned
@@ -500,7 +502,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       }else requireValue(value.execution_id==null && value.execution_started===false, 'Done must not execute');
       if(request.finish==='close')requireValue(value.draft_discarded===true && value.settings_applied===false,'Close must discard draft settings');
     }});
-    if(request.finish==='execute') {
+    if(request.finish==='execute'||existingOutputRead) {
       state.execution={status:'pending',execution_id:finish.execution_id};
       const terminal=await waitForExecution('execute');
       if(terminal)return terminal;

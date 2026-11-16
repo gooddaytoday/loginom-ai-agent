@@ -132,7 +132,7 @@ export function buildNodeReadRequest(args,source,{saves=[]}={}){
   mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
    ...(crossPolicy?{cross_table_policy:crossPolicy}:{}),
    ...(javascript?{javascript_source:javascriptReadSourceBinding(readback.source)}:{})},
-  mappings:[],finish:'execute',read:{ports:structuredClone(ports),...(variablePorts.length?{variable_ports:structuredClone(variablePorts)}:{}),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  mappings:[],finish:args.execution==='execute'?'execute':'done',read:{ports:structuredClone(ports),...(variablePorts.length?{variable_ports:structuredClone(variablePorts)}:{}),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 // A browser recovery receipt carries only runtime-proven release facts and the
@@ -150,7 +150,7 @@ function buildRecoveredReadRequest(args,receipt){
   target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(receipt.node)},inputs:[],
   mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',observed_schema:true,
    schemas:ports.map(port=>({port,schema:null}))},
-  mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  mappings:[],finish:args.execution==='execute'?'execute':'done',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 export function nodeReadHandler(handler){
@@ -162,11 +162,11 @@ export function nodeReadHandler(handler){
       &&parameters&&Object.keys(parameters).join(',')==='source_operation_id'&&typeof parameters.source_operation_id==='string','Builtin snapshot cannot execute, configure or read other ports');return;
    }
    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
-    &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
+    &&request.finish===(parameters.execution_policy==='existing'?'done':'execute')&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
     'Existing-output reads cannot create nodes, configure ports or export files');
    const javascript=request.target.type==='programming.javascript';
    const observed=parameters?.observed_schema===true;
-   need(parameters&&['existing','execute'].includes(parameters.execution_policy)
+   need(parameters&&(parameters.execution_policy===undefined||['existing','execute'].includes(parameters.execution_policy))
     &&Object.keys(parameters).filter(k=>k!=='execution_policy').sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
     &&typeof parameters.source_operation_id==='string'
     &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&(parameters.schemas.length>0||request.read.variable_ports?.length>0),

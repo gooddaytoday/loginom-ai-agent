@@ -39,22 +39,17 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    workflow_ref:request.workflow_ref,node:request.target.ref},node:request.target.ref,uiEpoch:owner.ui_epoch,
    deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,redactor,
    channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000})});
- const forbidden=()=>{throw Error('A read operation cannot open or configure node/port wizards');};
- return {
-  verifySource:async()=>verified(unchanged
-   ?{source_kind:unchangedImport?'unchanged_existing_'+(request.target.type==='imports.excel'?'excel':'text')+'_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
-   :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id}),
-  ...(existing?{async beforeTarget(ctx){
+ const waitExisting=async(ctx,initial)=>{
    enter({...ctx,node:request.target.ref});
    const started=now();let pinned;
    const refuse=(code,message)=>{
     const error=Object.assign(Error(message),{code});
-    error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:false,cleanup_complete:true,
+    error.nodePhaseRefusal={phase:ctx.receipt_id.split(':').at(-1),status:'FAILED',effect_possible:false,cleanup_complete:true,
      verification:'existing_output_read_only',node:request.target.ref};
     throw error;
    };
    for(;;){
-    const snapshot=await channel.readExistingProcesses();
+    const snapshot=initial??await channel.readExistingProcesses();initial=undefined;
     // Completion can change FLocked between the two native identity reads.
     // Discard that mixed snapshot, retaining the original deadline.
     if(snapshot.reason!=='node_context_changed'){
@@ -64,13 +59,27 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
      if(pinned&&pinned!==identity)refuse('NODE_OUTPUT_NOT_FRESH','The native running execution was replaced. No Execute was sent.');
      if(execution.status==='completed')return verified({settings_changed:false,execution_started:false,execution_id:execution.execution_id});
      pinned=identity;
-     operation.nodeApply.execution={status:'pending',execution_id:execution.execution_id,waited_ms:now()-started};
+     operation.nodeApply.execution={status:'pending',execution_id:execution.execution_id,waited_ms:Math.floor(now()-started)};
     }
-    if(now()+250>=ctx.deadline)refuse('NODE_EXECUTION_RUNNING',
+    if(now()+1000>=ctx.deadline)refuse('NODE_EXECUTION_RUNNING',
      'Execution is still running; waited '+Math.floor((now()-started)/1000)+' seconds. No Execute was sent. Repeat the read to wait again.');
-    signal?.throwIfAborted();await new Promise(resolve=>setTimeout(resolve,250));
+    signal?.throwIfAborted();await new Promise(resolve=>setTimeout(resolve,1000));
    }
-  }}:javascript?{async beforeTarget(ctx){
+
+ };
+ const forbidden=()=>{throw Error('A read operation cannot open or configure node/port wizards');};
+ return {
+  verifySource:async(_,ctx)=>{
+   if(existing){
+    enter({...ctx,node:request.target.ref});
+    const snapshot=await channel.readExistingProcesses();
+    if(snapshot.node_context?.verified===true&&snapshot.node_context.surface==='graph')await waitExisting(ctx,snapshot);
+   }
+   return verified(unchanged
+   ?{source_kind:unchangedImport?'unchanged_existing_'+(request.target.type==='imports.excel'?'excel':'text')+'_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
+   :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id});
+  },
+  ...(existing?{beforeTarget:ctx=>waitExisting(ctx)}:javascript?{async beforeTarget(ctx){
    enter({...ctx,node:request.target.ref});
    sourceReceipt=await withJavascriptSourcePolicyBoundary({phase:'target',owner,deadline:ctx.deadline,record:onRecord},
     ()=>sourceAdmission(ctx).admit({}));
@@ -80,7 +89,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
   }}:{}),
   mapPorts:forbidden,openWizard:forbidden,finish:forbidden,
   async finishGraph(mode,ctx){
-   need(mode==='execute','Existing output read requires a fresh execution');enter(ctx);
+   need(mode===(existing?'done':'execute'),'Output read finish policy differs');enter(ctx);
    if(existing){
     need(execution?.status==='completed','Current native execution is not completed');
     return verified({mode,settings_applied:false,execution_started:false,execution_id:execution.execution_id});

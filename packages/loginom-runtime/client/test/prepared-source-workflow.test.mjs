@@ -49,8 +49,8 @@ test('apply activates the still-owned workflow selected away by upload before it
  assert.deepEqual(f.phases.slice(0,2),['workflow','source']);assert.deepEqual(f.clicks,['trial','click']);
 });
 
-for(const fault of [null,'foreign-document','foreign-workflow','foreign-tab','foreign-prefix','foreign-path','failed-save'])
-test('table reread uses only its confirmed Save continuation through the browser adapter: '+fault,async()=>{
+for(const execution of ['existing','execute'])for(const fault of [null,'foreign-document','foreign-workflow','foreign-tab','foreign-prefix','foreign-path','failed-save'])
+test('table reread uses only its confirmed Save continuation through the browser adapter: '+execution+' '+fault,async()=>{
  const f=fixture({active:true}),old=structuredClone(f.request.workflow_ref);
  const next={...old,navigation_path:[...old.navigation_path.slice(0,-1),{tid:'MF;TF-1;cnrNaviMode;b.s_Saved',label:'Saved'}]};
  const continuation={document_id:'doc',previous_workflow_ref:old,workflow_ref:structuredClone(next)};
@@ -73,7 +73,7 @@ test('table reread uses only its confirmed Save continuation through the browser
   execute:async()=>++saveCalls===1?{...save,status:'NOT_APPLIED',phase:'prepared',effect_possible:false,checkpoint:{workflow_ref:old}}:save,
   nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([['transform.filter_data',{revision:'1',modes:['conditions'],validate(){},configure:async()=>verified({})}]]),
   nodeApplyDriverFactory:()=>({verifySource:async()=>verified({}),mapPorts:async()=>verified({}),openWizard:async()=>verified({}),
-   finish:async mode=>verified({mode,execution_id:'exec'}),finishGraph:async mode=>{executes++;return verified({mode,execution_id:'exec',settings_applied:false});},
+   finish:async mode=>verified({mode,execution_id:'exec'}),finishGraph:async mode=>{if(mode==='execute')executes++;return verified({mode,execution_id:'exec',execution_started:mode==='execute',settings_applied:false});},
    waitExecution:async()=>verified({status:'completed',execution_id:'exec'}),verifyContinuation:async()=>true,
    readOutput:async()=>verified({status:'complete',execution_id:'exec',evidence_ref:'output',ports:[{port:0,schema,fresh:true,execution_id:'exec'}]})})});
  const request={...f.request,operation_id:'initial',target:{kind:'existing',type:'transform.filter_data',ref:node},mode:'conditions',parameters:{},
@@ -83,10 +83,10 @@ test('table reread uses only its confirmed Save continuation through the browser
  const saved=await runtime.run('package.save_checkpoint',{path:'/user/report.lgp',conflict_policy:'fail'},{operationId:'save'});
  assert.equal(saved.status,save.status,JSON.stringify(saved));
  f.crumb.textContent='Saved';f.crumb.getAttribute=()=>next.navigation_path.at(-1).tid;
- await runtime.startNodeRead({operation_id:'reread',source_operation_id:'initial'});
+ await runtime.startNodeRead({operation_id:'reread',source_operation_id:'initial',execution});
  const result=await runtime.waitNodeApply('reread',{timeoutMs:1000});
  assert.equal(result.outcome.status,fault?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(result));
- assert.equal(executes-initialExecutes,fault?0:1);assert.deepEqual(f.clicks,[]);
+ assert.equal(executes-initialExecutes,fault||execution==='existing'?0:1);assert.deepEqual(f.clicks,[]);
  assert.deepEqual(request.workflow_ref,old,'the completed source keeps its original immutable request');
 });
 test('an active workflow preserves source-before-workflow order without a gesture',async()=>{
