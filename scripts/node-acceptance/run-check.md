@@ -1,6 +1,12 @@
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
+`rest-simulation` uses the approved C8 `task-simulation.md`, only `response.json`
+and frozen `acceptance/modes/simulation/expected.json`. The native file simulation
+returns one typed message/amount/ok row without a table input. Full output, CSV,
+Save, cold execution of the saved REST without recreation and cleanup use stock
+checks. Only task and response file reach the model; expected/oracle stay private.
+
 `rest-variables` uses the approved REST C4 `task-variables.md`, requests.csv and
 unchanged `acceptance/modes/variables/expected.json`. Cycle first → second must
 update the response on the same REST without reconfiguration. Full typed output,

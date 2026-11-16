@@ -856,6 +856,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/calculator/acceptance'
         return dict(source=src / 'modes', prompt=src / 'task-javascript.md', data=src.parent / 'fixtures',
                     input_files=['modes.csv'], base=None, expected_name='expected.json')
+    if name == 'rest-simulation':
+        src = REPO / 'docs/node-development/nodes/integration-restrequest'
+        return dict(source=src / 'acceptance/modes/simulation',
+                    prompt=src / 'acceptance/task-simulation.md', data=src / 'fixtures/modes',
+                    input_files=['response.json'], base=None, expected_name='expected.json',
+                    oracle=src / 'acceptance/modes/oracle.py')
     if name == 'rest-get-plain':
         src = REPO / 'docs/node-development/nodes/integration-restrequest/acceptance/plain'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
