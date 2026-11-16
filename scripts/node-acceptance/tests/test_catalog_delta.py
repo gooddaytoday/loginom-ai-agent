@@ -7,6 +7,29 @@ from unittest.mock import patch
 from test_run_check import runner
 
 
+class UngroupSeasonalEdgesTests(unittest.TestCase):
+    def test_seasonal_edges_keep_private_expectations_and_original_inputs(self):
+        node = runner.REPO / 'docs/node-development/nodes/transform-ungroupdata'
+        for kind, totals, support in [('zero', 'totals', 'zero-support'),
+                                      ('null', 'totals', 'null-support'),
+                                      ('empty-support', 'totals', 'empty-support'),
+                                      ('empty-totals', 'empty-totals', 'constant-support')]:
+            with self.subTest(kind=kind):
+                spec = runner.scenario('ungroup-seasonal-' + kind)
+                self.assertEqual(spec['prompt'], node / ('acceptance/task-seasonal-' + kind + '.md'))
+                self.assertEqual(spec['input_files'], ['seasonal-' + totals + '.csv', 'seasonal-' + support + '.csv'])
+                self.assertEqual(spec['oracle'], node / 'acceptance/oracle-seasonal.py')
+                self.assertEqual(spec['export_count'], 0 if kind.startswith('empty') else 2)
+                expected = runner.expected_for(spec, '/test/edges.lgp')
+                approved = runner.read(node / ('acceptance/expected-seasonal-' + kind + '.json'))
+                self.assertEqual(expected, dict(approved, package_path='/test/edges.lgp'))
+                if kind.startswith('empty'):
+                    self.assertEqual(expected['outputs'], [])
+                    self.assertTrue(expected.get('refusal') or expected.get('execution_error'))
+                else:
+                    self.assertEqual([len(o['rows']) for o in expected['outputs']], [4, 2] if kind == 'zero' else [0, 0])
+
+
 class TreeOnlyTests(unittest.TestCase):
     def test_tree_read_is_required_and_cold_receives_no_csv(self):
         for missing in [False, True]:
