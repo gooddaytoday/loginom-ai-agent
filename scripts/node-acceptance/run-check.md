@@ -649,6 +649,7 @@ To add a scenario for a new node:
 | Name | Stock fixture under docs/node-development/nodes | Acceptance |
 |---|---|---|
 | calculator-viewport | transform-calculator/acceptance/calculator-viewport | Nine calculators, distant financial node, export then fresh port/tooltip read; CSV/Save/cold/cleanup |
+| calculator-eight | transform-calculator/acceptance/calculator-eight | 20,000 AB rows, one Calculator with eight expressions and a one-row exact sample, grouped audit totals; summary CSV/Save/cold/cleanup. Stock headless viewport is 1280×800; an already-open Preview is requested only when public tools support it, so this alone does not certify the Desktop 1920×945 case. |
 | linreg-short | datamining-linregression/acceptance/linreg-short | Expected Loginom training error: two rows, four coefficients; Save/cleanup, no CSV |
 | throw1 | programming-javascript/acceptance/throw1 | Expected JavaScript exception; Save/cleanup, no CSV |
 | js-declared-empty | programming-javascript/acceptance/js-declared-empty | Positive declared Broken:real empty table; header-only CSV/Save/cold/cleanup |

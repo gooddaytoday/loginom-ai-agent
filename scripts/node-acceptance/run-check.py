@@ -371,9 +371,10 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['calculator-viewport', 'linreg-short', 'throw1', 'js-declared-empty']:
+    if name in ['calculator-viewport', 'calculator-eight', 'linreg-short', 'throw1', 'js-declared-empty']:
         slug, filename = {
             'calculator-viewport': ('transform-calculator', 'sales.csv'),
+            'calculator-eight': ('transform-calculator', 'ab.csv'),
             'linreg-short': ('datamining-linregression', 'train.csv'),
             'throw1': ('programming-javascript', 'orders.csv'),
             'js-declared-empty': ('programming-javascript', 'orders.csv'),
