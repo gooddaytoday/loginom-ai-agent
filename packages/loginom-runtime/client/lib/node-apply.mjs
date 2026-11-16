@@ -388,7 +388,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
-          &&(!(request.read.variable_ports?.length)||value.owner_verified===true&&typeof value.process_id==='string'&&typeof value.process_record_id==='string')
+          &&(value.status==='failed'||!(request.read.variable_ports?.length)||value.owner_verified===true&&typeof value.process_id==='string'&&typeof value.process_record_id==='string')
           &&(name!=='materialization_execute'||value.owner_verified===true) && ['completed','cancelled','failed'].includes(value.status)
           && (value.status!=='cancelled'||stopSignal?.aborted===true&&value.stop_verified===true&&value.owner_verified===true)
           && (value.status!=='failed'||value.failure_verified===true&&value.output_refreshed===false
