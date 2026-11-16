@@ -1,3 +1,13 @@
+`rest-content-types` uses the reduced C5 `task-content-types.md`, only
+`content-types.csv` and `acceptance/modes/content-types/expected.json`.
+Two raw UTF-8 POST bodies (text/plain, application/xml) must produce two typed
+rows with echoed content type, unchanged body and actual HTTP status. The two
+GET response-MIME branches were removed to reserve at least 25% of the unchanged
+1800s model limit under the observed slower-REST timing; this case no longer
+claims live coverage of response MIME text/plain or */*.
+Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
+Only task and CSV reach the model; expected/oracle remain private.
+
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
