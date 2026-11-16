@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {validateRestRequestParameters,restRequestParametersSchema} from '../lib/rest-request-parameters.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
+import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
 test('C8 validates simulation paths and disabling before mutation',()=>{
@@ -59,13 +60,13 @@ test('plain GET accepts an empty query list and no table input through schema an
  assert.throws(()=>validateRestRequestParameters(parameters(),'request',{...request,inputs:[]}),/one table input/);
 });
 test('REST response Content-Type is an explicit optional connection setting',()=>{
- for(const response_content_type of ['application/json','text/html']){
+ for(const response_content_type of ['application/json','text/html','text/plain','*/*']){
   const p=parameters();p.connection.response_content_type=response_content_type;
   assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
   delete p.connection.base_url;
   assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
  }
- for(const response_content_type of [null,true,1,'','text/plain','text/html; charset=utf-8','*/*']){
+ for(const response_content_type of [null,true,1,'','application/xml','text/html; charset=utf-8','text/*']){
   const p=parameters();p.connection.response_content_type=response_content_type;
   assert.throws(()=>validateRestRequestParameters(p,'request',request),/response_content_type/);
  }
@@ -128,4 +129,24 @@ for(const name of ['Content-Type','content-length','HOST'])test('C2 refuses nati
 });
 test('C2 accepts harmless header names containing partial credential words',()=>{
  for(const name of ['X-Lab-Cycle','X-Author','X-Tokenizer','X-Secretariat'])assert.doesNotThrow(()=>validateRestRequestParameters({...parameters(),headers:[{name,value:'public'}]},'request',request));
+});
+
+for(const method of ['POST','PUT','PATCH'])test('C5 validates raw XML bodies for '+method,()=>{
+ const p={connection:{name:'XML',method,request_content_type:'application/xml'},query_parameters:[],body_field:'Body'};
+ assert.equal(new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema)(p).valid,true);
+ assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+ for(const request_content_type of ['text/xml','*/*','application/xml; charset=UTF-8'])
+  assert.throws(()=>validateRestRequestParameters({...p,connection:{...p.connection,request_content_type}},'request',request),/request_content_type/);
+});
+test('C5 public readback accepts observed MIME values with simulation and variable headers',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ for(const response_content_type of ['application/json','text/html','text/plain','*/*']){
+  const node={document_id:'d',workflow_id:'w',node_id:'n'};
+  const connection={name:'XML',base_url:'https://httpbin.org/anything',method:'POST',url_mode:'query',authentication:'none',verify_server_certificate:true,query_parameters:[],reference_node_id:'ref',request_content_type:'application/xml',response_content_type};
+  const phases=[{phase:'configure',status:'verified',receipt_id:'c5:configure',value:{configuration:{verified:true,node_context:node,method:'POST',body_field:'Body',query_parameters:[],connection,simulation:{enabled:false,file_path:''},headers:[{name:'X-Cycle',value:{variable:'Cycle'}}]}}},
+   {phase:'node_finish',status:'verified',receipt_id:'c5:node_finish',value:{settings_applied:true,mode:'done',node_context:node}}];
+  const readback=restRequestReadback({node,phases,operation_id:'c5'});
+  assert.deepEqual(readback.connection,connection);
+  assert.equal(validate(readback).valid,true,JSON.stringify(validate(readback).errors));
+ }
 });

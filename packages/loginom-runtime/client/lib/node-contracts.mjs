@@ -6,7 +6,7 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
-  ['control.loop','Цикл','loop',1,1,false,['group_rows'],'processors/control/loop.md'],
+  ['control.loop','Цикл','loop',1,1,false,['group_rows','for'],'processors/control/loop.md'],
   ['control.supernode','Подмодель','modelgeneric',1,1,false,['tabular_boundary','variable_boundary'],'processors/control/supernode.md'],
   ['control.supernode_output','Выходной узел подмодели','nullvendor',1,0,false,['tabular_boundary'],'processors/control/supernode.md'],
   ['variables.replace','Замена (переменные)','replacevariables',0,0,false,['exact','rules'],'processors/variables/variables-replace.md'],
