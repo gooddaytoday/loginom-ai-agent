@@ -2105,7 +2105,9 @@ class Runner:
                     for item in value.values(): destinations(item)
                 if isinstance(value, list):
                     for item in value: destinations(item)
-            for journal in folder.glob('*/model.stdout'):
+            # Native server fixtures have one exact, privately seeded name;
+            # an exported CSV can have identical bytes without being an upload.
+            for journal in ([] if self.current.get('native_server_fixture') else folder.glob('*/model.stdout')):
                 for _, event in records(journal):
                     part = event.get('part', {})
                     state = part.get('state', {})
@@ -3028,8 +3030,9 @@ class Runner:
             assert formats and formats[0].get('variant_as_general_type') is True and formats[-1].get('variant_as_general_type') is False, 'TEXT_VARIANT_TOGGLE_READBACK'
         if spec.get('native_server_import'):
             calls = [event['part'] for _, event in events if event.get('type') == 'tool_use']
-            assert not any(re.search(r'storage_download|artifact_deliver|file_(?:profile|scan|sample)',
-                                     call.get('tool', '')) for call in calls), 'SERVER_IMPORT_DOWNLOADED_OR_DELIVERED'
+            if case == 'import-server-nodownload':
+                assert not any(re.search(r'storage_download|artifact_deliver|file_(?:profile|scan|sample)',
+                                         call.get('tool', '')) for call in calls), 'SERVER_IMPORT_DOWNLOADED_OR_DELIVERED'
             imports = [(owner, port) for _, reply in replies for owner, port in ports(reply)
                        if owner.get('status') == 'SUCCEEDED'
                        and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'

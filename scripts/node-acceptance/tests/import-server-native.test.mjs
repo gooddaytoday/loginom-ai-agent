@@ -42,6 +42,20 @@ for name in ['import-server-nodownload','import-server-wide']:
   assert header==[col['name'] for col in e['server_import']['columns']]
   assert json.loads((root/'fixtures/manifest.json').read_text())['bytes']==path.stat().st_size
   assert len(header)==(3 if name.endswith('nodownload') else 13)
+with tempfile.TemporaryDirectory() as directory:
+ root=Path(directory);(root/'fixtures').mkdir();(root/'model').mkdir()
+ source=root/('native-import-'+'a'*20+'.txt');source.write_text('abc')
+ r.write(root/'fixtures/manifest.json',{'bytes':3})
+ event={'type':'tool_use','part':{'tool':'loginom_dock_node_apply','state':{'status':'completed',
+        'output':json.dumps({'destination':'/own/export.csv','bytes':3})}}}
+ (root/'model/model.stdout').write_text(json.dumps(event)+'\\n')
+ instance=r.Runner.__new__(r.Runner);instance.current={'dataset':str(source),'native_server_fixture':True}
+ def phase(name,command,*args,**kwargs):
+  config=r.read(root/'dataset-cleanup-config.json')
+  assert config['names']==[source.name] and config['native_server_import'] is True
+ with patch.object(instance,'phase',side_effect=phase):
+  instance.cleanup_d87(root,{'package_directory':'/own'},root/'build')
+ assert not source.exists() and instance.current['dataset-cleanup']=='storage PASS; disk PASS'
 `],{encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
