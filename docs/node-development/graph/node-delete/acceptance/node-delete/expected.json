@@ -1,0 +1,79 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "null_marker": "NULL",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.sorting"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "absent_node_types": [
+    "transform.filter_data"
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/sales-sorted.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "ID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Region",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-09,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "ID": 3,
+          "Region": "Запад",
+          "Amount": 300.25
+        },
+        {
+          "ID": 5,
+          "Region": "Север",
+          "Amount": 210.0
+        },
+        {
+          "ID": 1,
+          "Region": "Север",
+          "Amount": 120.5
+        },
+        {
+          "ID": 6,
+          "Region": "Юг",
+          "Amount": 99.5
+        },
+        {
+          "ID": 2,
+          "Region": "Юг",
+          "Amount": 80.0
+        },
+        {
+          "ID": 4,
+          "Region": "Восток",
+          "Amount": 45.75
+        }
+      ]
+    }
+  ]
+}

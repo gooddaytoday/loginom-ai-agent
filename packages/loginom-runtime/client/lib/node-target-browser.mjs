@@ -223,7 +223,7 @@ export async function readGraph(page, task) {
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect graph must still match immediately before the gesture.
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap) {
-  let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry;
+  let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry,deletion;
   let gestureBefore=task.effect.before;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
@@ -256,7 +256,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const before=await read(page,task);
     if(JSON.stringify(before)!==JSON.stringify(task.effect.before) || !before.interaction_ready)throw new Error('Graph changed before gesture');
     const p=task.effect.parameters,kind=task.effect.kind;
-    if(kind==='rename'||kind==='move'||kind==='reveal_control'){
+    if(kind==='rename'||kind==='move'||kind==='reveal_control'||kind==='delete_node'){
       const node=before.nodes.find(n=>n.ref.node_id===p.ref.node_id);
       if(!node||node.locked)throw Error('Exact unlocked target node required');
       const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
@@ -501,6 +501,57 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       await wait('single_link_confirmation_reachable',async()=>{try{await point(yes);return true;}catch{return false;}});
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
       await yes.click({timeout:remaining()});transient=false;
+    }else if(kind==='delete_node'){
+      // Select exactly this node cell by a body pixel owned by it (never its
+      // Setting/Launch controls), then the native Delete-selected command.
+      const selection=()=>page.evaluate(id=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
+        const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id),cells=d.FmxGraph.getSelectionCells();
+        return ns.length===1&&ns[0].FLocked!==true&&cells.length===1&&cells[0]===ns[0].FCell&&cells[0].edge!==true;},p.ref.node_id);
+      // Every native edge of the node must be a link this reader verifies;
+      // an unrecognized connection could vanish without a provable diff.
+      const touches=e=>e.source===p.ref.node_id||e.target===p.ref.node_id;
+      const known=[...before.links,...before.variable_links??[],...before.rest_connection_links??[]].filter(touches).length;
+      const body=await page.evaluate(({id,known})=>{
+        const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram,g=d.FmxGraph;
+        const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id);if(ns.length!==1||ns[0].FLocked)throw Error('Exact unlocked node to delete required');
+        const edges=new Set([...(ns[0].FCell.edges??[]),...(ns[0].FPorts??[]).flatMap(list=>list.FCollection??[]).flatMap(port=>port.FCell?.edges??[])]);
+        if(edges.size!==known)throw Error('Node to delete has a connection Dock cannot verify ('+edges.size+' native, '+known+' recognized); nothing was deleted');
+        const n=ns[0],dom=g.view.getState(n.FCell)?.shape?.node,gb=g.container.getBoundingClientRect(),box=dom?.getBoundingClientRect();
+        if(!dom||!g.container.contains(dom)||!box?.width||!box.height)throw Error('Node body to delete unavailable');
+        for(const dx of [.5,.25,.75,.1,.9])for(const dy of [.5,.25,.75,.1,.9]){
+          const x=box.x+box.width*dx,y=box.y+box.height*dy,hit=document.elementFromPoint(x,y),cell=g.getCellAt(x-gb.x+g.container.scrollLeft,y-gb.y+g.container.scrollTop);
+          if(x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&hit&&(hit===dom||dom.contains(hit))&&hit.closest('[data-tid]')===dom&&cell===n.FCell)return {x,y};
+        }
+        throw Error('Native node body hit unavailable');
+      },{id:p.ref.node_id,known});
+      if(remaining()<=1000)throw new Error('Insufficient deadline for owned node selection');
+      // Selection alone is not a graph effect; only the Delete command is.
+      await ensureContext();await page.mouse.click(body.x,body.y);
+      await wait('owned_node_selection',selection,1000);
+      const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
+      await wait('single_node_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
+      const selectedGraph=await wait('owned_node_selection_graph_ready',async()=>{
+        try{return await read(page,task);}catch(error){if(String(error.message).includes('Graph is blocked'))return null;throw error;}
+      },1000);
+      if(!await selection()||!sameGraph(before,selectedGraph))throw new Error('Owned node selection or graph changed before deletion');
+      gestureBefore=selectedGraph;
+      effectPossible=true;await remove.click({timeout:remaining()});transient='delete';
+      const message=find('msgbox;cnt;cnt;cmp');
+      await message.waitFor({state:'visible',timeout:Math.min(15000,remaining())});
+      // Observed Loginom 7.4.2 single-node text only; any other dialog is cancelled.
+      const text=(await message.textContent()).trim();
+      if(text!=='Удалить выделенный узел?'||await page.locator('[data-tid="msgbox;cnt;cnt;cmp"]').count()!==1){
+        const no=find('msgbox;tlb;no');await point(no);await no.click({timeout:remaining()});transient=false;
+        await wait('foreign_confirmation_closed',async()=>await message.count()===0||!await message.isVisible());
+        // Cancel is a proven non-dispatch only if the complete graph is unchanged.
+        if(sameGraph(gestureBefore,await read(page,task)))effectPossible=false;
+        throw new Error('Single node deletion confirmation unavailable: '+text.slice(0,200));
+      }
+      const yes=find('msgbox;tlb;yes');
+      await wait('single_node_confirmation_reachable',async()=>{try{await point(yes);return true;}catch{return false;}});
+      if((await message.textContent()).trim()!==text||!await selection())throw new Error('Single node confirmation or selection changed');
+      deletion={confirmation_text:text.slice(0,200)};
+      await yes.click({timeout:remaining()});transient=false;
     }else throw new Error('Graph primitive is not implemented: '+kind);
     await page.mouse.move(10,10);
     const settleJavascript=kind==='create' && p.type==='programming.javascript';
@@ -542,6 +593,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;
   if(moveGeometry)outcome.move_geometry=moveGeometry;
+  if(deletion)outcome.deletion=deletion;
   if(paletteScrollUncertain||placementNavigationUncertain)outcome.cleanup_complete=false;
   return outcome;
 }

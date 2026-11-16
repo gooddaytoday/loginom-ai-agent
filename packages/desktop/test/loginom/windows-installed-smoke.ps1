@@ -52,7 +52,7 @@ function Test-StartupLog([string]$Text, [string]$Version) {
 }
 function Test-CrashLog([string]$Text) {
     # Remove only complete startup records, including their path metadata and closing brace.
-    $startupRecord = '(?m)^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[info\] +\(crash\) crash reporter started \{\r?\n +path: ''[^''\r\n]+''\r?\n\}\r?(?:\n|\z)'
+    $startupRecord = '(?m)^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] \[info\] +\(crash\) crash reporter started \{(?:\r?\n +path: ''[^''\r\n]+''\r?\n\}| path: ''[^''\r\n]+'' \})\r?(?:\n|\z)'
     return (-not [regex]::Replace($Text, $startupRecord, '').Trim())
 }
 function Test-RetiredEndpoint([string]$Directory, [string]$Ripgrep) {

@@ -11,12 +11,14 @@ import {createJavascriptSourceAdmission} from './javascript-source-admission.mjs
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {existingOutputExecution} from './node-execution-evidence.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
 
 export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor,handler}){
  const {operation,execute,onRecord,now,receiptOptions}=options;
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
+ const existing=request.mode==='read_existing_output'&&request.parameters.execution_policy==='existing';
  const unchangedImport=isUnchangedTextImportExecution(request)||handler?.unchangedExecution?.(request)===true,unchangedTransform=isUnchangedTransformExecution(request,handler);
  const unchanged=unchangedImport||unchangedTransform;
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
@@ -37,12 +39,51 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    workflow_ref:request.workflow_ref,node:request.target.ref},node:request.target.ref,uiEpoch:owner.ui_epoch,
    deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,redactor,
    channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000})});
+ const waitExisting=async(ctx,initial)=>{
+   enter({...ctx,node:request.target.ref});
+   const started=now();let pinned;
+   const refuse=(code,message)=>{
+    const error=Object.assign(Error(message),{code});
+    error.nodePhaseRefusal={phase:ctx.receipt_id?.split(':').at(-1)??'source',status:'FAILED',effect_possible:false,cleanup_complete:true,
+     verification:'existing_output_read_only',node:request.target.ref};
+    throw error;
+   };
+   const pending=()=>{operation.nodeApply.execution={status:'pending',execution_id:execution?.execution_id??null,waited_ms:Math.floor(now()-started)};};
+   const timeout=()=>{pending();refuse('NODE_EXECUTION_RUNNING',
+    'Execution is still running; waited '+Math.floor((now()-started)/1000)+' seconds. No Execute was sent. Repeat the read to wait again.');};
+   for(;;){
+    if(now()>=ctx.deadline)timeout();
+    const snapshot=initial??await channel.readExistingProcesses();initial=undefined;
+    // Completion can change FLocked between the two native identity reads.
+    // Discard that mixed snapshot, retaining the original deadline.
+    const transient=snapshot.verified!==true&&['node_context_changed','console_store','process_root','console_not_ready'].includes(snapshot.reason);
+    if(!transient){
+     try{execution=existingOutputExecution(snapshot,request.target.ref);}
+     catch(error){refuse('NODE_OUTPUT_NOT_FRESH',String(error.message)+'. No Execute was sent. Ask whether to execute the node.');}
+     const identity=execution.execution_id?JSON.stringify([execution.execution_id,execution.process_record_id]):null;
+     if(pinned&&identity&&pinned!==identity)refuse('NODE_OUTPUT_NOT_FRESH','The native running execution was replaced. No Execute was sent.');
+     if(execution.status==='completed')return verified({settings_changed:false,execution_started:false,execution_id:execution.execution_id});
+     if(identity)pinned=identity;
+    }
+    pending();
+    if(now()>=ctx.deadline)timeout();
+    signal?.throwIfAborted();await new Promise(resolve=>setTimeout(resolve,Math.min(1000,ctx.deadline-now())));
+   }
+
+ };
  const forbidden=()=>{throw Error('A read operation cannot open or configure node/port wizards');};
  return {
-  verifySource:async()=>verified(unchanged
+  verifySource:async(_,ctx)=>{
+   if(existing){
+    enter({...ctx,node:request.target.ref});
+    const snapshot=await channel.readExistingProcesses();
+    if(snapshot.node_context?.verified===true&&snapshot.node_context.surface==='graph')await waitExisting(ctx,snapshot);
+   }
+   return verified(unchanged
    ?{source_kind:unchangedImport?'unchanged_existing_'+(request.target.type==='imports.excel'?'excel':'text')+'_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
-   :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id}),
-  ...(javascript?{async beforeTarget(ctx){
+   :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id});
+  },
+  ...(existing?{beforeTarget:ctx=>waitExisting(ctx)}:javascript?{async beforeTarget(ctx){
    enter({...ctx,node:request.target.ref});
    sourceReceipt=await withJavascriptSourcePolicyBoundary({phase:'target',owner,deadline:ctx.deadline,record:onRecord},
     ()=>sourceAdmission(ctx).admit({}));
@@ -52,7 +93,11 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
   }}:{}),
   mapPorts:forbidden,openWizard:forbidden,finish:forbidden,
   async finishGraph(mode,ctx){
-   need(mode==='execute','Existing output read requires a fresh execution');enter(ctx);
+   need(mode===(existing?'done':'execute'),'Output read finish policy differs');enter(ctx);
+   if(existing){
+    need(execution?.status==='completed','Current native execution is not completed');
+    return verified({mode,settings_applied:false,execution_started:false,execution_id:execution.execution_id});
+   }
    const launch=async()=>{
    if(unchangedTransform&&request.target.type==='transform.join_data'){
     // Read the native saved mode before the only Execute. Close discards the
@@ -96,7 +141,8 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    });
   },
   async waitExecution(ctx){
-   enter(ctx);need(driver,'Read execution driver missing');
+   enter(ctx);if(existing){need(execution?.status==='completed','Current native execution is not completed');return execution;}
+   need(driver,'Read execution driver missing');
    try{execution=await driver.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});}
    catch(error){
     if(!ctx.stopSignal?.aborted||error!==ctx.stopSignal.reason||operation.transportUncertain)throw error;
@@ -123,7 +169,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     if(policy){
      need(operation.parameters.target.type==='transform.cross_table'&&policy.kind==='crosstable_sliding'
       &&policy.configuration.category_mode==='sliding'&&port===0&&output.port_guid===policy.port_guid
-      &&ctx.execution.execution_id!==policy.source_execution_id
+      &&(existing||ctx.execution.execution_id!==policy.source_execution_id)
       &&['document_id','workflow_id','node_id'].every(k=>policy.node[k]===ctx.node[k]),'CrossTable reread owner/port differs');
      materialized=resolveCrossTableSchema(output.schema,policy.configuration);
     }
@@ -132,7 +178,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    }
    return verified({effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',
     execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,
-    ...(javascript?{javascript_source:{...request.parameters.javascript_source,
+    ...(javascript&&!existing?{javascript_source:{...request.parameters.javascript_source,
      source_operation_id:request.parameters.source_operation_id,settings_sha256:sourceReceipt.settings_sha256,
      policy:sourceReceipt.effective_source.policy}}:{})});
   },

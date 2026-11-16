@@ -6,7 +6,7 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
-  ['control.loop','Цикл','loop',1,1,false,['group_rows'],'processors/control/loop.md'],
+  ['control.loop','Цикл','loop',1,1,false,['group_rows','for'],'processors/control/loop.md'],
   ['control.supernode','Подмодель','modelgeneric',1,1,false,['tabular_boundary','variable_boundary'],'processors/control/supernode.md'],
   ['control.supernode_output','Выходной узел подмодели','nullvendor',1,0,false,['tabular_boundary'],'processors/control/supernode.md'],
   ['variables.replace','Замена (переменные)','replacevariables',0,0,false,['exact','rules'],'processors/variables/variables-replace.md'],
@@ -117,6 +117,14 @@ export function validateNodeTargetRequest(request) {
     validateNodeReference(target.ref);
     if (!Object.hasOwn(NODE_TYPES, target.type)) throw new Error('Node type has no local graph handler');
     if (target.ref.document_id !== request.document_id || target.ref.workflow_id !== request.workflow_ref.workflow_id) throw new Error('Target belongs to another workflow');
+  } else if (target?.kind === 'delete') {
+    // Deletion binds only the scoped GUID; an optional caption must still match.
+    object(target, ['kind', 'ref', 'label'], ['kind', 'ref']);
+    validateNodeReference(target.ref);
+    if (target.ref.document_id !== request.document_id || target.ref.workflow_id !== request.workflow_ref.workflow_id) throw new Error('Target belongs to another workflow');
+    if (!Array.isArray(request.inputs) || request.inputs.length || request.variable_inputs !== undefined) throw new Error('Node deletion takes no inputs');
+    if (target.label !== undefined && (typeof target.label !== 'string' || !target.label || target.label.length > 200)) throw new Error('Invalid node deletion label');
+    return request;
   } else throw new Error('Choose exactly one new or existing node target');
   if (target.label !== undefined && (typeof target.label !== 'string' || !target.label.trim() || target.label.length > 200
     || /[;|<>"'\\\x00-\x1f]/.test(target.label))) throw new Error('Invalid parameters.target.label: expected nonblank text of at most 200 UTF-16 code units without semicolon, vertical bar, angle brackets, single/double quotes, backslash or control characters U+0000..U+001F. Omit target.label or use a plain-language caption; keep comparison operators in parameters, not in the node label');

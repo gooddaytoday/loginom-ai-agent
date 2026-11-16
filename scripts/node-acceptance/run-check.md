@@ -191,6 +191,32 @@ order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
 the existing node, cold execution without configuration and cleanup use stock
 checks. Only the business task and CSV reach the model.
 
+`read-no-rerun[-1..3]` and `read-wait-running[-1..3]` are the owner-approved
+`run-check-two-turn` mode (LAB-1720, 2026-11-16). Owner review permits the known post-turn-two
+`closed_ack=false` / `LOGINOM_RUNTIME_TIMEOUT` signature only when the runtime
+exits 0, both turns complete, package cleanup succeeds, logout is confirmed and
+no unsaved changes are discarded. It is recorded in `shutdown-signature.json`;
+other shutdown failures remain failures. Only these cases use one
+interactive CLI process for both prompts, one chat, and one runtime. The package
+stays open between prompts. The transcript database is read without modification;
+its actual tool parts feed the stock CSV/Save/cold/cleanup checks. No oracle or
+expected file reaches the model. Ordinary scenarios keep `run --format json`.
+`turns.jsonl` records submitted/completed boundaries, the same CLI PID and session;
+`read-turn-proof.json` names the execution_id and exact journal lines. A second
+turn must contain a separate successful current-output read, with no new Execute
+request for that node. The no-rerun case must retain the first turn's execution_id.
+The wait case must observe native pending progress for the same root/group during
+the second turn and then read that completed execution; a completed-only smoke
+does not pass. After the first model reply, its second prompt is held until a fresh
+native process record proves the requested node is running; merely starting an
+asynchronous configuration job is insufficient. That native execution_id is also
+recorded on the turn boundary. Both use independent integer-row oracles and stock cold execution.
+The no-rerun case filters a six-row CSV; its physical input name includes run and
+attempt names to avoid collisions with previous uploads (#1157). The wait case
+uses a zero-input native JavaScript node computing three rows after 90 seconds,
+so the execution window is reproducible without a large-file upload or simulated
+process state. It neither intercepts nor modifies Loginom internals.
+
 `row-filter-top-n` uses the approved row-filter `acceptance/typed/task-top-n.md`
 and only `fixtures/typed/rows.csv`. The private stdlib oracle checks TopN 3→5,
 both full ordered outputs and four CSVs. The source alone changes on the same
@@ -409,6 +435,12 @@ python3 scripts/node-acceptance/run-check.py wait /absolute/result-directory --t
 Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
 Only the task and `fixtures/variables.csv` reach the model. The update task
 changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
+
+`calculator-vars-saveas` (LAB-1729) uses `scenarios/calculator-vars-saveas/task.md`: the
+Calculator Var.Amount task (7), Save As with reopen, then Amount=11 and the same Calculator
+in the reopened package, final Save As with reopen. Checks `calculator/acceptance/expected.json`, stock CSV/Save/cold,
+a confirmed `save_as` receipt with `reopened:true` and an accepted
+`reopened_package_cleanup_binding` for the saved path (#986 cleanup branch).
 
 `calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
 `modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
@@ -1320,7 +1352,6 @@ its final LF. Both require full typed reads, CSV, Save, cold execution without
 configuration and confirmed cleanup. Only task and CSV reach the model; oracle
 and expected remain private. Regression: supernode-calc and rest-get-plain once.
 
-
 `supernode-vars` uses control-supernode/acceptance/variables/task.md without input
 files. Its independent oracle checks the original Page=99, Limit=2 body: Skip=198,
 exact integer Skip/Page/Limit order, full typed output and downloaded CSV.
@@ -1329,3 +1360,27 @@ and Calculator, converter table → Calculator → OutputNode, and retained inte
 definition IDs/values and input-port GUID across Save/cold. Only task reaches
 the model; no Loop or XML oracle is involved. Cold uses owned port inspection
 with Close, then stock execution/export checks and confirmed package/logout cleanup.
+
+`loop-for-offline` and `loop-for-rest` use the frozen control-loop FOR tasks and
+expected-for-{offline,rest}.json with no input files. Only the task reaches the
+model. Sequential literal count=3 substitutes the saved Page definition 99 with
+0/1/2; Limit remains 2 and native integer IterationId is last. Both require full
+typed output, downloaded CSV, Save and cold execution without configuration.
+The private audit observes the variable boundary GUID/definition IDs, local
+converter/Calculator links (and REST when present), saved FOR and identifiers;
+cold compares those identities after opening the saved package. Regression:
+loop-pages-offline, loop-pages-rest, supernode-vars, supernode-calc, rest-get-plain.
+
+
+`node-delete` (LAB-1721): approved `graph/node-delete/acceptance/node-delete/task.md`
+and only sales.csv. Four nodes Import → Row Filter «Крупные продажи» → Sorting →
+Export; the user then asks to delete the filter, reconnect Import to the same Sorting
+and export all rows. Exactly one verified `loginom_dock_node_delete` (SUCCEEDED,
+output.status deleted, no AMBIGUOUS), frozen sorted six-row CSV, Save, cold with
+`absent_node_types:["transform.filter_data"]` and stock cleanup.
+
+`node-delete-refused` (LAB-1721): approved `node-delete-refused/task.md` and only
+numbers.csv. The user asks to delete a JavaScript node while its 60-second (below the 120 s default execute budget)
+execution runs. Every deletion reply must be NOT_APPLIED with effect_possible:false
+and at least one `NODE_OPERATION_RUNNING`; the node stays, its CSV, Save, cold and
+cleanup use stock checks. Expected/oracle never reach the model.
