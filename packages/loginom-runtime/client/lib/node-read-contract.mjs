@@ -48,6 +48,9 @@ function retainedMappingSchemas(node,sourceId,type){
  // REST retains connection settings at Done, not an output-mapping wizard.
  // Its table schemas must still come from the completed output below.
  const rest=type==='integration.rest_request'&&r.kind==='rest_request';
+ const skippedMaterialization=javascript&&r.schema_mode==='declared'
+  &&['materialization_start','materialization_execute'].every(name=>r.receipt_ids?.includes(sourceId+':'+name)&&node.phases?.filter(p=>p.phase===name
+   &&p.receipt_id===sourceId+':'+name&&p.status==='not_requested'&&p.effect_possible===false).length===1);
  need(node.configuration.status==='applied'
   &&r.scope===(javascript?'observed_after_verified_finish':'observed_before_verified_finish')
   &&r.values_are===(javascript?'independent_owned_source_readback':'observed_ui_values')
@@ -55,7 +58,8 @@ function retainedMappingSchemas(node,sourceId,type){
   &&Array.isArray(r.receipt_ids)&&r.receipt_ids.length>0&&new Set(r.receipt_ids).size===r.receipt_ids.length
   &&(rest?['configure','node_finish']:['finish','output_mapping']).every(phase=>r.receipt_ids.includes(sourceId+':'+phase))
   &&r.receipt_ids.every(id=>node.phases?.filter(p=>p.receipt_id===id&&id===sourceId+':'+p.phase
-   &&p.status==='verified').length===1),
+   &&(p.status==='verified'||skippedMaterialization&&['materialization_start','materialization_execute'].includes(p.phase)
+    &&p.status==='not_requested'&&p.effect_possible===false)).length===1),
   'Invalid parameters.source_operation_id: output mapping readback ownership or receipts differ');
  if(rest)return [];
  if(javascript)need(['code','declared'].includes(r.schema_mode)&&r.settings_preserved===true
@@ -111,7 +115,7 @@ export function buildNodeReadRequest(args,source,{saves=[]}={}){
  if(javascript)need(readback?.kind==='javascript', 'JavaScript output reread requires source-bound admission');
  const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.port_kind==='tree'?p.tree.schema:p.schema}))??[];
  // A verified local configuration retains the full mapping even when the
- // original operation requested no preview. Fresh execution and table-schema
+ // original operation requested no preview. Native freshness and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
  const crossPolicy=retainCrossTableReadPolicy(source,args.source_operation_id);
  const retained=request.target.type==='transform.cross_table'||previews.length===0&&node.output?.variable_ports?.length?[]:retainedMappingSchemas(node,args.source_operation_id,request.target.type);
@@ -128,16 +132,16 @@ export function buildNodeReadRequest(args,source,{saves=[]}={}){
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:node.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
-  target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(node.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
+  target:{kind:'existing',type:request.target.type,...(args.execution==='execute'&&request.target.label!==undefined?{label:request.target.label}:{}),ref:structuredClone(node.node)},inputs:[],
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',schemas:structuredClone(schemas.filter(p=>ports.includes(p.port))),
    ...(crossPolicy?{cross_table_policy:crossPolicy}:{}),
    ...(javascript?{javascript_source:javascriptReadSourceBinding(readback.source)}:{})},
-  mappings:[],finish:'execute',read:{ports:structuredClone(ports),...(variablePorts.length?{variable_ports:structuredClone(variablePorts)}:{}),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  mappings:[],finish:args.execution==='execute'?'execute':'done',read:{ports:structuredClone(ports),...(variablePorts.length?{variable_ports:structuredClone(variablePorts)}:{}),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 // A browser recovery receipt carries only runtime-proven release facts and the
-// model's attested settings. No schema is trusted from it: the read executes the
-// node fresh and returns the observed output schema as its own evidence.
+// model's attested settings. No schema is trusted from it: the read requires
+// native freshness and returns the observed output schema as its own evidence.
 function buildRecoveredReadRequest(args,receipt){
  const request=receipt.request;
  need(receipt.status==='continuable'&&receipt.facts?.includes('node_released_on_quiet_graph')&&receipt.node&&request?.target
@@ -147,10 +151,10 @@ function buildRecoveredReadRequest(args,receipt){
  const budget=args.budget_ms??300000;
  return {operation_id:args.operation_id,contract_revision:request.contract_revision,
   document_id:receipt.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
-  target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(receipt.node)},inputs:[],
-  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,observed_schema:true,
+  target:{kind:'existing',type:request.target.type,...(args.execution==='execute'&&request.target.label!==undefined?{label:request.target.label}:{}),ref:structuredClone(receipt.node)},inputs:[],
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,execution_policy:args.execution??'existing',observed_schema:true,
    schemas:ports.map(port=>({port,schema:null}))},
-  mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  mappings:[],finish:args.execution==='execute'?'execute':'done',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
 export function nodeReadHandler(handler){
@@ -162,11 +166,12 @@ export function nodeReadHandler(handler){
       &&parameters&&Object.keys(parameters).join(',')==='source_operation_id'&&typeof parameters.source_operation_id==='string','Builtin snapshot cannot execute, configure or read other ports');return;
    }
    need(mode===NODE_READ_MODE&&request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
-    &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
+    &&request.finish===(parameters.execution_policy==='existing'?'done':'execute')&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
     'Existing-output reads cannot create nodes, configure ports or export files');
    const javascript=request.target.type==='programming.javascript';
    const observed=parameters?.observed_schema===true;
-   need(parameters&&Object.keys(parameters).sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
+   need(parameters&&(parameters.execution_policy===undefined||['existing','execute'].includes(parameters.execution_policy))
+    &&Object.keys(parameters).filter(k=>k!=='execution_policy').sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
     &&typeof parameters.source_operation_id==='string'
     &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&(parameters.schemas.length>0||request.read.variable_ports?.length>0),
     'Verified local output schemas required');
