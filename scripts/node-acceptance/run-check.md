@@ -1008,6 +1008,15 @@ order; fixed width supplies the real .txt file without treating it as CSV,
 while the final UTF-16 BE file supplies its decoded CSV header. Cold repeats
 the byte oracle for the file passed through --csv. No oracle reaches the model.
 
+`text-export-file-variable` uses `nodes/text-import/acceptance/task-file-variable-export.md`
+with only `sales-2026-11-05.csv`. run-check substitutes `{{EXPORTS_DIR}}` with the pair
+folder and a run-unique prefix for `report-`, so `overwrite=reject` never meets an older
+run. Both downloaded CSV (dates 11-05 and 11-06) must carry the first-stage rows
+(`oracle.py --export`: typed rows, header names, LF, no BOM) and come from one Export
+whose readback has `file_name_variable=ReportFile`, the resolved destination and a
+reject check; no exports.text request may carry a literal destination. Cold reads the
+last output and requires the saved filename binding to resolve to the final path.
+
 `factor-auto` uses the approved `modes/task-auto.md`: eigenvalue 1.1 then
 variance 90% on the same node, both complete typed outputs after each execution.
 Both stages use the unchanged independent `modes/expected.json` and stock
