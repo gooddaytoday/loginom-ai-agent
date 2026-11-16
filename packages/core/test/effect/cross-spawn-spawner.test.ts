@@ -289,8 +289,14 @@ describe("cross-spawn spawner", () => {
             return
           }
           // Orphans may remain as zombies until the host's init reaps them.
-          const state = yield* Effect.promise(() => fs.readFile(`/proc/${child.pid}/stat`, "utf8").catch(() => ""))
-          expect(state === "" || state.slice(state.lastIndexOf(")") + 2).startsWith("Z ")).toBe(true)
+          // Closing the pipe can precede the kernel's final process state change.
+          yield* Effect.gen(function* () {
+            while (true) {
+              const state = yield* Effect.promise(() => fs.readFile(`/proc/${child.pid}/stat`, "utf8").catch(() => ""))
+              if (state === "" || state.slice(state.lastIndexOf(")") + 2).startsWith("Z ")) return
+              yield* Effect.sleep("10 millis")
+            }
+          }).pipe(Effect.timeout("1 second"))
         }),
         15_000,
       )
