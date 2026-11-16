@@ -165,6 +165,9 @@ test
       .map((line) => JSON.parse(line))
     expect(phases.at(-1)).toMatchObject({ scope: "installation", status: "failed", error: { name: "Error", code } })
   },
+  // Same Node copy + forced hash as the bounded-budget case below (10 s); the
+  // Bun default of 5 s was exceeded by a ~4 s CI I/O stall in that setup.
+  10_000,
 )
 
 test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE)(
