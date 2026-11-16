@@ -62,3 +62,13 @@ test("node paths are usable beyond the sampled SkillTool resource list", () => {
 test('node selection preserves the standard-node restriction', () => {
   expect(skill).toContain('Для операций ниже используй указанные штатные узлы и режимы, без замены Калькулятором или JavaScript')
 })
+
+test("final message leaves package cleanup to the host and never links server paths", () => {
+  const finish = skill.slice(skill.indexOf("## Завершение"))
+  // The host closes the saved package and logs out after the answer; no tool does it.
+  expect(finish).toContain("закрытие и выход выполнит приложение")
+  expect(finish).toContain("не пиши, что пакет останется открытым")
+  // Export results carry artifact_id/destination, not a download URL.
+  expect(finish).toContain("серверный путь пиши в `коде`, не ссылкой")
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+})
