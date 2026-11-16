@@ -72,6 +72,39 @@ test("Chromium network diagnostics retain MIME, 304 and byte counts without touc
   assert.equal(session.eventNames().length, 0)
 })
 
+test("Chromium network diagnostics close is bounded by page or context close when detach never answers", async () => {
+  const fixture = () => {
+    const session = new EventEmitter(), context = new EventEmitter(), page = new EventEmitter()
+    let closed = false, detaches = 0
+    session.send = async () => {}
+    session.detach = () => { detaches++; return new Promise(() => {}) }
+    context.newCDPSession = async () => session
+    page.context = () => context
+    page.isClosed = () => closed
+    return { session, context, page, detaches: () => detaches, markClosed: () => { closed = true } }
+  }
+  const pending = promise => Promise.race([promise.then(() => "settled"), new Promise(resolve => setTimeout(resolve, 50, "pending"))])
+  const listeners = ({ page, context }) => page.listenerCount("close") + context.listenerCount("close")
+  // A live page (keepOpen/MCP) keeps waiting for detach.
+  for (const closer of ["page", "context"]) {
+    const live = fixture(), trace = await trackLoginNetwork(live.page)
+    const closing = trace.close()
+    assert.equal(await pending(closing), "pending")
+    assert.equal(listeners(live), 2)
+    live.markClosed(); live[closer].emit("close")
+    assert.equal(await pending(closing), "settled")
+    assert.equal(listeners(live), 0)
+    assert.equal(live.session.eventNames().length, 0)
+    assert.equal(live.detaches(), 1)
+  }
+  // A page closed before close() emits no further event; it must not wait.
+  const gone = fixture(), trace = await trackLoginNetwork(gone.page)
+  gone.markClosed()
+  assert.equal(await pending(trace.close()), "settled")
+  assert.equal(listeners(gone), 0)
+  assert.equal(gone.detaches(), 1)
+})
+
 test("browser launch retains a sanitized cause and phase before normalizing the error", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-launch-failure-"))
   const phases = []

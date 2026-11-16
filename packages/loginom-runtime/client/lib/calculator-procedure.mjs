@@ -43,13 +43,13 @@ async function selectCalculatorSyntax(channel,syntax) {
  return s;
 }
 
-export async function configureCalculator(channel,parameters,{newNode=false,recoverRejectedRequest=false,captureBaseline}={}) {
+export async function configureCalculator(channel,parameters,{newNode=false,createdByOperation=false,recoverRejectedRequest=false,captureBaseline}={}) {
  const ready=s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true;
  const observe=condition=>channel.observe({condition,readCalculator:true,ready});
  const baseline=await observe('complete calculator configuration before patch');
  captureBaseline?.(structuredClone(baseline));
  let plan;
- try {plan=resolveCalculatorPatch(parameters,baseline.node_calculator,baseline.node_calculator.input_fields,{newNode});}
+ try {plan=resolveCalculatorPatch(parameters,baseline.node_calculator,baseline.node_calculator.input_fields,{newNode,removeDefault:newNode&&createdByOperation});}
  catch(error){
   if(recoverRejectedRequest&&!newNode)await rejectUnchangedCalculatorDraft(channel,baseline,error);
   throw error;
@@ -160,6 +160,20 @@ export async function configureCalculator(channel,parameters,{newNode=false,reco
   }
   s=await observe('calculator formula and untouched options read back');
   requireValue(same(semantic(row(s,recordId)),semantic(patch)),'Calculator expression readback differs');identities.set(patch.name,recordId);
+ }
+ if(plan.discard_default){
+  const original=plan.discard_default,s=await select(original.record_id);
+  requireValue(same(semantic(row(s,original.record_id)),semantic(original)), 'New Calculator template changed before deletion');
+  const retained=s.node_calculator.expressions.filter(e=>e.record_id!==original.record_id);
+  requireValue(retained.length===plan.expressions.length&&retained.length>0,'Requested expressions must exist before template deletion');
+  await channel.perform({condition:'delete only this new Calculator untouched template',initialObservation:s,
+   ready:s=>ready(s)&&row(s,original.record_id)?.selected===true&&same(semantic(row(s,original.record_id)),semantic(original)),
+   identity:()=>({record_id:original.record_id,template:semantic(original)}),
+   resolve:s=>({verb:'click',ref:control(s,';CalcDataWizard;btnDelExpr','click').ref})});
+  const after=await observe('new Calculator template deleted');
+  requireValue(!row(after,original.record_id)&&after.node_calculator.expressions.length===retained.length
+   &&retained.every(e=>same(semantic(row(after,e.record_id)),semantic(e))),'Template deletion changed another expression');
+  identities.delete(original.name);
  }
  // Move existing records with Loginom controls. Never delete/recreate expressions
  // to obtain an order: dependent references and unrequested options survive.

@@ -1,0 +1,77 @@
+{
+  "nodes": [
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "transform.group_data"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "summary.csv",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Batch",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Rows",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "NA",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "NB",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "YA",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "YB",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Missing",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "BadGroup",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "BadExtras",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Batch": "AB test",
+          "Rows": 20000,
+          "NA": 10000,
+          "NB": 10000,
+          "YA": 2000,
+          "YB": 2000,
+          "Missing": 0,
+          "BadGroup": 0,
+          "BadExtras": 0
+        }
+      ]
+    }
+  ]
+}

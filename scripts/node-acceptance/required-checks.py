@@ -75,6 +75,8 @@ RULES = (
     ((C + 'calculator-*.mjs',
       'docs/node-development/nodes/transform-calculator/acceptance/calculator-viewport/**'),
      ('live-ui',), ('calculator-viewport',)),
+    (('docs/node-development/nodes/transform-calculator/acceptance/calculator-eight/**',),
+     ('live-ui',), ('calculator-eight',)),
     ((C + 'node-execution-*.mjs', C + 'node-process-context.mjs', C + 'node-procedure.mjs', C + 'executor.mjs',
       C + 'workspace-ui.mjs', C + '*toast*.mjs'),
      ('live-ui',), ('s1', 's3', 's5', 'n18', 'n19', 'n20', 'linreg-short', 'throw1')),

@@ -410,6 +410,12 @@ Var.* tasks and exact typed expectations under `nodes/calculator/acceptance`.
 Only the task and `fixtures/variables.csv` reach the model. The update task
 changes the source on the same Calculator; stock CSV/Save/cold/cleanup apply.
 
+`calculator-vars-saveas` (LAB-1729) uses `scenarios/calculator-vars-saveas/task.md`: the
+Calculator Var.Amount task (7), Save As with reopen, then Amount=11 and the same Calculator
+in the reopened package, final Save As with reopen. Checks `calculator/acceptance/expected.json`, stock CSV/Save/cold,
+a confirmed `save_as` receipt with `reopened:true` and an accepted
+`reopened_package_cleanup_binding` for the saved path (#986 cleanup branch).
+
 `calculator-expression-options` uses the approved Loginom-syntax task (intermediate cached Helper, reorder, same-node rerun with cache off) and
 `modes/expected-expression-options.json`; only the task and `fixtures/modes.csv` reach the model.
 
@@ -664,6 +670,7 @@ To add a scenario for a new node:
 | Name | Stock fixture under docs/node-development/nodes | Acceptance |
 |---|---|---|
 | calculator-viewport | transform-calculator/acceptance/calculator-viewport | Nine calculators, distant financial node, export then fresh port/tooltip read; CSV/Save/cold/cleanup |
+| calculator-eight | transform-calculator/acceptance/calculator-eight | 20,000 AB rows, one Calculator with eight expressions and a one-row exact sample, grouped audit totals; summary CSV/Save/cold/cleanup. Run with `--viewport 1280x800` and `--viewport 1920x945`. Native Calculator Preview opens before execution; source Preview is requested when public tools support it. |
 | linreg-short | datamining-linregression/acceptance/linreg-short | Expected Loginom training error: two rows, four coefficients; Save/cleanup, no CSV |
 | throw1 | programming-javascript/acceptance/throw1 | Expected JavaScript exception; Save/cleanup, no CSV |
 | js-declared-empty | programming-javascript/acceptance/js-declared-empty | Positive declared Broken:real empty table; header-only CSV/Save/cold/cleanup |
@@ -1311,7 +1318,6 @@ its final LF. Both require full typed reads, CSV, Save, cold execution without
 configuration and confirmed cleanup. Only task and CSV reach the model; oracle
 and expected remain private. Regression: supernode-calc and rest-get-plain once.
 
-
 `supernode-vars` uses control-supernode/acceptance/variables/task.md without input
 files. Its independent oracle checks the original Page=99, Limit=2 body: Skip=198,
 exact integer Skip/Page/Limit order, full typed output and downloaded CSV.
@@ -1320,3 +1326,16 @@ and Calculator, converter table → Calculator → OutputNode, and retained inte
 definition IDs/values and input-port GUID across Save/cold. Only task reaches
 the model; no Loop or XML oracle is involved. Cold uses owned port inspection
 with Close, then stock execution/export checks and confirmed package/logout cleanup.
+
+`node-delete` (LAB-1721): approved `graph/node-delete/acceptance/node-delete/task.md`
+and only sales.csv. Four nodes Import → Row Filter «Крупные продажи» → Sorting →
+Export; the user then asks to delete the filter, reconnect Import to the same Sorting
+and export all rows. Exactly one verified `loginom_dock_node_delete` (SUCCEEDED,
+output.status deleted, no AMBIGUOUS), frozen sorted six-row CSV, Save, cold with
+`absent_node_types:["transform.filter_data"]` and stock cleanup.
+
+`node-delete-refused` (LAB-1721): approved `node-delete-refused/task.md` and only
+numbers.csv. The user asks to delete a JavaScript node while its 60-second (below the 120 s default execute budget)
+execution runs. Every deletion reply must be NOT_APPLIED with effect_possible:false
+and at least one `NODE_OPERATION_RUNNING`; the node stays, its CSV, Save, cold and
+cleanup use stock checks. Expected/oracle never reach the model.

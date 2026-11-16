@@ -1,0 +1,206 @@
+{
+ "package_path": "{{PACKAGE_PATH}}",
+ "nodes": [
+  {
+   "type": "imports.text"
+  },
+  {
+   "type": "exports.text"
+  }
+ ],
+ "outputs": [
+  {
+   "output_node_type": "imports.text",
+   "output_port": 0,
+   "ordered": false,
+   "column_order": "any",
+   "columns": [
+    {
+     "name": "TransactionID",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Account",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Amount",
+     "type": "real",
+     "label_any": true
+    },
+    {
+     "name": "Currency",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Branch",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Customer",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Category",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Status",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Merchant",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Country",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Channel",
+     "type": "string",
+     "label_any": true
+    },
+    {
+     "name": "Fee",
+     "type": "real",
+     "label_any": true
+    },
+    {
+     "name": "Memo",
+     "type": "string",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "TransactionID": "TX-1",
+     "Account": "ACC-1",
+     "Amount": 1.25,
+     "Currency": "RUB",
+     "Branch": "Moscow",
+     "Customer": "Customer-1",
+     "Category": "retail",
+     "Status": "approved",
+     "Merchant": "Shop",
+     "Country": "RU",
+     "Channel": "web",
+     "Fee": 0.5,
+     "Memo": "Note-1"
+    },
+    {
+     "TransactionID": "TX-2",
+     "Account": "ACC-2",
+     "Amount": 2.25,
+     "Currency": "RUB",
+     "Branch": "Moscow",
+     "Customer": "Customer-2",
+     "Category": "retail",
+     "Status": "approved",
+     "Merchant": "Shop",
+     "Country": "RU",
+     "Channel": "web",
+     "Fee": 0.5,
+     "Memo": "Note-2"
+    },
+    {
+     "TransactionID": "TX-3",
+     "Account": "ACC-3",
+     "Amount": 3.25,
+     "Currency": "RUB",
+     "Branch": "Moscow",
+     "Customer": "Customer-3",
+     "Category": "retail",
+     "Status": "approved",
+     "Merchant": "Shop",
+     "Country": "RU",
+     "Channel": "web",
+     "Fee": 0.5,
+     "Memo": "Note-3"
+    },
+    {
+     "TransactionID": "TX-4",
+     "Account": "ACC-4",
+     "Amount": 4.25,
+     "Currency": "RUB",
+     "Branch": "Moscow",
+     "Customer": "Customer-4",
+     "Category": "retail",
+     "Status": "approved",
+     "Merchant": "Shop",
+     "Country": "RU",
+     "Channel": "web",
+     "Fee": 0.5,
+     "Memo": "Note-4"
+    }
+   ],
+   "export_destination": "native-wide.csv"
+  }
+ ],
+ "server_import": {
+  "records": 4,
+  "columns": [
+   {
+    "name": "TransactionID",
+    "type": "string"
+   },
+   {
+    "name": "Account",
+    "type": "string"
+   },
+   {
+    "name": "Amount",
+    "type": "real"
+   },
+   {
+    "name": "Currency",
+    "type": "string"
+   },
+   {
+    "name": "Branch",
+    "type": "string"
+   },
+   {
+    "name": "Customer",
+    "type": "string"
+   },
+   {
+    "name": "Category",
+    "type": "string"
+   },
+   {
+    "name": "Status",
+    "type": "string"
+   },
+   {
+    "name": "Merchant",
+    "type": "string"
+   },
+   {
+    "name": "Country",
+    "type": "string"
+   },
+   {
+    "name": "Channel",
+    "type": "string"
+   },
+   {
+    "name": "Fee",
+    "type": "real"
+   },
+   {
+    "name": "Memo",
+    "type": "string"
+   }
+  ]
+ }
+}

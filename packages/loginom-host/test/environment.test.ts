@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test"
 import { runtimeEnvironment } from "../src/supervisor"
 
+test("runtime forwards the fixed acceptance viewport to its own browser launcher", () => {
+  expect(runtimeEnvironment({ LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT: "1920x945" }, "linux").LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT).toBe("1920x945")
+})
+
 test("runtime inherits proxy routes and Linux system settings without provider credentials", () => {
   const env = runtimeEnvironment(
     {
