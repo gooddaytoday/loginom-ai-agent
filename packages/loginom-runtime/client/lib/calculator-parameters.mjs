@@ -68,12 +68,15 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
     'New calculator default expression changed');
   }
   const original=baseline;
+  // An explicitly requested Expr1 uses the existing rename planner: the
+  // template becomes a requested expression instead of being deleted.
+  const discardTemplate=newNode&&removeDefault&&!parameters.expressions.some(e=>e.name==='Expr1');
   const resolved=newNode?[]:structuredClone(baseline),changes=[],rewritten=new Set();
   for(const [index,patch] of parameters.expressions.entries()) {
     const existing=patch.target.kind==='existing';
     const matches=existing?original.filter(e=>e.name===patch.target.name):[];
     requireValue(!existing||matches.length===1,'Existing expression name is missing or ambiguous');
-    const before=existing?matches[0]:newNode&&index===0&&(!removeDefault||patch.name==='Expr1')?baseline[0]:null;
+    const before=existing?matches[0]:newNode&&index===0&&!discardTemplate?baseline[0]:null;
     const after=before?structuredClone(before):{intermediate:false,cached:false,description:'',replace:false};
     for(const key of [...properties,...flags])if(patch[key]!==undefined)after[key]=patch[key];
     if(patch.formula!==undefined)rewritten.add(after);
@@ -98,7 +101,7 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
     resolved.sort((a,b)=>parameters.order.indexOf(a.name)-parameters.order.indexOf(b.name));
   }
   return {baseline,changes,expressions:resolved.map((e,index)=>({...e,index})),order:resolved.map(e=>e.name),
-    discard_default:newNode&&removeDefault&&!changes.some(c=>c.before?.record_id===baseline[0].record_id)?baseline[0]:null};
+    discard_default:discardTemplate?baseline[0]:null};
 }
 
 // Loginom checks names on each Apply, not just the final inventory. Free a
