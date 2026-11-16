@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { $ } from "bun"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -12,10 +12,19 @@ const updateAssets = [
 ]
 const macUpdateAssets = ["latest-mac.yml", "loginom-ai-agent-mac-arm64.zip.blockmap"]
 
-test("release notes require all platforms, matching provenance, checksums and passing reports", async () => {
+test("0.4.0 release notes require all platforms, matching provenance, checksums and passing reports", async () => {
+  const tag = "v0.4.0"
   const root = resolve(import.meta.dir, "../../../..")
   const dir = await mkdtemp(join(tmpdir(), "loginom-release-notes-"))
-  const commit = (await $`git rev-parse HEAD`.cwd(root).text()).trim()
+  const repository = join(dir, "git")
+  await mkdir(repository)
+  await $`git init -q ${repository}`.quiet()
+  await $`git -c user.name=Fixture -c user.email=fixture@example.test commit --allow-empty -qm fixture`
+    .cwd(repository)
+    .quiet()
+  if (tag !== "HEAD") await $`git tag ${tag}`.cwd(repository).quiet()
+  const commit = (await $`git rev-parse HEAD`.cwd(repository).text()).trim()
+  const version = tag.replace(/^v/, "")
   const assets = [
     "loginom-ai-agent-linux-amd64.deb",
     "loginom-ai-agent-linux-x86_64.AppImage",
@@ -28,10 +37,10 @@ test("release notes require all platforms, matching provenance, checksums and pa
     "loginom-ai-agent-HEAD-source.tar.gz",
     "loginom-ai-agent-HEAD-windows-source.tar.gz",
     "loginom-ai-agent-HEAD-macos-source.tar.gz",
-  ]
+  ].map((file) => file.replaceAll("HEAD", version))
   const digest = new Bun.CryptoHasher("sha256").update("fixture").digest("hex")
   const manifest = {
-    version: "HEAD",
+    version,
     source: { commit, dirty: false },
     artifacts: assets.map((file) => ({ file, sha256: digest })),
   }
@@ -41,8 +50,8 @@ test("release notes require all platforms, matching provenance, checksums and pa
   }
   const write = (name: string, value: unknown) => Bun.write(join(dir, name), JSON.stringify(value))
   const run = () =>
-    $`${process.execPath} ${join(root, "script/release-notes.ts")} --tag HEAD --channel prod --assets ${dir} --output ${join(dir, "notes.md")}`
-      .cwd(root)
+    $`${process.execPath} ${join(root, "script/release-notes.ts")} --tag ${tag} --channel prod --assets ${dir} --output ${join(dir, "notes.md")}`
+      .cwd(repository)
       .quiet()
       .nothrow()
   try {
@@ -62,7 +71,12 @@ test("release notes require all platforms, matching provenance, checksums and pa
       await write(name, { status: "PASS" })
     await write("linux-matrix.json", matrix)
     expect((await run()).exitCode).toBe(0)
-    expect(await Bun.file(join(dir, "notes.md")).text()).toContain("Pre-release")
+    const notes = await Bun.file(join(dir, "notes.md")).text()
+    expect(notes).toContain("Pre-release")
+    const manual =
+      "Users of 0.3.9 on any platform must install 0.4.0 manually over the existing installation; 0.3.9 has its update feed disabled. Keep the existing profile; do not uninstall or delete application data first."
+    expect(notes).toContain(manual)
+    expect(notes).not.toContain("Windows 0.3.9 users")
     for (const name of [...updateAssets, ...macUpdateAssets]) {
       expect(await Bun.file(join(dir, "notes.md")).text()).toContain(name)
       expect(await Bun.file(join(dir, "SHA256SUMS.txt")).text()).toContain(`${digest}  ${name}\n`)
@@ -85,7 +99,7 @@ test("release notes require all platforms, matching provenance, checksums and pa
     await write("linux-matrix.json", { ...matrix, reports: matrix.reports.slice(1) })
     expect((await run()).stderr.toString()).toContain("complete passing Linux matrix")
     await write("linux-matrix.json", matrix)
-    await rm(join(dir, "loginom-ai-agent-cli-HEAD-win32-x64.zip"))
+    await rm(join(dir, `loginom-ai-agent-cli-${version}-win32-x64.zip`))
     expect((await run()).exitCode).not.toBe(0)
   } finally {
     await rm(dir, { recursive: true, force: true })

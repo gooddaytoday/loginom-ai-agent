@@ -888,6 +888,12 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task-variables-update.md' if update else 'task-variables.md'),
                     data=src.parent / 'fixtures', input_files=['variables.csv'], base=None,
                     expected_name='expected.json' if update else 'expected-initial.json', oracle=src / 'oracle-variables.py')
+    if name == 'calculator-vars-saveas':
+        # LAB-1729: Save As with reopen, then continue in the reopened package (#986 cleanup).
+        src = REPO / 'docs/node-development/nodes/calculator/acceptance'
+        return dict(source=src, prompt=REPO / 'scripts/node-acceptance/scenarios/calculator-vars-saveas/task.md', data=src.parent / 'fixtures',
+                    input_files=['variables.csv'], base=None, expected_name='expected.json',
+                    oracle=src / 'oracle-variables.py', reopened_cleanup=True)
     if name == 'calculator-expression-options':
         src = REPO / 'docs/node-development/nodes/calculator/acceptance'
         return dict(source=src / 'modes', prompt=src / 'task-expression-options.md', data=src.parent / 'fixtures',
@@ -1012,6 +1018,9 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task-' + mode + '.md'),
                     data=src.parent / 'fixtures/v040', input_files=['left.csv', 'right.csv'],
                     expected_name='v040/' + mode + '/expected.json', oracle=src / 'oracle-v040.py', base=None)
+    if name in ['node-delete', 'node-delete-refused']:
+        src = REPO / 'docs/node-development/graph/node-delete/acceptance' / name
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, node_delete=name, oracle=src.parent / 'oracle.py')
     if name in ['join-right', 'join-full', 'join-difference']:
         src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
@@ -1206,6 +1215,26 @@ def model_replies(events):
         except (ValueError, TypeError): continue
         if isinstance(reply, dict): replies.append((n, reply))
     return replies
+
+
+def check_node_delete(events, refused):
+    # Every model deletion reply, including tool errors, is part of the verdict.
+    deletes = []
+    for _, event in events:
+        part = event.get('part', {})
+        if event.get('type') != 'tool_use' or part.get('tool') != 'loginom_dock_node_delete': continue
+        state = part.get('state', {})
+        try: reply = json.JSONDecoder().raw_decode(state.get('output') or state.get('error') or '')[0]
+        except (ValueError, TypeError): reply = {}
+        if state.get('status') in ('completed', 'error'): deletes.append(reply if isinstance(reply, dict) else {})
+    assert deletes, 'NODE_DELETE_NOT_REQUESTED'
+    if refused:
+        assert all(r.get('status') == 'NOT_APPLIED' and r.get('effect_possible') is False for r in deletes), 'NODE_DELETE_REFUSAL_MUTATED'
+        assert any((r.get('error') or {}).get('code') == 'NODE_OPERATION_RUNNING' for r in deletes), 'NODE_DELETE_RUNNING_REFUSAL_MISSING'
+    else:
+        done = [r for r in deletes if r.get('status') == 'SUCCEEDED']
+        assert len(done) == 1 and done[0].get('output', {}).get('status') == 'deleted', 'NODE_DELETE_NOT_VERIFIED'
+        assert not any(r.get('status') == 'AMBIGUOUS' for r in deletes), 'NODE_DELETE_AMBIGUOUS'
 
 
 def check_text_auto_label(replies):
@@ -2884,6 +2913,14 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
+        if spec.get('reopened_cleanup'):
+            # #986: the final cleanup must bind the package reopened by Save As.
+            assert any(save_confirmed(spec, o, package) and o.get('action_key') == 'package.save_as'
+                       and o.get('output', {}).get('reopened') is True for _, o in replies), 'SAVE_AS_REOPEN_MISSING'
+            bindings = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)
+                        if event.get('phase') == 'reopened_package_cleanup_binding']
+            assert any(b.get('accepted') is True and b.get('package_path') == package for b in bindings), 'REOPENED_CLEANUP_BINDING_MISSING'
+            self.current['cleanup'] = 'main PASS (reopened binding)'
         if spec.get('text_folder_masks'):
             self.current.update(folder_source_metrics(events))
             check_text_folder_masks(replies, source_dir, spec['data'], expected, build / 'resources/loginom/bin/node')
@@ -3127,6 +3164,8 @@ class Runner:
         if spec.get('text_file_info'):
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_file_info(replies)
+        if spec.get('node_delete'):
+            check_node_delete(events, spec['node_delete'] == 'node-delete-refused')
         if spec.get('excel_multi') == 'excel-import-multi':
             check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True, kind='excel_import')
             check_excel_multi(replies, source_dir)
