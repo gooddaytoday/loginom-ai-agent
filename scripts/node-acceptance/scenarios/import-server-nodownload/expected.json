@@ -5,15 +5,12 @@
    "type": "imports.text"
   },
   {
-   "type": "transform.group_data"
-  },
-  {
    "type": "exports.text"
   }
  ],
  "outputs": [
   {
-   "output_node_type": "transform.group_data",
+   "output_node_type": "export_input",
    "output_port": 0,
    "ordered": false,
    "column_order": "any",

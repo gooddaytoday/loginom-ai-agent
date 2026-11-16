@@ -18,14 +18,14 @@ def expected(case):
     rows = [dict(zip(NAMES, [f'TX-{i}', f'ACC-{i}', i + 0.25, 'RUB', 'Moscow',
                             f'Customer-{i}', 'retail', 'approved', 'Shop', 'RU', 'web', 0.5, f'Note-{i}']))
             for i in range(1, 5)]
-    output = dict(output_node_type='transform.group_data' if large else 'imports.text',
+    output = dict(output_node_type='export_input' if large else 'imports.text',
                   output_port=0, ordered=False, column_order='any',
                   columns=[dict(name=n, type=t, label_any=True) for n, t in
                            ([('N', 'integer'), ('Total', 'integer')] if large else columns)],
                   rows=[dict(N=RECORDS, Total=RECORDS * (RECORDS + 1) // 2)] if large else rows,
                   export_destination='native-total.csv' if large else 'native-wide.csv')
     return dict(package_path='{{PACKAGE_PATH}}',
-                nodes=[dict(type=t) for t in ['imports.text', *(['transform.group_data'] if large else []), 'exports.text']],
+                nodes=[dict(type=t) for t in ['imports.text', 'exports.text']],
                 outputs=[output], server_import=dict(records=RECORDS if large else len(rows),
                 columns=[dict(name=n, type=t) for n, t in columns]))
 

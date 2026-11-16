@@ -14,6 +14,9 @@ r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
 for name in ['import-server-nodownload','import-server-wide']:
  c=r.scenario(name);e=r.expected_for(c,'/own/test.lgp')
  assert e==r.expected_for(c,'/own/test.lgp',cold=True)
+ if name=='import-server-nodownload':
+  assert e['outputs'][0]['output_node_type']=='export_input'
+  assert [n['type'] for n in e['nodes']]==['imports.text','exports.text']
  subprocess.run([sys.executable,'-B',str(c['oracle']),'--case',name,'--check'],check=True)
  with tempfile.TemporaryDirectory() as directory:
   root=Path(directory);folder=root/'stage';folder.mkdir();workspace=root/'workspace';workspace.mkdir()
