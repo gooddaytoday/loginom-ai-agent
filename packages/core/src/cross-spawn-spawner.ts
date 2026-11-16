@@ -397,9 +397,6 @@ export const make = Effect.gen(function* () {
             const send = (s: NodeJS.Signals) =>
               Effect.catch(killGroup(command, proc, s), () => killOne(command, proc, s))
             const sig = opts?.killSignal ?? "SIGTERM"
-            // A reaped leader can still have descendants in its process group.
-            if (proc.exitCode !== null || proc.signalCode !== null)
-              return Effect.ignore(send(sig)).pipe(Effect.andThen(closed))
             const attempt = send(sig).pipe(
               Effect.andThen(Predicate.isUndefined(opts?.forceKillAfter) ? exited : Deferred.await(signal)),
               Effect.asVoid,

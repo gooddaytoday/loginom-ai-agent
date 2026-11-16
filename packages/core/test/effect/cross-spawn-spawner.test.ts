@@ -229,7 +229,13 @@ describe("cross-spawn spawner", () => {
   })
 
   describe("process control", () => {
-    for (const scenario of ["scope-stubborn", "scope-exited", "kill-detached", "kill-exited-detached"] as const) {
+    for (const scenario of [
+      "scope-stubborn",
+      "scope-exited",
+      "scope-exited-stubborn",
+      "kill-detached",
+      "kill-exited-detached",
+    ] as const) {
       fx.live(
         `bounds cancellation with inherited stdio: ${scenario}`,
         Effect.gen(function* () {
@@ -253,7 +259,7 @@ describe("cross-spawn spawner", () => {
             Effect.gen(function* () {
               const code = [
                 'const fs = require("node:fs")',
-                scenario === "scope-stubborn" ? 'process.on("SIGTERM", () => {})' : "",
+                scenario.endsWith("stubborn") ? 'process.on("SIGTERM", () => {})' : "",
                 `fs.writeFileSync(${JSON.stringify(marker)}, String(process.pid))`,
                 "setTimeout(() => process.exit(0), 8000)",
               ]
@@ -303,7 +309,7 @@ describe("cross-spawn spawner", () => {
     }
 
     fx.live(
-      "releases an exited process while inherited stdio prevents close",
+      "bounds release when a detached descendant keeps stdio",
       Effect.gen(function* () {
         if (process.platform === "win32") return
 
