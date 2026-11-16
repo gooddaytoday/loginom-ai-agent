@@ -61,8 +61,16 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
     if(before.nodes.filter(n=>n.ref.node_id===id).length!==1||after.nodes.some(n=>n.ref.node_id===id))return null;
     const service=(before.rest_connection_links??[]).filter(touches),gone=service.map(e=>e.tid);
     const rest=g=>(g.rest_connection_links??[]).filter(e=>!touches(e));
-    const remaining=g=>({nodes:g.nodes.filter(n=>n.ref.node_id!==id).map(domainNode),links:g.links.filter(e=>!touches(e)),
-      variable_links:(g.variable_links??[]).filter(e=>!touches(e))});
+    // A downstream variable input fed only by the deleted node may disappear
+    // natively, renumbering the remaining dynamic ports. Bind survivors by GUID.
+    const fed=(before.variable_links??[]).filter(e=>e.source===id);
+    const dropped=new Set(fed.map(e=>e.target_port_guid)),narrowed=new Set(fed.map(e=>e.target));
+    if(fed.some(e=>typeof e.target_port_guid!=='string'||!e.target_port_guid))return null;
+    const port=n=>!narrowed.has(n.ref.node_id)?n:{...n,variable_outputs:n.variable_outputs??[],
+      variable_inputs:(n.variable_inputs??[]).filter(v=>!dropped.has(v.port_guid)).map(({kind,port_guid})=>({kind,port_guid})),
+      other_ports:(n.other_ports??[]).filter(name=>!/^Input_(?:Var-\d+|ControlVar)$/.test(name))};
+    const remaining=g=>({nodes:g.nodes.filter(n=>n.ref.node_id!==id).map(port).map(domainNode),links:g.links.filter(e=>!touches(e)),
+      variable_links:(g.variable_links??[]).filter(e=>!touches(e)).map(({input,...e})=>narrowed.has(e.target)?e:{...e,input})});
     return same(after.foreign_links,before.foreign_links.filter(tid=>!gone.includes(tid)))&&same(rest(after),rest(before))
       &&![...after.links,...after.variable_links??[],...after.rest_connection_links??[]].some(touches)&&same(remaining(before),remaining(after))
       ?{removed_links:before.links.filter(touches),removed_variable_links:(before.variable_links??[]).filter(touches),removed_service_links:service}:null;
@@ -214,7 +222,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         await commit();
         // New receipt ID, same graph identity and original deadline. No retry
         // is allowed unless this exact gesture was proved not dispatched.
-        if(refresh<2){original=after;continue;}
+        // A refused deletion is reported, never re-dispatched under a new receipt.
+        if(refresh<2&&kind!=='delete_node'){original=after;continue;}
         throw new Error('Graph gesture refused before effect: '+(receipt.error??'unknown precondition'));
       }
       state.pending.receipt = structuredClone(receipt);

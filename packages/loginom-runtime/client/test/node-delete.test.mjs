@@ -79,6 +79,45 @@ for(const [name,change,r,pattern] of [
  assert.match(result.error,pattern);assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);
 });
 
+test('a native pre-gesture refusal of deletion is reported once and leaves no pending effect',async()=>{
+ const f=fixture();
+ f.adapter.mutate=async effect=>{f.calls.push(effect.kind);return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,
+  error:'Node to delete has a connection Dock cannot verify (3 native, 2 recognized); nothing was deleted'};};
+ const before=structuredClone(f.graph),result=await f.run();
+ assert.equal(result.status,'NOT_APPLIED',JSON.stringify(result));assert.equal(result.partial_effect,false);assert.equal(result.cleanup_complete,true);
+ assert.equal(result.pending,null);assert.match(result.error,/cannot verify/);
+ assert.deepEqual(f.calls,['delete_node'],'a refused deletion is never re-dispatched');assert.deepEqual(f.graph,before);
+});
+
+const variableGraph=()=>{
+ const g=chain();
+ // b feeds Var-0 of a variables node; a feeds its Var-1 (renumbered after b goes).
+ g.nodes.push({ref:ref('v'),type:'variables.column_union',label:'Переменные',position:{x:96,y:300},inputs:[],outputs:[],locked:false,
+  variable_inputs:[{kind:'variables',port:0,native_index:0,port_guid:'pb'},{kind:'variables',port:1,native_index:1,port_guid:'pa'}],
+  variable_outputs:[{kind:'variables',port:0,native_index:0,port_guid:'out'}],other_ports:['Input_Var-0','Input_Var-1','Output_Var-0']});
+ g.variable_links=[{source:'b',output:0,target:'v',input:0,kind:'variables',source_port_guid:'sb',target_port_guid:'pb'},
+  {source:'a',output:0,target:'v',input:1,kind:'variables',source_port_guid:'sa',target_port_guid:'pa'}];
+ return g;
+};
+test('deleting a variable source tolerates only the native removal of its own downstream input',()=>{
+ const before=variableGraph(),effect={kind:'delete_node',parameters:{ref:ref('b')},before};
+ const narrowed=()=>{const g=structuredClone(remove(before,'b'));g.variable_links=[{...before.variable_links[1],input:0}];
+  Object.assign(g.nodes.find(n=>n.ref.node_id==='v'),{variable_inputs:[{kind:'variables',port:0,native_index:0,port_guid:'pa'}],other_ports:['Input_Var-0','Output_Var-0']});return g;};
+ assert.ok(verifyNodeTargetEffect(effect,narrowed()),'native narrowing and renumbering');
+ const kept=structuredClone(remove(before,'b'));kept.variable_links=[before.variable_links[1]];
+ assert.ok(verifyNodeTargetEffect(effect,kept),'port retained without its link');
+ for(const [name,change] of Object.entries({
+  foreign_port_dropped:g=>{g.nodes.find(n=>n.ref.node_id==='v').variable_inputs=[];},
+  surviving_link_lost:g=>{g.variable_links=[];},
+  surviving_link_rebound:g=>{g.variable_links[0].target_port_guid='other';},
+  outputs_changed:g=>{g.nodes.find(n=>n.ref.node_id==='v').variable_outputs=[];},
+  tabular_changed:g=>{g.nodes.find(n=>n.ref.node_id==='v').inputs=[0];},
+ })){const g=narrowed();change(g);assert.equal(verifyNodeTargetEffect(effect,g),null,name);}
+ // Without native port GUIDs the narrowing cannot be bound.
+ const unbound=structuredClone(before);delete unbound.variable_links[0].target_port_guid;
+ assert.equal(verifyNodeTargetEffect({...effect,before:unbound},narrowed()),null);
+});
+
 test('deletion contract rejects foreign workflow, inputs and unknown fields before observation',()=>{
  for(const r of [{...request(),target:{kind:'delete',ref:{...ref('b'),workflow_id:'other'}}},{...request(),inputs:[{source:ref('a'),output:0,input:0}]},
   {...request(),variable_inputs:[]},{...request(),target:{kind:'delete',ref:ref('b'),type:'transform.filter_data'}}])
@@ -93,19 +132,22 @@ test('an unverified deletion stays ambiguous and is never repeated',async()=>{
 });
 
 // Native gesture: select exactly the node cell, toolbar Delete, confirm.
-function page({selected=true,text='Удалить выделенный узел?',locked=false}={}) {
- let graph=chain(),selection=[],clicks=[];
+function page({selected=true,text='Удалить выделенный узел?',locked=false,extraEdges=0}={}) {
+ let graph=chain(),selection=[],clicks=[],dialog=false;
  const value={graph:()=>graph,clicks,
   evaluate:async(fn,arg)=>{
    const source=fn.toString();
    if(arg?.epoch)return;
-   if(source.includes('Native node body hit unavailable')){if(locked)throw Error('Exact unlocked node to delete required');return {x:200,y:120};}
+   if(source.includes('Native node body hit unavailable')){
+    if(locked)throw Error('Exact unlocked node to delete required');
+    if(arg.known+extraEdges!==arg.known)throw Error('Node to delete has a connection Dock cannot verify ('+(arg.known+extraEdges)+' native, '+arg.known+' recognized); nothing was deleted');
+    assert.equal(arg.known,2);return {x:200,y:120};}
    if(source.includes('getSelectionCells'))return selection.length===1&&selection[0]===arg&&graph.nodes.some(n=>n.ref.node_id===arg);
    throw Error('Unexpected evaluate '+source.slice(0,80));
   },
-  locator:selector=>({locator:child=>value.locator(child),count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,
+  locator:selector=>{const box=selector.includes('msgbox;');return {locator:child=>value.locator(child),count:async()=>!box||dialog?1:0,isVisible:async()=>!box||dialog,isEnabled:async()=>true,
    evaluate:async()=>({x:10,y:10}),waitFor:async()=>{},textContent:async()=>text,
-   click:async()=>{clicks.push(selector);if(selector.includes('msgbox;tlb;yes'))graph=remove(graph,'b');}}),
+   click:async()=>{clicks.push(selector);if(selector.includes('btnRemoveSelected'))dialog=true;if(selector.includes('msgbox;tlb;'))dialog=false;if(selector.includes('msgbox;tlb;yes'))graph=remove(graph,'b');}};},
   mouse:{click:async()=>{clicks.push('body');if(selected)selection=['b'];},move:async()=>{}},
   keyboard:{press:async()=>{}},waitForTimeout:async()=>{},
  };
@@ -128,14 +170,22 @@ test('native deletion selects the owned node body and confirms once',async()=>{
 });
 test('native deletion never presses Delete without the exact single-node selection',async()=>{
  const {receipt,clicks}=await gesture({selected:false});
- assert.equal(receipt.status,'AMBIGUOUS');assert.match(receipt.error,/owned_node_selection/);
+ // A selection click alone is no graph effect: the refusal is NOT_APPLIED.
+ assert.equal(receipt.status,'NOT_APPLIED');assert.equal(receipt.effect_possible,false);assert.match(receipt.error,/owned_node_selection/);
  assert.deepEqual(clicks,['body']);
 });
-test('an unrelated confirmation is cancelled without deleting',async()=>{
- const {receipt,clicks,graph}=await gesture({text:'Сохранить изменения?'});
- assert.equal(receipt.status,'AMBIGUOUS');assert.equal(receipt.cleanup_complete,true);
+for(const text of ['Сохранить изменения?','Не удалось удалить узел','Связанные узлы будут удалены. Удалить?','Удалить выделенные узлы?'])
+ test('a foreign confirmation is cancelled without deleting: '+text,async()=>{
+ const {receipt,clicks,graph}=await gesture({text});
+ // Cancel on an unchanged graph proves the deletion was never dispatched.
+ assert.equal(receipt.status,'NOT_APPLIED');assert.equal(receipt.effect_possible,false);assert.equal(receipt.cleanup_complete,true);
  assert.match(receipt.error,/confirmation unavailable/);assert.ok(clicks.includes('[data-tid="msgbox;tlb;no"]'));
- assert.equal(graph.nodes.length,4);
+ assert.ok(!clicks.includes('[data-tid="msgbox;tlb;yes"]'));assert.equal(graph.nodes.length,4);
+});
+test('an unrecognized native connection is refused before any click',async()=>{
+ const {receipt,clicks,graph}=await gesture({extraEdges:1});
+ assert.equal(receipt.status,'NOT_APPLIED');assert.equal(receipt.effect_possible,false);
+ assert.match(receipt.error,/connection Dock cannot verify \(3 native, 2 recognized\)/);assert.deepEqual(clicks,[]);assert.equal(graph.nodes.length,4);
 });
 test('a locked node is refused before the selection click',async()=>{
  const {receipt,clicks}=await gesture({locked:true});
