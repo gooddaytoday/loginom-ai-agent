@@ -117,7 +117,7 @@ export function previewImportFirstFormRefusal(request,history) {
       +'2) then resend this binding request with a NEW operation_id.';
   }
   const s=request.parameters?.settings??{};
-  const missing=['encoding','rows_to_skip','first_line_as_title'].filter(k=>!Object.hasOwn(s.source??{},k)).map(k=>'settings.source.'+k);
+  const missing=['encoding','first_line_as_title'].filter(k=>!Object.hasOwn(s.source??{},k)).map(k=>'settings.source.'+k);
   if(!Object.hasOwn(s.format??{},'decimal_separator'))missing.push('settings.format.decimal_separator');
   if(s.columns===undefined&&!autoTypesRequested(s))missing.push('settings.columns');
   return missing.length?'Invalid parameters.parameters.settings: this Import was only previewed (Close), so it has no saved source or format. '

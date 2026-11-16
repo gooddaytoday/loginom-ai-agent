@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureTextImportPatch,ImportInitialSettingsError} from '../lib/text-import-procedure.mjs';
+import {configureTextImportPatch,ImportInitialSettingsError,initialImportColumnKind} from '../lib/text-import-procedure.mjs';
 
 function fixture({omit=[],preview=true,path='/own/data.csv',verified='/own/data.csv',sourceKey='source_path',sourceName='Amount',qualifier='Двойная кавычка (")',twoColumns=false}={}) {
  const owner={status:'observed',node:{tid:'node'},path:[{tid:'scenario',label:'Scenario'}]};
@@ -11,7 +11,7 @@ function fixture({omit=[],preview=true,path='/own/data.csv',verified='/own/data.
  const settings={source:{[sourceKey]:path,encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},
   format:{delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'},columns:[{...column,source_name:sourceName}]};
  if(twoColumns)settings.columns.unshift({...columns[1]});
- for(const key of omit)delete (key==='data_kind'?settings.columns[0]:settings.format)[key];
+ for(const key of omit)delete (key==='data_kind'?settings.columns[0]:key==='rows_to_skip'?settings.source:settings.format)[key];
  if(twoColumns&&omit.includes('data_kind'))delete settings.columns[1].data_kind;
  let stage='text_import_file';const actions=[];
  const observed=values=>Object.fromEntries(Object.entries(values).map(([name,value])=>[name,{status:'observed',value,owner_ref:name,input_ref:name,display_ref:name}]));
@@ -79,4 +79,21 @@ test('first configuration after preview accepts '+sourceKey,async()=>{
  const f=fixture({omit:['text_qualifier'],path,verified,sourceKey}),original=structuredClone(f.settings),result=await f.run();
  assert.equal(result.verified,true);assert.equal(f.source.source_path,verified);
  assert.deepEqual(f.settings,original,'caller settings stay unchanged');
+});
+// LAB-1766 text-mask: Month parsed datetime/«Непрерывный», requested string
+// without data_kind; the old kind was absent from the string options (timeout).
+test('omitted data kind follows a requested type change',()=>{
+ const parsed={name:'Month',type:'datetime',data_kind:'Непрерывный'};
+ assert.equal(initialImportColumnKind({source_name:'Month',name:'Month',type:'string'},parsed).data_kind,'Дискретный');
+ assert.equal(initialImportColumnKind({name:'Month',type:'boolean'},parsed).data_kind,'Дискретный');
+ assert.equal(initialImportColumnKind({name:'Code',type:'integer'},{name:'Code',type:'string',data_kind:'Дискретный'}).data_kind,'Непрерывный');
+ assert.equal(initialImportColumnKind({name:'Month',type:'datetime'},parsed).data_kind,'Непрерывный','same type keeps parsed kind');
+ assert.equal(initialImportColumnKind({name:'Month'},parsed).data_kind,'Непрерывный');
+ assert.equal(initialImportColumnKind({name:'Month',type:'string',data_kind:'Неопределенное'},parsed).data_kind,'Неопределенное','explicit kind wins');
+});
+// LAB-1766 text-parallel: the first form omitted only rows_to_skip.
+test('first configuration after preview keeps the observed native rows_to_skip',async()=>{
+ const f=fixture({omit:['rows_to_skip']}),result=await f.run();
+ assert.equal(result.verified,true);assert.equal(f.source.rows_to_skip,'0');
+ assert.equal(f.actions.some(a=>a.ref==='rows_to_skip'),false,'no gesture on the native value');
 });

@@ -21,7 +21,7 @@ test('first form of a previewed import names every missing field and allowed val
  assert.match(message,/decimal_separator "\." or ","/);
  assert.doesNotMatch(message,/explicit source_path/);
  const all=previewImportFirstFormRefusal(request({format:{delimiter:';'}}),[preview]);
- assert.match(all,/Missing: settings\.source\.encoding, settings\.source\.rows_to_skip, settings\.source\.first_line_as_title, settings\.format\.decimal_separator, settings\.columns\./);
+ assert.match(all,/Missing: settings\.source\.encoding, settings\.source\.first_line_as_title, settings\.format\.decimal_separator, settings\.columns\./);
  assert.equal(previewImportFirstFormRefusal(request(settings),[preview]),null);
  assert.equal(previewImportFirstFormRefusal(request({...without('format.decimal_separator'),format:{decimal_separator:','}}),[preview]),null,'omitted delimiter etc. keep native defaults');
  const auto=structuredClone(settings);delete auto.columns;auto.format.auto_detect_columns='new';
@@ -84,4 +84,8 @@ test('a binding on a previewed-only import is refused before the browser with th
   return true;
  });
  assert.equal(browser,0);
+});
+
+test('an omitted rows_to_skip alone is no first-form refusal (native integer kept)',()=>{
+ assert.equal(previewImportFirstFormRefusal(request(without('source.rows_to_skip')),[preview]),null);
 });
