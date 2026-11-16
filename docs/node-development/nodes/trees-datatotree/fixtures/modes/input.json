@@ -13,6 +13,6 @@
     {"type":"boolean","value":false},
     {"type":"string","value":""}
   ],
-  "delivery":"CSV alone does not establish Variant subtypes. A source with the declared native types must be independently checked before a future run.",
+  "delivery":"The own package for this attempt contains TypedInput → TypedSource. TypedSource projects the requested When/Value from rows.csv. Explicit DateTime/Integer/Boolean/String columns followed by native Collapse establish Variant subtypes independently of CSV inference. Verify this source before conversion.",
   "grouping":"Proposal: group by Group in first-occurrence order; preserve input order within a group. Not a native observation."
 }

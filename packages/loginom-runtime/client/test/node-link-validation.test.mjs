@@ -41,10 +41,42 @@ for(const mode of ['delayed','rejected','expired','foreign','marker','cancelled'
  if(mode==='delayed')assert.ok(page.clock-start>=20000);
  if(mode==='expired')assert.match(result.error.message,/deadline/);
  if(mode==='cancelled')assert.match(result.error.message,/cancelled/);
+ if(mode==='marker'){
+  const diagnostic=page[Symbol.for('loginom-dock.node-target-link-diagnostic')];
+  assert.equal(diagnostic.after.state,'ready');assert.equal(diagnostic.after.target_ready,false);
+  assert.deepEqual(diagnostic.before.point,diagnostic.after.point);
+  assert.doesNotMatch(JSON.stringify(result),/marker_cell|target_cell_id|node-target-link-diagnostic/);
+ }
 });
 
 test('REST service links retain native cached compatibility and marker ownership',async()=>{const f=fixture(true,'connection');assert.equal((await f.read()).state,'ready');f.handler.marker.validState=null;assert.equal((await f.read()).target_ready,false);f.diagram.FHandlers.FConnectionHandler.FDelegationHandler.FMouseDown=false;await assert.rejects(f.read(),/owner/);});
 test('tree_io link validation binds the native tree sockets and retains drag ownership',async()=>{
  const f=fixture(true,'tree');assert.equal((await f.read()).state,'ready');
  f.target.port.parent={};await assert.rejects(f.read(),/port changed/);
+});
+
+// LAB-1690 diagnostic: marker cell 210 was ready at (683,714); moving to
+// that identical center cleared validState while compatibility stayed ready.
+for(const shift of [0,3])test('ready marker preserves the held drag and recenters only for changed geometry: '+shift,async()=>{
+ const page=linkPage(),evaluate=page.evaluate.bind(page),move=page.mouse.move;
+ let invalidated=false,reads=0;
+ page.mouse.move=async(x,y,options)=>{
+  if(page.down&&page.point.x===x&&page.point.y===y)invalidated=true;
+  return move(x,y,options);
+ };
+ page.evaluate=async(fn,arg)=>{
+  if(fn.toString().includes('Link validation workflow changed')){
+   reads++;assert.equal(page.down,true);
+   const box=page.elements().find(e=>e.node==='Приёмник'&&e.port==='Input_Data-0').box;
+   return {state:'ready',target_ready:!invalidated,point:{x:box.x+box.width/2+shift,y:box.y+box.height/2}};
+  }
+  if(fn.toString().includes('Node target link context changed'))return;
+  return evaluate(fn,arg);
+ };
+ const result=await run(page,'link.create',linkParameters(page,'data'),{node_target_context:{},deadline_at:page.clock+30000});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(invalidated,false);assert.equal(reads,2);
+ const box=page.elements().find(e=>e.node==='Приёмник'&&e.port==='Input_Data-0').box;
+ assert.equal(page.point.x,box.x+box.width/2+shift);
+ assert.equal(page.drops,1);assert.equal(page.upCalls,1);assert.equal(page.down,false);
 });

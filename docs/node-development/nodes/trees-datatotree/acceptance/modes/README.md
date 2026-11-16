@@ -1,5 +1,14 @@
 Предложение LAB-1042, этап 0, до утверждения владельцем.
 
+LAB-1685: случай dates-variant зарегистрирован как `table-tree-dates-variant`.
+Native-проба подтверждена в [плане reader](../../../variant-reader/tree-reader.md#r4--treesfrom_table-lab-1685-15112026).
+`expected-dates-variant.json` — отдельная проверяемая oracle проекция R1/R3;
+исходный контейнер предложений сохранён. Подготовка fixture доставляет
+`typed-source.lgp` (только TypedInput → TypedSource, без целевого дерева) и
+`lab1685-types.csv` в каталог нового собственного пакета. Относительный путь
+сохраняет переносимость между аккаунтами; CSV задаёт три отдельные скалярные
+колонки, native Collapse сохраняет их подтипы в Value. Исходный `task` не менялся.
+
 Задания: `task-arrays.md`, `task-grouping.md`, `task-dates-variant.md`, `task-empty.md`, `task-editor-depth.md`.
 Каждое задание — отдельный будущий сценарий с новым чатом, профилем и пакетом;
 состояния одного узла внутри задания проверяются последовательно.

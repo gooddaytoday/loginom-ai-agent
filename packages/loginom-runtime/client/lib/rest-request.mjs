@@ -247,6 +247,31 @@ export async function restRequestCapability(page,t,readContext){
     need(observed.length===t.headers.length&&observed.every((h,i)=>h.name===t.headers[i].name&&JSON.stringify(h.value)===JSON.stringify(t.headers[i].value)),'custom header readback differs');
     configuration.headers=observed;
    }
+   if(caption==='Дополнительные параметры'){
+    const advanced=root+';AdditionalParamsWizard',flag=advanced+';pedUseResponseStub;ValueControl',file=advanced+';pedResponseStub;ValueControl';
+    const readSimulation=async()=>{await guard();return page.evaluate(({advanced,flag,file})=>{
+     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),
+      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0])throw Error('Owned REST additional parameters page changed');
+     const fields=[flag,file].map((tid,i)=>{const es=exact(tid),e=es[0],field=e&&Ext.getCmp(e.id);
+      if(es.length!==1||!roots[0].contains(e)||field?.el?.dom!==e||field.getXType()!==(i?'pickerfield':'checkboxfield')||!field.inputEl?.dom)throw Error('REST simulation field binding unavailable');
+      const value=field.getValue();if(typeof value!==(i?'string':'boolean'))throw Error('REST simulation field value unavailable');return value;});
+     return {enabled:fields[0],file_path:fields[1]};
+    },{advanced,flag,file});};
+    let observed=await readSimulation();
+    if(t.simulation){
+     if(t.simulation.enabled&&t.simulation.file_path!==observed.file_path){
+      // Enable the native picker before editing its file path.
+      if(!observed.enabled){await click(flag+';DisplayEl');observed=await wait('simulation enabled',async()=>{const s=await readSimulation();return s.enabled?s:null;});}
+      await quiet();await guard();await point(file);effect=true;
+      const input=find(file).locator('input');await input.fill(t.simulation.file_path,{timeout:remaining()});await input.press('Tab',{timeout:remaining()});
+     }
+     observed=await readSimulation();
+     if(observed.enabled!==t.simulation.enabled)await click(flag+';DisplayEl');
+     observed=await wait('simulation readback',async()=>{const s=await readSimulation();return s.enabled===t.simulation.enabled&&(!s.enabled||s.file_path===t.simulation.file_path)?s:null;});
+    }
+    configuration.simulation=observed;
+   }
    if(caption==='Дополнительные параметры'&&t.new_node===true){
     const advanced=root+';AdditionalParamsWizard';
     const readDefaults=async()=>{await guard();return page.evaluate(({advanced})=>{

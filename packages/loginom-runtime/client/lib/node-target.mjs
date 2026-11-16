@@ -208,7 +208,19 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       await commit();
       const after = await observe();
       if(await settleMoveMismatch({operation,state,effect,receipt,graph:after,adapter,record}))throw Error(state.result.error);
-      if (receipt?.cleanup_complete !== true || !verifyNodeTargetEffect(effect,after,adapter.positionMatches) || !verify(before, after, effect)) { throw new Error('Graph effect needs reconciliation'); }
+      if (receipt?.cleanup_complete !== true || !verifyNodeTargetEffect(effect,after,adapter.positionMatches) || !verify(before, after, effect)) {
+        if(kind==='connect'&&receipt?.error?.message==='Validated link target is no longer ready'){
+          // Omit user captions and foreign tids; hashes still expose changes.
+          const snapshot=g=>({complete:g.complete,document_id:g.document_id,workflow_id:g.workflow_ref.workflow_id,dom_epoch:g.dom_epoch,
+            nodes:g.nodes.map(n=>({ref:n.ref,type:n.type,label_digest:digest(n.label),dom_epoch:n.dom_epoch,position:n.position,
+              inputs:n.inputs,outputs:n.outputs,variable_inputs:n.variable_inputs,variable_outputs:n.variable_outputs,
+              other_ports_digest:digest(n.other_ports??[]),boundary_role:n.boundary_role,locked:n.locked})),
+            links:g.links,variable_links:g.variable_links??[],foreign_links_digest:digest(g.foreign_links??[])});
+          try{await record({operation_id:effect.id,phase:'node_target_link_graph_refused',internal_provenance:'node_target_v1',before:snapshot(before),after:snapshot(after)});}
+          catch{/* Keep the original reconciliation refusal if evidence is unavailable. */}
+        }
+        throw new Error('Graph effect needs reconciliation');
+      }
       state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt),...(kind==='move'?{before:effect.before}:{}) });
       state.pending = null; state.last_graph=structuredClone(after);
       await commit();

@@ -231,8 +231,8 @@ test('Excel preflight and download retain exact byte/hash verification and forma
  for(const extension of ['XLSX','XLS']){
  const f=await fixture({name:'sales.'+extension,bytes});
  try {
-  for(const name of ['sales.xlsx','sales.XLSX','sales.xls','sales.XLS','sales.csv','sales.tsv','sales.txt'])assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name}));
-  for(const name of ['sales.xlsm','file.lgp','sales.xlsx.exe','file.json'])assert.throws(()=>f.rt.preflightDeliveredArtifact({name}),e=>e.code==='ARTIFACT_VERIFICATION_UNSUPPORTED');
+  for(const name of ['sales.xlsx','sales.XLSX','sales.xls','sales.XLS','sales.csv','sales.tsv','sales.txt','response.json','response.JSON'])assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name}));
+  for(const name of ['sales.xlsm','file.lgp','sales.xlsx.exe','file.json.exe'])assert.throws(()=>f.rt.preflightDeliveredArtifact({name}),e=>e.code==='ARTIFACT_VERIFICATION_UNSUPPORTED');
   const result=await f.rt.verifyArtifact(await f.request());
   assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.bytes_verified,true);
   assert.equal(result.output.sha256,createHash('sha256').update(bytes).digest('hex'));
@@ -263,4 +263,15 @@ test('LGD delivery verifies original binary bytes and refuses a changed server c
    assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
   }finally{await f.cleanup();}
  }
+});
+
+test('C8 JSON uses the existing exact server-copy byte and hash verification',async()=>{
+ const bytes=Buffer.from('{"message":"REST offline fixture","amount":17,"ok":true}'),f=await fixture({name:'response.json',bytes});
+ try{
+  assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name:'response.json'}));
+  const result=await f.rt.verifyArtifact(await f.request());
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.bytes_verified,true);
+  assert.equal(result.output.sha256,createHash('sha256').update(bytes).digest('hex'));
+  assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
+ }finally{await f.cleanup();}
 });

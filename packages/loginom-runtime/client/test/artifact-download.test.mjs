@@ -697,3 +697,9 @@ test('post-copy blocking dialog cannot extend the original download deadline',as
  assert.equal(f.calls.filter(c=>c==='click').length,1);assert.equal(result.cleanup_complete,true);
  assert.equal(result.output.download_completed,undefined);
 });
+
+test('C8 JSON download uses the same owned file gesture and byte verification lease',async()=>{
+ const f=fixture('response.json'),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.bytes_verification_required,true);
+ assert.deepEqual(f.calls,['listen','click','save']);
+});
