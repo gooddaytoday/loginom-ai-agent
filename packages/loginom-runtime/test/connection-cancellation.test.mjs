@@ -11,6 +11,8 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
     skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
     timeout: 15000,
   }, async t => {
+    const T0 = performance.now();
+    const mark = text => process.stderr.write(`[diag ${phase} ${new Date().toISOString()} +${Math.round(performance.now()-T0)}ms] ${text}\n`);
     const directory = await mkdtemp(join(tmpdir(), 'login-cancellation-'));
     const entered = Promise.withResolvers();
     const release = Promise.withResolvers();
@@ -32,14 +34,20 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
     if (phase === 'before-launch') controller.abort(Error('LOGINOM_HOST_CLOSED'));
     const login = loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER, profile:join(directory,'browser'),
       candidate:{url:`http://127.0.0.1:${http.address().port}/app/`, username:'user',password:''},
-      headless:true, signal:AbortSignal.any([controller.signal, t.signal])});
+      headless:true, signal:AbortSignal.any([controller.signal, t.signal]),
+      onPhase: event => mark('phase ' + JSON.stringify(event)), onRetry: event => mark('retry ' + JSON.stringify(event))});
+    login.then(() => mark('login resolved'), error => mark('login rejected ' + error?.message));
     void login.catch(() => {});
     t.after(async () => {
+      mark('after start');
       controller.abort(Error('LOGINOM_HOST_CLOSED'));
       release.resolve();
       http.closeAllConnections();
+      mark('after closeAllConnections');
       await new Promise(resolve => http.close(resolve));
+      mark('after http closed');
       await login.catch(() => {});
+      mark('after login settled');
       await rm(directory,{recursive:true,force:true});
     });
     let timer;
@@ -48,10 +56,11 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
         // A failed launch cannot reach the fixture. Surface that failure instead
         // of leaving an open HTTP server behind the node:test timeout.
         await Promise.race([entered.promise, login.then(() => { throw Error('LOGIN_FINISHED_BEFORE_FIXTURE'); })]);
+        mark('fixture entered; abort');
         controller.abort(Error('LOGINOM_HOST_CLOSED'));
       }
       await assert.rejects(Promise.race([login, new Promise((_, reject) => {
-        timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), 2000);
+        timer=setTimeout(() => { mark('2s timer fired'); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
       })]), /LOGINOM_HOST_CLOSED/);
     } finally {
       clearTimeout(timer);

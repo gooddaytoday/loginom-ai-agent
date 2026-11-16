@@ -207,14 +207,24 @@ jobs:
             test/storage-download.test.mjs test/storage-source.test.mjs \
             test/text-export.test.mjs test/text-export-cp1251.test.mjs test/text-import-encoding.test.mjs \
             2>&1 | tee "$RUNNER_TEMP/windows-client-tests.log"
-      - name: Verify complete supervised runtime suite
+      - name: DIAG cancellation timeline
         if: matrix.suite == 'runtime'
-        timeout-minutes: 5
+        timeout-minutes: 14
         working-directory: packages/loginom-runtime
+        env:
+          DEBUG: pw:browser
         run: |
-          set -euo pipefail
-          "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 test/*.test.mjs \
-            2>&1 | tee "$RUNNER_TEMP/windows-runtime-tests.log"
+          set -uo pipefail
+          for i in $(seq 1 6); do
+            echo "=== DIAG suite iteration $i"
+            "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 test/*.test.mjs 2>&1 \
+              | grep -E 'diag |pw:browser|not ok|^ok .*cancellation|duration_ms: [0-9]{4}' || true
+          done
+          for i in $(seq 1 10); do
+            echo "=== DIAG alone iteration $i"
+            "$LOGINOM_AI_AGENT_TEST_NODE" --test-timeout=60000 test/connection-cancellation.test.mjs 2>&1 | grep -E 'diag |pw:browser|not ok|^ok ' || true
+          done
+          echo done > "$RUNNER_TEMP/windows-runtime-tests.log"
       - name: Verify platform-dependent host tests
         if: matrix.suite == 'host'
         timeout-minutes: 8
