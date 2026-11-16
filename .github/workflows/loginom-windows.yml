@@ -35,6 +35,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  updater-source-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --frozen-lockfile --ignore-scripts
+      - name: Verify fixture trust and updater behavior
+        working-directory: packages/desktop
+        env:
+          LOGINOM_AI_AGENT_TEST_NODE: ${{ env.NODE }}
+        run: |
+          export LOGINOM_AI_AGENT_TEST_NODE="$(command -v node)"
+          bun test electron.vite.config.test.ts src/main/update-policy.test.ts src/main/update-sources.test.ts src/main/updater-controller.test.ts
+          bun typecheck
+
   build-package-test:
     # Owner decision v040-ci-platform-batches: pull requests build platform candidates only for integration
     # batches and release PRs; node PRs skip (a skipped job still satisfies required checks).

@@ -125,6 +125,11 @@ const notes = [
   "- CI builds use no Loginom account or LLM credentials and do not replace installed GUI, Keychain/DPAPI or live Loginom/provider acceptance for this exact build.",
   "- Settings: saved-key indicator, Save closes after success, Check tests the current draft, Close/Escape confirm unsaved changes.",
   "- Desktop updates use signed GitHub Release metadata with a private cloud.ru S3 fallback using read-only SigV4 GET. Build-time endpoints remain disabled until signature acceptance on the exact source SHA; publication and mirror checks are required.",
+  ...(version === "0.4.0"
+    ? [
+        "- Windows 0.3.9 users must manually install 0.4.0 over their existing installation: 0.3.9 has its update feed disabled and cannot discover 0.4.0 automatically. Keep the existing profile; do not uninstall or delete application data first.",
+      ]
+    : []),
   "- Desktop applies detected system proxy settings to its backend with a startup fallback; explicit proxy environment and Chromium/browser proxy handling remain supported.",
   "",
   "## Assets",

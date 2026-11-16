@@ -1,4 +1,14 @@
-# Linux AppImage update acceptance
+# Desktop update acceptance
+
+## Windows fixtures
+
+Dispatch `loginom-windows.yml` with `updater-fixtures=true` and `updater-public-key` containing an Ed25519 public PEM. CI builds isolated Desktop installers 0.4.0 and 0.4.1 and a matching Linux 0.4.1 AppImage for the mirror input contract. These artifacts are test fixtures; do not publish them as product releases. The signing private key stays with the test operator. The Windows fixture contains only the existing read-only S3 key, never a writer, and its built-in feed is restricted to `dryrun-040/`.
+
+Only `LOGINOM_AI_AGENT_UPDATE_TEST_BUILD=1` at build time enables the fixture trust root. The release workflow ignores this opt-in. Ordinary builds ignore the test-key input and packaged applications cannot replace their trust roots through environment variables or command-line arguments. Run fixtures with `LOGINOM_AI_AGENT_TEST_ONBOARDING=1` and an explicit absolute `LOGINOM_AI_AGENT_TEST_ROOT`. Only these compiled fixtures persist the isolated backend database at `<root>/data/loginom-ai-agent.db`; ordinary onboarding tests retain their in-memory database. The fixture refuses to start without an isolated test profile.
+
+Use the administrator policy `feedUrl` to route a fixture to a private HTTPS test server; preserve and restore any existing policy. Removing that override returns the Windows fixture to authenticated reads of `https://updates-loginom.s3.cloud.ru/dryrun-040/`. Test certificates must be trusted normally; do not disable certificate verification. Preserve exact installer hashes, source SHA, download/install logs and the same profile across restarts. Admit a chat through the public backend APIs without executing a model request. Verify settings, that chat and native credential readback after the update.
+
+## Linux AppImage
 
 Run after building the desktop and Linux packages, from `packages/desktop`, with the pinned Bun in PATH:
 
