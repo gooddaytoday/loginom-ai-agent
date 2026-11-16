@@ -62,3 +62,26 @@ test("node paths are usable beyond the sampled SkillTool resource list", () => {
 test('node selection preserves the standard-node restriction', () => {
   expect(skill).toContain('Для операций ниже используй указанные штатные узлы и режимы, без замены Калькулятором или JavaScript')
 })
+
+test("final message leaves package cleanup to the host and never links server paths", () => {
+  const finish = skill.slice(skill.indexOf("## Завершение"))
+  // The host closes the saved package and logs out after the answer; no tool does it.
+  expect(finish).toContain("закрытие и выход выполнит приложение")
+  expect(finish).toContain("не пиши, что пакет останется открытым")
+  // Export results carry artifact_id/destination, not a download URL.
+  expect(finish).toContain("серверный путь пиши в `коде`, не ссылкой")
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(40_000)
+})
+
+test("skill markdown links resolve inside the skill, as the bundled manifest requires", async () => {
+  // Same link pattern as verifyBundledSkills: an example like [x](/path) escapes the skill.
+  for (const name of ["SKILL.md", ...(await readdir(new URL("references/", root), { recursive: true }))
+    .filter((file) => file.endsWith(".md")).map((file) => "references/" + file)]) {
+    const text = await Bun.file(new URL(name, root)).text()
+    for (const link of text.matchAll(/\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)) {
+      const target = link[1] ?? link[2]
+      if (/^(?:https?:|viking:|mailto:|#)/i.test(target)) continue
+      expect(target.startsWith("/"), name + ": " + target).toBe(false)
+    }
+  }
+})

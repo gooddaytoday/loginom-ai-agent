@@ -18,6 +18,22 @@ test('compact variable snapshots retain complete exact values and source identit
  assert.deepEqual(raw,before);
 });
 
+test('input Done readiness failure explains the retained checkpoint and recovery route',()=>{
+ for(const phase of ['target','input_mapping']) {
+  const raw={operation_id:'combine-first',state:'settled',outcome:{status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false,
+   error:{code:'NODE_APPLY_STOPPED',message:'Node procedure readiness timeout: calculator done available; no mutation was authorized'},
+   output:{pending_phase:phase,node:null,package_saved:false,output:{status:'not_refreshed',ports:[]}}}};
+  const before=structuredClone(raw),reply=compactNodeResult(raw);
+  assert.equal(validate(reply).valid,true);
+  assert.equal(reply.next_step.tool,'dock_operation_inspect');
+  assert.equal(reply.next_step.arguments.operation_id,'combine-first');
+  assert.match(reply.next_step.instruction,/input mapping.*Done/);
+  assert.match(reply.next_step.instruction,/earlier.*effects/);
+  assert.match(reply.next_step.instruction,/abandon_operation.*dock_browser_recovery/);
+  assert.deepEqual(raw,before);
+ }
+});
+
 test('zero interpretation warning counts only explicit numeric zeros in returned cells',()=>{
  const sample=[[{type:'integer',value:'0',is_null:false},{type:'real',value:0,is_null:false},
   {type:'string',value:'0',is_null:false},{type:'real',value:0,is_null:true},
