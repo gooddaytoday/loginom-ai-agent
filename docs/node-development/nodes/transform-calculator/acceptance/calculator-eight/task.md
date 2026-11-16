@@ -9,4 +9,4 @@ Missing integer IF(IsNull(RowIndex) or IsNull(UserId) or IsNull(TestGroup) or Is
 BadGroup integer IF(IsNull(TestGroup) or not IN(TestGroup,"ad","psa"),1,0)
 BadExtras integer IF((TotalAds<0) or (MostAdsHour<0) or (MostAdsHour>23) or not IN(MostAdsDay,"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"),1,0)
 Выполни этот запрос с finish execute и read ports [0], sample_rows 1, require_exact_numbers true. Проверь, нет ли лишнего пустого выражения Expr1.
-После Калькулятора сгруппируй по Batch: Rows — количество строк, остальные семь добавленных целых полей просуммируй с сохранением имён. Прочитай полный результат группировки. Экспортируй его в summary.csv в порядке Batch, Rows, NA, NB, YA, YB, Missing, BadGroup, BadExtras, скачай CSV и сохрани сценарий.
+После Калькулятора сгруппируй по Batch: Rows — количество строк, остальные семь добавленных целых полей просуммируй с сохранением имён; результаты суммирования — вещественные поля. Прочитай полный результат группировки. Экспортируй его в summary.csv в порядке Batch, Rows, NA, NB, YA, YB, Missing, BadGroup, BadExtras, скачай CSV и сохрани сценарий.

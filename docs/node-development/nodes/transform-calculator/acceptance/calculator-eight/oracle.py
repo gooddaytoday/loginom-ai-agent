@@ -26,6 +26,7 @@ def check():
     expected = json.loads((ROOT / 'expected.json').read_text())['outputs'][0]
     assert expected['rows'] == [summary]
     assert [column['name'] for column in expected['columns']] == list(summary)
+    assert [column['type'] for column in expected['columns']] == ['string', 'integer'] + ['real'] * 7
 
 
 if __name__ == '__main__':

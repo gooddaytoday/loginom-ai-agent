@@ -25,37 +25,37 @@
         },
         {
           "name": "NA",
-          "type": "integer",
+          "type": "real",
           "label_any": true
         },
         {
           "name": "NB",
-          "type": "integer",
+          "type": "real",
           "label_any": true
         },
         {
           "name": "YA",
-          "type": "integer",
+          "type": "real",
           "label_any": true
         },
         {
           "name": "YB",
-          "type": "integer",
+          "type": "real",
           "label_any": true
         },
         {
           "name": "Missing",
-          "type": "integer",
+          "type": "real",
           "label_any": true
         },
         {
           "name": "BadGroup",
-          "type": "integer",
+          "type": "real",
           "label_any": true
         },
         {
           "name": "BadExtras",
-          "type": "integer",
+          "type": "real",
           "label_any": true
         }
       ],
