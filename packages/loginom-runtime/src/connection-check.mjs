@@ -91,7 +91,19 @@ export async function trackLoginNetwork(page) {
   on("Network.responseReceivedExtraInfo", event => { const row = observed.get(event.requestId); if (row) row.wire_status = event.statusCode })
   on("Network.loadingFinished", event => { const entry = active.get(event.requestId); if (entry) entry.row.wire_bytes = event.encodedDataLength; end(event.requestId, event.timestamp, false) })
   on("Network.loadingFailed", event => end(event.requestId, event.timestamp, true))
-  const close = () => closing ??= (async () => { for (const [name, handler] of hooks) session.off(name, handler); await session.detach().catch(() => undefined) })()
+  const close = () => closing ??= (async () => {
+    for (const [name, handler] of hooks) session.off(name, handler)
+    const detached = session.detach().catch(() => undefined)
+    // A detach racing a closing page/browser may never be answered. A live page
+    // still awaits it; a closed one (before or during this wait) ends it.
+    if (page.isClosed?.()) return
+    const context = page.context?.()
+    let ended
+    const closed = new Promise(resolve => { ended = resolve })
+    page.once?.("close", ended); context?.once?.("close", ended)
+    try { await Promise.race([detached, closed]) }
+    finally { page.off?.("close", ended); context?.off?.("close", ended) }
+  })()
   try { await session.send("Network.enable") }
   catch { await close(); return trackPageNetwork(page) }
   return {

@@ -771,6 +771,42 @@ for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files 
 });
 
 
+for(const cleanup of [true,false])test('large conflict offers byte verification only after confirmed cleanup: '+cleanup,async()=>{
+ const f=fixture();f.artifact.bytes=17*1024*1024;f.artifact.upload.overwrite='reject';
+ f.runtime.uploadLargeArtifact=async()=>{throw Object.assign(Error('UPLOAD_PATH_CONFLICT'),{code:'UPLOAD_PATH_CONFLICT'});};
+ f.runtime.cancelLargeArtifact=async()=>cleanup;
+ await f.service.deliver(request);await f.service.drain();
+ const result=f.service.status(request.operation_id);
+ assert.equal(result.error.code,cleanup?'UPLOAD_PATH_CONFLICT':'LOGINOM_UPLOAD_UNCERTAIN');
+ assert.equal(result.outcome.cleanup_complete,cleanup);assert.equal(result.outcome.effect_possible,!cleanup);
+ assert.equal(f.service.unsettled,!cleanup);
+ if(cleanup){
+  assert.equal(result.outcome.destination,f.artifact.upload.destination);
+  assert.equal(result.outcome.sha256,f.artifact.sha256);
+  assert.equal(result.outcome.next_step.tool,'loginom_dock_storage_source');
+  const steps=['loginom_dock_storage_source','loginom_dock_storage_download_start','loginom_dock_storage_download_wait','loginom_file_profile','loginom_file_scan'];
+  const at=steps.map(name=>result.outcome.next_step.instruction.indexOf(name));
+  assert.ok(at.every((i,n)=>i>=0&&(n===0||i>at[n-1])),'chain names model-visible tools in order');
+  assert.match(result.outcome.next_step.instruction,/sha256 of the local artifact in this outcome/);
+  assert.match(result.outcome.next_step.instruction,/differ, stop and tell the user/);
+  assert.match(result.outcome.next_step.instruction,/Never overwrite or delete the server file/);
+ }else assert.equal(result.outcome.next_step,undefined);
+ assert.ok(!f.calls.includes('upload'));assert.ok(!f.calls.includes('verify'));
+});
+
+test('large conflict without a durable outcome receipt withdraws the server-file next step',async()=>{
+ const f=fixture(undefined,'/',{record:async e=>{if(e.phase==='large_upload_failed'&&e.result)throw Error('Disk unavailable');return e;}});
+ f.artifact.bytes=17*1024*1024;f.artifact.upload.overwrite='reject';
+ f.runtime.uploadLargeArtifact=async()=>{throw Object.assign(Error('UPLOAD_PATH_CONFLICT'),{code:'UPLOAD_PATH_CONFLICT'});};
+ f.runtime.cancelLargeArtifact=async()=>true;
+ await f.service.deliver(request);await f.service.drain();
+ const result=f.service.status(request.operation_id);
+ assert.equal(result.status,'uncertain');assert.equal(result.error.code,'LOGINOM_UPLOAD_UNCERTAIN');
+ assert.equal(result.outcome.code,'LOGINOM_UPLOAD_UNCERTAIN');assert.equal(result.outcome.effect_possible,true);
+ assert.equal(result.outcome.next_step,undefined);
+ assert.ok(!f.calls.includes('upload'));assert.ok(!f.calls.includes('verify'));
+});
+
 test('large delivery journals the first browser failure before failed cancellation replaces it',async()=>{
  const f=fixture();f.artifact.bytes=1024**3;f.artifact.upload.overwrite='reject';
  f.runtime.uploadLargeArtifact=async()=>{throw Error('Pinned browser capability call failed [LOGINOM_DISCONNECTED] (reason=owner)');};

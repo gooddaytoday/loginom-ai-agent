@@ -223,6 +223,20 @@ def dates_variant_projection():
                     document=document)])
 
 
+def tree_to_table_typed_projection():
+    """LAB-1699: the same R4 leaves after native Tree to Table, one row per item."""
+    items = dates_variant_projection()['tree_outputs'][0]['document']['children'][0]['children']
+    rows = [dict(When=when['value'], Value=dict(cell_type=value['cell_type'], value=value['value']))
+            for when, value in (item['children'] for item in items)]
+    return dict(package_path='{{PACKAGE_PATH}}',
+                nodes=[dict(type=t, label_any=True) for t in
+                       ['imports.text', 'transform.collapse_columns', 'trees.from_table', 'trees.to_table']],
+                outputs=[dict(output_node_type='trees.to_table', output_port=0, export_destination='tree-table-typed.csv',
+                              ordered=True, column_order='exact',
+                              columns=[dict(name='When', type='datetime', label_any=True),
+                                       dict(name='Value', type='variant', label_any=True)], rows=rows)])
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--check', action='store_true')
@@ -239,4 +253,7 @@ if __name__ == '__main__':
         if args.check and slug == SLUGS[0]:
             projection = target.with_name('expected-dates-variant.json')
             assert json.loads(projection.read_text(encoding='utf-8')) == dates_variant_projection(), str(projection)
+        if args.check and slug == SLUGS[3]:
+            projection = target.with_name('expected-typed-run.json')
+            assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_typed_projection(), str(projection)
         print(slug + ': ' + str(len(output['cases'])) + ' independent proposals; native not_checked')

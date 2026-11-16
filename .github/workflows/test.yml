@@ -449,6 +449,12 @@ jobs:
         working-directory: packages/desktop
         run: bun test --path-ignore-patterns=src/main/draft-store.test.ts
 
+      # The draft store (drafts saved on exit) runs under the pinned Node 24 instead,
+      # which provides `node:sqlite` and strips the test's TypeScript types natively.
+      - name: Run desktop draft store tests under pinned Node
+        working-directory: packages/desktop
+        run: '"$LOGINOM_AI_AGENT_TEST_NODE" --version && "$LOGINOM_AI_AGENT_TEST_NODE" --test src/main/draft-store.test.ts'
+
   e2e:
     name: e2e
     runs-on: ubuntu-24.04

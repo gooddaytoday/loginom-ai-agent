@@ -16,29 +16,44 @@ export function fixtureClock() {
 
 // This small DOM is an external UI double, not a replacement of the production
 // observer/guards. Every test executes the full serialized browser capability.
+// Each distinct selector is parsed once; the observer issues the same few
+// selectors against every fake element thousands of times per test.
+const compiledSelectors = new Map();
 function matches(element, selector) {
-  if (selector.includes(',')) return selector.split(',').some(part => matches(element, part));
+  let matcher = compiledSelectors.get(selector);
+  if (!matcher) compiledSelectors.set(selector, matcher = compileSelector(selector));
+  return matcher(element);
+}
+function compileSelector(selector) {
+  if (selector.includes(',')) {
+    const parts = selector.split(',');
+    return element => parts.some(part => matches(element, part));
+  }
   selector = selector.trim();
   const breadcrumbLabel=/^(\[data-tid\*=";cnrNaviMode;b\.s"\]) (\.x-btn-inner-default-toolbar-small)$/.exec(selector);
-  if(breadcrumbLabel)return matches(element,breadcrumbLabel[2]) && !!element.parentElement?.closest(breadcrumbLabel[1]);
+  if(breadcrumbLabel)return element => matches(element,breadcrumbLabel[2]) && !!element.parentElement?.closest(breadcrumbLabel[1]);
   const ownedInput=/^((?:\[data-tid[$^*]?="[^"]+"\])+) (input|textarea|\.x-form-error-msg|img\.x-grid-checkcolumn|\*)$/.exec(selector);
-  if(ownedInput)return matches(element,ownedInput[2]) && !!element.parentElement?.closest(ownedInput[1]);
-  const not = [...selector.matchAll(/:not\(([^)]+)\)/g)];
-  if (not.some(([, inner]) => matches(element, inner))) return false;
+  if(ownedInput)return element => matches(element,ownedInput[2]) && !!element.parentElement?.closest(ownedInput[1]);
+  const not = [...selector.matchAll(/:not\(([^)]+)\)/g)].map(([, inner]) => inner);
   selector = selector.replace(/:not\([^)]+\)/g, '');
-  if (selector === ':disabled') return !!element.disabled;
-  const tag = selector.match(/^[a-z]+/i)?.[0];
-  if (tag && element.tagName !== tag.toUpperCase()) return false;
+  const excluded = element => not.some(inner => matches(element, inner));
+  if (selector === ':disabled') return element => !excluded(element) && !!element.disabled;
+  const tag = selector.match(/^[a-z]+/i)?.[0]?.toUpperCase();
   const attributes=/\[([^\s=\]$^*]+)(?:([$^*]?=)"([^"]*)")?\]/g;
-  for (const [,name,operator,value] of selector.matchAll(attributes)) {
-    const actual=element.getAttribute(name);
-    if (actual===null) return false;
-    if (operator==='=' && actual!==value || operator==='$=' && !actual.endsWith(value)
-      || operator==='^=' && !actual.startsWith(value) || operator==='*=' && !actual.includes(value)) return false;
-  }
-  selector=selector.replace(attributes,'');
-  for (const [, name] of selector.matchAll(/\.([\w-]+)/g)) if (!element.classList.contains(name)) return false;
-  return true;
+  const required = [...selector.matchAll(attributes)].map(([, name, operator, value]) => ({ name, operator, value }));
+  const classes = [...selector.replace(attributes,'').matchAll(/\.([\w-]+)/g)].map(([, name]) => name);
+  return element => {
+    if (excluded(element)) return false;
+    if (tag && element.tagName !== tag) return false;
+    for (const {name,operator,value} of required) {
+      const actual=element.getAttribute(name);
+      if (actual===null) return false;
+      if (operator==='=' && actual!==value || operator==='$=' && !actual.endsWith(value)
+        || operator==='^=' && !actual.startsWith(value) || operator==='*=' && !actual.includes(value)) return false;
+    }
+    for (const name of classes) if (!element.classList.contains(name)) return false;
+    return true;
+  };
 }
 export class Element {
   constructor(tag = 'div', attrs = {}, text = '', box = { x: 0, y: 0, width: 10, height: 10 }) {
