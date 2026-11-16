@@ -28,7 +28,17 @@ export async function restLinkCapability(page,t,readValidation){
   const parameters={source_port:{kind:'connection',index:0},target_port:{kind:'connection',index:0}};
   let validation;
   do{need(Date.now()<t.deadline,'validation deadline elapsed');validation=await readValidation(page,context,parameters);need(validation.state!=='rejected','native compatibility rejected the ports');if(validation.state==='pending')await page.waitForTimeout(Math.min(50,t.deadline-Date.now()));}while(validation.state==='pending');
-  await page.mouse.move(validation.point.x,validation.point.y);validation=await readValidation(page,context,parameters);need(validation.state==='ready'&&validation.target_ready,'native target marker is not ready');
+  const before=validation;
+  // As with data links (#1154), another move at the ready center clears mxGraph's marker.
+  if(!validation.target_ready||validation.point.x!==target.x||validation.point.y!==target.y)
+   await page.mouse.move(validation.point.x,validation.point.y);
+  validation=await readValidation(page,context,parameters);
+  if(validation.state!=='ready'||!validation.target_ready){
+   const root=await page.evaluate(prefix=>{const expected=prefix+';ModelForm;cmpDiagram',graph=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph;
+    return {expected,actual:graph.container?.getAttribute('data-tid'),count:document.querySelectorAll('[data-tid='+JSON.stringify(expected)+']').length,connected:graph.container?.isConnected};
+   },t.workflow_ref.prefix).catch(()=>({observed:false}));
+   need(false,'native target marker is not ready; '+JSON.stringify({root,drag_target:target,before,after:validation}));
+  }
   await page.mouse.up();held=false;
   while(await find(edgeTid).count()!==1){need(Date.now()<t.deadline,'connection edge did not settle');await page.waitForTimeout(Math.min(80,t.deadline-Date.now()));}
   need(await page.evaluate(t=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram,g=d.FmxGraph;
