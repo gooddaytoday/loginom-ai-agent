@@ -32,7 +32,7 @@ export function createSkillLoader({ resources }) {
       const text=await readFile(join(prepared.directory,'references/nodes',type+'.md'),'utf8');
       if(createHash('sha256').update(text).digest('hex')!==file.sha256)throw Error('LOGINOM_SKILL_HASH_MISMATCH: '+path);
       const pattern=/^<!-- mode: ([a-z0-9_]+(?: [a-z0-9_]+)*) -->\r?\n([\s\S]*?)^<!-- \/mode -->\r?$/gm;
-      const sections=[...text.matchAll(pattern)];
+      const sections=[...text.matchAll(pattern)].filter(section=>type===card.type||section[1].split(' ').some(mode=>card.modes.includes(mode)));
       const common=text.replace(pattern,'').trim();
       if(common.includes('<!-- mode:')||common.includes('<!-- /mode -->')
         ||sections.some(section=>section[2].includes('<!-- mode:')||section[1].split(' ').some(mode=>!card.modes.includes(mode)))

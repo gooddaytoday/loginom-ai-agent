@@ -11,12 +11,16 @@ test('production login theme stylesheet: '+mode,{skip:!browserPath,timeout:20000
   const profile=await mkdtemp(join(tmpdir(),'theme-reload-'));
   const contexts=[],gestures=[],failures=[];
   const controller=new AbortController(),callbackEvents=[];
-  let documents=0,authenticated;
+  let documents=0,authenticated,releaseTheme;
+  // In deadline mode the reloaded document's theme never arrives, so only the
+  // original deadline can end the reload. Launch and the first document vary
+  // with host load and must not consume the time the reload is tested in.
+  const reloadedTheme=new Promise(resolve=>releaseTheme=resolve);
   try {
-    const started=Date.now();
+    const deadline=Date.now()+10000;
     const result=loginBrowser({browserPath,profile,headless:true,keepOpen:true,
       candidate:{url:'http://theme.invalid/app/',username:'worker',password:'fixture-password'},
-      deadline:Date.now()+(mode==='deadline'?1500:10000),signal:controller.signal,
+      deadline,signal:controller.signal,
       onRetry:['cancel','journal-user'].includes(mode)?async event=>{
         callbackEvents.push(event);
         if(mode==='cancel')controller.abort(Error('cancelled'));
@@ -37,7 +41,7 @@ test('production login theme stylesheet: '+mode,{skip:!browserPath,timeout:20000
           const path=new URL(route.request().url()).pathname;
           if(path.endsWith('.css')){
             const theme=path.includes('deductor-theme');
-            if(theme&&mode==='deadline'&&documents===2)await new Promise(resolve=>setTimeout(resolve,2500));
+            if(theme&&mode==='deadline'&&documents===2)return reloadedTheme.then(()=>route.abort('failed')).catch(()=>{});
             if(theme&&(mode==='twice'||['once','user','authenticated','deadline','cancel','journal-user'].includes(mode)&&documents===1)||!theme&&mode==='unrelated')
               return route.abort('failed');
             return route.fulfill({contentType:'text/css',body:theme&&mode==='empty'&&documents===1?'':'.theme-probe { color: red; }'});
@@ -57,6 +61,7 @@ test('production login theme stylesheet: '+mode,{skip:!browserPath,timeout:20000
     });
     if(['twice','user','authenticated','deadline','cancel','journal-user'].includes(mode))await assert.rejects(result,{message:mode==='cancel'?'cancelled':'LOGINOM_LOGIN_UNAVAILABLE'});
     else {authenticated=await result;assert.equal(authenticated.authenticated,true);}
+    const settled=Date.now();
     const reload=['once','twice','empty','deadline','cancel','journal-user'].includes(mode);
     assert.equal(documents,reload&&!['cancel','journal-user'].includes(mode)?2:1);
     assert.equal(contexts.length,1,'theme failure must not trigger the separate browser login retry');
@@ -70,8 +75,11 @@ test('production login theme stylesheet: '+mode,{skip:!browserPath,timeout:20000
     assert.equal(gestures.filter(g=>g.kind==='login').length,['twice','user','authenticated','deadline','cancel','journal-user'].includes(mode)?0:1);
     assert.ok(gestures.every(g=>g.document===documents),'reload must happen before any credential gesture');
     if(['once','twice'].includes(mode))assert.equal(failures.filter(url=>url.includes('deductor-theme')).length,mode==='twice'?2:1);
-    if(mode==='deadline')assert.ok(Date.now()-started<2300,'reload stays inside the original deadline');
+    // The reload gets no time allowance of its own (connection-check.mjs:213):
+    // it ends at the original deadline; the margin covers context.close() under load.
+    if(mode==='deadline')assert.ok(settled>=deadline&&settled<deadline+3000,'the reload ends at the original deadline');
   }finally{
+    releaseTheme();
     await authenticated?.context?.close();
     for(const context of contexts)await context.close().catch(()=>{});
     await rm(profile,{recursive:true,force:true});

@@ -7,6 +7,7 @@ import release from "../../product/loginom-release.json"
 import { productHelpDirectory, productSkillsDirectory } from "@loginom-ai-agent/product/skills"
 import { verifyBundledSkills } from "../src/bundled-skills"
 import { ripgrepPins } from "../script/ripgrep-resource"
+import { removeFixture } from "./remove-fixture"
 
 test("resource staging selects the signed action catalog for the target platform", () => {
   expect(actionCatalogForPlatform("linux")).toEqual({
@@ -196,7 +197,9 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
         expect(manifest.files.some((file: { path: string }) => file.path === "skills/" + path)).toBe(true)
       }
     } finally {
-      await rm(root, { recursive: true, force: true })
+      // The pinned node.exe and rg.exe children above have exited, but Windows
+      // can keep their copied images locked briefly afterwards (EBUSY).
+      await removeFixture(root)
     }
   },
   300000,

@@ -275,10 +275,21 @@ test('owned upload dismisses only the observed Loginom toast debugger confirm th
    const accepted=await page.evaluate(message=>confirm(message),${JSON.stringify(message)});
    page[Symbol.for('upload-test.result')]={accepted,...await guard(page,task,'release')};
   }`}});
-  await new Promise(resolve=>setTimeout(resolve,250));
-  const response=await client.callTool({name:'browser_run_code_unsafe',arguments:{code:`async page=>page[Symbol.for('upload-test.result')]`}});
+  // MCP returns the call above as soon as the confirm opens. Until the guard has
+  // dismissed it, MCP refuses other tools for this exact modal; then the result
+  // is stored. A fixed 250 ms pause raced both. Wait for that condition (bounded
+  // by the test timeout, whose abort also ends this loop); the read never
+  // handles the dialog itself.
+  let response,text;
+  for(;;){
+   t.signal.throwIfAborted();
+   response=await client.callTool({name:'browser_run_code_unsafe',arguments:{code:`async page=>page[Symbol.for('upload-test.result')]??null`}});
+   text=response.content.find(b=>b.type==='text').text;
+   const dialogPending=response.isError&&text.includes('does not handle the modal state')&&text.includes(`"confirm" dialog with message "${message}"`);
+   if(!dialogPending&&!/^### Result\nnull(?:\n|$)/.test(text))break;
+   await new Promise(resolve=>setTimeout(resolve,50));
+  }
   assert.notEqual(response.isError,true,JSON.stringify(response));
-  const text=response.content.find(b=>b.type==='text').text;
   const match=text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/);assert.ok(match,text);
   const result=JSON.parse(match[1]);
   assert.equal(result.accepted,false);assert.equal(result.dismissed,1);assert.equal(result.failed,false);

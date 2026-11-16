@@ -191,3 +191,21 @@ test('LASSO native details observe its method identity and initialized editable 
  for(const value of [null,NaN,Infinity,-1,0]){lambda.getValue=()=>value;assert.equal(read().verified,false);}
  lambda.getValue=()=>1;delete lambda.isDisabled;assert.equal(read().verified,false);
 });
+
+
+test('Elastic Net native details require both initialized penalties and editable-state observations',()=>{
+ const base='MF;TF;WizrdMCF;',elements=[],components={};
+ const add=(tid,value,disabled=false)=>{const e={id:'elastic'+elements.length,tid,checkVisibility:()=>true,getBoundingClientRect:()=>({x:10,y:10,width:100,height:20})};elements.push(e);components[e.id]={el:{dom:e},getValue:()=>value,isDisabled:()=>disabled};return components[e.id];};
+ add(base+'LogRegressionWizard-1');
+ const method=add(base+'LogRegressionWizard;pedRegressionMethod;ValueControl',6);
+ Object.assign(method,{valueField:'id',displayField:'label',getStore:()=>({getData:()=>({items:[{data:{id:6,label:'Elastic-net (Регрессия эластичная сеть)'}}]})})});
+ for(const [name,value] of Object.entries({pedEpsilon:1e-10,pedIntercept:true,pedThreshold:0.8,pedRegSelQuality:0,pedAddSignificance:0.05,pedRemoveSignificance:0.1,pedLassoSetupMethod:0,pedLambdaLasso:0.75,pedRidgeSetupMethod:0,pedLambdaRidge:1.25}))add(base+'LogRegressionWizard-1;'+name+';ValueControl',value,name.startsWith('pedRegSel')||name.endsWith('Significance'));
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ const read=()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')(' + JSON.stringify('MF;TF') + ')',context)));
+ assert.equal(read().verified,true);assert.equal(read().values.pedLambdaLasso,0.75);assert.equal(read().values.pedLambdaRidge,1.25);
+ for(const name of ['pedLambdaLasso','pedLambdaRidge','pedLassoSetupMethod','pedRidgeSetupMethod']){
+  const c=components[elements.find(e=>e.tid===base+'LogRegressionWizard-1;'+name+';ValueControl').id],value=c.getValue();
+  for(const invalid of name.startsWith('pedLambda')?[null,NaN,Infinity,0,-1]:[null,2]){c.getValue=()=>invalid;assert.equal(read().verified,false,name);}
+  c.getValue=()=>value;const disabled=c.isDisabled;delete c.isDisabled;assert.equal(read().verified,false,name);c.isDisabled=disabled;
+ }
+});

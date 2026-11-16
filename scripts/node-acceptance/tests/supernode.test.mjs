@@ -112,3 +112,16 @@ test('supernode frozen DateTime uses ISO civil representation checked by its ind
   assert.match(execFileSync('python3',[new URL('oracle.py',expectedDirectory).pathname,'--case',caseName,'--check'],{encoding:'utf8'}),/: OK/);
  }
 });
+
+test('variable body requires BOTH observed variable links and converter table chain',()=>{
+ const g={nodes:[...graph.nodes,{ref:{node_id:'convert'},type:'variables.to_table'}],
+  links:[{source:'convert',output:0,target:'calc',input:0},graph.links[1]],
+  variable_links:[{source:'input',target:'convert',kind:'variables',output:0,input:0},{source:'input',target:'calc',kind:'variables',output:0,input:0}]};
+ assert.equal(checkSupernodeGraph(g).calculator,'calc');
+ for(const i of [0,1])assert.throws(()=>checkSupernodeGraph({...g,variable_links:g.variable_links.filter((_,n)=>n!==i)}),/LOCAL_VARIABLE_LINKS/);
+ assert.throws(()=>checkSupernodeGraph({...g,links:[graph.links[0],graph.links[1]]}),/LOCAL_LINKS/);
+ const raw={nodes:g.nodes.map(n=>({...n,node_ref:{node_label:n.ref.node_id}})),links:[
+  'MF;TF-2;Graph;input|Output_Var-0|convert|Input_Var-0','MF;TF-2;Graph;input|Output_Var-0|calc|Input_Var-1',
+  'MF;TF-2;Graph;convert|Output_Data-0|calc|Input_Data-0','MF;TF-2;Graph;calc|Output_Data-0|output|Input_Data-0']};
+ assert.equal(checkSupernodeGraph(raw,'calc','convert').calculator,'calc');
+});

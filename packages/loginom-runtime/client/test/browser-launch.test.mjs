@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {browserLaunch} from '../lib/browser-launch.mjs';
 
+test('acceptance viewport is explicit, bounded and headless only',()=>{
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1920x945'}).viewport,{width:1920,height:945});
+ assert.deepEqual(browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1280x800'}).viewport,{width:1280,height:800});
+ assert.equal(browserLaunch(false,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'1920x945'}).viewport,null);
+ assert.throws(()=>browserLaunch(true,'linux',{LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT:'4000x4000'}),/acceptance viewport/);
+});
+
 test('browser launch normalizes headed DPI without incompatible viewport emulation', () => {
   assert.deepEqual(browserLaunch(false, 'linux', {}), {
     args:['--start-maximized','--window-size=1280,800','--force-device-scale-factor=1'], viewport:null, windowMode:'maximized',
