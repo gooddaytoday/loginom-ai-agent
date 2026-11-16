@@ -34,7 +34,7 @@ try {
   const npm = join(dirname(dirname(node)), "lib/node_modules/npm")
   await cp(npm, join(context, "node-runtime/lib/node_modules/npm"), { recursive: true })
   await run(["tar", "-C", join(pkg, "template"), "--exclude=node_modules", "--exclude=dist", "-cf", join(work, "template.tar"), "."])
-  await run(["tar", "-C", join(context, "template"), "-xf", join(work, "template.tar")])
+  await run(["tar", "-C", join(context, "template"), "--same-permissions", "-xf", join(work, "template.tar")])
   for (const name of ["server.mjs", "shell.js"]) {
     await run([node, "--check", join(pkg, "dist", name)])
     await cp(join(pkg, "dist", name), join(context, name))
