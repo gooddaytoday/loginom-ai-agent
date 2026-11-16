@@ -143,7 +143,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -181,6 +181,8 @@ async function handle(message) {
       const login = {
         browserPath: resources.browserPath,
         profile: browserProfile,
+        // Host resets this directory on credential changes and after normal shutdown.
+        httpCachePath: validationHttpCache ? join(input.stateDir, "http-cache") : undefined,
         candidate: input.connection,
         headless: input.headless === true,
         signal: state.startupController.signal,

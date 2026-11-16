@@ -17,8 +17,9 @@ export const inspectJavascriptWizardSettlement=withJavascriptWizardMasks(functio
   const ancestors=new Set();let tree,wizard;
   for(let n=current;n&&ancestors.size<32&&!ancestors.has(n);n=n.ParentNode){
     ancestors.add(n);
-    if(app.ModelNodeTreeNode&&n instanceof app.ModelNodeTreeNode)tree=n;
-    if(app.WizardTreeNode&&n instanceof app.WizardTreeNode)wizard=n;
+    // Enclosing submodels are ancestors too, but do not own this node's wizard.
+    if(!ancestors.has(b.workflow)&&app.ModelNodeTreeNode&&n instanceof app.ModelNodeTreeNode)tree=n;
+    if(!ancestors.has(b.workflow)&&app.WizardTreeNode&&n instanceof app.WizardTreeNode)wizard=n;
   }
   if(!ancestors.has(b.workflow)||!ancestors.has(records[0].packageNode)
     ||tree&&(tree.ParentNode!==b.workflow||tree.FGuid!==b.native.FGuid||tree.FModelNode!==b.nodeData)

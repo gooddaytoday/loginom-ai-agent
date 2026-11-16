@@ -6,15 +6,21 @@ import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {pinActionCatalog,BUNDLED_CATALOG_RELEASES} from '../lib/action-catalog.mjs';
 import {userNodeTool,userActionInventory} from '../lib/user-workflow.mjs';
-import {boundedUserToolReply,JAVASCRIPT_DESCRIBE_WIRE_BUDGET} from '../lib/user-response-budget.mjs';
+import {boundedUserToolReply} from '../lib/user-response-budget.mjs';
 import {createSkillLoader} from '../lib/skill.mjs';
 import {createBundledSkillFixture} from './support/bundled-skill-fixture.mjs';
 
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
-// Existing JS describe exception: [JS plan, J21](../../../../docs/node-development/nodes/programming-javascript/plan.md).
-// boundedUserToolReply below also enforces this limit on the complete JS wire reply.
-const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'programming.javascript':JAVASCRIPT_DESCRIBE_WIRE_BUDGET,
- 'imports.text':12000});
+const NODE_CARD_BUDGET_EXCEPTIONS=Object.freeze({'imports.text':12000});
+
+test('JavaScript reference fits 6000 bytes and retains Data API guidance',async t=>{
+ const reference=await readFile(new URL('../../../product/skills/loginom-automation/references/nodes/programming.javascript.md',import.meta.url),'utf8');
+ const size=Buffer.byteLength(reference,'utf8');
+ t.diagnostic(JSON.stringify({javascript_reference_bytes:size,headroom_bytes:6000-size}));
+ assert.ok(size<=6000);
+ for(const rule of ['builtIn/Data','InputTable.Get','OutputTable.AssignColumns','OutputTable.Append','OutputTable.Set',
+  'DataType.Real','Сумма→Summa','Integer','globals','Не задано'])assert.ok(reference.includes(rule),rule);
+});
 
 test('user-v1 model receives dock_node_apply within 20000 bytes',t=>{
  const full=nodeApiTools.find(tool=>tool.name==='dock_node_apply');

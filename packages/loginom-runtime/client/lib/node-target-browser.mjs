@@ -918,7 +918,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
             if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(t.effect.id))throw Error('Node target cancelled');
             const value=t.deadline-Date.now();if(value<=0)throw Error('Connect deadline elapsed');return value;
           };
-          const guard=async()=>{remaining();const graph=await (${observeLinkGraph.toString()})(page,t,${readGraph.toString()});remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,graph))throw Error('Graph changed during link source navigation');};
+          const guard=async()=>{remaining();const graph=await (${observeLinkGraph.toString()})(page,t,${readGraph.toString()});remaining();if(!(${samePlacementGraph.toString()})(t.effect.before,graph))throw Error('Graph changed during link source navigation; next_step: dock_operation_inspect for the original node operation before retrying');};
           await guard();
           const geometry=await (${linkPortGeometry.toString()})(page,t);
           if(geometry.ready)return {zoom_steps:0};

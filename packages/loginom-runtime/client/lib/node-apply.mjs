@@ -7,7 +7,7 @@ import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs
 import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
-import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
+import {verifiedJavascriptSourcePolicyRefusal,verifiedJavascriptEffectsSourceRefusal,JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT} from './javascript-source-policy-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
 import {NODE_READ_MODE,nodeReadHandler,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
 
@@ -250,6 +250,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&verifiedJavascriptSourcePolicyRefusal(refusal,request,state.node)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        if(refusal.proof.closed.reason==='declared_output_required')state.javascript_declared_output_required=true;
       }
       if(name==='node_finish'&&refusal?.phase===name&&refusal.status==='FAILED'&&refusal.effect_possible===true
         &&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&verifiedJavascriptWizardRefusal(refusal,request)) {
@@ -345,11 +346,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
       }
-      if((name==='target'||name==='source'&&state.phases.length===0&&!previousEffect)
+      const effectsOutputRefusal=name==='source'&&verifiedJavascriptEffectsSourceRefusal(refusal,request);
+      if((name==='target'||name==='source'&&state.phases.length===0&&!previousEffect||effectsOutputRefusal)
         && refusal?.phase===name && refusal.status==='NOT_APPLIED'
         && refusal.effect_possible===false && refusal.cleanup_complete===true){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;
+        if(effectsOutputRefusal)state.javascript_declared_output_required=true;
       }
       const pause=error.nodeExecutionWaitPause;
       if(executionPhase&&signal?.aborted&&!stopSignal?.aborted
@@ -448,7 +451,20 @@ export async function applyNode({request, operation, handlers, drivers, record,
       else requireValue(value.mode==='done'&&value.settings_applied===true&&value.execution_started===false&&value.execution_id==null,
         'Intermediate node Done must save settings without execution');
     }});
-    if(materialize){
+    const declaredOutput=materialize&&state.phases.find(p=>p.phase==='node_finish')?.value?.schema_mode==='declared';
+    if(declaredOutput){
+      // Native declared columns already expose complete output mapping before
+      // Execute. Keep the existing receipt vocabulary without inventing a run.
+      for(const name of ['materialization_start','materialization_execute']){
+        const prior=state.phases.find(p=>p.phase===name);
+        if(prior){requireValue(prior.status==='not_requested','Declared materialization was already dispatched');continue;}
+        check();
+        const receipt={phase:name,receipt_id:operation.id+':'+name,status:'not_requested',effect_possible:false,
+          value:{verified:true,cleanup_complete:true,effect_possible:false,materialization_required:false,schema_mode:'declared'}};
+        await acknowledge({phase:'node_phase_completed',signature,receipt});
+        state.phases.push(receipt);
+      }
+    }else if(materialize){
       const first=await phase('materialization_start',ctx=>drivers.materializeOutput(ctx),{verify:value=>requireValue(
         value.mode==='execute'&&id(value.execution_id),'Materialization requires a fresh execution identity')});
       state.execution={status:'pending',execution_id:first.execution_id};
@@ -594,9 +610,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
           :'Correct settings using the observed source names/labels and submit a NEW operation_id with target:')+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply the complete source, format and column settings (or native detection) again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
       ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'Retained calculator settings were independently rechecked unchanged. Correct expressions and submit a NEW operation_id with the SAME existing target '+JSON.stringify(state.node)+'. '+(state.calculator_default_expression?'The restored node has the blank default Expr1. Correct the formula by updating target:{kind:"existing",name:"Expr1"} inside the first expression with replace:false (name/label/type may be changed). replace:true replaces an INPUT field, not the saved expression. Do not leave this blank default behind. ':'To execute/read without changing formulas use parameters:{expressions:[]}; to edit a retained expression use target:{kind:"existing",name:"existing_name"} inside that expression. ')+'Keep existing connections: inputs:[] and mappings:[]. Do not create another node.'}}:{}),
+      ...(state.javascript_declared_output_required&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
+        instruction:'FS/Fetch scripts need declared output columns before execution. Submit a NEW operation_id: configure a NEW JavaScript node with parameters.schema_mode:"declared" and complete columns, retaining the intended source and inputs, then finish:"execute". Existing-node requests cannot change schema mode. Alternatively configure the SAME target with finish:"done", read:{ports:[],sample_rows:0,require_exact_numbers:false} and no coverage. Other import admission rules still apply.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }

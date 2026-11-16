@@ -17,6 +17,8 @@ export type Launch = {
   actionManifestUri?: string
   actionManifestSha256?: string
   validation?: boolean
+  // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
+  validationHttpCache?: boolean
   headless?: boolean
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during

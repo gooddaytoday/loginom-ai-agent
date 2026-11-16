@@ -236,6 +236,12 @@ export async function createLoginomHost(options: {
   const stale = new Set<string>()
   const startupCleanup = { failed: false }
   const shutdown = { failed: false }
+  const validationCache = {
+    directory: join(root, "validation", "http-cache"),
+    connection: undefined as ActiveConnection | undefined,
+    inUse: false,
+    failed: false,
+  }
   const resourceController = new AbortController()
   const resourceStarted = performance.now()
   // Desktop supplies its version; packaged CLI already carries the version in
@@ -338,12 +344,29 @@ export async function createLoginomHost(options: {
     })
     return tracked
   }
+  async function prepareValidationCache(connection: ActiveConnection) {
+    try {
+      const previous = validationCache.connection
+      if (!previous || previous.url !== connection.url || previous.username !== connection.username ||
+          previous.password !== connection.password) {
+        await rm(validationCache.directory, { recursive: true, force: true })
+        await mkdir(validationCache.directory, { recursive: true, mode: 0o700 })
+        validationCache.connection = connection
+      }
+      return true
+    } catch {
+      // A cache is optional; filesystem failure must not prevent a fresh login.
+      validationCache.connection = undefined
+      return false
+    }
+  }
   async function launch(
     connection: ActiveConnection,
     chat: string,
     validation = false,
     signal?: AbortSignal,
     deadline?: number,
+    validationHttpCache = false,
   ) {
     const startupDeadline = deadline ?? Date.now() + (validation ? 210_000 : 120_000)
     signal?.throwIfAborted()
@@ -427,6 +450,8 @@ export async function createLoginomHost(options: {
         }),
       )
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
+    // Mutate cache state only after the existing resource-verification admission.
+    const httpCache = validationHttpCache && await prepareValidationCache(connection)
     return supervise(
       {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -437,6 +462,7 @@ export async function createLoginomHost(options: {
         chat,
         connection,
         validation,
+        validationHttpCache: httpCache,
         // CLI applies its explicit browser policy to validation too; Desktop
         // retains quiet validation while Help readiness stays browser-free.
         headless: validation ? (options.preflightHeadless ?? true) : options.headless === true,
@@ -467,6 +493,9 @@ export async function createLoginomHost(options: {
       async check(connection, signal) {
         signal?.throwIfAborted()
         const chat = randomUUID()
+        // An overlapping check keeps its independent fresh cache; no queue or new deadline.
+        const httpCache = !validationCache.inUse && !validationCache.failed && !startupCleanup.failed
+        if (httpCache) validationCache.inUse = true
         try {
           const knowledge = await superviseKnowledge(
             {
@@ -493,16 +522,20 @@ export async function createLoginomHost(options: {
             await knowledge.close()
           }
           signal?.throwIfAborted()
-          const child = await launch(connection, chat, true, signal).catch((error: unknown) => {
+          const child = await launch(connection, chat, true, signal, undefined, httpCache).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
             throw error
           })
           if ("state" in child) return child
-          await child.close()
+          await child.close().catch((error: unknown) => {
+            if (httpCache) validationCache.failed = true
+            throw error
+          })
           signal?.throwIfAborted()
           return { state: "verified" as const }
         } finally {
+          if (httpCache) validationCache.inUse = false
           await Promise.all([
             rm(join(root, "validation", "generations", String(connection.generation), "chats", chat), {
               recursive: true,
@@ -596,7 +629,8 @@ export async function createLoginomHost(options: {
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.
-      if (startupCleanup.failed || shutdown.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      if (startupCleanup.failed || shutdown.failed || validationCache.failed) throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      await rm(validationCache.directory, { recursive: true, force: true }).catch(() => { throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED") })
       await references.close()
     },
     api: {

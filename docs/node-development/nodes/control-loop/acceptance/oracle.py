@@ -1,6 +1,6 @@
-"""Stage-1 expected values for Loop, computed without Loginom or runtime.
+"""Loop expected values, computed without Loginom or runtime.
 
-Loop mode: group processing, fixed group size 1, over fixtures/pages.csv,
+Stage-1 Loop mode: group processing, fixed group size 1, over fixtures/pages.csv,
 sequential (no parallel threads), iteration identifiers off.
 The looped node is a Submodel with one table input and one table output.
 
@@ -11,6 +11,11 @@ Cases:
 Native probe LAB-1669 confirmed appended iteration order and exact REST bodies.
 Offline field order is explicitly requested, not the Calculator's native default.
 HTTP error diagnostics are data of REST, not exceptions raised by this oracle.
+
+Proposed stage 2: FOR count=3, integer input Page=99, Limit=2. The loop
+overrides Page with range(3); identifiers are on. A variables-to-table node
+produces one row and the Calculator computes Skip from the input variables.
+LAB-1691 confirmed both FOR outputs and fresh-context Save/cold natively.
 """
 import argparse
 import csv
@@ -19,7 +24,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 URL = "https://httpbin.org/response-headers"
-FILES = {"offline": "expected-offline.json", "rest": "expected.json"}
+FILES = {"offline": "expected-offline.json", "rest": "expected.json",
+         "for-offline": "expected-for-offline.json", "for-rest": "expected-for-rest.json"}
 
 
 def pages():
@@ -44,6 +50,8 @@ def column(name, kind):
 
 
 def expected(case):
+    if case.startswith("for-"):
+        return expected_for(case)
     groups = [[page] for page in pages()]  # fixed group size 1, input order
     if case == "offline":
         columns = [column("PageNo", "integer"), column("Limit", "integer"), column("Skip", "integer"),
@@ -57,6 +65,26 @@ def expected(case):
     return {
         "package_path": "{{PACKAGE_PATH}}",
         "nodes": [{"type": "imports.text"}, {"type": "control.supernode"}, {"type": "control.loop"}],
+        "outputs": [{"output_node_type": "control.loop", "output_port": 0, "ordered": True,
+                     "column_order": "exact", "columns": columns, "rows": rows}],
+    }
+
+
+def expected_for(case):
+    # Independent arithmetic: the configured initial Page=99 is overwritten,
+    # not incremented. No input CSV and no access to runtime/native state.
+    iterations = [{"Page": page, "Limit": 2, "Skip": page * 2} for page in range(3)]
+    if case == "for-offline":
+        columns = [column(name, "integer") for name in ("Skip", "Page", "Limit", "IterationId")]
+        rows = [{**row, "IterationId": page} for page, row in enumerate(iterations)]
+    else:
+        columns = [column("RequestID", "integer"), column("Response", "string"), column("IterationId", "integer")]
+        rows = [{"RequestID": 0,
+                 "Response": httpbin_response_headers({"limit": str(row["Limit"]), "skip": str(row["Skip"])}),
+                 "IterationId": page} for page, row in enumerate(iterations)]
+    return {
+        "package_path": "{{PACKAGE_PATH}}",
+        "nodes": [{"type": "control.supernode"}, {"type": "control.loop"}],
         "outputs": [{"output_node_type": "control.loop", "output_port": 0, "ordered": True,
                      "column_order": "exact", "columns": columns, "rows": rows}],
     }

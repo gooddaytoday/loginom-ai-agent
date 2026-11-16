@@ -1,3 +1,4 @@
+import {makeLoopConfigureCode,makeLoopInspectCode,makeLoopVendorCode} from './loop-procedure.mjs';
 import {makeVariablesReplaceConfigureCode} from './variables-replace-procedure.mjs';
 import {makeConditionConfigureCode} from './control-condition-procedure.mjs';
 import {makeVariablesColumnUnionContextCode} from './variables-coluniondatavar-context.mjs';
@@ -95,7 +96,7 @@ const canonical = value => Array.isArray(value) ? value.map(canonical)
 // selectors or step arrays are accepted from the caller. The enclosing action
 // runtime owns its mutation gate for the whole procedure, including observations.
 export function createNodeProcedure({ operation, execute, record, wrapMutation,
-  targetOrigin, targetBuild, now = Date.now, monotonicNow = now === Date.now ? () => performance.now() : now, maxSteps = 96, signal, preparedNodeContext,
+  targetOrigin, targetBuild, settleReportedErrorToast = false, now = Date.now, monotonicNow = now === Date.now ? () => performance.now() : now, maxSteps = 96, signal, preparedNodeContext,
   wait = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   let sequence = 0;
   const nextStep=()=>{sequence++;return operation.nodeStepSequence=(operation.nodeStepSequence??0)+1;};
@@ -254,7 +255,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('CrossTable step was not durably prepared');
     checkBudget();
     const deadline=operation.deadline,code=makeCode(preparedNodeContext,{...payload,origin:targetOrigin,build:targetBuild,operation_id:id,deadline});
-    const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:${JSON.stringify(verb)},effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:r.error}:null,trace:[]}}`;
+    const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:${JSON.stringify(verb)},effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.error?{code:${JSON.stringify(verb==='loop_group_rows')}?r.error_code:'CROSSTABLE_VARIABLE_STEP_UNCONFIRMED',message:r.error}:null,trace:[]}}`;
     let result;
     try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(5000,deadline-now()+5000)});}
     catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
@@ -388,6 +389,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     async configureVariablesReplace(settings){return crossTableOwnedStep('variable_replace',settings,makeVariablesReplaceConfigureCode);},
     async configureCondition(settings){return crossTableOwnedStep('condition',settings,makeConditionConfigureCode);},
     async configureVariablesColumnUnion(settings){return crossTableOwnedStep('variable_column_union',{...settings,source_fields:operation.variablesColumnUnionPreflight?.outputs.flatMap((o,input)=>o.variables.map(v=>({input,name:v.name,label:v.label,type:v.type})))??[]},makeVariablesColumnUnionConfigureCode);},
+    async configureLoop(parameters){return crossTableOwnedStep('loop_group_rows',{parameters,source:operation.loopSource},makeLoopConfigureCode);},
+    async inspectLoopVendor(){return crossTableOwnedStep('loop_vendor',{},makeLoopVendorCode);},
+    async inspectLoop(parameters){return crossTableOwnedStep('loop_ports',{parameters,source:operation.loopSource},makeLoopInspectCode);},
     async configureSupernode(parameters){return crossTableOwnedStep('supernode_boundary',{parameters},makeSupernodeConfigureCode);},
     async configureVariablesCalculator(plan){return crossTableOwnedStep('calculator_expressions',{plan},makeVariablesCalculatorConfigureCode);},
     async configurePythonColumns(columns) {return crossTableOwnedStep('python_columns',{columns},makePythonColumnsCode);},
@@ -1030,7 +1034,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               ||state.ui.masks.some(m=>!settlingErrorToast.masks.some(old=>m.ref===old.ref
                 &&m.graph_loading_owner_ref===old.graph_loading_owner_ref))))
               throw Error('Owned execution error toast settlement context changed');
-            if(Object.values(reportChecks).every(Boolean)) {
+            if(Object.values(reportChecks).every(Boolean)&&!settleReportedErrorToast) {
               const failure={code:'NODE_EXECUTION_FAILED',message:('Loginom сообщил после запуска: '+toast.message).slice(0,1000),
                 native:{source:'loginom_post_launch_error_toast',attribution:'own_action_wait',message:toast.message,
                   node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id}};
@@ -1047,10 +1051,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               report_failed_conditions:Object.keys(reportChecks).filter(k=>!reportChecks[k]),native_proof_error:nativeProofError??null,
               launch:structuredClone(launchEvidence),native_processes:structuredClone(native),
               execution:structuredClone(execution??null),child:structuredClone(child??null),outcome:structuredClone(detail),initial_outcome:structuredClone(result)});
-            if(Object.values(checks).every(Boolean)) {
-              const failure={code:'NODE_EXECUTION_FAILED',message:toast.message,native:{source:'loginom_error_toast',
+            if(Object.values(checks).every(Boolean)||settleReportedErrorToast&&Object.values(reportChecks).every(Boolean)) {
+              const failure=Object.values(checks).every(Boolean)?{code:'NODE_EXECUTION_FAILED',message:toast.message,native:{source:'loginom_error_toast',
                 node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id,
-                execution_id:execution.execution_id,process_id:child.process_id,process_record_id:child.record_id}};
+                execution_id:execution.execution_id,process_id:child.process_id,process_record_id:child.record_id}}
+                :{code:"NODE_EXECUTION_FAILED",message:("Loginom сообщил после запуска: "+toast.message).slice(0,1000),
+                  native:{source:"loginom_post_launch_error_toast",attribution:"own_action_wait",message:toast.message,
+                    node:structuredClone(launchEvidence.baseline.node),launch_operation_id:launchEvidence.operation_id}};
               const saved=await entry('node_execution_error_toast_observed',{step,sample,internal_operation_id:id,
                 launch:structuredClone(launchEvidence),failure,native_processes:native,outcome:structuredClone(detail)});
               if(JSON.stringify(saved?.failure)!==JSON.stringify(failure)||!saved?.outcome?.output)throw Error('Native error toast was not durably acknowledged');

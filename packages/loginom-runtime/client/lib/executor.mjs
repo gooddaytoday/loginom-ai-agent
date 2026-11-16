@@ -740,7 +740,8 @@ export function makeArtifactDownloadCode(options) {
 }
 
 export function rebindNodeTargetLinkEpochs(context,observed) {
-  const shape=g=>({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node)});
+  // The native output boundary follows the diagram right extent on repaint.
+  const shape=g=>({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node.type==='control.supernode_output'&&node.boundary_role==='output'&&Number.isFinite(node.position?.x)?{...node,position:{...node.position,x:0}}:node)});
   if(!context.graph_baseline||observed?.complete!==true||JSON.stringify(shape(context.graph_baseline))!==JSON.stringify(shape(observed)))
     throw Error('Node target link graph changed before gesture');
   return context.nodes.map(expected=>{

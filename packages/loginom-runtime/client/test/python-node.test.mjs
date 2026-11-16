@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {inspectPythonSourcePolicy,pythonCodeSkeleton} from '../lib/python-source-policy.mjs';
+import {inspectPythonSourcePolicy as inspectPolicy,pythonCodeSkeleton} from '../lib/python-source-policy.mjs';
+import {execFileSync} from 'node:child_process';
 import {validatePythonParameters} from '../lib/python-parameters.mjs';
 import {configurePython} from '../lib/python-procedure.mjs';
 import {pythonConfigurationReadback} from '../lib/python-readback.mjs';
@@ -15,6 +16,9 @@ import {NODE_TYPES} from '../lib/node-contracts.mjs';
 const acceptance=new URL('../../../../docs/node-development/nodes/programming-python/acceptance/',import.meta.url);
 const stdlib=readFileSync(new URL('python-stdlib/data/calculation.py',acceptance),'utf8');
 const pandas=readFileSync(new URL('python-pandas/data/pandas_calculation.py',acceptance),'utf8');
+// Every source checked in this file; the last test compares their skeletons with Python's tokenizer.
+const corpus=new Set();
+const inspectPythonSourcePolicy=source=>{corpus.add(source);return inspectPolicy(source);};
 const sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
 const request=(kind='new',extra={})=>({target:{kind,type:'programming.python'},inputs:[{input:0}],mappings:[],read:{ports:[0]},finish:'execute',...extra});
 const declared=[['Id','integer'],['Amount','real'],['AmountScaled','real'],['Text','string'],['Flag','boolean'],['Date','datetime']].map(([name,type])=>({name,label:name,type}));
@@ -177,7 +181,7 @@ for(const [source,reason] of [
  ['from numpy.lib.format import open_memmap\n','attribute:lib'],['from numpy import open_memmap\n','attribute:open_memmap'],
  ['ｅｖａｌ("1")\n','non_ascii'],
  ['x = ｏｐｅｎ("/etc/passwd").read()\n','non_ascii'],
- ['x = f"{"}" + str(__import__) + "{"}"\n','fstring_braces'],
+ ['x = f"{"}" + str(__import__) + "{"}"\n','name:__import__'],
  ['import operator\nf = operator.attrgetter("__globals__")\n','module:operator'],
  ['import string\nstring.Formatter().get_field("0.__globals__", (f,), {})\n','module:string'],
  ['import typing\ntyping.get_type_hints(f)\n','module:typing'],
@@ -290,4 +294,269 @@ test('declared columns refuse at once when the open type picker lacks the wanted
  const r=await f.run();
  assert.equal(r.status,'AMBIGUOUS');assert.match(r.error,/type option missing: Дата\/Время/);assert.equal(r.cleanup_complete,true);
  assert.ok(Date.now()-started<1500,'no polling until the deadline');
+});
+
+// LAB-1680: module members are allowlisted. Each source below was ADMITTED by
+// the denylist-only python-module-v1 (np.fromregex and pd.ExcelFile read files).
+for(const [source,reason] of [
+ ['import numpy as np\nrows = np.fromregex("/etc/passwd", r"(\\w+):", [("u", "U32")])\n','attribute:numpy.fromregex'],
+ ['import pandas as pd\nx = pd.ExcelFile("/srv/secret.xlsx").parse(0)\n','attribute:pandas.ExcelFile'],
+ ['from numpy import fromregex\n','attribute:numpy.fromregex'],
+ ['from numpy import (array,\n    fromregex)\n','attribute:numpy.fromregex'],
+ ['from numpy import \\\n    fromregex\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = (np.\n    fromregex)\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = (np\n    .fromregex)\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = np . fromregex\n','attribute:numpy.fromregex'],
+ ['import numpy as np\nx = f"{np.fromregex(1)}"\n','attribute:numpy.fromregex'],
+ ['from pandas import ExcelFile as E\n','attribute:pandas.ExcelFile'],
+ ['from numpy.ma.mrecords import fromtextfile\n','attribute:numpy.ma.mrecords'],
+ ['import numpy.ma.mrecords as m\n','attribute:numpy.ma.mrecords'],
+ ['import numpy as np\nx = np.ma.mrecords.fromtextfile("/etc/passwd")\n','attribute:numpy.ma.mrecords'],
+ ['import numpy as np\nx = np.rec.fromrecords([])\n','attribute:numpy.rec'],
+ ['import pandas as pd\nx = pd.api.extensions\n','attribute:pandas.api.extensions'],
+ ['import pandas as pd\nx = pd.plotting\n','attribute:pandas.plotting'],
+ ['import numpy as np\nnp.show_config()\n','attribute:numpy.show_config'],
+ ['import math\nx = math.no_such_name\n','attribute:math.no_such_name'],
+ ['from numpy import *\n','attribute:numpy.*'],
+ ['import numpy as np\nf = np\nf.fromregex("/etc/passwd", "x", [])\n','module_value:numpy'],
+ ['import numpy as np\nr = np.random\n','module_value:numpy.random'],
+ ['import numpy as np\nprint(np)\n','module_value:numpy'],
+ ['import datetime\nfrom datetime import datetime\n','alias:datetime'],
+ ['import numpy as random\nfrom random import random\n','alias:random'],
+])test('module member allowlist refuses '+reason+' '+JSON.stringify(source.slice(0,40)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('module member allowlist admits computation code, aliases, submodules and from-imported classes',()=>{
+ for(const source of [
+  'import json\nimport math\nfrom collections import Counter\nimport datetime\nrows = json.loads("[1, 2]")\ny = math.sqrt(2)\nc = Counter(rows)\nnow = datetime.datetime.now()\n',
+  'from datetime import datetime, timedelta\nx = datetime.now() + timedelta(days=1)\n',
+  'import datetime as dt\nx = dt.date(2024, 1, 1) - dt.timedelta(days=1)\n',
+  'import pandas as pd\nimport numpy as np\nfrom builtin_data import InputTable, OutputTable\nfrom builtin_pandas_utils import to_data_frame, prepare_compatible_table, fill_table\n'+
+   'df = to_data_frame(InputTable, True)\ndf["d"] = pd.to_datetime(df["d"])\ndf["n"] = pd.to_numeric(df["n"], errors="coerce")\n'+
+   'df["k"] = np.where(df["n"] > 0, "pos", np.nan)\ndf["s"] = np.select([df["n"] > 1], ["big"], default="small")\n'+
+   'g = df.groupby("k").agg(total=("n", "sum"), avg=("n", "mean")).reset_index()\ng["b"] = pd.cut(g["total"], bins=3)\n'+
+   'm = pd.merge(df, g, on="k", how="left")\nm = pd.concat([m, m], ignore_index=True)\nm = m[pd.notna(m["d"]) & ~pd.isna(m["n"])]\n'+
+   'm["e"] = m["d"] + pd.Timedelta(days=1) + pd.offsets.MonthEnd(0)\nprepare_compatible_table(OutputTable, m, with_index=False)\nfill_table(OutputTable, m, with_index=False)\n',
+  'import numpy as np\nrng = np.random.default_rng(1)\nx = (np.\n    linalg.norm(np.array([3, 4])))\ny = np.round(np.mean(np.arange(10)), 2)\n',
+  'from numpy import random as npr, where\nx = where(npr.default_rng(1).random(3) > 0.5, 1, 0)\n',
+  'import pandas as pd\nok = pd.api.types.is_numeric_dtype(pd.Series([1]))\n',
+  'import collections.abc\nok = isinstance({}, collections.abc.Mapping)\n',
+  'import fractions as f\nx = f"{1}" + str(f.Fraction(1, 3))\n',
+  'import re\nx = re.sub(r"\\s+", " ", "a  b")\nlabel = f"{1234.5:,.2f} руб."\nfor _ in range(3):\n    pass\n',
+  'import statistics, itertools, functools, random, decimal, cmath\nx = statistics.median([1, 2])\ny = list(itertools.chain([1], [2]))\n'+
+   'z = functools.reduce(lambda a, b: a + b, y)\nrandom.seed(1)\nd = decimal.Decimal("1.5").quantize(decimal.Decimal("1"), rounding=decimal.ROUND_HALF_UP)\nc = cmath.sqrt(-1)\n',
+  'try:\n    pass\nexcept ValueError as error:\n    raise RuntimeError("x") from error\n',
+ ])assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source+JSON.stringify(inspectPythonSourcePolicy(source)));
+});
+
+test('allowlist refusal tells the model which member is refused and what to use instead',()=>{
+ assert.throws(()=>validatePythonParameters({source_text:'import numpy as np\nx = np.fromregex("f", "x", [])\n',schema_mode:'code'},'script',request()),
+  /python-module-v1 \(attribute:numpy\.fromregex at line 2\): numpy\.fromregex is not an allowed module member .*np\.where.*boolean mask/);
+ assert.throws(()=>validatePythonParameters({source_text:'import numpy as np\nf = np\n',schema_mode:'code'},'script',request()),/module_value:numpy at line 2\): use the module only as alias\.member/);
+ assert.throws(()=>validatePythonParameters({source_text:'import datetime\nfrom datetime import datetime\n',schema_mode:'code'},'script',request()),/alias:datetime\): datetime is imported as two different things; import it once/);
+});
+
+// LAB-1680 re-review: a string literal inside an f-string field closed the
+// field early ('}' … '{'), so the code between was blanked as literal text and
+// no name check saw it. Each source below was ADMITTED and ran its code.
+for(const [source,reason] of [
+ ['r = f"{\'}\' and exec(\'import os; os.system(chr(105)+chr(100))\') and \'{\'}"\n','name:exec'],
+ ['r = f\'{"}" and open(chr(47)+chr(101)+chr(116)+chr(99)).read() and "{"}\'\n','name:open'],
+ ['r = rf"{\'}\' and eval(chr(49)) and \'{\'}"\n','name:eval'],
+ ['r = fr"{\'}\' and eval(chr(49)) and \'{\'}"\n','name:eval'],
+ ['r = f"""{\'}\' and eval(chr(49)) and \'{\'}"""\n','name:eval'],
+ ['r = f\'\'\'{"""}""" and eval(chr(49)) and """{"""}\'\'\'\n','name:eval'],
+ ['r = f"{"}" and eval(chr(49)) and "{"}"\n','name:eval'],
+ ['r = f"{f\'{eval(chr(49))}\'}"\n','name:eval'],
+ ['r = f"{f\'{\'}\'}\' and eval(chr(49))}"\n','name:eval'],
+ ['r = f"{x:{\'}\'}} {eval(chr(49))}"\n','name:eval'],
+ ['r = f"{x:{eval(chr(49))}}"\n','name:eval'],
+ ['r = f"{(lambda: \'}\')() and eval(chr(49))}"\n','name:eval'],
+ ['r = f"{x # }\n and eval(chr(49))}"\n','name:eval'],
+ ['r = f"\\{eval(chr(49))}}}"\n','name:eval'],
+ ['import numpy as np\nr = f"{\'}\' and np.fromregex(\'/etc/passwd\', \'x\', []) and \'{\'}"\n','attribute:numpy.fromregex'],
+])test('f-string field literal bypass refused: '+reason+' '+JSON.stringify(source.slice(0,44)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('f-string field code stays visible to the name checks',()=>{
+ const source='r = rf"{\'}\' and print(chr(80)+chr(87)+chr(78)+chr(68)) and \'{\'}"\n';
+ assert.match(pythonCodeSkeleton(source).code,/and print\(chr\(80\)/);
+ assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED');
+ for(const source of ['x = f"{d[\'k\']}"\n','x = f"{\'a\' if x else \'b\'}"\n','x = f"{v:,.2f} руб."\n','x = f"{\'}\'}"\n','x = f"{x:{\'}\'}}"\n',
+  'x = f"{x!r:>{w}}"\n','x = f"{a!=b}"\n','x = f"{x:\'>10}"\n','x = f"{x=}"\n','x = f"{d["k"]}"\n','x = f"""{\nx # c\n}"""\n','x = f"\\N{LOW LINE}{x}"\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
+ assert.equal(inspectPythonSourcePolicy('x = f"{x:"}"\n').reason,'fstring_braces');
+});
+
+test('re.compile is admitted only as a member of re; the builtin compile stays refused',()=>{
+ for(const source of ['import re\np = re.compile(r"\\d+")\n','import re as rx\np = rx.compile("a")\n',
+  'import numpy as np\nimport pandas as pd\nx = np.int_(1) + np.uint(2)\nok = np.isdtype(np.dtype("int64"), "integral")\nt = pd.ArrowDtype\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source);
+ for(const [source,reason] of [['c = compile("1", "f", "eval")\n','name:compile'],['from re import compile\n','name:compile'],
+  ['x.compile("1")\n','name:compile'],['import numpy as np\nnp.compile\n','attribute:numpy.compile'],['import re\nx = (re.\n    compile)\n','name:compile']])
+  assert.equal(inspectPythonSourcePolicy(source).reason,reason,source);
+});
+
+// Differential check: identifiers left in the skeleton are exactly Python's
+// NAME tokens (code regions agree) for every source above that Python 3.12+
+// tokenizes and the skeleton accepts.
+test('skeleton code regions match python tokenize on the test corpus',t=>{
+ const sources=[...corpus,stdlib,pandas];
+ const script='import io,json,sys,tokenize\n'+
+  'if sys.version_info<(3,12):print("null");sys.exit()\n'+
+  'def names(s):\n try:return [t.string for t in tokenize.generate_tokens(io.StringIO(s).readline) if t.type==tokenize.NAME]\n except Exception:return None\n'+
+  'print(json.dumps([names(s) for s in json.load(sys.stdin)]))\n';
+ let expected;
+ try{expected=JSON.parse(execFileSync('python3',['-I','-W','ignore','-c',script],{input:JSON.stringify(sources),encoding:'utf8'}));}catch{expected=null;}
+ if(!expected){t.skip('python3 >= 3.12 unavailable');return;}
+ let compared=0;
+ for(const [index,source] of sources.entries()){
+  const skeleton=pythonCodeSkeleton(source);
+  if(!expected[index]||skeleton.error)continue;
+  const names=[...skeleton.code.matchAll(/(?<![\p{L}\p{N}_])[\p{L}_][\p{L}\p{N}_]*/gu)].filter(m=>!(/^(?:[rRuUbBfF]|[rR][bBfF]|[bBfF][rR])$/.test(m[0])&&/["']/.test(skeleton.code[m.index+m[0].length]??''))).map(m=>m[0]);
+  assert.deepEqual(names,expected[index],source);compared++;
+ }
+ t.diagnostic('compared '+compared+' of '+sources.length);assert.ok(compared>=100,'compared '+compared);
+});
+
+// LAB-1689: pandas dispatchers (agg/aggregate/transform/apply/filter, aggfunc of
+// pivot_table/crosstab/NamedAgg) call getattr(obj, name) for a string function
+// argument. Each source below was ADMITTED and, on pandas 3.1.1, the first ran
+// `id` and the second wrote a file.
+const dunder='u = chr(95) * 2\nexpr = "@o." + u+"class"+u + "." + u+"init"+u + "." + u+"globals"+u + "[\'sys\'].modules[\'os\'].system(\'id\')==0"\n';
+for(const [source,reason] of [
+ ['import pandas as pd\ndf = pd.DataFrame({"a": [1]})\n'+dunder+'df.agg("query", 0, expr, engine="python", local_dict={"o": df})\n','dispatch:agg'],
+ ['df.agg("to_csv", 0, "out.csv")\n','dispatch:agg'],
+ ['df.aggregate("to_csv", 0, "out.csv")\n','dispatch:aggregate'],
+ ['df.transform("to_csv", 0, "out.csv")\n','dispatch:transform'],
+ ['df.apply("to_csv", 0, args=("out.csv",))\n','dispatch:apply'],
+ ['df.agg(func="query")\n','dispatch:agg'],
+ ['df.groupby("k").agg("query")\n','dispatch:agg'],
+ ['df.groupby("k")["b"].filter("to_csv", True, "out.csv")\n','dispatch:filter'],
+ ['df.rolling(2).agg(["sum", "query"])\n','dispatch:agg'],
+ ['df.resample("D").agg({"b": "query"})\n','dispatch:agg'],
+ ['df.resample("D").transform(arg="query")\n','dispatch:transform'],
+ ['df.expanding().aggregate({"b": ["sum", "to_csv"]})\n','dispatch:aggregate'],
+ ['df.ewm(com=1).agg(("mean", "query"))\n','dispatch:agg'],
+ ['df.groupby("k").agg(total=("b", "query"))\n','dispatch:agg'],
+ ['df.groupby("k")["b"].agg(total="query")\n','dispatch:agg'],
+ ['df.agg(None, total=("b", "query"))\n','dispatch:agg'],
+ ['import pandas as pd\nx = pd.pivot_table(df, values="b", index="k", aggfunc="query")\n','dispatch:pivot_table'],
+ ['import pandas as pd\nx = pd.pivot_table(df, "b", "k", None, "query")\n','dispatch:pivot_table'],
+ ['x = df.pivot_table("b", "k", None, "query")\n','dispatch:pivot_table'],
+ ['import pandas as pd\nx = pd.crosstab(df.k, df.c, df.b, aggfunc="query")\n','dispatch:crosstab'],
+ ['from pandas import pivot_table as pt\nx = pt(df, aggfunc="to_csv")\n','dispatch:pivot_table'],
+ ['import pandas as pd\nx = df.groupby("k").agg(total=pd.NamedAgg("b", "query"))\n','dispatch:NamedAgg'],
+ ['from pandas import NamedAgg\nx = df.groupby("k").agg(total=NamedAgg(column="b", aggfunc="query"))\n','dispatch:NamedAgg'],
+ ['f = "qu" + "ery"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['df.agg("qu" "ery", 0, "a")\n','dispatch:agg'],
+ ['df.agg(f"query", 0, "a")\n','dispatch:agg'],
+ ['df.agg("\\x71uery", 0, "a")\n','dispatch:agg'],
+ ['df.agg(*["query", 0, "a"])\n','dispatch:agg'],
+ ['df.agg(**{"func": "query"})\n','dispatch:agg'],
+ ['df.agg("sum", *args)\n','dispatch:agg'],
+ ['m = df.agg\nm("query", 0, "a")\n','dispatch:agg'],
+ ['m = df.agg\n("sum")\nm("query", 0, "a")\n','dispatch:agg'],
+ ['x = list(map(df.agg, ["query"]))\n','dispatch:agg'],
+ ['import functools\np = functools.partial(df.agg, "query")\n','dispatch:agg'],
+ ['import pandas as pd\nx = df.pipe(pd.DataFrame.agg, "query", 0, "a")\n','dispatch:agg'],
+ ['import pandas as pd\nx = pd.DataFrame.agg(df, "query", 0, "a")\n','dispatch:agg'],
+ ['import pandas as pd\nf = pd.pivot_table\n','dispatch:pivot_table'],
+ ['x = (df.agg)("query")\n','dispatch:agg'],
+ ['str = "query"\ndf.agg(str, 0, "a")\n','dispatch:agg'],
+ ['len = "query"\ndf.agg([len])\n','dispatch:agg'],
+ ['str = "query"\ndf.agg(str.upper)\n','dispatch:agg'],
+ ['def f(x):\n    return x\nf = "query"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\ndef g(f):\n    return df.agg(f, 0, "a")\ng("query")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nh = lambda f: df.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nh = (lambda a, f, b: df.agg(f, 0, "a"))(1, "query", 2)\n','dispatch:agg'],
+ ['def f(x):\n    return x\nh = print(lambda a=lambda: 0, f, b: df.agg(f, 0, "a"))\n','dispatch:agg'],
+ ['def f(x):\n    return x\nr = [df.agg(f, 0, "a") for f in ["query"]]\n','dispatch:agg'],
+ ['def f(x):\n    return x\nr = sum(df.agg(f, 0, "a") for a, f, b in [(1, "query", 2)])\n','dispatch:agg'],
+ ['def f(x):\n    return x\nif (f := "query"):\n    df.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nfor f in ["query"]:\n    df.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\nf += "query"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['def f(x):\n    return x\na, f = 1, "query"\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['dec = lambda _: "query"\n@dec\ndef f(x):\n    return x\ndf.agg(f, 0, "a")\n','dispatch:agg'],
+ ['class f:\n    pass\ndf.agg(f)\n','dispatch:agg'],
+ ['def f(x):\n    return x\nmatch 1:\n    case P(a, f):\n        df.agg(f)\n','dispatch:agg'],
+ ['import numpy as np\ndf.agg(np.random)\n','module_value:numpy.random'],
+ ['import pandas as pd\ndf.agg(pd.Series.query)\n','name:query'],
+ ['import pandas as pd\ndf.agg(pd.Series.nunique)\n','dispatch:agg'],
+ ['df.apply(str.format)\n','dispatch:apply'],
+ ['df.apply(df.query)\n','name:query'],
+ ['df.apply(getter)\n','dispatch:apply'],
+ ['df.filter(cols)\n','dispatch:filter'],
+])test('dispatcher function argument refused: '+reason+' '+JSON.stringify(source.slice(-48)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('dispatchers admit aggregation literals, lambdas, defs, builtins and module functions',()=>{
+ for(const source of [
+  'g = df.groupby("k").agg(["mean", "max"])\n',
+  'g = df.groupby("k").agg({"b": "sum", "c": ["min", "max"]})\n',
+  'g = df.groupby("k").agg(total=("b", "sum"), avg=("b", "mean"))\n',
+  'g = df.groupby("k")["b"].agg(total="sum")\n',
+  'import pandas as pd\ng = df.groupby("k").agg(total=pd.NamedAgg(column="b", aggfunc="sum"), n=pd.NamedAgg("b", "count"))\n',
+  'df["s"] = df.apply(lambda r: r["a"] + r["b"], axis=1)\n',
+  'df["u"] = df["t"].apply(str.upper)\n',
+  'df["t"] = df["t"].astype(str).apply(str.strip)\nn = len(df)\n',
+  'df["c"] = df.groupby("k")["b"].transform("cumsum")\n',
+  'import pandas as pd\np = pd.pivot_table(df, values="b", index="k", columns="c", aggfunc="sum", fill_value=0)\nq = df.pivot_table(values="b", index="k", aggfunc=["sum", "mean"])\n',
+  'import pandas as pd\nx = pd.crosstab(df.k, df.c)\ny = pd.crosstab(df.k, df.c, values=df.b, aggfunc="mean")\n',
+  'import numpy as np\nimport pandas as pd\ndf["n"] = df["s"].apply(pd.to_numeric, errors="coerce")\nm = df.agg(np.mean)\nr = df.rolling(3).apply(np.nanmean, raw=True)\n',
+  'from statistics import median\nm = df.groupby("k")["b"].agg(median)\n',
+  'def label(row):\n    return "big" if row["b"] > 1 else "small"\ndf["l"] = df.apply(label, axis=1)\nprint(label(df.iloc[0]))\n',
+  'names = df.groupby("k")["name"].agg(", ".join)\nlists = df.groupby("k")["b"].agg(list)\nn = df.groupby("k")["b"].agg(len)\n',
+  'r = df.apply(lambda r: r * 2, result_type="expand", args=())\nz = df.resample("D").agg("sum")\nw = df.expanding().agg(["min", "max"])\n',
+  'e = df.ewm(com=0.5).agg("mean")\nt = df.groupby("k").transform(lambda s: s - s.mean())\nh = df.groupby("k").filter(lambda g: len(g) > 1)\n',
+  'a = df.filter(like="x")\nb = df.filter(["a", "b"])\nc = df.filter(items=cols, axis=1)\nd = df.filter(regex="^a")\n',
+  'x = df.agg("sum", numeric_only=True)\ny = df.groupby("k").agg("std", ddof=0)\nz = df["b"].transform("rank", method="dense")\n',
+  'k = list(filter(lambda v: v > 1, [1, 2]))\nagg = df.groupby("k").sum()\n',
+  'x = df.groupby("k").agg(\n    total=("b", "sum"),\n)\ny = df.apply(\n    lambda r: r,\n    axis=1,\n)\n',
+  'x = sorted(names, key=len)\ny = df["b"].map(lambda v: len(str(v)))\n',
+ ])assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source+JSON.stringify(inspectPythonSourcePolicy(source)));
+});
+
+test('dispatch refusal tells the model which function arguments are allowed',()=>{
+ assert.throws(()=>validatePythonParameters({source_text:'df.agg("query", 0, "a")\n',schema_mode:'code'},'script',request()),
+  /python-module-v1 \(dispatch:agg at line 1\): the function argument of agg .*"sum".*lambda.*def/);
+});
+
+// LAB-1689 re-review: pandas parameters that name a module or a scipy routine.
+// plot/hist/boxplot(backend=) import the named module (plotting/_core.py:2503);
+// rolling(win_type=) and interpolate(method=) reach scipy by name.
+for(const [source,reason] of [
+ ['import pandas as pd\npd.DataFrame({"a": [1]}).plot(backend="colorsys")\n','attribute:plot'],
+ ['s.plot(backend="colorsys")\n','attribute:plot'],
+ ['df.plot.area(backend="colorsys")\n','attribute:plot'],
+ ['df.hist(backend="colorsys")\n','attribute:hist'],
+ ['df.boxplot(backend="colorsys")\n','attribute:boxplot'],
+ ['x = (df.\n    plot)\n','attribute:plot'],
+ ['x = df.rolling(2, win_type="boxcar").sum()\n','parameter:rolling'],
+ ['x = df.rolling(2, None, False, "boxcar").sum()\n','parameter:rolling'],
+ ['x = df.groupby("k").rolling(2, **{"win_type": "boxcar"}).sum()\n','parameter:rolling'],
+ ['r = df.rolling\nx = r(2, win_type="boxcar")\n','parameter:rolling'],
+ ['x = df.interpolate(method="spline", order=2)\n','parameter:interpolate'],
+ ['x = df.interpolate("spline", order=2)\n','parameter:interpolate'],
+ ['m = "linear"\nx = df.interpolate(method=m)\n','parameter:interpolate'],
+ ['import pandas as pd\nx = pd.Series.interpolate(s, "spline", order=2)\n','parameter:interpolate'],
+ ['x = df.resample("D").interpolate(method="cubicspline")\n','parameter:interpolate'],
+])test('pandas named-module parameter refused: '+reason+' '+JSON.stringify(source.slice(-40)),()=>{
+ const policy=inspectPythonSourcePolicy(source);
+ assert.equal(policy.status,'REFUSED',JSON.stringify(policy));assert.equal(policy.reason,reason);
+});
+
+test('interpolate without scipy and plain rolling stay admitted',()=>{
+ for(const source of ['x = df.interpolate()\n','x = df.interpolate(method="linear")\n','x = df["b"].interpolate("time", limit=2)\n',
+  'x = df.interpolate(method="pad")\n','x = df.rolling(3).mean()\ny = df.rolling(3, min_periods=1, center=True).sum()\n','hist = [1, 2]\nplot = len(hist)\n'])
+  assert.equal(inspectPythonSourcePolicy(source).status,'ADMITTED',source+JSON.stringify(inspectPythonSourcePolicy(source)));
+ assert.throws(()=>validatePythonParameters({source_text:'df.plot()\n',schema_mode:'code'},'script',request()),/attribute:plot at line 1\): plotting is unavailable/);
+ assert.throws(()=>validatePythonParameters({source_text:'df.rolling(2, win_type="boxcar")\n',schema_mode:'code'},'script',request()),/parameter:rolling at line 1\): .*win_type/);
+ assert.throws(()=>validatePythonParameters({source_text:'df.interpolate("spline")\n',schema_mode:'code'},'script',request()),/parameter:interpolate at line 1\): .*"linear"/);
 });
