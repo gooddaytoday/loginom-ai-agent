@@ -14,7 +14,7 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
-test('REST reopen retires its previous workflow before admitting another node request',()=>{
+test('an unrelated workflow replacement retires its previous identity before another node request',()=>{
  const b=createUserWorkflowBindings(),previous=workspace();b.remember(previous);
  const fresh={...previous,workflow_ref:{...previous.workflow_ref,workflow_id:'reopened',tab_tid:'fresh-tab',prefix:'fresh-prefix'}};
  b.remember({...fresh,previous_workflow_ref:previous.workflow_ref});

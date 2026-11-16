@@ -614,7 +614,8 @@ export async function createBridge(config, session, { browserTransport: managedB
                     packagePath:bindingRequest.package_path,bindOpenOnly:true,timeoutMs:5000});
                   const state = parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:6000}));
                   if(state.status!=='READY'||state.effect_possible!==false||state.document_id!==previous.document_id
-                    ||state.loginom_account!==previous.loginom_account||state.package_ref?.path!==bindingRequest.package_path)
+                    ||state.loginom_account!==previous.loginom_account||state.package_ref?.path!==bindingRequest.package_path
+                    ||state.workflow_ref.workflow_id!==previous.workflow_ref.workflow_id)
                     throw Error('REST normalization saved the package, but its reopened workspace could not be bound');
                   return state;
                 },assertTarget:target=>assertCatalogTarget(pinnedActions,target),record:recordExecution,save:()=>session.save(catalog)});
@@ -627,7 +628,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             }):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
             if(normalizedWorkspace)reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_workspace',
               document_id:normalizedWorkspace.document_id,workflow_ref:normalizedWorkspace.workflow_ref,package_ref:normalizedWorkspace.package_ref,
-              instruction:'REST finalization reopened this saved package. Use this fresh workflow and freshly observed node refs for further work.'})});
+              instruction:'REST finalization rebound the saved package. Issued document/workflow/node identities remain valid; this is their current tab and navigation.'})});
             if(outcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(outcome.action_key)&&outcome.output?.package_ref?.path){
               // Save As can reopen a package that Loginom immediately marks
               // modified. Report this while the model can still checkpoint it,

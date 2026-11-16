@@ -8,7 +8,7 @@ export function userActionTool(tool) {
   p.action_key.enum=[...userActionKeys];
   if(p.action_keys)p.action_keys.items.enum=[...userActionKeys];
   copy.description=tool.name==='dock_action_run'
-    ? 'Read and export needed results BEFORE the final package.save_checkpoint. REST connection references require Close/Open and at most one extra Save; previous workflow/node refs then expire. Use the returned fresh workspace for further work. Use package.save_as for explicitly requested reopen. Request missing parameters with dock_action_describe; create/configure nodes through dock_node_apply.'
+    ? 'Save the completed scenario with package.save_checkpoint. REST connection references require Close/Open and at most one extra Save; the application rebinds issued workflow/node identities for continued work. Use package.save_as for explicitly requested reopen. Request missing parameters with dock_action_describe; create/configure nodes through dock_node_apply.'
     : 'List nodes with {}. Single: action_key alone; never combine action_key with a batch. Batch: action_keys/node_types, optional modes. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Cards contain parameter_schema and guidance from the prepared skill. Without modes get common guidance and guidance_modes; request selected modes for their rules before applying. Read-only.';
   return copy;
 }
