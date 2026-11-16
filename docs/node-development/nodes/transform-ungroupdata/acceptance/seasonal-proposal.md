@@ -1,4 +1,4 @@
-# Сезонность LAB-1127: предложение, ожидающее решения
+# Сезонная приёмка: постоянная опора и края
 
 Это ограниченная бизнес-приёмка постоянной опоры и вырожденных входов.
 Она не доказывает правильность произвольного seasonal estimator. Исходный
@@ -8,43 +8,44 @@
 `task-seasonal.md` явно исключает доверительные границы из порта 0 через
 штатное соответствие выходных столбцов. Остальные десять полей и весь порт 1
 проверяются целиком существующим сравнителем, без игнорирования actual-полей,
-новых предикатов или ослабления точности. Такое ограничение объёма требует
-решения владельца до этапа 1; оно не согласовано этим PR.
+новых предикатов или ослабления точности. Постоянная опора уже зарегистрирована;
+решение владельца `v040-scope-expansion` разрешает zero/null по наблюдённым
+expected, а empty требует честного отказа. Произвольный estimator не принят.
 
 | Сценарий | Task | Expected | Строки 0 / 1 | Статус |
 |---|---|---|---:|---|
 | ungroup-seasonal | task-seasonal.md | expected-seasonal.json | 4 / 2 | доли, тренд, индексы вычислены и проверяются; UngroupQuality=NaN (`{"non_finite":"NaN"}`, решение `v040-nan-exact`) — наблюдение 7.4.2, не заявляется в справке |
-| ungroup-seasonal-zero (не зарегистрирован) | task-seasonal-zero.md | expected-seasonal-zero.json | 4 / 2 | наблюдение, не заявляется |
-| ungroup-seasonal-null (не зарегистрирован) | task-seasonal-null.md | expected-seasonal-null.json | 0 / 0 | наблюдение, не заявляется |
-| ungroup-seasonal-empty-support (не зарегистрирован) | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | 0 / 0 | наблюдение, не заявляется |
-| ungroup-seasonal-empty-totals (не зарегистрирован) | task-seasonal-empty-totals.md | expected-seasonal-empty-totals.json | 0 / 0 | наблюдение, не заявляется |
+| ungroup-seasonal-zero | task-seasonal-zero.md | expected-seasonal-zero.json | 4 / 2 | наблюдённый expected разрешён владельцем для PASS |
+| ungroup-seasonal-null | task-seasonal-null.md | expected-seasonal-null.json | 0 / 0 | наблюдённый expected разрешён владельцем для PASS |
+| ungroup-seasonal-empty-support | task-seasonal-empty-support.md | expected-seasonal-empty-support.json | — | явный отказ; без CSV и cold |
+| ungroup-seasonal-empty-totals | task-seasonal-empty-totals.md | expected-seasonal-empty-totals.json | — | явный отказ; без CSV и cold |
 
-LAB-1166 (решение оркестратора пересмотрено): исходы zero/null/empty
-(OutputVT=6 «Исключено», UngroupQuality=1 при нулевой опоре, пустые порты)
-и UngroupQuality=null при положительной опоре — переписанное native-наблюдение
-этапа 0, а не вычисление oracle. Каждый такой expected несёт поля
-`"claim": "наблюдение, не заявляется"` и `observation` (что именно наблюдено;
-run-check читает только `package_path`, `nodes`, `outputs`). Они не являются
-критерием PASS, пока native typed-read или решение владельца не подтвердит их.
-Задания не называют исход: в них нет фраз о пустом качестве и пустых выходах.
+Поля `claim` и `observation` у zero/null сохранены как происхождение эталона:
+это ограниченное native-наблюдение, а не формула произвольных рядов. Решение
+`v040-scope-expansion` разрешает именно эти эталоны. В zero не допускается
+нормирование нулей до ненулевых долей; null не подменяется нулями.
+Empty-файлы содержат только заголовок, в отличие от непустой NULL-опоры.
+Expected отказа фиксируется до живых прогонов и проверяется штатной веткой
+runner; сообщение должно назвать пустой вход, успешный экспорт запрещён.
 
 Во всех сценариях два входных CSV: totals и support из `oracle-seasonal.py:CASES`;
 выгрузки названы в task: `seasonal-details.csv` — порт 0, `seasonal-quality.csv` — порт 1
 (порядок `outputs` в expected), даты экспорта — `yyyy-mm-dd hh:mm:ss`, NULL входа — `?`;
-пустые файлы импортируются с явно заданной схемой, без определения типов
-по отсутствующим строкам. Два экспорта, новый чат/профиль/пакет, стандартные
-CSV/Save/cold/cleanup, 2/3 и независимые 2/3 на одном SHA. При пустых входах
-нужен полноценный пустой CSV с заголовком каждого порта, не отсутствие файла.
+схема входов задана task. Для constant/zero/null — два экспорта, новый
+чат/профиль/пакет, стандартные CSV/Save/cold/cleanup, минимум 2/3 на одном SHA.
+Для empty — отказ, Save и cleanup без экспорта/cold. Независимая приёмка
+назначается отдельно.
 Модель получает только task и входные CSV, без oracle/expected/этого текста.
 
 Порядок столбцов задан task. Порядок строк — totals, затем a,b; порт 1 — a,b.
 Типы integer/string/datetime строгие, real abs=rel=1e-12; метки label_any.
-NULL в качестве качества отличается от числовых 0 и 1.
+NULL отличается от числовых 0 и 1 и точного NaN-маркера.
 
 Oracle использует Python csv/Fraction и только входные fixtures. Он проверяет
 36 разных месячных точек и постоянство каждого ряда, считает нормированные
-доли и постоянный тренд, задаёт единичные индексы. Соглашения NULL/zero/empty
-и коды результата — явно ограниченная наблюдённая спецификация; формулу
+доли и постоянный тренд, задаёт единичные индексы. Соглашения NULL/zero
+и коды результата — явно ограниченная наблюдённая спецификация; empty —
+явный отказ, а не прогноз нулевых строк; формулу
 качества для произвольных рядов он не реализует. Непостоянная опора отвергается
 assert, а не подгоняется под actual. Воспроизведение из корня:
 
@@ -57,7 +58,7 @@ python3 docs/node-development/nodes/transform-ungroupdata/acceptance/oracle-seas
 python3 -I docs/node-development/nodes/transform-ungroupdata/acceptance/oracle-seasonal.py --check
 ```
 
-Вывод побайтно совпадает с соответствующим expected; `--check` сверяет все пять. Сопоставление с live DOM
-этапа 0 не означает PASS runtime или cold: они не запускались, CLI не собирался.
+Вывод побайтно совпадает с соответствующим expected; `--check` сверяет все пять.
+Сопоставление с DOM этапа 0 не заменяет живые прогоны и cold точного SHA.
 Невозможно объявить полный сезонный режим принятым по этому ограниченному
 комплекту без отдельного решения о чередующемся ряде и доверительных границах.

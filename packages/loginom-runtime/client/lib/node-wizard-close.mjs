@@ -74,7 +74,11 @@ export async function closePreparedWizard(channel,{initialObservation}={}) {
  if(!cancelledWizardReady(s,binding)&&!boundWizardCloseConfirmation(s,binding)) {
  await channel.perform({condition:'close the prepared wizard draft',initialObservation:s,
   ready:s=>same(wizardCloseBinding(s),binding),identity:()=>binding,
-  resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid===binding.root_tid+';btnClose').ref})});
+  resolve:s=>{
+   const controls=s.ui.elements.filter(e=>e.tid===binding.root_tid+';btnClose'&&e.allowed_actions?.includes('click'));
+   requireValue(controls.length===1,'The prepared wizard Close control is unavailable or ambiguous');
+   return {verb:'click',ref:controls[0].ref};
+  }});
  s=await channel.observe({condition:'wizard close confirmation or closed graph',wizardConfirmation:binding,
   ready:s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'||boundWizardCloseConfirmation(s,binding)});
  }

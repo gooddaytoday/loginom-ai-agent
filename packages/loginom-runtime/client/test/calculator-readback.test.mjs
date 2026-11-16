@@ -13,6 +13,10 @@ function fixture(){
 test('calculator readback projects observed expressions, preserved properties and mapping without claiming persistence',()=>{
  const r=calculatorConfigurationReadback(fixture());assert.equal(r.expressions[0].formula,'A * 2');assert.equal(r.expressions[0].description,'kept');assert.equal(r.output_mapping.fields[0].source_name,'Result');assert.equal(r.package_persistence_verified,false);
 });
+test('readback explicitly retains a saved empty Expr1',()=>{
+ const f=fixture();f.phases[0].value.configuration.expressions.push({index:1,name:'Expr1',label:'Expr1',type:'real',formula:'',replace:false,intermediate:false,cached:false,description:''});
+ assert.deepEqual(calculatorConfigurationReadback(f).expressions.map(e=>[e.name,e.formula]),[['Result','A * 2'],['Expr1','']]);
+});
 test('calculator readback checks separate variable names/types against owned W1 mapping without claiming cached values',()=>{
  const f=fixture(),input=f.phases.at(-1).value;
  f.phases[0].value.configuration.input_variables=[{name:'Var.Amount',label:'Scenario',type:'integer'}];

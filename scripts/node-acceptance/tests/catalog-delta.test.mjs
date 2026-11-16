@@ -10,7 +10,7 @@ def module(name):
  s=importlib.util.spec_from_file_location(name,'scripts/node-acceptance/'+name+'.py')
  m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
 r=module('run-check');checks=module('required-checks')
-for name in ['calculator-viewport','linreg-short','throw1','js-declared-empty']:
+for name in ['calculator-viewport','calculator-eight','linreg-short','throw1','js-declared-empty']:
  c=r.scenario(name);e=r.expected_for(c,'/own/run.lgp')
  assert c['prompt'].is_file() and (c['source']/'oracle.py').is_file()
  assert all((c['data']/f).is_file() for f in c['input_files'])
@@ -18,6 +18,9 @@ for name in ['calculator-viewport','linreg-short','throw1','js-declared-empty']:
  assert bool(e.get('execution_error')) == (name in ['linreg-short','throw1'])
  if e.get('execution_error'): assert e['outputs']==[]
  else: assert len(e['outputs'])==1
+ if name=='calculator-eight':
+  import runpy
+  runpy.run_path(str(c['source']/'oracle.py'))['check']()
  paths=[str(c['prompt'].relative_to(r.REPO))]
  assert name in checks.select(paths)[1]
 for path,names in [

@@ -193,3 +193,16 @@ acceptance-tests при изменении runner, run-check start+wait, CSV/Sav
 Прежде чем менять handler, владелец утверждает именно этот ограниченный
 полный путь и предложенные критерии. Отдельные даты, новые форматы, Excel,
 HTTP/REST и подстановки `%Name%` не принимаются этим этапом 0.
+
+## Экспорт в 0.4.0 (LAB-1698, цикл 1)
+
+Реализовано для `exports.text`: необязательный `parameters.file_name_variable={kind:"variable",name}`
+вместо литерала `destination` (имя `bindings` в общей схеме параметров уже занято).
+Источник — переменные на входе `variables` 0 (Калькулятор переменных); runtime сверяет
+одно подключённое не-NULL строковое значение с политикой `exports` до первого жеста мастера,
+переключает `edtFileName` на `VariableControl` и читает активный редактор, а не скрытый литерал.
+Повтор тем же Export с `parameters:{}` читает сохранённую привязку без её пересохранения.
+Readback: `file_name_variable`, `destination` (разрешённый путь) и `destination_check`.
+Сценарий `text-export-file-variable`: задание `acceptance/task-file-variable-export.md`,
+stock expected `acceptance/file-variable/expected-export.json` (`oracle.py --export`);
+`{{EXPORTS_DIR}}` и уникальный префикс имени подставляет `run-check`.

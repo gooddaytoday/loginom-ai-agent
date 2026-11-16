@@ -19,7 +19,7 @@ const request={operation_id:'logistic',contract_revision:'1.0.0',document_id:'do
 test('logistic registration and handler accept prediction and full coefficient outputs',()=>{
  const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
  const card=describeNodeTypes(['datamining.log_regression'],{},new Map(),support.nodeApplyHandlers,'7.4.2')[0];
- assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise','ridge','apply','lasso']);
+ assert.equal(card.palette_group,'Data_Mining');assert.deepEqual(card.modes,['enter','forward','backward','stepwise','ridge','apply','lasso','elastic_net']);
  assert.equal(card.tabular_outputs,2);assert.ok(card.parameter_schema.properties.logistic.properties.event.description);
  assert.ok(validateNodeApplyRequest(request,support.nodeApplyHandlers).handler);
  for(const ports of [[1],[0,1]])assert.ok(validateNodeApplyRequest({...request,read:{...request.read,ports}},support.nodeApplyHandlers).handler);
@@ -43,14 +43,14 @@ function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLab
  const inputMapping={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'TuneDataSourceMappingWizard',node_context:{...node,verified:true,input_port:{port:0}},source_fields,target_fields:fields.map((f,i)=>({...f,source:source_fields[i]}))};
  const values={pedAutoMethod:true,pedRegressionMethod:4,pedDenormalize:true,pedUseDetailedSettings:false,pedEventType:2,pedEventId:7,pedUseScoring:false,pedSetupCalibration:false};
  const details={pedEpsilon:0.0001,pedThreshold:0.5,pedIntercept:true,pedRegSelQuality:initialCriterion,pedAddSignificance:0.05,pedRemoveSignificance:0.1};
- if(mode==='ridge')Object.assign(details,{pedRidgeSetupMethod:1,pedLambdaRidge:2});
- if(mode==='lasso')Object.assign(details,{pedLassoSetupMethod:1,pedLambdaLasso:2});
+ if(['ridge','elastic_net'].includes(mode))Object.assign(details,{pedRidgeSetupMethod:1,pedLambdaRidge:2});
+ if(['lasso','elastic_net'].includes(mode))Object.assign(details,{pedLassoSetupMethod:1,pedLambdaLasso:2});
  if(mode==='apply'){Object.assign(values,{pedAutoMethod:false,pedRegressionMethod:0,pedUseDetailedSettings:true,pedEventType:4,pedEventId:2});Object.assign(details,{pedEpsilon:1e-10,pedThreshold:0.8});}
  let stage='input_mapping',picker=null,scrollTop=0,normType=initialNorm,normSelected=false,normEditor=false,editorNorm=initialNorm;const actions=[];
  const rawState=()=>({prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',owner_context:{status:'observed'},stage,root_tid:'MF;TF-1;WizrdMCF',root_ref:'wizard'},ui:{dialogs:[],masks:[],elements:[{tid:'MF;TF-1;WizrdMCF;btnClose',ref:'close',allowed_actions:['click']},{tid:'MF;TF-1;WizrdMCF;btnNext',ref:'ui-next',allowed_actions:['wizard_step']},
   ...Object.keys(stage==='lin_regression_details'?details:values).flatMap(key=>(stage==='lin_regression_details'?['','trg_picker']:['DisplayEl','trg_picker','InputEl']).map(part=>({tid:'MF;TF-1;WizrdMCF;'+(stage==='lin_regression_details'?'LogRegressionWizard-1':'LogRegressionWizard')+';'+key+';ValueControl'+(part?';'+part:''),ref:key+':'+part,allowed_actions:['click','set_checked','fill','press']}))),
-  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)',ridge:'Ridge (Гребневая регрессия)',lasso:'LASSO (L1-регуляризация)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'Информационный критерий Акаике',aicc:'Информационный критерий Акаике скорректированный',bic:'Информационный критерий Байеса',hqic:'Информационный критерий Ханнана-Куинна'})[selection?.criterion??'deviance']:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?'Задать вручную':'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
-  node_logregression:{verified:true,...(mode==='lasso'?{method_choices:[{value:5,label:'LASSO (L1-регуляризация)'}]}:{}),node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>[3,4].includes(f.usage_type)).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:['ridge','lasso'].includes(mode),pedAddSignificance:['ridge','lasso'].includes(mode)||details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:['ridge','lasso'].includes(mode)||details.pedRegSelQuality!==0||mode==='forward',...(mode==='ridge'?{pedRidgeSetupMethod:false,pedLambdaRidge:false}:mode==='lasso'?{pedLassoSetupMethod:false,pedLambdaLasso:false}:{})}})}});
+  ...(picker==='pedEventId'?optionLabels.map((label,i)=>({label,tid:'MF;TF-1;WizrdMCF;LogRegressionWizard;pedEventId;ValueControl;boundlist;'+i,ref:'event-'+i,allowed_actions:['click']})):picker?[{label:picker==='pedRegressionMethod'?({enter:'Enter (Принудительное включение)',forward:'Forward (Пошаговое включение)',backward:'Backward (Пошаговое исключение)',stepwise:'Stepwise (Пошаговое включение/исключение)',ridge:'Ridge (Гребневая регрессия)',lasso:'LASSO (L1-регуляризация)',elastic_net:'Elastic-net (Регрессия эластичная сеть)'})[mode]:picker==='pedRegSelQuality'?({deviance:'Deviance',aic:'Информационный критерий Акаике',aicc:'Информационный критерий Акаике скорректированный',bic:'Информационный критерий Байеса',hqic:'Информационный критерий Ханнана-Куинна'})[selection?.criterion??'deviance']:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?'Задать вручную':'Задано явно',tid:'boundlist-option',ref:'option',allowed_actions:['click']}]:[])]},
+  node_logregression:{verified:true,...(['lasso','elastic_net'].includes(mode)?{method_choices:[{value:5,label:'LASSO (L1-регуляризация)'},{value:6,label:'Elastic-net (Регрессия эластичная сеть)'}]}:{}),node_context:{...node,verified:true},...(stage==='input_mapping'?{fields,inventory_complete:true}:stage==='normalization'?{kind:'normalization',fields:fields.filter(f=>[3,4].includes(f.usage_type)).map(f=>({...f,norm_type:f.usage_type===3?0:1,importance:1,irremovable:false})),source_status:'Вход активирован'}:stage==='learn_partition'?{kind:'partition',values:{train:100,test:0,validation:0}}:stage==='lin_regression'?{kind:'parameters',values,classes,switches:{}}:{kind:'details',values:details,switches:{},disabled:{pedRegSelQuality:['ridge','lasso','elastic_net'].includes(mode),pedAddSignificance:['ridge','lasso','elastic_net'].includes(mode)||details.pedRegSelQuality!==0||mode==='backward',pedRemoveSignificance:['ridge','lasso','elastic_net'].includes(mode)||details.pedRegSelQuality!==0||mode==='forward',...(['ridge','elastic_net'].includes(mode)?{pedRidgeSetupMethod:false,pedLambdaRidge:false}:{}),...(['lasso','elastic_net'].includes(mode)?{pedLassoSetupMethod:false,pedLambdaLasso:false}:{})}})}});
  const state=()=>{if(stage==='closed')return {wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked:false},ui:{dialogs:[],masks:[],elements:[]}};const s=rawState();
   if(stage==='normalization'){
    s.node_logregression.fields[0].norm_type=normType;
@@ -76,7 +76,7 @@ function fixture({classes=[{index:7,label:'no'},{index:2,label:'yes'}],optionLab
   if(a.verb==='set_checked')target[key]=a.checked;
   else if(a.verb==='fill')target[key]=Number(a.text);
   else if(a.ref.startsWith('event-')){target.pedEventId=classes[Number(a.ref.slice(6))].index;picker=null;}
-  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise','ridge','lasso'].indexOf(mode):picker==='pedRegSelQuality'?['deviance','aic','aicc','bic','hqic'].indexOf(selection?.criterion??'deviance'):picker==='pedEventType'?4:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?0:2;picker=null;}
+  else if(a.ref==='option'){target[picker]=picker==='pedRegressionMethod'?['enter','forward','backward','stepwise','ridge','lasso','elastic_net'].indexOf(mode):picker==='pedRegSelQuality'?['deviance','aic','aicc','bic','hqic'].indexOf(selection?.criterion??'deviance'):picker==='pedEventType'?4:['pedRidgeSetupMethod','pedLassoSetupMethod'].includes(picker)?0:2;picker=null;}
   else if(a.verb==='click')picker=key;
  }};
  return {channel,inputMapping,actions,values,details,run:()=>configureLogRegression(channel,{logistic:{...logistic,...(weightType?{weight_field:"Weight"}:{}),...(normalization!==undefined?{normalization}:{}),...(selection?{selection}:{}),...(regularization?{regularization}:{})}},{request:{...request,mode,target:existing?{kind:'existing',ref:node}:request.target},inputMapping})};
@@ -164,7 +164,7 @@ for(const mode of ['forward','backward','stepwise'])for(const criterion of ['dev
  const selection={criterion,...(criterion==='deviance'?{...(mode!=='backward'?{entry_significance:1e-7}:{}),...(mode!=='forward'?{removal_significance:0.2}:{})}:{})};
  assert.doesNotThrow(()=>validateLogRegressionParameters({logistic:{...logistic,selection}},mode));
  const f=fixture({mode,selection,initialCriterion:criterion==='aic'?0:1}),r=await f.run();
- assert.equal(f.values.pedRegressionMethod,['enter','forward','backward','stepwise','ridge','lasso'].indexOf(mode));
+ assert.equal(f.values.pedRegressionMethod,['enter','forward','backward','stepwise','ridge','lasso','elastic_net'].indexOf(mode));
  assert.equal(r.configuration.mode,mode);assert.deepEqual(r.configuration.selection,selection);
  assert.equal(f.details.pedRegSelQuality,['deviance','aic','aicc','bic','hqic'].indexOf(criterion));
  const edited=f.actions.filter(a=>a.verb==='fill').map(a=>a.ref.split(':')[0]);
@@ -305,4 +305,39 @@ test('LASSO rejects invalid L1, L2, selection and weights before effects',()=>{
   assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization}},'lasso'));
  for(const patch of [{selection:{criterion:'aic'}},{weight_field:'Weight'}])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_lasso:1},...patch}},'lasso'));
  for(const mode of ['enter','ridge','forward','backward','stepwise','apply'])assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:{lambda_lasso:1}}},mode));
+});
+
+
+test('manual Elastic Net configures both independent penalties for new and existing nodes',async()=>{
+ const regularization={lambda_lasso:0.75,lambda_ridge:1.25};
+ const support=createCandidateNodeSupport({targetOrigin:'https://example.test',targetBuild:'7.4.2'});
+ assert.ok(validateNodeApplyRequest({...request,mode:'elastic_net',parameters:{logistic:{...logistic,regularization}}},support.nodeApplyHandlers).handler);
+ for(const existing of [false,true]){
+  const f=fixture({mode:'elastic_net',regularization,existing}),r=await f.run();
+  assert.equal(f.values.pedRegressionMethod,6);assert.equal(f.details.pedIntercept,true);
+  for(const [suffix,value] of [['Lasso',0.75],['Ridge',1.25]]){
+   assert.equal(f.details['ped'+suffix+'SetupMethod'],0);
+   assert.equal(f.details['pedLambda'+suffix],value);
+   assert.ok(f.actions.some(a=>a.verb==='fill'&&a.ref.startsWith('pedLambda'+suffix)));
+  }
+  assert.equal(r.configuration.mode,'elastic_net');assert.deepEqual(r.configuration.regularization,regularization);
+  assert.equal(f.actions.at(-1).expected_stage,'done');
+ }
+ for(const suffix of ['Lasso','Ridge']){
+  const f=fixture({mode:'elastic_net',regularization}),perform=f.channel.perform;
+  f.channel.perform=async options=>{const a=options.initialObservation&&options.resolve(options.initialObservation);if(a?.verb==='fill'&&a.ref.startsWith('pedLambda'+suffix))return;return perform(options);};
+  await assert.rejects(f.run(),/setting differs/);
+  assert.ok(!f.actions.some(a=>a.expected_stage==='done'));
+ }
+});
+
+test('Elastic Net refuses incomplete, invalid or extra penalties, selection and weights before effects',()=>{
+ const valid={lambda_lasso:1,lambda_ridge:1};
+ for(const regularization of [undefined,null,{},[],{lambda_lasso:1},{lambda_ridge:1},{...valid,alpha:0.5},
+  ...['lambda_lasso','lambda_ridge'].flatMap(key=>[0,-1,NaN,Infinity,'1',null].map(value=>({...valid,[key]:value})))])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization}},'elastic_net'));
+ for(const patch of [{selection:{criterion:'aic'}},{weight_field:'Weight'}])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:valid,...patch}},'elastic_net'));
+ for(const mode of ['enter','ridge','lasso','forward','backward','stepwise','apply'])
+  assert.throws(()=>validateLogRegressionParameters({logistic:{...logistic,regularization:valid}},mode));
 });

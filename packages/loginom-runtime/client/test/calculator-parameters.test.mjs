@@ -83,6 +83,26 @@ test('only a pristine new-node default may be reused',()=>{
  const r=resolveCalculatorPatch(p,o,inputs,{newNode:true});assert.equal(r.changes[0].reuse_default,true);assert.equal(r.expressions[0].record_id,'r0');
  o.expressions[0].formula='123';assert.throws(()=>resolveCalculatorPatch(p,o,inputs,{newNode:true}),/default expression changed/);
 });
+test('owned-template cleanup still permits an explicitly requested Expr1 at any position',async()=>{
+ const {planCalculatorEdits}=await import('../lib/calculator-parameters.mjs');
+ for(const names of [['Flag','Expr1'],['Expr1','Flag'],['Flag','expr1'],['Flag','EXPR1']]){
+  const o=observed();o.expressions=[{...expression('Expr1'),formula:'',cached:false,description:''}];
+  const parameters={expressions:names.map(name=>({target:{kind:'new'},name,label:name,type:'real',formula:'1',replace:false}))};
+  const plan=resolveCalculatorPatch(parameters,o,inputs,{newNode:true,removeDefault:true});
+  assert.doesNotThrow(()=>planCalculatorEdits(plan,inputs));
+  assert.deepEqual(plan.expressions.map(e=>e.name),names);
+  assert.equal(plan.discard_default,null);
+ }
+});
+for(const count of [128,127])test('owned-template cleanup stays within the reader bound for '+count+' new expressions',()=>{
+ const o=observed();o.expressions=[{...expression('Expr1'),formula:'',cached:false,description:''}];
+ const parameters={expressions:Array.from({length:count},(_,i)=>({target:{kind:'new'},name:'Field'+i,label:'Field'+i,type:'real',formula:'1',replace:false}))};
+ validateCalculatorParameters(parameters,'expression',{...request(),target:{kind:'new'},inputs:[{input:0}]});
+ const plan=resolveCalculatorPatch(parameters,o,inputs,{newNode:true,removeDefault:true});
+ assert.deepEqual(plan.discard_default,count===128?null:o.expressions[0]);
+ assert.equal(plan.changes[0].reuse_default,count===128);
+ assert.deepEqual(plan.expressions.map(e=>e.name),parameters.expressions.map(e=>e.name));
+});
 test('Close refuses a separate input mapping before any UI work',()=>{
  const p={expressions:[{target:{kind:'existing',name:'A'},formula:'2'}]};
  for(const mapping of [{direction:'input',port:0},{direction:'input',port:0,autosync:true},{direction:'input',port:0,fields:[{source:{kind:'configured_field',name:'Amount'},name:'NewAmount'}]}])

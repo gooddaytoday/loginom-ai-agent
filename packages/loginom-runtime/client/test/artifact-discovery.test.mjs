@@ -412,7 +412,7 @@ for(const fault of ['receipt','digest','no_digest','account','origin','time','ty
  if(fault==='no_digest'){f.task.artifact.sha256=null;receipt.sha256=null;}
  if(fault==='digest')receipt.sha256='b'.repeat(64);if(fault==='account')receipt.account='other';if(fault==='origin')receipt.origin='https://other';
  if(fault==='time')f.row.Time='other';if(fault==='type')f.row.Type=1;if(fault==='directory')receipt.directory='/other';
- await assert.rejects(()=>largeUploadNative(f.page,{...f.task,mode:'bind',receipt:fault==='receipt'?undefined:receipt}),/UPLOAD_PATH_CONFLICT/);
+ assert.equal((await largeUploadNative(f.page,{...f.task,mode:'bind',receipt:fault==='receipt'?undefined:receipt})).conflict_rejected,true);
  assert.deepEqual(f.clicks,[]);
 });
 
@@ -434,6 +434,20 @@ test('large native steps cross the production typed browser parser',async()=>{
  const raw=await vm.runInNewContext('('+makeLargeUploadCode({...f.task,mode:'bind'})+')')(f.page);
  const reply=parseCapabilityResult({content:[{type:'text',text:'### Result\n'+JSON.stringify(raw)}]});
  assert.equal(reply.status,'SUCCEEDED');assert.equal(reply.action_key,'artifact.large.native');assert.equal(reply.output.reused,false);assert.equal(reply.output.bytes,0);
+});
+
+test('large path conflict survives Playwright error decoration as a settled typed refusal',async()=>{
+ const {makeLargeUploadCode}=await import('../lib/artifact-discovery.mjs');
+ const {parseCapabilityResult}=await import('../lib/executor.mjs');
+ const f=largeNativeFixture();f.publish();
+ const evaluate=f.page.evaluate;
+ f.page.evaluate=async(...args)=>{try{return await evaluate(...args);}catch(error){throw Error('page.evaluate: Error: '+error.message);}};
+ const raw=await vm.runInNewContext('('+makeLargeUploadCode({...f.task,mode:'bind'})+')')(f.page);
+ const reply=parseCapabilityResult({content:[{type:'text',text:'### Result\n'+JSON.stringify(raw)}]});
+ assert.equal(reply.status,'FAILED');assert.equal(reply.error.code,'UPLOAD_PATH_CONFLICT');
+ assert.equal(reply.effect_possible,false);assert.equal(reply.cleanup_complete,true);
+ assert.equal(reply.output.conflict_rejected,true);assert.equal(reply.output.upload_submitted,false);
+ assert.deepEqual(f.clicks,[]);assert.equal(f.records.length,1);
 });
 
 test('native cancellation waits for a loader disposed between capture and the cancel gesture without replay',async()=>{
