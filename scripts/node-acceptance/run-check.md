@@ -1,7 +1,10 @@
-`rest-content-types` uses frozen C5 `task-content-types.md`, only
+`rest-content-types` uses the reduced C5 `task-content-types.md`, only
 `content-types.csv` and `acceptance/modes/content-types/expected.json`.
-Two raw UTF-8 bodies (text/plain, application/xml) and two response MIME settings
-(text/plain, */*) must produce four typed rows with actual HTTP status.
+Two raw UTF-8 POST bodies (text/plain, application/xml) must produce two typed
+rows with echoed content type, unchanged body and actual HTTP status. The two
+GET response-MIME branches were removed to reserve at least 25% of the unchanged
+1800s model limit under the observed slower-REST timing; this case no longer
+claims live coverage of response MIME text/plain or */*.
 Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
 Only task and CSV reach the model; expected/oracle remain private.
 

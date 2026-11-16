@@ -12,7 +12,7 @@
 | 2 — заголовки | `task-headers.md` | `requests.csv` | `headers/expected.json`: окончательный second, прежние тела и HTTP-коды |
 | 3 — сохранённая авторизация/TLS | `task-auth-tls.md` | нет; приватная подготовка LabBasic/LabBearer оператором | `auth-tls/expected.json`: authenticated=true от проверочного сервиса |
 | 4 — переменные | `task-variables.md` | `requests.csv` | `variables/expected.json`: second после изменения только источника Cycle |
-| 5 — типы содержимого | `task-content-types.md` | `content-types.csv` | `content-types/expected.json`: plain/XML запросы и plain/* ответ; 4 стабильные строки |
+| 5 — типы содержимого | `task-content-types.md` | `content-types.csv` | `content-types/expected.json`: plain/XML POST, 2 стабильные строки; GET-ветки MIME исключены из этого сценария по решению владельца LAB-1693 |
 | 6 — способы URL | `task-url-modes.md` | `requests.csv` | `url-modes/expected.json`: 6 URL с одним кодированием, как нормативное предложение |
 | 7 — тайм-аут/повторы | `task-timeout-retry.md` | нет | `timeout-retry/expected.json`: только HTTP 500/HasError; **не доказательство числа попыток** |
 | 8 — имитация | `task-simulation.md` | `response.json` | `simulation/expected.json`: точный типизированный объект fixture |
@@ -93,5 +93,10 @@ C9 остаётся остановлен до отдельного решени�
 C8 зарегистрирован как `rest-simulation`: полный типизированный вывод, CSV,
 Save, cold без пересоздания REST и cleanup через штатный `run-check`.
 
-C5 registered as `rest-content-types`: original task/CSV and frozen expected;
-full typed output, UTF-8 CSV, Save, cold execution and cleanup use stock checks.
+C5 зарегистрирован как `rest-content-types`: исходный CSV и две строки plain/XML
+из прежнего expected. После независимой приёмки LAB-1762 владелец LAB-1693
+разрешил облегчить сценарий: два POST вместо четырёх REST-веток, без GET-проверок
+response MIME text/plain/*, чтобы оставить ≥25% от неизменного лимита1800с.
+Полный типизированный вывод, UTF-8 CSV, Save, cold и cleanup — штатные проверки.
+Запас оценивается по времени прежних PASS с REST по150с; новая длительность
+и отсутствие прежнего отказа первого Import требуют живого прогона нового SHA.
