@@ -2146,8 +2146,9 @@ class Runner:
                     file.unlink()
             self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
 
-    def text_mask_directory(self, login):
-        return login['package_directory'].rstrip('/') + '/' + self.out.name + '-mask'
+    def text_mask_directory(self, login, case=None):
+        # Excel C4 scenarios share a batch: each owns its own mask directory.
+        return login['package_directory'].rstrip('/') + '/' + self.out.name + ('-' + case if case else '') + '-mask'
 
     def fs_directory(self, case, login):
         return login['package_directory'].rstrip('/') + '/' + self.out.name + '-js-fs-' + case
@@ -2202,15 +2203,15 @@ class Runner:
 
     def source_dir(self, spec, login):
         # The one server directory whose paths the task receives for its sources.
-        if spec.get('text_mask') or spec.get('excel_multi'): return self.text_mask_directory(login)
+        if spec.get('text_mask') or spec.get('excel_multi'): return self.text_mask_directory(login, spec.get('excel_multi'))
         if spec.get('text_list_sources') or spec.get('seed_files'): return login['package_directory'].rstrip('/')
         # A space in the parent path is part of the owner's observed request.
         if spec.get('text_folder_masks'): return login['package_directory'].rstrip('/') + '/' + self.out.name + ' Silent Talk'
         return None
 
     def text_mask_inputs(self, spec, folder, login, build, *, late=False):
-        name = self.out.name + '-mask'
-        directory = self.text_mask_directory(login)
+        directory = self.text_mask_directory(login, spec.get('excel_multi'))
+        name = Path(directory).name
         files = [spec['data'] / 'variants/sales_2026-03.csv'] if late else [spec['data'] / f for f in spec['input_files']]
         books = [dict(fixture=str(f), destination=directory + '/' + f.name) for f in files]
         phase = 'text-mask-new-month-input' if late else 'text-mask-inputs'

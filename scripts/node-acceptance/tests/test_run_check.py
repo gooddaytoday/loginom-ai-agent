@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import types
 import tempfile
 import time
 import unittest
@@ -81,6 +82,12 @@ class RunCheckTests(unittest.TestCase):
         self.assertNotIn('lgd_initial', parallel)
         self.assertEqual(parallel['expected_name'], 'expected-parallel.json')
         self.assertEqual(subprocess.run([sys.executable, '-B', multi['oracle']], capture_output=True).returncode, 0)
+        owner = types.SimpleNamespace(out=Path('/runs/b1'))
+        owner.text_mask_directory = lambda login, case=None: runner.Runner.text_mask_directory(owner, login, case)
+        login = dict(package_directory='/own/')
+        dirs = [runner.Runner.source_dir(owner, case, login) for case in [multi, parallel]]
+        self.assertEqual(dirs, ['/own/b1-excel-import-multi-mask', '/own/b1-excel-import-parallel-mask'])
+        self.assertEqual(runner.Runner.text_mask_directory(owner, login), '/own/b1-mask')
 
     def test_excel_multi_requires_list_then_native_mask_on_one_node(self):
         d = '/own/run-mask'
