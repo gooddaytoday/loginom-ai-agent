@@ -9,7 +9,13 @@ import {Page,Element,origin} from './support/workspace-ui-fixture.mjs';
 // same canvas scrollTop=0/max82; native input0 has SVG/native index1.
 // This external DOM/native-protocol fixture executes the real serialized observer,
 // scroll and port opener. Stop at the verified wizard boundary: mapping is separate.
-function fixture({onRecord=()=>{},deadlineMs=15000}={}) {
+// expireRefusedReadiness: instead of a short real deadline that races host speed
+// (it could expire inside an earlier step or a sample's journal acknowledgement),
+// the fixture's clock crosses the 15 s readiness window right after the first
+// refused readiness sample is journaled. The 60 s operation deadline is never hit.
+function fixture({onRecord=()=>{},expireRefusedReadiness=false}={}) {
+ let skew=0;
+ const now=expireRefusedReadiness?()=>Date.now()+skew:Date.now,deadlineMs=expireRefusedReadiness?60000:15000;
  const page=new Page();page.app.Version='7.4.2';page.context.innerWidth=1280;page.context.innerHeight=800;
  page.viewportSize=()=>({width:1280,height:800});page.waitForTimeout=async()=>{};
  const prefix='MF;TF-1',tid=prefix+';Graph;Export';
@@ -73,12 +79,14 @@ function fixture({onRecord=()=>{},deadlineMs=15000}={}) {
  const controller=new AbortController(),stop=new Error('Fixture stopped after verified own input wizard'),records=[];
  const operation={id:'export',action:{action_key:'node.apply',revision:'1.0.0'},nodeApply:{request:{finish:'execute'}}};
  const support=createTextExportNodeSupport({targetOrigin:origin,targetBuild:'7.4.2'});
- const driver=support.nodeApplyDriverFactory({operation,now:Date.now,
+ const driver=support.nodeApplyDriverFactory({operation,now,
   execute:async code=>JSON.parse(JSON.stringify(await vm.runInContext('('+code+')',page.context)(page))),
   receiptOptions:(id,key,signature)=>({receipt_namespace:'test',receipt_id:id,receipt_signature:signature}),
-  onRecord:async event=>{records.push(event);onRecord(event);if(event.phase==='node_step_completed'&&event.outcome?.output?.verified===true&&event.outcome.output.direction==='input')controller.abort(stop);return event;}});
+  onRecord:async event=>{records.push(event);onRecord(event);
+   if(expireRefusedReadiness&&event.phase==='node_observation_sample'&&event.readiness.satisfied===false)skew=15000;
+   if(event.phase==='node_step_completed'&&event.outcome?.output?.verified===true&&event.outcome.output.direction==='input')controller.abort(stop);return event;}});
  return {page,canvas,input,body,anchor,node,port,native,records,gestures,stop,
-  run:()=>driver.mapPorts([],{document_id:'doc',workflow_ref:workflowRef,node:nodeRef,deadline:Date.now()+deadlineMs,signal:controller.signal,receipt_id:'export:input_mapping'})};
+  run:()=>driver.mapPorts([],{document_id:'doc',workflow_ref:workflowRef,node:nodeRef,deadline:now()+deadlineMs,signal:controller.signal,receipt_id:'export:input_mapping'})};
 }
 
 // Actual diagnostic journal758/760, SHA107d308e7f755ac774abff77b6b659332c354d0f75441271cf924d9c4299c97a:
@@ -170,7 +178,7 @@ for(const mode of ['missing','duplicate','covered','foreign','disabled','script'
 });
 
 for(const mode of ['mask','lock'])test('Export stops before opening input when a '+mode+' appears after label admission',async()=>{
- const f=coveredFixture({deadlineMs:1000,onRecord:event=>{
+ const f=coveredFixture({expireRefusedReadiness:true,onRecord:event=>{
   if(event.phase!=='node_step_prepared'||event.action.verb!=='click')return;
   if(mode==='mask')f.page.add('div','busy','Loading').attrs.class='x-mask-msg';
   if(mode==='lock')f.node.FLocked=true;
@@ -183,10 +191,10 @@ for(const mode of ['mask','lock'])test('Export stops before opening input when a
 });
 
 test('Export never admits a label click when the fresh revealed native node is locked',async()=>{
- const f=coveredFixture({deadlineMs:1000,onRecord:event=>{
+ const f=coveredFixture({expireRefusedReadiness:true,onRecord:event=>{
   if(event.phase==='node_step_completed'&&event.outcome?.trace?.some(e=>e.event==='ui_scroll_applied'))f.node.FLocked=true;
  }});
- await assert.rejects(f.run(),/readiness timeout/);assert.equal(f.canvas.scrollTop,82);assert.deepEqual(f.gestures,[]);
+ await assert.rejects(f.run(),/readiness timeout: export input after canvas scroll;/);assert.equal(f.canvas.scrollTop,82);assert.deepEqual(f.gestures,[]);
  assert.equal(f.records.filter(e=>e.action?.verb==='click'||e.action?.verb==='open_input_port').length,0);
 });
 
@@ -206,7 +214,7 @@ for(const mode of ['port identity','label geometry'])test('Export refuses change
 });
 
 for(const mode of ['native owner','graph container'])test('Export refuses changed '+mode+' after label selection',async()=>{
- const f=coveredFixture({deadlineMs:1000,onRecord:event=>{
+ const f=coveredFixture({expireRefusedReadiness:true,onRecord:event=>{
   if(event.phase!=='node_step_completed'||!event.outcome?.trace?.some(e=>e.event==='ui_gesture_applied'&&e.verb==='click'))return;
   if(mode==='native owner')f.node.FGuid='foreign';
   if(mode==='graph container')f.canvas.attrs['data-tid']='MF;TF-2;ModelForm;cmpDiagram';
@@ -304,7 +312,7 @@ for(const mode of ['script','foreign','covered'])test('Export refuses '+mode+' c
 });
 
 for(const mode of ['mask','lock','document'])test('Export preserves the '+mode+' guard before opening its input',async()=>{
- const f=fixture({deadlineMs:1000,onRecord:event=>{
+ const f=fixture({expireRefusedReadiness:true,onRecord:event=>{
   if(event.phase!=='node_step_prepared'||event.action.verb!=='scroll')return;
   if(mode==='mask')f.page.add('div','busy','Loading').attrs.class='x-mask-msg';
   if(mode==='lock')f.node.FLocked=true;
@@ -327,7 +335,7 @@ test('Export rechecks its native canvas after the scroll before opening input',a
 });
 
 test('Export never starts a reveal while its native node is already locked',async()=>{
- const f=fixture({deadlineMs:500});f.node.FLocked=true;
+ const f=fixture({expireRefusedReadiness:true});f.node.FLocked=true;
  await assert.rejects(f.run(),/readiness timeout/);
  assert.equal(f.canvas.scrollTop,0);assert.deepEqual(f.gestures,[]);
  assert.equal(f.records.filter(e=>e.phase==='node_step_prepared').length,0);
