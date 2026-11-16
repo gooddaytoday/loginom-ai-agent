@@ -618,7 +618,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     throw Error('REST normalization saved the package, but its reopened workspace could not be bound');
                   return state;
                 },assertTarget:target=>assertCatalogTarget(pinnedActions,target),record:recordExecution,save:()=>session.save(catalog)});
-              if(userProfile)userWorkflows.remember(normalizedWorkspace);
+              if(userProfile)userWorkflows.remember({...normalizedWorkspace,previous_workflow_ref:previous.workflow_ref});
             }
             if (userProfile && outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key))
               for (const continuation of outcome.output?.workflow_continuations ?? []) userWorkflows.remember(continuation);
