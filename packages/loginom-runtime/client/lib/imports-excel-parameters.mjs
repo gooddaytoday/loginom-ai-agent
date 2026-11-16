@@ -3,25 +3,26 @@ const text=maxLength=>({type:'string',minLength:1,maxLength});
 const object=(properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 export const excelSettingsSchema=object({
  source_path:{...text(2048),description:'verified delivery .xlsx path; original workbook, no CSV conversion. Omit when bound.'},
- source_paths:{type:'array',items:text(2048),minItems:2,maxItems:16,description:'Instead of source_path: ordered .xlsx list, one verified_sources ref each.'},
- source_mask:{...text(2048),description:'Instead of source_path: <dir>/<name*.xlsx>; verified_sources = every match.'},
- parallel_processing:{type:'boolean',description:'List/mask only; omitted=false.'},
- max_threads:{enum:['auto',2,4,8,16,32],description:'Only with parallel_processing:true.'},
+ source_paths:{type:'array',items:text(2048),minItems:2,maxItems:16},
+ source_mask:text(2048),
+ parallel_processing:{type:'boolean'},
+ max_threads:{enum:['auto',2,4,8,16,32]},
  sheet_name:{...text(120),description:'Exact worksheet; exclusive with named_range. Omit both=first initially, preserve during source_switch.'},
- named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange. Select the native named range, only its columns; exclusive with sheet_name.'},
- extend_range:{type:'boolean',description:'Only with named_range. false/omitted=defined boundaries; true=continue its columns to the last populated row. Reconfigure the same node to change this.'},
+ named_range:{...text(120),description:'Exact workbook-defined name, e.g. SalesRange: only its columns; exclusive with sheet_name.'},
+ extend_range:{type:'boolean',description:'Only with named_range: false/omitted=its bounds; true=its columns to the last populated row.'},
  header_rows:{type:'integer',minimum:1,maximum:1000,description:'Initial: required, normally 1. source_switch: omit=preserve.'},
- columns:{type:'array',minItems:1,maxItems:64,description:'Initial only, required: all source columns in order, explicit types (no detection). Preserve names; renaming requires source_name header.',items:object({
+ columns:{type:'array',minItems:1,maxItems:64,description:'Initial, required: all source columns in order, explicit types (no detection); renaming requires source_name header.',items:object({
   source_name:text(120),name:{...text(120),pattern:'^[A-Za-z_][A-Za-z0-9_]*$'},label:text(120),
   type:{type:'string',enum:['string','integer','real','datetime','boolean']},
   data_kind:{type:'string',enum:['Непрерывный','Дискретный']},
  },['name','label','type'])},
 },[]);
-const excelSourceSchema={oneOf:[...importSourceSchema.oneOf,object({kind:{const:'verified_sources'},sources:{type:'array',items:importSourceSchema,minItems:1,maxItems:16}})]};
+// List/mask refs are validated as importSourceSchema items before mutation.
+const excelSourceSchema={oneOf:[...importSourceSchema.oneOf,object({kind:{const:'verified_sources'},sources:{type:'array',minItems:1,maxItems:16}})]};
 export const excelParametersSchema=object({
  source:excelSourceSchema,
  excel:excelSettingsSchema,
- source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Existing Excel import only: after exact XLSX scan and package.save_checkpoint, supply profile_id and save_operation_id; excel contains source_path and optional sheet_name only. Preserves columns and mapping, independently reopens, executes once and compares completed output N with the backend scan. Never supply expected_records.'},
+ source_switch:{...object({profile_id:text(128),save_operation_id:text(128)}),description:'Existing import after exact XLSX scan and package.save_checkpoint: their IDs; excel only source_path, optional sheet_name. Keeps columns/mapping, reopens, executes once, compares output N with the scan. Never expected_records.'},
 },['source','excel']);
 // An empty existing Excel patch executes its saved native configuration.
 export const isUnchangedExcelImportExecution=r=>r?.target?.type==='imports.excel'&&r.target.kind==='existing'&&!r.bindings?.length

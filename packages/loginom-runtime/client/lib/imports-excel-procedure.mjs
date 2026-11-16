@@ -14,8 +14,8 @@ export async function excelConfigureCapability(page,t,readContext){
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  let effect=false,waitingFor=null;
  // One path, a U+FF5C-joined ordered list or one mask in the native input.
- const want=t.excel.source_paths?t.excel.source_paths.join('｜'):t.excel.source_mask??t.excel.source_path,multi=want?.includes('｜')||want?.includes('*');
- const threadLabel=t.excel.max_threads==='auto'?'Автоопределение':t.excel.max_threads===undefined?undefined:String(t.excel.max_threads);
+ const e=t.excel??{},want=e.source_paths?e.source_paths.join('｜'):e.source_mask??e.source_path,multi=want?.includes('｜')||want?.includes('*');
+ const threadLabel=e.max_threads==='auto'?'Автоопределение':e.max_threads===undefined?undefined:String(e.max_threads);
  try{
   const guard=async()=>{remaining();const b=await readContext(page,binding);need(b.verified&&b.surface==='wizard'&&b.node_id===t.node.node_id,'owned wizard changed');
    need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return b;};
@@ -102,8 +102,8 @@ export async function excelConfigureCapability(page,t,readContext){
   if(multi){
    // Lists and masks are read sequentially unless parallel reading is asked.
    const parallel=find(file+'chkParallelProcessing;ValueControl'),checked=()=>parallel.evaluate(e=>e.classList.contains('x-form-cb-checked'));
-   if(await checked()!==(t.excel.parallel_processing===true)){await click(find(file+'chkParallelProcessing;ValueControl;DisplayEl'));
-    await wait('parallel processing readback',async()=>await checked()===(t.excel.parallel_processing===true));}
+   if(await checked()!==(e.parallel_processing===true)){await click(find(file+'chkParallelProcessing;ValueControl;DisplayEl'));
+    await wait('parallel processing readback',async()=>await checked()===(e.parallel_processing===true));}
    if(threadLabel!==undefined)await choose(file+'cbbMaxThreadCount;ValueControl',threadLabel);
   }
   }
@@ -130,7 +130,7 @@ export async function excelConfigureCapability(page,t,readContext){
    source.source_path=t.binding.value;}
   if(t.source_only)return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source}};
   const named=source.sheet_method==='Именованный диапазон';
-  need((t.inspect||source.source_path===want&&(!multi||t.preserve||source.parallel_processing===(t.excel.parallel_processing===true)&&(threadLabel===undefined||source.max_threads===threadLabel))&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.named_range??t.excel.sheet_name??'1')))
+  need((t.inspect||source.source_path===want&&(!multi||t.preserve||source.parallel_processing===(e.parallel_processing===true)&&(threadLabel===undefined||source.max_threads===threadLabel))&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.named_range??t.excel.sheet_name??'1')))
    &&(t.inspect||t.preserve||source.header_rows===t.excel.header_rows)
    &&(named?typeof source.extend_range==='boolean':source.whole_sheet)&&source.blank_rows==='Импортировать','source settings differ');
   if(!t.inspect&&!t.preserve&&t.excel.named_range!==undefined)need(named&&source.named_range===t.excel.named_range&&source.extend_range===(t.excel.extend_range??false),'named range settings differ');
