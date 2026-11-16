@@ -25,3 +25,26 @@ assert [r['RowID'] for r in first['rows']]==[9,10,7,8,6,2,4,3,5,1] and first['co
 `],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
+
+test('sorting-variant freezes the independent ordered typed projection and repeats it twice',()=>{
+ const result=spawnSync('python3',['-B','-c',`import importlib.util, json, subprocess, sys
+from pathlib import Path
+p=Path('scripts/node-acceptance/run-check.py')
+s=importlib.util.spec_from_file_location('run_check',p)
+m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+c=m.scenario('sorting-variant');e=m.expected_for(c,'/own/variant.lgp')
+assert c['prompt'].name=='task-variant.md' and c['export_count']==2 and c['base'] is None
+assert c['input_files']==['variant-wide.csv'] and (c['data']/c['input_files'][0]).is_file()
+assert [n['type'] for n in e['nodes']]==['imports.text','transform.collapse_columns','transform.sorting','exports.text']
+assert e['package_path']=='/own/variant.lgp' and e['sorting_mode']=='variant'
+assert e['sorting_stages']==e['outputs']*2
+o=e['outputs'][0]
+assert o['ordered'] and o['column_order']=='exact' and len(o['rows'])==9
+assert [f['name'] for f in o['columns']]==['RowID','Names','Values']
+assert [r['Values'] for r in o['rows'][:3]]==[None]*3
+assert [r['Values']['cell_type'] for r in o['rows'][3:]]==['integer','real','real','integer','string','string']
+proposal=json.loads(subprocess.check_output([sys.executable,str(c['source']/'oracle.py')]))
+assert o==dict(proposal['cases']['variant']['stages'][0],column_order='exact')
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});

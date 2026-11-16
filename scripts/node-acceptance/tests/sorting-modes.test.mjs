@@ -31,8 +31,35 @@ for(const mode of ['case','threads','auto'])test('sorting '+mode+' checks both c
  }
 });
 
+const variant=JSON.parse(readFileSync(new URL('../../../docs/node-development/nodes/sorting/acceptance/modes/expected-variant.json',import.meta.url)));
+const variantExpected={sorting_mode:'variant',sorting_stages:[variant.outputs[0],variant.outputs[0]]};
+function variantReceipt(stage){
+ const r=receipt('case',stage),o=variant.outputs[0];
+ r.configuration.readback.keys=[{name:'Values',type:'variant',direction:'ASC',case_sensitive:false},{name:'RowID',type:'integer',direction:'ASC'},{name:'Names',type:'string',direction:'ASC',case_sensitive:false}];
+ r.configuration.readback.options.chkLocaleAware.value=false;
+ const port=r.output.ports[0];port.row_count=o.rows.length;port.schema=o.columns.map(({name,type})=>({name,type}));
+ port.sample=o.rows.map(row=>o.columns.map(c=>{
+  const value=row[c.name];
+  if(c.type!=='variant')return {type:c.type,is_null:false,value:c.type==='integer'?String(value):value};
+  const subtype=value?.cell_type??'null';
+  return {type:'variant',cell_type:subtype,is_null:value===null,value:value===null?null:String(value.value),precision:'exact_native',native:{tag:{null:1,integer:20,real:5,string:8}[subtype]}};
+ }));
+ return r;
+}
+test('sorting Variant checks repeated native subtypes, NULLs, keys, order and identity',()=>{
+ const replies=[variantReceipt(0),variantReceipt(1)];
+ assert.equal(checkSortingModes(variantExpected,replies).stages_verified,2);
+ for(const change of [r=>r.shift(),r=>r[1].node.node_id='other',r=>r[1].output.ports[0].sample.reverse(),
+  r=>r[0].output.ports[0].sample.pop(),r=>r[1].output.ports[0].sample[3][2].cell_type='string',
+  r=>r[1].output.ports[0].sample[4][2].native.tag=20,r=>r[1].output.ports[0].sample[0][2].is_null=false,
+  r=>r[1].configuration.readback.keys[0].case_sensitive=true,r=>r[1].configuration.readback.keys.pop(),
+  r=>r[1].configuration.readback.options.chkLocaleAware.value=true,r=>r[1].configuration.readback.options.cbxMaxThreadCount.value=2]){
+  const candidate=structuredClone(replies);change(candidate);assert.throws(()=>checkSortingModes(variantExpected,candidate));
+ }
+});
+
 function savedFixture(mode,change=()=>{},cancel={verified:true,cleanup_complete:true,settings_applied:false}){
- const configuration={...receipt(mode,1).configuration.readback,verified:true};change(configuration);
+ const configuration={...(mode==='variant'?variantReceipt(1):receipt(mode,1)).configuration.readback,verified:true};change(configuration);
  const graph={prepared_node_context:{verified:true,surface:'graph',document_id:'doc',workflow_id:'flow',node_id:'sort'},wizard:{status:'absent'}};
  const state={wizard:{stage:'sorting'},node_sorting:configuration},calls=[];
  const channel={observe:async spec=>{
@@ -50,7 +77,7 @@ function savedFixture(mode,change=()=>{},cancel={verified:true,cleanup_complete:
  return {calls,run:()=>observeSortingSaved({load,channel,mode})};
 }
 test('cold Sorting reads saved literal settings and cancels without applying',async()=>{
- for(const mode of ['case','threads','auto']){
+ for(const mode of ['case','threads','auto','variant']){
   const f=savedFixture(mode);const proof=await f.run();assert.equal(proof.settings_applied,false);
   assert.equal(proof.options.cbxMaxThreadCount.value,mode==='threads'?2:0);
   assert.deepEqual(f.calls,['select','open','advance','cancel']);
