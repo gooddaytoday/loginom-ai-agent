@@ -603,7 +603,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             }
             let normalizedWorkspace = null;
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
-                && outcome.trace.some(e => e.event === 'rest_package_normalization' && e.modified_after === false)) {
+                && normalization?.modified_after === false) {
               const previous = session.metadata.workspacePreparation.state;
               const bindingRequest = {intent:'open_package',package_path:outcome.output.package_ref.path,operation_id:'rest-save-bind-'+randomUUID()};
               normalizedWorkspace = await prepareWorkspaceSession({metadata:session.metadata,request:bindingRequest,signal:extra.signal,
