@@ -743,7 +743,7 @@ export async function prepareLinkHover(page,task,read,sameGraph,reveal,readViewp
   return after;
 }
 
-export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
+export function createNodeTargetBrowserAdapter({execute,origin,build,pinned,record=async()=>{}}) {
   if(build!=='7.4.2')throw new Error('Node target browser profile is verified only for Loginom 7.4.2');
   let request;
   const task = extra => ({request,types:NODE_TYPES,origin,build,...extra});
@@ -935,9 +935,16 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const params={source_node:legacy(bound.source),target_node:legacy(bound.target),
           source_port:{kind:bound.source.kind,index:bound.source.index},target_port:{kind:bound.target.kind,index:bound.target.index}};
         signal?.throwIfAborted();if(Date.now()>=deadline)throw Error('Connect deadline elapsed');
-        return await call(makeCapabilityCode(pinned.actions.get('link.create'),pinned.selectors,params,{mode:'apply',operation_id:effect.id,expected_build:build,
+        const receipt=await call(makeCapabilityCode(pinned.actions.get('link.create'),pinned.selectors,params,{mode:'apply',operation_id:effect.id,expected_build:build,
           deadline_at:deadline,node_target_graph_reader:readGraph,node_target_context:{request,graph_baseline:graph,graph_probe:task(),dom_epoch:graph.dom_epoch,nodes:[{id:effect.parameters.edge.source,tid:bound.source.label,dom_epoch:graph.nodes.find(n=>n.ref.node_id===effect.parameters.edge.source).dom_epoch},{id:effect.parameters.edge.target,tid:bound.target.label,dom_epoch:graph.nodes.find(n=>n.ref.node_id===effect.parameters.edge.target).dom_epoch}]},node_target_cancellation_id:effect.id,receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
           receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')}),deadline);
+        if(receipt.error?.message==='Validated link target is no longer ready'){
+          try{
+            const diagnostic=await call(`async page=>{const key=Symbol.for('loginom-dock.node-target-link-diagnostic'),value=page[key];delete page[key];return value?.operation_id===${JSON.stringify(effect.id)}?value:null;}`,deadline);
+            if(diagnostic)await record({operation_id:effect.id,phase:'node_target_link_validation_refused',internal_provenance:'node_target_v1',diagnostic});
+          }catch{/* Diagnostic failure must preserve the original receipt. */}
+        }
+        return receipt;
       }
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};
