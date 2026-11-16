@@ -146,7 +146,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     const request=operation.nodeApply.request;
     let baseline;
     const changed=await configureCalculator(channel,p,{newNode:request.target.kind==='new',
-     createdByOperation:operation.nodeApply.phases.find(p=>p.phase==='target')?.value?.target?.created===true,
+     createdByOperation:operation.nodeApply.phases?.find(p=>p.phase==='target')?.value?.target?.created===true,
      captureBaseline:s=>{baseline=s;},
      recoverRejectedRequest:request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0});configured=changed.configuration;
     // Close discards this editor draft directly. Next can validate a formula or

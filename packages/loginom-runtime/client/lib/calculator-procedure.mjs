@@ -166,7 +166,8 @@ export async function configureCalculator(channel,parameters,{newNode=false,crea
   requireValue(same(semantic(row(s,original.record_id)),semantic(original)), 'New Calculator template changed before deletion');
   const retained=s.node_calculator.expressions.filter(e=>e.record_id!==original.record_id);
   requireValue(retained.length===plan.expressions.length&&retained.length>0,'Requested expressions must exist before template deletion');
-  await channel.perform({condition:'delete only this new Calculator untouched template',initialObservation:s,ready,
+  await channel.perform({condition:'delete only this new Calculator untouched template',initialObservation:s,
+   ready:s=>ready(s)&&row(s,original.record_id)?.selected===true&&same(semantic(row(s,original.record_id)),semantic(original)),
    identity:()=>({record_id:original.record_id,template:semantic(original)}),
    resolve:s=>({verb:'click',ref:control(s,';CalcDataWizard;btnDelExpr','click').ref})});
   const after=await observe('new Calculator template deleted');
