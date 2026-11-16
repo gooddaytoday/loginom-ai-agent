@@ -385,6 +385,8 @@ jobs:
           } finally { Pop-Location }
           $installer = Get-Item "$env:RUNNER_TEMP/updater/desktop/loginom-ai-agent-win-x64.exe"
           if ((Get-AuthenticodeSignature $installer.FullName).Status -ne 'NotSigned') { throw "Expected unsigned fixture" }
+          & ./packages/desktop/test/loginom/windows-installed-smoke.test.ps1 -RipgrepPath "$env:RUNNER_TEMP/updater/desktop/win-unpacked/resources/loginom/ripgrep/rg.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Installed smoke regression failed" }
           & ./packages/desktop/test/loginom/windows-installed-smoke.ps1 -Installer $installer.FullName -RunRoot "$env:RUNNER_TEMP/updater/smoke" -ExpectedVersion $env:LOGINOM_AI_AGENT_VERSION -Channel prod -AllowServer -KeepProxy
           if ($LASTEXITCODE -ne 0) { throw "Installed fixture smoke failed" }
           @{ commit=$env:GITHUB_SHA; version=$env:LOGINOM_AI_AGENT_VERSION; fixture=$true; sha256=(Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); bytes=$installer.Length; publicKey=$env:LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/updater/fixture.json" -Encoding utf8

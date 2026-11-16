@@ -8,6 +8,8 @@ Only `LOGINOM_AI_AGENT_UPDATE_TEST_BUILD=1` at build time enables the fixture tr
 
 Use the administrator policy `feedUrl` to route a fixture to a private HTTPS test server; preserve and restore any existing policy. Removing that override returns the Windows fixture to authenticated reads of `https://updates-loginom.s3.cloud.ru/dryrun-040/`. Test certificates must be trusted normally; do not disable certificate verification. Preserve exact installer hashes, source SHA, download/install logs and the same profile across restarts. Admit a chat through the public backend APIs without executing a model request. Verify settings, that chat and native credential readback after the update.
 
+When upgrading an isolated **normal** 0.3.9 profile to a fixture, preserve its Chromium `Local State` as well as the connection files. Normal Electron shares `userData` and `sessionData`, whereas onboarding tests normally split `<root>/desktop` and `<root>/session`. Point both fixture paths at the original isolated profile before its first launch; starting with a new session profile creates a different encryption key and cannot establish DPAPI preservation. Keep a closed old-profile snapshot for each acceptance trial.
+
 ## Linux AppImage
 
 Run after building the desktop and Linux packages, from `packages/desktop`, with the pinned Bun in PATH:
