@@ -190,3 +190,34 @@ GUID узла и его активному tree output 0; все получен�
    datetime или string?
 7. Иконка `bg-TBGDataType-dtVariant` и `EditDataTreeNodeDefForm;cbxDataType`
    для листа value совпадают с LAB-1136 (`trees-jsontotree/nested-records.md`)?
+
+## R4 — trees.from_table, LAB-1685, 15.11.2026
+
+Native-проба без сборки на v040@7cb38f6f, Loginom 7.4.2, собственная пара mas3.
+CSV с явно заданными When/DateTime, IntegerValue/Integer,
+BooleanValue/Boolean и StringValue/String прочитан целиком. Свёртка трёх
+последних столбцов с ignore_empty=true сохраняет false и пустую String,
+отбрасывая только NULL. Values переименован в Value. Это типизированная
+подготовка источника, не предположение о Variant из текстового CSV.
+
+Редактор DataToTreeWizard: Root/items[]/{When,Value}; source_field связан
+перетаскиванием по colFields_0/colFields_3. В EditDataTreeNodeDefForm список
+cbxDataType;boundlist содержит «Дата/Время» и «Переменный». Native Execute
+даёт When DataType 2 и Value DataType 6. Полный readTreePortSource подтвердил
+civil 2026-11-07T12:34:56.789 / 2026-11-08T00:00:00.001 /
+2026-11-07T12:34:56.789 без сдвига пояса; Variant — integer
+9007199254740993 (тег 20, signed Int64), boolean false (11), string "" (8).
+Все proxy освобождены. Листовая схема и порядок совпадают с предложением
+LAB-1042 dates-variant. Frozen expected.json не переписан по ответу продукта;
+отдельная проекция expected-dates-variant.json использует формы R1/R3.
+
+Production red: validateTreeConversionParameters → Unsupported tree type;
+дополнительно требуются выбор двух типов в UI и допуск их в выходной проверке
+только trees.from_table. Сериализация trees.to_json по-прежнему отказывает
+DateTime/Variant. Общий reader, его RPC, лимиты и остальные узлы не меняются.
+
+Первый модельный прогон R4 прочитал все шесть листьев точно, сохранил пакет
+и подтвердил cleanup, но выбрал техническую ветвь `/Items` вместо `/items`
+из frozen proposal (TREE_SCHEMA_ORDER, load1=1.49). Справка не определяла
+имя массива по умолчанию; теперь это `items` в нижнем регистре, если
+пользователь не задал имя. Oracle и бизнес-задание не менялись.
