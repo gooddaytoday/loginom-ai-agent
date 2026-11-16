@@ -5,7 +5,7 @@ import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {mutateGraph} from '../lib/node-target-browser.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {nodeApiTools,dispatchNodeApi} from '../lib/node-api.mjs';
-import {userNodeTool} from '../lib/user-workflow.mjs';
+import {userNodeTool,createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
 
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
@@ -186,5 +186,15 @@ test('dock_node_delete is a compact additive model tool',()=>{
  const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_delete'));
  assert.deepEqual(tool.inputSchema.required,['operation_id','document_id','workflow_ref','node']);
  assert.match(tool.description,/explicitly asks/);assert.match(tool.description,/JavaScript/);
+ assert.deepEqual(tool.inputSchema.properties.workflow_ref.required,['workflow_id']);
+ assert.deepEqual(Object.keys(tool.inputSchema.properties.workflow_ref.properties),['workflow_id']);
  assert.ok(Buffer.byteLength(JSON.stringify({name:tool.name,description:tool.description,inputSchema:tool.inputSchema}))<=2400);
+});
+test('user-v1 deletion expands the compact workflow issued by preparation',async()=>{
+ const bindings=createUserWorkflowBindings(),compact={...args,workflow_ref:{workflow_id:'wf'}};
+ assert.throws(()=>bindings.expandNodeDelete(compact),/UNKNOWN_PREPARED_WORKFLOW.*Nothing was deleted/);
+ bindings.remember({document_id:'doc',workflow_ref:workflow});
+ const expanded=bindings.expandNodeDelete(compact);assert.deepEqual(expanded.workflow_ref,workflow);
+ const f=runtime(),result=await dispatchNodeApi(f.runtime,'dock_node_delete',expanded);
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.deepEqual(f.calls,['delete_node']);
 });

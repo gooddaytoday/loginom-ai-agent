@@ -1252,3 +1252,16 @@ keeps RequestID=0 per iteration and the exact 98-byte httpbin response including
 its final LF. Both require full typed reads, CSV, Save, cold execution without
 configuration and confirmed cleanup. Only task and CSV reach the model; oracle
 and expected remain private. Regression: supernode-calc and rest-get-plain once.
+
+`node-delete` (LAB-1721): approved `graph/node-delete/acceptance/node-delete/task.md`
+and only sales.csv. Four nodes Import → Row Filter «Крупные продажи» → Sorting →
+Export; the user then asks to delete the filter, reconnect Import to the same Sorting
+and export all rows. Exactly one verified `loginom_dock_node_delete` (SUCCEEDED,
+output.status deleted, no AMBIGUOUS), frozen sorted six-row CSV, Save, cold with
+`absent_node_types:["transform.filter_data"]` and stock cleanup.
+
+`node-delete-refused` (LAB-1721): approved `node-delete-refused/task.md` and only
+numbers.csv. The user asks to delete a JavaScript node while its 120-second
+execution runs. Every deletion reply must be NOT_APPLIED with effect_possible:false
+and at least one `NODE_OPERATION_RUNNING`; the node stays, its CSV, Save, cold and
+cleanup use stock checks. Expected/oracle never reach the model.
