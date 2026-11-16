@@ -6,7 +6,72 @@ import { createHash, X509Certificate } from "node:crypto"
 const [action, ...args] = process.argv.slice(2)
 const input = () => readFileSync(0, "utf8")
 const binding = () => ({ packagePath: "/" + args[0], nodeGuid: args[1], workflowGuid: args[2] })
-if (action === "config") {
+if (action === "settings") {
+  const settings = Object.fromEntries(input().trim().split("\n").map(line => line.split("=")))
+  assert(/^[1-9][0-9]{0,4}$/.test(settings.DASHBOARD_APP_HOST_PORT) && Number(settings.DASHBOARD_APP_HOST_PORT) <= 65535)
+  assert(["normal", "strict"].includes(settings.DASHBOARD_MODE))
+  assert(["0", "1"].includes(settings.DASHBOARD_CLI_BUTTON))
+  const hosts = [...new Set(settings.DASHBOARD_CLIENT_ORIGINS.split(",").map(value => {
+    const url = new URL(value)
+    assert.equal(url.origin, value)
+    assert(["http:", "https:"].includes(url.protocol))
+    assert(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(url.hostname))
+    return url.hostname
+  }))]
+  const app = new URL(settings.DASHBOARD_APP_ORIGIN)
+  assert.equal(app.origin, settings.DASHBOARD_APP_ORIGIN)
+  console.log([settings.DASHBOARD_APP_HOST_PORT, settings.DASHBOARD_MODE, settings.DASHBOARD_CLI_BUTTON,
+    settings.DASHBOARD_MODE === "strict" ? app.hostname : "", ...hosts].join("\n"))
+} else if (action === "discovery") {
+  const settings = Object.fromEntries(input().trim().split("\n").map(line => line.split("=")))
+  for (const [index, name] of ["CLIENT_ORIGINS", "TLS_UPSTREAM", "USERSTORAGE", "NETWORK", "PUBLISHER_USER"].entries())
+    assert.equal(settings["DASHBOARD_" + name], args[index], "Loginom changed; repeat install required: " + name)
+} else if (action === "apache") {
+  const [fds, rest] = input().split("\nTCP\n")
+  assert(["httpd", "apache2"].includes(fds.split("\n")[0]), "Port 8444 is not owned by Apache PID1")
+  const [tcp, dump] = rest.split("\nVHOSTS\n")
+  const sockets = tcp.trim().split("\n").map(line => line.trim().split(/\s+/))
+    .filter(fields => fields[1]?.endsWith(":20FC") && fields[3] === "0A")
+  assert(sockets.length, "No Apache 8444 listener proof")
+  for (const fields of sockets) assert(fds.split("\n").includes("socket:[" + fields[9] + "]"), "Foreign 8444 socket")
+  let selected = false
+  let own = false
+  for (const line of dump.split("\n")) {
+    if (/^\S/.test(line)) selected = /^\S+:8444\s/.test(line)
+    if (!selected) continue
+    const path = line.match(/\(([^()]+):[0-9]+\)/)
+    if (!path) continue
+    assert.equal(path[1], "/usr/local/apache2/conf/dashboard.site.conf", "Foreign 8444 virtual host")
+    own = true
+  }
+  assert(own, "Managed 8444 virtual host not active")
+} else if (action === "site") {
+  const site = input()
+  const recovery = "Unrecoverable managed Apache configuration; repeat original --strict --app-host-domain --app-host-cert --app-host-key flags"
+  assert(site.startsWith("# Managed by loginom-dashboard release installer\n"), recovery)
+  const sections = [...site.matchAll(/^<VirtualHost \*:8444>\n([\s\S]*?)^<\/VirtualHost>$/gm)]
+  assert.equal((site.match(/^\s*<VirtualHost\b/gm) || []).length, sections.length, recovery)
+  assert(sections.length <= 1, recovery)
+  if (args[0] === "strict" || sections.length) {
+    assert.equal(sections.length, 1, recovery)
+    assert.equal((site.match(/^Listen 8444$/gm) || []).length, 1, recovery)
+    assert(sections[0][1].includes("  ProxyPass / http://loginom-dashboard-web:8102/\n"), recovery)
+    const paths = ["SSLCertificateFile", "SSLCertificateKeyFile"].map(name => {
+      const matches = [...site.matchAll(new RegExp('^\\s*' + name + ' "([^"\\r\\n]+)"$', "gm"))]
+      assert.equal((site.match(new RegExp("^\\s*" + name + "\\b", "gmi")) || []).length, 1, recovery)
+      assert.equal(matches.length, 1, recovery)
+      assert(sections[0][1].includes(matches[0][0].trimStart()), recovery)
+      if (args[0] === "strict") assert(/^\/[a-zA-Z0-9/_.-]+$/.test(matches[0][1]), recovery)
+      return matches[0][1]
+    })
+    assert.equal(sections[0][1], [
+      "  RewriteOptions IgnoreInherit", "  SetEnv DASHBOARD_APP_HOST 1", "  ProxyPreserveHost On",
+      "  Include conf/snippets/ssl.conf", `  SSLCertificateFile "${paths[0]}"`, `  SSLCertificateKeyFile "${paths[1]}"`,
+      "  ProxyPass / http://loginom-dashboard-web:8102/", "  ProxyPassReverse / http://loginom-dashboard-web:8102/", "",
+    ].join("\n"), recovery)
+    if (args[0] === "strict") console.log(paths.join("\n"))
+  }
+} else if (action === "config") {
   for (const value of [args[0], ...args[1].split(",")]) {
     const url = new URL(value)
     assert.equal(url.origin, value)
@@ -89,6 +154,22 @@ if (action === "config") {
   })) assert.equal(container.Config.Labels[name], value, "Foreign dashboard container")
   const directory = args[1] === "builder" ? "jobs-in" : "builds"
   assert(container.Mounts.some(mount => mount.Source === args[0] + "/" + directory && mount.Destination === "/" + directory))
+  if (args[2]) {
+    assert.equal(args[1], "web")
+    const ports = Object.entries(container.NetworkSettings.Ports).filter(([, bindings]) => bindings?.length)
+    assert.equal(ports.length, 1, "Foreign published binding")
+    assert.equal(ports[0][0], "8101/tcp")
+    assert(ports[0][1].every(binding => binding.HostPort === args[2]), "App host port is occupied")
+    for (const line of (args[3] || "").trim().split("\n").filter(Boolean)) {
+      const fields = line.trim().split(/\s+/)
+      assert(["4", "6"].includes(fields[0]), "Unknown listener address family")
+      const address = fields[4].replace(/^\*:/, fields[0] === "4" ? "0.0.0.0:" : "[::]:")
+      assert(ports[0][1].some(binding => {
+        const host = binding.HostIp.includes(":") ? "[" + binding.HostIp + "]" : binding.HostIp
+        return address === host + ":" + args[2]
+      }), "Foreign app listener address")
+    }
+  }
 } else if (action === "roles") {
   const roles = JSON.parse(input())
   assert.equal(roles.length, 3)

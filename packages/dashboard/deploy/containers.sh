@@ -5,6 +5,7 @@ usage="Usage: $0 install|check|stop|start|uninstall [--engine docker|podman] [--
 action=${1:-}
 [[ $action == install || $action == check || $action == stop || $action == start || $action == uninstall ]] || die "$usage"
 shift
+app_port_explicit=false
 engine=docker hosts=() app_port=8101 mode=normal cli_button=0 domain='' cert='' key='' remove_image=false
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,7 +17,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --engine) engine=$2;;
     --public-host) hosts+=("$2");;
-    --app-host-port) app_port=$2;;
+    --app-host-port) app_port=$2; app_port_explicit=true;;
     --app-host-domain) domain=$2;;
     --app-host-cert) cert=$2;;
     --app-host-key) key=$2;;
@@ -30,15 +31,15 @@ for host in "${hosts[@]}"; do [[ $host =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || die 
 if [[ $action != install ]]; then
   [[ ${#hosts[@]} == 0 && $app_port == 8101 && $mode == normal && $cli_button == 0 && -z $domain$cert$key ]] || die "$usage"
 fi
-if [[ $mode == strict ]]; then
+state=/var/opt/loginom-dashboard
+[[ $engine != podman ]] || state=$HOME/loginom-dashboard
+if [[ $mode == strict && ! -d $state ]]; then
   [[ $domain =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ && $cert =~ ^/[a-zA-Z0-9/_.-]+$ && $key =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "$usage"
   for host in "${hosts[@]}"; do [[ $domain != "$host" ]] || die "Strict app domain must differ from Studio"; done
-else
+elif [[ $mode != strict ]]; then
   [[ -z $domain$cert$key ]] || die "$usage"
 fi
 bundle=$(cd "$(dirname "$0")" && pwd)
-state=/var/opt/loginom-dashboard
-[[ $engine != podman ]] || state=$HOME/loginom-dashboard
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 saved() { sed -n "s/^$1=//p" "$state/.env"; }
@@ -101,9 +102,82 @@ if [[ $action == stop || $action == start || $action == uninstall ]]; then
     exit 0
   fi
 fi
+mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
+[[ ${#studios[@]} == 1 ]] || die "Expected one running standard Loginom installation"
+studio=${studios[0]}
+project=$("$engine" inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$studio")
+mapfile -t servers < <("$engine" ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')
+[[ ${#servers[@]} == 1 ]] || die "Loginom server not found in selected installation"
+server=${servers[0]}
+mapfile -t conf_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{println .Source}}{{end}}{{end}}' "$studio" | sed '/^$/d')
+mapfile -t storage_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/workdir"}}{{println .Source}}{{end}}{{if eq .Destination "/workdir/UserStorage"}}{{println .Source}}{{end}}{{end}}' "$server" | sed '/^$/d')
+[[ ${#conf_mounts[@]} == 1 && ${#storage_mounts[@]} == 1 ]] || die "Ambiguous Loginom mounts"
+conf=$(realpath -e "${conf_mounts[0]}")
+server_root=$(realpath -e "${storage_mounts[0]}")
+storage=$(realpath -e "$server_root/UserStorage")
+[[ -d $conf && -d $storage && $storage == "$server_root/UserStorage" && $storage =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "Physical UserStorage not found"
+# Go templates are interpreted by the container engine, not the shell.
+# shellcheck disable=SC2016
+mapfile -t networks < <(comm -12 <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$server" | sed '/^$/d' | sort) <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$studio" | sed '/^$/d' | sort))
+[[ ${#networks[@]} == 1 ]] || die "Expected one common Loginom network"
+network=${networks[0]}
+site=$conf/dashboard.site.conf
+replace_site() {
+  [[ ! -e $site ]] || cp -a "$site" "$tmp/previous.conf"
+  if [[ -f $tmp/dashboard.site.conf ]]; then install -m 644 "$tmp/dashboard.site.conf" "$site.new";
+    if command -v selinuxenabled >/dev/null && selinuxenabled; then chcon --reference="$conf/httpd.conf" "$site.new"; fi
+    mv -f "$site.new" "$site"; else rm -f "$site"; fi
+  if ! "$engine" exec "$studio" httpd -t; then
+    if [[ -e $tmp/previous.conf ]]; then cp -a "$tmp/previous.conf" "$site.new";
+      mv -f "$site.new" "$site"; else rm -f "$site"; fi
+    die "Apache configuration rejected; previous file restored"
+  fi
+}
+if [[ $action == uninstall ]]; then
+  replace_site
+  "$engine" exec "$studio" httpd -k graceful
+  (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml down)
+  autostart remove
+  rm -rf "$state"
+  if [[ $remove_image == true ]]; then "$engine" image rm --no-prune "$image"; fi
+  echo "Dashboard uninstalled; UserStorage publications preserved"
+  exit 0
+fi
+if [[ $installed == true ]]; then
+  json settings < "$state/.env" > "$tmp/settings"
+  mapfile -t settings < "$tmp/settings"
+  [[ $app_port_explicit == true ]] || app_port=${settings[0]}
+  [[ $mode == strict ]] || mode=${settings[1]}
+  [[ $cli_button == 1 ]] || cli_button=${settings[2]}
+  [[ -n $domain ]] || domain=${settings[3]}
+  [[ ${#hosts[@]} -gt 0 ]] || hosts=("${settings[@]:4}")
+fi
+[[ ${#hosts[@]} -gt 0 ]] || die "$usage"
+for host in "${hosts[@]}"; do [[ $host =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || die "$usage"; done
+studio_name=$("$engine" inspect --format '{{.Name}}' "$studio")
+studio_name=${studio_name#/}
+http_port=$("$engine" port "$studio" 80/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
+https_port=$("$engine" port "$studio" 443/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
+[[ -n $http_port || -n $https_port ]] || die "No published Studio HTTP or HTTPS port"
+clients='' scheme=http upstream=''
+for host in "${hosts[@]}"; do
+  if [[ -n $http_port ]]; then
+    client="http://$host:$http_port"
+    [[ $http_port != 80 ]] || client="http://$host"
+    clients="${clients:+$clients,}$client"
+  fi
+  if [[ -n $https_port ]]; then
+    client="https://$host:$https_port"
+    [[ $https_port != 443 ]] || client="https://$host"
+    clients="${clients:+$clients,}$client"
+  fi
+done
+if [[ -n $https_port || $mode == strict ]]; then scheme=https; upstream=$studio_name:8444; fi
+publisher_user=$("$engine" exec "$server" stat -c '%u:%g' /proc/1)
 # Saved installation is data, never shell code.
 if [[ $action == check ]]; then
-  [[ -f $state/.env ]] || die "Dashboard is not installed"
+  [[ $installed == true ]] || die "Dashboard is not installed"
+  json discovery "$clients" "$upstream" "$storage" "$network" "$publisher_user" < "$state/.env"
   image=$(saved DASHBOARD_IMAGE)
   [[ $image =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]+$ ]] || die "Invalid saved image"
   app_origin=$(saved DASHBOARD_APP_ORIGIN)
@@ -236,97 +310,61 @@ if [[ $action == check ]]; then
   echo "Client access NOT CHECKED: run check-studio.mjs on the client host"
   exit 0
 fi
-mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
-[[ ${#studios[@]} == 1 ]] || die "Expected one running standard Loginom installation"
-studio=${studios[0]}
-project=$("$engine" inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$studio")
-mapfile -t servers < <("$engine" ps --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=loginom-server --format '{{.ID}}')
-[[ ${#servers[@]} == 1 ]] || die "Loginom server not found in selected installation"
-server=${servers[0]}
-mapfile -t conf_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{println .Source}}{{end}}{{end}}' "$studio" | sed '/^$/d')
-mapfile -t storage_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/workdir"}}{{println .Source}}{{end}}{{if eq .Destination "/workdir/UserStorage"}}{{println .Source}}{{end}}{{end}}' "$server" | sed '/^$/d')
-[[ ${#conf_mounts[@]} == 1 && ${#storage_mounts[@]} == 1 ]] || die "Ambiguous Loginom mounts"
-conf=$(realpath -e "${conf_mounts[0]}")
-server_root=$(realpath -e "${storage_mounts[0]}")
-storage=$(realpath -e "$server_root/UserStorage")
-[[ -d $conf && -d $storage && $storage == "$server_root/UserStorage" && $storage =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "Physical UserStorage not found"
-# Go templates are interpreted by the container engine, not the shell.
-# shellcheck disable=SC2016
-mapfile -t networks < <(comm -12 <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$server" | sed '/^$/d' | sort) <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$studio" | sed '/^$/d' | sort))
-[[ ${#networks[@]} == 1 ]] || die "Expected one common Loginom network"
-network=${networks[0]}
-site=$conf/dashboard.site.conf
-replace_site() {
-  [[ ! -e $site ]] || cp -p "$site" "$tmp/previous.conf"
-  if [[ -f $tmp/dashboard.site.conf ]]; then install -m 644 "$tmp/dashboard.site.conf" "$site.new";
-    if command -v selinuxenabled >/dev/null && selinuxenabled; then chcon --reference="$conf/httpd.conf" "$site.new"; fi
-    mv -f "$site.new" "$site"; else rm -f "$site"; fi
-  if ! "$engine" exec "$studio" httpd -t; then
-    if [[ -e $tmp/previous.conf ]]; then cp -p "$tmp/previous.conf" "$site.new";
-      if command -v selinuxenabled >/dev/null && selinuxenabled; then chcon --reference="$conf/httpd.conf" "$site.new"; fi
-      mv -f "$site.new" "$site"; else rm -f "$site"; fi
-    die "Apache configuration rejected; previous file restored"
-  fi
-}
-if [[ $action == uninstall ]]; then
-  replace_site
-  "$engine" exec "$studio" httpd -k graceful
-  (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml down)
-  autostart remove
-  rm -rf "$state"
-  if [[ $remove_image == true ]]; then "$engine" image rm --no-prune "$image"; fi
-  echo "Dashboard uninstalled; UserStorage publications preserved"
-  exit 0
-fi
 if [[ $installed == true ]]; then
-  for host in "${hosts[@]}"; do
-    [[ $(saved DASHBOARD_CLIENT_ORIGINS) == *"://$host:"* || $(saved DASHBOARD_CLIENT_ORIGINS) == *"://$host,"* || $(saved DASHBOARD_CLIENT_ORIGINS) == *"://$host" ]] || die "Dashboard is installed with different public hosts"
-  done
-  (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d)
-  autostart add
-  echo "Dashboard already installed; saved settings preserved"
-  exit 0
+  [[ ! -L $site ]] || die "Dashboard Apache file is occupied"
+  if [[ -e $site ]]; then [[ -f $site ]] || die "Dashboard Apache file is occupied"; json site < "$site"; fi
+else
+  [[ ! -e $site && ! -L $site ]] || die "Dashboard Apache file is occupied"
 fi
-[[ ${#hosts[@]} -gt 0 ]] || die "$usage"
-[[ ! -e $site && ! -L $site ]] || die "Dashboard Apache file is occupied"
-host=${hosts[0]}
-studio_name=$("$engine" inspect --format '{{.Name}}' "$studio")
-studio_name=${studio_name#/}
-http_port=$("$engine" port "$studio" 80/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
-https_port=$("$engine" port "$studio" 443/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || true)
-[[ -n $http_port || -n $https_port ]] || die "No published Studio HTTP or HTTPS port"
-clients='' scheme=http upstream=''
-for host in "${hosts[@]}"; do
-  if [[ -n $http_port ]]; then
-    client="http://$host:$http_port"
-    [[ $http_port != 80 ]] || client="http://$host"
-    clients="${clients:+$clients,}$client"
+if [[ $mode == strict ]]; then
+  if [[ -z $cert || -z $key ]]; then
+    [[ $installed == true ]] || die "$usage"
+    [[ -f $site ]] || die "Strict settings unavailable; repeat original --strict --app-host-domain --app-host-cert --app-host-key flags"
+    json site strict < "$site" > "$tmp/tls-paths"
+    mapfile -t paths < "$tmp/tls-paths"
+    [[ -n $cert ]] || cert=${paths[0]}
+    [[ -n $key ]] || key=${paths[1]}
   fi
-  if [[ -n $https_port ]]; then
-    client="https://$host:$https_port"
-    [[ $https_port != 443 ]] || client="https://$host"
-    clients="${clients:+$clients,}$client"
-  fi
-done
+  [[ $domain =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ && $cert =~ ^/[a-zA-Z0-9/_.-]+$ && $key =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "$usage"
+  for host in "${hosts[@]}"; do [[ $domain != "$host" ]] || die "Strict app domain must differ from Studio"; done
+fi
 if [[ -n $https_port || $mode == strict ]]; then
   scheme=https
   upstream=$studio_name:8444
   "$engine" exec "$studio" test -f /usr/local/apache2/modules/mod_substitute.so || die "Apache mod_substitute is required"
-  "$engine" exec "$studio" sh -c '! grep -qiE "[0-9A-F]+:20FC .* 0A " /proc/net/tcp /proc/net/tcp6' || die "Apache port 8444 is occupied"
+  if ! "$engine" exec "$studio" sh -c '! grep -qiE "[0-9A-F]+:20FC .* 0A " /proc/net/tcp /proc/net/tcp6'; then
+    [[ $installed == true && -f $site ]] || die "Apache port 8444 is occupied"
+    # Observe the live Apache sockets and active virtual hosts without changing configuration.
+    # shellcheck disable=SC2016
+    "$engine" exec "$studio" sh -ec 'cat /proc/1/comm; for fd in /proc/1/fd/*; do readlink "$fd" || true; done; echo TCP; cat /proc/net/tcp /proc/net/tcp6; echo VHOSTS; httpd -S 2>&1' > "$tmp/apache"
+    json apache < "$tmp/apache"
+  fi
 fi
 if [[ $mode == strict ]]; then
   host=$domain
   # Paths are administrator-owned paths inside Apache, never mounts into web.
-  "$engine" exec "$studio" test -r "$cert" || die "App certificate is not readable in Apache"
-  "$engine" exec "$studio" test -r "$key" || die "App key is not readable in Apache"
+  "$engine" exec "$studio" test -r "$cert" || die "App certificate unavailable; repeat original --strict --app-host-domain --app-host-cert --app-host-key flags"
+  "$engine" exec "$studio" test -r "$key" || die "App key unavailable; repeat original --strict --app-host-domain --app-host-cert --app-host-key flags"
 else
   host=${hosts[0]}
 fi
 app_origin="$scheme://$host:$app_port"
 if [[ $scheme == https && $app_port == 443 || $scheme == http && $app_port == 80 ]]; then app_origin="$scheme://$host"; fi
-[[ -z $(ss -H -lnt "sport = :$app_port") ]] || die "App host port is occupied"
+ss -H -lnt4 "sport = :$app_port" > "$tmp/listeners4"
+ss -H -lnt6 "sport = :$app_port" > "$tmp/listeners6"
+listeners=$(sed 's/^/4 /' "$tmp/listeners4"; sed 's/^/6 /' "$tmp/listeners6")
+if [[ -n $listeners ]]; then
+  [[ $installed == true && -s $tmp/web.json ]] || die "App host port is occupied"
+  json owned "$state" web "$app_port" "$listeners" < "$tmp/web.json"
+fi
+[[ ! -e $site.new && ! -L $site.new ]] || die "Dashboard Apache candidate path is occupied"
+if [[ $installed == true ]]; then
+  [[ -f $state/compose-release.yaml && ! -L $state/compose-release.yaml ]] || die "Saved compose file is occupied"
+fi
+for directory in builds jobs-in jobs-out; do
+  [[ ! -L $state/$directory && ( ! -e $state/$directory || -d $state/$directory ) ]] || die "Dashboard directory is occupied"
+done
 for client in ${clients//,/ }; do curl --silent --show-error --fail --max-time 10 "$client/app/" -o /dev/null || die "Public Studio address is not reachable"; done
-publisher_user=$("$engine" exec "$server" stat -c '%u:%g' /proc/1)
 "$engine" load -i "$bundle/image.tar"
 "$engine" image inspect "$image" >/dev/null
 integrity=$("$engine" run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --entrypoint /opt/node/bin/node "$image" --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; console.log("sha384-"+createHash("sha384").update(readFileSync("/opt/dashboard/shell.js")).digest("base64"))')
@@ -382,18 +420,15 @@ fi
 if [[ $mode == strict ]]; then
   sed -i "s|\\\${SSL_CERT}|$cert|; s|\\\${SSL_KEY}|$key|" "$tmp/dashboard.site.conf"
 fi
-replace_site
-install -d -m 755 "$state"
-install -d -m 777 "$state/builds" "$state/jobs-in" "$state/jobs-out"
-cp "$bundle/compose-release.yaml" "$state/compose-release.yaml"
+cp "$bundle/compose-release.yaml" "$tmp/compose-release.yaml"
 # Preserve an administrator's private server MCS label; only publisher bypasses that label.
 if [[ $engine == podman ]] && command -v selinuxenabled >/dev/null && selinuxenabled && [[ $(stat -c '%C' "$storage") == *:container_file_t:s0:c* ]]; then
-  sed -i '/^  publisher:$/a\    security_opt: [no-new-privileges, label=disable]' "$state/compose-release.yaml"
+  sed -i '/^  publisher:$/a\    security_opt: [no-new-privileges, label=disable]' "$tmp/compose-release.yaml"
   # Keep Compose's variable expression literal.
   # shellcheck disable=SC2016
-  sed -i 's|${DASHBOARD_USERSTORAGE:?required}:/storage:ro,z|${DASHBOARD_USERSTORAGE:?required}:/storage:ro|' "$state/compose-release.yaml"
+  sed -i 's|${DASHBOARD_USERSTORAGE:?required}:/storage:ro,z|${DASHBOARD_USERSTORAGE:?required}:/storage:ro|' "$tmp/compose-release.yaml"
 fi
-cat > "$state/.env" <<EOF
+cat > "$tmp/.env" <<EOF
 DASHBOARD_IMAGE=$image
 DASHBOARD_STATE=$state
 DASHBOARD_APP_HOST_PORT=$app_port
@@ -406,7 +441,27 @@ DASHBOARD_NETWORK=$network
 DASHBOARD_MODE=$mode
 DASHBOARD_CLI_BUTTON=$cli_button
 EOF
-(cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d)
-"$engine" exec "$studio" httpd -k graceful
-autostart add
+mv "$tmp/.env" "$tmp/next.env"
+mv "$tmp/compose-release.yaml" "$tmp/next-compose.yaml"
+if [[ $installed == true ]]; then
+  cp -p "$state/.env" "$state/compose-release.yaml" "$tmp/"
+fi
+[[ -d $state ]] || install -d -m 755 "$state"
+for directory in builds jobs-in jobs-out; do
+  [[ -d $state/$directory ]] || install -d -m 777 "$state/$directory"
+done
+replace_site
+if ! { cp "$tmp/next.env" "$state/.env" && cp "$tmp/next-compose.yaml" "$state/compose-release.yaml" &&
+  (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d) && "$engine" exec "$studio" httpd -k graceful; }; then
+  if [[ -e $tmp/previous.conf ]]; then
+    { cp -a "$tmp/previous.conf" "$site.new" && mv -f "$site.new" "$site"; } || echo "Previous Apache file recovery failed" >&2
+  else rm -f "$site" || echo "Apache candidate removal failed" >&2; fi
+  if [[ $installed == true ]]; then
+    cp -p "$tmp/.env" "$tmp/compose-release.yaml" "$state/" || echo "Previous env/compose recovery failed" >&2
+    (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d) || echo "Previous compose recovery failed; data preserved" >&2
+  fi
+  "$engine" exec "$studio" httpd -k graceful || echo "Previous Apache reload failed; data preserved" >&2
+  die "Dashboard apply failed; previous configuration recovery attempted; verify recovery"
+fi
+if ! (autostart add); then echo "Dashboard installed; autostart update failed; configure it separately" >&2; fi
 echo "Dashboard installed at $app_origin; verify the client connection separately."
