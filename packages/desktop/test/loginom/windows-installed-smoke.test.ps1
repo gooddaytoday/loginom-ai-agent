@@ -37,6 +37,10 @@ Assert (-not (Test-StartupLog ($start.Replace('packaged: true', 'packaged: false
 Assert (Test-StartupLog ($start + '[info] server ready {}') '0.3.9') 'Healthy startup rejected'
 $startup = "[2026-11-12 16:58:19.163] [info]  (crash) crash reporter started {`n  path: 'C:\\lab\\profile\\desktop\\Crashpad'`n}"
 Assert (Test-CrashLog $startup) 'Normal crash setup rejected'
+$singleLine = "[2026-11-16 15:21:02.789] [info]  (crash) crash reporter started { path: 'D:\\a\\_temp\\updater\\smoke\\profile\\desktop\\Crashpad' }"
+Assert (Test-CrashLog $singleLine) 'Complete single-line crash setup rejected'
+Assert (-not (Test-CrashLog ($singleLine + ' unexpected'))) 'Trailing single-line crash content accepted'
+Assert (-not (Test-CrashLog ($singleLine -replace ' \}$', ", failure: 'unexpected' }"))) 'Unexpected inline metadata accepted'
 Assert (-not (Test-CrashLog ($startup + "`nunexpected metadata"))) 'Unexpected crash-log content accepted'
 Assert (-not (Test-CrashLog '[2026-11-12 16:58:19.163] [info] (crash) crash reporter started {')) 'Incomplete startup record accepted'
 Assert (-not (Test-CrashLog '[error] (crash) previous session ended unexpectedly')) 'Crash accepted'
@@ -57,6 +61,9 @@ try {
         @{ name='empty'; text=''; status='PASS' },
         @{ name='startup'; text=$startup; status='PASS' },
         @{ name='CRLF startup'; text=$startup.Replace("`n", "`r`n"); status='PASS' },
+        @{ name='single-line startup'; text=$singleLine; status='PASS' },
+        @{ name='mixed startup formats'; text=($singleLine + "`r`n" + $startup); status='PASS' },
+        @{ name='inline startup followed by crash'; text=($singleLine + "`r`n[error] renderer crashed"); status='FAIL' },
         @{ name='repeated startup'; text=($startup + "`r`n" + $startup); status='PASS' },
         @{ name='unexpected record'; text=($startup + "`r`n[2026-11-12 16:58:20.000] [warn] (crash) previous session did not exit cleanly"); status='FAIL' },
         @{ name='startup substring'; text='unexpected crash reporter started'; status='FAIL' },

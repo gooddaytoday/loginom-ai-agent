@@ -458,7 +458,7 @@ async function fixture(
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
   const port = (server.address() as { port: number }).port
   const base = `http://127.0.0.1:${port}`
-  const read = (url: string) => readUpdateBytes(url, (url) => request(url), 50)
+  const read = (url: string) => readUpdateBytes(url, (url) => request(url), options.timeout ? 50 : 2000)
   const sources = [
     { kind: "github" as const, api: base + "/api/", download: base + "/download/", channel: "stable" as const },
     { kind: "generic" as const, feed: base + "/s3/stable/" },
@@ -592,6 +592,7 @@ test("an older S3 release cannot replace a GitHub download that already failed",
       currentVersion: "0.4.1",
       keys,
     })
+    expect(selected?.source).toBe("github")
     const updater = new Updater()
     configureSignedUpdate(updater, selected)
     await updater.checkForUpdates()
