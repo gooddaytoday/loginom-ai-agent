@@ -332,9 +332,9 @@ test('REST query audit refuses unproven read schemas or real edits: '+fault,()=>
  if(fault==='missing read ports')delete r.read;
  if(fault==='ambiguous source port')source.output.ports.push(structuredClone(source.output.ports[0]));
  if(fault==='bindings')r.bindings=[{name:'limit',source:'other'}];
- if(fault==='connection')r.parameters.connection={base_url:'https://example.invalid'};
- if(fault==='query')r.parameters.query_parameters=[{name:'limit',value:'99'}];
- if(fault==='mappings')r.mappings=[{field:'Response',name:'Other'}];
+ if(fault==='connection')r.parameters.connection={name:'Other connection',base_url:'https://example.invalid/anything',method:'GET'};
+ if(fault==='query')r.parameters.query_parameters=[{name:'limit',field:'skip_text'},{name:'skip',field:'limit_text'}];
+ if(fault==='mappings')r.mappings=[{direction:'output',port:0,fields:[{source:{schema_id:'rest-output',field_id:'response'},name:'Other'}]}];
  assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_RECONFIGURED/);
 });
 test('REST query audit allows a new downstream Calculator after the initial REST response',()=>{
