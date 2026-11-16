@@ -394,12 +394,14 @@ test('W1 builtin snapshot follows only confirmed same-document Save continuation
 
 // The downstream consumer receives the production driver's output, not a
 // hand-written javascript_source field as in the older rereadFixture.
-test('production existing JS read without source wizard admits Sorting from its last managed source',async()=>{
+for(const sourcePreview of [true,false])test('production existing JS read admits Sorting '+(sourcePreview?'with':'without')+' original preview',async()=>{
  const history=JSON.parse(readFileSync(new URL('./fixtures/javascript-preflight-source.json',import.meta.url),'utf8'));
+ const captured=structuredClone(history.outcome.output.output.ports[0]);
+ if(!sourcePreview){history.request.read={ports:[],sample_rows:0,require_exact_numbers:false};history.outcome.output.output={status:'not_requested',evidence_ref:null,ports:[]};}
  const request=buildNodeReadRequest({operation_id:'read',source_operation_id:history.request.operation_id},
   {parameters:history.request,outcome:history.outcome});
  const target=request.target.ref,execution=history.outcome.output.execution.execution_id;
- const output={...structuredClone(history.outcome.output.output.ports[0]),schema:request.parameters.schemas[0].schema,execution_id:execution};
+ const output={...captured,schema:request.parameters.schemas[0].schema,execution_id:execution};
  const snap=nativeExecution(),[,rootId,groupId]=execution.split(':');
  snap.root_id=rootId;snap.processes[0].process_id=groupId;snap.processes[1].process_id=groupId+'.1';snap.processes[1].parent_id=groupId;
  snap.node_context={...target,verified:true,surface:'graph'};snap.processes[1].owner.node_id=target.node_id;

@@ -23,6 +23,7 @@ export function managedJavascriptPreviewAdmission(history,binding,port){
  const candidates=matches.filter(item=>!observational(item));
  need(candidates.length>0,'Managed JavaScript source operation unavailable');
  const latest=candidates.reduce((a,b)=>a.sequence>b.sequence?a:b),request=latest.request,node=latest.outcome?.output;
+ let data=node;
  // A settled readonly failure can be followed by a successful retry. Neither
  // may conceal a pending operation, foreign owner or changed native execution.
  const trailing=matches.filter(item=>observational(item)&&item.sequence>latest.sequence);
@@ -35,6 +36,9 @@ export function managedJavascriptPreviewAdmission(history,binding,port){
    &&read.execution.execution_id===node?.execution?.execution_id&&read.output?.verified===true
    &&read.output.execution_id===read.execution.execution_id,
    'Latest existing JavaScript output read owner or native execution differs');
+  // Data evidence may come from that read even if the source operation had
+  // no preview; it never supplies a replacement source-code admission.
+  if(read.output.ports?.some(p=>p.port===0))data=read;
  }
  need(request?.target?.type==='programming.javascript'&&latest.cleanup_confirmed===true
   &&latest.outcome?.status==='SUCCEEDED'&&latest.outcome.action_key==='node.apply'
@@ -57,9 +61,9 @@ export function managedJavascriptPreviewAdmission(history,binding,port){
  }
  const read=reread?request:buildNodeReadRequest({operation_id:'preview-admission',source_operation_id:request.operation_id,read:{ports:[0]}},
   {parameters:request,outcome:latest.outcome});
- const outputs=node.output?.ports?.filter(p=>p.port===0),output=outputs?.[0],execution=node.execution?.execution_id;
- need(typeof execution==='string'&&execution.length>0&&node.output?.verified===true&&node.output.cleanup_complete===true
-  &&node.output.execution_id===execution&&outputs?.length===1&&output.fresh===true&&output.execution_id===execution
+ const outputs=data.output?.ports?.filter(p=>p.port===0),output=outputs?.[0],execution=data.execution?.execution_id;
+ need(typeof execution==='string'&&execution.length>0&&data.output?.verified===true&&data.output.cleanup_complete===true
+  &&data.output.execution_id===execution&&outputs?.length===1&&output.fresh===true&&output.execution_id===execution
   &&port.index===0&&port.native_index===0&&port.active===true&&output.port_guid===port.port_guid,
   'Managed JavaScript preview requires the same freshly executed native output zero');
  return {source_operation_id:request.operation_id,execution_id:execution,
