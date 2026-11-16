@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import types
 import tempfile
 import time
 import unittest
@@ -82,6 +83,41 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(case['export_count'], 2)
         self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-parallel.md').read_bytes())
         self.assertEqual(runner.expected_for(case, '/own/parallel.lgp', cold=True), runner.expected_for(case, '/own/parallel.lgp'))
+
+    def test_excel_multi_scenarios_use_capabilities_books_and_private_tables(self):
+        multi, parallel = runner.scenario('excel-import-multi'), runner.scenario('excel-import-parallel')
+        for case in [multi, parallel]:
+            self.assertEqual(case['input_files'], ['sales-a.xlsx', 'sales-b.xlsx'])
+            self.assertTrue(all((case['data'] / name).is_file() for name in case['input_files']))
+            self.assertNotIn('expected', case['prompt'].read_text())
+        self.assertEqual((multi['lgd_initial'], multi['expected_name']), ('expected-list.json', 'expected-mask.json'))
+        self.assertNotIn('lgd_initial', parallel)
+        self.assertEqual(parallel['expected_name'], 'expected-parallel.json')
+        self.assertEqual(subprocess.run([sys.executable, '-B', multi['oracle']], capture_output=True).returncode, 0)
+        owner = types.SimpleNamespace(out=Path('/runs/b1'))
+        owner.text_mask_directory = lambda login, case=None: runner.Runner.text_mask_directory(owner, login, case)
+        login = dict(package_directory='/own/')
+        dirs = [runner.Runner.source_dir(owner, case, login) for case in [multi, parallel]]
+        self.assertEqual(dirs, ['/own/b1-excel-import-multi-mask', '/own/b1-excel-import-parallel-mask'])
+        self.assertEqual(runner.Runner.text_mask_directory(owner, login), '/own/b1-mask')
+
+    def test_excel_multi_requires_list_then_native_mask_on_one_node(self):
+        d = '/own/run-mask'
+        reply = lambda n, path, parallel=False, threads=None, node='excel': (n, dict(status='SUCCEEDED', node=dict(node_id=node),
+            configuration=dict(readback=dict(kind='excel_import', source=dict(source_path=path, sheet='Data', parallel_processing=parallel,
+                **({'max_threads': threads} if threads else {})))), output=dict(ports=[dict(port=0, schema=[], sample=[])])))
+        listed, masked = reply(0, d + '/sales-a.xlsx｜' + d + '/sales-b.xlsx'), reply(1, d + '/sales-*.xlsx')
+        runner.check_excel_multi([listed, masked], d)
+        for replies, message in [([masked], 'STAGES_MISSING'), ([reply(0, d + '/sales-b.xlsx｜' + d + '/sales-a.xlsx'), masked], 'LIST_ORDER'),
+                                 ([listed, reply(1, d + '/sales-a.xlsx｜' + d + '/sales-b.xlsx')], 'NATIVE_MASK'),
+                                 ([listed, reply(1, d + '/sales-*.xlsx', True)], 'SEQUENTIAL'), ([listed, reply(1, d + '/sales-*.xlsx', node='new')], 'RECREATED')]:
+            with self.assertRaisesRegex(AssertionError, message):
+                runner.check_excel_multi(replies, d)
+        runner.check_excel_parallel([reply(0, d + '/sales-*.xlsx', True, '2')], d)
+        for replies, message in [([reply(0, d + '/sales-*.xlsx', True, '4')], 'TWO_THREADS'), ([reply(0, d + '/sales-*.xlsx')], 'TWO_THREADS'),
+                                 ([reply(0, d + '/sales-a.xlsx', True, '2')], 'SOURCES'), ([], 'MISSING')]:
+            with self.assertRaisesRegex(AssertionError, message):
+                runner.check_excel_parallel(replies, d)
 
     def test_text_parallel_requires_native_toggle_and_same_node(self):
         replies = [(n, dict(status='SUCCEEDED', node=dict(node_id='import'), configuration=dict(readback=dict(
