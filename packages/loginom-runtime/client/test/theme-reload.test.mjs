@@ -61,6 +61,7 @@ test('production login theme stylesheet: '+mode,{skip:!browserPath,timeout:20000
     });
     if(['twice','user','authenticated','deadline','cancel','journal-user'].includes(mode))await assert.rejects(result,{message:mode==='cancel'?'cancelled':'LOGINOM_LOGIN_UNAVAILABLE'});
     else {authenticated=await result;assert.equal(authenticated.authenticated,true);}
+    const settled=Date.now();
     const reload=['once','twice','empty','deadline','cancel','journal-user'].includes(mode);
     assert.equal(documents,reload&&!['cancel','journal-user'].includes(mode)?2:1);
     assert.equal(contexts.length,1,'theme failure must not trigger the separate browser login retry');
@@ -74,7 +75,9 @@ test('production login theme stylesheet: '+mode,{skip:!browserPath,timeout:20000
     assert.equal(gestures.filter(g=>g.kind==='login').length,['twice','user','authenticated','deadline','cancel','journal-user'].includes(mode)?0:1);
     assert.ok(gestures.every(g=>g.document===documents),'reload must happen before any credential gesture');
     if(['once','twice'].includes(mode))assert.equal(failures.filter(url=>url.includes('deductor-theme')).length,mode==='twice'?2:1);
-    if(mode==='deadline')assert.ok(Date.now()>=deadline,'the reload ends only at the original deadline');
+    // The reload gets no time allowance of its own (connection-check.mjs:213):
+    // it ends at the original deadline; the margin covers context.close() under load.
+    if(mode==='deadline')assert.ok(settled>=deadline&&settled<deadline+3000,'the reload ends at the original deadline');
   }finally{
     releaseTheme();
     await authenticated?.context?.close();
