@@ -305,8 +305,10 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     catch(cleanupError){try{await acknowledge(job,'large_upload_cleanup_failed',{cause:operationFailureDiagnostic(cleanupError)});}catch{}}
     const cancelled=signal?.aborted===true&&cleanup;
     job.status=!cleanup?'uncertain':cancelled?'cancelled':'failed';job.phase=job.status;
-    const code=!cleanup?'LOGINOM_UPLOAD_UNCERTAIN':cancelled?'LOGINOM_UPLOAD_CANCELLED':error.message==='LOGINOM_FILE_CHANGED'?'LOGINOM_FILE_CHANGED':'LOGINOM_UPLOAD_FAILED';
+    const code=!cleanup?'LOGINOM_UPLOAD_UNCERTAIN':cancelled?'LOGINOM_UPLOAD_CANCELLED':error.code==='UPLOAD_PATH_CONFLICT'?'UPLOAD_PATH_CONFLICT':error.message==='LOGINOM_FILE_CHANGED'?'LOGINOM_FILE_CHANGED':'LOGINOM_UPLOAD_FAILED';
     job.error={code,message:code};job.outcome={status:cleanup?'FAILED':'AMBIGUOUS',code,cleanup_complete:cleanup,effect_possible:!cleanup,upload_completion_verified:false};
+    if(code==='UPLOAD_PATH_CONFLICT')Object.assign(job.outcome,{destination:artifact.upload.destination,upload_operation_id:job.uploadId,upload_submitted:false,
+     next_step:{tool:'dock_storage_download_start',instruction:'Observe the existing destination file with dock_storage_source, then use storage_download_start and wait to compare its sha256 with the local artifact. Only if the hashes match, use the verified server file as the import source. Do not overwrite it.'}});
     try{await acknowledge(job,'large_upload_'+job.status,{result:job.outcome});}catch{job.status='uncertain';job.phase='uncertain';job.error={code:'LOGINOM_UPLOAD_UNCERTAIN',message:'LOGINOM_UPLOAD_UNCERTAIN'};job.outcome={...job.outcome,status:'AMBIGUOUS',code:'LOGINOM_UPLOAD_UNCERTAIN',cleanup_complete:false,effect_possible:true};}
     return snapshot(job);
    }

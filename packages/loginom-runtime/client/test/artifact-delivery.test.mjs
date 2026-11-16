@@ -771,6 +771,25 @@ for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files 
 });
 
 
+for(const cleanup of [true,false])test('large conflict offers byte verification only after confirmed cleanup: '+cleanup,async()=>{
+ const f=fixture();f.artifact.bytes=17*1024*1024;f.artifact.upload.overwrite='reject';
+ f.runtime.uploadLargeArtifact=async()=>{throw Object.assign(Error('UPLOAD_PATH_CONFLICT'),{code:'UPLOAD_PATH_CONFLICT'});};
+ f.runtime.cancelLargeArtifact=async()=>cleanup;
+ await f.service.deliver(request);await f.service.drain();
+ const result=f.service.status(request.operation_id);
+ assert.equal(result.error.code,cleanup?'UPLOAD_PATH_CONFLICT':'LOGINOM_UPLOAD_UNCERTAIN');
+ assert.equal(result.outcome.cleanup_complete,cleanup);assert.equal(result.outcome.effect_possible,!cleanup);
+ assert.equal(f.service.unsettled,!cleanup);
+ if(cleanup){
+  assert.equal(result.outcome.destination,f.artifact.upload.destination);
+  assert.equal(result.outcome.next_step.tool,'dock_storage_download_start');
+  assert.match(result.outcome.next_step.instruction,/sha256/i);
+  assert.match(result.outcome.next_step.instruction,/local artifact/i);
+  assert.match(result.outcome.next_step.instruction,/source/i);
+ }else assert.equal(result.outcome.next_step,undefined);
+ assert.ok(!f.calls.includes('upload'));assert.ok(!f.calls.includes('verify'));
+});
+
 test('large delivery journals the first browser failure before failed cancellation replaces it',async()=>{
  const f=fixture();f.artifact.bytes=1024**3;f.artifact.upload.overwrite='reject';
  f.runtime.uploadLargeArtifact=async()=>{throw Error('Pinned browser capability call failed [LOGINOM_DISCONNECTED] (reason=owner)');};
