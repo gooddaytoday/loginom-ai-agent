@@ -15,7 +15,9 @@ test('node-delete kits register task, data and frozen expected graph',()=>{
     assert e['package_path']=='/own/p.lgp' and [n['type'] for n in e['nodes']]==nodes and e.get('absent_node_types',[])==absent, e
     assert len(e['outputs'])==1 and e['outputs'][0]['output_node_type']=='export_input'
 rows=m.expected_for(m.scenario('node-delete'),'/p.lgp')['outputs'][0]['rows']
-assert [r['ID'] for r in rows]==[3,5,1,6,2,4], rows`);
+assert [r['ID'] for r in rows]==[3,5,1,6,2,4], rows
+import subprocess,sys
+assert subprocess.run([sys.executable,'-B',str(m.scenario('node-delete')['oracle']),'--check']).returncode==0`);
  assert.equal(r.status,0,r.stdout+r.stderr);
 });
 

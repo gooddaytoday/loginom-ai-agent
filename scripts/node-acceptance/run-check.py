@@ -981,7 +981,7 @@ def scenario(name, case_root=None, *, cases=None):
                     expected_name='v040/' + mode + '/expected.json', oracle=src / 'oracle-v040.py', base=None)
     if name in ['node-delete', 'node-delete-refused']:
         src = REPO / 'docs/node-development/graph/node-delete/acceptance' / name
-        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, node_delete=name)
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, node_delete=name, oracle=src.parent / 'oracle.py')
     if name in ['join-right', 'join-full', 'join-difference']:
         src = REPO / 'docs/node-development/nodes/join/acceptance' / name.removeprefix('join-')
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
