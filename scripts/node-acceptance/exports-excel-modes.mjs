@@ -136,7 +136,12 @@ try{
    }finally{await lease.release();}
    continue;
   }
-  const result=await runtime.deliverArtifact({operation_id:'excel-seed-'+index,artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
+  const deadline=Date.now()+120000;
+  let result=await runtime.deliverArtifact({operation_id:'excel-seed-'+index,artifact_id:artifact.artifact_id,upload_grant_id:artifact.upload.grant_id,budget_ms:120000});
+  while(config.native_server_import===true&&result.state==='running'&&Date.now()<deadline){
+   await new Promise(resolve=>setTimeout(resolve,5000));
+   result=await runtime.artifactDeliveryStatus('excel-seed-'+index);
+  }
   if(result.outcome?.status!=='SUCCEEDED'||result.outcome.destination!==book.destination||result.outcome.upload_completion_verified!==true||result.outcome.cleanup_complete!==true)throw Error('SEED_UPLOAD:'+JSON.stringify(result));
   delivered.push(result.outcome);
  }
