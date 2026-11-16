@@ -12,6 +12,7 @@ import {inspectSavedLgd} from './lgd-cold.mjs'
 import {observeImportBindingInventory} from './import-bindings.mjs';
 import {observeFilterBindingInventory} from './filter-bindings.mjs';
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
+import {inspectSavedExcelAuto} from './imports-excel-auto.mjs';
 import {inspectColdConditionBranches} from './control-condition.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings,verifyExcelColdBindings} from './exports-excel-cold.mjs'
@@ -428,6 +429,10 @@ page = context.pages()[0]
   if(expected.clustering_gmeans&&target.type==='datamining.clustering'){
    const training=await trainConfiguredNode(channel,node);
    await record({phase:'gmeans_seed_repeat_training',node,training,settings_applied:false});
+  }
+  if(expected.excel_auto&&target.type==='imports.excel'){
+   const settings=await inspectSavedExcelAuto({load,channel,execute,graph,node,expected:expected.excel_auto,origin});
+   await record({phase:'cold_excel_auto_saved_settings',node,...settings});
   }
   if(expected.excel_named_range&&target.type==='imports.excel'){
    const settings=await inspectSavedExcelNamed({load,channel,execute,graph,node,expected:expected.excel_named_range,origin});

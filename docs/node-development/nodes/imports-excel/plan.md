@@ -265,6 +265,35 @@ server package_closed/logged_out первой сессии **не подтвер
 C3/C4/C5/C7/C8/C10 — границы source/readback/приёмки. Это точки решения владельца,
 а не разрешение вносить изменения в общем коде. На этапе 0 таких изменений нет.
 
+### C8: динамическая схема, LAB-1752
+
+Native-проба 16.11.2026 на Loginom 7.4.2, mas, от
+`v040@3d82fce6f6e9565c9a7004e60f4947c68240d045`, до production-правки:
+AB→ABD→BC на тех же узлах. Нет сохраняет A,B (1,10 → 1,10 → 20,2);
+Только новые добавляет D:string=`new` при Execute ABD, затем BC даёт A20,B2;
+Все даёт A,B → A,B,D → B,C. Types-a→types-b на том же узле меняет
+Value integer4→string5 и 10→`text`. Расхождений с C8 expected нет.
+Режимы прочитаны из `ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode`.
+Пакет пробы сохранён, закрыт; logout и отсутствие discard подтверждены.
+
+Аддитивный `excel.auto_detect` none/new/all. Прежний ручной контракт и
+exact-schema `source_switch` сохранены. Path-only existing patch сохраняет
+определения/параметры; All запрещает ручные columns. Только new/all откладывают
+проверку выхода до свежего принадлежащего узлу Execute: new сверяет сохранённый
+префикс позиций/типов, all — всю наблюдённую новую схему. В readback прежняя
+ветка Нет сохранена, добавлена ветка с `dynamic_schema` и execution_id;
+непрочитанный вид нового поля не выдумывается.
+
+Наблюдённая native особенность All: собственная постоянная `.x-mask` на
+отключённом `ColumnsMappingEngineOutputPortWizard;colTargetDelete` не является
+загрузкой. Только этот точный native/DOM owner исключён из ожидания мастера;
+остальные маски и общий UI-код сохраняют guards. Live production-reader:
+прежде `automatic typing must be disabled`, после — verified All/BC.
+
+Регистрация четырёх `excel-import-auto-*` и cold-аудит политики находятся в
+`scripts/node-acceptance`; исходные task/fixtures/expected контейнера не менялись.
+Native-проба не является CLI/cold/2 из 3 PASS.
+
 ### Размеры и критерии для утверждения
 
 На базе назначения `node --test test/model-schema-budget.test.mjs`:
