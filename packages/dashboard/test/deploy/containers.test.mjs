@@ -71,6 +71,13 @@ test("role helper rejects added publisher capabilities despite cap_drop ALL", ()
   assert.equal(inspectPublisher({ CapAdd: ["SYS_ADMIN"] }).status, 1)
 })
 
+test("role helper accepts enabled NNP and rejects explicitly disabled NNP", () => {
+  for (const value of ["no-new-privileges", "no-new-privileges:true", "no-new-privileges=true"])
+    assert.equal(inspectPublisher({ SecurityOpt: [value] }).status, 0)
+  for (const value of ["no-new-privileges:false", "no-new-privileges=false"])
+    assert.equal(inspectPublisher({ SecurityOpt: [value] }).status, 1)
+})
+
 test("ownership accepts only the exact reserved compose container and state mount", () => {
   const inspect = [{ Name: "/loginom-dashboard-web", Config: { Labels: {
     "loginom.dashboard.owner": "release", "com.docker.compose.project": "loginom-dashboard",

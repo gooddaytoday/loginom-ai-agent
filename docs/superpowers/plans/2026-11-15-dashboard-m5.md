@@ -10,7 +10,7 @@
 
 **Spec:** [Принятый дизайн M5](../specs/2026-11-15-dashboard-m5-design.md), [roadmap](../specs/2026-11-11-dashboard-architecture-roadmap.md), [изоляция](../../security/dashboard-isolation.md).
 
-Статус: выполнение разрешено владельцем 15 ноября 2026 года; Tasks 0–3 приняты: Spec Approved и Quality Approved, обязательных замечаний нет. Task 4 начат и заблокирован недоступностью прежнего сервера лицензий после частичной rootless-проверки; его критерии не закрыты. Task 5 не начинался, M5 не завершён. Уточнение входа ниже принято независимым ревью до сборки; остальные требования M5 сохранены. План прошёл независимое ревью — Approved, неразрешённых замечаний нет. Ход исполнения — [checkpoint M5](../../testing/loginom-ai-agent/dashboard-m5-checkpoint.md).
+Статус: выполнение разрешено владельцем 15 ноября 2026 года; Tasks 0–3 приняты: Spec Approved и Quality Approved, обязательных замечаний нет. Task 4 начат: современный rootless путь подтверждён, точные нижние версии дали реальные несовместимости; решение владельца по границе совместимости ожидается, критерии не закрыты. Task 5 не начинался, M5 не завершён. Уточнение входа ниже принято независимым ревью до сборки; остальные требования M5 сохранены. План прошёл независимое ревью — Approved, неразрешённых замечаний нет. Ход исполнения — [checkpoint M5](../../testing/loginom-ai-agent/dashboard-m5-checkpoint.md).
 
 ## Global Constraints
 
@@ -150,7 +150,9 @@ M4 окончательно принят: [checkpoint M4](../../testing/loginom-
 
 ### Task 4: Rootless Podman, SELinux и нижние версии
 
-**Files:** только необходимые корректировки `containers.sh`/release-compose/tests и runbook; новый движок, универсальный адаптер или постоянный VM harness не создавать.
+**Files:** только необходимые корректировки `containers.sh`/release-compose/tests, существующего `script/build-release.ts` и runbook; новый движок, универсальный адаптер или постоянный VM harness не создавать.
+
+Совместимый export сохраняет один Docker-архив с исходными manifest/config/layers; дополнительные OCI `index.json`/`oci-layout`, если они присутствуют, удаляются в существующем producer (около 6 строк). Это необходимо для native `podman load` на согласованном минимуме; classic Docker export без этих двух файлов остаётся допустимым. Ошибки listing/delete прерывают сборку; image-ID/tag fallback и отдельные варианты для движков не добавляются.
 
 **Interfaces:** тот же архив и команды Task 3 под пользователем штатной rootless-установки; Loginom UID/GID и host mapping обнаруживаются. Web/builder non-root нельзя вычислять как `id -u` rootful Docker-администратора. Настройки SELinux следуют фактическим меткам UserStorage.
 

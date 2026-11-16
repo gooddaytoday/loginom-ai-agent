@@ -102,7 +102,7 @@ if (action === "config") {
     if (args[6] !== "podman") assert(container.HostConfig.CapDrop.includes("ALL"))
     assert.notEqual(container.HostConfig.Privileged, true)
     assert.deepEqual(container.HostConfig.CapAdd ?? [], [])
-    assert(container.HostConfig.SecurityOpt.some(value => value.startsWith("no-new-privileges")))
+    assert(container.HostConfig.SecurityOpt.some(value => ["no-new-privileges", "no-new-privileges:true", "no-new-privileges=true"].includes(value)))
     assert(container.HostConfig.Memory > 0 && container.HostConfig.PidsLimit > 0)
     for (const option of ["noexec", "nosuid", "size="]) assert(container.HostConfig.Tmpfs["/tmp"].includes(option))
     assert.equal(container.Config.User, role === "publisher" ? args[3] : "65534:65534")

@@ -60,6 +60,11 @@ try {
   const image = "loginom-dashboard:" + hash.digest("hex").slice(0, 16)
   await run(["docker", "build", "--network", "none", "-f", join(pkg, "deploy/Dockerfile"), "-t", image, context])
   await run(["docker", "save", "-o", join(release, "image.tar"), image])
+  // Old Podman loads the supplementary OCI tag without its repository; keep the Docker archive.
+  const exported = Bun.spawnSync(["tar", "-tf", join(release, "image.tar")], { stdout: "pipe", stderr: "inherit" })
+  if (exported.exitCode !== 0) throw Error("Cannot list saved image archive")
+  const metadata = exported.stdout.toString().split("\n").filter(name => ["index.json", "oci-layout"].includes(name))
+  if (metadata.length) await run(["tar", "--delete", "-f", join(release, "image.tar"), ...metadata])
   await Bun.write(join(release, "image.ref"), image + "\n")
   const files = ["containers.sh", "compose-release.yaml", "check-release.mjs"]
   for (const name of files) await cp(join(pkg, "deploy", name), join(release, name))

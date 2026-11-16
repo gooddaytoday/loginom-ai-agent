@@ -1,9 +1,9 @@
 version: "2.4"
 x-common: &common
-  image: ${DASHBOARD_IMAGE:?}
+  image: ${DASHBOARD_IMAGE:?required}
   read_only: true
   cap_drop: [ALL]
-  security_opt: [no-new-privileges:true]
+  security_opt: [no-new-privileges]
   restart: unless-stopped
   labels:
     loginom.dashboard.owner: release
@@ -18,31 +18,31 @@ services:
     mem_limit: 512m
     pids_limit: 64
     tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
-    volumes: ["${DASHBOARD_STATE:?}/builds:/builds:ro,z"]
+    volumes: ["${DASHBOARD_STATE:?required}/builds:/builds:ro,z"]
     networks: [studio]
-    ports: ["${DASHBOARD_APP_HOST_PORT:?}:8101"]
+    ports: ["${DASHBOARD_APP_HOST_PORT:?required}:8101"]
     environment:
       DASHBOARD_HOST: 0.0.0.0
       DASHBOARD_MODE: ${DASHBOARD_MODE:-normal}
       DASHBOARD_CLI_BUTTON: ${DASHBOARD_CLI_BUTTON:-0}
-      DASHBOARD_APP_ORIGIN: ${DASHBOARD_APP_ORIGIN:?}
-      DASHBOARD_CLIENT_ORIGINS: ${DASHBOARD_CLIENT_ORIGINS:?}
-      DASHBOARD_TLS_UPSTREAM: ${DASHBOARD_TLS_UPSTREAM:-}
+      DASHBOARD_APP_ORIGIN: ${DASHBOARD_APP_ORIGIN:?required}
+      DASHBOARD_CLIENT_ORIGINS: ${DASHBOARD_CLIENT_ORIGINS:?required}
+      DASHBOARD_TLS_UPSTREAM: ${DASHBOARD_TLS_UPSTREAM}
       DASHBOARD_BUILDS: /builds
   publisher:
     <<: *common
     container_name: loginom-dashboard-publisher
     command: [publisher]
-    user: ${DASHBOARD_PUBLISHER_USER:?}
+    user: ${DASHBOARD_PUBLISHER_USER:?required}
     network_mode: none
     mem_limit: 512m
     pids_limit: 64
     tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
     volumes:
-      - ${DASHBOARD_USERSTORAGE:?}:/storage:ro,z
-      - ${DASHBOARD_STATE:?}/builds:/builds:rw,z
-      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:rw,z
-      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw,z
+      - ${DASHBOARD_USERSTORAGE:?required}:/storage:ro,z
+      - ${DASHBOARD_STATE:?required}/builds:/builds:rw,z
+      - ${DASHBOARD_STATE:?required}/jobs-in:/jobs-in:rw,z
+      - ${DASHBOARD_STATE:?required}/jobs-out:/jobs-out:rw,z
   builder:
     <<: *common
     container_name: loginom-dashboard-builder
@@ -53,9 +53,9 @@ services:
     pids_limit: 256
     tmpfs: ["/tmp:rw,noexec,nosuid,size=512m,mode=1777"]
     volumes:
-      - ${DASHBOARD_STATE:?}/jobs-in:/jobs-in:ro,z
-      - ${DASHBOARD_STATE:?}/jobs-out:/jobs-out:rw,z
+      - ${DASHBOARD_STATE:?required}/jobs-in:/jobs-in:ro,z
+      - ${DASHBOARD_STATE:?required}/jobs-out:/jobs-out:rw,z
 networks:
   studio:
     external: true
-    name: ${DASHBOARD_NETWORK:?}
+    name: ${DASHBOARD_NETWORK:?required}

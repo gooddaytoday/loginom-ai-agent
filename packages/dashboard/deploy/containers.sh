@@ -67,6 +67,17 @@ json() {
     --memory 128m --pids-limit 32 --user 65534:65534 \
     -v "$bundle/check-release.mjs:/check.mjs:ro,z" --entrypoint /opt/node/bin/node "$image" /check.mjs "$@"
 }
+autostart() {
+  [[ $engine == podman ]] || return 0
+  local row
+  row="@reboot $(command -v "${compose[0]}") -p loginom-dashboard -f \"$state/compose-release.yaml\" start"
+  if ! LC_ALL=C crontab -l > "$tmp/crontab" 2> "$tmp/crontab-error"; then
+    [[ $(cat "$tmp/crontab-error") == "no crontab for $(id -un)" ]] || die "Cannot read user crontab; dashboard state preserved"
+  fi
+  awk -v row="$row" '$0 != row' "$tmp/crontab" > "$tmp/crontab-next"
+  [[ $1 != add ]] || printf '%s\n' "$row" >> "$tmp/crontab-next"
+  crontab "$tmp/crontab-next"
+}
 # Inspect only our reserved names and compose project before any destructive operation.
 for role in web publisher builder; do
   if "$engine" container inspect "loginom-dashboard-$role" > "$tmp/$role.json" 2>/dev/null; then
@@ -261,6 +272,7 @@ if [[ $action == uninstall ]]; then
   replace_site
   "$engine" exec "$studio" httpd -k graceful
   (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml down)
+  autostart remove
   rm -rf "$state"
   if [[ $remove_image == true ]]; then "$engine" image rm --no-prune "$image"; fi
   echo "Dashboard uninstalled; UserStorage publications preserved"
@@ -271,6 +283,7 @@ if [[ $installed == true ]]; then
     [[ $(saved DASHBOARD_CLIENT_ORIGINS) == *"://$host:"* || $(saved DASHBOARD_CLIENT_ORIGINS) == *"://$host,"* || $(saved DASHBOARD_CLIENT_ORIGINS) == *"://$host" ]] || die "Dashboard is installed with different public hosts"
   done
   (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d)
+  autostart add
   echo "Dashboard already installed; saved settings preserved"
   exit 0
 fi
@@ -375,10 +388,10 @@ install -d -m 777 "$state/builds" "$state/jobs-in" "$state/jobs-out"
 cp "$bundle/compose-release.yaml" "$state/compose-release.yaml"
 # Preserve an administrator's private server MCS label; only publisher bypasses that label.
 if [[ $engine == podman ]] && command -v selinuxenabled >/dev/null && selinuxenabled && [[ $(stat -c '%C' "$storage") == *:container_file_t:s0:c* ]]; then
-  sed -i '/^  publisher:$/a\    security_opt: [no-new-privileges:true, label=disable]' "$state/compose-release.yaml"
+  sed -i '/^  publisher:$/a\    security_opt: [no-new-privileges, label=disable]' "$state/compose-release.yaml"
   # Keep Compose's variable expression literal.
   # shellcheck disable=SC2016
-  sed -i 's|${DASHBOARD_USERSTORAGE:?}:/storage:ro,z|${DASHBOARD_USERSTORAGE:?}:/storage:ro|' "$state/compose-release.yaml"
+  sed -i 's|${DASHBOARD_USERSTORAGE:?required}:/storage:ro,z|${DASHBOARD_USERSTORAGE:?required}:/storage:ro|' "$state/compose-release.yaml"
 fi
 cat > "$state/.env" <<EOF
 DASHBOARD_IMAGE=$image
@@ -395,4 +408,5 @@ DASHBOARD_CLI_BUTTON=$cli_button
 EOF
 (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d)
 "$engine" exec "$studio" httpd -k graceful
+autostart add
 echo "Dashboard installed at $app_origin; verify the client connection separately."
