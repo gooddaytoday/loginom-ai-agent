@@ -651,6 +651,13 @@ def scenario(name, case_root=None, *, cases=None):
                     prompt=node / ('acceptance/penalty/task-elastic.md' if name == 'linreg-elastic' else 'acceptance/penalty/task-lasso.md'),
                     data=node / 'fixtures/penalty', input_files=['shifted.csv'], base=None,
                     expected_name='expected.json', oracle=node / 'acceptance/penalty/oracle.py')
+    if name == 'linreg-summary':
+        node = REPO / 'docs/node-development/nodes/datamining-linregression'
+        src = node / 'acceptance/modes/summary'
+        return dict(source=src, prompt=src / 'task-summary.md',
+                    data=node / 'fixtures/modes', input_files=['design.csv'], base=None,
+                    expected_name='expected.json', oracle=node / 'acceptance/modes/oracle.py',
+                    linreg_forward=True, linreg_summary=True)
     if name == 'linreg-partition-sequential':
         node = REPO / 'docs/node-development/nodes/datamining-linregression'
         src = node / 'acceptance/modes/partition-sequential'
@@ -2747,6 +2754,12 @@ class Runner:
             assert self.current.get('tree-read') == 'PASS', 'TREE_READ_MISSING'
             self.current['csv'] = '— (tree)'
             return session, expected, None, None
+        if spec.get('linreg_summary'):
+            evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
+            write(folder / 'linreg-summary-events.json', evidence)
+            self.phase('linreg-summary-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/expected-outputs.mjs',
+                'linreg-summary', folder / 'expected.json', folder / 'linreg-summary-events.json'], folder, timeout=60)
+            self.current['summary-read'] = 'PASS'
         if spec.get('variable_only'):
             evidence = [event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)]
             evidence.sort(key=lambda event: event.get('recorded_at', ''))
