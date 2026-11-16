@@ -293,7 +293,7 @@ test('first read rejects unverified phases and never borrows a missing port',()=
  assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[1]}},unreadSource()));
 });
 
-function javascriptSource(){
+function javascriptSource({declaredOnly=false}={}){
  const s=source();s.parameters.target.type='programming.javascript';s.outcome.output.output.ports=[];
  const mapping={verified:true,source_identity_verified:true,autosync:true,target_fields:[
   {...schema[0],data_kind:'Непрерывный',excluded:false,source:{name:'Raw'}}]};
@@ -303,9 +303,31 @@ function javascriptSource(){
    source_sha256:'a'.repeat(64),source_utf8_bytes:80,source_lf_lines:3}
    :phase==='output_mapping'||phase==='input_mapping'?{native_mapping:mapping}
    :phase==='materialization_execute'||phase==='execute'?{owner_verified:true,status:'completed',execution_id:phase}:{}}));
+ if(declaredOnly){
+  Object.assign(phases.find(p=>p.phase==='node_finish').value,{schema_mode:'declared',declared_columns:schema});
+  phases.find(p=>p.phase==='input_mapping').value.native_mapping={verified:true,source_identity_verified:true,autosync:true,
+   input_state:'unconnected',no_incoming_links_verified:true,source_fields:[],target_fields:[]};
+  for(const name of ['materialization_start','materialization_execute'])Object.assign(phases.find(p=>p.phase===name),
+   {status:'not_requested',effect_possible:false,value:{materialization_required:false,schema_mode:'declared'}});
+ }
  s.outcome.output.phases=phases.map(({value,...phase})=>phase);
  s.outcome.output.configuration={status:'applied',readback:javascriptCodeReadback({node:structuredClone(node),phases})};return s;
 }
+test('declared JavaScript reads completed output without materialization receipts claiming an execution',()=>{
+ const s=javascriptSource({declaredOnly:true});
+ const request=buildNodeReadRequest({...args,execution:undefined},s);
+ assert.equal(request.finish,'done');assert.equal(request.parameters.execution_policy,'existing');
+ assert.equal(request.parameters.javascript_source.source_sha256,'a'.repeat(64));
+ for(const mutate of [
+  s=>s.outcome.output.configuration.readback.receipt_ids=s.outcome.output.configuration.readback.receipt_ids.filter(id=>id!=='created:materialization_start'),
+  s=>s.outcome.output.configuration.readback.schema_mode='code',
+  s=>s.outcome.output.phases.find(p=>p.phase==='materialization_start').status='verified',
+  s=>s.outcome.output.phases.find(p=>p.phase==='materialization_execute').effect_possible=true,
+  s=>s.outcome.output.phases.find(p=>p.phase==='execute').status='not_requested',
+  s=>s.outcome.output.phases.find(p=>p.phase==='node_finish').status='not_requested']){
+  const invalid=structuredClone(s);mutate(invalid);assert.throws(()=>buildNodeReadRequest(args,invalid));
+ }
+});
 test('JavaScript reread is built from actual executed handler readback and never caller source',()=>{
  const s=javascriptSource(),before=structuredClone(s),request=buildNodeReadRequest(args,s);
  const support=new Map([['programming.javascript',{revision:'js',modes:['script'],configure(){throw Error('No configuration');}}]]);

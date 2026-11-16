@@ -48,6 +48,9 @@ function retainedMappingSchemas(node,sourceId,type){
  // REST retains connection settings at Done, not an output-mapping wizard.
  // Its table schemas must still come from the completed output below.
  const rest=type==='integration.rest_request'&&r.kind==='rest_request';
+ const skippedMaterialization=javascript&&r.schema_mode==='declared'
+  &&['materialization_start','materialization_execute'].every(name=>r.receipt_ids?.includes(sourceId+':'+name)&&node.phases?.filter(p=>p.phase===name
+   &&p.receipt_id===sourceId+':'+name&&p.status==='not_requested'&&p.effect_possible===false).length===1);
  need(node.configuration.status==='applied'
   &&r.scope===(javascript?'observed_after_verified_finish':'observed_before_verified_finish')
   &&r.values_are===(javascript?'independent_owned_source_readback':'observed_ui_values')
@@ -55,7 +58,8 @@ function retainedMappingSchemas(node,sourceId,type){
   &&Array.isArray(r.receipt_ids)&&r.receipt_ids.length>0&&new Set(r.receipt_ids).size===r.receipt_ids.length
   &&(rest?['configure','node_finish']:['finish','output_mapping']).every(phase=>r.receipt_ids.includes(sourceId+':'+phase))
   &&r.receipt_ids.every(id=>node.phases?.filter(p=>p.receipt_id===id&&id===sourceId+':'+p.phase
-   &&p.status==='verified').length===1),
+   &&(p.status==='verified'||skippedMaterialization&&['materialization_start','materialization_execute'].includes(p.phase)
+    &&p.status==='not_requested'&&p.effect_possible===false)).length===1),
   'Invalid parameters.source_operation_id: output mapping readback ownership or receipts differ');
  if(rest)return [];
  if(javascript)need(['code','declared'].includes(r.schema_mode)&&r.settings_preserved===true
