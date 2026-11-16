@@ -15,7 +15,7 @@ export function createSupernodeNodeSupport(config){
    if(request.mode==='variable_boundary'&&request.target.kind==='existing')return channel.configureSupernode({definitions:request.parameters.boundary?.input.definitions??null,read_only:true});
    return verified({not_applicable:true,mappings:[]});
   },
-  configureAllOutputs:async(channel,_c,p)=>_c.configuration.mode==='variable_boundary'
+  configureAllOutputs:async(channel,_c,p)=>_c.mode==='variable_boundary'
    ?channel.configureSupernode({definitions:p.boundary?.input.definitions??null,read_only:!p.boundary})
    :verified({not_applicable:true,mappings:[]}),
   configure:configureSupernode,

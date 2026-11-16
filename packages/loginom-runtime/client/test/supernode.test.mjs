@@ -133,6 +133,10 @@ test('saved variable inventory accepts only complete source collections and exac
  const read=()=>vm.runInNewContext('('+readSupernodeVariablesBrowser.toString()+')(task)',context);
  assert.equal(read().definitions[0].value,99);
  source.items.push({});assert.throws(read,/complete unfiltered/);source.items.pop();
+ records[0].data.DataType=5;records[0].data.DisplayValue='';assert.throws(read,/integer/);
+ task.draft={index:0};assert.equal(read().definitions[0].type,'string');
+ task.draft.id=999;assert.throws(read,/draft identity/);delete task.draft;
+ records[0].data.DataType=4;records[0].data.DisplayValue=99;
  records[0].data.ValueIsNull=true;assert.throws(read,/non-NULL integer/);records[0].data.ValueIsNull=false;
  r.port.FGuid='foreign';assert.throws(read,/owned input/);
 });

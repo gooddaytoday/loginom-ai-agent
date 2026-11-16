@@ -84,18 +84,35 @@ export async function configureSupernode(channel,parameters,{request}){
 
 export async function configureSupernodeVariablesBrowser(page,t,readNode,openPort,readVariables){
  const b=t.binding,root=b.workflow_ref.prefix+';WizrdMCF',form=root+';TuneVariablesMappingWizard';
- let effect=false,opened=false;
+ let effect=false,opened=false,draft,retained;
  const need=(v,m)=>{if(!v)throw Error('Supernode variables: '+m);};
  const remaining=()=>{const n=t.deadline-Date.now();need(n>0,'original deadline expired');return n;};
  const at=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']:visible');
- const inspect=()=>page.evaluate(readVariables,t);
+ const inspect=()=>page.evaluate(readVariables,{...t,...(draft?{draft}:{})});
+ const graphReady=async()=>{
+  const end=Date.now()+Math.min(5000,remaining());let previous;
+  for(;;){
+   const n=await readNode(page,b);
+   if(!n.surface_pending&&!(n.verified&&n.locked)){
+    need(n.verified&&n.surface==='graph'&&n.node_id===b.node.node_id,'graph return unconfirmed: '+JSON.stringify(n));
+    if(previous===JSON.stringify(n))return n;previous=JSON.stringify(n);
+   }else previous=null;
+   need(Date.now()<end,'graph settlement deadline');await page.waitForTimeout(Math.min(100,remaining(),Math.max(1,end-Date.now())));
+  }
+ };
+
  const guard=async(dialog=false)=>{
   remaining();const n=await readNode(page,b);need(n.verified&&n.surface==='wizard'&&n.input_port?.port===0,'owned variable wizard required');
-  await inspect();
+  const values=await inspect();
+  if(draft){need(values.definitions.length===retained.definitions.length+1&&values.port_guid===retained.port_guid
+   &&retained.definitions.every((d,i)=>JSON.stringify(d)===JSON.stringify(values.definitions[i])),'retained definitions changed during Add');
+   draft.id??=values.definitions.at(-1).id;}
   need(await page.evaluate(({root,dialog})=>{
    const exact=t=>[...document.querySelectorAll('[data-tid='+JSON.stringify(t)+']')],visible=e=>e.checkVisibility({checkVisibilityCSS:true});
    const roots=exact(root),ds=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')].filter(visible),edit=exact('EditTuneVariableForm').filter(visible);
+   const active=edit.length===1&&Ext.getCmp(edit[0].id);
    const masks=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message')].filter(visible).filter(e=>{
+    if(dialog&&active?.modal===true&&Ext.WindowManager.getActive()===active&&active.zIndexManager?.mask?.dom===e)return false;
     const parent=e.parentElement,c=parent&&globalThis.Ext?.getCmp(parent.id);
     return !(e.classList.contains('x-mask')&&!e.textContent.trim()&&parent?.getAttribute('data-tid')===root+';TuneVariablesMappingWizard;colTargetDelete'
      &&roots[0]?.contains(parent)&&c?.el.dom===parent&&c.disabled===true);
@@ -105,7 +122,7 @@ export async function configureSupernodeVariablesBrowser(page,t,readNode,openPor
  };
  const click=async(tid,dialog=false)=>{await guard(dialog);need(await at(tid).count()===1,'unique control required');await at(tid).click({trial:true,timeout:remaining()});await guard(dialog);effect=true;await at(tid).click({timeout:remaining()});};
  try{
-  const before=await readNode(page,b);need(before.verified&&before.surface==='graph'&&!before.locked,'owned unlocked graph required');
+  const before=await graphReady();
   const result=await openPort(page,{...t,operation_id:t.operation_id+':port',direction:'input',kind:'variables',port:0},readNode);
   effect=result.effect_possible===true;need(result.status==='SUCCEEDED',result.error);opened=true;
   await guard();let current=await inspect();const wanted=t.parameters.definitions;
@@ -117,6 +134,7 @@ export async function configureSupernodeVariablesBrowser(page,t,readNode,openPor
    for(const v of wanted){
     const previous=current;
     await click(form+';btnAddMappingColumn');
+    retained=previous;draft={index:previous.definitions.length};
     await at('EditTuneVariableForm').waitFor({state:'visible',timeout:remaining()});
     await click('EditTuneVariableForm;cbxDataType;trg_picker',true);
     await click('EditTuneVariableForm;cbxDataType;boundlist;Целый',true);
@@ -126,7 +144,7 @@ export async function configureSupernodeVariablesBrowser(page,t,readNode,openPor
     }
     await click('EditTuneVariableForm;btnApply',true);
     await page.locator('[data-tid="EditTuneVariableForm"]').waitFor({state:'hidden',timeout:remaining()});
-    await guard();current=await inspect();
+    draft=null;await guard();current=await inspect();
     need(current.port_guid===previous.port_guid&&current.definitions.length===previous.definitions.length+1
      &&previous.definitions.every((d,i)=>JSON.stringify(d)===JSON.stringify(current.definitions[i])),'Add changed retained definitions');
     const added=current.definitions.at(-1);need(added.name===v.name&&added.label===v.name&&added.value===v.value,'definition readback differs');
@@ -142,7 +160,7 @@ export async function configureSupernodeVariablesBrowser(page,t,readNode,openPor
    }
   }
   await page.locator('[data-tid='+JSON.stringify(root)+']').waitFor({state:'hidden',timeout:remaining()});
-  const after=await readNode(page,b);need(after.verified&&after.surface==='graph'&&after.node_id===before.node_id,'graph return unconfirmed');
+  const after=await graphReady();need(after.node_id===before.node_id,'graph owner changed');
   return {status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:effect,node_context:after,variable_boundary:current};
  }catch(error){return {status:effect?'AMBIGUOUS':'NOT_APPLIED',verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000),port_opened:opened};}
 }

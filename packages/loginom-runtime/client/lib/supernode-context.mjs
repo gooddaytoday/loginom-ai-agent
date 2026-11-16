@@ -72,11 +72,13 @@ export function readSupernodeVariablesBrowser(task){
  const store=grid.getStore(),records=store.getData()?.items;
  need(!store.isBufferedStore&&!store.isLoading()&&Array.isArray(records)&&records.length<=128&&store.getCount()===records.length
   &&(!store.getData().getSource?.()||store.getData().getSource().items.length===records.length&&store.getData().getSource().items.every(r=>records.includes(r))),'complete unfiltered definitions required');
- const definitions=records.map((r,index)=>{const d=r.data;
+ const definitions=records.map((r,index)=>{const d=r.data,draft=task.draft&&index===task.draft.index&&index===records.length-1;
+  if(draft)need(task.draft.id===undefined||task.draft.id===d.ID,'new draft identity changed');
   need(r.isModel&&Number.isSafeInteger(d.ID)&&d.Index===index&&typeof d.Name==='string'&&typeof d.DisplayName==='string'
-   &&d.DataType===4&&d.OriginType===1&&d.ConnectedRecord==null&&d.ValueIsNull===false&&Number.isSafeInteger(d.DisplayValue)
+   &&(draft?[4,5].includes(d.DataType):d.DataType===4)&&d.OriginType===1&&d.ConnectedRecord==null&&d.ValueIsNull===false
+   &&(draft?['number','string'].includes(typeof d.DisplayValue):Number.isSafeInteger(d.DisplayValue))
    &&d.IsDerived===false&&d.Broken===false,'local non-NULL integer definition required');
-  return {id:d.ID,index,name:d.Name,label:d.DisplayName,type:'integer',value:d.DisplayValue,is_null:false};
+  return {id:d.ID,index,name:d.Name,label:d.DisplayName,type:d.DataType===4?'integer':'string',value:d.DisplayValue,is_null:false};
  });
  need(new Set(definitions.map(d=>d.id)).size===records.length&&new Set(definitions.map(d=>d.name.toLowerCase())).size===records.length,'unique definitions required');
  return {port_guid:o.portGuid,native_index:o.nativeIndex,kind:'variables',definitions};
