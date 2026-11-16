@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
+import {readFile} from 'node:fs/promises';
+import {runInNewContext} from 'node:vm';
 import test from 'node:test';
 
 test('native server cases seed full files privately and retain CSV/Save/cold expectations',()=>{
@@ -22,7 +24,11 @@ for name in ['import-server-nodownload','import-server-wide']:
    if phase=='model':
     assert not list(workspace.iterdir()),'Server fixture leaked to model workspace'
     assert '--file' not in command,'Server fixture became an attachment'
-    assert '/own/'+c['input_files'][0] in command[-1]
+    path=Path(instance.current['dataset'])
+    assert '/own/'+path.name in command[-1]
+    seed=json.loads((folder/'text-list-inputs.json').read_text())
+    assert seed['native_server_import'] is True and seed['overwrite']=='reject'
+    assert seed['books']==[{'fixture':str(path),'destination':'/own/'+path.name}]
     raise InterruptedError
   with patch.object(instance,'phase',side_effect=phase):
    try: instance.model(name,folder,root/'profile',workspace,'/own/test.lgp',{'package_directory':'/own'},root/'build')
@@ -38,4 +44,15 @@ for name in ['import-server-nodownload','import-server-wide']:
   assert len(header)==(3 if name.endswith('nodownload') else 13)
 `],{encoding:'utf8'});
  assert.equal(result.status,0,result.stdout+result.stderr);
+});
+
+test('native fixture cleanup admits one scoped name only with the private fixture flag',async()=>{
+ const source=await readFile(new URL('../d87-cleanup.mjs',import.meta.url),'utf8');
+ const guard=source.slice(source.indexOf('const nativeNames='),source.indexOf('const directory ='));
+ const own='native-import-'+'a'.repeat(20)+'.csv';
+ assert.doesNotThrow(()=>runInNewContext(guard,{config:{native_server_import:true},names:[own]}));
+ for(const [flag,names] of [[false,[own]],[true,['large.csv']],[true,['/foreign/'+own]],
+   [true,[own,own]],[true,['native-import-'+ 'g'.repeat(20)+'.txt']]])
+  assert.throws(()=>runInNewContext(guard,{config:{native_server_import:flag},names}),/D87_NAME_INVALID/);
+ assert.doesNotThrow(()=>runInNewContext(guard,{config:{},names:['d87-original-E3.csv']}));
 });

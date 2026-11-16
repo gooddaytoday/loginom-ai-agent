@@ -88,7 +88,8 @@ try{
   save.effect={...save.effect,allowed_roots:[directory]};
  }
  const selectors=JSON.parse(await readFile(root+'/runtime/executor/catalog/selectors.json','utf8')).selectors;
- const artifactStore=await createArtifactStore({directory:output+'/artifacts',sessionId});
+ const artifactStore=await createArtifactStore({directory:output+'/artifacts',sessionId,
+  ...(config.native_server_import===true?{maxBytes:32*1024*1024}:{})});
  const nodeSupport=config.fs_error_seed?(await load('client/lib/node-support.mjs')).createCandidateNodeSupport({targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2'}):{};
  const runtime=createActionRuntime({pinned:{actions:new Map(actions.map(a=>[a.action_key,a])),selectors:new Map(selectors.map(s=>[s.symbol,s])),pins:{}},...nodeSupport,execute,onRecord:record,artifactStore,allowCandidate:true,targetOrigin:new URL(config.login.url).origin,targetBuild:'7.4.2',getStorageBinding:()=>binding,...(config.fs_error_audit===true?{cacheDirectory:output+'/server-download-cache'}:{})});
  if(config.fs_error_seed){

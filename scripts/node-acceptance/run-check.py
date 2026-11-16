@@ -2114,7 +2114,8 @@ class Runner:
                     except (ValueError, TypeError): continue
                     destinations(reply)
             config = folder / 'dataset-cleanup-config.json'
-            write(config, dict(login=login, names=sorted(names)))
+            write(config, dict(login=login, names=sorted(names),
+                               **(dict(native_server_import=True) if self.current.get('native_server_fixture') else {})))
             self.phase('dataset-cleanup', [build / 'resources/loginom/bin/node',
                        REPO / 'scripts/node-acceptance/d87-cleanup.mjs', build / 'resources/loginom',
                        config, folder / 'dataset-cleanup'], folder, timeout=180)
@@ -2213,11 +2214,16 @@ class Runner:
         if spec.get('native_server_import'):
             spec['data'] = folder / 'server-inputs'
             source = spec['data'] / spec['input_files'][0]
-            self.current['dataset'] = str(source)
+            name = 'native-import-' + hashlib.sha256(str(folder).encode()).hexdigest()[:20] + source.suffix
+            owned = source.with_name(name)
+            self.current.update(dataset=str(owned), native_server_fixture=True)
             self.phase('server-inputs', [sys.executable, '-B', spec['oracle'], '--generate', spec['data'],
                        '--case', case], folder, timeout=60)
+            source.rename(owned)
+            prompt = prompt.replace(source.name, owned.name)
+            spec['input_files'] = [owned.name]
             (folder.parent / 'fixtures').mkdir(exist_ok=True)
-            write(folder.parent / 'fixtures/manifest.json', dict(bytes=source.stat().st_size))
+            write(folder.parent / 'fixtures/manifest.json', dict(bytes=owned.stat().st_size))
         if spec.get('prepared_table_source'):
             prompt += f'\nПодготовка источника: новый собственный пакет уже создан для этой попытки по пути {package}. Открой его; исходная таблица {spec["prepared_table_source"]} содержит запрошенные When и Value с заданными native типами. Не заменяй её новым импортом rows.csv: CSV служит описанием исходных строк.'
         if spec.get('fs_case'):
@@ -2391,7 +2397,8 @@ class Runner:
             # the existing verified delivery protocol, rejecting unequal files.
             seeds = [spec['data'] / name for name in spec['seed_files']] if spec.get('seed_files') else files
             books = [dict(fixture=str(f), destination=source_dir + '/' + f.name) for f in seeds]
-            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books))
+            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books,
+                  **(dict(native_server_import=True) if spec.get('native_server_import') else {})))
             self.phase('text-list-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
                        build / 'resources/loginom', folder / 'text-list-inputs.json', folder / 'text-list-inputs'], folder, timeout=300)
             prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
