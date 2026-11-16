@@ -5,12 +5,13 @@ import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {loopParametersSchema,validateLoopParameters} from './loop-parameters.mjs';
 import {makeLoopSourceCode} from './loop-procedure.mjs';
 import {loopConfigurationReadback} from './loop-readback.mjs';
+import {makeSupernodeConfigureCode} from './supernode-procedure.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
 export function createLoopNodeSupport(config){
  const support=createTabularTransformNodeSupport(config,{
-  type:'control.loop',mode:'group_rows',revision:'loop-group-rows-v1',parameterSchema:loopParametersSchema,validate:validateLoopParameters,readback:loopConfigurationReadback,
+  type:'control.loop',modes:['group_rows','for'],revision:'loop-for-variable-v2',parameterSchema:loopParametersSchema,validate:validateLoopParameters,readback:loopConfigurationReadback,
   configurationObservation:{condition:'owned Loop selection',ready:s=>s.wizard?.stage==='loop_node'},
   configureInputs:async()=>verified({not_applicable:true,mappings:[]}),
   configure:(channel,p)=>channel.configureLoop(p),
@@ -19,10 +20,10 @@ export function createLoopNodeSupport(config){
    const s=await channel.observe({condition:'saved Loop before derived component readback',ready:s=>s.prepared_node_context?.surface==='graph'});
    await selectPreparedGraphNode(channel,s,'select saved Loop');await openPreparedWizard(channel);
    await channel.observe({condition:'saved Loop selection readback',ready:s=>s.wizard?.stage==='loop_node'});
-   const vendor=await channel.inspectLoopVendor();await closePreparedWizard(channel);
+   const vendor=await channel.inspectLoopVendor(p);await closePreparedWizard(channel);
    const after=await channel.inspectLoop(p);
    if(JSON.stringify(graph.actual_ports)!==JSON.stringify(after.actual_ports))throw Error('Loop ports changed during saved readback');
-   return {...after,derived_component:vendor.derived_component};
+   return {...after,derived_component:vendor.derived_component,...(vendor.saved_configuration?{saved_configuration:vendor.saved_configuration}:{})};
   },
   readOutputs:async(channel,read,ctx)=>{
    const ports=[];
@@ -35,10 +36,21 @@ export function createLoopNodeSupport(config){
   const r=options.operation.parameters;
   const graph=await options.operation.nodeTargetAdapter.observe({document_id:r.document_id,workflow_ref:r.workflow_ref},ctx.deadline);
   const source=graph.nodes.filter(n=>n.ref.node_id===r.parameters.body.node_id);
-  if(!graph.complete||source.length!==1||source[0].type!=='control.supernode'||JSON.stringify(source[0].inputs)!=='[0]'
-   ||JSON.stringify(source[0].outputs)!=='[0]'||source[0].variable_inputs?.length||source[0].variable_outputs?.length
-   ||source[0].input_kinds?.some(k=>k!=='data')||source[0].output_kinds?.some(k=>k!=='data'))throw Error('Loop: same-workflow one-table Supernode required before mutation');
-  const evidence=await options.execute(makeLoopSourceCode({document_id:r.document_id,workflow_ref:r.workflow_ref,body:r.parameters.body,
+  const variable=r.mode==='for';
+  const input=source[0]?.variable_inputs?.[0];
+  const variableBoundary=source[0]?.variable_inputs?.length===1&&input?.kind==='variables'&&input.port===0
+   &&input.native_index===0&&input.port_guid===r.parameters.variable?.port_guid;
+  if(!graph.complete||source.length!==1||source[0].type!=='control.supernode'||JSON.stringify(source[0].inputs)!==(variable?'[]':'[0]')
+   ||JSON.stringify(source[0].outputs)!=='[0]'||(variable?!variableBoundary:source[0].variable_inputs?.length)||source[0].variable_outputs?.length
+   ||source[0].input_kinds?.some(k=>k!=='data')||source[0].output_kinds?.some(k=>k!=='data'))throw Error('Loop: same-workflow Supernode with the requested boundary required before mutation');
+  let variables;
+  if(variable){
+   const observed=await options.execute(makeSupernodeConfigureCode({document_id:r.document_id,workflow_ref:r.workflow_ref,node:r.parameters.body},{origin:config.targetOrigin,build:config.targetBuild,operation_id:r.operation_id+':body',deadline:ctx.deadline,parameters:{definitions:null,read_only:true}}),{timeout:Math.max(1000,ctx.deadline-Date.now())});
+   if(observed.status!=='SUCCEEDED'||observed.cleanup_complete!==true)throw Error('Loop: saved variable boundary unavailable: '+observed.error);
+   variables=observed.variable_boundary;
+   if(variables.port_guid!==r.parameters.variable.port_guid||variables.definitions.filter(d=>d.id===r.parameters.variable.definition_id&&d.type==='integer'&&d.is_null===false).length!==1)throw Error('Loop: selected port/definition ID is stale or not a non-NULL integer');
+  }
+  const evidence=await options.execute(makeLoopSourceCode({document_id:r.document_id,workflow_ref:r.workflow_ref,body:r.parameters.body,mode:r.mode,...(variables?{variables}:{}),
    ...(r.target.kind==='existing'?{loop:r.target.ref,allow_unconfigured:true}:{}),origin:config.targetOrigin,build:config.targetBuild}),{timeout:Math.max(1000,ctx.deadline-Date.now())});
   options.operation.loopSource=evidence;
   return verified({source_kind:'same_workflow_supernode',...evidence});

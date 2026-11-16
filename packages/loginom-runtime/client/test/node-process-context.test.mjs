@@ -106,6 +106,13 @@ test('unrecognised, contradictory or incomplete process status never grants canc
  assert.deepEqual(r.processes[1].owner,{verified:true,node_id:'node',source:'native_process_model_identity'});
  assert.equal(r.processes[0].owner,undefined);
  });
+test('current-output inspection reads native activity behind a hidden console without granting controls',async()=>{
+ const f=fixture(),model={};f.nodes.push({FGuid:'node',data:model,FStatus:1,FRunning:true,FLocked:true});
+ f.child.data.ModelNode=model;f.left.hidden=true;f.right.hidden=true;
+ const r=await readNodeProcesses(f.page,{},f.readNode,false,true);
+ assert.equal(r.verified,true);assert.deepEqual(r.native_state,{active:true,running:true,locked:true});
+ assert.equal(r.processes[1].rendered,false);assert.equal(r.execution_freshness_verified,false);
+});
  for(const [name,mutate] of Object.entries({
  lookalike:f=>f.child.data.ModelNode={},
  foreign:f=>f.nodes[0].FGuid='foreign',
@@ -131,4 +138,13 @@ test('buffered split-grid cells may be rendered before their expander is annotat
  assert.equal(r.verified,true);assert.equal(group.rendered,true);assert.equal(group.children_loaded,true);
  assert.equal(group.process_tid,'ConsoleForm;ProgressForm;colProcess_1');
  assert.equal(group.expander_tid,null);assert.equal(group.expanded,null);
+});
+
+test('existing-output mask is temporary and never admits the hidden process cache',async()=>{
+ const f=fixture(),model={};f.nodes.push({FGuid:'node',data:model,FStatus:1,FRunning:true,FLocked:true});
+ f.child.data.ModelNode=model;f.left.hidden=true;f.right.hidden=true;
+ const mask=f.el('mask');f.masks.push(mask);
+ const blocked=await readNodeProcesses(f.page,{},f.readNode,false,true);
+ assert.equal(blocked.verified,false);assert.equal(blocked.reason,'console_not_ready');assert.equal(blocked.processes,undefined);
+ f.masks.length=0;assert.equal((await readNodeProcesses(f.page,{},f.readNode,false,true)).verified,true);
 });

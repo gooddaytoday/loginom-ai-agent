@@ -171,3 +171,18 @@ load5=0.26 при 12 ядрах, поэтому это не отказ из-за
 
 Предложения [задач/expected/oracle](acceptance/modes/README.md) отделены от этих
 наблюдений. Уровень готовности узла/реестр и прежние GET-критерии не меняются.
+
+### C5 native confirmation — 2026-11-16, mas3, LAB-1693
+
+Before code, the worker pair executed the original `content-types.csv` via the
+native Text Import and REST masters. `CW;pedRequestContentType;ValueControl`
+persisted `text/plain` then `application/xml`; `Response_0/1` retained both raw
+UTF-8 bodies, including XML quotes and Cyrillic. httpbin appended `charset=UTF-8`.
+Port 1 reported ErrorCode=0 and HttpStatusCode=200 for both rows.
+`CW;pedResponseContentType;ValueControl` persisted `text/plain` then `*/*` on the
+same GET connection. Both executions of the frozen response-headers URL returned
+Content-Type=text/plain, Fixture=LAB-976, ErrorCode=0, HttpStatusCode=200.
+These observations match the four frozen C5 rows; expected and task are unchanged.
+The diagnostic draft and its own uploaded CSV were removed through native UI.
+The tab close child has no separate data-tid; its owned tab was addressed by
+`MF;cntMain;cntWorkspace;Workspace;t.br;tb-1`, then native `data-ref=closeEl`.

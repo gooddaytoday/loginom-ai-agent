@@ -41,10 +41,10 @@ test('REST readback admits optional observed response Content-Type without chang
  r.configuration={status:'applied',readback:{kind:'rest_request',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',method:'GET',connection,
   query_parameters:[{name:'RequestId',field:'RequestId'}],receipt_ids:['op:configure','op:node_finish'],package_persistence_verified:false}};
  assert.equal(validate(r).valid,true);
- for(const response_content_type of ['application/json','text/html']){
+ for(const response_content_type of ['application/json','text/html','text/plain','*/*']){
   connection.response_content_type=response_content_type;assert.equal(validate(r).valid,true);
  }
- for(const response_content_type of [null,true,'text/plain']){
+ for(const response_content_type of [null,true,'application/xml','text/*']){
   connection.response_content_type=response_content_type;assert.equal(validate(r).valid,false);
  }
  delete connection.response_content_type;

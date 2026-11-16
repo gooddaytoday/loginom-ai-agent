@@ -80,6 +80,9 @@ import { startBackgroundCli } from "./background-cli"
 import { setNativeTranslations } from "./native-translations"
 import { closeWindows, createQuitHandler } from "./shutdown"
 
+declare const LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: string | null
+const UPDATE_TEST_FIXTURE =
+  typeof LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY !== "undefined" && Boolean(LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY)
 const TEST_ONBOARDING = process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1"
 const SIDECAR_VERSION = process.env.LOGINOM_AI_AGENT_SIDECAR_V2 === "1" ? "v2" : "v1"
 const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
@@ -139,6 +142,13 @@ const main = Effect.gen(function* () {
 
   const appId = app.isPackaged ? Product.channels[CHANNEL] : Product.channels.dev
   const onboardingTestRoot = ((): string | undefined => {
+    if (
+      UPDATE_TEST_FIXTURE &&
+      (!TEST_ONBOARDING ||
+        !process.env.LOGINOM_AI_AGENT_TEST_ROOT ||
+        !isAbsolute(process.env.LOGINOM_AI_AGENT_TEST_ROOT))
+    )
+      throw Error("LOGINOM_UPDATE_TEST_PROFILE_REQUIRED")
     if (!TEST_ONBOARDING) return
 
     const root = process.env.LOGINOM_AI_AGENT_TEST_ROOT ?? join(tmpdir(), `loginom-ai-agent-onboarding-${randomUUID()}`)
@@ -146,7 +156,7 @@ const main = Effect.gen(function* () {
     ;["data", "config", "cache", "state", "desktop", "session"].forEach((dir) =>
       mkdirSync(join(root, dir), { recursive: true }),
     )
-    process.env.LOGINOM_AI_AGENT_DB = ":memory:"
+    process.env.LOGINOM_AI_AGENT_DB = UPDATE_TEST_FIXTURE ? join(root, "data", Product.database) : ":memory:"
     process.env.XDG_DATA_HOME = join(root, "data")
     process.env.XDG_CONFIG_HOME = join(root, "config")
     process.env.XDG_CACHE_HOME = join(root, "cache")

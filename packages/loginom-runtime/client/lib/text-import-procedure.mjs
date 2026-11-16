@@ -151,7 +151,7 @@ function validateSettings(p,maxColumns,previewPending=false) {
   requireValue(Object.keys(p).filter(k=>!['analysis','node_title'].includes(k)).sort().join(',') === (auto&&!Object.hasOwn(p,'columns')?'format,source':'columns,format,source'), 'Unexpected text import parameters');
   if(Object.hasOwn(p,'node_title'))validateNodeTitle(p.node_title);
   if(Object.hasOwn(p,'analysis'))validateAnalysis(p.analysis);
-  requireValue(p.source&&['encoding','first_line_as_title','rows_to_skip'].every(k=>Object.hasOwn(p.source,k))
+  requireValue(p.source&&['encoding','first_line_as_title',...(previewPending?[]:['rows_to_skip'])].every(k=>Object.hasOwn(p.source,k))
     &&Object.keys(p.source).every(k=>['encoding','first_line_as_title','rows_to_skip','source_path','source_paths','source_mask','file_info','parallel_processing','max_threads'].includes(k)), 'Source parameters are incomplete');
   if(Object.hasOwn(p.source,'source_mask'))textImportSourceMask(p.source);
   else textImportSourcePaths(p.source);
@@ -164,8 +164,8 @@ function validateSettings(p,maxColumns,previewPending=false) {
       'max_threads requires parallel_processing:true');
   }
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
-  requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
-    && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
+  requireValue(typeof p.source.first_line_as_title === 'boolean' && (previewPending&&!Object.hasOwn(p.source,'rows_to_skip')||Number.isInteger(p.source.rows_to_skip)
+    && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000), 'Invalid source row settings');
   const formatKeys=['delimiter','decimal_separator','null_marker','text_qualifier'];
   requireValue(p.format && (previewPending||formatKeys.every(k=>Object.hasOwn(p.format,k)))
     &&Object.keys(p.format).every(k=>[...formatKeys,'multiple_delimiters','variant_as_general_type','date_format','date_separator','auto_detect_columns'].includes(k)), 'Format parameters are incomplete');
@@ -213,6 +213,15 @@ export class ImportInitialSettingsError extends Error {
     super('Existing import has no saved source. Supply complete settings.source including an explicit source_path matching the verified upload, complete settings.format and either nonempty settings.columns or native auto_detect_columns=new/all without columns; the upload reference does not supply settings. '+reason);
     this.name='ImportInitialSettingsError';
   }
+}
+
+// An omitted data kind keeps the parsed one only for the parsed type. A type
+// change resets it natively (string: «Дискретный»), so the old kind can be absent
+// from the new type's options; use the new type's default instead.
+export function initialImportColumnKind(column,field) {
+  if(Object.hasOwn(column,'data_kind'))return column;
+  const changed=column.type!==undefined&&column.type!==field.type;
+  return {...column,data_kind:changed?(['string','boolean'].includes(column.type)?'Дискретный':'Непрерывный'):field.data_kind};
 }
 
 export function validateInitialExistingImportSettings(parameters,verifiedSourcePath,previewPending=false) {
@@ -472,6 +481,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     ...(parameters.analysis?{analysis:parameters.analysis}:{})};
   const requested=structuredClone(parameters);
   // Serialize only after validation; preflight verifies every path separately.
+  // Later initial-settings checks read the requested list or mask, not this join.
   if(parameters.source?.source_paths){parameters.source.source_path=textImportSourcePaths(parameters.source).join('｜');delete parameters.source.source_paths;}
   if(Object.hasOwn(parameters.source??{},'source_mask')){parameters.source.source_path=textImportSourceMask(parameters.source);delete parameters.source.source_mask;}
   requireValue(owner?.status === 'observed' && owner.node?.tid && owner.path?.length, 'An observed wizard owner is required');
@@ -574,7 +584,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
       &&!Object.hasOwn(requested.source,'parallel_processing');
     if(sequential)parameters.source.parallel_processing=false;
     if(['file_info','parallel_processing','max_threads'].includes(name)&&!Object.hasOwn(parameters.source,name))continue;
-    if((patch||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
+    if((patch||initialSourcePath||name==='source_path')&&!Object.hasOwn(parameters.source,name))continue;
     let s = await read('text_import_file'), f = field(s, name, true);
     if(name==='max_threads')requireValue(f.enabled!==false,'max_threads requires parallel_processing:true');
     const encoding = fieldsOnly && name==='encoding' ? resolveTextImportEncoding(parameters.source.encoding):null;
@@ -608,6 +618,10 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     state.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout');
   if(initialSourcePath) {
     requireValue(sourceReadback.fields.source_path.value===initialSourcePath,'Existing source does not match the verified upload');
+    // An omitted rows_to_skip keeps the observed native integer of this wizard.
+    const skip=sourceReadback.fields.rows_to_skip;
+    if(!Object.hasOwn(parameters.source,'rows_to_skip')&&skip?.status==='observed'&&/^[0-9]+$/.test(skip.value))
+      parameters.source.rows_to_skip=requested.source.rows_to_skip=Number(skip.value);
     const preview=(await read('text_import_format','initial import preview defaults')).wizard.settings;
     const labels={delimiter:{'Точка с запятой':';','Запятая':',','Символ табуляции':'\t','Пробел':' '},
       decimal_separator:{'Точка (.)':'.','Запятая (,)':','},
@@ -619,7 +633,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     }
     // Validate the format now; data kinds still await the parsed definitions
     // after explicit format changes. No value comes from another operation.
-    validateInitialExistingImportSettings(parameters,initialSourcePath,true);
+    validateInitialExistingImportSettings({...parameters,source:requested.source},initialSourcePath,true);
     if(!['delimiter','decimal_separator','null_marker','text_qualifier'].every(k=>Object.hasOwn(parameters.format,k)))
       throw new ImportInitialSettingsError('Format parameters are incomplete');
   }
@@ -723,9 +737,9 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch,bound
     if(initialSourcePath) {
       if(parameters.columns)parameters.columns=resolveImportSourceColumns(parameters.columns,parsed.fields).map(c=>{
         const field=parsed.fields.find(f=>f.name===(c.source_name??c.name));
-        return Object.hasOwn(c,'data_kind')?c:{...c,data_kind:field.data_kind};
+        return initialImportColumnKind(c,field);
       });
-      validateInitialExistingImportSettings(parameters,initialSourcePath);
+      validateInitialExistingImportSettings({...parameters,source:requested.source},initialSourcePath);
     }
     if(autoTypesRequested(parameters)) {
       parameters.columns=mergeImportColumnPatch(parsed.fields,parameters.columns??[]);
