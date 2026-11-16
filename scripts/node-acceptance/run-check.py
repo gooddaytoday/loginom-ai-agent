@@ -28,7 +28,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
-D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week')
+D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -469,6 +469,14 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['rows.csv', 'input.json'], seed_files=['lab1685-types.csv'],
                     source_package=node / 'fixtures/modes/typed-source.lgp', prepared_table_source='TypedSource', base=None, external=True,
                     tree_only=True, expected_name='expected-dates-variant.json', oracle=src / 'oracle.py')
+    if name == 'tree-to-table-typed':
+        # LAB-1699: the R4 typed source and tree, then native Tree to Table with its CSV.
+        node = REPO / 'docs/node-development/nodes/trees-datatotree'
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-typed.md', data=node / 'fixtures/modes',
+                    input_files=['rows.csv', 'input.json'], seed_files=['lab1685-types.csv'],
+                    source_package=node / 'fixtures/modes/typed-source.lgp', prepared_table_source='TypedSource', base=None, external=True,
+                    expected_name='expected-typed-run.json', oracle=src / 'oracle.py')
     if name in ['tree-dates', 'tree-scalar-arrays', 'tree-variant']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         src = node / 'acceptance/typed'
@@ -1621,7 +1629,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned: both for types300; midnight_date
         # also for date-time-formats (LAB-1101) and date-time-parts/week
-        # (owner decision d76-date-time-parts; port/cold retain exact values).
+        # (owner decision d76-date-time-parts; port/cold retain exact values)
+        # and tree-to-table-typed (owner decision d76-tree-to-table, LAB-1699).
         # LAB-1153: CrossTable permits only omission of exactly zero time.
         if scenario_name not in D76_SCENARIOS + ('crosstable-datetime',): return None
         if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0

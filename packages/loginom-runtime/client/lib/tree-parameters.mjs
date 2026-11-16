@@ -113,7 +113,7 @@ export function validateJsonTreeSchema(schema){
 export function validateSelectedTreePaths(schema,paths,indexPaths){
  if(!Array.isArray(schema)||!schema.length||schema.length>256||schema[0].is_array||schema.filter(n=>n.is_array).length!==1)throw Error('Tree stage 1 requires one object and one repeated branch');
  const leaves=schema.filter(n=>!n.is_container);
- if(new Set(leaves.map(n=>n.name)).size!==leaves.length||leaves.some(n=>!['integer','real','string','boolean'].includes(n.type)))throw Error('Tree stage 1 requires distinct scalar leaf names and supported types');
+ if(new Set(leaves.map(n=>n.name)).size!==leaves.length||leaves.some(n=>!['integer','real','string','boolean','datetime','variant'].includes(n.type)))throw Error('Tree stage 1 requires distinct scalar leaf names and supported types');
  if(paths){const selected=leaves.filter(n=>paths.includes(n.path)).map(n=>n.path);
   if(JSON.stringify(selected)!==JSON.stringify(paths))throw Error('Invalid parameters.selected_paths: choose existing leaves in native schema order');}
  if(indexPaths?.some(p=>!schema.some(n=>n.path===p&&n.is_array)))throw Error('Invalid parameters.global_index_paths: choose the repeated array path');
