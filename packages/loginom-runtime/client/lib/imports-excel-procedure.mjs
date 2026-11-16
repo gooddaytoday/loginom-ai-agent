@@ -13,10 +13,14 @@ export async function excelConfigureCapability(page,t,readContext){
  const root=t.workflow_ref.prefix+';WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
  let effect=false,waitingFor=null;
+ // One path, a U+FF5C-joined ordered list or one mask in the native input.
+ const e=t.excel??{},want=e.source_paths?e.source_paths.join('｜'):e.source_mask??e.source_path,multi=want?.includes('｜')||want?.includes('*');
+ const threadLabel=e.max_threads==='auto'?'Автоопределение':e.max_threads===undefined?undefined:String(e.max_threads);
  try{
   const guard=async()=>{remaining();const b=await readContext(page,binding);need(b.verified&&b.surface==='wizard'&&b.node_id===t.node.node_id,'owned wizard changed');
    need(await page.evaluate(t=>location.origin===t.origin&&bg.app.Version===t.build,t),'target changed');return b;};
-  const wait=async(label,read)=>{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}throw Error(label+' did not settle');};
+  const wait=async(label,read)=>{try{while(remaining()>0){await guard();const v=await read();if(v)return v;await page.waitForTimeout(Math.min(80,remaining()));}}
+   catch(error){if(/operation deadline exceeded$/.test(error.message))error.message+=' ['+label+']';throw error;}throw Error(label+' did not settle');};
   const quiet=()=>wait('wizard loading',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
   const point=(locator,settled)=>{
    waitingFor=String(locator);
@@ -33,7 +37,8 @@ export async function excelConfigureCapability(page,t,readContext){
    }).then(p=>{waitingFor=null;return p;});
   };
   const click=async(locator,double=false,settled)=>{await quiet();await guard();const p=await point(locator,settled);if(p.selected)return;effect=true;if(double)await page.mouse.dblclick(p.x,p.y);else await page.mouse.click(p.x,p.y);};
-  const fill=async(locator,value)=>{await quiet();await guard();await point(locator);effect=true;await locator.fill(String(value));await locator.press('Tab');await wait('field readback',()=>locator.inputValue().then(v=>v===String(value)));};
+  // A saved U+FF5C list survives a plain fill (the mask is appended): clear first.
+  const fill=async(locator,value,clear)=>{await quiet();await guard();await point(locator);effect=true;if(clear){await locator.press('Control+A');await locator.press('Backspace');}await locator.fill(String(value));await locator.press('Tab');await wait('field readback',()=>locator.inputValue().then(v=>v===String(value)));};
   const choose=async(owner,value,optionTid)=>{
    const input=find(owner).locator('input:not([type="hidden"])');
    if(await input.inputValue()===value)return;
@@ -75,7 +80,8 @@ export async function excelConfigureCapability(page,t,readContext){
    }
   }else{
   const pathInput=find(file+'edtFileName;ValueControl').locator('input');
-  if(await pathInput.inputValue()!==t.excel.source_path)await fill(pathInput,t.excel.source_path);
+  const saved=await pathInput.inputValue();
+  if(saved!==want)await fill(pathInput,want,saved.includes('｜'));
   }
   if(!t.preserve||t.excel.sheet_name!==undefined){
   await choose(file+'cbbTableNamingMethod;ValueControl',t.excel.named_range!==undefined?'Именованный диапазон':t.excel.sheet_name===undefined?'По номеру':'По имени');
@@ -96,6 +102,13 @@ export async function excelConfigureCapability(page,t,readContext){
   }
   await choose(file+'cbbActionBlankRow;ValueControl','Импортировать');
   await fill(find(file+'edtTitleRowCount;ValueControl').locator('input'),t.excel.header_rows);
+  if(multi){
+   // Lists and masks are read sequentially unless parallel reading is asked.
+   const parallel=find(file+'chkParallelProcessing;ValueControl'),checked=()=>parallel.evaluate(e=>e.classList.contains('x-form-cb-checked'));
+   if(await checked()!==(e.parallel_processing===true)){await click(find(file+'chkParallelProcessing;ValueControl;DisplayEl'));
+    await wait('parallel processing readback',async()=>await checked()===(e.parallel_processing===true));}
+   if(threadLabel!==undefined)await choose(file+'cbbMaxThreadCount;ValueControl',threadLabel);
+  }
   }
   await quiet();await guard();
   const source=await page.evaluate(({file})=>{const input=key=>{const a=document.querySelectorAll('[data-tid='+JSON.stringify(file+key)+'] input');if(a.length!==1)throw Error('Excel source field ambiguous');return a[0].value;};
@@ -109,15 +122,18 @@ export async function excelConfigureCapability(page,t,readContext){
     const at=caption.lastIndexOf(' ( /')>=1?caption.lastIndexOf(' ( /'):caption.lastIndexOf(' ( '),value=at>=1&&caption.endsWith(' )')?caption.slice(at+3,-2):'';
     binding_field={status:'observed',variable_mode:true,variable_caption:caption,row_id:String(rows[0].internalId),value,value_length_utf16:value.length,truncated:false};
    }
+   const flag=key=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(file+key)+']');return es.length===1?es[0].classList.contains('x-form-cb-checked'):undefined;};
+   const threads=document.querySelectorAll('[data-tid='+JSON.stringify(file+'cbbMaxThreadCount;ValueControl')+'] input');
    const region=()=>{const es=document.querySelectorAll('[data-tid='+JSON.stringify(file+'chkAllRows;ValueControl')+']');if(es.length!==1)throw Error('Excel range extension ambiguous');return {named_range:name,extend_range:es[0].classList.contains('x-form-cb-checked')};};
    return {source_path:binding_field?binding_field.value:input('edtFileName;ValueControl'),...(binding_field?{binding_field}:{}),sheet_method:method,sheet:name,...(method==='Именованный диапазон'?region():{}),header_rows:Number(input('edtTitleRowCount;ValueControl')),
-    whole_sheet:document.querySelector('[data-tid='+JSON.stringify(file+'chkUsedRange;ValueControl')+']')?.classList.contains('x-form-cb-checked'),blank_rows:input('cbbActionBlankRow;ValueControl')};},{file});
+    whole_sheet:document.querySelector('[data-tid='+JSON.stringify(file+'chkUsedRange;ValueControl')+']')?.classList.contains('x-form-cb-checked'),blank_rows:input('cbbActionBlankRow;ValueControl'),
+    parallel_processing:flag('chkParallelProcessing;ValueControl'),max_threads:threads.length===1?threads[0].value:undefined};},{file});
   if(t.binding){const f=source.binding_field;
    need(f&&(f.variable_caption===t.binding.label||f.variable_caption===t.binding.label+' ( '+t.binding.value+' )'),'BINDING_SOURCE_UNVERIFIED: selected Excel filename variable differs');
    source.source_path=t.binding.value;}
   if(t.source_only)return {verified:true,cleanup_complete:true,effect_possible:effect,configuration:{verified:true,node_context:{...t.node,verified:true},source}};
   const named=source.sheet_method==='Именованный диапазон';
-  need((t.inspect||source.source_path===t.excel.source_path&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.named_range??t.excel.sheet_name??'1')))
+  need((t.inspect||source.source_path===want&&(!multi||t.preserve||source.parallel_processing===(e.parallel_processing===true)&&(threadLabel===undefined||source.max_threads===threadLabel))&&(t.preserve&&t.excel.sheet_name===undefined||source.sheet===(t.excel.named_range??t.excel.sheet_name??'1')))
    &&(t.inspect||t.preserve||source.header_rows===t.excel.header_rows)
    &&(named?typeof source.extend_range==='boolean':source.whole_sheet)&&source.blank_rows==='Импортировать','source settings differ');
   if(!t.inspect&&!t.preserve&&t.excel.named_range!==undefined)need(named&&source.named_range===t.excel.named_range&&source.extend_range===(t.excel.extend_range??false),'named range settings differ');

@@ -3,11 +3,12 @@
 
 Reads fixtures only. Constant signals have no slope and unit seasonal factors.
 Computed here: shares 25/75, constant trend, unit indices. Not computed:
-zero/NULL/empty outcomes (OutputVT=6 «Исключено», UngroupQuality=1 at zero
+zero/NULL outcomes (OutputVT=6 «Исключено», UngroupQuality=1 at zero
 support, empty ports) and UngroupQuality=NaN at positive constant support are
 rewritten native observations (NaN: Loginom 7.4.2 typed read, LAB-1314). Their
-expected files carry "claim": "наблюдение, не заявляется" and are not PASS
-criteria until a native typed-read or an owner decision. NaN is written as the
+expected files retain provenance in "claim": "наблюдение, не заявляется";
+zero/NULL are PASS criteria by owner decision v040-scope-expansion. Empty inputs
+require an explicit refusal under the same decision. NaN is written as the
 exact non-finite marker {"non_finite": "NaN"} (owner decision v040-nan-exact).
 The proposal projects out confidence bands: their formula is unknown.
 An alternating/nonconstant signal is deliberately refused, never fitted to actual.
@@ -32,8 +33,6 @@ OBSERVED_NOT_CLAIMED = {
     'constant': 'UngroupQuality=NaN при постоянной положительной опоре: native typed-read Loginom 7.4.2 (LAB-1314), CSV `Nan`',
     'zero': 'OutputVT=6 «Исключено», OutputValue=OutputTrend=0 и UngroupQuality=1 при нулевой опоре',
     'null': 'пустые порты 0 и 1 с полной схемой при полностью NULL-опоре',
-    'empty-support': 'пустые порты 0 и 1 с полной схемой при пустой опоре',
-    'empty-totals': 'пустые порты 0 и 1 с полной схемой при пустых итогах',
 }
 
 
@@ -45,6 +44,11 @@ def read(name):
 def expected(case):
     totals_file, support_file = CASES[case]
     totals, support = read(totals_file), read(support_file)
+    if case.startswith('empty-'):
+        assert (bool(totals), bool(support)) == ((True, False) if case == 'empty-support' else (False, True))
+        return dict(package_path='{{PACKAGE_PATH}}',
+                    nodes=[dict(type='imports.text'), dict(type='imports.text')],
+                    outputs=[], refusal=dict(text='устой вход'))
     signals = {}
     for row in support:
         if row['Weight'] != '?':

@@ -204,7 +204,7 @@ page = context.pages()[0]
     Date.now() + 30_000,
   )
   if(expected.nodes.some(n=>n.type==='control.supernode')&&expected.outputs.some(o=>o.output_node_type==='control.supernode'))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
-   platform:compatibilityPlatform,makeWorkspacePrepareCode,record});
+   platform:compatibilityPlatform,makeWorkspacePrepareCode,record,expected});
   await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
@@ -278,6 +278,23 @@ page = context.pages()[0]
    if(JSON.stringify(links)!==JSON.stringify(after))throw Error('COLD_VARIABLE_LINK_CHANGED');
    state.variableInventory={outputs,links};
   }
+  // A bound text filename resolves through its saved variable source. Execute
+  // that source (a builtin is a snapshot) before reading the export, unchanged.
+  if(expected.text_binding){
+   const links=(graph.variable_links??[]).filter(l=>l.kind==='variables'&&l.input===0&&graph.nodes.some(n=>n.ref.node_id===l.target&&n.type==='exports.text'));
+   const sources=links.length===1?graph.nodes.filter(n=>n.ref.node_id===(links[0].source?.node_id??links[0].source)):[];
+   if(sources.length!==1)throw Error('TEXT_COLD_VARIABLE_SOURCE');
+   if(sources[0].type!=='variables.user'){
+    const node=sources[0].ref;
+    const operation={id:'cold-text-binding-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_variables',revision:'1'},deadline:Date.now()+540000};
+    const channel=createNodeProcedure({operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
+     preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
+    const driver=createNodeExecutionProcedure(channel,node,{allowDeactivate:true});
+    const execution=await runColdExecution({driver,channel,node,operation,record,readReceipt:async r=>(await execute(withBrowserReceipt('null',{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.operation_id,receipt_read:true}))).output});
+    if(execution.status!=='completed'||execution.verified!==true||execution.owner_verified!==true)throw Error('TEXT_COLD_VARIABLE_SOURCE_EXECUTION');
+    await record({phase:'cold_text_binding_source',node,execution,settings_applied:false});
+   }
+  }
   // A bound LGD destination needs the saved variable source's fresh value.
   if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>['imports.text','imports.excel'].includes(b.node.type))?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
   // The existing inventory audit executes/reads it without changing settings.
@@ -288,6 +305,11 @@ page = context.pages()[0]
   if(expected.excel_sinks)for(const sink of expected.excel_sinks)verifyExcelColdSettings(destinations,sink);
   else if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
   if(expected.excel_bindings)verifyExcelColdBindings(destinations,expected);
+  // A saved text filename binding resolves to the last path and keeps its variable.
+  if(expected.text_binding){
+   const bound=(destinations??[]).filter(d=>d.destination===destination);
+   if(bound.length!==1||bound[0].text_binding!==expected.text_binding.variable)throw Error('TEXT_COLD_VARIABLE_BINDING');
+  }
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {
@@ -489,12 +511,12 @@ page = context.pages()[0]
    data=read.output;
   }
   // Variant cells have no exact table-visualizer proof; read them through the completed port.
-  const variantPortRead=['transform.replace_columns','transform.group_data'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
+  const variantPortRead=['transform.replace_columns','transform.group_data','transform.sorting'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
   if(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
    const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true,
-    ...(variantPortRead||['variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)?{typedVariants:true}:{}),...(variantPortRead&&target.type==='transform.replace_columns'?{variantEmptyIsNull:true}:{})});
+    ...(variantPortRead||['variables.to_table','transform.collapse_columns','imports.lgd','trees.to_table'].includes(target.type)?{typedVariants:true}:{}),...(variantPortRead&&target.type==='transform.replace_columns'?{variantEmptyIsNull:true}:{})});
    if(!read.verified||!read.cleanup_complete||read.output?.port_kind==='tree'||read.output?.sample_complete!==true)throw Error(target.type==='research.quality'?'COLD_QUALITY_TABLE_INCOMPLETE':'COLD_TREE_TABLE_INCOMPLETE');
    data=read.output;
   }
@@ -634,6 +656,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
     ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
     ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),
     ...(state.bindingInventory?{binding_inventory:state.bindingInventory}:{}),

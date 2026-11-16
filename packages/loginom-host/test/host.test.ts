@@ -9,6 +9,7 @@ import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { createHash } from "node:crypto"
 import { constants } from "node:fs"
+import { removeFixture } from "./remove-fixture"
 
 test("shared host can manage an unconfigured profile without Electron or starting a runtime", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-host-"))
@@ -487,19 +488,4 @@ async function startupFixture(closed: boolean) {
   await store.activate(1)
   const host = await createLoginomHost({ root, resources, codec, environment: {}, headless: true })
   return { directory, host }
-}
-
-// Both children have already emitted exit (close awaits it), but Windows can
-// keep the copied node.exe image locked briefly afterwards. Only fixture
-// removal waits for that release; the cleanup assertions above are unchanged.
-async function removeFixture(directory: string) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await rm(directory, { recursive: true, force: true })
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code ?? ""
-      if (process.platform !== "win32" || !["EBUSY", "EPERM", "ENOTEMPTY"].includes(code) || attempt >= 50) throw error
-      await Bun.sleep(100)
-    }
-  }
 }

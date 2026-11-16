@@ -10,6 +10,9 @@ function* receipts(value){
 }
 function settings(c,mode,stage){
  const keys=c.keys,options=c.options;
+ if(mode==='variant')return c.mode==='keys'
+  &&same(keys?.map(k=>[k.name,k.type,k.direction,['string','variant'].includes(k.type)?k.case_sensitive:null]),[['Values','variant','ASC',false],['RowID','integer','ASC',null],['Names','string','ASC',false]])
+  &&options?.chkLocaleAware?.value===false&&options.chkLocaleAware.switch_pressed===false;
  return c.mode==='keys'&&same(keys?.map(k=>[k.name,k.type,k.direction]),[['Word','string','ASC'],['RowID','integer','ASC']])
   &&keys[0].case_sensitive===(mode==='case'&&stage===0)
   &&options?.chkLocaleAware?.value===true&&options.chkLocaleAware.switch_pressed===false
@@ -17,7 +20,7 @@ function settings(c,mode,stage){
 }
 export function checkSortingModes(expected,replies){
  const mode=expected.sorting_mode,stages=expected.sorting_stages;
- need(['case','threads','auto'].includes(mode)&&stages?.length===2,'CONTRACT');
+ need(['case','threads','auto','variant'].includes(mode)&&stages?.length===2,'CONTRACT');
  const rounds=new Map();
  for(const r of receipts(replies)){
   const id=r.execution?.execution_id,c=r.configuration.readback,port=r.output?.ports?.find(p=>p.port===0);
@@ -31,7 +34,7 @@ export function checkSortingModes(expected,replies){
   if(!settings(a.c,mode,0)||!matchesExpectedOutput(a.port,stages[0]))continue;
   const b=values.slice(i+1).find(b=>settings(b.c,mode,1)&&matchesExpectedOutput(b.port,stages[1])&&same(b.node,a.node)
    &&same(b.c.options.chkBufferWhole,a.c.options.chkBufferWhole)
-   &&(mode!=='case'||same(b.c.options.cbxMaxThreadCount,a.c.options.cbxMaxThreadCount)));
+   &&(!['case','variant'].includes(mode)||same(b.c.options.cbxMaxThreadCount,a.c.options.cbxMaxThreadCount)));
   if(b)return {node:a.node,mode,stages_verified:2,execution_ids:[a.port.execution_id,b.port.execution_id]};
  }
  throw Error('SORTING_MODES_SAME_NODE_TWO_STAGES');

@@ -28,7 +28,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
-D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week')
+D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
     'E1': dict(attachment='path', generator=['--min-bytes', '1000000000'], heavy=False),
@@ -89,6 +89,9 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / ('task-offline.md' if offline else 'task.md'),
                     data=node / 'fixtures', base=None, input_files=['pages.csv'],
                     expected_name='expected-offline.json' if offline else 'expected.json', oracle=node / 'acceptance/oracle.py')
+    if name == 'supernode-vars' and not cases and not case_root:
+        src = REPO / 'docs/node-development/nodes/control-supernode/acceptance/variables'
+        return dict(source=src, prompt=src / 'task.md', data=src, base=None, input_files=[], supernode=True, oracle=src / 'oracle.py')
     if name == 'supernode-calc' and not cases and not case_root:
         node = REPO / 'docs/node-development/nodes/control-supernode'
         return dict(source=node / 'acceptance', prompt=node / 'acceptance/task.md', data=node / 'fixtures',
@@ -301,6 +304,12 @@ def scenario(name, case_root=None, *, cases=None):
             raise ValueError('External source must be an existing absolute file')
         return dict(SCENARIOS.get(name, {}), source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     local_file=source, attachment=config['attachment'], upload_only=config.get('upload_only', False))
+    if name in ['excel-import-multi', 'excel-import-parallel']:
+        src = REPO / 'docs/node-development/nodes/imports-excel/acceptance/excel-import-multi'
+        multi = name == 'excel-import-multi'
+        return dict(source=src, prompt=src / ('task.md' if multi else 'task-parallel.md'), data=src.parent / 'capabilities/fixtures', base=None,
+                    input_files=['sales-a.xlsx', 'sales-b.xlsx'], expected_name='expected-mask.json' if multi else 'expected-parallel.json',
+                    **(dict(lgd_initial='expected-list.json') if multi else {}), oracle=src / 'oracle.py', excel_multi=name)
     if name == 'excel-import-named':
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance/excel-import-named'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, excel_named_initial='expected-initial.json')
@@ -308,6 +317,12 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/imports-excel/acceptance' / ('stage1' if name == 'excel-import-single' else name)
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None, external=name != 'excel-import-single')
 
+    if name in ['import-server-nodownload', 'import-server-wide']:
+        src = REPO / 'scripts/node-acceptance/scenarios' / name
+        return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
+                    external=True, native_server_import=True, text_list_sources=True,
+                    input_files=['large.csv' if name == 'import-server-nodownload' else 'transactions.txt'],
+                    oracle=src.parent / 'import-server-oracle.py')
     if name == 'text-autodetect-types':
         root = REPO / 'docs/node-development/nodes/text-import/acceptance/autodetect'
         return dict(source=root, prompt=root / 'task.md', data=root / 'data', base=None,
@@ -371,9 +386,10 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'grouping-unique':
         src = REPO / 'docs/node-development/nodes/grouping/acceptance/unique'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None)
-    if name in ['calculator-viewport', 'linreg-short', 'throw1', 'js-declared-empty']:
+    if name in ['calculator-viewport', 'calculator-eight', 'linreg-short', 'throw1', 'js-declared-empty']:
         slug, filename = {
             'calculator-viewport': ('transform-calculator', 'sales.csv'),
+            'calculator-eight': ('transform-calculator', 'ab.csv'),
             'linreg-short': ('datamining-linregression', 'train.csv'),
             'throw1': ('programming-javascript', 'orders.csv'),
             'js-declared-empty': ('programming-javascript', 'orders.csv'),
@@ -411,6 +427,10 @@ def scenario(name, case_root=None, *, cases=None):
         src = REPO / 'docs/node-development/nodes/text-export/acceptance/cp1251'
         return dict(source=src, prompt=src / 'task.md', data=src / 'data', base=None,
                     export_count=2, csv_header='labels', text_export_encodings=['cp1251', 'utf-8'])
+    if name == 'text-export-file-variable':
+        src = REPO / 'docs/node-development/nodes/text-import/acceptance/file-variable'
+        return dict(source=src, prompt=src.parent / 'task-file-variable-export.md', data=src.parents[1] / 'fixtures/file-variable',
+                    input_files=['sales-2026-11-05.csv'], base=None, text_file_variable=True)
     if name == 'excel-export-variables':
         src = REPO / 'docs/node-development/nodes/exports-excel/acceptance/variables'
         return dict(source=src, prompt=src / 'task.md', data=src.parents[1] / 'fixtures', input_files=['modes.csv'], base=None, excel_mode='variables')
@@ -456,6 +476,14 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['rows.csv', 'input.json'], seed_files=['lab1685-types.csv'],
                     source_package=node / 'fixtures/modes/typed-source.lgp', prepared_table_source='TypedSource', base=None, external=True,
                     tree_only=True, expected_name='expected-dates-variant.json', oracle=src / 'oracle.py')
+    if name == 'tree-to-table-typed':
+        # LAB-1699: the R4 typed source and tree, then native Tree to Table with its CSV.
+        node = REPO / 'docs/node-development/nodes/trees-datatotree'
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-typed.md', data=node / 'fixtures/modes',
+                    input_files=['rows.csv', 'input.json'], seed_files=['lab1685-types.csv'],
+                    source_package=node / 'fixtures/modes/typed-source.lgp', prepared_table_source='TypedSource', base=None, external=True,
+                    expected_name='expected-typed-run.json', oracle=src / 'oracle.py')
     if name in ['tree-dates', 'tree-scalar-arrays', 'tree-variant']:
         node = REPO / 'docs/node-development/nodes/trees-jsontotree'
         src = node / 'acceptance/typed'
@@ -520,11 +548,16 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=src / ('task.md' if kind == 'count' else 'task-' + kind + '.md'),
                     data=src / 'data', base=None, export_count=2, input_files=data,
                     expected_name='expected.json' if kind == 'count' else 'expected-' + kind + '.json')
-    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights', 'ungroup-seasonal']:
+    if name in ['ungroup-shares', 'ungroup-null', 'ungroup-empty', 'ungroup-rounding', 'ungroup-weights', 'ungroup-seasonal',
+                'ungroup-seasonal-zero', 'ungroup-seasonal-null', 'ungroup-seasonal-empty-support', 'ungroup-seasonal-empty-totals']:
         node = REPO / 'docs/node-development/nodes/transform-ungroupdata'
         task, expected, inputs, count = {
             'ungroup-weights': ('task-weights.md', 'expected-weights.json', ['weights-totals.csv', 'weights-support.csv'], 2),
             'ungroup-seasonal': ('task-seasonal.md', 'expected-seasonal.json', ['seasonal-totals.csv', 'seasonal-constant-support.csv'], 2),
+            'ungroup-seasonal-zero': ('task-seasonal-zero.md', 'expected-seasonal-zero.json', ['seasonal-totals.csv', 'seasonal-zero-support.csv'], 2),
+            'ungroup-seasonal-null': ('task-seasonal-null.md', 'expected-seasonal-null.json', ['seasonal-totals.csv', 'seasonal-null-support.csv'], 2),
+            'ungroup-seasonal-empty-support': ('task-seasonal-empty-support.md', 'expected-seasonal-empty-support.json', ['seasonal-totals.csv', 'seasonal-empty-support.csv'], 0),
+            'ungroup-seasonal-empty-totals': ('task-seasonal-empty-totals.md', 'expected-seasonal-empty-totals.json', ['seasonal-empty-totals.csv', 'seasonal-constant-support.csv'], 0),
             'ungroup-shares': ('task.md', 'expected.json', ['totals.csv', 'shares.csv'], 1),
             'ungroup-null': ('task-null.md', 'expected-null.json', ['null-totals.csv', 'edge-shares.csv'], 1),
             'ungroup-empty': ('task-empty.md', 'expected-empty.json', ['empty-totals.csv', 'edge-shares.csv'], 1),
@@ -532,7 +565,7 @@ def scenario(name, case_root=None, *, cases=None):
         }[name]
         return dict(source=node / 'acceptance', prompt=node / 'acceptance' / task,
                     data=node / 'fixtures', base=None, expected_name=expected,
-                    input_files=inputs, export_count=count, **({'oracle': node / 'acceptance' / {'ungroup-weights': 'oracle-weights.py', 'ungroup-seasonal': 'oracle-seasonal.py'}[name]} if name in ('ungroup-weights', 'ungroup-seasonal') else {}))
+                    input_files=inputs, export_count=count, **({'oracle': node / 'acceptance' / ('oracle-seasonal.py' if name.startswith('ungroup-seasonal') else 'oracle-weights.py')} if name == 'ungroup-weights' or name.startswith('ungroup-seasonal') else {}))
     if name in ['corr-ranks', 'corr-discrete']:
         src = REPO / 'docs/node-development/nodes/research-corranalysis/acceptance/modes'
         return dict(source=src, prompt=src / ('task-discrete.md' if name=='corr-discrete' else 'task-ranks.md'), data=src / 'fixtures', base=None,
@@ -745,7 +778,7 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['weighted.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
-    if name in ['logreg-ridge', 'logreg-lasso']:
+    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net']:
         variant = name.removeprefix('logreg-')
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes' / variant
         return dict(source=src, prompt=src / ('task-' + variant + '.md'), data=src / 'data', base=None,
@@ -758,11 +791,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['normalization.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py', logreg_normalization=True,
                     cold_expected_name='cold/expected.json', export_count=2)
-    if name in ['sorting-locale', 'sorting-case', 'sorting-threads', 'sorting-auto']:
+    if name in ['sorting-locale', 'sorting-case', 'sorting-threads', 'sorting-auto', 'sorting-variant']:
         node = REPO / 'docs/node-development/nodes/sorting'
         src = node / 'acceptance/modes'
         return dict(source=src, prompt=src / ('task-' + name.removeprefix('sorting-') + '.md'), data=node / 'fixtures', base=None,
-                    input_files=['modes.csv'], export_count=2, sorting_case=name.removeprefix('sorting-'))
+                    input_files=['variant-wide.csv' if name == 'sorting-variant' else 'modes.csv'], export_count=2, sorting_case=name.removeprefix('sorting-'))
     if name == 'logreg-coefficients':
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes/coefficients'
         return dict(source=src, prompt=src / 'task-coefficients.md', data=src / 'data', base=None,
@@ -1018,6 +1051,8 @@ def scenario(name, case_root=None, *, cases=None):
 
 def sorting_stages(case):
     # Independent oracle: one ordered table per saved/exported stage, last = final node state.
+    if case['sorting_case'] == 'variant':
+        return read(case['source'] / 'expected-variant.json')['outputs'] * 2
     stages = json.loads(subprocess.check_output([sys.executable, '-B', str(case['source'] / 'oracle.py')]))['cases'][case['sorting_case']]['stages']
     return [dict(stage, column_order='exact') for stage in stages]
 
@@ -1050,6 +1085,32 @@ def check_text_parallel(replies):
     assert after.get('parallel_processing') is True and after.get('max_threads') == '2', 'TEXT_PARALLEL_TWO_THREADS_MISSING'
     assert before.get('source_path') == after.get('source_path'), 'TEXT_PARALLEL_SOURCE_CHANGED'
     assert all(source.get('file_info') == 'Имя файла' for source in [before, after]), 'TEXT_PARALLEL_FILENAME_MISSING'
+
+
+def excel_imports(replies):
+    return [owner for _, reply in replies for owner, port in ports(reply)
+            if owner.get('status') == 'SUCCEEDED' and port.get('port') == 0
+            and owner.get('configuration', {}).get('readback', {}).get('kind') == 'excel_import']
+
+
+def check_excel_multi(replies, directory):
+    imports = excel_imports(replies)
+    assert len(imports) >= 2, 'EXCEL_MULTI_STAGES_MISSING'
+    assert len({owner['node']['node_id'] for owner in imports}) == 1, 'EXCEL_MULTI_IMPORT_RECREATED'
+    first, last = [owner['configuration']['readback']['source'] for owner in [imports[0], imports[-1]]]
+    assert first.get('source_path') == directory + '/sales-a.xlsx｜' + directory + '/sales-b.xlsx', 'EXCEL_MULTI_LIST_ORDER'
+    assert last.get('source_path') == directory + '/sales-*.xlsx', 'EXCEL_MULTI_NATIVE_MASK_MISSING'
+    assert all(s.get('parallel_processing') is False and s.get('sheet') == 'Data' for s in [first, last]), 'EXCEL_MULTI_SEQUENTIAL_SHEET'
+
+
+def check_excel_parallel(replies, directory):
+    imports = excel_imports(replies)
+    assert imports, 'EXCEL_PARALLEL_IMPORT_MISSING'
+    assert len({owner['node']['node_id'] for owner in imports}) == 1, 'EXCEL_PARALLEL_IMPORT_RECREATED'
+    source = imports[-1]['configuration']['readback']['source']
+    assert source.get('source_path') in [directory + '/sales-a.xlsx｜' + directory + '/sales-b.xlsx', directory + '/sales-b.xlsx｜' + directory + '/sales-a.xlsx',
+                                         directory + '/sales-*.xlsx'], 'EXCEL_PARALLEL_SOURCES'
+    assert source.get('parallel_processing') is True and source.get('max_threads') == '2', 'EXCEL_PARALLEL_TWO_THREADS_MISSING'
 
 
 def check_text_multi_file_list(replies):
@@ -1194,7 +1255,7 @@ def check_text_update_ports(replies, destinations, stages, node_binary='node', *
         assert port_path(owner, port) and port.get('sample_complete') is True and port.get('row_count') == len(stage['rows']), 'TEXT_UPDATE_PORT_INCOMPLETE'
         assert [(c.get('name'), c.get('type')) for c in port.get('schema', [])] == [
             (c['name'], c['type']) for c in stage['columns']], 'TEXT_UPDATE_PORT_SCHEMA'
-        tables.append(dict(actual=dict(node=identity, type='programming.javascript' if kind == 'javascript' else 'imports.text',
+        tables.append(dict(actual=dict(node=identity, type=dict(javascript='programming.javascript', excel_import='imports.excel').get(kind, 'imports.text'),
             label=owner.get('configuration', {}).get('readback', {}).get('node_title', {}).get('label'), output_port=0, data=port), expected=stage))
         previous = exports[-1]
     # Use the same typed full-table matcher as cold, including exact numeric and
@@ -1255,6 +1316,9 @@ def expected_for(case, package, cold=False):
         stages = read(src / 'expected.json')['cases'][case['grouping_case']]['stages']
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.group_data'}, {'type': 'exports.text'}], outputs=[stages[-1]])
     if case.get('sorting_case'):
+        if case['sorting_case'] == 'variant':
+            return dict(read(src / 'expected-variant.json'), package_path=package,
+                        sorting_mode='variant', sorting_stages=sorting_stages(case))
         return dict(package_path=package, nodes=[{'type': 'imports.text'}, {'type': 'transform.sorting'}, {'type': 'exports.text'}],
                     outputs=[sorting_stages(case)[-1]], **(dict(sorting_mode=case['sorting_case'], sorting_stages=sorting_stages(case)) if case['sorting_case'] != 'locale' else {}))
     if case.get('sampling_uniform'):
@@ -1269,6 +1333,8 @@ def expected_for(case, package, cold=False):
             'expected', '/dev/stdin', 'uniform', package], input=json.dumps(proposal).encode()))
     if case.get('excel_xls_refusal'):
         return dict(package_path=package,nodes=[dict(type='imports.text',label_any=True)],outputs=[],refusal=dict(text='XLS'))
+    if case.get('text_file_variable'):
+        return dict(read(src / 'expected-export.json'), package_path=package)
     if case.get('excel_mode') == 'variables':
         approved = read(src / 'expected.json')
         return dict(package_path=package, nodes=[dict(type='imports.text', label_any=True), *approved['nodes']],
@@ -1369,6 +1435,7 @@ def arguments(argv=None):
     start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
+    start.add_argument('--viewport', choices=['1280x800', '1920x945'], default='1280x800')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
     start.add_argument('--spacing', type=float, default=60)
@@ -1431,6 +1498,30 @@ def csv_delimiter(path):
         # A single-column CSV has no delimiter to infer.
         if not any(char in text for char in ',;\t'): return ','
         raise
+
+
+def check_text_file_variable(replies, events, destinations):
+    """Both dates come from one Export whose filename stays bound to ReportFile."""
+    assert len(destinations) == 2, 'TEXT_FILE_VARIABLE_STAGE_COUNT'
+    stages = []
+    for destination in destinations:
+        matches = [(n, o) for n, o in replies if o.get('status') == 'SUCCEEDED' and o.get('execution', {}).get('status') == 'completed'
+                   and o.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'
+                   and o['configuration']['readback'].get('destination') == destination
+                   and o['configuration']['readback'].get('file_name_variable') == dict(kind='variable', name='ReportFile')
+                   and any(f.get('destination') == destination and f.get('bytes', 0) > 0 for f in o.get('output', {}).get('file_artifacts', []))]
+        assert matches, 'TEXT_FILE_VARIABLE_EXPORT_MISSING:' + destination
+        stages.append(matches[0])
+    (first, a), (second, b) = stages
+    assert first < second and a['node'] == b['node'], 'TEXT_FILE_VARIABLE_SAME_NODE'
+    assert all(o['configuration']['readback'].get('destination_check', {}).get('existed') is False
+               and o['configuration']['readback']['destination_check'].get('overwrite') == 'reject' for o in (a, b)), 'TEXT_FILE_VARIABLE_REJECT_POLICY'
+    exports = {o['node']['node_id'] for _, o in replies if o.get('configuration', {}).get('readback', {}).get('kind') == 'text_export'}
+    assert exports == {a['node']['node_id']}, 'TEXT_FILE_VARIABLE_SECOND_EXPORT'
+    requests = [event.get('part', {}).get('state', {}).get('input', {}) for _, event in events
+                if event.get('type') == 'tool_use' and event.get('part', {}).get('tool') == 'loginom_dock_node_apply'
+                and event.get('part', {}).get('state', {}).get('input', {}).get('target', {}).get('type') == 'exports.text']
+    assert requests and not any('destination' in (r.get('parameters') or {}) for r in requests), 'TEXT_FILE_VARIABLE_LITERAL_DESTINATION'
 
 
 def check_text_export_encodings(replies, destinations):
@@ -1552,7 +1643,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     def limitation(value, col, target):
         # Owner-approved D76 forms are code-owned: both for types300; midnight_date
         # also for date-time-formats (LAB-1101) and date-time-parts/week
-        # (owner decision d76-date-time-parts; port/cold retain exact values).
+        # (owner decision d76-date-time-parts; port/cold retain exact values)
+        # and tree-to-table-typed (owner decision d76-tree-to-table, LAB-1699).
         # LAB-1153: CrossTable permits only omission of exactly zero time.
         if scenario_name not in D76_SCENARIOS + ('crosstable-datetime',): return None
         if (scenario_name == 'types300' and col['type'] == 'real' and isinstance(target, (int, float)) and target == 0
@@ -1927,6 +2019,7 @@ class Runner:
         self.last_start = 0
         self.current = None
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
+        self.env['LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT'] = self.options.get('viewport', '1280x800')
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
 
     def memory(self, pid):
@@ -2112,7 +2205,9 @@ class Runner:
                     for item in value.values(): destinations(item)
                 if isinstance(value, list):
                     for item in value: destinations(item)
-            for journal in folder.glob('*/model.stdout'):
+            # Native server fixtures have one exact, privately seeded name;
+            # an exported CSV can have identical bytes without being an upload.
+            for journal in ([] if self.current.get('native_server_fixture') else folder.glob('*/model.stdout')):
                 for _, event in records(journal):
                     part = event.get('part', {})
                     state = part.get('state', {})
@@ -2121,7 +2216,8 @@ class Runner:
                     except (ValueError, TypeError): continue
                     destinations(reply)
             config = folder / 'dataset-cleanup-config.json'
-            write(config, dict(login=login, names=sorted(names)))
+            write(config, dict(login=login, names=sorted(names),
+                               **(dict(native_server_import=True) if self.current.get('native_server_fixture') else {})))
             self.phase('dataset-cleanup', [build / 'resources/loginom/bin/node',
                        REPO / 'scripts/node-acceptance/d87-cleanup.mjs', build / 'resources/loginom',
                        config, folder / 'dataset-cleanup'], folder, timeout=180)
@@ -2133,8 +2229,9 @@ class Runner:
                     file.unlink()
             self.current['dataset-cleanup'] = self.current.get('dataset-cleanup', 'storage FAIL') + '; disk PASS'
 
-    def text_mask_directory(self, login):
-        return login['package_directory'].rstrip('/') + '/' + self.out.name + '-mask'
+    def text_mask_directory(self, login, case=None):
+        # Excel C4 scenarios share a batch: each owns its own mask directory.
+        return login['package_directory'].rstrip('/') + '/' + self.out.name + ('-' + case if case else '') + '-mask'
 
     def fs_directory(self, case, login):
         return login['package_directory'].rstrip('/') + '/' + self.out.name + '-js-fs-' + case
@@ -2189,15 +2286,15 @@ class Runner:
 
     def source_dir(self, spec, login):
         # The one server directory whose paths the task receives for its sources.
-        if spec.get('text_mask'): return self.text_mask_directory(login)
+        if spec.get('text_mask') or spec.get('excel_multi'): return self.text_mask_directory(login, spec.get('excel_multi'))
         if spec.get('text_list_sources') or spec.get('seed_files'): return login['package_directory'].rstrip('/')
         # A space in the parent path is part of the owner's observed request.
         if spec.get('text_folder_masks'): return login['package_directory'].rstrip('/') + '/' + self.out.name + ' Silent Talk'
         return None
 
     def text_mask_inputs(self, spec, folder, login, build, *, late=False):
-        name = self.out.name + '-mask'
-        directory = self.text_mask_directory(login)
+        directory = self.text_mask_directory(login, spec.get('excel_multi'))
+        name = Path(directory).name
         files = [spec['data'] / 'variants/sales_2026-03.csv'] if late else [spec['data'] / f for f in spec['input_files']]
         books = [dict(fixture=str(f), destination=directory + '/' + f.name) for f in files]
         phase = 'text-mask-new-month-input' if late else 'text-mask-inputs'
@@ -2217,6 +2314,19 @@ class Runner:
                     cases=getattr(self, 'options', {}).get('cases')))
         src = spec['source']
         prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        if spec.get('native_server_import'):
+            spec['data'] = folder / 'server-inputs'
+            source = spec['data'] / spec['input_files'][0]
+            name = 'native-import-' + hashlib.sha256(str(folder).encode()).hexdigest()[:20] + source.suffix
+            owned = source.with_name(name)
+            self.current.update(dataset=str(owned), native_server_fixture=True)
+            self.phase('server-inputs', [sys.executable, '-B', spec['oracle'], '--generate', spec['data'],
+                       '--case', case], folder, timeout=60)
+            source.rename(owned)
+            prompt = prompt.replace(source.name, owned.name)
+            spec['input_files'] = [owned.name]
+            (folder.parent / 'fixtures').mkdir(exist_ok=True)
+            write(folder.parent / 'fixtures/manifest.json', dict(bytes=owned.stat().st_size))
         if spec.get('prepared_table_source'):
             prompt += f'\nПодготовка источника: новый собственный пакет уже создан для этой попытки по пути {package}. Открой его; исходная таблица {spec["prepared_table_source"]} содержит запрошенные When и Value с заданными native типами. Не заменяй её новым импортом rows.csv: CSV служит описанием исходных строк.'
         if spec.get('fs_case'):
@@ -2270,6 +2380,7 @@ class Runner:
         if spec.get('text_update'): exports = ['text-update-1.csv', 'text-update-2.csv']
         if spec.get('text_mask'): exports = ['text-mask-initial.csv', 'text-mask-final.csv']
         if spec.get('excel_mode'): exports = [b['filename'] for b in expected['excel_books']]
+        if spec.get('text_file_variable'): exports = [Path(o['export_destination']).name for o in expected['outputs']]
         if spec.get('external'):
             assert all(re.fullmatch(r'[\w-]+\.csv', name) for name in exports), 'Invalid CSV export filename'
             if exports and not any(name in prompt for name in exports):
@@ -2297,16 +2408,23 @@ class Runner:
                 variables=[dict(name='ExcelPath', label_any=True, type='string', value=destinations[1]),
                            dict(name='SheetName', label_any=True, type='string', value='Февраль')])],
                 links=[dict(source=dict(type='variables.calculator'), output=0, target=dict(type='exports.excel'), input=0, kind='variables')])
+        if spec.get('text_file_variable'):
+            # The model computes each path from {{EXPORTS_DIR}} and the name prefix;
+            # a run-unique prefix keeps the reject policy from meeting older runs.
+            prefix = self.out.name + '-' + folder.parent.name + '-'
+            assert prompt.count('{{EXPORTS_DIR}}') == 1 and prompt.count('`report-`') == 1, 'TEXT_FILE_VARIABLE_TASK_PLACEHOLDERS'
+            prompt = prompt.replace('{{EXPORTS_DIR}}', login['package_directory'].rstrip('/')).replace('`report-`', '`' + prefix + 'report-`')
+            assert destinations == [login['package_directory'].rstrip('/') + '/' + prefix + name for name in exports], 'TEXT_FILE_VARIABLE_DESTINATIONS'
         if spec.get('text_mask'):
             prompt += '\nВыгрузи и скачай первоначальную таблицу в ' + destinations[0] + '. Новая выгрузка придёт следующим сообщением.'
         if not spec.get('upload_only'):
             if spec.get('logreg_normalization'):
                 prompt += '\n' + logreg_normalization_exports(destinations)
             prompt += f'\nСохрани пакет как {package}.'
-            if not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
+            if not spec.get('variable_only') and not spec.get('tree_only') and not spec.get('text_folder_masks') and not spec.get('text_export_cases') and not spec.get('text_file_variable') and not rejection and not refusal and not execution_error and not lgd_corrupt: prompt += ' Выгрузи и скачай полную итоговую книгу XLSX.' if spec.get('xlsx') else ' Доставь все итоговые книги Excel.' if spec.get('excel_mode') else ' Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
         for index, output in enumerate(expected['outputs']):
-            if spec.get('excel_mode') or spec.get('fs_case') == 'paths': output['export_destination'] = destinations[index]
+            if spec.get('excel_mode') or spec.get('fs_case') == 'paths' or spec.get('text_file_variable'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
             elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         if spec.get('rest_query_initial'):
@@ -2367,6 +2485,11 @@ class Runner:
         if spec.get('local_file'):
             if spec['attachment'] == 'file': command += ['--file', spec['local_file']]
             files = []  # No multi-GiB workspace copy, and no --file for the path case.
+        if spec.get('excel_multi'):
+            # Own fresh directory: a mask must match exactly these two books.
+            books = self.text_mask_inputs(spec, folder, login, build)
+            prompt += '\nИсходные книги уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
+            files = []
         if spec.get('text_mask'):
             self.current['new_month'] = 'NOT_RUN'
             books = self.text_mask_inputs(spec, folder, login, build)
@@ -2390,7 +2513,8 @@ class Runner:
             # the existing verified delivery protocol, rejecting unequal files.
             seeds = [spec['data'] / name for name in spec['seed_files']] if spec.get('seed_files') else files
             books = [dict(fixture=str(f), destination=source_dir + '/' + f.name) for f in seeds]
-            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books))
+            write(folder / 'text-list-inputs.json', dict(login=login, overwrite='reject', books=books,
+                  **(dict(native_server_import=True) if spec.get('native_server_import') else {})))
             self.phase('text-list-inputs', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/exports-excel-modes.mjs',
                        build / 'resources/loginom', folder / 'text-list-inputs.json', folder / 'text-list-inputs'], folder, timeout=300)
             prompt += '\nИсходные файлы уже находятся в хранилище Loginom (серверные пути):\n' + '\n'.join(b['destination'] for b in books)
@@ -3009,6 +3133,11 @@ class Runner:
         if spec.get('text_file_info'):
             check_text_update_ports(replies, destinations, [bind_source_dir(read(src / spec['lgd_initial']), source_dir)['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_file_info(replies)
+        if spec.get('excel_multi') == 'excel-import-multi':
+            check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True, kind='excel_import')
+            check_excel_multi(replies, source_dir)
+        if spec.get('excel_multi') == 'excel-import-parallel':
+            check_excel_parallel(replies, source_dir)
         if spec.get('text_parallel'):
             check_text_update_ports(replies, destinations, [read(src / spec['lgd_initial'])['outputs'][0], expected['outputs'][0]], build / 'resources/loginom/bin/node', same_node_id=True)
             check_text_parallel(replies)
@@ -3024,10 +3153,33 @@ class Runner:
             formats = [owner['configuration']['readback']['format'] for _, reply in replies for owner, _ in ports(reply)
                        if owner.get('status') == 'SUCCEEDED' and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import']
             assert formats and formats[0].get('variant_as_general_type') is True and formats[-1].get('variant_as_general_type') is False, 'TEXT_VARIANT_TOGGLE_READBACK'
+        if spec.get('native_server_import'):
+            calls = [event['part'] for _, event in events if event.get('type') == 'tool_use']
+            if case == 'import-server-nodownload':
+                assert not any(re.search(r'storage_download|artifact_deliver|file_(?:profile|scan|sample)',
+                                         call.get('tool', '')) for call in calls), 'SERVER_IMPORT_DOWNLOADED_OR_DELIVERED'
+            imports = [(owner, port) for _, reply in replies for owner, port in ports(reply)
+                       if owner.get('status') == 'SUCCEEDED'
+                       and owner.get('configuration', {}).get('readback', {}).get('kind') == 'text_import'
+                       and port.get('port') == 0]
+            assert imports, 'SERVER_IMPORT_PORT_MISSING'
+            wanted = read(src / 'expected.json')['server_import']
+            assert any(port_path(owner, port) and port.get('row_count') == wanted['records']
+                       and [(c.get('name'), c.get('type')) for c in port.get('schema', [])]
+                       == [(c['name'], c['type']) for c in wanted['columns']]
+                       for owner, port in imports), 'SERVER_IMPORT_COUNT_OR_TYPES'
+            self.current['native_server_import'] = 'PASS'
         if spec.get('text_update'):
             check_text_update_ports(replies, destinations, text_update_stages(spec), build / 'resources/loginom/bin/node')
         if spec.get('text_export_encodings'):
             check_text_export_encodings(replies, destinations)
+        if spec.get('text_file_variable'):
+            check_text_file_variable(replies, events, destinations)
+            for index, destination in enumerate(destinations):
+                actual = folder / Path(destination).name
+                shutil.copyfile(downloaded_csv(profile, destination), actual)
+                self.phase('oracle-' + str(index + 1), [sys.executable, '-B', src / 'oracle.py', '--export', '--actual', actual], folder, timeout=60)
+            self.current['file_variable'] = 'PASS'
         sampling_csvs = []
         for index, destination in enumerate(destinations):
             actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
@@ -3151,7 +3303,7 @@ class Runner:
                     if self.options['cold'] and not spec.get('upload_only') and not expected.get('rejection') and not expected.get('refusal') and not expected.get('execution_error') and spec.get('lgd') != 'corrupt':
                         r['cold'] = 'FAIL'
                         cold_expected = stage / 'expected.json'
-                        if spec.get('fs_case') == 'paths':
+                        if spec.get('fs_case') == 'paths' or spec.get('text_file_variable'):
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, {**expected, 'outputs': [expected['outputs'][-1]]})
                         if spec.get('cold_expected_name') or spec.get('grouping_mode') == 'concat':
@@ -3168,6 +3320,8 @@ class Runner:
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
                         if spec.get('variable_audit') == 'variables-union-inputs':
                             self.phase('cold-inputs-audit', [build / 'resources/loginom/bin/node', spec['oracle'], 'cold', stage / 'variable-oracle.stdout', folder / 'cold/result.json'], folder, timeout=60)
+                        if case == 'supernode-vars':
+                            assert cold.get('supernode_variable_boundary') == read(stage / 'supernode-audit.json')['variable_boundary'], 'COLD_SUPERNODE_DEFINITION_IDENTITY'
                         r.update(cold='PASS', cleanup='both PASS')
                         if spec.get('fs_case'):
                             self.fs_files(spec, folder, login, build, 'fs-cold')
