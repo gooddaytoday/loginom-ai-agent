@@ -1,0 +1,65 @@
+{
+ "package_path": "{{PACKAGE_PATH}}",
+ "nodes": [
+  {
+   "type": "imports.text",
+   "label_any": true
+  },
+  {
+   "type": "transform.collapse_columns",
+   "label_any": true
+  },
+  {
+   "type": "trees.from_table",
+   "label_any": true
+  },
+  {
+   "type": "trees.to_table",
+   "label_any": true
+  }
+ ],
+ "outputs": [
+  {
+   "output_node_type": "trees.to_table",
+   "output_port": 0,
+   "export_destination": "tree-table-typed.csv",
+   "ordered": true,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "When",
+     "type": "datetime",
+     "label_any": true
+    },
+    {
+     "name": "Value",
+     "type": "variant",
+     "label_any": true
+    }
+   ],
+   "rows": [
+    {
+     "When": "2026-11-07T12:34:56.789",
+     "Value": {
+      "cell_type": "integer",
+      "value": "9007199254740993"
+     }
+    },
+    {
+     "When": "2026-11-08T00:00:00.001",
+     "Value": {
+      "cell_type": "boolean",
+      "value": false
+     }
+    },
+    {
+     "When": "2026-11-07T12:34:56.789",
+     "Value": {
+      "cell_type": "string",
+      "value": ""
+     }
+    }
+   ]
+  }
+ ]
+}

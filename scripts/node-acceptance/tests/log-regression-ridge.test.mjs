@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
-for(const variant of ['ridge','lasso'])test('logreg-'+variant+' uses the approved task and complete independent 32x8 penalized oracle',()=>{
+for(const variant of ['ridge','lasso','elastic-net'])test('logreg-'+variant+' uses the approved task and complete independent 32x8 penalized oracle',()=>{
  const result=spawnSync('python3',['-B','-c',`import importlib.util
 from pathlib import Path
 p=Path('scripts/node-acceptance/run-check.py')

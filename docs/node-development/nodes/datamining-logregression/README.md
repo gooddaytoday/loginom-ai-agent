@@ -6,11 +6,35 @@
 
 ## Текущий срез v0.4.0
 
-Зарегистрирован `datamining.log_regression` / `enter`, `forward`, `backward`, `stepwise`. Бинарная String-цель, явные event и threshold (p >= threshold); Train текущего входа, порт 0. selection.criterion: deviance/aic/aicc/bic/hqic; Deviance: entry_significance для forward, removal_significance для backward, оба и entry<removal для stepwise; пороги в (0,1). Пропуск selection сохраняет Deviance 0.05/0.1.
+Зарегистрирован `datamining.log_regression`: Enter, Forward/Backward/Stepwise,
+ручные Ridge, LASSO и Elastic Net (`elastic_net`). Бинарная String-цель,
+явные event и threshold (`p >= threshold`), константа, epsilon=1e-10,
+100% обучения. Execute обучает текущий вход и прогнозирует.
+Ручная регуляризация: `regularization.lambda_ridge` для Ridge,
+`regularization.lambda_lasso` для LASSO, оба обязательны для Elastic Net;
+каждый λ — конечное число >0. Автоматические λ и alpha не поддержаны.
+Повторная настройка и обучение — на том же existing-узле.
 
-Ограничения: Apply, веса, чтение коэффициентов/сводки не поддержаны. Enter запрещает selection; информационные критерии запрещают significance-пороги.
+Нормализация факторов none/standardize; пропуск на существующем узле сохраняет её.
+Enter допускает отдельный Real weight_field; Integer Weight не поддержан.
+Порт 0 — полный прогноз и исходные поля, порт 1 — полные коэффициенты.
+Apply — только сохранённая Enter-модель, без Teach и перенастройки.
+Selection: deviance/aic/aicc/bic/hqic; значимости только для Deviance.
+Регуляризация запрещает selection и weight_field. Сводка порта 2,
+управление выборками, валидацией и калибровкой остаются вне этого среза.
 
-Источник: `origin/v040-loginom-sync@94551fa4933ba0e23ab442ff47febaa6142d1c01`; [log-regression-node.mjs](../../../../packages/loginom-runtime/client/lib/log-regression-node.mjs):1–32; [log-regression-parameters.mjs](../../../../packages/loginom-runtime/client/lib/log-regression-parameters.mjs):1–36; [datamining.log_regression.md](../../../../packages/product/skills/loginom-automation/references/nodes/datamining.log_regression.md):1–15. Регистрация не заменяет живую приёмку точного SHA; прежние результаты ниже относятся к своим ревизиям.
+Elastic Net: native-проба LAB-1694 от 16.11.2026 на worker назначенной пары,
+Loginom 7.4.2, до изменения обработчика. Метод выбран по наблюдённой подписи
+`Elastic-net (Регрессия "эластичная сеть")`. Оба setup-контрола —
+«Задать вручную» (0), оба λ=1 доступны для редактирования.
+На исходном train.csv все 32×8 значений и порядок совпали с неизменённым
+`acceptance/modes/elastic-net/expected.json`; max |Δp| = 3.33e-16.
+Save, закрытие пакета и logout подтверждены без discard. Это native-исследование,
+не модельная приёмка нового SHA. Независимый oracle и expected не изменены.
+
+Сценарий `logreg-elastic-net` использует утверждённые task/data и штатные
+CSV/Save/cold/cleanup; численные ожидания модели не передаются.
+Регистрация не заменяет живую приёмку точного SHA.
 
 ## Исторические материалы и план расширений
 

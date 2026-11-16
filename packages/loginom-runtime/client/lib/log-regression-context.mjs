@@ -26,8 +26,9 @@ export function readLogRegressionBrowser(prefix) {
   const base=prefix+';WizrdMCF;'+card;if(!active(base))continue;
   const method=exactValue(prefix+';WizrdMCF;LogRegressionWizard;pedRegressionMethod;ValueControl'),store=method?.getStore?.(),records=store?.getData?.()?.items;
   const method_choices=Array.isArray(records)&&records.length<=1000&&!store.isLoading?.()?records.map(r=>({value:r.data?.[method.valueField],label:r.data?.[method.displayField]})).filter(c=>Number.isInteger(c.value)&&typeof c.label==='string'):[];
-  const lasso=kind==='details'&&method_choices.some(c=>c.value===method.getValue()&&/^LASSO\b/.test(c.label));
-  const ridge=kind==='details'&&method?.getValue()===4;
+  const elastic=kind==='details'&&method_choices.some(c=>c.value===method.getValue()&&/^Elastic-net\b/.test(c.label));
+  const lasso=elastic||kind==='details'&&method_choices.some(c=>c.value===method.getValue()&&/^LASSO\b/.test(c.label));
+  const ridge=elastic||kind==='details'&&method?.getValue()===4;
   if(ridge)names.push('pedRidgeSetupMethod','pedLambdaRidge');
   if(lasso)names.push('pedLassoSetupMethod','pedLambdaLasso');
   const values={},switches={},disabled={};

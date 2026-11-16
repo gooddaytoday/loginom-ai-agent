@@ -154,8 +154,11 @@ export function createExcelImportNodeSupport(config){
     return verified();
    }}:{}),
    async verifySource(p){
-    const storage=p.source.kind==='storage'?await options.resolveStorageSource?.(p.source.server_source_ref):undefined;
-    sourceReceipt=verifyTextImportSource({source:p.source,settings:{source:{source_path:bound?storage?.destination:p.excel.source_path}}},p.source.kind==='storage'?[]:options.verifiedUploads(),p.source.kind==='storage'?undefined:options.uploadHistory?.(),storage);
+    // A list or mask has one verified ref per file, checked like imports.text.
+    const list=p.source.kind==='verified_sources',storage=p.source.kind==='storage'?await options.resolveStorageSource?.(p.source.server_source_ref)
+     :list?await Promise.all(p.source.sources.map(s=>s.kind==='storage'?options.resolveStorageSource?.(s.server_source_ref):undefined)):undefined;
+    const declared=list?(p.excel.source_paths?{source_paths:p.excel.source_paths}:{source_mask:p.excel.source_mask}):{source_path:bound?storage?.destination:p.excel.source_path};
+    sourceReceipt=verifyTextImportSource({source:p.source,settings:{source:declared}},p.source.kind==='storage'?[]:options.verifiedUploads(),p.source.kind==='storage'?undefined:options.uploadHistory?.(),storage);
     if(switching){need(typeof options.verifySourceSwitchSave==='function','Full source switch requires a verified package save');saveReceipt=options.verifySourceSwitchSave(switching.save_operation_id);}
     return sourceReceipt;
    },

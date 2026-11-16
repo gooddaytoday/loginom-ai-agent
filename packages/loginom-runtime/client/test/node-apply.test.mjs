@@ -660,22 +660,24 @@ test('refused date configure proof preserves the original pending boundary',asyn
  await assert.rejects(f.run(p,{resume:true}),/Live package/);assert.deepEqual(f.operation.nodeApply.pending,boundary);assert.equal(f.calls.length,count);
 });
 
-test('verified failed execution settles once without output and refuses unproven failure receipts',async()=>{
+for(const variablePorts of [false,true])test('verified failed execution settles once without output and refuses unproven failure receipts; variable ports='+variablePorts,async()=>{
  const proof={verified:true,cleanup_complete:true,status:'failed',execution_id:'doc:root:1',node:{document_id:'doc',workflow_id:'workflow',node_id:'node1'},
   root_id:'root',group_id:'1',group_record_id:'record',failure_verified:true,output_refreshed:false,error:{code:'NODE_EXECUTION_FAILED',message:'Input file not found'}};
  for(const mutate of [null,p=>p.failure_verified=false,p=>p.cleanup_complete=false,p=>p.node.node_id='foreign',p=>p.root_id='other',p=>p.error.message='',p=>p.output_refreshed=true]){
   const f=fixture(),p=structuredClone(proof);mutate?.(p);
   f.drivers.finish=async()=>({mode:'execute',verified:true,cleanup_complete:true,execution_id:'doc:root:1',execution_started:true});
   f.drivers.waitExecution=async()=>p;
-  const result=await f.run();assert.equal(result.status,mutate?'AMBIGUOUS':'FAILED');assert.ok(!f.calls.includes('read'));
+  const r=request();if(variablePorts)r.read.variable_ports=[0];
+  const result=await f.run(r);assert.equal(result.status,mutate?'AMBIGUOUS':'FAILED');assert.ok(!f.calls.includes('read'));
   if(!mutate){assert.equal(result.execution.status,'failed');assert.equal(result.cleanup_complete,true);assert.equal(result.error.message,proof.error.message);
    assert.equal(result.next_step.tool,'dock_node_apply');assert.match(result.next_step.instruction,/NEW operation_id/);
    assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
-   const calls=f.calls.length;assert.deepEqual(await f.run(),result);assert.equal(f.calls.length,calls);}
+   const calls=f.calls.length;assert.deepEqual(await f.run(r),result);assert.equal(f.calls.length,calls);}
  }
  for(const failure of ['phase','checkpoint']) {
   const f=fixture();f.drivers.finish=async()=>({mode:'execute',verified:true,cleanup_complete:true,execution_id:'doc:root:1'});f.drivers.waitExecution=async()=>proof;
-  const result=await f.run(request(),{record:async e=>{if(failure==='phase'&&e.phase==='node_phase_completed'&&e.receipt.phase==='execute'||failure==='checkpoint'&&e.phase==='node_checkpoint')throw Error('disk unavailable');return structuredClone(e);}});
+  const r=request();if(variablePorts)r.read.variable_ports=[0];
+  const result=await f.run(r,{record:async e=>{if(failure==='phase'&&e.phase==='node_phase_completed'&&e.receipt.phase==='execute'||failure==='checkpoint'&&e.phase==='node_checkpoint')throw Error('disk unavailable');return structuredClone(e);}});
   assert.equal(result.status,'AMBIGUOUS');assert.equal(f.operation.nodeApply.result,undefined);
  }
 });

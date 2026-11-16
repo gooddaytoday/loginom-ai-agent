@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import types
 import tempfile
 import time
 import unittest
@@ -82,6 +83,41 @@ class RunCheckTests(unittest.TestCase):
         self.assertEqual(case['export_count'], 2)
         self.assertEqual(case['prompt'].read_bytes(), (runner.REPO / 'docs/node-development/nodes/text-import/acceptance/task-parallel.md').read_bytes())
         self.assertEqual(runner.expected_for(case, '/own/parallel.lgp', cold=True), runner.expected_for(case, '/own/parallel.lgp'))
+
+    def test_excel_multi_scenarios_use_capabilities_books_and_private_tables(self):
+        multi, parallel = runner.scenario('excel-import-multi'), runner.scenario('excel-import-parallel')
+        for case in [multi, parallel]:
+            self.assertEqual(case['input_files'], ['sales-a.xlsx', 'sales-b.xlsx'])
+            self.assertTrue(all((case['data'] / name).is_file() for name in case['input_files']))
+            self.assertNotIn('expected', case['prompt'].read_text())
+        self.assertEqual((multi['lgd_initial'], multi['expected_name']), ('expected-list.json', 'expected-mask.json'))
+        self.assertNotIn('lgd_initial', parallel)
+        self.assertEqual(parallel['expected_name'], 'expected-parallel.json')
+        self.assertEqual(subprocess.run([sys.executable, '-B', multi['oracle']], capture_output=True).returncode, 0)
+        owner = types.SimpleNamespace(out=Path('/runs/b1'))
+        owner.text_mask_directory = lambda login, case=None: runner.Runner.text_mask_directory(owner, login, case)
+        login = dict(package_directory='/own/')
+        dirs = [runner.Runner.source_dir(owner, case, login) for case in [multi, parallel]]
+        self.assertEqual(dirs, ['/own/b1-excel-import-multi-mask', '/own/b1-excel-import-parallel-mask'])
+        self.assertEqual(runner.Runner.text_mask_directory(owner, login), '/own/b1-mask')
+
+    def test_excel_multi_requires_list_then_native_mask_on_one_node(self):
+        d = '/own/run-mask'
+        reply = lambda n, path, parallel=False, threads=None, node='excel': (n, dict(status='SUCCEEDED', node=dict(node_id=node),
+            configuration=dict(readback=dict(kind='excel_import', source=dict(source_path=path, sheet='Data', parallel_processing=parallel,
+                **({'max_threads': threads} if threads else {})))), output=dict(ports=[dict(port=0, schema=[], sample=[])])))
+        listed, masked = reply(0, d + '/sales-a.xlsx｜' + d + '/sales-b.xlsx'), reply(1, d + '/sales-*.xlsx')
+        runner.check_excel_multi([listed, masked], d)
+        for replies, message in [([masked], 'STAGES_MISSING'), ([reply(0, d + '/sales-b.xlsx｜' + d + '/sales-a.xlsx'), masked], 'LIST_ORDER'),
+                                 ([listed, reply(1, d + '/sales-a.xlsx｜' + d + '/sales-b.xlsx')], 'NATIVE_MASK'),
+                                 ([listed, reply(1, d + '/sales-*.xlsx', True)], 'SEQUENTIAL'), ([listed, reply(1, d + '/sales-*.xlsx', node='new')], 'RECREATED')]:
+            with self.assertRaisesRegex(AssertionError, message):
+                runner.check_excel_multi(replies, d)
+        runner.check_excel_parallel([reply(0, d + '/sales-*.xlsx', True, '2')], d)
+        for replies, message in [([reply(0, d + '/sales-*.xlsx', True, '4')], 'TWO_THREADS'), ([reply(0, d + '/sales-*.xlsx')], 'TWO_THREADS'),
+                                 ([reply(0, d + '/sales-a.xlsx', True, '2')], 'SOURCES'), ([], 'MISSING')]:
+            with self.assertRaisesRegex(AssertionError, message):
+                runner.check_excel_parallel(replies, d)
 
     def test_text_parallel_requires_native_toggle_and_same_node(self):
         replies = [(n, dict(status='SUCCEEDED', node=dict(node_id='import'), configuration=dict(readback=dict(
@@ -411,11 +447,11 @@ class RunCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'INVALID_CSV_HEADER'):
             self.csv_result(dict(output, header='false'), '1,1\n2,3\n')
 
-    def refusal_run(self, root, variant=None):
+    def refusal_run(self, root, variant=None, *, expected_text=None, answer=None):
         case = root / 'cases/safe-refusal'
         (case / 'data').mkdir(parents=True)
         (case / 'task.md').write_text('Обработай недоступный тип данных.')
-        expected = dict(nodes=[], outputs=[], refusal=dict(text='Не могу: этот тип данных не поддерживается.'))
+        expected = dict(nodes=[], outputs=[], refusal=dict(text=expected_text or 'Не могу: этот тип данных не поддерживается.'))
         if variant == 'import node': expected['nodes'] = [dict(type='imports.text')]
         if variant == 'invalid oracle': expected['refusal']['text'] = ' '
         if variant == 'conflicting oracle': expected['rejection'] = dict(code='LOGINOM_FILE_CHANGED', node_type='transform.group_data')
@@ -462,7 +498,7 @@ class RunCheckTests(unittest.TestCase):
             if variant == 'csv': (profile / 'unexpected.csv').write_text('result\n1\n')
             if variant != 'answer':
                 events.append(dict(type='text', sessionID='session', part=dict(text=(
-                    'Готово.' if variant == 'explanation' else 'Не могу: этот тип данных не поддерживается.'))))
+                    'Готово.' if variant == 'explanation' else answer or 'Не могу: этот тип данных не поддерживается.'))))
             (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)))
             runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=variant != 'cleanup', logged_out=True))
             if variant != 'ack': runner.write(profile / 'runtime-close-test.json', dict(closed_ack=True))
@@ -483,6 +519,25 @@ class RunCheckTests(unittest.TestCase):
             self.assertIn('expected refusal', result['cold'])
             self.assertNotIn('Выгрузи', (folder / 'task.md').read_text())
             self.assertNotIn('не поддерживается', (folder / 'task.md').read_text())
+
+    def test_seasonal_refusal_accepts_observed_input_reason_with_either_initial_case(self):
+        node = runner.REPO / 'docs/node-development/nodes/transform-ungroupdata/acceptance'
+        for kind in ['support', 'totals']:
+            expected = runner.read(node / ('expected-seasonal-empty-' + kind + '.json'))['refusal']['text']
+            for reason in ['пустой вход', 'Пустой вход']:
+                with self.subTest(kind=kind, reason=reason), tempfile.TemporaryDirectory() as directory:
+                    result, _, _ = self.refusal_run(Path(directory), expected_text=expected,
+                                                   answer=reason + ': seasonal-empty-' + kind + '.csv')
+                    self.assertEqual(result['status'], 'PASS', result)
+
+    def test_seasonal_refusal_rejects_input_read_error_without_empty_reason(self):
+        for kind in ['support', 'totals']:
+            expected = runner.expected_for(runner.scenario('ungroup-seasonal-empty-' + kind), '/test/refusal.lgp')
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                result, _, _ = self.refusal_run(Path(directory), expected_text=expected['refusal']['text'],
+                                               answer='входной файл не прочитан')
+                self.assertEqual(result['status'], 'FAIL', result)
+                self.assertEqual(result['failure_class'], 'REFUSAL_NOT_REPORTED', result)
 
     def test_private_refusal_allows_only_declared_input_imports(self):
         with tempfile.TemporaryDirectory() as directory:
