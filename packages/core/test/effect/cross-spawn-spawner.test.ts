@@ -40,6 +40,16 @@ function alive(pid: number) {
   }
 }
 
+function killIfPresent(pid: number) {
+  if (!pid) return
+  try {
+    process.kill(pid, "SIGKILL")
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ESRCH") return
+    throw error
+  }
+}
+
 async function tmpdir() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-core-test-"))
   return {
@@ -250,7 +260,7 @@ describe("cross-spawn spawner", () => {
             Effect.sync(() => ({ pid: 0 })),
             (child) =>
               Effect.sync(() => {
-                if (child.pid && alive(child.pid)) process.kill(child.pid, "SIGKILL")
+                killIfPresent(child.pid)
               }),
           )
           const detached = scenario.includes("detached")
@@ -322,7 +332,7 @@ describe("cross-spawn spawner", () => {
           Effect.sync(() => ({ pid: 0 })),
           (child) =>
             Effect.sync(() => {
-              if (child.pid && alive(child.pid)) process.kill(child.pid, "SIGKILL")
+              killIfPresent(child.pid)
             }),
         )
         const released = yield* Effect.scoped(
