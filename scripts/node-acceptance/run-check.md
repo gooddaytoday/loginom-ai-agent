@@ -1277,3 +1277,10 @@ and Calculator, converter table → Calculator → OutputNode, and retained inte
 definition IDs/values and input-port GUID across Save/cold. Only task reaches
 the model; no Loop or XML oracle is involved. Cold uses owned port inspection
 with Close, then stock execution/export checks and confirmed package/logout cleanup.
+
+`logreg-partition-sequential`: утверждённый `modes/partition-sequential/task-partition-sequential.md`
+и только partition.csv. Enter, первые 50% train / следующие 50% test, без валидации.
+Независимый неизменённый modes/oracle.py проверяет прогноз 64×10, типы,
+порядок и NULL; Split/Fold не факторы. Сводка порта 2 в expected не входит;
+размеры выборок доступны в configuration.partition. CSV/Save/cold без Teach
+и cleanup штатные. Только task и CSV получает модель; oracle/expected приватны.

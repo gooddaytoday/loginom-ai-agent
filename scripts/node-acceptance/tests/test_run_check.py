@@ -2052,6 +2052,15 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_logreg_partition_sequential_catalog_keeps_frozen_oracle_private(self):
+        case = runner.scenario('logreg-partition-sequential')
+        self.assertEqual(case['prompt'].name, 'task-partition-sequential.md')
+        self.assertEqual(case['input_files'], ['partition.csv'])
+        self.assertEqual(case['expected_name'], 'expected.json')
+        self.assertEqual(case['oracle'].name, 'oracle.py')
+        self.assertEqual(case['source'].name, 'partition-sequential')
+        self.assertEqual(runner.scenario('logreg-coefficients')['input_files'], ['train.csv'])
+
     def test_logreg_enter_uses_authored_task_input_and_preserves_n21(self):
         self.assertEqual(runner.scenario('n21')['source'].parent.name, 'transform-slidingwindow')
         case = runner.scenario('logreg-enter')

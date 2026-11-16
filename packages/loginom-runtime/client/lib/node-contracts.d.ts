@@ -444,7 +444,7 @@ export interface LogRegressionConfigurationReadback {
  kind:'log_regression'; scope:'observed_before_verified_finish'; values_are:'observed_ui_values';
  node:NodeRef; receipt_ids:string[]; mode:'enter'|'forward'|'backward'|'stepwise'|'apply'|'ridge'|'lasso'|'elastic_net'; regularization?:{lambda_ridge:number}|{lambda_lasso:number}|{lambda_lasso:number;lambda_ridge:number}; selection?:{criterion:'deviance'|'aic'|'aicc'|'bic'|'hqic';entry_significance?:number;removal_significance?:number}; input_fields:string[]; target_field:string;
  classes:Array<{index:number;label:string}>; event:string; threshold:number; intercept:true; epsilon:1e-10;
- normalization:'none'; train_percent:100; validation:'none'; calibration:'train';
+ normalization:'none'|'standardize'; train_percent:number; partition?:{method:'sequential';train_percent:number;test_percent:number;train_count?:number;test_count?:number;total_count?:number}; validation:'none'; calibration:'train';
  training:ClusteringConfigurationReadback['training']; package_persistence_verified:false;
 }
 

@@ -9,7 +9,7 @@
 Зарегистрирован `datamining.log_regression`: Enter, Forward/Backward/Stepwise,
 ручные Ridge, LASSO и Elastic Net (`elastic_net`). Бинарная String-цель,
 явные event и threshold (`p >= threshold`), константа, epsilon=1e-10,
-100% обучения. Execute обучает текущий вход и прогнозирует.
+100% обучения по умолчанию. Execute обучает текущий вход и прогнозирует.
 Ручная регуляризация: `regularization.lambda_ridge` для Ridge,
 `regularization.lambda_lasso` для LASSO, оба обязательны для Elastic Net;
 каждый λ — конечное число >0. Автоматические λ и alpha не поддержаны.
@@ -21,7 +21,7 @@ Enter допускает отдельный Real weight_field; Integer Weight н
 Apply — только сохранённая Enter-модель, без Teach и перенастройки.
 Selection: deviance/aic/aicc/bic/hqic; значимости только для Deviance.
 Регуляризация запрещает selection и weight_field. Сводка порта 2,
-управление выборками, валидацией и калибровкой остаются вне этого среза.
+валидация и калибровка остаются вне этого среза.
 
 Elastic Net: native-проба LAB-1694 от 16.11.2026 на worker назначенной пары,
 Loginom 7.4.2, до изменения обработчика. Метод выбран по наблюдённой подписи
@@ -35,6 +35,23 @@ Save, закрытие пакета и logout подтверждены без di
 Сценарий `logreg-elastic-net` использует утверждённые task/data и штатные
 CSV/Save/cold/cleanup; численные ожидания модели не передаются.
 Регистрация не заменяет живую приёмку точного SHA.
+
+Последовательное разбиение Enter: `logistic.partition` с `method:"sequential"`,
+`train_percent` и `test_percent` >0, сумма 100. Первые строки — train,
+следующие — test; прогноз для всего входа. Пропуск partition сохраняет
+прежний контракт 100% обучения. Apply сверяет прежний partition без Teach.
+Readback содержит доли и наблюдённые числа строк, порт 2 не читается.
+
+Native-проба LAB-1744, mas3, 16.11.2026, собственный worker, Loginom 7.4.2:
+`LearnPartitionWizard;pedSamplingMethod;ValueControl` = 1 («Последовательный»),
+обе процентные ячейки = 50, абсолютные = 32, всего = 64; порядок
+Обучающее → Тестовое → Неиспользуемое, валидация = 0.
+Порт 0: все 64×10 ячеек совпали с неизменённым expected, max |Δp|=2.371e-10.
+Порт 2: наблюдены TotalSamples=64, TrainSamples=32, TestSamples=32;
+сводка остаётся вне публичного обработчика и табличного expected.
+Save и close/logout без discard подтверждены. Сценарий
+`logreg-partition-sequential`: исходные task/data, штатные CSV/Save/cold/cleanup,
+oracle и численные ожидания модели не передаются.
 
 ## Исторические материалы и план расширений
 

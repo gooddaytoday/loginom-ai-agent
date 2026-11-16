@@ -742,11 +742,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['weighted.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
-    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net']:
+    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net', 'logreg-partition-sequential']:
         variant = name.removeprefix('logreg-')
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes' / variant
         return dict(source=src, prompt=src / ('task-' + variant + '.md'), data=src / 'data', base=None,
-                    input_files=['train.csv'], expected_name='expected.json',
+                    input_files=['partition.csv' if variant == 'partition-sequential' else 'train.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
     if name == 'logreg-normalization':

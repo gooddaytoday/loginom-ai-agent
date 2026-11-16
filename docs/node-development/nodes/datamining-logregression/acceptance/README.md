@@ -64,3 +64,13 @@ runner уже принимает task.md/expected.json/oracle.py/data через
 W4, новые общие валидаторы и механизмы проверки не предлагаются.
 `schema-size.mjs`: production full inputSchema 45 891 → 46 677 Б,
 приращение 786 Б; лимит на тип ≤1 050 Б соблюдён, запас общего лимита даёт F2.
+
+## v0.4.0: последовательное разбиение
+
+`logreg-partition-sequential` зарегистрирован по назначению LAB-1744:
+неизменённые `modes/partition-sequential/task-partition-sequential.md`,
+`data/partition.csv` и `expected.json`, проверка `modes/oracle.py --check`.
+Enter, первые 32 из 64 строк обучают, следующие 32 тестовые; все 64×10
+табличных ячеек, порядок, типы и NULL проверяются штатно. Сводка порта 2
+не входит в expected. CSV, Save, cold без Teach и cleanup обязательны;
+модель получает только задачу и CSV. Native-подтверждение — в README узла.
