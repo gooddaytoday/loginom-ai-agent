@@ -11,17 +11,10 @@ if (action === "settings") {
   assert(/^[1-9][0-9]{0,4}$/.test(settings.DASHBOARD_APP_HOST_PORT) && Number(settings.DASHBOARD_APP_HOST_PORT) <= 65535)
   assert(["normal", "strict"].includes(settings.DASHBOARD_MODE))
   assert(["0", "1"].includes(settings.DASHBOARD_CLI_BUTTON))
-  const hosts = [...new Set(settings.DASHBOARD_CLIENT_ORIGINS.split(",").map(value => {
-    const url = new URL(value)
-    assert.equal(url.origin, value)
-    assert(["http:", "https:"].includes(url.protocol))
-    assert(/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(url.hostname))
-    return url.hostname
-  }))]
-  const app = new URL(settings.DASHBOARD_APP_ORIGIN)
-  assert.equal(app.origin, settings.DASHBOARD_APP_ORIGIN)
+  const hosts = [...new Set(settings.DASHBOARD_CLIENT_ORIGINS.split(",").map(originHost))]
+  const app = originHost(settings.DASHBOARD_APP_ORIGIN)
   console.log([settings.DASHBOARD_APP_HOST_PORT, settings.DASHBOARD_MODE, settings.DASHBOARD_CLI_BUTTON,
-    settings.DASHBOARD_MODE === "strict" ? app.hostname : "", ...hosts].join("\n"))
+    settings.DASHBOARD_MODE === "strict" ? app : "", ...hosts].join("\n"))
 } else if (action === "discovery") {
   const settings = Object.fromEntries(input().trim().split("\n").map(line => line.split("=")))
   for (const [index, name] of ["CLIENT_ORIGINS", "TLS_UPSTREAM", "USERSTORAGE", "NETWORK", "PUBLISHER_USER"].entries())
@@ -72,11 +65,7 @@ if (action === "settings") {
     if (args[0] === "strict") console.log(paths.join("\n"))
   }
 } else if (action === "config") {
-  for (const value of [args[0], ...args[1].split(",")]) {
-    const url = new URL(value)
-    assert.equal(url.origin, value)
-    assert(["http:", "https:"].includes(url.protocol))
-  }
+  for (const value of [args[0], ...args[1].split(",")]) originHost(value)
   assert(args[2].startsWith("/") && !/[\r\n]/.test(args[2]))
 } else if (action === "publication") {
   console.log(JSON.stringify({ format: 1, template: 1, binding: binding(), title: "Release check", parameters: [], files: [
@@ -198,3 +187,10 @@ if (action === "settings") {
     }
   }
 } else throw Error("Unknown check operation")
+
+function originHost(value) {
+  const match = value.match(/^https?:\/\/([a-zA-Z0-9][a-zA-Z0-9.-]*)(?::[0-9]+)?$/)
+  assert(match, "Invalid public origin")
+  assert.equal(new URL(value).origin, value.toLowerCase())
+  return match[1]
+}

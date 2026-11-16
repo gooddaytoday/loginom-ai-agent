@@ -168,3 +168,25 @@ test("Apache reuse requires its PID1 sockets and only the managed 8444 virtual h
     observation.replace("*:8444 apps.example", "*:8444 is a NameVirtualHost\n default server foreign (/other.conf:1)\n port 8444 namevhost apps.example")])
     assert.equal(check("apache", invalid).status, 1)
 })
+
+test("repeat settings retain uppercase public hosts and their order through discovery and config", () => {
+  const clients = "http://Studio.Example:8080,https://Studio.Example:8443,http://Second.Example:8080"
+  const saved = `DASHBOARD_APP_HOST_PORT=8101\nDASHBOARD_MODE=normal\nDASHBOARD_CLI_BUTTON=0\nDASHBOARD_APP_ORIGIN=https://Studio.Example:8101\nDASHBOARD_CLIENT_ORIGINS=${clients}\nDASHBOARD_TLS_UPSTREAM=studio:8444\nDASHBOARD_USERSTORAGE=/synthetic/storage\nDASHBOARD_NETWORK=synthetic-network\nDASHBOARD_PUBLISHER_USER=1234:1234\n`
+  const result = check("settings", saved)
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout, "8101\nnormal\n0\n\nStudio.Example\nSecond.Example\n")
+  assert.equal(check("discovery", saved, clients, "studio:8444", "/synthetic/storage", "synthetic-network", "1234:1234").status, 0)
+  const config = check("config", "", "https://Studio.Example:8101", clients, "/synthetic/storage")
+  assert.equal(config.status, 0, config.stderr)
+})
+
+test("repeat strict settings preserve uppercase administrator domain", () => {
+  const origin = "https://Apps.Example:9443"
+  const clients = "https://studio.example:8443"
+  const saved = `DASHBOARD_APP_HOST_PORT=9443\nDASHBOARD_MODE=strict\nDASHBOARD_CLI_BUTTON=1\nDASHBOARD_APP_ORIGIN=${origin}\nDASHBOARD_CLIENT_ORIGINS=${clients}\n`
+  const result = check("settings", saved)
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout, "9443\nstrict\n1\nApps.Example\nstudio.example\n")
+  const config = check("config", "", origin, clients, "/synthetic/storage")
+  assert.equal(config.status, 0, config.stderr)
+})
