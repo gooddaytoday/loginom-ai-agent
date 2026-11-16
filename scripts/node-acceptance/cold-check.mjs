@@ -278,6 +278,23 @@ page = context.pages()[0]
    if(JSON.stringify(links)!==JSON.stringify(after))throw Error('COLD_VARIABLE_LINK_CHANGED');
    state.variableInventory={outputs,links};
   }
+  // A bound text filename resolves through its saved variable source. Execute
+  // that source (a builtin is a snapshot) before reading the export, unchanged.
+  if(expected.text_binding){
+   const links=(graph.variable_links??[]).filter(l=>l.kind==='variables'&&l.input===0&&graph.nodes.some(n=>n.ref.node_id===l.target&&n.type==='exports.text'));
+   const sources=links.length===1?graph.nodes.filter(n=>n.ref.node_id===(links[0].source?.node_id??links[0].source)):[];
+   if(sources.length!==1)throw Error('TEXT_COLD_VARIABLE_SOURCE');
+   if(sources[0].type!=='variables.user'){
+    const node=sources[0].ref;
+    const operation={id:'cold-text-binding-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_variables',revision:'1'},deadline:Date.now()+540000};
+    const channel=createNodeProcedure({operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
+     preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
+    const driver=createNodeExecutionProcedure(channel,node,{allowDeactivate:true});
+    const execution=await runColdExecution({driver,channel,node,operation,record,readReceipt:async r=>(await execute(withBrowserReceipt('null',{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.operation_id,receipt_read:true}))).output});
+    if(execution.status!=='completed'||execution.verified!==true||execution.owner_verified!==true)throw Error('TEXT_COLD_VARIABLE_SOURCE_EXECUTION');
+    await record({phase:'cold_text_binding_source',node,execution,settings_applied:false});
+   }
+  }
   // A bound LGD destination needs the saved variable source's fresh value.
   if(expected.binding_inventory)state.bindingInventory=await (expected.binding_inventory.every(b=>['imports.text','imports.excel'].includes(b.node.type))?observeImportBindingInventory:observeFilterBindingInventory)({load,graph,channelFor,expected,record});
   // The existing inventory audit executes/reads it without changing settings.
