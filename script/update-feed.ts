@@ -331,6 +331,41 @@ export async function mirrorRelease(
   return names
 }
 
+export async function mirrorStatus(
+  store: Store,
+  dir: string,
+  version: string,
+  target: string,
+  keys: readonly string[] = UPDATE_PUBLIC_KEYS,
+) {
+  channel(target)
+  const { sums, names } = await verifySignedRelease(dir, version, keys)
+  for (const name of names)
+    for (const suffix of ["", ".sig"]) {
+      const path = `${target}/${name}${suffix}`
+      if (
+        !(await store.head(path)) ||
+        !Buffer.from(await store.get(path)).equals(Buffer.from(await Bun.file(join(dir, name + suffix)).bytes()))
+      )
+        throw Error(`Mirror metadata differs: ${path}`)
+      if ((await store.head(path))?.cache !== "no-cache") throw Error(`Invalid metadata cache policy: ${path}`)
+    }
+  for (const [name, expected] of [
+    ...sums,
+    ["SHA256SUMS.txt", await digest(join(dir, "SHA256SUMS.txt"), "sha256", "hex")] as const,
+  ]) {
+    const path = `releases/${version}/${name}`
+    const info = await store.head(path)
+    if (!info) throw Error(`Missing ${path}`)
+    if (info.cache !== immutable) throw Error(`Invalid immutable cache policy: ${path}`)
+    const actual = store.sha256
+      ? await store.sha256(path)
+      : new Bun.CryptoHasher("sha256").update(await store.get(path)).digest("hex")
+    if (actual !== expected) throw Error(`Mirror SHA256 mismatch: ${path}`)
+  }
+  return { status: "PASS", channel: target, version, metadata: names, assets: sums.size }
+}
+
 export async function verifyPublicRelease(
   dir: string,
   version: string,
@@ -740,7 +775,7 @@ async function main() {
   })
   if (values.help) {
     console.log(
-      "update-feed.ts sign-release --assets <directory> --version X.Y.Z [--min-supported X.Y.Z] [--key <file> or LOGINOM_UPDATES_SIGNING_KEY]\nmirror-release --assets <directory> --version X.Y.Z --channel stable|unstable [--allow-rollback]\nverify-public --assets <directory> --version X.Y.Z --channel stable|unstable --github-base HTTPS_URL\nLegacy (requires --legacy): publish --channel unstable --version X.Y.Z --from-release vX.Y.Z --key <file> [--staging 100] [--min-supported X.Y.Z]\npromote --to stable --version X.Y.Z --key <file> [--staging N]\nstage --channel stable|unstable --percent N --key <file>\nstatus --channel stable|unstable\nCommon: --feed-base HTTPS_URL (or LOGINOM_AI_AGENT_UPDATE_FEED), --config <S3 credentials file>, --public-key <test PEM> (repeatable). publish: --assets <checked local release directory> instead of --from-release.",
+      "update-feed.ts sign-release --assets <directory> --version X.Y.Z [--min-supported X.Y.Z] [--key <file> or LOGINOM_UPDATES_SIGNING_KEY]\nmirror-release --assets <directory> --version X.Y.Z --channel stable|unstable [--allow-rollback]\nstatus --assets <directory> --version X.Y.Z --channel stable|unstable (read-only mirror verification)\nverify-public --assets <directory> --version X.Y.Z --channel stable|unstable --github-base HTTPS_URL\nLegacy (requires --legacy): publish --channel unstable --version X.Y.Z --from-release vX.Y.Z --key <file> [--staging 100] [--min-supported X.Y.Z]\npromote --to stable --version X.Y.Z --key <file> [--staging N]\nstage --channel stable|unstable --percent N --key <file>\nstatus --channel stable|unstable\nCommon: --feed-base HTTPS_URL (or LOGINOM_AI_AGENT_UPDATE_FEED), --config <S3 credentials file>, --public-key <test PEM> (repeatable). publish: --assets <checked local release directory> instead of --from-release.",
     )
     return
   }
@@ -771,7 +806,7 @@ async function main() {
     console.log("Update feeds: " + (enabled ? "enabled" : "disabled explicitly or for an unverified candidate"))
     return
   }
-  if (["sign-release", "mirror-release", "verify-public"].includes(command)) {
+  if (["sign-release", "mirror-release", "verify-public", "status"].includes(command) && !values.legacy) {
     if (positionals.length !== 1 || !values.assets || !values.version) throw Error("Required --assets and --version")
     const keys = values["public-key"]
       ? await Promise.all(values["public-key"].map((file) => Bun.file(resolve(file)).text()))
@@ -800,6 +835,14 @@ async function main() {
     const base = storageBase.href
     if (!base) throw Error("Missing feed base")
     const target = channel(values.channel ?? "")
+    if (command === "status") {
+      console.log(
+        JSON.stringify(
+          await mirrorStatus(await s3Store(values.config, base), resolve(values.assets), values.version, target, keys),
+        ),
+      )
+      return
+    }
     if (command === "verify-public") {
       if (!values["github-base"]) throw Error("Missing --github-base")
       await verifyPublicRelease(resolve(values.assets), values.version, values["github-base"], base, target, keys, {

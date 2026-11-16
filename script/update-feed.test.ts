@@ -10,6 +10,7 @@ import {
   validateVersion,
   signRelease,
   mirrorRelease,
+  mirrorStatus,
   verifySignedRelease,
   verifyPublicRelease,
   s3Store,
@@ -553,6 +554,38 @@ async function signedFixture() {
   await releaseSums(dir)
   return dir
 }
+
+test("mirror status verifies the signed releases tree without GitHub or legacy CLI metadata and never writes", async () => {
+  const dir = await signedFixture()
+  const m = memory()
+  try {
+    await signRelease(dir, "0.4.0", "0.3.9", key, [publicKey])
+    await releaseSums(dir)
+    await mirrorRelease(m.store, dir, "0.4.0", "unstable", [publicKey])
+    const writes = m.events.length
+    expect(await mirrorStatus(m.store, dir, "0.4.0", "unstable", [publicKey])).toMatchObject({
+      status: "PASS",
+      channel: "unstable",
+      version: "0.4.0",
+    })
+    const pointer = m.files.get("unstable/latest.yml.sig")!
+    m.files.set("unstable/latest.yml.sig", { ...pointer, bytes: new TextEncoder().encode("invalid") })
+    await expect(mirrorStatus(m.store, dir, "0.4.0", "unstable", [publicKey])).rejects.toThrow("metadata")
+    m.files.set("unstable/latest.yml.sig", pointer)
+    const name = "releases/0.4.0/loginom-ai-agent-desktop.exe"
+    const payload = m.files.get(name)!
+    m.files.set(name, { ...payload, bytes: new Uint8Array(payload.bytes.length) })
+    await expect(mirrorStatus(m.store, dir, "0.4.0", "unstable", [publicKey])).rejects.toThrow("SHA256")
+    m.files.set(name, payload)
+    m.files.delete(name)
+    await expect(mirrorStatus(m.store, dir, "0.4.0", "unstable", [publicKey])).rejects.toThrow("Missing")
+    m.files.set(name, { ...payload, cache: "no-cache" })
+    await expect(mirrorStatus(m.store, dir, "0.4.0", "unstable", [publicKey])).rejects.toThrow("cache")
+    expect(m.events).toHaveLength(writes)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 
 test("dual release signs GitHub bytes, mirrors immutable assets and conditionally PUTs both channel pointers", async () => {
   const dir = await signedFixture()
