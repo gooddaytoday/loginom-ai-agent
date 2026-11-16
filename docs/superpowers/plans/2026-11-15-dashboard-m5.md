@@ -167,7 +167,7 @@ M4 окончательно принят: [checkpoint M4](../../testing/loginom-
 
 ### Task 5: Обновление и итоговая установленная приёмка
 
-**Срез Task 5a:** source/CI/dev build-context PASS, browser 245/245 с concurrency 2; необходимый selfcheck shutdown fix проверен. Независимый scoped review этого среза ещё впереди; установленная приёмка, точный release-архив и остальные пункты Task 5 открыты. Подробности и идентичности — [runbook M5](../../testing/loginom-ai-agent/dashboard-m5.md#task-5a--source-ci-и-dev-build-context).
+**Срез Task 5a:** source/CI/dev build-context PASS, browser 246/246 с concurrency 2; fix round 1 сохраняет один ожидаемый selfcheck close outcome и проверяет обе фазы отмены. Scoped re-review замечания P2 ещё впереди; установленная приёмка, точный release-архив и остальные пункты Task 5 открыты. Подробности и идентичности — [runbook M5](../../testing/loginom-ai-agent/dashboard-m5.md#task-5a--source-ci-и-dev-build-context).
 
 **Files:** runbook/checkpoint/README, owning AGENTS.md, roadmap; `.github/workflows/test.yml`, package scripts/tests — только необходимые итоговые подключения.
 

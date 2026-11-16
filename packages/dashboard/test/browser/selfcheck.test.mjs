@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process"
 import { cp, mkdtemp, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { createServer } from "node:http"
 import test from "node:test"
 import { setTimeout } from "node:timers/promises"
 import { selfCheck } from "../../src/agent/check.ts"
@@ -94,6 +95,34 @@ test("cancelling a check closes its Chromium before removing the profile", async
   const { url } = await fixture(t, "silent")
   const controller = new AbortController()
   const pending = selfCheck({ resources, url, signal: controller.signal })
+  const running = await runningCheck()
+  controller.abort()
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.state, "failed")
+  assert.equal(spawnSync("pgrep", ["-f", running.directory]).status, 1)
+  await assert.rejects(stat(running.directory), { code: "ENOENT" })
+})
+
+test("cancelling after a page request closes Chromium before removing the profile", async t => {
+  if (process.platform !== "linux") return t.skip("Process ownership checks use /proc")
+  const requested = Promise.withResolvers()
+  const server = createServer((_request, response) => {
+    response.end("<!doctype html><html><body>silent</body></html>")
+    requested.resolve()
+  })
+  t.after(() => {
+    server.closeAllConnections()
+    return new Promise(resolve => server.close(resolve))
+  })
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve))
+  const controller = new AbortController()
+  const pending = selfCheck({ resources, url: `http://127.0.0.1:${server.address().port}/`, signal: controller.signal })
+  t.after(() => {
+    controller.abort()
+    return pending
+  })
+  await Promise.race([requested.promise, pending.then(() => assert.fail("The self-check must request the page before cancellation"))])
   const running = await runningCheck()
   controller.abort()
   const result = await pending

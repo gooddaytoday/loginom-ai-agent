@@ -16,5 +16,5 @@
 - Итоговый независимый scoped gate Task 4 пройден: Spec ✅ / Quality Approved, mandatory 0 (`task-4-resume-review.md`). Полный M5 и whole-branch review ещё впереди.
 - Git переносит исходники и инструкции; архивы, VM, CA/SSH keys, credentials, лицензии и raw evidence остаются приватными. Перечень повторно получаемых входов — в runbook.
 - Прежние стенды/диски сохранены; primary VM остановлена для RAM. Новому компьютеру нужны собственные тестовые среды и действующее лицензирование.
-- Task 5a от `d154a5fd83`: CI/source/browser 245/245 и dev-context PASS; fix selfcheck shutdown, browser concurrency 2. Scoped review, update/change, installed Desktop/CLI/CA и итог Task 5 открыты.
+- Task 5a от `d154a5fd83`: CI/source/browser 246/246 и dev-context PASS; shared selfcheck close, regression обеих фаз отмены, concurrency 2. Scoped re-review, update/change, installed Desktop/CLI/CA и итог Task 5 открыты.
 - Текущий документационный срез — commit без push; PR/merge/tag/release требуют отдельной команды.

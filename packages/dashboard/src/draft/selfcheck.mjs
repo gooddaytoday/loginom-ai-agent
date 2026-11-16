@@ -6,9 +6,10 @@ const { chromium } = await import(pathToFileURL(join(playwright, "index.mjs")).h
 // A stop during launch must wait until the browser can close its helpers cleanly.
 let stopped = false
 let browser
-process.on("SIGTERM", async () => {
+let closing
+process.on("SIGTERM", () => {
   stopped = true
-  await browser?.close()
+  if (browser) close()
 })
 // Model-written code runs in a fresh profile with the Chromium sandbox enabled.
 browser = await chromium.launch({ executablePath, headless: true, chromiumSandbox: true, handleSIGTERM: false, timeout: 30_000, args: ["--no-proxy-server"] })
@@ -30,5 +31,13 @@ try {
   await page.waitForTimeout(500)
   process.stdout.write(JSON.stringify({ ok: state === "ready" && errors.length === 0, state, errors }) + "\n")
 } finally {
-  await browser.close()
+  await close()
+}
+
+function close() {
+  if (closing) return closing
+  closing = browser.close()
+  // Observe signal-handler failures immediately; finally awaits the same outcome.
+  void closing.catch(() => {})
+  return closing
 }
