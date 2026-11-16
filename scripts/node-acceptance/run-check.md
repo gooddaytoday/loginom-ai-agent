@@ -1260,3 +1260,13 @@ keeps RequestID=0 per iteration and the exact 98-byte httpbin response including
 its final LF. Both require full typed reads, CSV, Save, cold execution without
 configuration and confirmed cleanup. Only task and CSV reach the model; oracle
 and expected remain private. Regression: supernode-calc and rest-get-plain once.
+
+
+`supernode-vars` uses control-supernode/acceptance/variables/task.md without input
+files. Its independent oracle checks the original Page=99, Limit=2 body: Skip=198,
+exact integer Skip/Page/Limit order, full typed output and downloaded CSV.
+The existing Supernode audit requires InputNode variable links to both converter
+and Calculator, converter table → Calculator → OutputNode, and retained integer
+definition IDs/values and input-port GUID across Save/cold. Only task reaches
+the model; no Loop or XML oracle is involved. Cold uses owned port inspection
+with Close, then stock execution/export checks and confirmed package/logout cleanup.
