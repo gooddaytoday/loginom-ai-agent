@@ -1844,7 +1844,7 @@ test('calculator Preview rejects a native formula error before Next or Done',asy
 });
 
 test('calculator Preview accepts only its native modal and closes with an observed ref',async()=>{
- for(const fault of ['none','console_error','foreign_form','foreign_owner','loading','incomplete']) {
+ for(const fault of ['none','heavy','console_error','foreign_form','foreign_owner','loading','incomplete']) {
   const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard';c.marker.id='calc-page';
   page.add('button',c.base+';CalcDataWizard;btnAddExpr','',undefined,c.marker);
   page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.marker);
@@ -1859,7 +1859,14 @@ test('calculator Preview accepts only its native modal and closes with an observ
    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
    async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
   const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview'));
-  let popup;const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
+  let popup;const evaluate=page.evaluate.bind(page);
+  page.evaluate=async(fn,args)=>{
+   if(fault==='heavy'&&popup&&args&&Object.hasOwn(args,'discoverRoots')&&!args.discoverRoots
+    &&args.rootRef!==page.context[Symbol.for('loginom-dock.workspace-ui.identity.v1')]?.ids.get(popup))
+    return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:'time',scan_stage:'controls'}};
+   return evaluate(fn,args);
+  };
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
    if(popup){popup.remove();return;}
    popup=page.add('div',c.base+';CalcPreviewForm','',{x:100,y:100,width:600,height:400});popup.id='preview';popup.attrs.class='x-window';
    page.add('div',c.base+';CalcPreviewForm;p.h;close','',{x:650,y:110,width:30,height:30},popup).attrs.class='x-tool';
@@ -1872,13 +1879,13 @@ test('calculator Preview accepts only its native modal and closes with an observ
   };
   page.waitForTimeout=async ms=>page.clock.advance(ms);
   const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
-  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(result.status,['none','heavy'].includes(fault)?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
   if(fault==='console_error') {
    assert.equal(result.error.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
    assert.equal(result.output.wizard.calculator_validation.source,'loginom_calculator_preview_console');
   }
-  if(fault!=='none')continue;
+  if(!['none','heavy'].includes(fault))continue;
   const close=result.output.ui.elements.find(e=>e.tid.endsWith(';CalcPreviewForm;p.h;close'));
   const closed=await execute({mode:'act',snapshot:result.output,action:{verb:'click',ref:close.ref}});
   assert.equal(closed.status,'SUCCEEDED',JSON.stringify(closed.error));

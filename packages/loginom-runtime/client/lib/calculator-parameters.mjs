@@ -58,7 +58,7 @@ export function validateCalculatorParameters(parameters,mode,request) {
 
 // Resolve a patch against observed identities, preserving every unrequested
 // property and expression. This plans only one calculator, never a scenario.
-export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=false}={}) {
+export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=false,removeDefault=false}={}) {
   requireValue(observed?.verified===true&&observed.inventory_complete===true&&observed.mode==='expression','Complete observed calculator required');
   requireValue(Array.isArray(inputFields)&&new Set(inputFields.map(f=>f.name.toLowerCase())).size===inputFields.length,'Unique observed input field names required');
   let baseline=structuredClone(observed.expressions);
@@ -73,13 +73,13 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
     const existing=patch.target.kind==='existing';
     const matches=existing?original.filter(e=>e.name===patch.target.name):[];
     requireValue(!existing||matches.length===1,'Existing expression name is missing or ambiguous');
-    const before=existing?matches[0]:newNode&&index===0?baseline[0]:null;
+    const before=existing?matches[0]:newNode&&index===0&&(!removeDefault||patch.name==='Expr1')?baseline[0]:null;
     const after=before?structuredClone(before):{intermediate:false,cached:false,description:'',replace:false};
     for(const key of [...properties,...flags])if(patch[key]!==undefined)after[key]=patch[key];
     if(patch.formula!==undefined)rewritten.add(after);
     // A new expression inherits no stale formula/options from another row.
     if(existing)resolved[resolved.findIndex(e=>e.record_id===before.record_id)]=after;else resolved.push(after);
-    changes.push({before,after,reuse_default:newNode&&index===0});
+    changes.push({before,after,reuse_default:newNode&&index===0&&!!before});
   }
   requireValue(resolved.length>0&&resolved.length<=128,'Calculator expression count outside supported bounds');
   // Loginom keeps formula text when the language changes and never translates it.
@@ -97,7 +97,8 @@ export function resolveCalculatorPatch(parameters,observed,inputFields,{newNode=
       'Explicit order must include every resulting expression exactly once');
     resolved.sort((a,b)=>parameters.order.indexOf(a.name)-parameters.order.indexOf(b.name));
   }
-  return {baseline,changes,expressions:resolved.map((e,index)=>({...e,index})),order:resolved.map(e=>e.name)};
+  return {baseline,changes,expressions:resolved.map((e,index)=>({...e,index})),order:resolved.map(e=>e.name),
+    discard_default:newNode&&removeDefault&&!changes.some(c=>c.before?.record_id===baseline[0].record_id)?baseline[0]:null};
 }
 
 // Loginom checks names on each Apply, not just the final inventory. Free a

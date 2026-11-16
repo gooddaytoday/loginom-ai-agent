@@ -4880,8 +4880,25 @@ function readRenderedInputMapping(observation) {
             }
           }
         };
+        const calculatorPreview=task.action.verb==='click'&&current.prepared_node_context?.verified===true&&current.wizard.stage==='calculator'
+          &&current.ui.elements.find(e=>e.ref===task.action.ref)?.tid===current.wizard.root_tid+';CalcDataWizard;btnPreview';
+        // Preview adds a heavy sibling window. Discover its exact root after
+        // the single click instead of scanning it through the old wizard root.
+        const readCalculatorPreviewUi=async()=>{
+          const roots=await readUi(true);
+          if(!roots.authenticated||roots.origin!==current.origin||roots.loginom_build!==current.loginom_build
+            ||!same(roots.workflow_ref,current.workflow_ref)||roots.dom_epoch?.document!==current.dom_epoch.document
+            ||roots.wizard?.root_ref!==current.wizard.root_ref)
+            fail('WIZARD_CONTEXT_CHANGED','Calculator preview owner changed after its single click');
+          const previews=roots.ui.elements.filter(e=>e.tid===current.wizard.root_tid+';CalcPreviewForm');
+          if(previews.length>1)fail('WIZARD_CONTEXT_CHANGED','Calculator preview root is ambiguous');
+          postActionRoot=previews[0]?.ref??roots.wizard.root_ref;
+          // The preview loop owns mask settlement and rediscovers the newly
+          // mounted window each time, under the unchanged action deadline.
+          return readUi(false,false,false);
+        };
         let observed;
-        try { observed = await (['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action.verb)?readOpeningUi():readUi()); }
+        try { observed = await (calculatorPreview?readCalculatorPreviewUi():['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action.verb)?readOpeningUi():readUi()); }
         catch(error) {
           // A generic click can legitimately close its popup/tree. Rediscover
           // regions only after the completed gesture, never for preconditions
@@ -4890,8 +4907,7 @@ function readRenderedInputMapping(observation) {
           observed=await readUi(true);
           record('ui_root_closed_after_gesture',{verification_required:true});
         }
-        if(task.action.verb==='click'&&current.prepared_node_context?.verified===true&&current.wizard.stage==='calculator'
-          &&current.ui.elements.find(e=>e.ref===task.action.ref)?.tid===current.wizard.root_tid+';CalcDataWizard;btnPreview') {
+        if(calculatorPreview) {
           const owned=s=>s.authenticated&&s.origin===current.origin&&s.loginom_build===current.loginom_build
             &&same(s.workflow_ref,current.workflow_ref)&&same(s.prepared_node_context,current.prepared_node_context)
             &&s.dom_epoch.document===current.dom_epoch.document&&s.wizard.stage==='calculator'&&s.wizard.root_ref===current.wizard.root_ref;
@@ -4930,7 +4946,7 @@ function readRenderedInputMapping(observation) {
                 record('wizard_calculator_preview_error_dismissed',{root_ref:current.wizard.root_ref,message});
               } finally {postActionRoot=wizardRoot;}
               if(calculatorDialogFailure) {
-                observed=await readUi();
+                observed=await readCalculatorPreviewUi();
                 if(!owned(observed)||observed.ui.dialogs.length||observed.ui.masks.length)
                   fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Calculator did not return from its error dialog');
                 record('wizard_calculator_validation_failed',calculatorDialogFailure);
@@ -4939,7 +4955,7 @@ function readRenderedInputMapping(observation) {
             }
             const validation=observed.wizard.calculator_validation;
             if(observed.ui.dialogs.length===0&&observed.ui.masks.length===0&&validation?.status==='observed') {
-              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readCalculatorPreviewUi();
               if(owned(fresh)&&!fresh.ui.dialogs.length&&!fresh.ui.masks.length&&same(fresh.wizard.calculator_validation,validation)) {
                 observed=fresh;record('wizard_calculator_validation_failed',validation);
                 fail('WIZARD_CALCULATOR_VALIDATION_FAILED',validation.message);
@@ -4947,7 +4963,7 @@ function readRenderedInputMapping(observation) {
               observed=fresh;continue;
             }
             if(observed.ui.dialogs.length||observed.ui.masks.some(m=>m.target_tid!==current.wizard.root_tid))break;
-            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi();
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readCalculatorPreviewUi();
           }
           if(!owned(observed)||!accepted(observed))fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Owned calculator preview did not settle after one click; inspect before retry');
           record('wizard_calculator_preview_verified',{root_ref:observed.wizard.calculator_preview.root_ref,settings_applied:false});

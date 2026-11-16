@@ -1351,6 +1351,7 @@ def arguments(argv=None):
     start.add_argument('--prepare-only', action='store_true', help='Prepare/verify the build without starting Loginom or the model')
     start.add_argument('--cases', type=Path, help='Private external task/expected/oracle/data case directory')
     start.add_argument('--cold', action='store_true')
+    start.add_argument('--viewport', choices=['1280x800', '1920x945'], default='1280x800')
     start.add_argument('--case-root', type=Path, help='Private external task.md/expected.json/case.json fixtures; oracle is never sent')
     start.add_argument('--host-load-max', type=float, default=8)
     start.add_argument('--spacing', type=float, default=60)
@@ -1909,6 +1910,7 @@ class Runner:
         self.last_start = 0
         self.current = None
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(('MULTICA_', 'CODEX_'))}
+        self.env['LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT'] = self.options.get('viewport', '1280x800')
         self.env.update(LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS='false', HTTP_PROXY='http://127.0.0.1:2080', HTTPS_PROXY='http://127.0.0.1:2080', NO_PROXY='localhost,127.0.0.1,::1,app.loginom.ai,mcp.loginom.ai,mas.kartamyshev.dev')
 
     def memory(self, pid):
