@@ -215,14 +215,19 @@ jobs:
           DEBUG: pw:browser
         run: |
           set -uo pipefail
-          for i in $(seq 1 6); do
+          echo "NUMBER_OF_PROCESSORS=${NUMBER_OF_PROCESSORS:-?}"
+          for i in $(seq 1 5); do
             echo "=== DIAG suite iteration $i"
             "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 test/*.test.mjs 2>&1 \
-              | grep -E 'diag |pw:browser|not ok|^ok .*cancellation|duration_ms: [0-9]{4}' || true
+              | grep -E 'diag|pw:browser|not ok|^ok .*cancellation|duration_ms: [0-9]{4}' || true
           done
-          for i in $(seq 1 10); do
-            echo "=== DIAG alone iteration $i"
-            "$LOGINOM_AI_AGENT_TEST_NODE" --test-timeout=60000 test/connection-cancellation.test.mjs 2>&1 | grep -E 'diag |pw:browser|not ok|^ok ' || true
+          for i in $(seq 1 12); do
+            kill=""; [ "$i" -gt 6 ] && kill=1
+            echo "=== DIAG burn iteration $i kill=$kill"
+            for b in 1 2; do "$LOGINOM_AI_AGENT_TEST_NODE" -e 'const e=Date.now()+30e3;while(Date.now()<e){}' & done
+            sleep 1
+            DIAG_KILL=$kill "$LOGINOM_AI_AGENT_TEST_NODE" --test-timeout=60000 test/connection-cancellation.test.mjs 2>&1 | grep -E 'diag|pw:browser|not ok|^ok ' || true
+            wait
           done
           echo done > "$RUNNER_TEMP/windows-runtime-tests.log"
       - name: Verify platform-dependent host tests

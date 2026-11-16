@@ -5,6 +5,20 @@ import {mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {loginBrowser} from '../src/connection-check.mjs';
+import childProcess from 'node:child_process';
+const diagSpawn = childProcess.spawn;
+let diagChrome;
+childProcess.spawn = function (...args) {
+  const child = diagSpawn.apply(this, args);
+  if (/chrom/i.test(String(args[0]))) {
+    diagChrome = child;
+    const say = text => process.stderr.write(`[diagproc ${new Date().toISOString()} pid=${child.pid}] ${text}\n`);
+    say('spawned');
+    child.once('exit', (code, signal) => say(`exit code=${code} signal=${signal}`));
+    child.once('close', () => say('close'));
+  }
+  return child;
+};
 
 for (const phase of ['before-launch', 'navigation', 'login-form']) {
   test('private browser cancellation closes its context: ' + phase, {
@@ -58,6 +72,10 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
         await Promise.race([entered.promise, login.then(() => { throw Error('LOGIN_FINISHED_BEFORE_FIXTURE'); })]);
         mark('fixture entered; abort');
         controller.abort(Error('LOGINOM_HOST_CLOSED'));
+        if (process.env.DIAG_KILL && diagChrome) {
+          const pid = diagChrome.pid;
+          setTimeout(() => { mark('taskkill ' + pid); childProcess.exec(`taskkill /pid ${pid} /T /F`, () => mark('taskkill returned')); }, 0);
+        }
       }
       await assert.rejects(Promise.race([login, new Promise((_, reject) => {
         timer=setTimeout(() => { mark('2s timer fired'); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
