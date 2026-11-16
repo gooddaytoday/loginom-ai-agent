@@ -688,7 +688,9 @@ with `trees.to_table`. Private `expected-typed-run.json` is the pair oracle's
 `tree_to_table_typed_projection` (checked by `oracle.py --check`): one ordered
 table When DateTime (civil milliseconds) and Value Variant with native subtypes
 integer `9007199254740993`/boolean false/string "", label_any, its CSV, Save and
-cold (exact typed Variant port read). The CSV compares Variant integers as
+cold (exact typed Variant port read). The task names the CSV When format
+`yyyy-mm-dd hh:nn:ss.zzz`: the default writer prints 00:00:00.001 as a date
+(D76 `midnight_date`, not extended here). The CSV compares Variant integers as
 numbers; Int64 exactness is proven only by the typed read.
 
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),

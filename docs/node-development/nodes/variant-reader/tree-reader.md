@@ -221,3 +221,20 @@ DateTime/Variant. Общий reader, его RPC, лимиты и остальн�
 из frozen proposal (TREE_SCHEMA_ORDER, load1=1.49). Справка не определяла
 имя массива по умолчанию; теперь это `items` в нижнем регистре, если
 пользователь не задал имя. Oracle и бизнес-задание не менялись.
+
+## R5 — trees.to_table, LAB-1699, 16.11.2026
+
+Production red: `validateSelectedTreePaths` допускал только integer/real/
+string/boolean, и дерево R4 отклонялось «supported types» (LAB-1688).
+Правка: допуск листьев `datetime` и `variant` и точное чтение Variant
+выхода (`typedVariants`) в run и cold. Общий reader не менялся.
+
+Native-наблюдение — первый прогон `tree-to-table-typed` на `9466b701`, своя
+пара mas2, Loginom 7.4.2 (`execution-events.jsonl:928`). Выход 0 — таблица
+When DataType datetime и Value Variant, 3 строки. When — civil
+2026-11-07T12:34:56.789 / 2026-11-08T00:00:00.001 без сдвига пояса;
+Value — integer 9007199254740993 (тег 20, signed Int64), boolean false (11),
+string "" (8). Совпало с `expected-typed-run.json`. Текстовый экспорт по
+умолчанию записал 00:00:00.001 датой `2026-11-08` (D76 `midnight_date`),
+поэтому задание называет формат CSV. Variant NULL источник R4 не даёт.
+
