@@ -66,8 +66,8 @@ test('table reread uses only its confirmed Save continuation through the browser
  if(fault==='failed-save')save.status='FAILED';
  const node={document_id:'doc',workflow_id:'wf',node_id:'report'},schema=[{index:0,name:'Id',label:'Id',type:'integer'}];
  const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
- let saveCalls=0,executes=0;
- const adapter={...f.adapter,observe:async(...args)=>({...await f.adapter.observe(...args),nodes:[{ref:node,type:'transform.filter_data',label:'Report',
+ let saveCalls=0,executes=0,graphLabel='Report';
+ const adapter={...f.adapter,observe:async(...args)=>({...await f.adapter.observe(...args),nodes:[{ref:node,type:'transform.filter_data',label:graphLabel,
   position:{x:100,y:100},inputs:[],outputs:[0]}]})};
  const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,onRecord:async e=>structuredClone(e),
   execute:async()=>++saveCalls===1?{...save,status:'NOT_APPLIED',phase:'prepared',effect_possible:false,checkpoint:{workflow_ref:old}}:save,
@@ -76,13 +76,14 @@ test('table reread uses only its confirmed Save continuation through the browser
    finish:async mode=>verified({mode,execution_id:'exec'}),finishGraph:async mode=>{if(mode==='execute')executes++;return verified({mode,execution_id:'exec',execution_started:mode==='execute',settings_applied:false});},
    waitExecution:async()=>verified({status:'completed',execution_id:'exec'}),verifyContinuation:async()=>true,
    readOutput:async()=>verified({status:'complete',execution_id:'exec',evidence_ref:'output',ports:[{port:0,schema,fresh:true,execution_id:'exec'}]})})});
- const request={...f.request,operation_id:'initial',target:{kind:'existing',type:'transform.filter_data',ref:node},mode:'conditions',parameters:{},
+ const request={...f.request,operation_id:'initial',target:{kind:'existing',type:'transform.filter_data',label:'Report',ref:node},mode:'conditions',parameters:{},
   finish:'execute',read:{ports:[0],sample_rows:1,require_exact_numbers:true}};
  const initial=await runtime.runNodeApply(request);assert.equal(initial.status,'SUCCEEDED',JSON.stringify(initial));
  const initialExecutes=executes;assert.equal(initialExecutes,1,'unchanged initial Filter executes through its read lifecycle');
  const saved=await runtime.run('package.save_checkpoint',{path:'/user/report.lgp',conflict_policy:'fail'},{operationId:'save'});
  assert.equal(saved.status,save.status,JSON.stringify(saved));
  f.crumb.textContent='Saved';f.crumb.getAttribute=()=>next.navigation_path.at(-1).tid;
+ graphLabel='Renamed report';
  await runtime.startNodeRead({operation_id:'reread',source_operation_id:'initial',execution});
  const result=await runtime.waitNodeApply('reread',{timeoutMs:1000});
  assert.equal(result.outcome.status,fault?'NOT_APPLIED':'SUCCEEDED',JSON.stringify(result));

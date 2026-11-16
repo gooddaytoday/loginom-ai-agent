@@ -18,6 +18,7 @@ test('output reading preserves the current execution unless Execute is explicitl
  const current=buildNodeReadRequest({...args,execution:undefined},source());
  assert.equal(current.parameters.execution_policy,'existing');
  assert.equal(current.finish,'done');
+ assert.equal(current.target.label,undefined,'A read must not restore an old caption');
  assert.equal(buildNodeReadRequest({...args,execution:'execute'},source()).parameters.execution_policy,'execute');
 });
 const handlers=new Map([['transform.calculator',{revision:'1',modes:['expression'],validate(){throw Error('Configuration validation must not run');},configure(){throw Error('Configuration must not run');},configurationReadback(){throw Error('No configuration readback');}}]]);

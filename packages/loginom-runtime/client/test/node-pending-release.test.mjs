@@ -473,7 +473,7 @@ test('dock_node_read accepts only a release stopped at read as its source',async
   checkpoint_kind:'local_node_released',released_phase,node,phases,execution:{status:'completed',execution_id:'exec'},
   output:{status:'not_refreshed',evidence_ref:null,ports:[]},configuration:{status:'applied',readback}}}});
  const read=buildNodeReadRequest({operation_id:'reread',source_operation_id:'apply'},source('read'));
- assert.deepEqual(read.target,{kind:'existing',type:'imports.text',label:'Source',ref:node});assert.deepEqual(read.read.ports,[0]);
+ assert.deepEqual(read.target,{kind:'existing',type:'imports.text',ref:node});assert.deepEqual(read.read.ports,[0]);
  assert.throws(()=>buildNodeReadRequest({operation_id:'reread',source_operation_id:'apply'},source('finish')),/completed local table node/);
  // Releasing that reread itself points back to the original source, not to the reread.
  const handlers=new Map([['imports.text',{revision:'1',modes:['delimited'],validate:()=>{},configure:async()=>({})}]]);
@@ -482,7 +482,7 @@ test('dock_node_read accepts only a release stopped at read as its source',async
  const events=[];
  const result=await releaseNodeApply({operation,handlers,record:async e=>{events.push(e);return e;},
   drivers:{releasePending:proved()}});
- assert.deepEqual(result.configuration,{status:'not_requested'});assert.deepEqual(result.execution,{status:'unknown',execution_id:null});
+ assert.deepEqual(result.configuration,{status:'not_requested'});assert.deepEqual(result.execution,{status:'not_requested',execution_id:null});
  assert.equal(result.next_step.tool,'dock_node_read');assert.match(result.next_step.instruction,/source_operation_id:"apply"/);
  assert.equal(operation.nodeApply.pending,null);assert.equal(events[0].phase,'node_operation_released');
 });

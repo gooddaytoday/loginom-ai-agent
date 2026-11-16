@@ -309,7 +309,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(!valid||!result.verified||!operation.cleanupConfirmed){
         const error=Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
         if(valid&&!result.verified&&operation.cleanupConfirmed
-          &&operation.parameters.mode==='read_existing_output'&&operation.parameters.parameters.execution_policy==='existing'){
+          &&operation.parameters?.mode==='read_existing_output'&&operation.parameters.parameters?.execution_policy==='existing'){
           error.code='NODE_OUTPUT_READ_REFUSED';
           error.message+='. No Execute was sent.';
           error.nodePhaseRefusal={phase:'read',status:'FAILED',effect_possible:false,cleanup_complete:true,

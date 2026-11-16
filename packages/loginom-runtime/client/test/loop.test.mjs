@@ -79,7 +79,7 @@ test('Loop reread rejects the old active execution and accepts only the new comp
    parallel:false,iteration_identifiers:false,ignore_errors:false,save_configuration:false,body:{ref:body},node,
    scope:'observed_before_verified_finish',values_are:'observed_ui_values',receipt_ids:phases.map(p=>p.receipt_id)}},
   output:{ports:[{port:0,schema:[{index:0,name:'PageNo',label:'PageNo',type:'integer'}]}]}}}};
- const r=buildNodeReadRequest({operation_id:'read-loop',source_operation_id:'created',read:{sample_rows:100,require_exact_numbers:true}},s);
+ const r=buildNodeReadRequest({operation_id:'read-loop',source_operation_id:'created',execution:'execute',read:{sample_rows:100,require_exact_numbers:true}},s);
  assert.equal(r.finish,'execute');assert.equal(r.mode,'read_existing_output');
  for(const outputExecution of ['old','fresh']){
   let launches=0;const ok=v=>({verified:true,cleanup_complete:true,...v});
