@@ -183,6 +183,9 @@ const excelExportConfigurationReadback=object({kind:values('excel_export'),scope
 const exportConfigurationReadback=object({kind:values('text_export'),scope:values('observed_before_verified_finish'),node:ref,
  receipt_ids:{...array(str),minItems:3,maxItems:3},values_are:values('observed_ui_values'),destination:str,settings:object({destination:str,text_qualifier:values('"'),decimal_separator:values('.',','),date_separator:str,time_separator:str,true_value:str,false_value:str,null_marker:str,date_format:str,time_format:str,delimiter:values(';',',','\t'),encoding:{type:'integer',enum:[65001,1251,1252,1200,1201]},bom:bool,line_ending:{type:'integer',enum:[0,1]},header:{type:'integer',enum:[0,1,2]}}),input_mapping:object({port:{type:'integer',const:0},autosync:bool,fields:boundedFields(readbackMappingField)}),package_persistence_verified:{type:'boolean',const:false}});
 exportConfigurationReadback.properties.format=values('delimited','fixed_width');
+// Present only for a variable-bound filename; destination is its resolved value.
+exportConfigurationReadback.properties.file_name_variable=object({kind:values('variable'),name:str});
+exportConfigurationReadback.properties.destination_check=object({destination:str,overwrite:values('reject','replace'),existed:bool});
 const missingValuesThreshold={type:'integer',minimum:0,maximum:100};
 const disabled={type:'boolean',const:false};
 const missingValuesField={name:str,label:str,type:str,data_kind:str};

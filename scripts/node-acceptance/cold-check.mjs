@@ -288,6 +288,11 @@ page = context.pages()[0]
   if(expected.excel_sinks)for(const sink of expected.excel_sinks)verifyExcelColdSettings(destinations,sink);
   else if(expected.xlsx_sink)verifyExcelColdSettings(destinations,expected.xlsx_sink);
   if(expected.excel_bindings)verifyExcelColdBindings(destinations,expected);
+  // A saved text filename binding resolves to the last path and keeps its variable.
+  if(expected.text_binding){
+   const bound=(destinations??[]).filter(d=>d.destination===destination);
+   if(bound.length!==1||bound[0].text_binding!==expected.text_binding.variable)throw Error('TEXT_COLD_VARIABLE_BINDING');
+  }
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations,...(expected.xlsx_sink?{type:'exports.excel'}:{})}):null;
   for (const want of expected.nodes) {

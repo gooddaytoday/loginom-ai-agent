@@ -1,0 +1,93 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "variables.calculator"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "null_marker": "NULL",
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Item": "Чай",
+          "Amount": 12
+        },
+        {
+          "Id": 2,
+          "Item": "Кофе, молотый",
+          "Amount": 0
+        }
+      ],
+      "export_destination": "{{EXPORTS_DIR}}/report-2026-11-05.csv"
+    },
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Item",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Amount",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Item": "Чай",
+          "Amount": 12
+        },
+        {
+          "Id": 2,
+          "Item": "Кофе, молотый",
+          "Amount": 0
+        }
+      ],
+      "export_destination": "{{EXPORTS_DIR}}/report-2026-11-06.csv"
+    }
+  ],
+  "text_binding": {
+    "parameter": "file_name_variable",
+    "variable": "ReportFile",
+    "kind": "variables",
+    "input": 0
+  }
+}
