@@ -890,10 +890,11 @@ test('normalization cannot rebind a replaced native node with the same rendered 
  assert.equal(result.trace.some(e=>e.event==='save_continuations_observed'),false);
 });
 
-for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
-test('Save normalizes a workflow without REST or grouping exactly once: '+action+' '+modified,async()=>{
+for(const icon of ['bg-vendor-icon-linregression','bg-vendor-icon-clusterization'])for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
+test('Save normalizes an observed dirty node type exactly once: '+icon+' '+action+' '+modified,async()=>{
  const page=await restSavePage(modified,false);
  page.model.FDiagram.FNodes.FCollection.forEach((node,i)=>{node.FIconCls=['bg-vendor-icon-importtextfile','bg-vendor-icon-sorting','bg-vendor-icon-exporttextfile'][i];});
+ page.model.FDiagram.FNodes.FCollection[1].FIconCls=icon;
  const outcome=await run(page,action,{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
  assert.equal(outcome.status,modified.at(-1)?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(outcome));
  assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
@@ -908,6 +909,18 @@ test('Save normalizes a workflow without REST or grouping exactly once: '+action
   validateActionParameters(actions.get(action).output_schema,outcome.output);
   if(action==='package.save_checkpoint')assert.equal(outcome.output.workflow_continuations[0].workflow_ref.workflow_id,'workflow');
  }
+});
+
+for(const icon of ['bg-vendor-icon-restclient','bg-vendor-icon-importtextfile','bg-vendor-icon-calcdata','bg-vendor-icon-sorting'])
+test('ordinary checkpoint avoids reopening without an observed dirty node type: '+icon,async()=>{
+ const page=await restSavePage([true,true],false);
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls=icon;
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
+ assert.equal(page.events.includes('package_closed'),false);assert.equal(outcome.output.reopened,false);
+ assert.equal(page.events.includes('package_reopened'),false);
+ assert.equal(outcome.trace.some(e=>e.event==='rest_package_normalization'),false);
 });
 
 for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
