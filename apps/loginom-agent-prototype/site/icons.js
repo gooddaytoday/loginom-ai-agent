@@ -1,0 +1,43 @@
+const paths = {
+  plus:'<path d="M12 5v14M5 12h14"/>', home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  layers:'<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/>',
+  file:'<path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Zm0 0v7h7M8 14h8m-8 3h5"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+  database:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
+  message:'<path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.3 0-2.5-.3-3.6-.8L4 21l.9-4.7a8.5 8.5 0 1 1 15.6-4.8Z"/>',
+  settings:'<path d="M10 3h4l.7 2.3 2 .9 2.2-.8 2 3.4-1.6 1.6v2.2l1.6 1.6-2 3.4-2.2-.8-2 .9L14 20h-4l-.7-2.3-2-.9-2.2.8-2-3.4 1.6-1.6v-2.2L3.1 8.8l2-3.4 2.2.8 2-.9z"/><circle cx="12" cy="11.5" r="3"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.2 9a3 3 0 0 1 5.8 1c0 1.7-2.9 2.1-2.9 3.8M12 17h.01"/>',
+  search:'<circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4 4"/>',
+  more:'<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/>',
+  chevron:'<path d="m9 18 6-6-6-6"/>', down:'<path d="m6 9 6 6 6-6"/>',
+  arrow:'<path d="M4 12h15m-6-6 6 6-6 6"/>', up:'<path d="M12 19V5m-6 6 6-6 6 6"/>',
+  external:'<path d="M13 5h6v6m0-6-8 8m7 0v6H5V6h6"/>',
+  paperclip:'<path d="m9 14 6-6a2 2 0 0 1 3 3l-7 7a4 4 0 0 1-6-6l7-7a6 6 0 0 1 9 8"/>',
+  chart:'<path d="M4 4v16h16M8 16v-4m4 4V8m4 8v-6m4 6V5"/>',
+  flow:'<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h6M6 9v9h9"/>',
+  shield:'<path d="m12 3 8 3v5c0 4.5-3.5 7.7-8 10-4.5-2.3-8-5.5-8-10V6z"/><path d="m9 12 2 2 4-4"/>',
+  spark:'<path d="M12 2 14.4 9.6 22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2Z"/>',
+  circle:'<circle cx="12" cy="12" r="8"/>', check:'<path d="m5 12 4 4L19 6"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  book:'<path d="M3 5c4-1 6 0 9 2 3-2 5-3 9-2v14c-4-1-6 0-9 2-3-2-5-3-9-2zM12 7v14"/>',
+  box:'<path d="M3 7 12 3l9 4v10l-9 4-9-4zM3 7l9 4 9-4m-9 4v10M7 5l9 4"/>',
+  cpu:'<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/>',
+  close:'<path d="m6 6 12 12M18 6 6 18"/>', menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>',
+  moon:'<path d="M20.5 15a9 9 0 0 1-11.5-11.5A9 9 0 1 0 20.5 15Z"/>',
+  stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  refresh:'<path d="M20 11a8 8 0 1 0-2 6m2-10v4h-4"/>',
+  alert:'<path d="m12 3 10 17H2zM12 9v4m0 3h.01"/>',
+  terminal:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/>',
+  upload:'<path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5"/>',
+  download:'<path d="M12 4v12m-4-4 4 4 4-4M4 16v4h16v-4"/>',
+  lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
+  panel:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>',
+  wand:'<path d="m5 19 13-13 2 2L7 21zM6 3v6M3 6h6m8 9v6m-3-3h6"/>'
+}
+
+export function icon(name, size = 18) {
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.circle}</svg>`
+}
