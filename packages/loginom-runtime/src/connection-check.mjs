@@ -38,6 +38,7 @@ export function loginomAddress(value) {
 
 // The passive Network domain observes the existing owned page. Retain only
 // numbers, fixed classes and cache flags; URLs, cookies and bodies never enter diagnostics.
+const diag = text => { try { globalThis.__loginomDiag?.(text) } catch {} }
 export async function trackLoginNetwork(page) {
   const session = await page.context?.()?.newCDPSession?.(page).catch(() => undefined)
   if (!session) return trackPageNetwork(page)
@@ -92,17 +93,20 @@ export async function trackLoginNetwork(page) {
   on("Network.loadingFinished", event => { const entry = active.get(event.requestId); if (entry) entry.row.wire_bytes = event.encodedDataLength; end(event.requestId, event.timestamp, false) })
   on("Network.loadingFailed", event => end(event.requestId, event.timestamp, true))
   const close = () => closing ??= (async () => {
+    diag(`network.close start pageClosed=${page.isClosed?.()} contextClosed=${page.context?.()?.isClosed?.()}`)
     for (const [name, handler] of hooks) session.off(name, handler)
-    const detached = session.detach().catch(() => undefined)
+    const detached = session.detach().catch(() => undefined).then(() => diag('network.close detach settled'))
     // A detach racing a closing page/browser may never be answered. A live page
     // still awaits it; a closed one (before or during this wait) ends it.
-    if (page.isClosed?.()) return
+    if (page.isClosed?.()) { diag('network.close early return: page closed'); return }
     const context = page.context?.()
     let ended
     const closed = new Promise(resolve => { ended = resolve })
-    page.once?.("close", ended); context?.once?.("close", ended)
+    const pageEnded = () => { diag('network.close saw page close'); ended() }, contextEnded = () => { diag('network.close saw context close'); ended() }
+    page.once?.("close", pageEnded); context?.once?.("close", contextEnded)
+    diag(`network.close waiting pageClosed=${page.isClosed?.()} contextClosed=${context?.isClosed?.()}`)
     try { await Promise.race([detached, closed]) }
-    finally { page.off?.("close", ended); context?.off?.("close", ended) }
+    finally { page.off?.("close", pageEnded); context?.off?.("close", contextEnded); diag('network.close end') }
   })()
   try { await session.send("Network.enable") }
   catch { await close(); return trackPageNetwork(page) }
@@ -269,7 +273,9 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     throw Error(code, { cause: { login: loginFailure(original ?? error, candidate,
       phase, ended - phaseStarted, ended - started) } })
   } finally {
+    diag(`loginPage finally phase=${phase}`)
     await network.close()
+    diag('loginPage finally done')
   }
 }
 
@@ -403,8 +409,8 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   // This is a readiness milestone, not a second browser or a guessed CDP duration.
   await phase({ phase: "browser.cdp", status: "ready", attempt: attempt + 1 })
   const closing = { promise: undefined }
-  const close = () => closing.promise ??= context.close()
-  const cancel = () => { void close().catch(() => undefined) }
+  const close = () => closing.promise ??= (diag('context.close start'), context.close().then(() => diag('context.close resolved'), error => { diag('context.close rejected ' + error?.message); throw error }))
+  const cancel = () => { diag('cancel'); void close().catch(() => undefined) }
   signal?.addEventListener("abort", cancel, { once: true })
   const timer = setTimeout(cancel, Math.max(1, deadline - Date.now()))
   try {
@@ -440,6 +446,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     // MCP receives this same live context through its public contextGetter API.
     return { ...result, context }
   } catch (error) {
+    diag('loginBrowser catch ' + error?.message)
     await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
     signal?.throwIfAborted()
     // Only a classified transient login failure may retry, after confirmed close.

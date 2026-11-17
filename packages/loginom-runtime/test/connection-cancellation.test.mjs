@@ -5,12 +5,33 @@ import {mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {loginBrowser} from '../src/connection-check.mjs';
+import childProcess from 'node:child_process';
+let T0 = performance.now(), NAME = 'init';
+const mark = text => process.stderr.write(`[diag ${NAME} ${new Date().toISOString()} +${Math.round(performance.now()-T0)}ms] ${text}\n`);
+globalThis.__loginomDiag = mark;
+const diagSpawn = childProcess.spawn;
+childProcess.spawn = function (...args) {
+  const child = diagSpawn.apply(this, args);
+  if (/chrom/i.test(String(args[0]))) {
+    mark(`proc spawned pid=${child.pid}`);
+    child.once('exit', (code, signal) => mark(`proc exit pid=${child.pid} code=${code} signal=${signal}`));
+    child.once('close', () => mark(`proc close pid=${child.pid}`));
+  }
+  return child;
+};
+const observe = context => {
+  mark('context created');
+  context.once('close', () => mark('event context close'));
+  for (const page of context.pages()) page.once('close', () => mark('event page close'));
+  context.on('page', page => page.once('close', () => mark('event new page close')));
+};
 
 for (const phase of ['before-launch', 'navigation', 'login-form']) {
   test('private browser cancellation closes its context: ' + phase, {
     skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
     timeout: 15000,
   }, async t => {
+    T0 = performance.now(); NAME = phase;
     const directory = await mkdtemp(join(tmpdir(), 'login-cancellation-'));
     const entered = Promise.withResolvers();
     const release = Promise.withResolvers();
@@ -32,7 +53,8 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
     if (phase === 'before-launch') controller.abort(Error('LOGINOM_HOST_CLOSED'));
     const login = loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER, profile:join(directory,'browser'),
       candidate:{url:`http://127.0.0.1:${http.address().port}/app/`, username:'user',password:''},
-      headless:true, signal:AbortSignal.any([controller.signal, t.signal])});
+      headless:true, signal:AbortSignal.any([controller.signal, t.signal]), onContextCreated: observe});
+    login.then(() => mark('login resolved'), error => mark('login rejected ' + error?.message));
     void login.catch(() => {});
     t.after(async () => {
       controller.abort(Error('LOGINOM_HOST_CLOSED'));
@@ -48,10 +70,11 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
         // A failed launch cannot reach the fixture. Surface that failure instead
         // of leaving an open HTTP server behind the node:test timeout.
         await Promise.race([entered.promise, login.then(() => { throw Error('LOGIN_FINISHED_BEFORE_FIXTURE'); })]);
+        mark('fixture entered; abort');
         controller.abort(Error('LOGINOM_HOST_CLOSED'));
       }
       await assert.rejects(Promise.race([login, new Promise((_, reject) => {
-        timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), 2000);
+        timer=setTimeout(() => { mark('2s timer fired'); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
       })]), /LOGINOM_HOST_CLOSED/);
     } finally {
       clearTimeout(timer);
@@ -63,6 +86,7 @@ test('private browser cancellation settles when CDP detach is never answered', {
   skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
   timeout: 15000,
 }, async t => {
+  T0 = performance.now(); NAME = 'detach';
   // Deterministic form of the CI race: the browser closes while the login
   // network tracker's Target.detachFromTarget never gets an answer.
   const directory = await mkdtemp(join(tmpdir(), 'login-cancellation-detach-'));
@@ -79,13 +103,15 @@ test('private browser cancellation settles when CDP detach is never answered', {
     candidate:{url:`http://127.0.0.1:${http.address().port}/app/`, username:'user',password:''},
     headless:true, signal:AbortSignal.any([controller.signal, t.signal]),
     onContextCreated: context => {
+      observe(context);
       const newCDPSession = context.newCDPSession.bind(context);
       context.newCDPSession = async page => {
         const session = await newCDPSession(page);
-        session.detach = () => { detaches++; return new Promise(() => {}); };
+        session.detach = () => { detaches++; mark('stub detach called'); return new Promise(() => {}); };
         return session;
       };
     }});
+  login.then(() => mark('login resolved'), error => mark('login rejected ' + error?.message));
   void login.catch(() => {});
   t.after(async () => {
     controller.abort(Error('LOGINOM_HOST_CLOSED'));
@@ -93,15 +119,17 @@ test('private browser cancellation settles when CDP detach is never answered', {
     http.closeAllConnections();
     await new Promise(resolve => http.close(resolve));
     // Never let an unsettled login hold the runner past this test.
-    await Promise.race([login.catch(() => {}), new Promise(resolve => setTimeout(resolve, 5000).unref())]);
+    mark('after start');
+    await Promise.race([login.catch(() => {}).then(() => mark('after: login settled')), new Promise(resolve => setTimeout(() => { mark('after: 5s cap, login still pending'); resolve(); }, 5000).unref())]);
     await rm(directory,{recursive:true,force:true});
   });
   let timer;
   try {
     await Promise.race([entered.promise, login.then(() => { throw Error('LOGIN_FINISHED_BEFORE_FIXTURE'); })]);
+    mark('fixture entered; abort');
     controller.abort(Error('LOGINOM_HOST_CLOSED'));
     await assert.rejects(Promise.race([login, new Promise((_, reject) => {
-      timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), 2000);
+      timer=setTimeout(() => { mark('2s timer fired'); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
     })]), /LOGINOM_HOST_CLOSED/);
     assert.equal(detaches, 1);
   } finally {
