@@ -90,7 +90,9 @@ export async function makeEnv(name: string, options: { port: number; extraConfig
 
 function start(name: string, port: number, env: Record<string, string>, restart = false) {
   const log = path.join(SPIKE, ".run", name, restart ? "serve-restart.log" : "serve.log")
-  return Bun.spawn([path.join(SPIKE, "run-server.sh"), name, String(port)], {
+  // SPIKE_STRACE=<file> records every connect/sendto of the server tree for the network audit (S6).
+  const trace = env.SPIKE_STRACE ? ["strace", "--kill-on-exit", "-f", "-qq", "-s", "200", "-e", "trace=connect,sendto,sendmsg", "-o", env.SPIKE_STRACE] : []
+  return Bun.spawn([...trace, path.join(SPIKE, "run-server.sh"), name, String(port)], {
     env: { ...process.env, ...env },
     stdout: Bun.file(log),
     stderr: Bun.file(`${log}.err`),

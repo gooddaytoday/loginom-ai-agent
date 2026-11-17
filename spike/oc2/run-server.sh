@@ -10,5 +10,6 @@ run="$here/.run/$name"
 mkdir -p "$run/home"
 cd "$here/opencode/packages/cli"
 exec env HOME="$run/home" XDG_DATA_HOME="$run/data" XDG_CONFIG_HOME="$run/config" XDG_STATE_HOME="$run/state" \
-  XDG_CACHE_HOME="$run/cache" OPENCODE_SERVER_PASSWORD=spike OPENCODE_DISABLE_MODELS_FETCH=1 "$@" \
+  XDG_CACHE_HOME="$run/cache" OPENCODE_SERVER_PASSWORD=spike \
+  OPENCODE_DISABLE_MODELS_FETCH="${OPENCODE_DISABLE_MODELS_FETCH-1}" "$@" \
   bun run src/index.ts serve --port "$port"

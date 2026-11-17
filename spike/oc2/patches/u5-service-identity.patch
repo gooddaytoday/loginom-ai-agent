@@ -1,0 +1,25 @@
+diff --git a/packages/cli/src/services/service-config.ts b/packages/cli/src/services/service-config.ts
+index 483db314c4..a46bb16d37 100644
+--- a/packages/cli/src/services/service-config.ts
++++ b/packages/cli/src/services/service-config.ts
+@@ -38,7 +38,12 @@ const decodeLegacy = Schema.decodeUnknownOption(
+ )
+ const decodeRegistration = Schema.decodeUnknownEffect(Schema.fromJsonString(Service.Info))
+ 
++// Fork seam (spike U5): a product/profile identity gets its own registration file and port, so two products or two
++// profiles on one machine never adopt or block each other's service.
++const serviceIdentity = process.env.LOGINOM_SPIKE_U5_IDENTITY?.replace(/[^a-zA-Z0-9._-]/g, "-")
++
+ export function filename(channel = OPENCODE_CHANNEL) {
++  if (serviceIdentity) return `service-${serviceIdentity}.json`
+   if (channel === "latest" || channel === "dev" || channel === "beta" || channel === "next") return "service.json"
+   return `service-${channel.replace(/[^a-zA-Z0-9._-]/g, "-")}.json`
+ }
+@@ -54,6 +59,7 @@ export function defaultPort(channel = OPENCODE_CHANNEL, platform = process.platf
+ }
+ 
+ function channelPort(channel: string) {
++  if (serviceIdentity) return 10_000 + (Number.parseInt(Hash.fast(serviceIdentity).slice(0, 8), 16) % 50_000)
+   if (channel === "latest" || channel === "dev" || channel === "beta" || channel === "next") return 0xc0de
+   if (channel === "local") return 0xc0df
+   return 10_000 + (Number.parseInt(Hash.fast(channel).slice(0, 8), 16) % 50_000)
