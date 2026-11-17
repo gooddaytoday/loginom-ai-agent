@@ -1429,6 +1429,16 @@ RowID,X,Target, после переоткрытия — X,Target,RowID. CSV св
 техническим именам; значения, типы, число строк и набор столбцов строго.
 Порядок в cold строго по неизменённому expected; oracle не меняется.
 
+`logreg-partition-column` (решение владельца `logreg-c6-boolean-split`, 16.11):
+только `partition-column/task-partition-column.md` и `data/partition.csv`.
+Split Boolean: false обучает, true тестирует; Split/Fold не факторы.
+`modes/oracle.py --check` проверяет обновлённый expected: прежние числа,
+64 строки, Boolean Split, конец порядка Note,Fold,Split. Сводка не критерий.
+Для native-перестановки warm/reopen сценарий включён в
+`CSV_COLUMNS_BY_NAME_SCENARIOS`; только CSV сравнивается по именам,
+значения/типы/набор полей строго, cold-порядок строго. Штатные Save/cold/cleanup;
+oracle/expected модели не передаются.
+
 `logreg-validation-kfold`: неизменённые `modes/validation-kfold/task-validation-kfold.md`
 и validation.csv, Enter без нормализации, 100% train, K-fold/3/Последовательный.
 Помимо полного CSV и штатных typed/cold проверок обязательны readback

@@ -67,13 +67,13 @@
           "label_any": true
         },
         {
-          "name": "Split",
+          "name": "Fold",
           "type": "integer",
           "label_any": true
         },
         {
-          "name": "Fold",
-          "type": "integer",
+          "name": "Split",
+          "type": "boolean",
           "label_any": true
         }
       ],
@@ -87,8 +87,8 @@
           "Target": "yes",
           "RowID": 1,
           "Note": null,
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -99,8 +99,8 @@
           "Target": "no",
           "RowID": 2,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -111,8 +111,8 @@
           "Target": "no",
           "RowID": 3,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -123,8 +123,8 @@
           "Target": "no",
           "RowID": 4,
           "Note": null,
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -135,8 +135,8 @@
           "Target": "no",
           "RowID": 5,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -147,8 +147,8 @@
           "Target": "no",
           "RowID": 6,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -159,8 +159,8 @@
           "Target": "no",
           "RowID": 7,
           "Note": null,
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -171,8 +171,8 @@
           "Target": "no",
           "RowID": 8,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -183,8 +183,8 @@
           "Target": "no",
           "RowID": 9,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -195,8 +195,8 @@
           "Target": "no",
           "RowID": 10,
           "Note": null,
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -207,8 +207,8 @@
           "Target": "yes",
           "RowID": 11,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -219,8 +219,8 @@
           "Target": "no",
           "RowID": 12,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -231,8 +231,8 @@
           "Target": "no",
           "RowID": 13,
           "Note": null,
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -243,8 +243,8 @@
           "Target": "no",
           "RowID": 14,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -255,8 +255,8 @@
           "Target": "yes",
           "RowID": 15,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -267,8 +267,8 @@
           "Target": "yes",
           "RowID": 16,
           "Note": null,
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -279,8 +279,8 @@
           "Target": "no",
           "RowID": 17,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -291,8 +291,8 @@
           "Target": "no",
           "RowID": 18,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -303,8 +303,8 @@
           "Target": "yes",
           "RowID": 19,
           "Note": null,
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -315,8 +315,8 @@
           "Target": "yes",
           "RowID": 20,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -327,8 +327,8 @@
           "Target": "yes",
           "RowID": 21,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -339,8 +339,8 @@
           "Target": "no",
           "RowID": 22,
           "Note": null,
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -351,8 +351,8 @@
           "Target": "yes",
           "RowID": 23,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -363,8 +363,8 @@
           "Target": "yes",
           "RowID": 24,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -375,8 +375,8 @@
           "Target": "yes",
           "RowID": 25,
           "Note": null,
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -387,8 +387,8 @@
           "Target": "yes",
           "RowID": 26,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -399,8 +399,8 @@
           "Target": "yes",
           "RowID": 27,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -411,8 +411,8 @@
           "Target": "yes",
           "RowID": 28,
           "Note": null,
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -423,8 +423,8 @@
           "Target": "yes",
           "RowID": 29,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -435,8 +435,8 @@
           "Target": "yes",
           "RowID": 30,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -447,8 +447,8 @@
           "Target": "yes",
           "RowID": 31,
           "Note": null,
-          "Split": 0,
-          "Fold": 1
+          "Fold": 1,
+          "Split": false
         },
         {
           "PredictionEvent": true,
@@ -459,8 +459,8 @@
           "Target": "no",
           "RowID": 32,
           "Note": "synthetic",
-          "Split": 0,
-          "Fold": 0
+          "Fold": 0,
+          "Split": false
         },
         {
           "PredictionEvent": false,
@@ -471,8 +471,8 @@
           "Target": "no",
           "RowID": 33,
           "Note": null,
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -483,8 +483,8 @@
           "Target": "yes",
           "RowID": 34,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -495,8 +495,8 @@
           "Target": "yes",
           "RowID": 35,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -507,8 +507,8 @@
           "Target": "yes",
           "RowID": 36,
           "Note": null,
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -519,8 +519,8 @@
           "Target": "yes",
           "RowID": 37,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -531,8 +531,8 @@
           "Target": "yes",
           "RowID": 38,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -543,8 +543,8 @@
           "Target": "yes",
           "RowID": 39,
           "Note": null,
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -555,8 +555,8 @@
           "Target": "yes",
           "RowID": 40,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -567,8 +567,8 @@
           "Target": "yes",
           "RowID": 41,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -579,8 +579,8 @@
           "Target": "yes",
           "RowID": 42,
           "Note": null,
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -591,8 +591,8 @@
           "Target": "no",
           "RowID": 43,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -603,8 +603,8 @@
           "Target": "yes",
           "RowID": 44,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -615,8 +615,8 @@
           "Target": "yes",
           "RowID": 45,
           "Note": null,
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -627,8 +627,8 @@
           "Target": "yes",
           "RowID": 46,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -639,8 +639,8 @@
           "Target": "no",
           "RowID": 47,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -651,8 +651,8 @@
           "Target": "no",
           "RowID": 48,
           "Note": null,
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -663,8 +663,8 @@
           "Target": "yes",
           "RowID": 49,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -675,8 +675,8 @@
           "Target": "yes",
           "RowID": 50,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -687,8 +687,8 @@
           "Target": "no",
           "RowID": 51,
           "Note": null,
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -699,8 +699,8 @@
           "Target": "no",
           "RowID": 52,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -711,8 +711,8 @@
           "Target": "no",
           "RowID": 53,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": false,
@@ -723,8 +723,8 @@
           "Target": "yes",
           "RowID": 54,
           "Note": null,
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -735,8 +735,8 @@
           "Target": "no",
           "RowID": 55,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -747,8 +747,8 @@
           "Target": "no",
           "RowID": 56,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -759,8 +759,8 @@
           "Target": "no",
           "RowID": 57,
           "Note": null,
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -771,8 +771,8 @@
           "Target": "no",
           "RowID": 58,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -783,8 +783,8 @@
           "Target": "no",
           "RowID": 59,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -795,8 +795,8 @@
           "Target": "no",
           "RowID": 60,
           "Note": null,
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -807,8 +807,8 @@
           "Target": "no",
           "RowID": 61,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -819,8 +819,8 @@
           "Target": "no",
           "RowID": 62,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -831,8 +831,8 @@
           "Target": "no",
           "RowID": 63,
           "Note": null,
-          "Split": 1,
-          "Fold": 1
+          "Fold": 1,
+          "Split": true
         },
         {
           "PredictionEvent": true,
@@ -843,8 +843,8 @@
           "Target": "yes",
           "RowID": 64,
           "Note": "synthetic",
-          "Split": 1,
-          "Fold": 0
+          "Fold": 0,
+          "Split": true
         }
       ]
     }

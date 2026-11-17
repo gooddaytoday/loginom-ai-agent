@@ -12,18 +12,19 @@ Intercept, epsilon=1e-10; no bindings. Request parameter_schema.
 ## K-fold validation
 
 Enter: `logistic.validation:{method:"kfold",folds:3,sampling:"sequential"}`.
-Integer folds >=2, all rows train; no partition/weight_field. Fold is informational.
-Readback: folds/sampling; training.validation: executed folds/samples_per_fold
-bound to Teach. Port 2/full summary unsupported. Read table 0,
-CSV technical names, Save. Reopen/apply with saved validation, without Teach.
-Omitted validation requires no saved validation.
+Integer folds >=2; all train, no partition/weights. Fold informational.
+Readback proves Teach folds/samples. Table 0, technical CSV, Save; no port 2.
+Reopen/apply: saved validation, no Teach; omission requires none saved.
 
-## Sequential partition
+## Train/test partition
 
 Enter: `logistic.partition:{method:"sequential",train_percent:50,test_percent:50}`.
 Both >0, sum 100; first rows train, next test; predict all rows. Split/Fold
-are informational. Omit for 100% training. Readback: percentages and
-train/test/total counts. Reopen/apply with saved partition, without Teach.
+are informational. Omit: all train. Readback: percentages and row counts.
+Column: `logistic.partition:{method:"column",field:"Split"}`; Boolean flag,
+false trains, true tests. Exclude it from input_fields; retain it in output.
+No percentages/validation. Reopen/apply verifies saved partition, no Teach.
+After reopened Execute/read, Save again before finishing.
 
 ## Real frequency weights
 
@@ -53,15 +54,13 @@ Enter, saved parameters, finish:"execute", read.ports:[1] or [0,1],
 read.require_exact_numbers:true. Port 1: Name, DisplayName, UniqueValues, then
 target-prefixed _coefficients, _stdError, _wald, _waldPValue, _oddsRatio,
 _lowerBound, _upperBound (95%). Preserve NULL, precision and order.
-CSV: exports.text, output:1, technical names. Reopen/apply, saved parameters,
-read.ports:[1], no Teach.
+Export output:1, technical names; apply saved parameters, read.ports:[1], no Teach.
 
 ## Normalization
 
 `logistic.normalization:"standardize"` standardizes predictors; "none" disables it.
-First enter/none, Execute/read [0]; then same existing ref, standardize,
-Execute/read [0,1]. Coefficients use normalized units. Omission on existing
-preserves normalization; reopen/apply verifies it without Teach.
+Enter/none, Execute/read [0]; same ref, standardize, Execute/read [0,1].
+Coefficients: normalized units. Existing omission preserves; apply verifies, no Teach.
 <!-- /mode -->
 
 <!-- mode: ridge lasso elastic_net -->

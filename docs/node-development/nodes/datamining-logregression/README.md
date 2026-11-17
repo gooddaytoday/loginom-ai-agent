@@ -68,6 +68,20 @@ Save и close/logout без discard подтверждены. Сценарий
 `logreg-partition-sequential`: исходные task/data, штатные CSV/Save/cold/cleanup,
 oracle и численные ожидания модели не передаются.
 
+Разбиение по Boolean-столбцу (решение `logreg-c6-boolean-split`, LAB-1796):
+`logistic.partition:{method:"column",field:"Split"}`. false — train, true — test;
+поле должно быть Boolean и отличаться от факторов, цели и веса. Оно остаётся
+информационным полем выхода. Доли не задаются; валидация выключена.
+Apply проверяет сохранённый способ и поле без Teach и изменения настроек.
+Readback: `partition.method:"column"`, `partition.field` из native-контрола.
+
+`logreg-partition-column` использует собственные Boolean CSV и expected из
+`acceptance/modes/partition-column/`; численные значения прежние, окончание
+порядка порта 0 — Note,Fold,Split. Только CSV допускает сравнение по именам
+при native-перестановке warm/reopen; cold сохраняет строгий порядок.
+Типы, все 64 строки, значения, NULL и набор полей строго сверяются;
+TrainClsErrorPercentage остаётся ограничением вне критериев.
+
 ## Исторические материалы и план расширений
 
 ### Прежнее состояние

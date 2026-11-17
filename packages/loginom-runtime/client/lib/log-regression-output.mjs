@@ -5,6 +5,7 @@ import {ensureGroupingOutputSources} from './grouping-output-sources.mjs';
 const need=(v,m)=>{if(!v)throw Error('Logistic regression output: '+m);};
 export function logRegressionOutputColumns(configuration,port=0){
  const target=configuration.fields.filter(f=>f.usage_type===4);need(target.length===1,'one configured target required');
+ const partitionField=configuration.partition?.sampling===2?configuration.partition.field:undefined;
  need(port===0||port===1,'only prediction 0 and coefficients 1 are supported');
  if(port===1)return [
   ...['Name','DisplayName','UniqueValues'].map(name=>({name,type:'string'})),
@@ -13,14 +14,16 @@ export function logRegressionOutputColumns(configuration,port=0){
   {name:'PredictionProbability',label:'Вероятность события|Прогноз',type:'real'},
   {name:'ActualEvent',label:'Событие|Факт',type:'boolean'},
   {name:target[0].name+'_predicted',label:target[0].label+'|Прогноз',type:'string'},
-  ...(configuration.fields.some(f=>f.usage_type===7)?[...configuration.fields.filter(f=>f.usage_type===3),...target,...configuration.fields.filter(f=>![3,4,7].includes(f.usage_type)),...configuration.fields.filter(f=>f.usage_type===7)]:configuration.fields).map(({name,label,type,data_kind})=>({name,label,type,data_kind}))];
+  ...(configuration.fields.some(f=>f.usage_type===7)||partitionField?[...configuration.fields.filter(f=>f.usage_type===3),...target,...configuration.fields.filter(f=>![3,4,7].includes(f.usage_type)&&f.name!==partitionField),...configuration.fields.filter(f=>f.usage_type===7),...configuration.fields.filter(f=>f.name===partitionField)]:configuration.fields).map(({name,label,type,data_kind})=>({name,label,type,data_kind}))];
 }
 export async function configureLogRegressionOutputs(channel,configuration,p,mappings,finishWizard){
  need(mappings.length===0,'mapping overrides are outside stage 1');
- // l1466-r1 CSV retained RowID before factors, while cold regenerates role
- // order. Use the existing native mapping controls to pin the weighted layout.
+ // LAB-1796 c2 cold actual-readback retained Split before informational fields.
+ // Pin the approved order with the same native mapping
+ // controls already used for weighted predictions; never relax cold matching.
  const weighted=configuration.mode!=='apply'&&configuration.fields.some(f=>f.usage_type===7);
- if(weighted){
+ const column=configuration.mode!=='apply'&&configuration.partition?.sampling===2;
+ if(weighted||column){
   await channel.openOutputPort(0);
   const observe=condition=>channel.observe({condition,readMappings:true,ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
   let state=await observe('complete weighted prediction mapping');const expected=logRegressionOutputColumns(configuration);
@@ -40,7 +43,7 @@ export async function configureLogRegressionOutputs(channel,configuration,p,mapp
  }
  // Preserve both intrinsic tables; verify their materialized schemas after
  // native training/Execute. Coefficient labels come from the native output.
- return {verified:true,cleanup_complete:true,effect_possible:weighted,deferred_schema:true,
+ return {verified:true,cleanup_complete:true,effect_possible:weighted||column,deferred_schema:true,
   ports:[0,1].map(port=>({port,schema:logRegressionOutputColumns(configuration,port)}))};
 }
 export async function readLogRegressionOutputs(channel,read,ctx,mapped){

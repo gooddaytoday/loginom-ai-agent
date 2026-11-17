@@ -21,9 +21,11 @@ export function validateLogRegressionParameters(parameters,mode,r){
  const partition=p.partition;
  if(partition!==undefined){
   need(['enter','apply'].includes(mode),'partition requires enter or saved Enter apply');
-  need(partition&&typeof partition==='object'&&!Array.isArray(partition)&&Object.keys(partition).length===3
-   &&partition.method==='sequential'&&['train_percent','test_percent'].every(k=>typeof partition[k]==='number'&&Number.isFinite(partition[k])&&partition[k]>0&&partition[k]<100)
-   &&partition.train_percent+partition.test_percent===100,'partition requires sequential, positive train_percent/test_percent summing to 100');
+  need(partition&&typeof partition==='object'&&!Array.isArray(partition),'partition must be an object');
+  need(partition.method==='column'
+   ?Object.keys(partition).length===2&&name(partition.field)
+   :Object.keys(partition).length===3&&partition.method==='sequential'&&['train_percent','test_percent'].every(k=>typeof partition[k]==='number'&&Number.isFinite(partition[k])&&partition[k]>0&&partition[k]<100)&&partition.train_percent+partition.test_percent===100,
+   'partition requires column with Boolean field, or sequential with positive train_percent/test_percent summing to 100');
  }
  const regularization=p.regularization;
  if(mode==='ridge')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_ridge==='number'&&Number.isFinite(regularization.lambda_ridge)&&regularization.lambda_ridge>0,'ridge requires regularization:{lambda_ridge:positive finite number}');
@@ -42,7 +44,7 @@ export function validateLogRegressionParameters(parameters,mode,r){
   }
   if(mode==='stepwise'&&selection.criterion==='deviance')need(selection.entry_significance<selection.removal_significance,'entry_significance must be below removal_significance');
  }
- const names=[...p.input_fields,p.target_field,...(p.weight_field===undefined?[]:[p.weight_field])];need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'predictors, target and weight must be distinct');
+ const names=[...p.input_fields,p.target_field,...(p.weight_field===undefined?[]:[p.weight_field]),...(partition?.method==='column'?[partition.field]:[])];need(new Set(names.map(n=>n.toLowerCase())).size===names.length,'predictors, target, weight and partition field must be distinct');
  if(r){
   if(mode==='apply')need(r.target.kind==='existing'&&r.inputs.length===0&&r.finish==='execute','apply requires an existing trained model, unchanged connections and finish execute');
   need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&(r.target.kind==='existing'||r.inputs.length===1),'one connected training table is required');
@@ -56,5 +58,6 @@ export function resolveLogRegressionRoles(parameters,fields){
  for(const name of p.input_fields){const f=fields.find(f=>f.name===name);need(f&&['integer','real'].includes(f.type)&&f.data_kind==='Непрерывный','predictor must be an observed continuous numeric field: '+name);}
  const target=fields.find(f=>f.name===p.target_field);need(target&&target.type==='string'&&target.data_kind==='Дискретный','target must be an observed discrete string field');
  if(p.weight_field!==undefined){const weight=fields.find(f=>f.name===p.weight_field);need(weight&&weight.type==='real','weight_field requires an observed Real field; Loginom 7.4.2 has no Integer Weight role');}
+ if(p.partition?.method==='column')need(fields.some(f=>f.name===p.partition.field&&f.type==='boolean'),'partition field requires an observed Boolean test flag: false trains, true tests');
  return fields.map(f=>({...f,usage_type:p.input_fields.includes(f.name)?3:f.name===p.target_field?4:f.name===p.weight_field?7:0}));
 }
