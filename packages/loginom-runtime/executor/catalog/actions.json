@@ -942,13 +942,15 @@
           "reopened": {
             "type": "boolean",
             "enum": [
-              false
+              false,
+              true
             ]
           },
           "workflow_preserved": {
             "type": "boolean",
             "enum": [
-              true
+              true,
+              false
             ]
           },
           "save_completed": {
@@ -1106,7 +1108,9 @@
         "message.text",
         "message.error",
         "message.yes",
-        "message.no"
+        "message.no",
+        "packages.close",
+        "packages.open"
       ],
       "evidence": [
         {
@@ -1133,8 +1137,8 @@
       ],
       "postconditions": [
         "the awaited native Save As flow completed without an error",
-        "exact normalized destination path is observed in the same active workflow",
-        "the same graph remains open; no package close or reopen",
+        "exact normalized destination path and graph are observed",
+        "without REST connection references the same workflow stays open; REST references additionally reopen and verify a clean package after at most one extra Save",
         "persisted content requires separate final reopen acceptance"
       ],
       "effect": {

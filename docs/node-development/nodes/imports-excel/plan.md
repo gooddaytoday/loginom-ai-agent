@@ -265,6 +265,44 @@ server package_closed/logged_out первой сессии **не подтвер
 C3/C4/C5/C7/C8/C10 — границы source/readback/приёмки. Это точки решения владельца,
 а не разрешение вносить изменения в общем коде. На этапе 0 таких изменений нет.
 
+### C8: динамическая схема, LAB-1752
+
+Native-проба 16.11.2026 на Loginom 7.4.2, mas, от
+`v040@3d82fce6f6e9565c9a7004e60f4947c68240d045`, до production-правки:
+AB→ABD→BC на тех же узлах. Нет сохраняет A,B (1,10 → 1,10 → 20,2);
+Только новые добавляет D:string=`new` при Execute ABD, затем BC даёт A20,B2;
+Все даёт A,B → A,B,D → B,C. Types-a→types-b на том же узле меняет
+Value integer4→string5 и 10→`text`. Расхождений с C8 expected нет.
+Режимы прочитаны из `ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode`.
+Пакет пробы сохранён, закрыт; logout и отсутствие discard подтверждены.
+
+Аддитивный `excel.auto_detect` none/new/all. Прежний ручной контракт и
+exact-schema `source_switch` сохранены. Path-only existing patch сохраняет
+определения/параметры; All запрещает ручные columns. Только new/all откладывают
+проверку выхода до свежего принадлежащего узлу Execute: new сверяет сохранённый
+префикс позиций/типов, all — всю наблюдённую новую схему. В readback прежняя
+ветка Нет сохранена, добавлена ветка с `dynamic_schema` и execution_id;
+непрочитанный вид нового поля не выдумывается.
+
+Наблюдённая native особенность All: собственная постоянная `.x-mask` на
+отключённом `ColumnsMappingEngineOutputPortWizard;colTargetDelete` не является
+загрузкой. Только этот точный native/DOM owner исключён из ожидания мастера;
+остальные маски и общий UI-код сохраняют guards. Live production-reader:
+прежде `automatic typing must be disabled`, после — verified All/BC.
+
+Регистрация четырёх `excel-import-auto-*` и cold-аудит политики находятся в
+`scripts/node-acceptance`; исходные task/fixtures/expected контейнера не менялись.
+Native-проба не является CLI/cold/2 из 3 PASS.
+
+Первый CLI C8 None на `2f4ec0c3` выявил отказ завершения отдельного выходного
+порта: `execution-events.jsonl:132` содержит verified native mapping/owner,
+но `:135–201` при `calculator done available` уже не читает mapping, и видимая
+`btnDone` теряет `finish_wizard`. После browser recovery значения AB/BC верны,
+но первоначальный apply не завершён, поэтому audit не засчитывает такой результат.
+В общем finisher только Excel output port получает `readMappings:true`;
+остальные типы и проверки owner/Done сохранены. Повторная CLI/cold приёмка
+выполняется на новом чистом SHA; первая попытка остаётся продуктовым FAIL.
+
 ### Размеры и критерии для утверждения
 
 На базе назначения `node --test test/model-schema-budget.test.mjs`:
@@ -296,3 +334,20 @@ C8 утвердить семантику Нет/Только новые/Все �
 Каждый цикл — один PR, порядок: C7 (имя из переменной), C4 (список/маска/потоки),
 затем C8 и C5. C6 XLSM **отложен**: требует правки `packages/opencode`.
 C9 XLS — ограничение 7.4.2; C10 HTTP/Basic — нет стенда.
+## C8 follow-up: native output-port Done
+
+Before the third build, the failed production observations at
+`final-r3-none/execution-events.jsonl:137,211` showed enabled, point-observed
+Done, no masks, a verified complete native mapping and a GUID-bound output0.
+`wizard.port_context.status` remained `unobserved`, so no `finish_wizard`
+action was granted. Excel was missing from the existing output-folder toolbar
+overflow type list. Add only its native icon to that list; retain the same
+opening receipt, port/index/GUID, ancestry, visibility and duplicate guards.
+The existing overflow test matrix now covers Excel and failed before this fix.
+Other node types and the detection modes' deferred mapping path are unchanged.
+
+The C8 audit also excludes a prepared creation request only when its matching
+completed `node.apply` receipt proves `NOT_APPLIED` and `effect_possible=false`.
+An ambiguous, unmatched, incomplete or possibly effective attempt still counts.
+This has positive and negative tests; canonical expected data is unchanged.
+

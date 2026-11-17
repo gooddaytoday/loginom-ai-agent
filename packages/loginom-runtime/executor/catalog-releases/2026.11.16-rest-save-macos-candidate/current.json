@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "status": "candidate",
+  "catalog_version": "2026.11.16-rest-save-macos-candidate",
+  "manifest_uri": "viking://resources/loginom-dock/catalogs/executor-preview/releases/2026.11.16-rest-save-macos-candidate/manifest.json",
+  "manifest_sha256": "da96c141cdf7df26680ff5a3ef026b6fc6d7b3473e684e26d4b083ba197c4b09"
+}

@@ -1,4 +1,5 @@
 import {sameJsonValues,sameRestEchoValues} from './tree-conversion.mjs';
+import {isDeepStrictEqual} from 'node:util';
 const need=(v,m)=>{if(!v)throw Error(m);};
 // Read the first CSV record, including quoted separators/newlines and UTF-8 BOM.
 // The complete downloaded file is checked by the scenario's file oracle.
@@ -536,7 +537,20 @@ export function auditRestQueryVariables(events,initial,final){
  need(JSON.stringify(a.query_parameters.map(p=>p.name))==='["limit","skip"]'&&(!b||JSON.stringify(a.query_parameters)===JSON.stringify(b.query_parameters)),'REST_QUERY_BINDINGS_CHANGED');
  for(const e of requests.filter(e=>e.index>first.index&&e.index<second.index)){
   const r=e.request;if(r.target.type!=='integration.rest_request'&&!same(r.target.ref,first.result.node))continue;
-  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'&&k==='source_operation_id'),'REST_QUERY_RECONFIGURED');
+  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'&&['source_operation_id','schemas'].includes(k)),'REST_QUERY_RECONFIGURED');
+  if(Object.hasOwn(r.parameters??{},'schemas')){
+   const source=checkpoints.findLast(c=>c.index<e.index&&c.result.operation_id===r.parameters.source_operation_id&&same(c.result.node,r.target.ref));
+   const schemas=r.parameters.schemas,ports=r.read?.ports,outputs=source?.result.output?.ports;
+   need(r.finish==='execute'&&!r.bindings?.length&&source?.result.execution?.status==='completed'
+    &&Array.isArray(outputs)&&Array.isArray(schemas)&&schemas.length>0&&Array.isArray(ports)
+    &&ports.length===schemas.length&&new Set(ports).size===ports.length
+    &&schemas.every(s=>s&&Object.keys(s).sort().join(',')==='port,schema'&&Number.isInteger(s.port)
+      &&ports.includes(s.port)&&Array.isArray(s.schema)&&s.schema.length>0)
+    &&new Set(schemas.map(s=>s.port)).size===schemas.length
+    &&schemas.every(s=>{const matches=outputs.filter(p=>p.port===s.port);
+      return matches.length===1&&isDeepStrictEqual(s.schema,matches[0].schema);}),
+    'REST_QUERY_RECONFIGURED');
+  }
   need(r.target.type==='integration.rest_request'&&same(r.target.ref,first.result.node)&&!r.inputs?.length&&!r.variable_inputs?.length,'REST_QUERY_REPLACED');
  }
  const completed=requests.flatMap(q=>{const c=checkpoints.find(c=>c.result.operation_id===q.operation_id);return c?[{...q,node:c.result.node}]:[];});

@@ -270,6 +270,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const channel = {
     // Private cleanup proofs must use the same clock as this procedure's deadline.
     now,
+    async readExistingProcesses() {
+      checkBudget();
+      if(!preparedNodeContext)throw Error('Prepared node required for existing execution read');
+      const result=await execute(makeNodeProcessContextCode(preparedNodeContext,{existingOutput:true}),
+        {timeout:Math.max(5000,operation.deadline-now()+5000)});
+      await entry('node_existing_execution_observed',{outcome:structuredClone(result)});
+      return result;
+    },
     async readOutputPort(request) {
       checkBudget();
       const readType=(operation.nodeApply?.request??operation.parameters)?.target?.type;
@@ -298,7 +306,17 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       operation.portReadCleanupComplete=operation.cleanupConfirmed=valid&&result.cleanup_complete===true;
       checkBudget();
       if(valid&&!result.verified&&result.read_diagnostic)await entry('node_port_output_read_refused',{reason:result.reason,diagnostic:structuredClone(result.read_diagnostic),cleanup_complete:result.cleanup_complete});
-      if(!valid||!result.verified||!operation.cleanupConfirmed)throw Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
+      if(!valid||!result.verified||!operation.cleanupConfirmed){
+        const error=Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
+        if(valid&&!result.verified&&operation.cleanupConfirmed
+          &&operation.parameters?.mode==='read_existing_output'&&operation.parameters.parameters?.execution_policy==='existing'){
+          error.code='NODE_OUTPUT_READ_REFUSED';
+          error.message+='. No Execute was sent.';
+          error.nodePhaseRefusal={phase:'read',status:'FAILED',effect_possible:false,cleanup_complete:true,
+            verification:'existing_output_read_only',node:preparedNodeContext.node};
+        }
+        throw error;
+      }
       await entry('node_port_output_read',{outcome:structuredClone(result)});
       checkBudget();
       return structuredClone(result);

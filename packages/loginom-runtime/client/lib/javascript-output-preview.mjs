@@ -16,7 +16,30 @@ export function managedJavascriptPreviewAdmission(history,binding,port){
  const matches=history.filter(item=>owner(item.request?.target?.ref)||owner(item.outcome?.output?.node));
  need(matches.length>0&&matches.every(item=>Number.isSafeInteger(item.sequence))
   &&new Set(matches.map(item=>item.sequence)).size===matches.length,'Managed JavaScript history is ambiguous');
- const latest=matches.reduce((a,b)=>a.sequence>b.sequence?a:b),request=latest.request,node=latest.outcome?.output;
+ // Existing output reads prove data freshness, not a new source admission.
+ // Opening the source wizard can deactivate that output even on discard.
+ const observational=item=>item.request?.target?.type==='programming.javascript'
+  &&item.request.mode===NODE_READ_MODE&&item.request.parameters?.execution_policy==='existing';
+ const candidates=matches.filter(item=>!observational(item));
+ need(candidates.length>0,'Managed JavaScript source operation unavailable');
+ const latest=candidates.reduce((a,b)=>a.sequence>b.sequence?a:b),request=latest.request,node=latest.outcome?.output;
+ let data=node;
+ // A settled readonly failure can be followed by a successful retry. Neither
+ // may conceal a pending operation, foreign owner or changed native execution.
+ const trailing=matches.filter(item=>observational(item)&&item.sequence>latest.sequence);
+ need(trailing.every(item=>item.cleanup_confirmed===true&&item.outcome?.cleanup_complete===true
+  &&['SUCCEEDED','FAILED'].includes(item.outcome.status)), 'Later existing JavaScript output read is unsettled');
+ if(trailing.length){
+  const item=trailing.reduce((a,b)=>a.sequence>b.sequence?a:b),read=item.outcome.output;
+  need(item.outcome.status==='SUCCEEDED'&&read?.status==='SUCCEEDED'&&read.cleanup_complete===true&&owner(read.node)
+   &&read.configuration?.status==='not_requested'&&read.execution?.status==='completed'
+   &&read.execution.execution_id===node?.execution?.execution_id&&read.output?.verified===true
+   &&read.output.execution_id===read.execution.execution_id,
+   'Latest existing JavaScript output read owner or native execution differs');
+  // Data evidence may come from that read even if the source operation had
+  // no preview; it never supplies a replacement source-code admission.
+  if(read.output.ports?.some(p=>p.port===0))data=read;
+ }
  need(request?.target?.type==='programming.javascript'&&latest.cleanup_confirmed===true
   &&latest.outcome?.status==='SUCCEEDED'&&latest.outcome.action_key==='node.apply'
   &&latest.outcome.operation_id===request.operation_id&&node?.operation_id===request.operation_id
@@ -38,9 +61,9 @@ export function managedJavascriptPreviewAdmission(history,binding,port){
  }
  const read=reread?request:buildNodeReadRequest({operation_id:'preview-admission',source_operation_id:request.operation_id,read:{ports:[0]}},
   {parameters:request,outcome:latest.outcome});
- const outputs=node.output?.ports?.filter(p=>p.port===0),output=outputs?.[0],execution=node.execution?.execution_id;
- need(typeof execution==='string'&&execution.length>0&&node.output?.verified===true&&node.output.cleanup_complete===true
-  &&node.output.execution_id===execution&&outputs?.length===1&&output.fresh===true&&output.execution_id===execution
+ const outputs=data.output?.ports?.filter(p=>p.port===0),output=outputs?.[0],execution=data.execution?.execution_id;
+ need(typeof execution==='string'&&execution.length>0&&data.output?.verified===true&&data.output.cleanup_complete===true
+  &&data.output.execution_id===execution&&outputs?.length===1&&output.fresh===true&&output.execution_id===execution
   &&port.index===0&&port.native_index===0&&port.active===true&&output.port_guid===port.port_guid,
   'Managed JavaScript preview requires the same freshly executed native output zero');
  return {source_operation_id:request.operation_id,execution_id:execution,

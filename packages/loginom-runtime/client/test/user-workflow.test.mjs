@@ -14,6 +14,16 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
+test('an unrelated workflow replacement retires its previous identity before another node request',()=>{
+ const b=createUserWorkflowBindings(),previous=workspace();b.remember(previous);
+ const fresh={...previous,workflow_ref:{...previous.workflow_ref,workflow_id:'reopened',tab_tid:'fresh-tab',prefix:'fresh-prefix'}};
+ b.remember({...fresh,previous_workflow_ref:previous.workflow_ref});
+ assert.throws(()=>b.expandNode(request()),/UNKNOWN_PREPARED_WORKFLOW/);
+ assert.throws(()=>b.expandNodeRead({kind:'source',document_id:'doc',workflow_ref:{workflow_id:'wf'}}),/UNKNOWN_PREPARED_WORKFLOW/);
+ const current={...request(),workflow_ref:{workflow_id:'reopened'},target:{...request().target,ref:{...request().target.ref,workflow_id:'reopened'}}};
+ assert.deepEqual(b.expandNode(current).workflow_ref,fresh.workflow_ref);
+});
+
 test('LAB-374 preview request expands without an upload destination or import defaults',async()=>{
  const b=createUserWorkflowBindings();b.remember(workspace());
  const parameters={source:{kind:'storage',server_source_ref:'storage-one'},preview_only:true,

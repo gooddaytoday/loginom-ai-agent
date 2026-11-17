@@ -4,6 +4,9 @@ import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
 import { compactActionResult } from '../lib/user-results.mjs';
+import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
+import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
+import {makeCapabilityCode} from '../lib/executor.mjs';
 
 test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
   for (const action of ['package.save_checkpoint', 'package.save_as']) {
@@ -745,8 +748,8 @@ test('save conflict cleanup is not complete while its native dialog remains open
 async function continuationPage() {
  const page=linkPage();await page.execute('async page=>true');
  class WorkFlowTreeNode{};page.app.WorkFlowTreeNode=WorkFlowTreeNode;
- const pkg=new page.app.PackageTreeNode(),flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
- const tab={classList:{contains:name=>name==='x-tab-active'}};
+ let pkg=new page.app.PackageTreeNode(),flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
+ let tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
  const card={Controller:{FController:page.model,Node:{data:{node:flow}}}};
  page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
  let parentLength=0;const components=new Map();
@@ -767,13 +770,133 @@ async function continuationPage() {
  const document={querySelectorAll:selector=>{
    if(selector.includes('cnrNaviMode'))return crumbs().filter(e=>selector.includes('^=')||selector==='[data-tid='+JSON.stringify(e.tid)+']');
    if(selector.includes('cmpDiagram'))return [page.model.FDiagram.FmxGraph.container];
-   if(selector.includes('tb-1'))return [tab];return [];
+   if(selector==='[data-tid='+JSON.stringify(page.tabTid)+']'&&page.active)return [tab];return [];
  }};
  page.context.Ext={getCmp:id=>components.get(id)};
  page.context.document=document;
  page.context.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'workflow',tab,packageNode:pkg,nodeTargetWorkflowNode:flow}]])};
- return {page,flow,card};
+ return {page,flow,card,reopenNative(){
+  pkg=new page.app.PackageTreeNode();flow=new WorkFlowTreeNode();flow.ParentNode=pkg;
+  card.Controller.Node.data.node=flow;
+  tab={tid:page.tabTid,getAttribute(){return this.tid;},classList:{contains:name=>name==='x-tab-active'}};
+  return pkg;
+ }};
 }
+
+async function restSavePage(modified, restReference = true) {
+ const {page,flow,card,reopenNative}=await continuationPage(),pkg=flow.ParentNode;
+ page.storageBinding={session_id:'save-session',document_id:'doc',loginom_account:'save-user',origin:'https://loginom.invalid'};
+ pkg.Package={};pkg.HasRunningNodes=()=>false;Object.defineProperty(pkg,'ReadOnly',{value:false});
+ page.model.FDiagram.FNodes={FCollection:[{FGuid:'reference',FIconCls:restReference?'bg-vendor-icon-restclientconnection':'bg-vendor-icon-restclient'},
+  {FGuid:'rest',FIconCls:'bg-vendor-icon-restclient'},{FGuid:'source',FIconCls:'source'}]};
+ page.onReopen=()=>{const fresh=reopenNative();fresh.Package={};fresh.HasRunningNodes=()=>false;fresh.ReadOnly=false;};
+ page.app.Application.FInstance.FMainForm.FMapTree={PackageNodes:{Count:1,Items:()=>card.Controller.Node.data.node.ParentNode},
+  FServerConnection:{Connected:true,UserName:'save-user',Session:{IsPackageModified:async()=>{
+   page.modifiedReads++;return modified[Math.min(page.modifiedReads-1,modified.length-1)];
+  }}}};
+ page.context.location={origin:'https://loginom.invalid'};
+ page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
+ await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
+ page.saveWrites=0;page.modifiedReads=0;
+ const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
+ page.save=()=>{page.saveWrites++;save();};
+ page.elements=()=>[...elements(),...(page.menu?[page.element('MF;MainMenuForm;btnSavePackage',{symbol:'native-save'})]:[])];
+ page.click=async item=>{if(item.symbol==='native-save'){page.events.push('native_save');page.save();page.menu=false;return;}return click(item);};
+ return page;
+}
+
+for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
+test('REST checkpoint retains the legacy path without catalog selectors: '+missing,async()=>{
+ const page=await restSavePage([true,true]);
+ const action=structuredClone(actions.get('package.save_checkpoint'));
+ action.selector_symbols=action.selector_symbols.filter(symbol=>!missing.includes(symbol));
+ const outcome=await page.execute(makeCapabilityCode(action,selectors,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},
+  {expected_build:build,storage_binding:page.storageBinding}));
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(outcome.output.reopened,false);assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
+ assert.equal(page.events.some(e=>e==='package_closed'||e==='package_reopened'),false);
+ assert.equal(outcome.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])
+test('REST Save refuses an empty continuation before writing: '+action,async()=>{
+ const page=await restSavePage([true,false]);
+ page.context.__loginomDockPreparationV1.receipts.clear();
+ const outcome=await run(page,action,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'FAILED',JSON.stringify(outcome));
+ assert.match(outcome.error.message,/continuation unavailable/i);
+ assert.equal(outcome.effect_possible,false);assert.equal(page.saveWrites,0);
+ assert.equal(page.events.includes('package_closed'),false);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false]])
+test('REST reference Save normalizes once after reopen: '+action+' '+modified,async()=>{
+ const page=await restSavePage(modified);
+ const outcome=await run(page,action,{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.events.filter(e=>e==='package_closed').length,1);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,false);
+ assert.ok(event.duration_ms>=0);assert.equal(outcome.output.reopened,true);
+ validateActionParameters(actions.get(action).output_schema,outcome.output);
+});
+
+test('REST normalization refuses a second dirty result without another Save or reopen',async()=>{
+ const page=await restSavePage([true,true]);
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'AMBIGUOUS',JSON.stringify(outcome));
+ assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ assert.equal(page.saveWrites,2);assert.equal(page.modifiedReads,2);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,true);
+});
+
+test('normalized REST keeps logical ownership and its same-source edit, while a changed source still refuses',async()=>{
+ const page=await restSavePage([true,false]);
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const oldTab=original.tab,oldPackage=original.packageNode,oldWorkflow=original.nodeTargetWorkflowNode;
+ const saved=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ const continuation=saved.output.workflow_continuations?.[0];
+ assert.equal(continuation?.workflow_ref.workflow_id,'workflow');
+ assert.equal(continuation.workflow_ref.tab_tid,page.tabTid);assert.notEqual(page.tabTid,oldTab.getAttribute('data-tid'));
+ assert.notEqual(original.packageNode,oldPackage);assert.notEqual(original.nodeTargetWorkflowNode,oldWorkflow);
+ const bindings=createUserWorkflowBindings();bindings.remember(continuation);
+ for(const source of ['source','changed-source']){
+  const r=bindings.expandNode({operation_id:'edit-'+source,document_id:'doc',workflow_ref:{workflow_id:'workflow'},
+   target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'workflow',node_id:'rest'}},
+   inputs:[{source:{document_id:'doc',workflow_id:'workflow',node_id:source},output:0,input:0}],
+   mode:'request',parameters:{connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'limit',field:'limit'}]},
+   finish:'execute',budgets:{total_ms:600000}});
+  const graph={complete:true,document_id:'doc',workflow_ref:r.workflow_ref,
+   nodes:[{ref:r.target.ref,type:'integration.rest_request'}],links:[{source:'source',output:0,target:'rest',input:0}]};
+  const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>graph}};
+  const support=createRestRequestNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:build});
+  const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),
+   execute:async()=>{throw Error('connection validation reached');}});
+  await assert.rejects(drivers.beforeTarget({deadline:Date.now()+60000}),source==='source'?/connection validation reached/:/different raw source/);
+  assert.equal(operation.restQueryEncoder,undefined);
+ }
+});
+
+test('normalization cannot rebind a replaced native node with the same rendered graph',async()=>{
+ const page=await restSavePage([true,false]),reopen=page.onReopen;
+ page.onReopen=()=>{reopen();page.model.FDiagram.FNodes.FCollection.find(n=>n.FGuid==='source').FGuid='replacement';};
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'AMBIGUOUS',JSON.stringify(result));
+ assert.equal(result.trace.find(e=>e.event==='reopened_package_observed').graph_matches,false);
+ assert.equal(result.trace.some(e=>e.event==='save_continuations_observed'),false);
+});
+
+test('a REST request without a connection reference keeps the ordinary checkpoint path',async()=>{
+ const page=await restSavePage([true,true],false);
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
+ assert.equal(page.events.includes('package_closed'),false);assert.equal(outcome.output.reopened,false);
+});
 
 test('saved continuation returns current navigation with the same native workflow and original binding',async()=>{
  const {page}=await continuationPage();
