@@ -62,6 +62,16 @@ export function readLogRegressionBrowser(prefix) {
     names[key]=path;values[key]=v;
    }
   }
+  let column_choices;
+  if(values.sampling===2){
+   const path='ByColumnMethodForm;pedPartitionColumn',c=exactValue(partitionBase+';'+path+';ValueControl'),store=c?.getStore?.(),records=store?.getData?.()?.items;
+   if(!c||store?.isLoading?.()||!Array.isArray(records)||records.length>1000||store.getCount?.()!==records.length)return {verified:false,reason:'logregression_partition_column'};
+   column_choices=records.map(r=>({name:r.data?.[c.valueField],label:r.data?.[c.displayField]}));
+   if(records.some((r,i)=>r.data?.IconCls!=='bg-TBGDataType-dtBoolean'||typeof column_choices[i].name!=='string'||typeof column_choices[i].label!=='string')
+    ||new Set(column_choices.map(c=>c.name)).size!==records.length)return {verified:false,reason:'logregression_partition_column_type'};
+   values.field=c.getValue();names.field=path;
+   if(values.field!==null&&!column_choices.some(c=>c.name===values.field))return {verified:false,reason:'logregression_partition_column_selection'};
+  }
   const switches={},disabled={};
   for(const [key,path] of Object.entries(names)){
    const c=exactValue(partitionBase+';'+path+';ValueControl');
@@ -84,7 +94,7 @@ export function readLogRegressionBrowser(prefix) {
    const c=exactValue(partitionBase+';'+path),value=c?.getValue();
    if(value!==undefined&&value!==''&&Number.isSafeInteger(Number(value))&&Number(value)>=0)counts[key]=Number(value);
   }
-  return {verified:true,kind:'partition',values,switches,disabled,sequence,...counts,source_status:exactValue(partitionBase+';txtActivationPortStatus')?.getValue()??null};
+  return {verified:true,kind:'partition',values,switches,disabled,sequence,...(column_choices?{column_choices}:{}),...counts,source_status:exactValue(partitionBase+';txtActivationPortStatus')?.getValue()??null};
  }
 
  const normBase=prefix+';WizrdMCF;NormTuneWizard;',normRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(normBase.slice(0,-1))+']')];

@@ -2328,6 +2328,19 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         self.assertEqual(case['source'].name, 'partition-sequential')
         self.assertEqual(runner.scenario('logreg-coefficients')['input_files'], ['train.csv'])
 
+    def test_logreg_column_partition_keeps_boolean_kit_and_oracle_private(self):
+        case = runner.scenario('logreg-partition-column')
+        self.assertEqual(case['input_files'], ['partition.csv'])
+        self.assertEqual(case['prompt'].name, 'task-partition-column.md')
+        self.assertEqual(case['oracle'].name, 'oracle.py')
+        expected = json.loads((case['source'] / 'expected.json').read_text())['outputs'][0]
+        self.assertEqual([c['name'] for c in expected['columns']][-2:], ['Fold', 'Split'])
+        self.assertEqual(expected['columns'][-1]['type'], 'boolean')
+        self.assertEqual(expected['column_order'], 'exact')
+        self.assertEqual(len(expected['rows']), 64)
+        self.assertTrue(all(type(r['Split']) is bool for r in expected['rows']))
+        self.assertIn('logreg-partition-column', runner.CSV_COLUMNS_BY_NAME_SCENARIOS)
+
     def test_logreg_enter_uses_authored_task_input_and_preserves_n21(self):
         self.assertEqual(runner.scenario('n21')['source'].parent.name, 'transform-slidingwindow')
         case = runner.scenario('logreg-enter')

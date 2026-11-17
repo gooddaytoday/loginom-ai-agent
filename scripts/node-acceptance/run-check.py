@@ -29,7 +29,7 @@ SCENARIOS = {
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
-CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-validation-kfold')
+CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
@@ -800,11 +800,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['weighted.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
-    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net', 'logreg-partition-sequential', 'logreg-validation-kfold']:
+    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net', 'logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold']:
         variant = name.removeprefix('logreg-')
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes' / variant
         return dict(source=src, prompt=src / ('task-' + variant + '.md'), data=src / 'data', base=None,
-                    input_files=['partition.csv' if variant == 'partition-sequential' else 'validation.csv' if variant == 'validation-kfold' else 'train.csv'], expected_name='expected.json',
+                    input_files=['partition.csv' if variant in ('partition-sequential', 'partition-column') else 'validation.csv' if variant == 'validation-kfold' else 'train.csv'], expected_name='expected.json',
                     **(dict(logreg_kfold=True) if variant == 'validation-kfold' else {}),
                     oracle=src.parent / 'oracle.py')
 

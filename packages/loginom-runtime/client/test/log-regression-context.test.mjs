@@ -10,7 +10,7 @@ test('production DOM observes only the K-fold validation pickers and fold input 
  const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
  t.after(()=>browser.close());const page=await browser.newPage({viewport:{width:1280,height:800}});
  const root='MF;TF-1;WizrdMCF',partition=root+';LearnPartitionWizard',validation=partition+';ValidationSettings';
- const admitted=[partition+';pedSamplingMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;boundlist;K-fold_кросс-валидация',validation+';pedKFoldsSamplingMethod;ValueControl;trg_picker',validation+';pedKFoldsSamplingMethod;ValueControl;boundlist;Последовательный'];
+ const admitted=[partition+';ByColumnMethodForm;pedPartitionColumn;ValueControl;trg_picker',partition+';ByColumnMethodForm;pedPartitionColumn;ValueControl;boundlist;Split',partition+';pedSamplingMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;boundlist;K-fold_кросс-валидация',validation+';pedKFoldsSamplingMethod;ValueControl;trg_picker',validation+';pedKFoldsSamplingMethod;ValueControl;boundlist;Последовательный'];
  const foreign=[validation+';pedIterations;ValueControl;trg_picker',validation+';pedValidationColumnName;ValueControl;trg_picker',validation+';pedForeign;ValueControl;boundlist;Последовательный',partition+';Other;ValidationSettings;pedLearnValidationMethod;ValueControl;trg_picker','MF;TF-2;WizrdMCF;LearnPartitionWizard;ValidationSettings;pedLearnValidationMethod;ValueControl;trg_picker'];
  await page.route(origin+'/**',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><style>[data-tid]{min-width:20px;min-height:20px} .picker{width:80px;height:22px}</style>
  <button data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">Account</button>
@@ -247,6 +247,16 @@ function partitionFixture(){
 test('partition reader binds percentages, native row counts and complete train/test/unused order',()=>{
  const f=partitionFixture(),r=f.read();assert.equal(r.verified,true);assert.deepEqual(r.values,{train:50,test:50,sampling:1,validation:0});assert.deepEqual(r.sequence,[0,1,2]);assert.equal(r.train_count,32);assert.equal(r.test_count,32);assert.equal(r.total_count,64);
  f.records[0].data.PartitionType=1;assert.equal(f.read().verified,false);
+});
+test('column partition reader binds only the native Boolean picker and selected field',()=>{
+ const f=partitionFixture();f.values[f.base+';pedSamplingMethod;ValueControl']=2;
+ assert.equal(f.read().verified,false);
+ const field=f.add(f.base+';ByColumnMethodForm;pedPartitionColumn;ValueControl','Split');
+ field.valueField='Value';field.displayField='DisplayText';
+ const records=[{data:{Value:'Split',DisplayText:'Split',IconCls:'bg-TBGDataType-dtBoolean'}}];
+ field.getStore=()=>({isLoading:()=>false,getCount:()=>1,getData:()=>({items:records})});
+ const r=f.read();assert.equal(r.verified,true);assert.equal(r.values.field,'Split');assert.deepEqual(r.column_choices,[{name:'Split',label:'Split'}]);
+ records[0].data.IconCls='bg-TBGDataType-dtInteger';assert.equal(f.read().verified,false);
 });
 test('partition reader refuses stale sequence inventory and retains variable binding flags',()=>{
  for(const mutate of [f=>f.store.isLoading=()=>true,f=>f.store.getCount=()=>2,f=>f.records[1].data.SequenceOrder=0,f=>f.records[1].data.SizePath='Var.X']){const f=partitionFixture();mutate(f);assert.equal(f.read().verified,false);}
