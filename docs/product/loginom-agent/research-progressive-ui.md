@@ -30,7 +30,8 @@
 - [З] Пустое состояние — место для объяснения и прямой кнопки к задаче. — [NN/g, 2021](https://www.nngroup.com/articles/empty-state-interface-design/)
 - [З] Больше двух уровней раскрытия — люди теряются; часто нужное держать видимым. — [NN/g, Progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
 - [И] Урезанный стартовый интерфейс: базовое находят быстрее, но о продвинутых функциях знают меньше (3,1 против
-  7,1 из 20 на тесте припоминания). — [Findlater & McGrenere, 2007](https://www.cs.ubc.ca/labs/edapt/papers/findlater2007.pdf)
+  7,1 из 20 на тесте припоминания); косвенная мера — время на продвинутые команды — различий не показала. —
+  [Findlater & McGrenere, 2007](https://www.cs.ubc.ca/labs/edapt/papers/findlater2007.pdf)
 - [И] Самоподстраивающиеся меню Word 2000: 13 из 20 предпочли меню, которое настраивают сами; 7 из 20 не
   заметили, что меню меняется. — [McGrenere et al., CHI 2002](https://www.dgp.toronto.edu/public_user/RMB/papers/p28.pdf);
   в Office 2007 такие меню выключены по умолчанию — [Microsoft, 2006](https://learn.microsoft.com/en-us/archive/blogs/jensenh/the-end-of-personalized-menus)
@@ -39,8 +40,8 @@
 - [З] Содержимое по наведению: важное для задачи не прятать; открывать и с клавиатуры; можно закрыть, можно
   навести на него курсор, само не пропадает. — [NN/g, Tooltips](https://www.nngroup.com/articles/tooltip-guidelines/),
   [WCAG 1.4.13](https://www.w3.org/WAI/WCAG21/Understanding/content-on-hover-or-focus.html)
-- [И] Скрытая навигация на десктопе: ею пользуются в 27% случаев против 48% у видимой, работа минимум на 39%
-  медленнее. — [NN/g, 2016](https://www.nngroup.com/articles/hamburger-menus/)
+- [И] Скрытая навигация сайтов на десктопе (не приложений и не элементы по наведению): ею пользуются в 27% случаев
+  против 48% у видимой, работа минимум на 39% медленнее. — [NN/g, 2016](https://www.nngroup.com/articles/hamburger-menus/)
 - [З] Примеры: Notion показывает «+» и «⋮⋮» у блока при наведении — [Notion](https://www.notion.com/help/writing-and-editing-basics);
   VS Code показывает действия панели при наведении и даёт настройку «показывать всегда» —
   [исходник](https://raw.githubusercontent.com/microsoft/vscode/main/src/vs/workbench/browser/workbench.contribution.ts);
@@ -48,24 +49,30 @@
 
 ## 2. Оболочка AI-приложений
 
-- [З] Левая панель — список работы (проекты, закреплённое, недавние разговоры, задачи агента со статусом), а не
+Закономерности ниже — вывод исследователя по документации и официальным скриншотам; живые интерфейсы не
+открывались, поэтому метка [В], а ссылки показывают, на чём вывод основан.
+
+- [В] Левая панель — список работы (проекты, закреплённое, недавние разговоры, задачи агента со статусом), а не
   меню функций: ChatGPT, Claude, Cursor, VS Code, Gemini. — [ChatGPT](https://learn.chatgpt.com/docs/projects),
   [Cursor](https://cursor.com/docs/release-notes), [VS Code](https://code.visualstudio.com/docs/agents/run/agents-window),
   [Gemini](https://support.google.com/gemini/answer/13666746?hl=en)
 - [З] Свернуть панель — Ctrl/Cmd+B в ChatGPT, Claude Desktop и VS Code; у Claude ещё кнопка вверху панели. Cursor
   отказался от раскрытия наведением в пользу кнопки. — [ChatGPT](https://learn.chatgpt.com/docs/reference/commands),
   [Claude](https://claude.com/docs/cowork/changelog), [Cursor](https://cursor.com/docs/release-notes)
-- [З] Модель видна и меняется в поле ввода, рядом с кнопкой отправки: Claude, ChatGPT, VS Code, Gemini. —
+- [В] Модель видна и меняется в поле ввода, рядом с кнопкой отправки: Claude, ChatGPT, VS Code, Gemini. —
   [Claude](https://support.claude.com/en/articles/8664678-change-the-model-effort-and-thinking-settings),
   [VS Code](https://code.visualstudio.com/docs/agent-customization/language-models),
   [Gemini](https://support.google.com/gemini/answer/18648722?hl=en)
-- [З] Подключения настраиваются на отдельном экране, а в разговоре включаются через «+» или `@`. Постоянного
-  индикатора связи нет: сбой показывают по событию — уведомлением, точкой, сообщением. —
+- [В] Подключения (MCP, коннекторы) настраиваются на отдельном экране, а в разговоре включаются через «+» или `@`.
+  Постоянного индикатора их связи в документации не нашлось: сбой показывают по событию — уведомлением, точкой,
+  сообщением. Исключения: у Cursor есть карточка статуса сервиса в панели, у LM Studio — живой статус локального
+  сервера. Коннекторы — необязательные дополнения; Loginom для нашего агента — основная зависимость, поэтому
+  аналогия неполная. —
   [Claude](https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities),
   [Gemini](https://support.google.com/gemini/answer/13695044?hl=en), [ChatGPT](https://learn.chatgpt.com/docs/extend/mcp)
-- [З] «Агент работает» — в самом разговоре, меткой у разговора в панели (идёт / ждёт ответа / ошибка) и общим
+- [В] «Агент работает» — в самом разговоре, меткой у разговора в панели (идёт / ждёт ответа / ошибка) и общим
   счётчиком. — [ChatGPT](https://learn.chatgpt.com/docs/notifications), [VS Code](https://code.visualstudio.com/docs/agents/run/sessions/manage-sessions)
-- [З] Настройки и профиль — внизу левой панели; тема — в настройках (светлая / тёмная / как в системе). —
+- [В] Настройки и профиль — внизу левой панели; тема — в настройках (светлая / тёмная / как в системе). —
   [Claude](https://support.claude.com/en/articles/8887527-customizing-your-appearance-settings),
   [Gemini](https://support.google.com/gemini/answer/13542227?hl=en)
 
@@ -132,7 +139,9 @@
 3. Вход к тому, что скрыто, виден всегда в одном месте — меню «+» у поля ввода; это снимает риск «не знают, что
    есть».
 4. Подсказки о функции — по одной, в момент нужды, не при запуске, закрываются и больше не возвращаются.
-5. Ничего не перестраивать по статистике использования.
+5. Не перестраивать интерфейс по статистике использования. Отсюда вопрос к «Примерам задач»: исчезать «со
+   временем» (сам интерфейс решает, когда) — риск потери доверия; исчезать «после действий пользователя» (закрыл,
+   сам начал несколько разговоров) — предсказуемо.
 
 ## 6. Что не удалось проверить
 
