@@ -26,14 +26,10 @@ const examples = [
   { id:'refactor', title:'Проверить сценарий', icon:'flow', tone:'blue', detail:'Найти проблемы в пакете Loginom', prompt:'Проверь сценарий продаж и покажи, что можно улучшить.' },
   { id:'quality', title:'Проверить данные', icon:'shield', tone:'violet', detail:'Найти пропуски и дубликаты в таблице', prompt:'Проверь демонстрационные продажи на пропуски и дубликаты. Покажи результат в таблице.' },
 ]
-const placeholders = {
-  1:'Опишите задачу: собрать сценарий, разобрать пакет, проверить данные',
-  2:'Что сделать в Loginom? Например, задокументировать пакет',
-}
+const placeholder = 'Опишите задачу: собрать сценарий, разобрать пакет, проверить данные'
 // Iteration 2: the prototype opens as a first launch («new») or as after a week of work («used»);
 // the owner compares variants on the review page.
 const stage = read('stage','new') === 'used' ? 'used' : 'new'
-const variant = {nav:'plus', placeholder:1, status:'composer', panel:'pinned', ...read('variant',{})}
 const seed = [
   {id:'seed-sales', title:'ABC-анализ товаров', date:'Сегодня', phase:'done', prompt:examples[0].prompt, kind:'abc', files:['sales-demo.csv'], project:'p-sales'},
   {id:'seed-flow', title:'Проверка сценария продаж', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'refactor').prompt, kind:'refactor', files:['Продажи.lgp'], project:'p-sales'},
@@ -106,7 +102,7 @@ const state = {
   projectView:null, projectTab:'chats', menu:null, renameId:null, deleteId:null,
   expanded:stage === 'used' ? ['p-sales','p-report'] : [], showAll:[],
   sessions:stage === 'used' ? seed.map(item => ({...item})) : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
-  collapsed:read('collapsed',variant.panel === 'rail'), draftPackage:null, pickFor:null, connecting:false,
+  collapsed:read('collapsed',false), draftPackage:null, pickFor:null, connecting:false,
   // What the user has already done: things appear after these events and never disappear.
   progress:stage === 'used' ? {ownChats:3, packages:true, catalog:true, examplesHidden:false} : {ownChats:0, packages:false, catalog:false, examplesHidden:false},
   solution:'refactor', review:false, reviewTab:'plan', activeRun:false,
@@ -308,12 +304,9 @@ function navButton(page, glyph, label = pages[page]) {
 }
 // The panel follows the Codex desktop app: «Новый разговор», «Закреплённые» (only once something is pinned),
 // «Проекты» — folders with their chats inside — and «Разговоры» for chats without a project. «…» on a row
-// (it appears on hover) holds the actions. In variant «panel» Пакеты and Каталог join the panel after the
-// first visit. Nothing that appeared ever disappears or moves.
+// (it appears on hover) holds the actions. «Поиск» (Ctrl K) finds projects and chats. Пакеты and Каталог
+// stay behind the input's «+» (owner's choice). Nothing that appeared ever disappears or moves.
 function sidebar() {
-  const items = variant.nav === 'panel'
-    ? [state.progress.packages || state.page === 'loginom' ? navButton('loginom','flow','Пакеты') : '', state.progress.catalog || state.page === 'hub' ? navButton('hub','grid','Каталог') : ''].join('')
-    : ''
   const pinnedProjects = state.projects.filter(item => item.pinned)
   const pinnedChats = state.sessions.filter(item => item.pinned)
   const loose = state.sessions.filter(item => !item.pinned && !projectById(item.project))
@@ -322,7 +315,7 @@ function sidebar() {
       <button class="icon-btn neutral collapse-btn" data-action="collapse" aria-label="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'}" title="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'} (Ctrl+B)"><span class="rail-ico">${icon('panel',18)}</span>${state.collapsed ? `<span class="pin-ico">${icon('pin',18)}</span>` : ''}</button>
     </div>
     <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('compose',17)}<span>Новый разговор</span><kbd>Ctrl N</kbd></button>
-    ${items ? `<nav class="sidenav" aria-label="Разделы">${items}</nav>` : ''}
+    <button class="nav-item search-row" data-overlay="search">${icon('search',17)}<span>Поиск</span><kbd>Ctrl K</kbd></button>
     <div class="sidebar-history">
       <span class="rail-history" aria-hidden="true">${icon('clock',17)}${chatsMark(state.sessions)}</span>
       ${pinnedProjects.length || pinnedChats.length ? `<section class="side-section" aria-label="Закреплённые">
@@ -414,7 +407,7 @@ function header() {
       ${state.page === 'chat' && projectById(sessionProject()) ? `<button class="crumb-project" data-open-project="${sessionProject()}">${icon('folder',16)}<span>${esc(projectById(sessionProject()).name)}</span></button>` : ''}
     </div>
     <div class="top-actions">
-      ${variant.status === 'top' || !['home','chat','project'].includes(state.page) ? loginomChip() : ''}
+      ${['home','chat','project'].includes(state.page) ? '' : loginomChip()}
       <button class="icon-btn theme-btn" title="Переключить цветовую схему" aria-label="Переключить цветовую схему" data-action="theme">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',17)}</button>
     </div>
   </header>`
@@ -425,7 +418,7 @@ function composer() {
   return `<form class="composer" id="composer">
     ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
-    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholders[variant.placeholder] || placeholders[1])}" rows="2">${esc(state.draft)}</textarea>
+    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
         <button class="icon-btn neutral plus-btn" type="button" aria-label="Добавить: пакет, файл, каталог" title="Пакет из Loginom, файл с компьютера, каталог" data-overlay="plus">${icon('plus',18)}</button>
@@ -433,7 +426,7 @@ function composer() {
         ${state.settings.preferences.agentPicker ? `<button class="filter-btn mode-pick" type="button" data-overlay="agent-mode" title="Режим агента: ${state.mode}">${icon(state.mode === 'Планирование' ? 'layers' : 'spark',15)} <span class="filter-label">${state.mode}</span> ${icon('down',12)}</button>` : ''}
       </div>
       <div class="composer-options">
-        ${variant.status === 'composer' ? loginomChip() : ''}
+        ${loginomChip()}
         <button class="filter-btn composer-model${modelName ? '' : ' lgm-chip off'}" type="button" data-settings="models" title="Модель">${icon('cpu',15)} <span class="filter-label">${esc(modelName || 'Выберите модель')}</span> ${icon('down',12)}</button>
         <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
       </div>
@@ -850,7 +843,6 @@ function packages() {
 }
 // Owner review page for iteration 2: variants to compare, what to try, what changed.
 function review() {
-  const choice = (key, value, label, hint) => `<button class="rv-choice" data-variant="${key}:${value}" aria-pressed="${String(variant[key]) === String(value)}"><strong>${label}</strong><small>${hint}</small></button>`
   const look = [
     ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Разговор сразу появится в панели, а агент попросит подключить Loginom прямо в разговоре — одна кнопка.','stage-new'],
     ['Пакет','«+» у поля ввода → «Пакет из Loginom…» → выберите пакет. Над полем появится «Что сделать с пакетом». Пример «Задокументировать пакет» показывает то же на учебном файле.','try-package'],
@@ -860,12 +852,16 @@ function review() {
   const later = [
     'Закрытый контур без модели: в поле ввода вместо модели — «Выберите модель», отправка ведёт в настройки моделей.',
     'Элементы по наведению — действия над сообщением (копировать, повторить) — появятся вместе с лентой разговора в следующей итерации.',
-    'Поиск по приложению убран. Поиск остался внутри каталога и окна выбора пакета: там десятки элементов (И1-7). Если и его убрать — скажите.',
+    'Поиск в панели ищет по названиям проектов и разговоров и по тексту запросов; по ответам агента — нет.',
     'После перезагрузки страницы прототип начинает заново: разговоры и счётчики не сохраняются.',
     'Из ChatGPT пока не перенесены: архив разговоров, перетаскивание разговора на проект, ручной порядок, отдельная память проекта, выбор значка проекта (есть только цвет).',
   ]
-  const questions = [
-    'Поиск. В ChatGPT поиск по разговорам и проектам — строкой в панели; по вашему решению В-6 поиска нет. Когда проектов и разговоров станет много, листать их долго. Рекомендую добавить «Поиск» строкой под «Новым разговором» (Ctrl K). Добавить?',
+  const chosen = [
+    '«Пакеты» и «Каталог» — только через «+» у поля ввода; панель не меняется (В-15).',
+    'Подсказка в поле ввода: «Опишите задачу: собрать сценарий, разобрать пакет, проверить данные» (В-9).',
+    'Состояние Loginom — в поле ввода рядом с моделью; на страницах без поля ввода — вверху справа (В-4).',
+    'Панель при первом запуске закреплена; свернуть до значков — кнопкой или Ctrl+B (В-1).',
+    'Поиск — строкой «Поиск» под «Новым разговором» и Ctrl K; посмотреть, как это выглядит (В-6 пересмотрено).',
   ]
   const open11 = [
     'Названия в каталоге: Действие · Навык · Пакет Loginom · Подключение (И1.1-1).',
@@ -874,16 +870,9 @@ function review() {
   ]
   const changed = ['Проекты и разговоры — как в Codex: проекты в панели — папки, разговоры проекта внутри них; в «Разговорах» — только разговоры без проекта; закреплённое — сверху. Карандаш у проекта открывает новый разговор в нём: поле ввода, инструкции, разговоры, источники.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладок разговоров нет: переключаться между разговорами — только в боковой панели.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в четырёх вопросах — переключение сразу меняет прототип. Затем пройдите четыре сценария, около 10 минут.</p></div></div>
-    <h2 class="rv-heading">Выбрать вариант</h2>
-    <div class="rv-variants">
-      <div><h3>1. Где «Пакеты» и «Каталог»</h3><div class="rv-choices">${choice('nav','plus','Только через «+»','Панель не меняется: новый разговор, проекты, разговоры')}${choice('nav','panel','Появляются в панели','«Пакеты» — после первого пакета, «Каталог» — после первого захода')}</div></div>
-      <div><h3>2. Подсказка в поле ввода</h3><div class="rv-choices">${choice('placeholder',1,'Вариант 1',esc(placeholders[1]))}${choice('placeholder',2,'Вариант 2',esc(placeholders[2]))}</div></div>
-      <div><h3>3. Где состояние Loginom</h3><div class="rv-choices">${choice('status','composer','В поле ввода','Рядом с моделью; на страницах без поля ввода — вверху справа')}${choice('status','top','Вверху справа','Рядом с темой, видно на любой странице')}</div></div>
-      <div><h3>4. Панель при первом запуске</h3><div class="rv-choices">${choice('panel','pinned','Закреплена','Подписи видны сразу; свернуть до значков — кнопкой или Ctrl+B')}${choice('panel','rail','Свёрнута до значков','Раскрывается, когда на неё наведена мышь')}</div></div>
-    </div>
-    <h2 class="rv-heading">Вопрос</h2>
-    <ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Варианты выбраны — они ниже. Пройдите четыре сценария, около 10 минут</p></div></div>
+    <h2 class="rv-heading">Выбрано</h2>
+    <ul class="rv-changes">${chosen.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВГ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${target === 'stage-new' ? 'Начать как новый пользователь' : target === 'try-projects' ? 'Открыть проект' : target === 'stage-used' ? 'После недели работы' : 'Открыть'} ${icon('arrow',15)}</button></article>`).join('')}</div>
     <h2 class="rv-heading">Пока не показано</h2>
@@ -893,6 +882,19 @@ function review() {
     <h2 class="rv-heading">Что изменилось</h2>
     <ul class="rv-changes">${changed.map(text => `<li>${text}</li>`).join('')}</ul>
   </div>`
+}
+function searchResults(query) {
+  const q = query.trim().toLowerCase()
+  const has = text => String(text || '').toLowerCase().includes(q)
+  const projects = q ? state.projects.filter(item => has(item.name)) : []
+  // A match in the title comes first, then in the project name, then in the request text; newest first within each.
+  const rank = item => has(item.title) ? 0 : has(projectById(item.project)?.name) ? 1 : 2
+  const chats = state.sessions.filter(item => !q || has(item.title) || has(item.prompt) || has(projectById(item.project)?.name)).sort((a, b) => q ? rank(a) - rank(b) : 0).slice(0, q ? 20 : 8)
+  if (!projects.length && !chats.length) return `<p class="search-empty">${q ? 'Ничего не нашлось. Поиск идёт по названиям проектов и разговоров и по тексту запросов.' : 'Разговоров пока нет.'}</p>`
+  return `${projects.length ? `<p class="search-group">Проекты</p>${projects.map(item => `<button class="search-hit" data-open-project="${item.id}"><span class="pc-${item.color}">${icon('folder',17)}</span><span><strong>${esc(item.name)}</strong></span></button>`).join('')}` : ''}${chats.length ? `<p class="search-group">${q ? 'Разговоры' : 'Недавние разговоры'}</p>${chats.map(item => {
+    const project = projectById(item.project)
+    return `<button class="search-hit" data-session="${item.id}">${icon('message',16)}<span><strong>${esc(item.title)}</strong><small>${project ? `<i class="pc-dot pc-${project.color}"></i>${esc(project.name)} · ` : ''}${esc(item.date)}</small></span></button>`
+  }).join('')}` : ''}`
 }
 function projectForm(project) {
   return `<form id="project-form" class="project-form">
@@ -932,6 +934,7 @@ function overlay() {
     'pick-package':[packageActions[state.pendingAction]?.title + ': какой пакет?', kind === 'pick-package' ? packagePicker(false) : ''],
     'package-server':['Открыть из Loginom', kind === 'package-server' ? packagePicker(false) : ''],
     'package-computer':['Открыть с компьютера', kind === 'package-computer' ? packagePicker(true) : ''],
+    search: ['Поиск', kind === 'search' ? `<label class="sr-only" for="chat-search">Поиск по проектам и разговорам</label><input id="chat-search" class="search-input" type="search" autocomplete="off" placeholder="Название, проект или слова из запроса"><div id="search-results" class="search-results">${searchResults('')}</div>` : ''],
     'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
     'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
@@ -1024,6 +1027,7 @@ function render(resetScroll = false) {
     $('#package-search')?.focus()
     $('#package-version-name')?.focus()
     $('#project-name')?.focus()
+    $('#chat-search')?.focus()
     $('#session-name')?.focus()
     $('#session-name')?.select()
   }
@@ -1178,7 +1182,7 @@ const actions = {
     state.progress.ownChats = 0
     dismiss()
   },
-  'stage-new':() => { write('stage','new'); write('collapsed',variant.panel === 'rail'); write('contour','online'); location.hash = ''; location.reload() },
+  'stage-new':() => { write('stage','new'); write('collapsed',false); write('contour','online'); location.hash = ''; location.reload() },
   'try-projects':() => {
     if (stage === 'used' && projectById('p-sales')) return openProject('p-sales')
     write('stage','used')
@@ -1381,8 +1385,12 @@ app.addEventListener('click', event => {
   if (d.go) return navigate(d.go)
   if (d.settings) return settingsTab(d.settings)
   if (d.overlay) { state.overlay = d.overlay; return render() }
-  // Clicking the chat that is already open keeps what the user is typing.
-  if (d.session) return state.page === 'chat' && state.session === d.session && !state.review ? undefined : openSession(d.session)
+  // Clicking the chat that is already open keeps what the user is typing (and closes the search, if open).
+  if (d.session) {
+    if (state.page !== 'chat' || state.session !== d.session || state.review) return openSession(d.session)
+    if (state.overlay) dismiss()
+    return
+  }
   if (d.openProject) return openProject(d.openProject)
   if (d.toggleProject) {
     state.expanded = state.expanded.includes(d.toggleProject) ? state.expanded.filter(id => id !== d.toggleProject) : [...state.expanded, d.toggleProject]
@@ -1412,17 +1420,7 @@ app.addEventListener('click', event => {
     state.overlay = null
     return setContour(d.contour)
   }
-  if (d.variant) {
-    const [key, value] = d.variant.split(':')
-    variant[key] = key === 'placeholder' ? Number(value) : value
-    write('variant',variant)
-    if (key === 'panel') {
-      state.collapsed = value === 'rail'
-      write('collapsed',state.collapsed)
-      setPeek(false)
-    }
-    return render()
-  }
+
   if (d.example) {
     const example = examples.find(item => item.id === d.example)
     useTemplate(example.title,example.prompt)
@@ -1496,6 +1494,10 @@ app.addEventListener('click', event => {
   if (Object.hasOwn(actions,d.action)) actions[d.action]()
 })
 app.addEventListener('input', event => {
+  if (event.target.id === 'chat-search') {
+    $('#search-results').innerHTML = searchResults(event.target.value)
+    return
+  }
   if (event.target.id === 'prompt') {
     state.draft = event.target.value
     $('.send-btn').disabled = !state.draft.trim()
@@ -1568,6 +1570,28 @@ document.addEventListener('keydown', event => {
   if (event.key === ',' && (event.metaKey || event.ctrlKey) && !document.querySelector('dialog[open]')) {
     event.preventDefault()
     navigate('settings')
+  }
+  if ((event.key.toLowerCase() === 'k' || event.code === 'KeyK') && (event.metaKey || event.ctrlKey) && !document.querySelector('dialog[open]')) {
+    event.preventDefault()
+    state.overlay = 'search'
+    render()
+    return
+  }
+  // In the search: Enter opens the first result, arrows walk the list.
+  if (state.overlay === 'search' && ['Enter','ArrowDown','ArrowUp'].includes(event.key) && event.target.closest?.('#app-dialog')) {
+    const hits = [...document.querySelectorAll('#search-results .search-hit')]
+    if (event.key === 'Enter' && event.target.id === 'chat-search') {
+      event.preventDefault()
+      hits[0]?.click()
+      return
+    }
+    if (event.key !== 'Enter') {
+      event.preventDefault()
+      const index = hits.indexOf(event.target)
+      const next = event.key === 'ArrowDown' ? index + 1 : index - 1
+      ;(next < 0 ? $('#chat-search') : hits[Math.min(next, hits.length - 1)])?.focus()
+      return
+    }
   }
   if (event.key.toLowerCase() === 'b' && (event.metaKey || event.ctrlKey) && !document.querySelector('dialog[open]')) {
     event.preventDefault()

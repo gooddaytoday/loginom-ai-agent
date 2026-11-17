@@ -224,17 +224,17 @@ button.prototype-mark:hover{color:var(--accent)}
 button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .proto-badge{display:inline-grid;place-items:center;width:24px;height:18px;border-radius:5px;background:var(--soft);font-size:10px;font-weight:700}
 .sidebar :is(.prototype-mark,.conn-run,.nav-item){white-space:nowrap}
-@media(max-width:1060px){.new-session kbd{display:none}}
+@media(max-width:1060px){:is(.new-session,.search-row) kbd{display:none}}
 @media(min-width:691px){
   .workspace.collapsed{grid-template-columns:60px minmax(0,1fr)}
   .workspace.collapsed .sidebar{position:relative;z-index:20;width:60px;overflow:hidden;transition:width .15s ease,box-shadow .15s ease}
   .workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:248px;box-shadow:var(--floating-shadow)}
   .workspace.collapsed.peek .collapse-btn .pin-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .pin-ico{display:block}
   .workspace.collapsed.peek .collapse-btn .rail-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .rail-ico{display:none}
-  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history>:not(.rail-history),.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
+  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>:is(span,kbd),.sidebar-history>:not(.rail-history),.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
   /* The rail: icons only. The list of projects and chats folds into one history icon at its top. Hidden
      things stay focusable (opacity, not visibility), so Tab reaches them and opens the panel. */
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history>:not(.rail-history),.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>:is(span,kbd),.sidebar-history>:not(.rail-history),.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.sidebar-history>:not(.rail-history)){pointer-events:none}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .rail-history{opacity:1}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .project-switch{border-color:transparent;background:transparent}
@@ -392,3 +392,17 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .top-brand+:is(.crumb-current,.crumb-project){border-left:1px solid var(--line);padding-left:12px;border-radius:0}
 @media(max-width:690px){.sidebar-head{display:none}.top-brand picture{width:84px}.top-brand>span{font-size:14px}}
 @media(max-width:410px){.top-brand>span{display:none}}
+/* Search (Ctrl K): a row under «Новый разговор» and a dialog */
+.search-row{margin:-6px 0 6px}
+.search-row kbd{margin-left:auto;font-weight:400}
+.search-input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.search-results{display:grid;gap:1px;margin-top:8px;max-height:min(60vh,420px);overflow:auto}
+.search-group{margin:8px 0 3px;padding:0 8px;color:var(--muted);font-size:12.5px;font-weight:600}
+.search-hit{display:flex;align-items:center;gap:10px;width:100%;padding:8px;border-radius:7px;text-align:left}
+.search-hit:hover,.search-hit:focus-visible{background:var(--soft)}
+.search-hit>span:last-child{display:grid;min-width:0}
+.search-hit strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-hit small{color:var(--muted);font-size:12.5px}
+.search-empty{margin:0;padding:10px 8px;color:var(--muted)}
+.search-hit>span:first-child:not(:last-child){flex:none;display:grid}
+.search-hit>span:last-child{flex:1}
