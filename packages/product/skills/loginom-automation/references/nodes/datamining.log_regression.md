@@ -8,7 +8,18 @@
 Target: two String classes; event iff p >= threshold. input_fields are numeric
 predictors; other fields pass through without a role. `finish:"execute"` trains
 on the current input and predicts; `read.ports:[0]` reads predictions/originals.
-Intercept, epsilon=1e-10. No validation or variable bindings. Request `parameter_schema`.
+Intercept, epsilon=1e-10. No variable bindings. Request `parameter_schema`.
+
+## K-fold validation
+
+Enter: `logistic.validation:{method:"kfold",folds:3,sampling:"sequential"}`.
+Explicit integer folds >=2, all rows training; omit partition and weight_field.
+Fold remains informational unless listed in input_fields. Execute trains and
+predicts; readback reports saved folds/sampling and training.validation with
+native executed fold count and samples_per_fold, tied to the Teach execution.
+Port 2/full summary and its quality metrics remain unsupported. Read table 0,
+export technical names, Save; after reopen apply with the saved validation
+parameters without Teach. Omitted validation requires no saved validation.
 
 ## Sequential partition
 

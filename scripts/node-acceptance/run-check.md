@@ -1409,6 +1409,21 @@ with Close, then stock execution/export checks and confirmed package/logout clea
 Typed port/cold expected и oracle неизменны; остальные сценарии сохраняют
 свои прежние правила порядка CSV. Это не D76-исключение значений.
 
+Решение владельца 16.11 `logreg-kfold-csv-by-name` добавляет только
+`logreg-validation-kfold` в тот же список: первое выполнение сохраняет
+RowID,X,Target, после переоткрытия — X,Target,RowID. CSV сверяется по
+техническим именам; значения, типы, число строк и набор столбцов строго.
+Порядок в cold строго по неизменённому expected; oracle не меняется.
+
+`logreg-validation-kfold`: неизменённые `modes/validation-kfold/task-validation-kfold.md`
+и validation.csv, Enter без нормализации, 100% train, K-fold/3/Последовательный.
+Помимо полного CSV и штатных typed/cold проверок обязательны readback
+folds/sampling и независимые native ValidationSamples=32/ValidationPartitions=3
+из VariablesForm после Teach, привязанные к его execution_id. Cold проверяет
+сохранённые настройки без применения/Teach и строгий порядок expected.
+Полная сводка порта 2 и её метрики в expected не входят; только task/CSV
+передаются модели. Save, cold и cleanup штатные.
+
 
 `loop-for-offline` and `loop-for-rest` use the frozen control-loop FOR tasks and
 expected-for-{offline,rest}.json with no input files. Only the task reaches the

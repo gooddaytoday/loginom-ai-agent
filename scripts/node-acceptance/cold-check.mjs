@@ -353,11 +353,11 @@ page = context.pages()[0]
    state.assnrulesExclusion=await observeAssnRulesExclusionSaved({load,channel:channelFor(nodes[0].ref,'exclusion-saved'),expected});
    await record({phase:'assnrules_exclusion_saved_settings',node:nodes[0].ref,...state.assnrulesExclusion});
   }
-  if(expected.logreg_normalization){
+  if(expected.logreg_normalization||expected.logreg_kfold){
    const nodes=graph.nodes.filter(n=>n.type==='datamining.log_regression');
    if(nodes.length!==1)throw Error('LOGREG_NORMALIZATION_ONE_SAVED_NODE');
-   const settings=await observeLogregNormalizationSaved({load,channel:channelFor(nodes[0].ref,'logreg-normalization-saved')});
-   await record({phase:'logreg_normalization_saved_settings',node:nodes[0].ref,...settings});
+   const settings=await observeLogregNormalizationSaved({load,channel:channelFor(nodes[0].ref,'logreg-normalization-saved'),kfold:expected.logreg_kfold===true});
+   await record({phase:expected.logreg_kfold?'logreg_kfold_saved_settings':'logreg_normalization_saved_settings',node:nodes[0].ref,...settings});
   }
   if(expected.reform_cache){
    const nodes=graph.nodes.filter(n=>n.type==='transform.reform_columns');

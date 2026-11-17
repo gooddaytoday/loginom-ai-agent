@@ -39,7 +39,26 @@ export function checkLogregNormalization(expected,replies){
  return {node:values[raw].node,execution_ids:[...rounds.keys()],normalization:'standardize'};
 }
 
-export async function observeLogregNormalizationSaved({load,channel}){
+// The stock CSV oracle checks all values; cold still enforces exact order.
+export function checkLogregKfold(expected,replies){
+ const candidates=[...receipts(replies)].filter(r=>r.execution?.status==='completed'&&r.configuration.readback.mode==='enter'
+  &&r.configuration.readback.validation?.method==='kfold');
+ need(candidates.length>0,'KFOLD_EXECUTION_MISSING');
+ const proof=candidates.find(r=>{
+  const c=r.configuration.readback,v=c.training?.validation,o=r.output?.ports?.find(p=>p.port===0),want=expected.outputs[0];
+  return r.cleanup_complete===true&&same(c.input_fields,['X'])&&c.target_field==='Target'&&c.event==='yes'&&c.threshold===0.8
+   &&c.normalization==='none'&&c.train_percent===100&&c.validation.folds===3&&c.validation.sampling==='sequential'
+   &&c.training?.status==='trained'&&c.training.execution_id!==r.execution.execution_id
+   &&v?.status==='completed'&&v.source==='native_validation_summary'&&v.execution_id===c.training.execution_id
+   &&typeof v.read_id==='string'&&v.read_id.length>0&&v.folds===3&&v.samples_per_fold===32
+   &&o?.fresh===true&&o.execution_id===r.execution.execution_id&&o.sample_complete===true&&o.row_count===96
+   &&o.schema.length===want.columns.length&&want.columns.every(f=>o.schema.filter(a=>a.name===f.name&&a.type===f.type).length===1);
+ });
+ need(proof,'KFOLD_READBACK_OR_NATIVE_EXECUTION');
+ return {node:proof.node,validation:proof.configuration.readback.validation,training:proof.configuration.readback.training};
+}
+
+export async function observeLogregNormalizationSaved({load,channel,kfold=false}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
@@ -57,11 +76,12 @@ export async function observeLogregNormalizationSaved({load,channel}){
   need(same(roles.filter(f=>f.usage_type!==0).map(f=>[f.name,f.type,f.usage_type]),[['X','real',3],['Target','string',4]]),'SAVED_ROLES');
   await next('input_mapping','normalization');
   const normalization=(await observe('normalization','normalization')).node_logregression.fields;
-  need(normalization.length===2&&normalization.every(f=>f.norm_type===(f.name==='X'?5:f.name==='Target'?9:-1)
+  need(normalization.length===2&&normalization.every(f=>f.norm_type===(f.name==='X'?(kfold?0:5):f.name==='Target'?9:-1)
    &&f.importance===1&&f.irremovable===false),'SAVED_NORMALIZERS');
   await next('normalization','learn_partition');
   const partition=(await observe('learn_partition','partition')).node_logregression.values;
-  need(partition.train===100&&partition.test===0&&partition.validation===0,'SAVED_PARTITION');
+  need(partition.train===100&&partition.test===0&&partition.validation===(kfold?1:0)
+   &&(!kfold||partition.folds===3&&partition.fold_sampling===1),'SAVED_PARTITION');
   await next('learn_partition','lin_regression');
   const {values,classes}=(await observe('lin_regression','parameters')).node_logregression;
   need(values.pedDenormalize===true&&values.pedRegressionMethod===0&&values.pedAutoMethod===false
@@ -69,7 +89,7 @@ export async function observeLogregNormalizationSaved({load,channel}){
   await next('lin_regression','lin_regression_details');
   const details=(await observe('lin_regression_details','details')).node_logregression.values;
   need(details.pedThreshold===0.8&&details.pedIntercept===true&&details.pedEpsilon===1e-10,'SAVED_DETAILS');
-  return {roles,normalization,denormalize:values.pedDenormalize,settings_applied:false};
+  return {roles,normalization,denormalize:values.pedDenormalize,settings_applied:false,...(kfold?{validation:{method:'kfold',folds:partition.folds,sampling:'sequential'}}:{})};
  }finally{
   const closed=await closePreparedWizard(channel);
   need(closed.verified&&closed.cleanup_complete&&closed.settings_applied===false,'CANCEL');
@@ -78,6 +98,6 @@ export async function observeLogregNormalizationSaved({load,channel}){
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const expected=JSON.parse(await readFile(process.argv[2],'utf8')),replies=JSON.parse(await readFile(process.argv[3],'utf8'));
- await writeFile(process.argv[4],JSON.stringify(checkLogregNormalization(expected,replies),null,2));
- console.log('PASS: same-node none -> standardize, independent complete typed predictions in both trainings');
+ await writeFile(process.argv[4],JSON.stringify(process.argv[5]==='kfold'?checkLogregKfold(expected,replies):checkLogregNormalization(expected,replies),null,2));
+ console.log(process.argv[5]==='kfold'?'PASS: K-fold readback and independent native validation execution counts':'PASS: same-node none -> standardize, independent complete typed predictions in both trainings');
 }

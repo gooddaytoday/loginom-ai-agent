@@ -228,3 +228,14 @@ test('partition reader refuses stale sequence inventory and retains variable bin
  for(const mutate of [f=>f.store.isLoading=()=>true,f=>f.store.getCount=()=>2,f=>f.records[1].data.SequenceOrder=0,f=>f.records[1].data.SizePath='Var.X']){const f=partitionFixture();mutate(f);assert.equal(f.read().verified,false);}
  const f=partitionFixture();f.add(f.base+';SizeGridForm;colRelativeSize;FloatPropEdit;SwitchButton').pressed=true;assert.equal(f.read().switches.train,true);
 });
+
+test('K-fold reader requires initialized fold count and sampling, and retains disabled and binding flags',()=>{
+ const f=partitionFixture();f.values[f.base+';ValidationSettings;pedLearnValidationMethod;ValueControl']=1;
+ assert.equal(f.read().verified,false);
+ const folds=f.add(f.base+';ValidationSettings;pedFolds;ValueControl',3);
+ f.add(f.base+';ValidationSettings;pedKFoldsSamplingMethod;ValueControl',1);
+ assert.equal(f.read().verified,true);assert.equal(f.read().values.folds,3);assert.equal(f.read().values.fold_sampling,1);
+ folds.isDisabled=()=>true;assert.equal(f.read().disabled.folds,true);
+ f.add(f.base+';ValidationSettings;pedFolds;SwitchButton').pressed=true;assert.equal(f.read().switches.folds,true);
+ for(const value of [null,1,2.5,NaN,Infinity]){f.values[f.base+';ValidationSettings;pedFolds;ValueControl']=value;assert.equal(f.read().verified,false);}
+});

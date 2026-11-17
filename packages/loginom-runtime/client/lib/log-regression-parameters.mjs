@@ -3,7 +3,7 @@ export function validateLogRegressionParameters(parameters,mode,r){
  need(['enter','forward','backward','stepwise','ridge','apply','lasso','elastic_net'].includes(mode),'use enter, forward, backward, stepwise, ridge, lasso, elastic_net or apply');
  need(parameters&&Object.keys(parameters).length===1&&parameters.logistic,'use parameters.logistic');
  const p=parameters.logistic;
- need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization','regularization','weight_field','partition'].includes(k)),'use input_fields, target_field, event and threshold');
+ need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization','regularization','weight_field','partition','validation'].includes(k)),'use input_fields, target_field, event and threshold');
  const name=n=>typeof n==='string'&&n.trim().length>0&&n.length<=128;
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(name),'input_fields must list continuous numeric predictors by technical name');
  need(name(p.target_field),'target_field must name one discrete string response');
@@ -11,6 +11,13 @@ export function validateLogRegressionParameters(parameters,mode,r){
  need(typeof p.threshold==='number'&&Number.isFinite(p.threshold)&&p.threshold>=0&&p.threshold<=1,'threshold is required in 0..1; event if p >= threshold');
  need(p.weight_field===undefined||name(p.weight_field),'weight_field must name one Real frequency-weight field');
  need(p.weight_field===undefined||['enter','apply'].includes(mode),'weight_field requires enter or saved Enter apply');
+ const validation=p.validation;
+ if(validation!==undefined){
+  need(['enter','apply'].includes(mode)&&p.partition===undefined&&p.weight_field===undefined,'validation requires Enter/apply with all rows training and no weights');
+  need(validation&&typeof validation==='object'&&!Array.isArray(validation)&&Object.keys(validation).length===3
+   &&validation.method==='kfold'&&validation.sampling==='sequential'&&Number.isSafeInteger(validation.folds)&&validation.folds>=2,
+   'validation requires {method:kfold,folds:integer >=2,sampling:sequential}');
+ }
  const partition=p.partition;
  if(partition!==undefined){
   need(['enter','apply'].includes(mode),'partition requires enter or saved Enter apply');
