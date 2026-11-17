@@ -7,6 +7,10 @@ expectation and actual downloaded CSV. Oracle, fixture and expected stay private
 `schemas` are allowed only when every requested port exactly matches the output
 of the earlier successful, clean, completed source operation on the same REST.
 Connection/query/mapping edits remain `REST_QUERY_RECONFIGURED`.
+The query-path audit accepts both integer → string conversion through a Calculator
+and direct integer columns from `variables.to_table` bound to `query_parameters`;
+the REST handler performs URL encoding for the direct path. Integer source types,
+both value updates, stable identities/bindings and the second echo remain required.
 
 `rest-content-types` uses the reduced C5 `task-content-types.md`, only
 `content-types.csv` and `acceptance/modes/content-types/expected.json`.
@@ -17,9 +21,6 @@ GET response-MIME branches were removed to reserve at least 25% of the unchanged
 claims live coverage of response MIME text/plain or */*.
 Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
 Only task and CSV reach the model; expected/oracle remain private.
-
-`rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
-in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
 `rest-simulation` uses the approved C8 `task-simulation.md`, only `response.json`
 and frozen `acceptance/modes/simulation/expected.json`. The native file simulation

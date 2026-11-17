@@ -261,7 +261,7 @@ test('v040-c8-filetime: C8 path expectations add FileTime present after FileName
  }
 });
 
-function restQueryHistory(){
+function restQueryHistory(direct=false){
  const initial=JSON.parse(readFileSync(new URL('../../../docs/node-development/variables/acceptance/expected-initial.json',import.meta.url)));
  const final=JSON.parse(readFileSync(new URL('../../../docs/node-development/variables/acceptance/expected.json',import.meta.url)));
  for(const [w,limit,skip] of [[initial,3,2],[final,5,10]])w.variable_inventory={outputs:[{node:{type:'variables.user'},port:4,variables:[{name:'limit',type:'integer',value:limit},{name:'skip',type:'integer',value:skip}]}]};
@@ -273,16 +273,55 @@ function restQueryHistory(){
  const snapshot=w=>({variable_ports:[{kind:'variables',port:4,source:'snapshot',native_source:'VariablesEditValuesWizard',package_modified:false,read_id:'snapshot-'+w.outputs[0].rows[0].limit,execution_id:null,fresh:true,complete:true,count:2,completeness:{count:2,store_count:2,unique_ids:2,loaded:true},variables:w.variable_inventory.outputs[0].variables.map((v,id)=>({id,index:id,name:v.name,type:'integer',cell:{type:'integer',is_null:false,value:String(v.value),precision:'exact_integer'}}))}]});
  const raw=(w,id)=>({execution:{status:'completed',execution_id:id},output:{ports:[{port:0,fresh:true,sample_complete:true,row_count:1,schema:[{name:'RequestID'},{name:'Response'}],sample:[[{value:0},{value:JSON.stringify({args:{limit:w.outputs[0].rows[0].limit,skip:w.outputs[0].rows[0].skip},url:w.outputs[0].rows[0].url})}]]}]}});
  add('initial-vars','variables.user',{mode:'values'},{output:snapshot(initial)});
- add('table','variables.to_table',{variable_inputs:[{source:node('variables.user'),output:4,input:0,kind:'variables'}]});
+ add('table','variables.to_table',{mode:'columns',variable_inputs:[{source:node('variables.user'),output:4,input:0,kind:'variables'}]});
  add('cast','transform.calculator',{inputs:[{source:node('variables.to_table'),output:0,input:0}]});
  const readback={kind:'rest_request',method:'GET',connection:{base_url:'https://httpbin.org/anything'},query_parameters:[{name:'limit',field:'limit_text'},{name:'skip',field:'skip_text'}]};
  add('first','integration.rest_request',{inputs:[{source:node('transform.calculator'),output:0,input:0}]},{...raw(initial,'first'),configuration:{readback}});
  add('updated-vars','variables.user',{mode:'values',parameters:{variables:final.variable_inventory.outputs[0].variables}},{output:snapshot(final)});
  add('second','integration.rest_request',{mode:'read_existing_output',parameters:{source_operation_id:'first'}},raw(final,'second'));
+ if(direct){
+  events[6].request.inputs=[{source:node('variables.to_table'),output:0,input:0}];
+  readback.query_parameters=[{name:'limit',field:'limit'},{name:'skip',field:'skip'}];
+  events.splice(4,2);
+ }
  return {events,initial,final};
 }
 test('REST query variables audit accepts integer snapshots and unchanged same-node execution',()=>{
  const {events,initial,final}=restQueryHistory();assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+test('REST query variables audit accepts direct integer query fields without a Calculator or table read',()=>{
+ const {events,initial,final}=restQueryHistory(true);
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+test('REST query direct path accepts observed integer fields renamed by output mappings',()=>{
+ const {events,initial,final}=restQueryHistory(true);
+ events[2].request.mappings=[{direction:'output',port:0,fields:[{source:'limit',name:'limit_query'},{source:'skip',name:'skip_query'}]}];
+ events[3].result.output={ports:[{port:0,schema:[{name:'limit_query',type:'integer'},{name:'skip_query',type:'integer'}]}]};
+ events[5].result.configuration.readback.query_parameters=[{name:'limit',field:'limit_query'},{name:'skip',field:'skip_query'}];
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const type of ['real','boolean'])test('REST query direct path rejects observed '+type+' query fields',()=>{
+ const {events,initial,final}=restQueryHistory(true);
+ events[3].result.output={ports:[{port:0,schema:[{name:'limit',type},{name:'skip',type:'integer'}]}]};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION/);
+});
+for(const direct of [false,true])for(const type of ['real','boolean'])test('REST query audit rejects '+type+' source on '+(direct?'direct':'Calculator')+' path',()=>{
+ const {events,initial,final}=restQueryHistory(direct);
+ const variable=events[1].result.output.variable_ports[0].variables[0];
+ variable.type=type;variable.cell={type,is_null:false,value:type==='real'?3:true};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_INITIAL_INTEGER_VARIABLES/);
+});
+for(const fault of ['missing input','foreign source','wrong output','wrong input','rows mode','missing query field','changed query binding'])
+test('REST query direct path rejects '+fault,()=>{
+ const {events,initial,final}=restQueryHistory(true),request=events[4].request;
+ if(fault==='missing input')request.inputs=[];
+ if(fault==='foreign source')request.inputs[0].source.workflow_id='other';
+ if(fault==='wrong output')request.inputs[0].output=1;
+ if(fault==='wrong input')request.inputs[0].input=1;
+ if(fault==='rows mode')events[2].request.mode='rows';
+ if(fault==='missing query field')events[5].result.configuration.readback.query_parameters[1].field='missing';
+ if(fault==='changed query binding')events[9].result.configuration={readback:{...structuredClone(events[5].result.configuration.readback),query_parameters:[{name:'limit',field:'skip'},{name:'skip',field:'limit'}]}};
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),fault==='changed query binding'?/REST_QUERY_BINDINGS_CHANGED/:/REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION/);
 });
 function restQuerySchemaRead(ports=[0,1]){
  const history=restQueryHistory(),source=history.events[7].result,request=history.events[10].request;
