@@ -36,12 +36,12 @@ const preferences = [
   ["releaseNotes", "История версий", "Показывать сведения о версии после обновления приложения."],
 ]
 const shortcuts = [
-  ["Новая сессия", "Ctrl", "N"],
+  ["Новый разговор", "Ctrl", "N"],
   ["Свернуть панель", "Ctrl", "B"],
   ["Настройки", "Ctrl", ","],
   ["Отправить сообщение", "Enter"],
   ["Новая строка", "Shift", "Enter"],
-  ["Закрыть панель", "Esc"],
+  ["Закрыть окно", "Esc"],
 ]
 
 function esc(x = "") {
@@ -56,10 +56,12 @@ export function ensureSettings(state) {
   s.connection ??= { ...defaults }
   s.draft ??= { ...s.connection, password: "" }
   s.closedMode ??= "intranet"
-  s.model ??= { ...modelDefaults[state.contour === "closed" ? defaultKind(s.closedMode) : "local"], tested: true }
+  // Online, a fresh profile already has a model: OpenCode's free models need no sign-in.
+  s.model ??= state.contour === "closed" ? { ...modelDefaults[defaultKind(s.closedMode)], tested: true } : { kind: "cloud", name: "Бесплатная модель", url: "", tested: true }
   s.modelDraft ??= { ...s.model }
   s.theme = state.theme ?? s.theme ?? "system"
-  s.preferences ??= { agentPicker: true, notifications: true, releaseNotes: true }
+  // Iteration 2: the agent mode picker is off for newcomers; it is turned on in «Общие».
+  s.preferences ??= { agentPicker: false, notifications: true, releaseNotes: true }
   s.proxy ??= "system"
   s.proxyUrl ??= ""
   s.mcp ??= true
@@ -472,7 +474,8 @@ export function bindSettings(root, state, api) {
     if (action === "save-loginom") {
       const error = connectionError(target.draft, state.contour, s.closedMode)
       if (error) { target.test = { browser: "error", error }; api.render(); return }
-      const browser = (s.test ?? s.defaultsConnectionTest).browser
+      // Save validates, as in 0.4: the check runs here if the user skipped it.
+      const browser = s.test?.browser ?? (s.draft.url.includes("unavailable") ? "error" : "verified")
       const next = { connection: savedConnection(s.draft, browser === "verified"), test: { help: "ready", browser } }
       if (running(state)) s.pendingConnection = next
       else {
@@ -482,7 +485,7 @@ export function bindSettings(root, state, api) {
       s.draft = { ...next.connection, password: "" }
       s.test = undefined
       api.toast(s.pendingConnection ? "Настройки применятся после завершения задачи" : "Подключение Loginom сохранено")
-      api.navigate("home")
+      api.navigate(state.returnTo && state.returnTo !== "settings" ? state.returnTo : "home")
       return
     }
     if (action === "provider") {

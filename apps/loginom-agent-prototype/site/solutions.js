@@ -14,7 +14,7 @@ const outcomes = [
   ['success','Готово'],['inconclusive','Не подтверждено'],['recovery','Нужна проверка'],['failed','Не удалось'],
 ];
 const demoPackages = [
-  {name:'Продажи.lgp', where:'Loginom · /analyst', source:'loginom'},
+  {name:'Продажи.lgp', where:'Loginom · /user', source:'loginom'},
   {name:'Сводка продаж.lgp', where:'Loginom · /Общие/Аналитика', source:'loginom'},
   {name:'Мой сценарий.lgp', where:'На компьютере · Документы', source:'local'},
 ];
@@ -295,7 +295,7 @@ function renderRunner(state, model) {
     run.values.target = state.runnerPackage.name.replace(/\.lgp$/,'') + ' — улучшено.lgp';
     run.step = 'params';
   }
-  const back = {loginom:['loginom','← Пакеты'], home:['home','← Новый разговор']}[state.runnerFrom] || ['hub','← Каталог'];
+  const back = {loginom:['loginom','← Пакеты'], home:['home','← Новый разговор'], chat:['chat','← Разговор']}[state.runnerFrom] || ['hub','← Каталог'];
   const blocked = key === 'regression' && run.values.baseline === 'missing';
   const access = accessFor(key, run, state.project);
   let body = '';
@@ -322,9 +322,10 @@ function renderRunner(state, model) {
     ${stepper(run.step)}${body}</div>`;
 }
 
-function renderAuthor(model) {
+function renderAuthor(model, state) {
   const author = model.author;
-  return `<div class="sl-page"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="hub">← Каталог</button>
+  const fromChat = state.solutions?.author?.method === 'chat' && state.session;
+  return `<div class="sl-page"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="${fromChat ? 'chat' : 'hub'}">${fromChat ? '← Разговор' : '← Каталог'}</button>
     <header class="sl-heading"><span class="sl-product">Свои навыки</span><h1>Создать навык</h1><p>Подготовьте повторяемую инструкцию для агента и сохраните черновик в библиотеке.</p></header>
     <div class="sl-switch" aria-label="Способ создания">${[['manual','С нуля'],['chat','Из разговора'],['import','Импорт файла']].map(([id,title]) => `<button type="button" class="sl-chip${id === author.method ? ' is-active' : ''}" data-sl-author="${id}" aria-pressed="${id === author.method}">${title}</button>`).join('')}</div>
     <div class="sl-grid"><section class="sl-panel"><div class="sl-panel-head"><h2>${author.method === 'import' ? 'Предпросмотр импорта' : 'Черновик навыка'}</h2><span class="sl-tag">Личный</span></div>
@@ -345,7 +346,7 @@ export function initSolutionDrafts(state) {
 export function renderSolutions(state) {
   const model = getState(state);
   if (state.page !== 'studio') return renderRunner(state,model);
-  return renderAuthor(model);
+  return renderAuthor(model, state);
 }
 
 function download(name, value) {
