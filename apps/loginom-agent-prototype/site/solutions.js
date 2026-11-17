@@ -98,27 +98,65 @@ function chosenPackage(run, name = 'package') {
   return packageChoices(run).find(item => item.name === run.values[name]) || demoPackages[0];
 }
 
+// What the run is allowed to do, in the words of the real profiles:
+// package-docs — local .lgp, built-in Loginom Help, write in the project folder; no Loginom, browser, shell or web;
+// loginom-automation — works in Loginom through the browser under the user's account, gated per action by the runner.
+// `pre` is what the application itself does before the agent starts; `data` is what goes to the model.
 function accessFor(key, run) {
-  const item = byId(key.split(':')[0]);
   const pkg = chosenPackage(run);
-  const can = [];
-  const cannot = [...item.cannot];
-  if (key === 'document') {
-    // package-docs reads only a local .lgp: for a Loginom package the app (not the agent) fetches a copy first.
-    can.push(`Прочитать копию «${pkg.name}»${pkg.source === 'loginom' ? ' — приложение заранее скачает её из Loginom' : ''}`,
-      `Сохранить документ «${pkg.name.replace(/\.lgp$/,'')} — описание.${run.values.format === 'md' ? 'md' : run.values.format}» в папку проекта`);
-  } else if (key === 'refactor:review') {
-    can.push(`Открыть копию «${pkg.name}» в Loginom только для чтения`, 'Прочитать настройки узлов');
-  } else if (key === 'refactor:copy') {
-    can.push(`Открыть копию «${pkg.name}» в Loginom`, 'Изменять узлы в копии', `Сохранить копию как «${run.values.target}»`);
-  } else if (key === 'regression') {
-    can.push(`Запустить копию «${pkg.name}» на ${run.values.data}`, `Прочитать эталон ${run.values.baseline}`);
-  } else if (key === 'tournament') {
-    can.push(`Запустить копии «${pkg.name}» и «${run.values.second}» на ${run.values.data}`, 'Замерить время выполнения');
-  } else {
-    can.push(`Создать пакет «${run.values.target}» в вашей папке Loginom`, `Запустить его на ${run.values.data}`);
-  }
-  return {can, cannot};
+  const name = pkg.name;
+  const report = 'отчёт в папке проекта';
+  const runsScenario = 'При запуске сценария выполняются и его выгрузки — например, в файл или базу данных. Если это нежелательно, используйте копию сценария без выгрузок.';
+  const noWeb = 'Открывать сайты в интернете';
+  if (key === 'document') return {
+    pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в папку проекта: документирование работает только с файлом на компьютере`] : [],
+    can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать документ «${docName(run)}» в папке проекта`],
+    cannot: ['Изменить пакет — он только читается', 'Подключаться к Loginom и открывать браузер', 'Запускать программы на компьютере', noWeb],
+    data: 'структура пакета и настройки узлов',
+  };
+  if (key === 'refactor:review') return {
+    pre: [],
+    can: [`Открыть «${name}» в Loginom под вашей учётной записью`, 'Читать настройки узлов', `Создать ${report}`],
+    cannot: ['Менять узлы и сохранять пакеты', 'Запускать сценарий', noWeb],
+    data: 'настройки узлов',
+  };
+  if (key === 'refactor:copy') return {
+    pre: [],
+    can: [`Открыть «${name}» в Loginom под вашей учётной записью`, 'Менять узлы в открытом пакете и запускать их для проверки', `Сохранить результат новым пакетом «${run.values.target}» рядом с исходным`],
+    cannot: [`Сохранить изменения поверх «${name}»`, 'Удалять пакеты', noWeb],
+    warn: runsScenario,
+    data: 'настройки узлов и первые строки данных на выходах узлов',
+  };
+  if (key === 'regression') return {
+    pre: [],
+    can: [`Открыть «${name}» в Loginom под вашей учётной записью`, `Запустить сценарий на данных ${run.values.data}`, `Прочитать эталон ${run.values.baseline}`, `Создать ${report}`],
+    cannot: ['Менять и сохранять пакет', 'Менять эталон', noWeb],
+    warn: runsScenario,
+    data: 'итоговые цифры сравнения (не все строки данных)',
+  };
+  if (key === 'tournament') return {
+    pre: [],
+    can: [`Открыть «${name}» и «${run.values.second}» в Loginom под вашей учётной записью`, `Запустить каждый сценарий ${run.values.repeats} раз на данных ${run.values.data}`, `Создать ${report}`],
+    cannot: ['Менять и сохранять пакеты', noWeb],
+    warn: runsScenario,
+    data: 'итоговые цифры сравнения и время выполнения',
+  };
+  return {
+    pre: [],
+    can: [`Создать новый пакет «${run.values.target}» в вашей папке Loginom под вашей учётной записью`, `Запустить его на данных ${run.values.data}`, `Создать ${report}`],
+    cannot: ['Подключаться к вашей базе данных — SQL-запрос только читается', 'Менять другие пакеты', noWeb],
+    data: 'текст SQL-запроса и первые строки результата',
+  };
+}
+
+function docName(run) {
+  return `${chosenPackage(run).name.replace(/\.lgp$/,'')}.lgp_report.${run.values.format === 'md' ? 'md' : run.values.format}`;
+}
+
+function modelLine(state) {
+  const model = state.settings?.model || {kind:'local', name:'Демо-модель'};
+  const where = {local:'работает на этом компьютере', intranet:'работает во внутренней сети', cloud:'облачный сервис — данные уйдут в интернет'}[model.kind] || '';
+  return [model.name, where, model.kind === 'cloud'];
 }
 
 // Only actions that save something in Loginom can end with an uncertain effect that needs a state check.
@@ -135,7 +173,7 @@ function stepper(current) {
 function logFor(key, run) {
   const pkg = chosenPackage(run);
   const lines = {
-    document: [`Получена копия «${pkg.name}»`, 'Прочитана структура: 14 узлов, 3 подмодели', 'Справка Loginom: описаны 9 типов узлов', 'Собран документ, 11 страниц'],
+    document: [`Прочитан файл «${pkg.name}»: 14 узлов, 3 подмодели`, 'Справка Loginom: найдены описания 9 типов узлов', 'Написан черновик документа', `Создан документ «${docName(run)}», 11 страниц`],
     'refactor:review': [`Открыта копия «${pkg.name}» только для чтения`, 'Прочитаны настройки 12 узлов', 'Найдено 2 улучшения', 'Отчёт сохранён в папку проекта'],
     'refactor:copy': [`Открыта копия «${pkg.name}»`, 'Объединены фильтры в узлах 04 и 08', 'Переименован узел 14', `Копия сохранена как «${run.values.target}»`],
     regression: ['Подготовлена тестовая копия', `Запуск на ${run.values.data}: 245 строк`, 'Сравнение с эталоном: 3 проверки', 'Отчёт сохранён'],
@@ -202,7 +240,7 @@ function outcomeText(key, run) {
 
 function resultFile(key, run) {
   const pkg = chosenPackage(run);
-  if (key === 'document') return [`${pkg.name.replace(/\.lgp$/,'')} — описание.${run.values.format === 'md' ? 'md' : run.values.format}`, 'Папка проекта'];
+  if (key === 'document') return [docName(run), 'Папка проекта'];
   if (key === 'refactor:copy' || key === 'migration') return [run.values.target, 'Ваша папка Loginom, рядом с исходным'];
   return ['Отчёт.html', 'Папка проекта'];
 }
@@ -260,12 +298,18 @@ function renderRunner(state, model) {
   let body = '';
   if (run.step === 'params') body = `<section class="sl-panel"><form class="sl-form" data-sl-form="run">${run.error ? note(escape(run.error),'warn') : ''}${renderFields(key, run)}
     <div class="sl-actions">${blocked ? `<button type="button" class="btn" data-sl-action="baseline-draft" ${run.baselineDraft ? 'disabled' : ''}>Подготовить черновик эталона</button>` : '<button type="submit" class="btn primary">Далее: доступ</button>'}</div></form></section>`;
-  if (run.step === 'access') body = `<section class="sl-panel sl-access">
-      <p class="sl-access-lead">Проверьте, что будет разрешено агенту. Права действуют только на этот запуск.</p>
+  if (run.step === 'access') {
+    const [modelName, modelWhere, cloud] = modelLine(state);
+    body = `<section class="sl-panel sl-access">
+      <p class="sl-access-lead">Проверьте, что произойдёт при запуске. Разрешения действуют только на этот запуск.</p>
+      ${access.pre.length ? `<div class="sl-pre">${icon('download',17)}<div><strong>Сначала приложение</strong>${access.pre.map(text => `<p>${escape(text)}</p>`).join('')}</div></div>` : ''}
       <div class="sl-perms"><div><h3>✓ Агент сможет</h3><ul>${access.can.map(text => `<li>${escape(text)}</li>`).join('')}</ul></div>
       <div><h3>✕ Агент не сможет</h3><ul>${access.cannot.map(text => `<li>${escape(text)}</li>`).join('')}</ul></div></div>
+      ${access.warn ? `<div class="sl-note sl-note-warn">${icon('alert',16)} ${escape(access.warn)}</div>` : ''}
+      <div class="sl-data${cloud ? ' sl-data-cloud' : ''}">${icon('cpu',17)}<p><strong>Что увидит модель:</strong> ${escape(access.data)}. Модель «${escape(modelName)}» — ${escape(modelWhere)}.</p></div>
       <div class="sl-actions"><button type="button" class="btn primary" data-sl-action="start">Разрешить и запустить</button><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button></div></section>
       <fieldset class="sl-demo"><legend>Только для прототипа: чем закончится запуск</legend>${outcomes.filter(([value]) => value !== 'recovery' || changesSomething(key)).map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}</fieldset>`;
+  }
   if (run.step === 'running') body = `<section class="sl-panel"><ol class="sl-stages" aria-live="polite">${item.stages.map((stage,index) => `<li class="${index < run.stage ? 'is-done' : index === run.stage ? 'is-current' : ''}"><span class="sl-stage-mark" aria-hidden="true">${index < run.stage ? '✓' : index+1}</span><span>${stage}</span><small>${index < run.stage ? 'Готово' : index === run.stage ? 'Идёт' : 'Ожидает'}</small></li>`).join('')}</ol>
       ${details(key, run)}
       <div class="sl-actions"><button type="button" class="btn" data-sl-action="stop">Остановить</button><small class="muted">Остановка прерывает агента, но не отменяет уже сделанное.</small></div></section>`;
