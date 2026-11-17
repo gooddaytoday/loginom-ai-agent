@@ -735,7 +735,7 @@ function review() {
   const look = [
     ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Разговор сразу появится в панели, а агент попросит подключить Loginom прямо в разговоре — одна кнопка.','stage-new'],
     ['Пакет','«+» у поля ввода → «Пакет из Loginom…» → выберите пакет. Над полем появится «Что сделать с пакетом». Пример «Задокументировать пакет» показывает то же на учебном файле.','try-package'],
-    ['Панель','Свернуть — кнопка в левом верхнем углу панели или Ctrl+B: остаются значки. Задержите мышь на значке — панель раскроется поверх страницы; выбор пункта или уход мыши свернут её, кнопка с булавкой закрепит. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
+    ['Панель','Свернуть — кнопка в левом верхнем углу панели или Ctrl+B: остаются значки. Наведите на них мышь — панель раскроется поверх страницы; выбор пункта или уход мыши свернут её, кнопка с булавкой закрепит. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
   ]
   const later = [
     'Закрытый контур без модели: в поле ввода вместо модели — «Выберите модель», отправка ведёт в настройки моделей.',
@@ -748,7 +748,7 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['При первом запуске в панели — проект, «Новый разговор», настройки; разговоры появляются после первого.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы, когда мышь задержалась на значке; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
+  const changed = ['При первом запуске в панели — проект, «Новый разговор», настройки; разговоры появляются после первого.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
   return `<div class="native-page review-page">
     <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в четырёх вопросах — переключение сразу меняет прототип. Затем пройдите три сценария, около 10 минут.</p></div></div>
     <h2 class="rv-heading">Выбрать вариант</h2>
@@ -756,7 +756,7 @@ function review() {
       <div><h3>1. Где «Пакеты» и «Каталог»</h3><div class="rv-choices">${choice('nav','plus','Только через «+»','Панель не меняется: проект, разговоры, настройки')}${choice('nav','panel','Появляются в панели','«Пакеты» — после первого пакета, «Каталог» — после первого захода')}</div></div>
       <div><h3>2. Подсказка в поле ввода</h3><div class="rv-choices">${choice('placeholder',1,'Вариант 1',esc(placeholders[1]))}${choice('placeholder',2,'Вариант 2',esc(placeholders[2]))}</div></div>
       <div><h3>3. Где состояние Loginom</h3><div class="rv-choices">${choice('status','composer','В поле ввода','Рядом с моделью; на страницах без поля ввода — вверху справа')}${choice('status','top','Вверху справа','Рядом с темой, видно на любой странице')}</div></div>
-      <div><h3>4. Панель при первом запуске</h3><div class="rv-choices">${choice('panel','pinned','Закреплена','Подписи видны сразу; свернуть до значков — кнопкой или Ctrl+B')}${choice('panel','rail','Свёрнута до значков','Подписи появляются, когда мышь остановится на значке')}</div></div>
+      <div><h3>4. Панель при первом запуске</h3><div class="rv-choices">${choice('panel','pinned','Закреплена','Подписи видны сразу; свернуть до значков — кнопкой или Ctrl+B')}${choice('panel','rail','Свёрнута до значков','Раскрывается, когда на неё наведена мышь')}</div></div>
     </div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${target === 'stage-new' ? 'Начать как новый пользователь' : target === 'stage-used' ? 'После недели работы' : 'Открыть'} ${icon('arrow',15)}</button></article>`).join('')}</div>
@@ -1306,21 +1306,24 @@ function setPeek(open) {
 // After the user collapses the panel or presses Esc with the mouse still on it, it stays a rail until the
 // mouse leaves; otherwise it would open again under the cursor right after the click. While render()
 // swaps the DOM the pointer briefly lands on #app itself — that is not the mouse leaving.
-// It opens only when the mouse rests on an icon — not while crossing the empty part of the rail, and not
-// while a button is held (selecting text by dragging past the left edge). Pointer events over a dialog say
-// nothing about the panel either.
+// Not while a button is held (selecting text by dragging past the left edge); pointer events over a dialog
+// say nothing about the panel either. The 90 ms delay lets a mouse cross the 60 px rail without opening it.
 document.addEventListener('pointerover', event => {
   const target = event.target
   if (event.pointerType !== 'mouse' || event.buttons || !state.collapsed || [app, document.body, document.documentElement].includes(target) || target.closest('dialog')) return
   const inside = Boolean(target.closest('.sidebar'))
   if (!inside) peekHeld = false
   if (peekHeld) return
-  peekSidebar(inside && Boolean(peek || target.closest('.sidebar :is(button,h2)')))
+  peekSidebar(inside)
 })
 // A choice made in the opened panel closes it, so the panel does not cover the page that just opened.
-// Chosen from the keyboard, focus moves on to the page instead of falling back to the panel.
+// Chosen from the keyboard, focus moves on to the page instead of falling back to the panel. Without a
+// mouse (touch screens) a tap on the rail outside its icons opens it and a tap on the page closes it.
 document.addEventListener('click', event => {
-  if (!state.collapsed || !event.target.closest('.sidebar button')) return
+  if (!state.collapsed) return
+  const inside = event.target.closest('.sidebar')
+  if (!inside) return peek && setPeek(false)
+  if (!event.target.closest('.sidebar button')) return setPeek(true)
   peekHeld = true
   setPeek(false)
   if (!event.detail && !document.querySelector('dialog[open]')) focusPage()
