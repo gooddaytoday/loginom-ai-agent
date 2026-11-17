@@ -67,6 +67,12 @@ function radios(name, label, choices, selected) {
     `<label><input type="radio" name="${name}" value="${value}" ${value === selected ? 'checked' : ''}><span>${text}</span></label>`).join('')}</div>${hint ? `<small>${hint}</small>` : ''}</fieldset>`;
 }
 
+function checks(name, label, choices, selected) {
+  const hint = choices.filter(([value]) => selected.includes(value)).map(([,text,why]) => `${text} — ${why.toLowerCase()}`).join('; ');
+  return `<fieldset class="sl-seg sl-multi"><legend>${label}</legend><div class="sl-seg-row">${choices.map(([value,text]) =>
+    `<label><input type="checkbox" name="${name}" value="${value}" ${selected.includes(value) ? 'checked' : ''}><span>${selected.includes(value) ? '✓ ' : ''}${text}</span></label>`).join('')}</div><small>${hint || 'Отметьте один или несколько форматов'}</small></fieldset>`;
+}
+
 function note(text, tone = '') {
   return `<div class="sl-note ${tone ? `sl-note-${tone}` : ''}" role="status">${text}</div>`;
 }
@@ -79,8 +85,9 @@ function renderFields(key, run) {
   const values = run.values;
   const data = select('data', 'Тестовые данные', ['sales_sample.csv','sales_edge_cases.csv'], values.data);
   if (key === 'document') return packageField(run) +
-    radios('format','Формат документа',[['pdf','PDF','Для чтения и печати'],['docx','Word','Можно редактировать'],['md','Markdown','Для базы знаний']],values.format) +
-    radios('depth','Подробность',[['short','Кратко','Назначение и основные шаги'],['full','Подробно','Каждый узел и поток данных']],values.depth);
+    checks('formats','Формат документа',docFormats,values.formats) +
+    radios('depth','Содержание',[['short','Кратко','Назначение и основные шаги'],['full','Подробно','Каждый узел и поток данных'],['custom','Своё','Агент напишет документ по вашему описанию']],values.depth) +
+    (values.depth === 'custom' ? `<label class="sl-field"><span>Какая документация нужна</span><textarea name="custom" rows="4" required placeholder="Например: инструкция для бизнес-пользователя — что подать на вход, как запустить, как читать результат; без технических деталей узлов">${escape(values.custom)}</textarea><small>Агент учтёт описание вместо стандартной структуры документа.</small></label>` : '');
   if (key.startsWith('refactor')) return packageField(run) +
     select('goal','На что обратить внимание',['Понятность структуры','Повторяющиеся преобразования','Названия и организация'],values.goal) +
     (key === 'refactor:copy' ? `<label class="sl-field"><span>Имя улучшенной копии</span><input name="target" value="${escape(values.target)}" required pattern=".+\\.lgp"><small>Копия появится рядом с исходным пакетом.</small></label>` : '');
@@ -111,9 +118,9 @@ function accessFor(key, run, project) {
   const noWeb = 'Открывать сайты в интернете';
   if (key === 'document') return {
     pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в папку проекта «${project}»: документирование работает только с файлом на компьютере`] : [],
-    can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать документ «${docName(run)}» в ${folder}`],
+    can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать ${docNames(run).length > 1 ? 'документы' : 'документ'} ${docNames(run).map(file => `«${file}»`).join(', ')} в ${folder}`],
     cannot: ['Изменить пакет — он только читается', 'Подключаться к Loginom и открывать браузер', 'Запускать программы на компьютере', noWeb],
-    data: 'структура пакета и настройки узлов',
+    data: run.values.depth === 'custom' ? 'структура пакета, настройки узлов и ваше описание документации' : 'структура пакета и настройки узлов',
   };
   if (key === 'refactor:review') return {
     pre: [],
@@ -150,8 +157,11 @@ function accessFor(key, run, project) {
   };
 }
 
-function docName(run) {
-  return `${chosenPackage(run).name.replace(/\.lgp$/,'')}.lgp_report.${run.values.format === 'md' ? 'md' : run.values.format}`;
+const docFormats = [['pdf','PDF','Для чтения и печати'],['docx','Word','Можно редактировать'],['md','Markdown','Для базы знаний']];
+// One document per chosen format, in the order of the list.
+function docNames(run) {
+  const base = chosenPackage(run).name.replace(/\.lgp$/,'');
+  return docFormats.filter(([value]) => run.values.formats.includes(value)).map(([value]) => `${base}.lgp_report.${value}`);
 }
 
 function modelLine(state) {
@@ -174,7 +184,7 @@ function stepper(current) {
 function logFor(key, run) {
   const pkg = chosenPackage(run);
   const lines = {
-    document: [`Прочитан файл «${pkg.name}»: 14 узлов, 3 подмодели`, 'Справка Loginom: найдены описания 9 типов узлов', 'Написан черновик документа', `Создан документ «${docName(run)}», 11 страниц`],
+    document: [`Прочитан файл «${pkg.name}»: 14 узлов, 3 подмодели`, 'Справка Loginom: найдены описания 9 типов узлов', run.values.depth === 'custom' ? 'Написан черновик по вашему описанию' : 'Написан черновик документа', `Созданы файлы: ${docNames(run).join(', ')}`],
     'refactor:review': [`Открыта копия «${pkg.name}» только для чтения`, 'Прочитаны настройки 12 узлов', 'Найдено 2 улучшения', 'Отчёт сохранён в папку проекта'],
     'refactor:copy': [`Открыта копия «${pkg.name}»`, 'Объединены фильтры в узлах 04 и 08', 'Переименован узел 14', `Копия сохранена как «${run.values.target}»`],
     regression: ['Подготовлена тестовая копия', `Запуск на ${run.values.data}: 245 строк`, 'Сравнение с эталоном: 3 проверки', 'Отчёт сохранён'],
@@ -186,8 +196,8 @@ function logFor(key, run) {
 
 function reportData(key, values) {
   if (key === 'document') return {
-    summary: 'Документ описывает назначение сценария, 14 узлов, потоки данных между ними и три подмодели.',
-    checks: ['Описаны 14 из 14 узлов', 'Документ сохранён и открывается', 'Исходный пакет не изменён'],
+    summary: values.depth === 'custom' ? `Документ составлен по вашему описанию: «${values.custom.trim().slice(0,120)}${values.custom.trim().length > 120 ? '…' : ''}».` : 'Документ описывает назначение сценария, 14 узлов, потоки данных между ними и три подмодели.',
+    checks: [values.depth === 'custom' ? 'Документ составлен по вашему описанию' : 'Описаны 14 из 14 узлов', values.formats.length > 1 ? `Сохранены и открываются все ${values.formats.length} файла` : 'Документ сохранён и открывается', 'Исходный пакет не изменён'],
     columns:['Раздел','Что внутри'], rows:[['Назначение','Что делает сценарий и для кого'],['Модули','Подмодели «Очистка», «Расчёт», «Выгрузка»'],['Потоки данных','Откуда берутся и куда уходят данные'],['Заметки','Комментарии автора из пакета']],
   };
   if (key === 'refactor:review') return {
@@ -239,25 +249,24 @@ function outcomeText(key, run) {
   }[run.outcome];
 }
 
-function resultFile(key, run) {
-  const pkg = chosenPackage(run);
-  if (key === 'document') return [docName(run), 'Папка проекта'];
-  if (key === 'refactor:copy' || key === 'migration') return [run.values.target, 'Ваша папка Loginom, рядом с исходным'];
-  return ['Отчёт.html', 'Папка проекта'];
+function resultFiles(key, run) {
+  if (key === 'document') return docNames(run).map(file => [file, 'Папка проекта']);
+  if (key === 'refactor:copy' || key === 'migration') return [[run.values.target, 'Ваша папка Loginom, рядом с исходным']];
+  return [['Отчёт.html', 'Папка проекта']];
 }
 
 function renderResult(key, run) {
   const data = reportData(key, run.values);
   const ok = run.outcome === 'success';
   const [tone, glyph, title] = outcomeView[run.outcome];
-  const [file, place] = resultFile(key, run);
+  const files = resultFiles(key, run);
   const checks = ok ? data.checks.map(text => ['ok', text]) : [['ok', 'Исходный пакет не изменён'],
     ...(run.outcome === 'inconclusive' ? [['warn', 'Сохранение результата не подтверждено']] : []),
     ...(run.outcome === 'recovery' ? [['danger', 'Неизвестно, сохранилась ли копия в Loginom']] : [])];
   const findings = ok && key !== 'document';
   return `<section class="sl-result sl-tone-${tone}" role="status">
       <header><span class="sl-result-icon">${icon(glyph,20)}</span><div><h2>${title}</h2><p>${escape(outcomeText(key, run))}</p></div></header>
-      ${ok ? `<div class="sl-file">${icon('file',20)}<span><strong>${escape(file)}</strong><small>${place}</small></span><button type="button" class="btn primary" data-sl-action="open-file">Открыть</button></div>` : ''}
+      ${ok ? files.map(([file, place]) => `<div class="sl-file">${icon('file',20)}<span><strong>${escape(file)}</strong><small>${place}</small></span><button type="button" class="btn primary" data-sl-action="open-file">Открыть</button></div>`).join('') : ''}
       <div class="sl-checks-row"><span class="sl-checks-title">Проверено приложением:</span>${checks.map(([cls,text]) => `<span class="sl-check sl-check-${cls}">${cls === 'ok' ? '✓' : '!'} ${escape(text)}</span>`).join('')}</div>
     </section>
     ${findings ? `<section class="sl-panel sl-findings"><h2>${key === 'regression' ? 'Проверки' : key === 'tournament' ? 'Сравнение' : key === 'migration' ? 'Соответствие SQL и узлов' : 'Что нашёл агент'}</h2>
@@ -283,7 +292,7 @@ function renderRunner(state, model) {
   const item = byId(id);
   const [title, description] = titles[key];
   const run = model.runs[key] ??= { values: {
-    package:'Продажи.lgp', second:'Сводка продаж.lgp', format:'pdf', depth:'full', goal:'Понятность структуры',
+    package:'Продажи.lgp', second:'Сводка продаж.lgp', formats:['pdf'], depth:'full', custom:'', goal:'Понятность структуры',
     target:'Продажи — улучшено.lgp', data:'sales_sample.csv', baseline:'sales_expected.csv', tolerance:'0.01',
     sql:sqlExample, repeats:'5',
   }, step:'params', stage:0, outcome:'success', demoOutcome:'success' };
@@ -375,6 +384,8 @@ function readDraft(name, source) {
 }
 
 function validateRun(key, values) {
+  if (key === 'document' && !values.formats.length) return 'Отметьте хотя бы один формат документа.';
+  if (key === 'document' && values.depth === 'custom' && !values.custom.trim()) return 'Опишите, какая документация нужна.';
   if (key === 'regression' && values.baseline === 'missing') return 'Нужен утверждённый эталон.';
   if (key === 'tournament' && values.package === values.second) return 'Выберите два разных пакета.';
   if (key === 'migration' && (!/^\s*SELECT\b[^;]*\bFROM\b[^;]+;?\s*$/i.test(values.sql) || /\b(?:INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|JOIN|UNION|OVER)\b/i.test(values.sql))) return 'Для этого примера используйте SELECT, WHERE и GROUP BY. Для других операций потребуется адаптация.';
@@ -395,7 +406,7 @@ export function bindSolutions(root,state,api) {
     const form = input.closest('[data-sl-form]');
     if (!form || !input.name || input.type === 'file') return;
     if (form.dataset.slForm === 'run') {
-      run.values[input.name] = input.value;
+      if (input.type !== 'checkbox') run.values[input.name] = input.value;
       return;
     }
     author[input.name] = input.value;
@@ -404,7 +415,21 @@ export function bindSolutions(root,state,api) {
   });
   panel.addEventListener('change', async event => {
     if (event.target.name === 'demo-outcome') { run.demoOutcome = event.target.value; return; }
-    if (event.target.type === 'radio' && event.target.closest('[data-sl-form="run"]')) { run.values[event.target.name] = event.target.value; api.render(); return; }
+    if (event.target.type === 'radio' && event.target.closest('[data-sl-form="run"]')) {
+      run.values[event.target.name] = event.target.value;
+      run.error = '';
+      api.render();
+      // «Своё» opens the description field: the cursor goes straight into it.
+      if (event.target.value === 'custom') panel.ownerDocument.querySelector('textarea[name="custom"]')?.focus();
+      return;
+    }
+    if (event.target.type === 'checkbox' && event.target.closest('[data-sl-form="run"]')) {
+      run.values[event.target.name] = [...event.target.form.querySelectorAll(`input[name="${event.target.name}"]:checked`)].map(input => input.value);
+      run.error = '';
+      api.render();
+      panel.ownerDocument.querySelector(`input[name="${event.target.name}"][value="${event.target.value}"]`)?.focus();
+      return;
+    }
     if (event.target.name === 'baseline') { run.values.baseline = event.target.value; api.render(); return; }
     if (event.target.name !== 'import') return;
     const file = event.target.files[0];
