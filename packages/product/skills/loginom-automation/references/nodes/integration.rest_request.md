@@ -1,6 +1,12 @@
 # REST-запрос (`integration.rest_request`)
 
 <!-- mode: request -->
+## Описания кодов
+
+`produce_error_descriptions:false` убирает ErrorDesc из порта 1;
+остаются RequestID, ErrorCode, HttpStatusCode (integer). true — вернуть;
+пропуск — сохранить. Readback — наблюдённый флаг. Выгружай сам порт 1.
+
 ## Имитация
 
 Доставь файл; используй его серверный путь:

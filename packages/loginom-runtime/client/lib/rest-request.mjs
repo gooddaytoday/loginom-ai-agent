@@ -259,6 +259,21 @@ export async function restRequestCapability(page,t,readContext){
    }
    if(caption==='Дополнительные параметры'){
     const advanced=root+';AdditionalParamsWizard',flag=advanced+';pedUseResponseStub;ValueControl',file=advanced+';pedResponseStub;ValueControl';
+    const descriptions=advanced+';pedProduceErrorDescs;ValueControl';
+    const readDescriptions=async()=>{await guard();return page.evaluate(({advanced,descriptions})=>{
+     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),es=exact(descriptions),e=es[0],field=e&&Ext.getCmp(e.id),
+      c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
+     if(roots.length!==1||c.FCardLayout.getActiveItem().el.dom!==roots[0]||es.length!==1||!roots[0].contains(e)
+      ||field?.el?.dom!==e||field.getXType()!=='checkboxfield'||!field.inputEl?.dom||typeof field.getValue()!=='boolean')throw Error('REST error descriptions field binding unavailable');
+     return field.getValue();
+    },{advanced,descriptions});};
+    let observedDescriptions=await readDescriptions();
+    if(t.produce_error_descriptions!==undefined&&observedDescriptions!==t.produce_error_descriptions){
+     await click(descriptions+';DisplayEl');
+     await wait('error descriptions readback',async()=>(await readDescriptions())===t.produce_error_descriptions);
+     observedDescriptions=await readDescriptions();
+    }
+    configuration.produce_error_descriptions=observedDescriptions;
     const readSimulation=async()=>{await guard();return page.evaluate(({advanced,flag,file})=>{
      const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']'),roots=exact(advanced),
       c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;
