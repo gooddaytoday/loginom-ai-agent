@@ -153,7 +153,11 @@ def proposals(slug):
     # Index values are computed here; column position follows the native 7.4.2 layout (LAB-1112 owner decision):
     # the global index is the first column of the array branch, after ancestor leaves.
     indexed = [dict(batch=r['batch'], item_index=i, code=r['code'], qty=r['qty']) for i,r in enumerate(rows, start=f['index_base_proposal'])]
-    composite = [{'items_code':r['code'],'items_qty':r['qty']} for r in rows]
+    # Owner decision tree-composite-native (LAB-1807 probe): Root opens every native composite
+    # name (segments joined by _) and label (tree labels joined by the separator).
+    composite_columns = [dict(name='Root_items_' + k, label='Root.' + labels['items'] + '.' + labels[k], type=t)
+                         for k, t in [('code', 'string'), ('qty', 'integer')]]
+    composite = [{c['name']: r[k] for c, k in zip(composite_columns, ['code', 'qty'])} for r in rows]
     wide_names = ['f' + str(i).zfill(2) for i in range(f['wide_fields'])]
     wide = {k:i for i,k in enumerate(wide_names)}
     return [
@@ -161,9 +165,10 @@ def proposals(slug):
              global_index_paths=['/items'], index_base=f['index_base_proposal'], index_position='native 7.4.2 layout: first column of the array branch',
              grouped_documents='deferred: several JSON rows build a native root array (LAB-1112)',
              index_metadata='native generated names need readback; no UI row index substitution'),
-        case('composite', table([dict(name='items_code',label='Позиции.Код',type='string'),dict(name='items_qty',label='Позиции.Количество',type='integer')], composite),
+        dict(case('composite', table(composite_columns, composite),
              composite_names=True, composite_labels=True, label_separator='.',
-             native_name_and_separator_status='technical name spelling and inclusion of Root pending native observation'),
+             native_names='Root and path segments joined by _; the separator changes labels only',
+             tree_input='prepared DocumentTree with user labels (composite-source.lgp)'), native_status='observed'),
         case('wide', table([dict(name=k,label_any=True,type='integer') for k in wide_names], [wide]), selected_field_count=f['wide_fields'], tree_input={'rows':[wide]}),
         case('siblings', table([*columns,dict(name='tag',label_any=True,type='string')],
              [dict(**r,tag=t['tag']) for r in rows for t in d['tags']]), multiplication=f['sibling_policy_proposal']),
@@ -237,6 +242,15 @@ def tree_to_table_typed_projection():
                                        dict(name='Value', type='variant', label_any=True)], rows=rows)])
 
 
+def tree_to_table_composite_projection():
+    """LAB-1815: the composite case on the prepared labelled DocumentTree, one table and its CSV."""
+    output = next(c['output'] for c in proposals(SLUGS[3]) if c['id'] == 'composite')
+    return dict(package_path='{{PACKAGE_PATH}}',
+                nodes=[dict(type=t, label_any=True) for t in ['imports.text', 'trees.from_json', 'trees.to_table']],
+                outputs=[dict(output_node_type='trees.to_table', output_port=0, export_destination='tree-composite.csv',
+                              ordered=True, column_order='exact', columns=output['columns'], rows=output['rows'])])
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--check', action='store_true')
@@ -256,4 +270,6 @@ if __name__ == '__main__':
         if args.check and slug == SLUGS[3]:
             projection = target.with_name('expected-typed-run.json')
             assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_typed_projection(), str(projection)
+            projection = target.with_name('expected-composite-run.json')
+            assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_composite_projection(), str(projection)
         print(slug + ': ' + str(len(output['cases'])) + ' independent proposals; native not_checked')

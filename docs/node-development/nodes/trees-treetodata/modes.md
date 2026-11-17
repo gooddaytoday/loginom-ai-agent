@@ -24,3 +24,10 @@ Wide fixture строит одну запись f00…f69 со значения�
 selected index, а preflight выбранной ветви ограничен одной array/64 leaves.
 Оценка: 4 цикла в `tree-{parameters,node}.mjs`, `node-output-context.mjs`;
 изменение общего reader сверх регистрации — stop до решения владельца.
+
+LAB-1815, composite: `native_status` — наблюдено (Loginom 7.4.2, проба LAB-1807 и
+мастер LAB-1815). Имена — Root и сегменты пути через `_` (`Root_items_code`), метки —
+метки дерева через разделитель (`Root.Позиции.Код`, «|» — `Root|Позиции|Код`).
+Разделитель — combo `pedCompositeDisplayNameSeparator` (`.` `|` пробел `-` `_`,
+опции `;boundlist;<имя>`), активен только с составными метками. Новый native узел
+включает составные метки по умолчанию; обработчик задаёт все три настройки явно.

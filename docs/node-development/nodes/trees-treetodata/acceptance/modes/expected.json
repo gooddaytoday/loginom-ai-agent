@@ -66,36 +66,37 @@
     },
     {
       "id": "composite",
-      "native_status": "not_checked",
+      "native_status": "observed",
       "settings_proposal": {
         "composite_names": true,
         "composite_labels": true,
         "label_separator": ".",
-        "native_name_and_separator_status": "technical name spelling and inclusion of Root pending native observation"
+        "native_names": "Root and path segments joined by _; the separator changes labels only",
+        "tree_input": "prepared DocumentTree with user labels (composite-source.lgp)"
       },
       "output": {
         "port": 0,
         "port_kind": "table",
         "columns": [
           {
-            "name": "items_code",
-            "label": "Позиции.Код",
+            "name": "Root_items_code",
+            "label": "Root.Позиции.Код",
             "type": "string"
           },
           {
-            "name": "items_qty",
-            "label": "Позиции.Количество",
+            "name": "Root_items_qty",
+            "label": "Root.Позиции.Количество",
             "type": "integer"
           }
         ],
         "rows": [
           {
-            "items_code": "x",
-            "items_qty": 2
+            "Root_items_code": "x",
+            "Root_items_qty": 2
           },
           {
-            "items_code": "y",
-            "items_qty": 0
+            "Root_items_code": "y",
+            "Root_items_qty": 0
           }
         ],
         "ordered": true

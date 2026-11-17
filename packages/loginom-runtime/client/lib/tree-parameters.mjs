@@ -1,11 +1,13 @@
+export const treeLabelSeparators=['.','|',' ','-','_'];
 const text=(description,maxLength=128)=>({type:'string',minLength:1,maxLength,description});
 export const jsonToTreeParametersSchema={type:'object',properties:{json_field:text('Exact input string column containing one JSON object.'),
  root_mode:{type:'string',enum:['auto'],description:'Automatic root; nested objects and object arrays in one repeated branch, with homogeneous scalar arrays. Empty arrays require a typed nonempty witness at the same schema path.'}},required:[],additionalProperties:false};
 export const treeToTableParametersSchema={type:'object',properties:{
  selected_paths:{type:'array',minItems:1,maxItems:64,items:text('JSON Pointer schema leaf path, without array indexes.',512),description:'Replace the complete leaf selection in native schema order.'},
  repeat_parents:{type:'boolean',description:'Repeat selected ancestors on every child row.'},
- composite_names:{type:'boolean',const:false,description:'Short leaf names only.'},composite_labels:{type:'boolean',const:false,description:'Short leaf labels only.'},
- label_separator:{type:'string',enum:['.'],description:'Preserve native dot separator.'},
+ composite_names:{type:'boolean',description:'true: native root+path names joined by _ (Root_items_code); false: leaf names.'},
+ composite_labels:{type:'boolean',description:'true: root+path tree labels joined by label_separator; false: leaf labels.'},
+ label_separator:{type:'string',enum:treeLabelSeparators,description:'Composite label separator; names always use _.'},
  global_index_paths:{type:'array',maxItems:1,items:text('JSON Pointer of the repeated array schema node.',512),description:'Optional: arrays whose native global index integer column is added; [] removes it. Read the generated name.'}},required:[],additionalProperties:false};
 const optionalOnNew=new Set(['global_index_paths']);
 export function validateTreeParameters(parameters,mode,request){
@@ -24,8 +26,8 @@ export function validateTreeParameters(parameters,mode,request){
   ||new Set(parameters.selected_paths).size!==parameters.selected_paths.length||parameters.selected_paths.some(p=>typeof p!=='string'||p.length>512||!/^\/(?:[^~]|~[01])+$/.test(p))))
   throw Error('Invalid parameters.selected_paths: distinct JSON Pointer schema paths required');
  if(parameters.repeat_parents!==undefined&&typeof parameters.repeat_parents!=='boolean')throw Error('Invalid parameters.repeat_parents');
- for(const k of ['composite_names','composite_labels'])if(parameters[k]!==undefined&&parameters[k]!==false)throw Error('Invalid parameters.'+k+': only false is supported');
- if(parameters.label_separator!==undefined&&parameters.label_separator!=='.')throw Error('Invalid parameters.label_separator: only dot is supported');
+ for(const k of ['composite_names','composite_labels'])if(parameters[k]!==undefined&&typeof parameters[k]!=='boolean')throw Error('Invalid parameters.'+k);
+ if(parameters.label_separator!==undefined&&!treeLabelSeparators.includes(parameters.label_separator))throw Error('Invalid parameters.label_separator: use . | space - or _');
  if(parameters.global_index_paths!==undefined&&(!Array.isArray(parameters.global_index_paths)||parameters.global_index_paths.length>1
   ||parameters.global_index_paths.some(p=>typeof p!=='string'||p.length>512||!/^\/(?:[^~]|~[01])+$/.test(p))))
   throw Error('Invalid parameters.global_index_paths: at most one JSON Pointer array path');

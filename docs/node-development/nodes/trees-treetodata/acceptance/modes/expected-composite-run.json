@@ -1,0 +1,48 @@
+{
+ "package_path": "{{PACKAGE_PATH}}",
+ "nodes": [
+  {
+   "type": "imports.text",
+   "label_any": true
+  },
+  {
+   "type": "trees.from_json",
+   "label_any": true
+  },
+  {
+   "type": "trees.to_table",
+   "label_any": true
+  }
+ ],
+ "outputs": [
+  {
+   "output_node_type": "trees.to_table",
+   "output_port": 0,
+   "export_destination": "tree-composite.csv",
+   "ordered": true,
+   "column_order": "exact",
+   "columns": [
+    {
+     "name": "Root_items_code",
+     "label": "Root.Позиции.Код",
+     "type": "string"
+    },
+    {
+     "name": "Root_items_qty",
+     "label": "Root.Позиции.Количество",
+     "type": "integer"
+    }
+   ],
+   "rows": [
+    {
+     "Root_items_code": "x",
+     "Root_items_qty": 2
+    },
+    {
+     "Root_items_code": "y",
+     "Root_items_qty": 0
+    }
+   ]
+  }
+ ]
+}

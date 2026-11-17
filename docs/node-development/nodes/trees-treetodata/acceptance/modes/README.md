@@ -10,7 +10,7 @@
 пользовательское описание данных, не скрытый acceptance manifest.
 
 `expected.json` — контейнер предложенных случаев, **не вход stock run-check**.
-Все `native_status` равны `not_checked`; совпадение арифметики не означает
+Все `native_status`, кроме composite (`observed`, LAB-1815), равны `not_checked`; совпадение арифметики не означает
 наблюдение Loginom или PASS обработчика. Нужны утверждение критериев и
 минимальные native-пробы данных, перечисленные в [modes.md](../../modes.md).
 
@@ -48,3 +48,11 @@ LAB-1699: `task-typed.md` — листья DateTime и Variant из подгот
 сверяет файл. Ограничение: Variant NULL не покрыт — native Свёртка с
 пропуском NULL отбрасывает пустые ячейки. CSV: полночь с мс пишется датой,
 учитывается как D76 `midnight_date` (решение `d76-tree-to-table`).
+
+LAB-1815 (решение владельца `tree-composite-native`): случай composite — native
+7.4.2 (проба LAB-1807): имя `Root_items_code` (Root и сегменты через `_`), метка
+`Root.Позиции.Код`; разделитель меняет только метки. Метки модель не задаёт:
+`task-composite.md` идёт на подготовленном `fixtures/modes/composite-source.lgp`
+(Documents с относительным `documents.csv` → DocumentTree с метками на выходном
+порту), сценарий `trees-to-table-composite`. `expected-composite-run.json` строит
+`tree_to_table_composite_projection`; `oracle.py --check` сверяет файл.

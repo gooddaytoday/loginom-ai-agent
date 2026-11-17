@@ -453,7 +453,7 @@ export interface TreeConfigurationReadback {
   scope: 'observed_before_verified_finish'; values_are: 'observed_ui_values';
   node: NodeRef; receipt_ids: string[]; package_persistence_verified: false;
   json_field?: string; root_mode?: 'auto'; auto_structure?: true; strict?: true; exclude_root?: false;
-  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: false; composite_labels?: false; label_separator?: '.'; global_index_paths?: string[];
+  selected_paths?: string[]; repeat_parents?: boolean; composite_names?: boolean; composite_labels?: boolean; label_separator?: '.' | '|' | ' ' | '-' | '_'; global_index_paths?: string[];
 }
 export interface TreeNodeOutputPort {
   port: number; port_guid: string; port_kind: 'tree'; fresh: true; execution_id: string;
