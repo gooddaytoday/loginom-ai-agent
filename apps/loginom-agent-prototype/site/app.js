@@ -1,9 +1,9 @@
 import { editedPackageBase64 } from './edited-package.js'
 import { icon } from './icons.js'
-import { renderHub, bindHub, hubHasInstalled, openHubSolution } from './hub.js'
+import { renderHub, bindHub, hubHasInstalled, openHubSolution, showHubType } from './hub.js'
 import { renderSettings, renderOnboarding, bindSettings, ensureSettings, beforeSettingsLeave } from './settings.js'
 import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
-import { actions as packageActions, byId } from './catalog.js'
+import { actions as packageActions, byId, tierBadge } from './catalog.js'
 
 const $ = (selector, scope = document) => scope.querySelector(selector)
 const app = $('#app')
@@ -15,8 +15,8 @@ const write = (key, value) => {
 }
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch])
 const pages = {
-  home:'Главная', chat:'Разговор', hub:'Решения', loginom:'Пакеты',
-  runner:'Запуск решения', studio:'Создать решение', settings:'Настройки', onboarding:'Первый запуск', help:'Справка',
+  home:'Главная', chat:'Разговор', hub:'Каталог', loginom:'Пакеты',
+  runner:'Запуск действия', studio:'Создать навык', settings:'Настройки', onboarding:'Первый запуск', help:'Справка', review:'Что решить',
 }
 const examples = [
   { id:'abc', title:'ABC-анализ товаров', label:'Аналитика продаж', icon:'chart', tone:'red', detail:'Сгруппировать товары по вкладу в выручку', prompt:'Построй ABC-анализ товаров по выручке в Loginom. Используй демонстрационные данные и сохрани результат как сценарий.' },
@@ -83,6 +83,8 @@ const state = {
   project:'Аналитика продаж', projects:['Аналитика продаж','Демо-проекты'], session:null, tabs:[],
   sessions:[...seed], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
   solution:'refactor', review:false, reviewTab:'plan', activeRun:false,
+  // Actions shown on Home; the rest are one click away in «Все действия».
+  pinnedActions:['document','check','improve','compare'],
   activePackage:serverPackages[0], importedPackages:[], packageScope:'personal',
   packageQuery:'', packageDir:'', packageSort:'date', packageDeep:false, pendingAction:null,
   // Packages the user worked with in this app: the app's own history, not a Loginom feature.
@@ -159,9 +161,13 @@ function runSolution(id, mode = 'review', from = 'hub') {
 // Runs a package action (document/check/improve/compare) for a chosen package.
 function runAction(actionId, pkg, from) {
   const action = packageActions[actionId]
-  if (pkg.id) rememberPackage(pkg.id, actionNoun[actionId])
+  if (!hubHasInstalled(state, action.solution)) {
+    openHubSolution(state, action.solution)
+    return navigate('hub')
+  }
+  if (pkg?.id) rememberPackage(pkg.id, actionNoun[actionId] || action.title.toLocaleLowerCase('ru'))
   state.runnerPackage = pkg
-  runSolution(action.solution, action.mode, from)
+  runSolution(action.run?.solution || action.solution, action.run?.mode ?? action.mode, from)
 }
 function packageRef(item) {
   return {id:item.id, name:item.name, where:'Loginom · ' + packagePath(item), source:'loginom'}
@@ -223,7 +229,7 @@ function sidebar() {
     <nav class="sidenav" aria-label="Рабочее пространство">
       ${navButton('home','home','Главная')}
       ${navButton('loginom','flow','Пакеты')}
-      ${navButton('hub','grid','Решения')}
+      ${navButton('hub','grid','Каталог')}
     </nav>
     <section class="sidebar-history" aria-label="Недавние разговоры">
       <h2>Недавние <button class="small-icon" data-overlay="search" aria-label="Найти разговор">${icon('more',16)}</button></h2>
@@ -232,14 +238,15 @@ function sidebar() {
     <nav class="sidebar-footer" aria-label="Настройки и справка">
       ${navButton('settings','settings')}${navButton('help','help')}
       ${connectionCard()}
-      <p class="prototype-mark">Прототип · итерация 1</p>
+      <button class="prototype-mark" data-go="review">Прототип 1.1 · что решить ${icon('arrow',12)}</button>
     </nav>
   </aside>`
 }
 function connectionCard() {
+  const running = Object.values(state.solutions?.runs || {}).some(run => run.step === 'running')
   const connected = state.settings.connection.connected
   const model = state.settings?.model?.name || 'Демо-модель'
-  return `<button class="conn-card" data-settings="loginom" title="Подключение к Loginom и модель">
+  return `${running ? `<button class="conn-run" data-go="runner"><i class="conn-dot busy"></i><span>Выполняется действие</span>${icon('chevron',14)}</button>` : ''}<button class="conn-card" data-settings="loginom" title="Подключение к Loginom и модель">
     <i class="conn-dot ${connected ? 'ok' : 'warn'}"></i>
     <span><strong>${connected ? 'Loginom подключён' : 'Loginom не подключён'}</strong><small>Модель: ${esc(model)}</small></span>${icon('chevron',14)}</button>`
 }
@@ -292,7 +299,7 @@ function home() {
       <div class="welcome-text">
         <span class="welcome-app"><img src="assets/loginom.png" alt="" width="31" height="31"> Loginom AI Agent</span>
         <h1>С чего начнём?</h1>
-        <p>Создавайте сценарии в Loginom, проверяйте данные и используйте готовые решения Hub.</p>
+        <p>Создавайте сценарии в Loginom, проверяйте данные и добавляйте возможности из каталога Loginom Hub.</p>
       </div>
       <div class="hero-diagram" aria-hidden="true">
         <span class="hero-orbit orbit-one"></span><span class="hero-orbit orbit-two"></span><span class="hero-orbit orbit-three"></span>
@@ -306,11 +313,11 @@ function home() {
     </section>
     ${state.settings.connection.connected ? '' : `<div class="connect-banner">${icon('alert',18)}<span><strong>Подключите Loginom.</strong> Без подключения агент может отвечать на вопросы, но не открывает и не меняет пакеты.</span><button class="btn primary" data-settings="loginom">Подключить</button></div>`}
     <section class="scenario-section">
-      <div class="section-bar"><h2>Работа с пакетом</h2><button class="link-btn" data-go="loginom">Все пакеты ${icon('arrow',16)}</button></div>
-      <div class="action-grid">${Object.entries(packageActions).map(([id,action]) => actionTile(id,action)).join('')}</div>
+      <div class="section-bar"><h2>Работа с пакетом</h2><button class="link-btn" data-overlay="all-actions">Все действия · ${Object.keys(packageActions).length} ${icon('arrow',16)}</button></div>
+      <div class="action-grid">${state.pinnedActions.map(id => actionTile(id,packageActions[id])).join('')}</div>
     </section>
     <section class="scenario-section">
-      <div class="section-bar"><h2>Примеры задач</h2><button class="link-btn" data-go="hub">Все решения ${icon('arrow',16)}</button></div>
+      <div class="section-bar"><h2>Примеры задач</h2><button class="link-btn" data-go="hub">Весь каталог ${icon('arrow',16)}</button></div>
       <div class="example-grid">${examples.map(item => `<button class="example-card" data-example="${item.id}">
         <div class="example-top"><span class="glyph ${item.tone}">${icon(item.icon,19)}</span>${icon('external',15)}</div><strong>${item.title}</strong><span>${item.detail}</span></button>`).join('')}</div>
     </section>
@@ -323,7 +330,7 @@ function home() {
 function actionTile(id, action) {
   const ready = hubHasInstalled(state, action.solution)
   return `<button class="action-tile" data-package-action="${id}"><span class="glyph red">${icon(action.icon,19)}</span>
-    <strong>${action.title}</strong><span>${action.detail}</span>${ready ? '' : `<small class="action-missing">${icon('plus',13)} Добавить из «Решений»</small>`}</button>`
+    <strong>${action.title}</strong><span>${action.detail}</span>${byId(action.solution)?.tier !== 'official' ? tierBadge(byId(action.solution)) : ''}${ready ? '' : `<small class="action-missing">${icon('plus',13)} Добавить из каталога</small>`}</button>`
 }
 function rightPanel(item) {
   const active = state.reviewTab
@@ -360,7 +367,7 @@ function result(item) {
   return `<div class="answer-block"><h2>${info[0]}</h2><p>${info[1]}</p>
     <dl class="result-metrics">${info[2].map(([key,value]) => `<div><dt>${key}</dt><dd>${value}</dd></div>`).join('')}</dl>
     <div class="artifact-card"><span class="glyph red">${icon('flow',19)}</span><span><strong>${resultPackage(item).name}</strong><small>Демонстрационный пакет Loginom</small></span><button class="btn" data-action="open-result-package">Открыть ${icon('external',14)}</button></div>
-    <div class="answer-actions"><button class="link-btn" data-action="download-result">${icon('download',15)} Скачать отчёт CSV</button><button class="link-btn" data-action="author-from-chat">${icon('box',15)} Сохранить как решение</button></div>
+    <div class="answer-actions"><button class="link-btn" data-action="download-result">${icon('download',15)} Скачать отчёт CSV</button><button class="link-btn" data-action="author-from-chat">${icon('box',15)} Сохранить как навык</button></div>
   </div>`
 }
 function currentPackageEdit() {
@@ -541,6 +548,25 @@ function packageBrowse() {
     <div class="pkg-list pkg-files" id="package-files">${folders.map(name => `<button class="pkg-row" data-package-dir="${esc(name)}"><span class="glyph blue">${icon('folder',16)}</span><span class="pkg-name"><strong>${esc(name)}</strong></span>${icon('chevron',15)}</button>`).join('')}${files.map(item => row(item, deep ? packagePath(item) : '', meta(item))).join('')}${folders.length + files.length ? '' : `<p class="empty-note">${q ? `Нет пакетов с «${esc(state.packageQuery.trim())}» в имени${deep ? '' : ' в этой папке'}.` : 'В этой папке нет пакетов.'}</p>`}</div>
     <p class="pkg-count">${q ? `Найдено: ${files.length}${deep ? ' — в этой папке и вложенных' : ' в этой папке'}` : `${files.length} ${packageWord(files.length)}${folders.length ? ' · папок: ' + folders.length : ''}`}${q && !deep && !state.packageDir ? ` · <button class="link-btn" data-action="package-deep">Искать и во вложенных папках</button>` : ''}</p>`
 }
+// Actions come with app updates and from the catalog; the user pins up to four of them to Home.
+function allActions() {
+  const entries = Object.entries(packageActions)
+  const installed = entries.filter(([,action]) => hubHasInstalled(state, action.solution))
+  const row = ([id,action]) => {
+    const item = byId(action.solution)
+    const ready = hubHasInstalled(state, action.solution)
+    const pinned = state.pinnedActions.includes(id)
+    return `<div class="all-action"><button class="all-action-main" data-package-action="${id}"><span class="glyph red">${icon(action.icon,17)}</span>
+      <span><strong>${action.title}${item?.tier && item.tier !== 'official' ? ` ${tierBadge(item)}` : ''}</strong><small>${action.detail}</small></span></button>
+      ${ready && !action.noPackage ? `<button class="pin-btn" data-pin-action="${id}" aria-pressed="${pinned}" title="${pinned ? 'Убрать с главной' : 'Показывать на главной'}">${pinned ? 'На главной' : 'На главную'}</button>` : ready ? '' : `<button class="pin-btn" data-package-action="${id}">Добавить</button>`}</div>`
+  }
+  const group = (title, list) => list.length ? `<p class="pkg-section">${title}</p><div class="all-actions">${list.map(row).join('')}</div>` : ''
+  return `<p class="dialog-desc">Новые действия появляются с обновлениями приложения и из каталога. Четыре можно закрепить на главной.</p>
+    ${group('Установлены', installed.filter(([,action]) => !action.noPackage))}
+    ${group('Без пакета', installed.filter(([,action]) => action.noPackage))}
+    ${group('Есть в каталоге', entries.filter(([,action]) => !hubHasInstalled(state, action.solution)))}
+    <button class="link-btn" data-action="catalog-actions">Все действия в каталоге ${icon('arrow',15)}</button>`
+}
 function packageWord(count) {
   if (count % 10 === 1 && count % 100 !== 11) return 'пакет'
   if ([2,3,4].includes(count % 10) && ![12,13,14].includes(count % 100)) return 'пакета'
@@ -634,18 +660,43 @@ function packages() {
       ${item.editSessionId ? `<button class="link-btn" data-session="${item.editSessionId}">${icon('message',16)} Вернуться к разговору</button>`
         : !item.savedVersion && !dirty ? `<button class="btn package-chat-cta" data-action="ask-package-edit">${icon('message',16)} Изменить с агентом</button>` : ''}
     </div></section>
-    ${item.isDraft ? '' : `<div class="section-bar package-section"><h2>Что сделать с пакетом</h2><button class="link-btn" data-go="hub">Другие решения ${icon('arrow',16)}</button></div>
-    <div class="action-grid">${Object.entries(packageActions).map(([id,action]) => actionTile(id,action)).join('')}</div>`}
+    ${item.isDraft ? '' : `<div class="section-bar package-section"><h2>Что сделать с пакетом</h2><button class="link-btn" data-action="catalog-actions">Ещё действия в каталоге ${icon('arrow',16)}</button></div>
+    <div class="action-grid">${Object.entries(packageActions).filter(([id,action]) => !action.noPackage && (hubHasInstalled(state,action.solution) || state.pinnedActions.includes(id))).map(([id,action]) => actionTile(id,action)).join('')}</div>`}
+  </div>`
+}
+// Owner review page for the current iteration: what to look at, what to decide, what changed.
+function review() {
+  const look = [
+    ['Новые действия','Главная → «Все действия · 7» → добавьте «Проверить по стандарту» и закрепите на главной вместо «Улучшить».','review-actions'],
+    ['Выбор пакета и запуск','Главная → «Документировать» → пакет из папки «Архив» → «Разрешить и запустить» → вернитесь на Главную: внизу меню видно «Выполняется действие».','home'],
+    ['Каталог и сообщество','Каталог → «Навыки» → «Сводка для руководителя»: новые тексты и отметка перед установкой.','review-skills'],
+  ]
+  const ask = [
+    ['Названия','Раздел «Каталог», в нём четыре типа по тому, что вы с ними делаете: <b>Действие</b> — запускается для пакета; <b>Навык</b> — агент лучше справляется в разговоре; <b>Пакет Loginom</b> — готовый сценарий в вашу папку; <b>Подключение</b> — внешний сервис. «Решение», «шаблон» и «база знаний» больше не показываются. Другие варианты: раздел «Расширения» или «Возможности»; типы «Инструмент · Знания · Готовый сценарий · Интеграция».'],
+    ['Новые действия','Приходят с обновлениями приложения и из каталога. На главной — четыре, их выбирает пользователь; остальные — в «Все действия»; на странице пакета — все установленные. Действия от сообщества — только «Проверено Loginom» и только как настройка встроенного действия: своего доступа к Loginom они не получают.'],
+    ['Выбор пакета и Loginom','На стенде список папки приходит за 1–3 секунды без агента, но через внутренний метод веб-клиента Loginom, и приложению нужна своя фоновая сессия Loginom. Можно ли попросить разработчиков Loginom закрепить этот метод? Занимает ли такая сессия лицензию?'],
+    ['Тексты для сообщества','Карточка: «Автор — участник сообщества, Loginom это не проверял…»; отметка перед установкой: «Понимаю, что Loginom это не проверял, и сам проверю результат»; в закрытом контуре: «Администратор вашей организации разрешил только то, что подготовил или проверил Loginom».'],
+    ['Состояние','Отдельной строки нет: внизу меню — карточка «Loginom · модель», над ней во время запуска — «Выполняется действие». Режим сети — вверху справа.'],
+  ]
+  const changed = ['Выбор пакета: поиск, недавние, папки Loginom; для «Документировать» — ещё файл с компьютера.','«Решения» → «Каталог», четыре типа, кнопки по смыслу типа: «Запустить», «Начать разговор».','«Все действия» и закрепление на главной; новое действие «Проверить по стандарту» (Проверено Loginom).','Новые тексты уровней доверия; «Создать своё» создаёт навык.','Индикатор «Выполняется действие» внизу меню.']
+  return `<div class="native-page review-page">
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 1.1</p><h1>Что решить</h1><p>Посмотрите три сценария — около 10 минут — и ответьте одной строкой: «ок» или «ок, кроме N». Мелочи на мне.</p></div></div>
+    <h2 class="rv-heading">Посмотреть</h2>
+    <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${index + 1}</span><h3>${title}</h3><p>${text}</p><button class="btn" ${target === 'home' ? 'data-go="home"' : `data-action="${target}"`}>Открыть ${icon('arrow',15)}</button></article>`).join('')}</div>
+    <h2 class="rv-heading">Решить</h2>
+    <ol class="rv-questions">${ask.map(([title,text]) => `<li><strong>${title}.</strong> ${text}</li>`).join('')}</ol>
+    <h2 class="rv-heading">Что изменилось</h2>
+    <ul class="rv-changes">${changed.map(text => `<li>${text}</li>`).join('')}</ul>
   </div>`
 }
 function help() {
   return `<div class="native-page help-page">
-    <div class="native-heading"><div><p class="eyebrow">Поддержка</p><h1>Справка</h1><p>Подключение, работа со сценариями и доставка решений в закрытый контур.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Поддержка</p><h1>Справка</h1><p>Подключение, работа со сценариями и доставка каталога в закрытый контур.</p></div></div>
     <div class="help-list">${[
       ['Подключить Loginom и модель','Выберите режим работы, настройте адрес Loginom и подключите доступную модель.', 'onboarding','Начать настройку'],
       ['Добавить возможности Hub без интернета','Администратор получает пакет с зависимостями на стороне с доступом к Hub. В закрытом контуре откройте Hub и импортируйте пакет из файла.', 'hub','Открыть Hub'],
       ['Проверить состояние подключения','Loginom, база знаний, модель и источник Hub проверяются отдельно. Для закрытой поставки база знаний и модель должны быть доступны локально или по внутренней сети.', 'settings','Открыть настройки'],
-      ['Разобрать пакет Loginom','Выберите пакет, откройте узел или запустите решение. Агент покажет требуемые разрешения и результат выполнения.', 'loginom','Открыть демопакет'],
+      ['Разобрать пакет Loginom','Выберите пакет, откройте узел или запустите действие. Агент покажет требуемые разрешения и результат выполнения.', 'loginom','Открыть демопакет'],
     ].map(([title,body,page,label],i) => `<details ${i === 0 ? 'open':''}><summary>${title}${icon('down',16)}</summary><p>${body}</p><button class="link-btn" data-go="${page}">${label} ${icon('arrow',16)}</button></details>`).join('')}</div>
   </div>`
 }
@@ -655,6 +706,7 @@ function overlay() {
   const content = {
     'package-edit-example':['Изменение на учебном пакете',`<p class="dialog-desc">Сценарий правки формулы в прототипе доступен для пакета «Расчёт суммы.lgp». Откройте его в чате, чтобы увидеть сравнение, подтверждение и сохранение.</p><div class="button-row package-picker-actions"><button class="btn quiet" type="button" data-action="dismiss">Отмена</button><button class="btn primary" type="button" data-action="ask-example-package-edit">Открыть учебный пакет в чате</button></div>`],
     'package-version':['Сохранить новую версию', kind === 'package-version' ? versionDialog() : ''],
+    'all-actions':['Действия с пакетом', kind === 'all-actions' ? allActions() : ''],
     'pick-package':[packageActions[state.pendingAction]?.title + ': какой пакет?', kind === 'pick-package' ? packagePicker(false) : ''],
     'package-server':['Открыть из Loginom', kind === 'package-server' ? packagePicker(false) : ''],
     'package-computer':['Открыть с компьютера', kind === 'package-computer' ? packagePicker(true) : ''],
@@ -678,11 +730,11 @@ function searchResults(value) {
   const q = value.trim().toLocaleLowerCase('ru')
   const entries = [
     ['home','Главная','home'],
-    ['hub','Решения (Loginom Hub)','grid'],
+    ['hub','Каталог (Loginom Hub)','grid'],
     ['loginom','Пакеты','flow'],
     ['settings','Настройки','settings'],
     ['onboarding','Мастер первого запуска','spark'],
-    ['studio','Создать решение','box'],
+    ['studio','Создать навык','box'],
     ['help','Справка','help'],
   ].filter(([,label]) => label.toLocaleLowerCase('ru').includes(q)).map(([page,label,glyph]) =>
     `<button data-go="${page}">${icon(glyph,17)}<span>${label}</span>${icon('arrow',15)}</button>`)
@@ -701,6 +753,7 @@ function pageContents() {
     case 'studio': return renderSolutions(state)
     case 'loginom': return packages()
     case 'help': return help()
+    case 'review': return review()
   }
 }
 function render(resetScroll = false) {
@@ -871,6 +924,9 @@ const actions = {
     if (session?.phase === 'done') openPackage(resultPackage(session))
   },
   'package-server':() => { resetPackageBrowse(); state.pendingAction = null; state.overlay = 'package-server'; render() },
+  'catalog-actions':() => { showHubType(state, 'Действие'); navigate('hub') },
+  'review-actions':() => { navigate('home'); state.overlay = 'all-actions'; render() },
+  'review-skills':() => { showHubType(state, 'Навык'); navigate('hub') },
   'package-sort':() => {
     state.packageSort = state.packageSort === 'name' ? 'date' : 'name'
     $('#package-browse').innerHTML = packageBrowse()
@@ -946,6 +1002,12 @@ app.addEventListener('click', event => {
   if (d.agentMode) { state.mode = d.agentMode; return dismiss() }
   if (d.review) { state.reviewTab = d.review; return render() }
   if (d.node != null) { state.node = Number(d.node); return render() }
+  if (d.pinAction) {
+    const pinned = state.pinnedActions.includes(d.pinAction)
+    if (!pinned && state.pinnedActions.length >= 4) return toast('На главной помещается 4 действия — открепите одно')
+    state.pinnedActions = pinned ? state.pinnedActions.filter(id => id !== d.pinAction) : [...state.pinnedActions, d.pinAction]
+    return render()
+  }
   if (d.packageScope) {
     resetPackageBrowse()
     state.packageScope = d.packageScope
@@ -966,6 +1028,10 @@ app.addEventListener('click', event => {
     return openPackage(item)
   }
   if (d.packageAction) {
+    const action = packageActions[d.packageAction]
+    state.overlay = null
+    if (!hubHasInstalled(state, action.solution)) return runAction(d.packageAction, null, 'home')
+    if (action.noPackage) return runAction(d.packageAction, null, 'home')
     if (state.page === 'loginom') return runAction(d.packageAction, packageRef(state.activePackage), 'loginom')
     resetPackageBrowse()
     state.pendingAction = d.packageAction

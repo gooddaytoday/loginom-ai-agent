@@ -2,24 +2,39 @@
 // tier: who stands behind the item — official (Loginom), verified (community, checked by Loginom),
 // community (not checked). evidence: separate axis — analytical checks on real examples.
 export const tiers = {
-  official: { label: 'Loginom', title: 'Официальное решение Loginom', tone: 'official',
-    explain: 'Подготовлено и поддерживается Loginom. Может работать с Loginom через встроенные инструменты приложения.' },
-  verified: { label: 'Проверено Loginom', title: 'Решение сообщества, проверенное Loginom', tone: 'verified',
-    explain: 'Автор из сообщества, содержимое проверено Loginom. Это инструкция для агента: дополнительных прав и доступа к Loginom она не даёт.' },
-  community: { label: 'Сообщество', title: 'Решение сообщества без проверки', tone: 'community',
-    explain: 'Loginom не проверял это решение. Это инструкция для агента: она не даёт доступа к Loginom и дополнительных прав — агент работает с теми же разрешениями, что и в обычном разговоре.' },
+  official: { label: 'Loginom', title: 'Подготовлено Loginom', tone: 'official',
+    explain: 'Подготовлено и поддерживается Loginom. Действия Loginom работают с Loginom через инструменты, встроенные в приложение; перед каждым запуском мастер показывает, что именно будет разрешено.' },
+  verified: { label: 'Проверено Loginom', title: 'От сообщества, проверено Loginom', tone: 'verified',
+    explain: 'Автор — участник сообщества, Loginom проверил содержимое. Своих прав не добавляет: навык только подсказывает агенту, а действие выполняется встроенным действием Loginom с разрешениями, которые мастер покажет перед запуском.' },
+  community: { label: 'Сообщество', title: 'От сообщества, Loginom не проверял', tone: 'community',
+    explain: 'Автор — участник сообщества, Loginom это не проверял. Содержимое может быть неточным или устаревшим — проверяйте результат. Что именно будет разрешено, написано ниже.' },
 }
 
+// What the user does with each type of catalog item. Hub formats (ADR-001) map onto these:
+// solution and adapter templates -> Действие, skill and knowledge-base -> Навык, lgp-package -> Пакет Loginom,
+// integration -> Подключение.
+export const kinds = {
+  'Действие': { plural: 'Действия', use: 'Запустить', how: 'Запускается для пакета по шагам и даёт отчёт или новый файл.' },
+  'Навык': { plural: 'Навыки', use: 'Начать разговор', how: 'Агент лучше справляется с задачей в разговоре. Отдельно запускать не нужно.' },
+  'Пакет Loginom': { plural: 'Пакеты Loginom', use: 'Открыть', how: 'Готовый сценарий: копируется в вашу папку Loginom, его можно открыть и изменить.' },
+  'Подключение': { plural: 'Подключения', use: 'Подключить', how: 'Даёт агенту доступ к внешнему сервису. Нужен интернет.' },
+}
+
+// Package actions. New ones arrive with app updates or from the catalog (kind «Действие»); privileged work is
+// always done by an action built into the app (run), catalog data only configures it.
 export const actions = {
   document: { title: 'Документировать', detail: 'Описание сценария, узлов и потоков данных', icon: 'book', solution: 'document' },
   check: { title: 'Проверить', detail: 'Найти проблемы в структуре сценария', icon: 'shield', solution: 'refactor', mode: 'review' },
   improve: { title: 'Улучшить', detail: 'Предложить правки и собрать улучшенную копию', icon: 'wand', solution: 'refactor', mode: 'copy' },
   compare: { title: 'Сравнить', detail: 'Сопоставить две версии по результату и скорости', icon: 'chart', solution: 'tournament' },
+  regression: { title: 'Проверить на эталоне', detail: 'Запустить на тестовых данных и сверить с эталоном', icon: 'layers', solution: 'regression' },
+  standard: { title: 'Проверить по стандарту', detail: 'Названия, комментарии и порядок полей по правилам DataLab', icon: 'check', solution: 'standard', run: { solution: 'refactor', mode: 'review' } },
+  sql: { title: 'Собрать пакет из SQL', detail: 'Создать сценарий Loginom по SQL-запросу', icon: 'database', solution: 'migration', noPackage: true },
 }
 
 export const catalog = [
   {
-    id: 'document', title: 'Документирование пакета', product: 'ИИ Отчёт', kind: 'Решение', icon: 'book', color: 'lilac',
+    id: 'document', title: 'Документирование пакета', product: 'ИИ Отчёт', kind: 'Действие', icon: 'book', color: 'lilac',
     version: '1.0.0', tier: 'official', builtIn: true, runner: true, offline: true, size: 'Встроено в приложение',
     keywords: 'документация описание отчёт docs',
     description: 'Создаёт понятное описание сценария: назначение, модули, потоки данных и заметки. PDF, Word или Markdown.',
@@ -29,7 +44,7 @@ export const catalog = [
     stages: ['Чтение пакета', 'Описание узлов по справке Loginom', 'Сборка документа', 'Проверка полноты'],
   },
   {
-    id: 'refactor', title: 'Проверка и улучшение сценария', product: 'Scenario Refactor', kind: 'Решение', icon: 'flow', color: 'sage',
+    id: 'refactor', title: 'Проверка и улучшение сценария', product: 'Scenario Refactor', kind: 'Действие', icon: 'flow', color: 'sage',
     version: '1.0.0', tier: 'official', runner: true, offline: true, size: '0,4 МБ',
     keywords: 'рефакторинг оптимизация улучшить проверить аудит',
     description: 'Находит повторяющиеся преобразования, неясные названия и лишние узлы. Улучшения собирает в отдельной копии.',
@@ -39,7 +54,7 @@ export const catalog = [
     stages: ['Открытие копии пакета', 'Разбор структуры', 'Поиск улучшений', 'Сборка отчёта'],
   },
   {
-    id: 'regression', title: 'Проверка на эталоне', product: 'Regression Studio', kind: 'Решение', icon: 'shield', color: 'blue',
+    id: 'regression', title: 'Проверка на эталоне', product: 'Regression Studio', kind: 'Действие', icon: 'shield', color: 'blue',
     version: '1.0.0', tier: 'official', runner: true, offline: true, size: '0,6 МБ',
     keywords: 'регрессия эталон проверка изменений',
     description: 'Запускает сценарий на тестовых данных и сравнивает результат с утверждённым эталоном.',
@@ -49,7 +64,7 @@ export const catalog = [
     stages: ['Подготовка копии', 'Запуск на тестовых данных', 'Сравнение с эталоном', 'Отчёт'],
   },
   {
-    id: 'tournament', title: 'Сравнение вариантов', product: 'Scenario Tournament', kind: 'Решение', icon: 'chart', color: 'sand',
+    id: 'tournament', title: 'Сравнение вариантов', product: 'Scenario Tournament', kind: 'Действие', icon: 'chart', color: 'sand',
     version: '1.0.0', tier: 'official', runner: true, offline: true, size: '0,5 МБ',
     keywords: 'сравнение турнир версии скорость',
     description: 'Сопоставляет две версии сценария: совпадают ли результаты и какая работает быстрее.',
@@ -59,7 +74,7 @@ export const catalog = [
     stages: ['Подготовка копий', 'Сверка результатов', 'Замеры времени', 'Отчёт'],
   },
   {
-    id: 'migration', title: 'Перенос SQL в Loginom', product: 'Migration Bridge', kind: 'Решение', icon: 'link', color: 'clay',
+    id: 'migration', title: 'Перенос SQL в Loginom', product: 'Migration Bridge', kind: 'Действие', icon: 'link', color: 'clay',
     version: '1.0.0', tier: 'official', runner: true, offline: true, size: '0,5 МБ',
     keywords: 'sql миграция перенос запрос',
     description: 'Собирает сценарий Loginom по SQL-запросу и сверяет результат на тестовой выборке.',
@@ -67,6 +82,15 @@ export const catalog = [
     can: ['Создавать новый пакет в вашей папке Loginom', 'Запускать его на тестовой выборке'],
     cannot: ['Подключаться к вашей базе данных — запрос только читается', 'Менять другие пакеты'],
     stages: ['Разбор запроса', 'Сборка сценария', 'Сверка на выборке', 'Отчёт'],
+  },
+  {
+    id: 'standard', title: 'Проверка по стандарту оформления', kind: 'Действие', icon: 'check', color: 'sage',
+    version: '1.1.0', tier: 'verified', publisher: 'DataLab · сообщество', runner: true, runAs: { solution: 'refactor', mode: 'review' }, offline: true, size: '18 КБ',
+    keywords: 'стандарт оформление названия комментарии проверка правила',
+    description: 'Проверяет пакет по правилам оформления DataLab: названия узлов, комментарии, порядок полей. Выполняется встроенным действием «Проверить».',
+    evidence: { passed: 7, total: 8, loginom: '7.4.2', note: 'на 8 пакетах DataLab' },
+    can: ['Через встроенное действие «Проверить»: открыть пакет в Loginom под вашей учётной записью и прочитать настройки узлов'],
+    cannot: ['Менять пакет', 'Добавлять права сверх действия «Проверить»', 'Открывать сайты в интернете'],
   },
   {
     id: 'quality', title: 'Проверка качества данных', kind: 'Навык', icon: 'shield', color: 'sage',
@@ -78,22 +102,22 @@ export const catalog = [
     can: ['Подсказывать агенту порядок проверки данных'], cannot: ['Давать агенту доступ к Loginom или дополнительные права'],
   },
   {
-    id: 'loads', title: 'Контроль полноты загрузок', kind: 'Шаблон', icon: 'flow', color: 'clay',
+    id: 'loads', title: 'Контроль полноты загрузок', kind: 'Навык', icon: 'flow', color: 'clay',
     version: '1.0.0', tier: 'official', offline: true, size: '22 КБ',
     keywords: 'загрузка полнота источники',
-    description: 'Сверяет количество строк и ключи по каждому источнику.',
+    description: 'Агент соберёт сценарий, который сверяет количество строк и ключи по каждому источнику.',
     evidence: null,
     prompt: 'Создай сценарий Loginom для контроля полноты загрузок по источникам.',
-    can: ['Подставить готовую постановку задачи в разговор'], cannot: [],
+    can: ['Подсказывать агенту, как собрать такой сценарий'], cannot: ['Давать агенту доступ к Loginom или дополнительные права'],
   },
   {
-    id: 'abc', title: 'ABC-анализ продаж', kind: 'Шаблон', icon: 'chart', color: 'sand',
+    id: 'abc', title: 'ABC-анализ продаж', kind: 'Навык', icon: 'chart', color: 'sand',
     version: '1.2.0', tier: 'verified', publisher: 'Retail Analytics · сообщество', offline: true, size: '31 КБ',
     keywords: 'abc продажи выручка',
-    description: 'Распределяет товары по вкладу в выручку и сохраняет сценарий.',
+    description: 'Агент построит сценарий ABC-анализа: распределит товары по вкладу в выручку.',
     evidence: { passed: 4, total: 4, loginom: '7.4.2', note: 'на 4 наборах продаж' },
     prompt: 'Построй в Loginom сценарий ABC-анализа товаров по выручке.',
-    can: ['Подставить готовую постановку задачи в разговор'], cannot: [],
+    can: ['Подсказывать агенту, как собрать такой сценарий'], cannot: ['Давать агенту доступ к Loginom или дополнительные права'],
   },
   {
     id: 'profile', title: 'Профилирование таблиц', kind: 'Пакет Loginom', icon: 'table', color: 'blue',
@@ -111,21 +135,21 @@ export const catalog = [
     description: 'Превращает результаты анализа в короткую сводку на одну страницу.',
     evidence: null,
     prompt: 'Составь короткую сводку для руководителя по результатам этого анализа.',
-    can: ['Подсказывать агенту формат сводки'], cannot: ['Давать агенту доступ к Loginom или дополнительные права'],
+    can: ['Подсказывать агенту формат сводки'], cannot: ['Работать с Loginom: пока агент работает в Loginom, навыки сообщества отключаются', 'Добавлять агенту права'],
   },
   {
-    id: 'help', title: 'Справка Loginom', kind: 'База знаний', icon: 'book', color: 'lilac',
+    id: 'help', title: 'Справка Loginom', kind: 'Навык', icon: 'book', color: 'lilac',
     version: '2026.11', tier: 'official', builtIn: true, offline: true, size: 'Встроено в приложение',
     keywords: 'справка документация узлы',
-    description: 'Руководство по узлам, функциям и работе со сценариями. Агент опирается на неё в ответах.',
+    description: 'Агент знает руководство по узлам, функциям и работе со сценариями и опирается на него в ответах.',
     evidence: null, can: ['Давать агенту сведения об узлах Loginom'], cannot: [],
   },
   {
-    id: 'cloud', title: 'Внешнее обогащение данных', kind: 'Интеграция', icon: 'link', color: 'blue',
+    id: 'cloud', title: 'Внешнее обогащение данных', kind: 'Подключение', icon: 'link', color: 'blue',
     version: '1.0.0', tier: 'community', publisher: 'Example Data Inc. · сообщество', offline: false, size: '64 КБ',
     keywords: 'обогащение внешний сервис api',
     description: 'Дополняет записи данными из внешнего сервиса по API.',
-    evidence: null, can: ['Отправлять выбранные поля во внешний сервис'], cannot: [],
+    evidence: null, can: ['Отправлять выбранные поля во внешний сервис Example Data'], cannot: [],
   },
 ]
 
