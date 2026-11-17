@@ -537,7 +537,8 @@ export function auditRestQueryVariables(events,initial,final){
  need(JSON.stringify(a.query_parameters.map(p=>p.name))==='["limit","skip"]'&&(!b||JSON.stringify(a.query_parameters)===JSON.stringify(b.query_parameters)),'REST_QUERY_BINDINGS_CHANGED');
  for(const e of requests.filter(e=>e.index>first.index&&e.index<second.index)){
   const r=e.request;if(r.target.type!=='integration.rest_request'&&!same(r.target.ref,first.result.node))continue;
-  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'&&['source_operation_id','schemas'].includes(k)),'REST_QUERY_RECONFIGURED');
+  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'
+   &&(['source_operation_id','schemas'].includes(k)||k==='execution_policy'&&r.parameters[k]==='execute'&&r.finish==='execute')),'REST_QUERY_RECONFIGURED');
   if(Object.hasOwn(r.parameters??{},'schemas')){
    const source=checkpoints.findLast(c=>c.index<e.index&&c.result.operation_id===r.parameters.source_operation_id&&same(c.result.node,r.target.ref));
    const schemas=r.parameters.schemas,ports=r.read?.ports,outputs=source?.result.output?.ports;
@@ -553,11 +554,19 @@ export function auditRestQueryVariables(events,initial,final){
   }
   need(r.target.type==='integration.rest_request'&&same(r.target.ref,first.result.node)&&!r.inputs?.length&&!r.variable_inputs?.length,'REST_QUERY_REPLACED');
  }
- const completed=requests.flatMap(q=>{const c=checkpoints.find(c=>c.result.operation_id===q.operation_id);return c?[{...q,node:c.result.node}]:[];});
+ const completed=requests.flatMap(q=>{const c=checkpoints.find(c=>c.result.operation_id===q.operation_id);return c?[{...q,node:c.result.node,output:c.result.output}]:[];});
  const tables=completed.filter(q=>q.request.target.type==='variables.to_table'&&q.request.variable_inputs?.some(i=>i.kind==='variables'&&i.input===0&&i.output===4&&same(i.source,before.result.node)));
  const edges=completed.flatMap(q=>(q.request.inputs??[]).map(i=>({source:i.source.node_id,target:q.node.node_id})));
  const path=(id,target,seen=new Set())=>id===target?[id]:seen.has(id)?null:(seen.add(id),edges.filter(e=>e.source===id).map(e=>path(e.target,target,new Set(seen))).find(Boolean)?.toSpliced(0,0,id));
- need(tables.some(q=>path(q.node.node_id,first.result.node.node_id)?.some(id=>completed.some(c=>c.node.node_id===id&&c.request.target.type==='transform.calculator'))),'REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION');
+ need(tables.some(q=>{
+  if(path(q.node.node_id,first.result.node.node_id)?.some(id=>completed.some(c=>c.node.node_id===id&&c.request.target.type==='transform.calculator')))return true;
+  // Columns preserves the verified integer variable types even when no table read was requested.
+  const fields=q.output?.ports?.find(p=>p.port===0)?.schema??(!q.request.mappings?.length?before.result.output.variable_ports.find(p=>p.port===4).variables:[]);
+  return q.request.mode==='columns'&&q.index<first.index
+   &&a.query_parameters.every(p=>fields.some(f=>f.name===p.field&&f.type==='integer'))
+   &&completed.some(c=>c.index<first.index&&same(c.node,first.result.node)
+    &&c.request.inputs?.length===1&&c.request.inputs[0].input===0&&c.request.inputs[0].output===0&&same(c.request.inputs[0].source,q.node));
+ }),'REST_QUERY_VARIABLE_TABLE_STRING_CONVERSION');
  return {status:'PASS',source:before.result.node,rest:first.result.node,initial_execution_id:first.result.execution.execution_id,updated_execution_id:second.result.execution.execution_id};
 }
 if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href&&process.argv[2]==='rest-query-variables'){
