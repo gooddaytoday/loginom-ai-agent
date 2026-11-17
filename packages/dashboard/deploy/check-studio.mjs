@@ -37,11 +37,23 @@ async function check() {
     const path = mode === "master" ? entry : "/app/"
     const target = new URL(entry, url)
     target.hash = "packages" + packagePath + "/" + unit + "/workflow"
+    const delayedShell = { response: Promise.withResolvers(), requested: false, expired: false, timer: undefined }
     let context, phase = "вход"
     try {
       const session = await loginBrowser({
         candidate: { url: target.href, username: config.username, password }, profile, browserPath,
         headless: true, keepOpen: true, onRetry: () => {},
+        ...(mode === "7.4.2" && { onContextCreated: async current => {
+          await current.route("**/dashboard/shell.js", async route => {
+            delayedShell.requested = true
+            delayedShell.timer = setTimeout(() => {
+              delayedShell.expired = true
+              delayedShell.response.resolve()
+            }, timeoutMs)
+            await delayedShell.response.promise
+            await route.continue()
+          }, { times: 1 })
+        } }),
       })
       context = session.context
       const page = context.pages()[0]
@@ -59,6 +71,12 @@ async function check() {
         const nodeId = ";Graph;" + nodeName.replace(/\s/g, "_").replaceAll(",", "")
         const node = page.locator("[data-tid$=" + JSON.stringify(nodeId) + "]:visible")
         await node.click()
+        if (mode === "7.4.2") {
+          if (!delayedShell.requested || delayedShell.expired) throw Error("Не проверено: Studio не готова до ответа задержанной оболочки.")
+          console.log(path, "Studio доступна до ответа задержанной оболочки.")
+          clearTimeout(delayedShell.timer)
+          delayedShell.response.resolve()
+        }
         phase = "проверка установленной оболочки"
         const shell = await page.evaluate(async () => {
           const scripts = [...document.querySelectorAll('script[src$="/shell.js"]')]
@@ -66,12 +84,14 @@ async function check() {
           const script = scripts[0]
           const response = await fetch(script.src, { cache: "no-store" })
           if (!response.ok) return false
-          return { integrity: script.integrity, bytes: [...new Uint8Array(await response.arrayBuffer())] }
+          return { integrity: script.integrity, async: script.async, studioHttpsPort: script.getAttribute("data-dashboard-studio-https-port"), bytes: [...new Uint8Array(await response.arrayBuffer())] }
         })
         if (!shell || mode === "7.4.2" && shell.integrity !== "sha384-" + createHash("sha384").update(Buffer.from(shell.bytes)).digest("base64")) throw Error("Не проверено: установленная оболочка отсутствует или SRI не совпадает.")
-        console.log(path, "Studio", version, "— узел выбран штатным кликом после запуска оболочки.")
+        if (mode === "7.4.2" && (!shell.async || url.protocol === "https:" && shell.studioHttpsPort !== (url.port || "443"))) throw Error("Не проверено: async или HTTPS-порт установленной оболочки не совпадает.")
+        console.log(path, "Studio", version, "— узел выбран штатным кликом.")
         const form = page.locator('[data-tid$=";ModelForm"]').filter({ has: node })
         const button = form.locator('[data-tid$=";tlbModel;dashboardApp"]:visible')
+        if (mode === "7.4.2") await button.waitFor()
         const visible = await button.isVisible()
         console.log(path, visible ? "Кнопка оболочки видна." : "Кнопка оболочки не видна.")
         phase = "API адаптера"
@@ -111,6 +131,8 @@ async function check() {
           await page.getByRole("button", { name: "Вернуться к сценарию", exact: true }).click()
         }
       } finally {
+        clearTimeout(delayedShell.timer)
+        delayedShell.response.resolve()
         const back = page.getByRole("button", { name: "Вернуться к сценарию", exact: true })
         if (await back.isVisible()) await back.click()
         await closeSession(page, config.username, packagePath).catch(() => {

@@ -1,18 +1,16 @@
 # Dashboard M5 — checkpoint
 
-- Ветка `m5-acceptance`; BASE712c489c1b/code unchanged; Tasks0–4/source5a приняты. Scoped Podman/final whole-branch review pending; M5 открыт. Root выполнит push после приёмки M5; PR/merge/release/M6 вне задачи.
-- Контракт — [план M5](../../superpowers/plans/2026-11-15-dashboard-m5.md); pins/authority/limits — [runbook M5](dashboard-m5.md).
-- SAME NEW LOCAL archive561cea52…/configcf61a1be…/manifestb15542ac… принят обоими engines; Docker5470a7c8… связан exact config/layers, actual Podman imageIDcf61a1be….
-- Home2b42/.3 и736a отдельны. True vendor741→742 принят исторически на Docker; нынешние same742 port/cert changes не названы upgrade.
-- Docker remainder accepted scoped: current COMMON/live/permissions/TLS/lateapply recovery/change/repeats/refusals/uninstall; неизменный source/client/model reuse ограничен authority.
-- Current Podman: Fedora43/Podman5.6.2/compose1.5.0/rootlessUID1000/subuids524288:65536/cgroupv2/SELinux Enforcing; shared:z, labeldisable не применялся.
-- SAME archive offline install/full server/isolation/TLS/Cleanup + отдельный unchanged calibrated native HTTPS/live5/strict CloseLogout/Chromium0 PASS.
-- Installed Desktop.1 personal model/draft/Deny/Allow once и fullCLI.1 COMMON downloaded/local/no-auto/explicit-auto actual Host write/ready PASS; seed A явно operator fixture.
-- Current failed C сохранил B; manual exact A rollback/B404. Native B/A actual post-snapshot marker6/typed CSV oracle/strict cleanup; CSV bytes+mtime восстановлены, LGP/oldJSON сохранены.
-- Native same742 change→stale refusal1→NoFlags-first0/original-flags0; defaults/.env/compose/effective settings/native3/22files/11ready/cron сохранены;3preflight refusals PASS/no apply.
-- Final post-change fullserver/unchanged calibrated native и installedCLI newHTTPS setup/check0/browserverified. Intermediate site-between-repeats NOT_CAPTURED; current site/SRI/CSP/порты verified.
-- Uninstall0: Dashboard3/state/site/tag/своя cron removed;42nativefiles+mtime/native3/network/nativecron exact. SAME saved native-only package execute/live5/strict CloseLogout/browser0.
-- Final loaded global Admin packages0/expanders0/Logout0. Selected101-file evidence exported+everySHA verified наhost ДО poweroff; reviewer — private local-podman/guest-export/safe-review-views.json.
-- Обе VM OFF; own Podman QEMU exited/4portsfree/disk+evidence retained. Native3 RUNNING — до shutdown. Own client profiles/work сохранены; новый binding брать штатно, control не редактировать.
-- Concerns retained: cold ACKfalse/actual0/unknowncause; extra raw-format checkerFAIL при independently proved live; auxiliary scopes/modes/parser limits — в runbook. All26 selected runtimes actual0/no signal/PIDs absent.
-- Original Podman rows2–5 covered with bounded historical ACL/no-access/vendor/TLS reuse. Pending только scoped/final review и final M5 closure владельца; source/artifacts unchanged.
+- Ветка `m5-acceptance`; FIX_BASE `0f4f8889888ed73ffeee237f06b1729915d688bc`. Source fixwave F1–F5 выполнена; M5 открыт до новой установленной приёмки и scoped review.
+- Контракт: [план M5](../../superpowers/plans/2026-11-15-dashboard-m5.md), final findings/Approved constraints и текущий отчёт — `.superpowers/sdd/2026-11-15-dashboard-m5/final-fixwave-report-20261117.md`.
+- Source:28 deploy/helper tests, pinned Node syntax, Bash syntax/ShellCheck и diff check PASS. Runtime TS, M4, клиенты `.1`, модель/ACL/CA/vendor-история не изменены; прежняя authority сохраняется отдельно.
+- F1: unmanaged uninstall RED→отказ с сохранением; candidate/site/dangling symlink отказывают; no-site uninstall0 сохранил55 native файлов и3 native identity/network.
+- F2: persisted operator case сохранён; canonical runtime URL/header/path. Actual normal и strict multi-host full server0; strict separate app domain/HTTPS/SRI/headers/cleanup проверены.
+- F3: missing own exact cron старый false PASS0→новый отказ1 без пробы; cron восстановлен exact, native3 identity/StartedAt и Dashboard IDs сохранены. Actual Enforcing/shared labels PASS; Disabled/Permissive/private-MCS helper cases PASS.
+- F4: actual configured absolute ActualStorage при сохранённом старом default — install0/publisher RO/native live5. Relative/absolute/ambiguous XML/mount tests PASS; physical native root/ancestors исключены после realpath/symlink admission.
+- F5: actual delayed-shell RED→async GREEN; native доступен до ответа shell, затем installed ready/live5 и strict Close/Logout/browser completion0; runtime shell не менялся.
+- Source fixtures изменённого распакованного561 не являются новым official artifact PASS. Immutable561/configcf61 и прежние engine/client результаты не переименованы.
+- Docker VM OFF: selected27 source receipts экспортированы/everySHA verified перед ordinary poweroff, QEMU absent/ports free/disk retained. Native ActualStorage clone намеренно сохранён; original Settings/metadata/default на месте в private backup.
+- Podman VM RUNNING/rootless/Enforcing: source strict server/native0, own cron после final safe refusal восстановлен. Source backup/receipts и own app leaf приватны; trust stores/global policies не менялись.
+- Следующий шаг: clean source commit → один official producer → SAME новый архив на Podman и Docker, affected checks/server+native/uninstall/preservation → восстановить Docker original Settings/удалить только own clone → безопасно выключить обе VM → один scoped review.
+- Ограничения: M1 cold runtime ACKfalse/actual0 остаётся UNKNOWN; старый6-role StartedAt composite FAIL retained, exact delta NOT_CAPTURED. Old Podman setup SSH EOF UNKNOWN/own transport closed255 при remote installer absent/ready11; install не повторялся.
+- Source auxiliary logs с non0600 приведены600; raw credentials/Env не выводились. Final status/checkbox/runbook closure и разрешённый push делает root после приёмки; worker не push/PR/merge/release/M6.

@@ -2,11 +2,47 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { createHash, X509Certificate } from "node:crypto"
+import { posix } from "node:path"
 
 const [action, ...args] = process.argv.slice(2)
 const input = () => readFileSync(0, "utf8")
 const binding = () => ({ packagePath: "/" + args[0], nodeGuid: args[1], workflowGuid: args[2] })
-if (action === "settings") {
+if (action === "storage") {
+  const directory = posix.resolve("/workdir", configuredStorage(input()))
+  assert(directory !== "/workdir", "UserStorage cannot expose the whole native workdir")
+  const mounts = JSON.parse(args[0])
+  const selected = mounts.filter(mount => directory === mount.Destination || directory.startsWith(mount.Destination.replace(/\/$/, "") + "/"))
+  assert.equal(selected.length, 1, "Ambiguous or unsupported UserStorage mount")
+  assert.equal(selected[0].Type, "bind", "UserStorage requires a physical bind mount")
+  assert(posix.isAbsolute(selected[0].Source), "Invalid UserStorage bind source")
+  const storage = posix.join(selected[0].Source, posix.relative(selected[0].Destination, directory))
+  assert(storage !== "/" && !mounts.some(mount => mount.Destination === "/workdir" &&
+    (storage === mount.Source || mount.Source.startsWith(storage + "/"))), "UserStorage cannot expose the native server directory")
+  console.log(storage)
+} else if (action === "selinux") {
+  assert(["Disabled", "Permissive", "Enforcing"].includes(args[0]), "Unknown SELinux mode")
+  if (args[0] === "Disabled") console.log("SELinux Disabled: volume labels not applicable")
+  else {
+    const labels = args.slice(1)
+    assert.equal(labels.length, 4, "Incomplete SELinux volume observations")
+    const shared = value => /^[^:\s]+:object_r:container_file_t:s0$/.test(value)
+    const privateStorage = /^[^:\s]+:object_r:container_file_t:s0:c[0-9]+(?:[.,]c[0-9]+)*$/.test(labels[0])
+    assert((shared(labels[0]) || privateStorage) && labels.slice(1).every(shared), "Unsupported SELinux volume label")
+    const roles = JSON.parse(input())
+    assert.equal(roles.length, 3, "Incomplete SELinux role observations")
+    assert.deepEqual(roles.map(container => container.Name.replace(/^\//, "")).sort(), ["loginom-dashboard-builder", "loginom-dashboard-publisher", "loginom-dashboard-web"])
+    for (const container of roles) {
+      const publisher = container.Name.replace(/^\//, "") === "loginom-dashboard-publisher"
+      const disabled = publisher && privateStorage
+      assert.deepEqual(container.HostConfig.SecurityOpt.filter(value => value.startsWith("label")),
+        disabled ? ["label=disable"] : [], "Unexpected SELinux role options")
+      assert(disabled || typeof container.ProcessLabel === "string" && container.ProcessLabel.length > 0, "SELinux process label is unavailable")
+      if (publisher)
+        assert(container.Mounts.some(mount => mount.Destination === "/storage" && mount.RW === false), "SELinux publisher storage must be read-only")
+    }
+    console.log(`SELinux ${args[0]} PASS: UserStorage ${labels[0]}; dashboard ${labels.slice(1).join(", ")}`)
+  }
+} else if (action === "settings") {
   const settings = Object.fromEntries(input().trim().split("\n").map(line => line.split("=")))
   assert(/^[1-9][0-9]{0,4}$/.test(settings.DASHBOARD_APP_HOST_PORT) && Number(settings.DASHBOARD_APP_HOST_PORT) <= 65535)
   assert(["normal", "strict"].includes(settings.DASHBOARD_MODE))
@@ -67,6 +103,7 @@ if (action === "settings") {
 } else if (action === "config") {
   for (const value of [args[0], ...args[1].split(",")]) originHost(value)
   assert(args[2].startsWith("/") && !/[\r\n]/.test(args[2]))
+  console.log(new URL(args[0]).origin)
 } else if (action === "publication") {
   console.log(JSON.stringify({ format: 1, template: 1, binding: binding(), title: "Release check", parameters: [], files: [
     { path: "src/main.tsx", encoding: "utf8", content: 'import {createRoot} from "react-dom/client"; createRoot(document.getElementById("root")!).render(<p>Release check</p>)' },
@@ -120,7 +157,7 @@ if (action === "settings") {
     assert(scripts[0][0].includes(`integrity="${args[3]}"`), "Installed shell SRI differs")
   } else {
     const { appHeaders } = await import("/opt/dashboard/server.mjs")
-    for (const [name, value] of Object.entries(appHeaders(args[1], args[2].split(",")))) assert.equal(headers[name], value, "App header " + name)
+    for (const [name, value] of Object.entries(appHeaders(new URL(args[1]).origin, args[2].split(",").map(value => new URL(value).origin)))) assert.equal(headers[name], value, "App header " + name)
   }
 } else if (action === "certificate-path") {
   const match = input().match(/^Define SSL_CERT "([^"\r\n]+)"/m)
@@ -194,4 +231,51 @@ function originHost(value) {
   assert(match, "Invalid public origin")
   assert.equal(new URL(value).origin, value.toLowerCase())
   return match[1]
+}
+
+function configuredStorage(input) {
+  // Settings.cfg uses attribute-only XML; reject unknown/ambiguous forms rather than guess a default.
+  const xml = input.replace(/^\uFEFF/, "").replace(/^\s*<\?xml\s[^?]*\?>/, "")
+  const stack = []
+  let offset = 0
+  let root = false
+  let storage
+  for (const match of xml.matchAll(/<!--(?:[^-]|-(?!-))*-->|<(?:[^<>"']|"[^"<]*"|'[^'<]*')+>/g)) {
+    assert(!xml.slice(offset, match.index).trim(), "Unsupported Settings.cfg XML")
+    offset = match.index + match[0].length
+    if (match[0].startsWith("<!--")) continue
+    const closing = match[0].match(/^<\/([A-Za-z][\w.-]*)\s*>$/)
+    if (closing) {
+      assert.equal(stack.pop(), closing[1], "Invalid Settings.cfg XML nesting")
+      continue
+    }
+    const tag = match[0].match(/^<([A-Za-z][\w.-]*)([\s\S]*?)(\/?)>$/)
+    assert(tag, "Unsupported Settings.cfg XML")
+    if (!stack.length) {
+      assert(!root && tag[1] === "Settings", "Expected one Settings root")
+      root = true
+    }
+    const attributes = Object.create(null)
+    let end = 0
+    for (const attribute of tag[2].matchAll(/\s+([A-Za-z_][\w.-]*)\s*=\s*(?:"([^"<]*)"|'([^'<]*)')/g)) {
+      assert(!tag[2].slice(end, attribute.index).trim(), "Unsupported Settings.cfg attribute")
+      assert(!Object.hasOwn(attributes, attribute[1]), "Duplicate Settings.cfg attribute")
+      attributes[attribute[1]] = attribute[2] ?? attribute[3]
+      end = attribute.index + attribute[0].length
+    }
+    assert(!tag[2].slice(end).trim(), "Unsupported Settings.cfg attribute")
+    if (stack.length === 1 && tag[1] === "Directories") {
+      assert(storage === undefined, "Ambiguous Settings Directories")
+      assert(typeof attributes.UserStorage === "string" && attributes.UserStorage.length, "Settings Directories UserStorage is required")
+      storage = attributes.UserStorage.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (_, entity) => {
+        if (entity.startsWith("#")) return String.fromCodePoint(entity[1].toLowerCase() === "x" ? parseInt(entity.slice(2), 16) : Number(entity.slice(1)))
+        return { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[entity]
+      })
+      assert(/^[a-zA-Z0-9/_.-]+$/.test(storage), "Unsupported UserStorage path")
+    }
+    if (!tag[3]) stack.push(tag[1])
+  }
+  assert(root && !stack.length && !xml.slice(offset).trim(), "Incomplete Settings.cfg XML")
+  assert(storage !== undefined, "Settings Directories UserStorage is required")
+  return storage
 }

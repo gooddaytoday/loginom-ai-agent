@@ -63,8 +63,9 @@ if [[ -e $state || -L $state ]]; then
   [[ $(saved DASHBOARD_STATE) == "$state" && $(saved DASHBOARD_IMAGE) == "$image" ]] || die "Saved release differs; use the matching release"
   installed=true
 fi
+[[ $action != check || $installed == true ]] || die "Dashboard is not installed"
 json() {
-  "$engine" run --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  "$engine" run --pull never --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
     --memory 128m --pids-limit 32 --user 65534:65534 \
     -v "$bundle/check-release.mjs:/check.mjs:ro,z" --entrypoint /opt/node/bin/node "$image" /check.mjs "$@"
 }
@@ -75,10 +76,18 @@ autostart() {
   if ! LC_ALL=C crontab -l > "$tmp/crontab" 2> "$tmp/crontab-error"; then
     [[ $(cat "$tmp/crontab-error") == "no crontab for $(id -un)" ]] || die "Cannot read user crontab; dashboard state preserved"
   fi
+  if [[ $1 == check ]]; then
+    grep -Fxq -- "$row" "$tmp/crontab" || die "Dashboard autostart row is missing"
+    return 0
+  fi
   awk -v row="$row" '$0 != row' "$tmp/crontab" > "$tmp/crontab-next"
   [[ $1 != add ]] || printf '%s\n' "$row" >> "$tmp/crontab-next"
   crontab "$tmp/crontab-next"
 }
+if [[ $action == install ]]; then
+  "$engine" load -i "$bundle/image.tar"
+  "$engine" image inspect "$image" >/dev/null
+fi
 # Inspect only our reserved names and compose project before any destructive operation.
 for role in web publisher builder; do
   if "$engine" container inspect "loginom-dashboard-$role" > "$tmp/$role.json" 2>/dev/null; then
@@ -110,18 +119,34 @@ mapfile -t servers < <("$engine" ps --filter "label=com.docker.compose.project=$
 [[ ${#servers[@]} == 1 ]] || die "Loginom server not found in selected installation"
 server=${servers[0]}
 mapfile -t conf_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/usr/local/apache2/conf"}}{{println .Source}}{{end}}{{end}}' "$studio" | sed '/^$/d')
-mapfile -t storage_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/workdir"}}{{println .Source}}{{end}}{{if eq .Destination "/workdir/UserStorage"}}{{println .Source}}{{end}}{{end}}' "$server" | sed '/^$/d')
-[[ ${#conf_mounts[@]} == 1 && ${#storage_mounts[@]} == 1 ]] || die "Ambiguous Loginom mounts"
+mapfile -t server_mounts < <("$engine" inspect --format '{{range .Mounts}}{{if eq .Destination "/workdir"}}{{println .Source}}{{end}}{{end}}' "$server" | sed '/^$/d')
+[[ ${#conf_mounts[@]} == 1 && ${#server_mounts[@]} == 1 ]] || die "Ambiguous Loginom mounts"
 conf=$(realpath -e "${conf_mounts[0]}")
-server_root=$(realpath -e "${storage_mounts[0]}")
-storage=$(realpath -e "$server_root/UserStorage")
-[[ -d $conf && -d $storage && $storage == "$server_root/UserStorage" && $storage =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "Physical UserStorage not found"
+server_root=$(realpath -e "${server_mounts[0]}")
+storage_path=$("$engine" exec "$server" cat /workdir/Settings.cfg | json storage "$("$engine" inspect --format '{{json .Mounts}}' "$server")")
+storage=$(realpath -e "$storage_path")
+[[ -d $conf && -d $storage && $storage == "$storage_path" && $storage =~ ^/[a-zA-Z0-9/_.-]+$ ]] || die "Physical UserStorage not found or contains symlinks"
+# Compare physical directory identities too: another bind may alias the server or an ancestor.
+ancestor=$server_root
+while :; do
+  [[ ! $storage -ef $ancestor ]] || die "UserStorage cannot expose the native server directory"
+  [[ $ancestor != / ]] || break
+  ancestor=${ancestor%/*}
+  [[ -n $ancestor ]] || ancestor=/
+done
 # Go templates are interpreted by the container engine, not the shell.
 # shellcheck disable=SC2016
 mapfile -t networks < <(comm -12 <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$server" | sed '/^$/d' | sort) <("$engine" inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$studio" | sed '/^$/d' | sort))
 [[ ${#networks[@]} == 1 ]] || die "Expected one common Loginom network"
 network=${networks[0]}
 site=$conf/dashboard.site.conf
+if [[ $installed == true ]]; then
+  [[ ! -L $site ]] || die "Dashboard Apache file is occupied"
+  if [[ -e $site ]]; then [[ -f $site ]] || die "Dashboard Apache file is occupied"; json site < "$site"; fi
+else
+  [[ ! -e $site && ! -L $site ]] || die "Dashboard Apache file is occupied"
+fi
+[[ ! -e $site.new && ! -L $site.new ]] || die "Dashboard Apache candidate path is occupied"
 replace_site() {
   [[ ! -e $site ]] || cp -a "$site" "$tmp/previous.conf"
   if [[ -f $tmp/dashboard.site.conf ]]; then install -m 644 "$tmp/dashboard.site.conf" "$site.new";
@@ -176,16 +201,24 @@ if [[ -n $https_port || $mode == strict ]]; then scheme=https; upstream=$studio_
 publisher_user=$("$engine" exec "$server" stat -c '%u:%g' /proc/1)
 # Saved installation is data, never shell code.
 if [[ $action == check ]]; then
-  [[ $installed == true ]] || die "Dashboard is not installed"
   json discovery "$clients" "$upstream" "$storage" "$network" "$publisher_user" < "$state/.env"
   image=$(saved DASHBOARD_IMAGE)
   [[ $image =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]+$ ]] || die "Invalid saved image"
-  app_origin=$(saved DASHBOARD_APP_ORIGIN)
   mode=$(saved DASHBOARD_MODE)
   mode=${mode:-normal}
   clients=$(saved DASHBOARD_CLIENT_ORIGINS)
   storage=$(saved DASHBOARD_USERSTORAGE)
-  json config "$app_origin" "$clients" "$storage" </dev/null
+  app_origin=$(json config "$(saved DASHBOARD_APP_ORIGIN)" "$clients" "$storage" </dev/null)
+  autostart check
+  selinux=Disabled
+  if command -v getenforce >/dev/null; then selinux=$(getenforce) || die "Cannot observe SELinux mode";
+  elif [[ -e /sys/fs/selinux/enforce ]]; then die "getenforce is required to observe SELinux"; fi
+  if [[ $selinux == Disabled ]]; then json selinux "$selinux" </dev/null
+  else
+    contexts=$(ls -Zd -- "$storage" "$state/builds" "$state/jobs-in" "$state/jobs-out") || die "Cannot observe SELinux volume labels"
+    mapfile -t contexts < <(awk '{print $1}' <<< "$contexts")
+    "$engine" inspect loginom-dashboard-web loginom-dashboard-publisher loginom-dashboard-builder | json selinux "$selinux" "${contexts[@]}"
+  fi
   origin=${clients##*,}
   request() { curl --silent --show-error --max-time 10 "$@"; }
   lookup() {
@@ -251,7 +284,7 @@ if [[ $action == check ]]; then
     shift 3
     status=$(request -D "$tmp/headers" -o "$tmp/body" -w '%{http_code}' "$@" "$address")
     [[ $status == "$expected" ]] || die "HTTP check failed: $kind expected $expected, got $status"
-    cat "$tmp/headers" "$tmp/body" | json response "$kind" "$app_origin" "$clients" "${integrity:-}" "${encoding:-identity}"
+    cat "$tmp/headers" "$tmp/body" | json response "$kind" "$(saved DASHBOARD_APP_ORIGIN)" "$clients" "${integrity:-}" "${encoding:-identity}"
   }
   mapfile -t studios < <("$engine" ps --filter label=com.docker.compose.service=loginom-http --format '{{.ID}}')
   [[ ${#studios[@]} == 1 ]] || die "Expected one installed Studio"
@@ -310,12 +343,6 @@ if [[ $action == check ]]; then
   echo "Client access NOT CHECKED: run check-studio.mjs on the client host"
   exit 0
 fi
-if [[ $installed == true ]]; then
-  [[ ! -L $site ]] || die "Dashboard Apache file is occupied"
-  if [[ -e $site ]]; then [[ -f $site ]] || die "Dashboard Apache file is occupied"; json site < "$site"; fi
-else
-  [[ ! -e $site && ! -L $site ]] || die "Dashboard Apache file is occupied"
-fi
 if [[ $mode == strict ]]; then
   if [[ -z $cert || -z $key ]]; then
     [[ $installed == true ]] || die "$usage"
@@ -362,7 +389,6 @@ if [[ -n $listeners ]]; then
   [[ $installed == true && -s $tmp/web.json ]] || die "App host port is occupied"
   json owned "$state" web "$app_port" "$listeners" < "$tmp/web.json"
 fi
-[[ ! -e $site.new && ! -L $site.new ]] || die "Dashboard Apache candidate path is occupied"
 if [[ $installed == true ]]; then
   [[ -f $state/compose-release.yaml && ! -L $state/compose-release.yaml ]] || die "Saved compose file is occupied"
 fi
@@ -370,8 +396,6 @@ for directory in builds jobs-in jobs-out; do
   [[ ! -L $state/$directory && ( ! -e $state/$directory || -d $state/$directory ) ]] || die "Dashboard directory is occupied"
 done
 for client in ${clients//,/ }; do curl --silent --show-error --fail --max-time 10 "$client/app/" -o /dev/null || die "Public Studio address is not reachable"; done
-"$engine" load -i "$bundle/image.tar"
-"$engine" image inspect "$image" >/dev/null
 integrity=$("$engine" run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 --entrypoint /opt/node/bin/node "$image" --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; console.log("sha384-"+createHash("sha384").update(readFileSync("/opt/dashboard/shell.js")).digest("base64"))')
 cat > "$tmp/dashboard.site.conf" <<EOF
 # Managed by loginom-dashboard release installer
@@ -392,7 +416,7 @@ RewriteRule ^/dashboard/(.*)$ http://loginom-dashboard-web:8100/dashboard/\$1 [P
   Header unset ETag
   Header unset Last-Modified
   Header always set Cache-Control "no-store"
-  Substitute "s|</head>|<script src=\"/dashboard/shell.js\" integrity=\"$integrity\" data-dashboard-studio-https-port=\"$https_port\"></script></head>|n"
+  Substitute "s|</head>|<script async src=\"/dashboard/shell.js\" integrity=\"$integrity\" data-dashboard-studio-https-port=\"$https_port\"></script></head>|n"
   <If "%{HTTP:Accept-Encoding} =~ /br/">
     SetOutputFilter SUBSTITUTE;BROTLI_COMPRESS
   </If>

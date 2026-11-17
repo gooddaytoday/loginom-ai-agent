@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { mkdtemp, readdir, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -104,6 +104,140 @@ const helper = fileURLToPath(new URL("../../deploy/check-release.mjs", import.me
 function check(action, input, ...args) {
   return spawnSync(process.execPath, [helper, action, ...args], { input, encoding: "utf8" })
 }
+
+function labelRoles() {
+  return ["web", "publisher", "builder"].map(role => ({
+    Name: "loginom-dashboard-" + role,
+    ProcessLabel: "system_u:system_r:container_t:s0:c123,c456",
+    HostConfig: { SecurityOpt: ["no-new-privileges"] },
+    Mounts: role === "publisher" ? [{ Destination: "/storage", RW: false }] : [],
+  }))
+}
+
+test("check derives the canonical app origin while saved public host spelling is preserved", () => {
+  const origin = "https://Studio.Example:8101"
+  const clients = "http://Studio.Example:8080,https://Studio.Example:8443,https://Second.Example:8443"
+  const config = check("config", "", origin, clients, "/synthetic/storage")
+  assert.equal(config.status, 0, config.stderr)
+  assert.equal(config.stdout.trim(), "https://studio.example:8101")
+  const result = check("ready", JSON.stringify({
+    appOrigin: "https://studio.example:8101", mode: "normal", key: "a".repeat(64), hash: "b".repeat(64),
+    publication: { name: "probe.json", sourceHash: "c".repeat(64), status: "ready" },
+    currentVersion: { name: "probe.json", sourceHash: "c".repeat(64) },
+  }), "probe.json", "c".repeat(64), config.stdout.trim(), "normal")
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout.trim().slice(config.stdout.trim().length), `/apps/${"a".repeat(64)}/${"b".repeat(64)}/`)
+})
+
+test("strict check uses the canonical separate app domain and still refuses a different ready origin", () => {
+  const config = check("config", "", "https://Apps.Example:9443", "https://Studio.Example:8443,https://Second.Example:8443", "/synthetic/storage")
+  assert.equal(config.status, 0, config.stderr)
+  assert.equal(config.stdout.trim(), "https://apps.example:9443")
+  const ready = {
+    appOrigin: config.stdout.trim(), mode: "strict", key: "a".repeat(64), hash: "b".repeat(64),
+    publication: { name: "probe.json", sourceHash: "c".repeat(64), status: "ready" },
+    currentVersion: { name: "probe.json", sourceHash: "c".repeat(64) },
+  }
+  assert.equal(check("ready", JSON.stringify(ready), "probe.json", "c".repeat(64), config.stdout.trim(), "strict").status, 0)
+  ready.appOrigin = "https://foreign.example:9443"
+  assert.equal(check("ready", JSON.stringify(ready), "probe.json", "c".repeat(64), config.stdout.trim(), "strict").status, 1)
+})
+
+test("discovery maps configured relative UserStorage instead of an existing old default directory", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "dashboard-storage-"))
+  try {
+    await mkdir(join(directory, "UserStorage"))
+    await mkdir(join(directory, "ActualStorage"))
+    const result = check("storage", '<?xml version="1.0"?><Settings><Directories UserStorage="ActualStorage"/></Settings>',
+      JSON.stringify([{ Type: "bind", Source: directory, Destination: "/workdir" }]))
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout.trim(), join(directory, "ActualStorage"))
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test("discovery refuses unsupported XML rather than inventing a UserStorage value", () => {
+  const result = check("storage", '<Settings><Directories UserStorage="Ac<!--ignored-->tualStorage"/></Settings>',
+    JSON.stringify([{ Type: "bind", Source: "/synthetic/server", Destination: "/workdir" }]))
+  assert.equal(result.status, 1)
+})
+
+test("discovery maps an absolute configured UserStorage and refuses missing or ambiguous settings and mounts", () => {
+  const mounts = JSON.stringify([{ Type: "bind", Source: "/synthetic/server", Destination: "/workdir" }])
+  const xml = '<Settings><Directories UserStorage="/workdir/ActualStorage"/></Settings>'
+  assert.equal(check("storage", xml, mounts).stdout.trim(), "/synthetic/server/ActualStorage")
+  for (const invalid of [
+    '<Settings><Directories/></Settings>', '<Settings><Bindings/></Settings>',
+    xml.replace('/></Settings>', '/><Directories UserStorage="UserStorage"/></Settings>'),
+    xml.replace('UserStorage=', 'UserStorage="UserStorage" UserStorage='),
+    xml.replace('/workdir/ActualStorage', '/elsewhere'),
+    xml.replace('/workdir/ActualStorage', '/workdir'),
+    xml.replace('/workdir/ActualStorage', 'Actual&UNKNOWN;Storage'),
+  ]) assert.equal(check("storage", invalid, mounts).status, 1, invalid)
+  assert.equal(check("storage", xml, '[]').status, 1)
+  assert.equal(check("storage", xml, JSON.stringify([
+    { Type: "bind", Source: "/synthetic/server", Destination: "/workdir" },
+    { Type: "bind", Source: "/synthetic/other", Destination: "/workdir" },
+  ])).status, 1)
+  assert.equal(check("storage", xml, mounts.replace('"bind"', '"volume"')).status, 1)
+})
+
+test("discovery refuses an absolute alias that would expose the whole native server directory", () => {
+  const mounts = [
+    { Type: "bind", Source: "/synthetic/server", Destination: "/workdir" },
+    { Type: "bind", Source: "/synthetic/server", Destination: "/external-storage" },
+  ]
+  const result = check("storage", '<Settings><Directories UserStorage="/external-storage"/></Settings>', JSON.stringify(mounts))
+  assert.equal(result.status, 1)
+})
+
+test("SELinux diagnostics accepts observed shared volume labels and a read-only publisher", () => {
+  const shared = "system_u:object_r:container_file_t:s0"
+  const result = check("selinux", JSON.stringify(labelRoles()), "Enforcing", shared, shared, shared, shared)
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /SELinux Enforcing PASS/)
+})
+
+test("SELinux diagnostics accepts private native MCS only with publisher label disable", () => {
+  const roles = labelRoles()
+  roles[1].HostConfig.SecurityOpt.push("label=disable")
+  roles[1].ProcessLabel = ""
+  const shared = "system_u:object_r:container_file_t:s0"
+  const result = check("selinux", JSON.stringify(roles), "Enforcing", shared + ":c123,c456", shared, shared, shared)
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test("SELinux diagnostics refuses an unavailable role label instead of declaring success", () => {
+  const roles = labelRoles()
+  roles[0].ProcessLabel = ""
+  const shared = "system_u:object_r:container_file_t:s0"
+  assert.equal(check("selinux", JSON.stringify(roles), "Enforcing", shared, shared, shared, shared).status, 1)
+})
+
+test("SELinux diagnostics reports Disabled and accepts the same valid labels in Permissive", () => {
+  assert.equal(check("selinux", "", "Disabled").status, 0)
+  const shared = "system_u:object_r:container_file_t:s0"
+  assert.equal(check("selinux", JSON.stringify(labelRoles()), "Permissive", shared, shared, shared, shared).status, 0)
+})
+
+test("SELinux diagnostics refuses unknown labels, missing observations and other label-disable roles", () => {
+  const shared = "system_u:object_r:container_file_t:s0"
+  const roles = labelRoles()
+  const run = (labels = [shared, shared, shared, shared]) => check("selinux", JSON.stringify(roles), "Enforcing", ...labels)
+  assert.equal(run(["?", shared, shared, shared]).status, 1)
+  assert.equal(run([shared, shared, shared]).status, 1)
+  assert.equal(run([shared, shared, "?", shared]).status, 1)
+  assert.equal(run([shared + ":c123,c456", shared, shared, shared]).status, 1)
+  roles[1].HostConfig.SecurityOpt.push("label=disable")
+  assert.equal(run().status, 1)
+  roles[0].HostConfig.SecurityOpt.push("label=disable")
+  assert.equal(run([shared + ":c123,c456", shared, shared, shared]).status, 1)
+  roles[0].HostConfig.SecurityOpt.pop()
+  roles[1].Mounts[0].RW = true
+  assert.equal(run([shared + ":c123,c456", shared, shared, shared]).status, 1)
+  assert.equal(check("selinux", "", "Unknown").status, 1)
+})
 
 test("saved settings recover ordered hosts, mode, CLI button and nondefault app port", () => {
   const saved = "DASHBOARD_APP_HOST_PORT=9443\nDASHBOARD_MODE=strict\nDASHBOARD_CLI_BUTTON=1\nDASHBOARD_APP_ORIGIN=https://apps.example:9443\nDASHBOARD_CLIENT_ORIGINS=http://one.example,https://one.example,http://two.example:8080\n"
