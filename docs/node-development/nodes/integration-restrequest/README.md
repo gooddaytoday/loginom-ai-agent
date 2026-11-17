@@ -6,6 +6,13 @@
 
 ## Текущий срез v0.4.0
 
+C10: `produce_error_descriptions` управляет native-флагом выдачи описаний кодов
+в дополнительных параметрах REST. `false` удаляет поле ErrorDesc: порт 1 содержит
+RequestID/ErrorCode/HttpStatusCode (integer); `true` возвращает четыре поля,
+пропуск сохраняет настройку. Readback читает флаг мастера, чтение выхода проверяет
+фактическую трёх- или четырёхполевую схему. Приёмка `rest-error-descriptions`
+использует неизменённые task/response.json/expected и штатные CSV/Save/cold/cleanup.
+
 Зарегистрирован `integration.rest_request` / `request`. request: GET полного URL с REST-подключением; запрос без входа/query либо с параметрами строки запроса из входной таблицы.
 
 Ограничения: POST/PUT/PATCH с телом и DELETE — #808, свои заголовки — #1030; retry и auth/TLS вне среза; независимый plain GET подтверждён LAB-690.

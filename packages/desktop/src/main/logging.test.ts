@@ -357,6 +357,20 @@ test("the Desktop archive follows the selected session, its chat and the chosen 
   expect(await previewDiagnosticsFile(ready.id, "chat/session.json")).toBeUndefined()
 })
 
+// LAB-1776: the Windows archive held 8 Desktop runs; the design takes the current and the previous one.
+test("of 8 Desktop run directories only the current and the previous run are archived", async () => {
+  const logs = join(paths.userData, "logs")
+  const [current] = readdirSync(logs)
+  put(join(logs, current, "main.log"), "current run\n")
+  const previous = Array.from({ length: 7 }, (_, i) => `20200101T00000${i}`)
+  for (const stamp of previous) put(join(logs, stamp, "main.log"), `run ${stamp}\n`)
+  const ready = await prepareDiagnostics({})
+  const desktop = ready.files.filter((file) => file.name.startsWith("desktop/")).map((file) => file.name)
+  expect(desktop.sort()).toEqual([`desktop/${current}/main.log`, "desktop/20200101T000006/main.log"].sort())
+  const { files } = await exported()
+  expect([...files.keys()].filter((name) => name.startsWith("desktop/")).sort()).toEqual(desktop)
+})
+
 test("only crash dumps are taken from the crash directory", async () => {
   const fixture = sessionFixture()
   put(join(paths.crashDumps, "settings.dat"), "crashpad settings")

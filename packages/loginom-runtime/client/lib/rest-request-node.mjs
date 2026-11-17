@@ -21,6 +21,7 @@ export function restRequestReadback({node,phases,operation_id}){
  need(configured?.status==='verified'&&c?.verified&&['document_id','workflow_id','node_id'].every(k=>c.node_context?.[k]===node[k]),'configuration readback owner differs');
  need(saved?.status==='verified'&&saved.value?.settings_applied===true&&saved.value.mode==='done'&&['document_id','workflow_id','node_id'].every(k=>saved.value.node_context?.[k]===node[k]),'node settings were not committed to this node');
  return {kind:'rest_request',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',method:c.method??'GET',
+  ...(c.produce_error_descriptions!==undefined?{produce_error_descriptions:c.produce_error_descriptions}:{}),
   ...(c.body_field!==undefined?{body_field:c.body_field}:{}),...(c.headers!==undefined?{headers:c.headers}:{}),...(c.simulation!==undefined?{simulation:c.simulation}:{}),connection:c.connection??null,query_parameters:c.query_parameters,receipt_ids:[configured,saved].map(p=>{need(p.receipt_id===operation_id+':'+p.phase,'readback phase differs');return p.receipt_id;}),package_persistence_verified:false};
 }
 
@@ -74,8 +75,9 @@ async function readRestOutputs(channel,read,ctx){
  const ports=[],observed=new Map();
  const readPort=async port=>{
   const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
-  need(output.schema.every((field,index)=>field.name===outputs[port][index]?.name),'output field order differs from the native REST schema');
-  const aligned=alignReadSchema(output.schema,outputs[port]);
+  const expected=port===1&&output.schema.length===3?outputs[1].filter(field=>field.name!=='ErrorDesc'):outputs[port];
+  need(output.schema.length===expected.length&&output.schema.every((field,index)=>field.name===expected[index].name),'output field order differs from the native REST schema');
+  const aligned=alignReadSchema(output.schema,expected);
   output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
   observed.set(port,output);return output;
  };

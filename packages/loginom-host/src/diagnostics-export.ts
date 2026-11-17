@@ -61,7 +61,14 @@ export type DiagnosticsInput = {
   /** Session export `{ info, messages: [{ info, parts }] }`. */
   chat?: unknown
   /** Extra sources collected for the last 24 hours: the first (current application logs) precedes startup failures, the rest follow them. */
-  logs?: { dir: string; prefix: string; /** Keeps only matching archive names within the window. */ match?: RegExp }[]
+  logs?: {
+    dir: string
+    prefix: string
+    /** Keeps only matching archive names within the window. */
+    match?: RegExp
+    /** Only the newest run directories `<dir>/<stamp>/…`, whatever their age, instead of the 24-hour window. */
+    runs?: number
+  }[]
   /** Values that must never appear in the archive. */
   knownSecrets?: string[]
   /** Login names replaced by `[user]`. */
@@ -125,6 +132,23 @@ export function collectDiagnosticFiles(dir: string, prefix: string, pattern?: Re
     /* Logs may rotate during collection. Other sources remain exportable. */
   }
   return result.sort((a, b) => b.mtime - a.mtime || a.name.localeCompare(b.name))
+}
+
+// Run directories are named by a sortable stamp (Desktop `logging.ts` `stamp()`): the greatest names are the latest runs.
+function latestRuns(dir: string, count: number) {
+  let names: string[] = []
+  try {
+    names = readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
+      .reverse()
+      .slice(0, count)
+  } catch {
+    /* A missing log directory exports nothing. */
+  }
+  if (!names.length) return /(?!)/
+  return new RegExp(`^(?:${names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})/`)
 }
 
 const sha256 = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex")
@@ -358,7 +382,7 @@ export async function buildDiagnosticsArchive(input: DiagnosticsInput) {
     ...attemptMeta.map((entry) => ({ name: entry.name, priority: 3, entry })),
     ...diagnostics.map((entry) => ({ name: entry.name, priority: 3, entry })),
     ...(input.logs ?? []).flatMap((source, index) =>
-      collectDiagnosticFiles(source.dir, source.prefix, undefined, limits.windowMs)
+      collectDiagnosticFiles(source.dir, source.prefix, source.runs === undefined ? undefined : latestRuns(source.dir, source.runs), limits.windowMs)
         .filter((entry) => !source.match || source.match.test(entry.name))
         .map((entry) => ({
           name: entry.name,
