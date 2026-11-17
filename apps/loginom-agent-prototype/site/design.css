@@ -513,3 +513,8 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .node-mark{position:absolute;top:-9px;left:50%;translate:-50% 0;padding:1px 7px;border-radius:999px;background:var(--paper);border:1px solid currentColor;font-size:11px;font-weight:700;white-space:nowrap}
 .is-add .node-mark{color:var(--success)}.is-mod .node-mark{color:var(--amber)}.is-del .node-mark{color:var(--accent)}
 .package-top .detail-toggle{margin-left:auto}
+.change-actions .discard-link{margin-left:auto}
+.change-note{margin:8px 0 0;color:var(--muted);font-size:12.5px}
+.change-counts b{font-weight:600}
+@media(max-width:690px){.diff-canvas{flex-wrap:wrap;gap:14px 10px;padding:22px 10px}.diff-canvas .canvas-connector{display:none}.diff-canvas .canvas-node{flex:1 1 40%;width:auto}.package-top .detail-toggle{margin-left:0}.change-actions .discard-link{margin-left:0}}
+@media(max-width:690px){.package-top{flex-wrap:wrap}.package-top .detail-toggle{flex-basis:100%}.package-top .detail-toggle button{flex:1}}
