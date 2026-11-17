@@ -489,3 +489,27 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .stream-caret{display:inline-block;width:7px;height:1.05em;margin-left:2px;vertical-align:-2px;background:var(--accent);animation:conn-pulse 1s steps(2) infinite}
 #announcements .toast-open{pointer-events:auto;margin-left:6px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;font-weight:600;font-size:13px}
 #announcements .toast-open:hover{border-color:var(--muted)}
+/* Iteration 4 — a package in the conversation */
+.findings{display:grid;gap:6px;margin:0 0 12px;padding-left:20px;line-height:1.45}
+.change-block .change-card{margin-top:4px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.change-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;background:var(--bg);border-bottom:1px solid var(--line)}
+.change-counts{margin-left:auto;display:inline-flex;gap:8px;font-weight:700;font-size:13px}
+.c-add{color:var(--success)}.c-mod{color:var(--amber)}.c-del{color:var(--accent)}
+.change-list{display:grid;margin:0;padding:4px 0;list-style:none}
+.change-list li{display:flex;gap:10px;padding:6px 12px;font-size:14px;line-height:1.4}
+.change-list .mark{flex:none;width:16px;font-weight:700;text-align:center}
+.change-list li.c-add .mark{color:var(--success)}.change-list li.c-mod .mark{color:var(--amber)}.change-list li.c-del .mark{color:var(--accent)}
+.change-list li>span:last-child{color:var(--ink)}
+.change-list li.c-del strong{text-decoration:line-through}
+.change-check{display:flex;align-items:center;gap:6px;margin:0;padding:8px 12px;border-top:1px solid var(--line);color:var(--success);font-size:13px}
+.change-card.is-saved .change-head,.change-card.is-replaced .change-head{background:var(--success-soft)}
+.change-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.change-legend{display:flex;gap:14px;padding:8px 14px;font-size:13px;font-weight:600}
+.diff-canvas .canvas-node{position:relative}
+.diff-canvas .canvas-node.is-add{border-color:var(--success);box-shadow:0 0 0 1px var(--success) inset}
+.diff-canvas .canvas-node.is-mod{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
+.diff-canvas .canvas-node.is-del{border-style:dashed;border-color:var(--accent);opacity:.7}
+.diff-canvas .canvas-node.is-del strong{text-decoration:line-through}
+.node-mark{position:absolute;top:-9px;left:50%;translate:-50% 0;padding:1px 7px;border-radius:999px;background:var(--paper);border:1px solid currentColor;font-size:11px;font-weight:700;white-space:nowrap}
+.is-add .node-mark{color:var(--success)}.is-mod .node-mark{color:var(--amber)}.is-del .node-mark{color:var(--accent)}
+.package-top .detail-toggle{margin-left:auto}
