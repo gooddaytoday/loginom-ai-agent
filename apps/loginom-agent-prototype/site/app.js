@@ -3,6 +3,7 @@ import { icon } from './icons.js'
 import { renderHub, bindHub, hubHasInstalled, openHubSolution } from './hub.js'
 import { renderSettings, renderOnboarding, bindSettings, ensureSettings, beforeSettingsLeave } from './settings.js'
 import { renderSolutions, bindSolutions, initSolutionDrafts } from './solutions.js'
+import { actions as packageActions, byId } from './catalog.js'
 
 const $ = (selector, scope = document) => scope.querySelector(selector)
 const app = $('#app')
@@ -14,7 +15,7 @@ const write = (key, value) => {
 }
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch])
 const pages = {
-  home:'Рабочее пространство', chat:'Разговор', hub:'Loginom Hub', loginom:'Пакеты Loginom',
+  home:'Главная', chat:'Разговор', hub:'Решения', loginom:'Пакеты',
   runner:'Запуск решения', studio:'Создать решение', settings:'Настройки', onboarding:'Первый запуск', help:'Справка',
 }
 const examples = [
@@ -83,7 +84,7 @@ route()
 initSolutionDrafts(state)
 
 const api = {
-  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution,
+  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss,
 }
 function canNavigate(page, tab) {
   if (beforeSettingsLeave(state,page,tab)) return true
@@ -126,13 +127,33 @@ function useTemplate(title, prompt) {
   render()
   $('#prompt')?.focus()
 }
-function runSolution(id) {
+function runSolution(id, mode = 'review', from = 'hub') {
   if (!hubHasInstalled(state,id)) {
     openHubSolution(state,id)
     return navigate('hub')
   }
   state.solution = id
+  state.solutionMode = mode
+  state.runnerFrom = from
   navigate('runner')
+}
+// Runs a package action (document/check/improve/compare) for a chosen package.
+function runAction(actionId, pkg, from) {
+  const action = packageActions[actionId]
+  state.runnerPackage = pkg
+  runSolution(action.solution, action.mode, from)
+}
+function packageRef(item) {
+  return {name:item.name, where:'Loginom · ' + packageFolder(item.scope), source:'loginom'}
+}
+// Opens a new conversation about a finished run, with its report attached.
+function discuss(title, prompt, files) {
+  newSession()
+  state.draft = prompt
+  state.draftFiles = files
+  state.templateTitle = title
+  render()
+  $('#prompt')?.focus()
 }
 function newSession() {
   if (!canNavigate('home')) return
@@ -161,7 +182,8 @@ function settingsTab(tab) {
   navigate('settings')
 }
 function navButton(page, glyph, label = pages[page]) {
-  const selected = state.page === page || (page === 'hub' && state.page === 'runner')
+  const origin = state.page === 'runner' ? ({loginom:'loginom', home:'home'}[state.runnerFrom] || 'hub') : state.page === 'studio' ? 'hub' : state.page
+  const selected = origin === page
   return `<button class="nav-item${selected ? ' selected' : ''}" ${selected ? 'aria-current="page"' : ''} data-go="${page}">${icon(glyph,17)}<span>${label}</span></button>`
 }
 function sidebar() {
@@ -176,9 +198,8 @@ function sidebar() {
     <button class="btn new-session" data-action="new">${icon('plus',17)} Новый разговор <kbd>⌘ N</kbd></button>
     <nav class="sidenav" aria-label="Рабочее пространство">
       ${navButton('home','home','Главная')}
-      ${navButton('loginom','flow','Пакеты Loginom')}
-      ${navButton('hub','grid','Loginom Hub')}
-      ${navButton('studio','box','Создать решение')}
+      ${navButton('loginom','flow','Пакеты')}
+      ${navButton('hub','grid','Решения')}
     </nav>
     <section class="sidebar-history" aria-label="Недавние разговоры">
       <h2>Недавние <button class="small-icon" data-overlay="search" aria-label="Найти разговор">${icon('more',16)}</button></h2>
@@ -186,9 +207,17 @@ function sidebar() {
     </section>
     <nav class="sidebar-footer" aria-label="Настройки и справка">
       ${navButton('settings','settings')}${navButton('help','help')}
-      <button class="profile" data-overlay="contour"><span class="profile-avatar">А</span><span><strong>Аналитик</strong><small>Демонстрационная среда</small></span>${icon('more',16)}</button>
+      ${connectionCard()}
+      <p class="prototype-mark">Прототип · итерация 1</p>
     </nav>
   </aside>`
+}
+function connectionCard() {
+  const connected = state.settings.connection.connected
+  const model = state.settings?.model?.name || 'Демо-модель'
+  return `<button class="conn-card" data-settings="loginom" title="Подключение к Loginom и модель">
+    <i class="conn-dot ${connected ? 'ok' : 'warn'}"></i>
+    <span><strong>${connected ? 'Loginom подключён' : 'Loginom не подключён'}</strong><small>Модель: ${esc(model)}</small></span>${icon('chevron',14)}</button>`
 }
 function header() {
   const nativeTab = state.page === 'chat' || state.page === 'home'
@@ -198,7 +227,7 @@ function header() {
       <span class="crumb">${esc(state.project)}</span><span class="crumb-arrow">${icon('chevron',11)}</span><span class="crumb-current">${pages[state.page]}</span>
     </div>
     <div class="top-actions">
-      <button class="mode-btn${state.contour === 'closed' ? ' closed' : ''}" data-overlay="contour">${icon(state.contour === 'closed' ? 'lock':'globe',15)}<span>${state.contour === 'closed' ? 'Закрытый контур':'Подключённый режим'}</span>${icon('down',13)}</button>
+      <button class="mode-btn${state.contour === 'closed' ? ' closed' : ''}" data-overlay="contour">${icon(state.contour === 'closed' ? 'lock':'globe',15)}<span>${state.contour === 'closed' ? 'Закрытый контур':'Интернет'}</span>${icon('down',13)}</button>
       <button class="icon-btn" title="Поиск (⌘ K)" aria-label="Поиск по приложению" data-overlay="search">${icon('search',18)}</button>
       <button class="icon-btn theme-btn" title="Переключить цветовую схему" aria-label="Переключить цветовую схему" data-action="theme">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',17)}</button>
     </div>
@@ -251,8 +280,13 @@ function home() {
       ${composer()}
       <div class="composer-context"><span>${icon(closed ? 'lock':'shield',15)}${closed ? 'Закрытый контур · локальные источники':'Демонстрационные данные и сценарии'}</span><button class="link-btn" data-go="onboarding">Мастер первого запуска ${icon('arrow',15)}</button></div>
     </section>
+    ${state.settings.connection.connected ? '' : `<div class="connect-banner">${icon('alert',18)}<span><strong>Подключите Loginom.</strong> Без подключения агент может отвечать на вопросы, но не открывает и не меняет пакеты.</span><button class="btn primary" data-settings="loginom">Подключить</button></div>`}
     <section class="scenario-section">
-      <div class="section-bar"><h2>Начать с примера</h2><button class="link-btn" data-go="hub">Все возможности ${icon('arrow',16)}</button></div>
+      <div class="section-bar"><h2>Работа с пакетом</h2><button class="link-btn" data-go="loginom">Все пакеты ${icon('arrow',16)}</button></div>
+      <div class="action-grid">${Object.entries(packageActions).map(([id,action]) => actionTile(id,action)).join('')}</div>
+    </section>
+    <section class="scenario-section">
+      <div class="section-bar"><h2>Примеры задач</h2><button class="link-btn" data-go="hub">Все решения ${icon('arrow',16)}</button></div>
       <div class="example-grid">${examples.map(item => `<button class="example-card" data-example="${item.id}">
         <div class="example-top"><span class="glyph ${item.tone}">${icon(item.icon,19)}</span>${icon('external',15)}</div><strong>${item.title}</strong><span>${item.detail}</span></button>`).join('')}</div>
     </section>
@@ -261,6 +295,11 @@ function home() {
       <div class="recent-list">${current.length ? current.map(item => `<button data-session="${item.id}"><span class="recent-icon">${icon('message',17)}</span><span><strong>${esc(item.title)}</strong><small>${esc(item.project)}</small></span><time>${item.date}</time>${icon('chevron',15)}</button>`).join('') : '<p class="empty-note">В этом проекте ещё нет разговоров.</p>'}</div>
     </section>
   </div>`
+}
+function actionTile(id, action) {
+  const ready = hubHasInstalled(state, action.solution)
+  return `<button class="action-tile" data-package-action="${id}"><span class="glyph red">${icon(action.icon,19)}</span>
+    <strong>${action.title}</strong><span>${action.detail}</span>${ready ? '' : `<small class="action-missing">${icon('plus',13)} Добавить из «Решений»</small>`}</button>`
 }
 function rightPanel(item) {
   const active = state.reviewTab
@@ -386,7 +425,7 @@ function chat() {
   } else if (item.phase === 'done') {
     body = result(item)
   } else {
-    body = `<div class="answer-block"><h2>Выполнение остановлено</h2><p>${item.phase === 'denied' ? 'Разрешение на запись отклонено.' : 'Запуск остановлен пользователем.'}</p><button class="btn" data-action="run-plan">Вернуться к плану</button></div>`
+    body = `<div class="answer-block"><h2>Выполнение остановлено</h2><p>${item.phase === 'denied' ? 'Разрешение на запись отклонено.' : 'Запуск остановлен пользователем.'}</p><button class="btn" data-action="back-to-plan">Вернуться к плану</button></div>`
   }
   return `<div class="chat-layout${state.review ? ' with-review':''}">
     <div class="chat-main">
@@ -450,6 +489,12 @@ function packagePicker(local) {
       : '<button class="link-btn sample-package" data-action="sample-package">Выбрать учебный файл</button>'}
     <p class="muted package-picker-note">В прототипе используется только имя файла. Открывается учебная схема.</p>
     <div class="button-row package-picker-actions"><button class="btn quiet" data-action="dismiss">Отмена</button><button class="btn primary" data-action="open-local-package" ${candidate ? '' : 'disabled'}>Загрузить копию и открыть</button></div>`
+}
+function pickPackage() {
+  const recent = [...serverPackages.filter(item => item.scope === 'personal'), ...state.importedPackages].slice(0,5)
+  return `<p class="dialog-desc">Выберите пакет из вашей папки Loginom. Агент будет работать с копией — исходный пакет не изменится.</p>
+    <div class="dialog-options">${recent.map(item => `<button data-pick-package="${item.id}"><span class="glyph red">${icon('flow',18)}</span><span><strong>${esc(item.name)}</strong><small>${esc(packageFolder(item.scope))}</small></span>${icon('chevron',16)}</button>`).join('')}</div>
+    <button class="link-btn" data-action="package-server">${icon('folder',15)} Другая папка или общие пакеты</button>`
 }
 function packageForOutput() {
   if (state.page !== 'chat') {
@@ -528,7 +573,7 @@ function packages() {
   const dirty = hasPackageEdits(item)
   const canDownload = dirty || Boolean(item.savedVersion)
   return `<div class="native-page packages-page">
-    <div class="native-heading"><div><p class="eyebrow">Рабочий проект</p><h1>Пакеты Loginom</h1><p>Откройте пакет, чтобы посмотреть схему или запустить решение.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Loginom</p><h1>Пакеты</h1><p>Откройте пакет, чтобы посмотреть схему, задокументировать, проверить или улучшить его.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
     <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packageFolder(item.scope))} · ${item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span></div>
     <div class="package-canvas" aria-label="Учебная схема из четырёх узлов">${nodes.map(([glyph,title,detail],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''}" data-node="${i}"><span class="glyph ${['blue','violet','red','green'][i]}">${icon(glyph,22)}</span><strong>${title}</strong><small>${detail}</small></button>`).join('')}</div>
     ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${Number.isInteger(state.node) ? nodes[state.node][3]:'Выберите узел, чтобы увидеть сведения.'}</div>`}
@@ -539,8 +584,8 @@ function packages() {
       ${item.editSessionId ? `<button class="link-btn" data-session="${item.editSessionId}">${icon('message',16)} Вернуться к разговору</button>`
         : !item.savedVersion && !dirty ? `<button class="btn package-chat-cta" data-action="ask-package-edit">${icon('message',16)} Изменить с агентом</button>` : ''}
     </div></section>
-    ${item.isDraft ? '' : `<div class="section-bar package-section"><h2>Действия над пакетом</h2><button class="link-btn" data-go="hub">Открыть Loginom Hub ${icon('arrow',16)}</button></div>
-    <div class="example-grid">${[['refactor','flow','Улучшить сценарий','Найти проблемы и предложить правки'],['regression','shield','Проверить изменения','Сравнить результат с эталоном'],['tournament','chart','Сравнить реализации','Выбрать две версии для проверки']].map(([id,glyph,title,detail]) => `<button class="example-card" data-solution="${id}"><div class="example-top"><span class="glyph red">${icon(glyph,19)}</span>${icon('external',15)}</div><strong>${title}</strong><span>${detail}</span></button>`).join('')}</div>`}
+    ${item.isDraft ? '' : `<div class="section-bar package-section"><h2>Что сделать с пакетом</h2><button class="link-btn" data-go="hub">Другие решения ${icon('arrow',16)}</button></div>
+    <div class="action-grid">${Object.entries(packageActions).map(([id,action]) => actionTile(id,action)).join('')}</div>`}
   </div>`
 }
 function help() {
@@ -560,6 +605,7 @@ function overlay() {
   const content = {
     'package-edit-example':['Изменение на учебном пакете',`<p class="dialog-desc">Сценарий правки формулы в прототипе доступен для пакета «Расчёт суммы.lgp». Откройте его в чате, чтобы увидеть сравнение, подтверждение и сохранение.</p><div class="button-row package-picker-actions"><button class="btn quiet" type="button" data-action="dismiss">Отмена</button><button class="btn primary" type="button" data-action="ask-example-package-edit">Открыть учебный пакет в чате</button></div>`],
     'package-version':['Сохранить новую версию', kind === 'package-version' ? versionDialog() : ''],
+    'pick-package':[packageActions[state.pendingAction]?.title + ': какой пакет?', kind === 'pick-package' ? pickPackage() : ''],
     'package-server':['Открыть из Loginom', kind === 'package-server' ? packagePicker(false) : ''],
     'package-computer':['Открыть с компьютера', kind === 'package-computer' ? packagePicker(true) : ''],
     contour: ['Режим работы',`<p class="dialog-desc">Профиль определяет, какие источники доступны приложению.</p>
@@ -582,8 +628,8 @@ function searchResults(value) {
   const q = value.trim().toLocaleLowerCase('ru')
   const entries = [
     ['home','Главная','home'],
-    ['hub','Loginom Hub','grid'],
-    ['loginom','Пакеты Loginom','flow'],
+    ['hub','Решения (Loginom Hub)','grid'],
+    ['loginom','Пакеты','flow'],
     ['settings','Настройки','settings'],
     ['onboarding','Мастер первого запуска','spark'],
     ['studio','Создать решение','box'],
@@ -634,7 +680,6 @@ function render(resetScroll = false) {
   app.innerHTML = `<div class="workspace">
     ${sidebar()}${state.mobile ? '<button class="mobile-scrim" aria-label="Закрыть меню" data-action="menu"></button>':''}
     <div class="workspace-main">${header()}<main id="main" class="page page-${state.page}">${pageContents()}</main>
-      <footer class="statusbar"><button data-settings="loginom"><i></i> Loginom <span>· Демо</span></button><button data-settings="models">${icon('cpu',14)} <span>Модель</span></button><button data-go="hub">${icon('box',14)} Hub <span>· ${state.contour === 'closed' ? 'Из файла':'Каталог'}</span></button><span class="status-build">Интерактивный прототип</span></footer>
     </div>
   </div>${overlay()}`
   $('#main').scrollTop = scroll
@@ -729,7 +774,7 @@ const actions = {
   dismiss,
   review:() => { state.review = !state.review; render() },
   allow:() => setPhase('running'), deny:() => setPhase('denied'),
-  'run-plan':() => setPhase('permission'), stop:() => setPhase('stopped'),
+  'run-plan':() => setPhase('permission'), 'back-to-plan':() => setPhase('plan'), stop:() => setPhase('stopped'),
   'download-result':downloadResult,
   'edit-package-example':() => {
     state.activePackage = editablePackage
@@ -845,10 +890,16 @@ app.addEventListener('click', event => {
     if (item) openPackage(item)
     return
   }
-  if (d.solution) {
-    const item = state.activePackage
-    state.runnerPackage = packageFolder(item.scope) + '/' + item.name
-    return runSolution(d.solution)
+  if (d.packageAction) {
+    if (state.page === 'loginom') return runAction(d.packageAction, packageRef(state.activePackage), 'loginom')
+    state.pendingAction = d.packageAction
+    state.overlay = 'pick-package'
+    return render()
+  }
+  if (d.pickPackage) {
+    const item = packageEntries().find(entry => entry.id === d.pickPackage)
+    state.overlay = null
+    return runAction(state.pendingAction, packageRef(item), 'home')
   }
   if (Object.hasOwn(actions,d.action)) actions[d.action]()
 })

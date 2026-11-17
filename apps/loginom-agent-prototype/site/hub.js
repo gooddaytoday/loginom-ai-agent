@@ -1,17 +1,7 @@
-const releases = [
-  {id:'refactor',name:'Scenario Refactor',keywords:'рефакторинг оптимизация улучшить',type:'Решение',icon:'flow',color:'sage',version:'1.0.0',offline:true,runner:true,description:'Найдите узкие места в сценарии и просмотрите предложенные правки.'},
-  {id:'regression',name:'Regression Studio',keywords:'регрессия регрессионные проверки',type:'Решение',icon:'shield',color:'blue',version:'1.0.0',offline:true,runner:true,description:'Сравните результаты с эталоном перед изменением сценария.'},
-  {id:'migration',name:'Migration Bridge',keywords:'перенос совместимость миграция запрос SQL',type:'Решение',icon:'link',color:'clay',version:'1.0.0',offline:true,runner:true,description:'Перенесите SQL-запрос в граф Loginom и проверьте результат на тестовой выборке.'},
-  {id:'tournament',name:'Scenario Tournament',keywords:'турнир сравнение сценариев',type:'Решение',icon:'chart',color:'sand',version:'1.0.0',offline:true,runner:true,description:'Сравните несколько сценариев по выбранным критериям и входным данным.'},
-  {id:'quality',name:'Проверка качества данных',type:'Навык',icon:'shield',color:'sage',version:'1.3.0',offline:true,description:'Найдите пропуски, дубликаты и выбросы до расчёта показателей.',prompt:'Проверь качество входной таблицы в Loginom и предложи план очистки.'},
-  {id:'loads',name:'Контроль полноты загрузок',type:'Шаблон',icon:'flow',color:'clay',version:'1.0.0',offline:true,description:'Сверьте количество строк и ключи по каждому источнику.',prompt:'Создай сценарий Loginom для контроля полноты загрузок по источникам.'},
-  {id:'profile',name:'Профилирование таблиц',type:'Пакет Loginom',icon:'table',color:'blue',version:'2.1.0',offline:true,description:'Профиль полей, распределения и сводка по типам данных.',prompt:'Подготовь к открытию демонстрационный пакет профилирования таблиц.'},
-  {id:'abc',name:'ABC-анализ продаж',type:'Шаблон',icon:'chart',color:'sand',version:'1.2.0',offline:true,description:'Распределите товары по вкладу в выручку и сохраните сценарий.',prompt:'Построй в Loginom сценарий ABC-анализа товаров по выручке.'},
-  {id:'help',name:'Справка Loginom',type:'База знаний',icon:'book',color:'lilac',version:'2026.11',offline:true,description:'Руководство по узлам, функциям и работе со сценариями.'},
-  {id:'cloud',name:'Внешнее обогащение данных',type:'Интеграция',icon:'link',color:'blue',version:'1.0.0',offline:false,community:true,description:'Дополните записи данными из внешнего сервиса.'},
-];
+import { catalog, byId, tiers, tierBadge, evidenceLine } from './catalog.js';
 
-const tabs = [['catalog','Каталог'],['installed','Моя библиотека'],['updates','Обновления'],['history','История']];
+const tabs = [['catalog','Каталог'],['installed','Установленные'],['updates','Обновления'],['history','История']];
+const tierFilters = [['all','Все'],['official','Loginom'],['verified','Проверено Loginom'],['community','Сообщество']];
 const defaultSelection = ['quality','loads','profile'];
 const archiveName = 'loginom-hub-analytics-2026.11.loginom-hub';
 const iconPaths = {
@@ -35,9 +25,12 @@ const iconPaths = {
   file:'M6 3h7l5 5v13H6z M13 3v6h5 M9 14h6 M9 17h6',
   star:'m12 3 2.8 5.8 6.4 1-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3L3 9.8l6.4-1L12 3Z',
   plus:'M12 5v14M5 12h14',
+  trash:'M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13',
+  wand:'m5 19 13-13 2 2L7 21z M6 3v6 M3 6h6',
 };
-const icon = (name,size = 18) => '<svg aria-hidden="true" width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="'+iconPaths[name]+'"/></svg>';
+const icon = (name,size = 18) => '<svg aria-hidden="true" width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="'+(iconPaths[name] || iconPaths.file)+'"/></svg>';
 const escape = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
+const now = () => new Date().toLocaleString('ru',{dateStyle:'short',timeStyle:'short'});
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8',{fatal:true});
@@ -57,7 +50,7 @@ export function createDemoArchive(ids = defaultSelection, compatible = true) {
   const directory = [];
   let offset = 0;
   let directorySize = 0;
-  const items = releases.filter(item => item.offline && ids.includes(item.id));
+  const items = catalog.filter(item => item.offline && !item.builtIn && ids.includes(item.id));
   const manifest = {
     format:'loginom-hub-demo-v1', name:'Аналитика и качество данных', publisher:'Loginom · демо',
     release:'2026.11', minAgent:compatible ? '0.5.0' : '0.7.0', minLoginom:'7.4.2',
@@ -65,7 +58,7 @@ export function createDemoArchive(ids = defaultSelection, compatible = true) {
   };
   const files = [
     ['manifest.json', JSON.stringify(manifest, null, 2)],
-    ...items.map(item => ['items/'+item.id+'.json', JSON.stringify({title:item.name,version:item.version,demo:true},null,2)]),
+    ...items.map(item => ['items/'+item.id+'.json', JSON.stringify({title:item.title,version:item.version,demo:true},null,2)]),
   ];
   for (const [path, value] of files) {
     const name = encoder.encode(path);
@@ -119,7 +112,7 @@ export async function inspectDemoArchive(file) {
   const count = view.getUint16(end+10,true);
   let offset = 0;
   let entryOffset = directory;
-  if (!count || count > releases.length+1 || directory >= end || directory+view.getUint32(end+12,true) !== end) {
+  if (!count || count > catalog.length+1 || directory >= end || directory+view.getUint32(end+12,true) !== end) {
     throw Error('Не удалось прочитать состав пакета.');
   }
   for (let index = 0; index < count; index++) {
@@ -152,7 +145,7 @@ export async function inspectDemoArchive(file) {
   if (manifest?.format !== 'loginom-hub-demo-v1' || manifest.release !== '2026.11' || !['0.5.0','0.7.0'].includes(manifest.minAgent) || manifest.minLoginom !== '7.4.2' || !Array.isArray(manifest.items) || !manifest.items.length) {
     throw Error('Пакет собран для другого формата. Выберите пакет, скачанный в демонстрации.');
   }
-  const ids = manifest.items.map(entry => releases.find(item => item.offline && item.id === entry?.id && item.version === entry.version)?.id);
+  const ids = manifest.items.map(entry => catalog.find(item => item.offline && item.id === entry?.id && item.version === entry.version)?.id);
   if (ids.some(id => !id || !files.has('items/'+id+'.json')) || new Set(ids).size !== ids.length || files.size !== ids.length+1) {
     throw Error('Состав архива не соответствует описи пакета.');
   }
@@ -163,85 +156,126 @@ export async function inspectDemoArchive(file) {
 }
 
 function hubState(state) {
-  return state.hub ??= {tab:'catalog',type:'Все',query:'',installed:{quality:'1.2.0',help:'2026.11',refactor:'1.0.0'},events:[],favorites:[],dialog:null,revision:0,community:false,favoritesOnly:false};
+  return state.hub ??= {
+    tab:'catalog', tier:'all', type:'Все', query:'',
+    installed:{document:'1.0.0',help:'2026.11',refactor:'1.0.0',quality:'1.2.0',abc:'1.2.0'},
+    events:[], favorites:[], dialog:null, revision:0,
+  };
 }
 
 export function hubHasInstalled(state, id) {
   return Object.hasOwn(hubState(state).installed, id);
 }
 
+// Opens the solution card (online) or the bundle import (closed contour) for a solution that is not installed.
 export function openHubSolution(state, id) {
-  if (!releases.some(item => item.id === id && item.runner)) return;
+  const item = byId(id);
+  if (!item) return;
   Object.assign(hubState(state), {
-    tab:'catalog',type:'Все',query:'',favoritesOnly:false,
+    tab:'catalog', tier:'all', type:'Все', query:'',
     dialog:state.contour === 'closed' && !hubHasInstalled(state,id) ? {kind:'import',required:id} : {kind:'detail',id},
   });
 }
 
+function blockedByPolicy(item, online) {
+  if (item.tier === 'community' && !online) return 'В закрытом контуре решения сообщества без проверки отключены политикой организации.';
+  if (!item.offline && !online) return 'Решению нужен доступ в интернет, а в закрытом контуре он отключён.';
+  return '';
+}
+
 function itemCard(item, hub, online, tab) {
   const installed = hub.installed[item.id];
-  const version = !online || (tab === 'installed' && installed) ? installed : item.version;
-  const update = installed && installed !== item.version;
+  const update = installed && installed !== item.version && online;
+  const status = item.builtIn ? icon('check',15)+' Встроено' : installed ? icon('check',15)+' Установлено' : '';
+  const primary = installed && tab !== 'updates' && (item.prompt || item.runner)
+    ? '<button class="btn" data-hub-use="'+item.id+'">Использовать '+icon('arrow',15)+'</button>'
+    : '<button class="btn" data-hub-detail="'+item.id+'">'+(update ? 'Обновить' : installed ? 'Подробнее' : 'Посмотреть')+' '+icon('arrow',15)+'</button>';
   return '<article class="hub-card">'+
     '<div class="hub-card-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,23)+'</span>'+
-    '<span class="hub-type">'+item.type+'</span>'+
+    '<span class="hub-type">'+item.kind+'</span>'+
     '<button class="hub-favorite" data-hub-favorite="'+item.id+'" aria-label="'+(hub.favorites.includes(item.id)?'Убрать из избранного':'В избранное')+'" aria-pressed="'+hub.favorites.includes(item.id)+'">'+icon('star',17)+'</button></div>'+
-    '<button class="hub-card-title" data-hub-detail="'+item.id+'">'+item.name+'</button>'+
+    '<button class="hub-card-title" data-hub-detail="'+item.id+'">'+item.title+'</button>'+
+    (item.product ? '<span class="hub-product">'+item.product+'</span>' : '')+
     '<p>'+item.description+'</p>'+
-    '<div class="hub-card-meta"><span class="hub-version">'+version+'</span><span class="'+(item.offline?'hub-offline-tag':'hub-online-tag')+'">'+(item.runner?'Loginom внутри контура':item.offline?'Работает офлайн':'Требуется интернет')+'</span></div>'+
-    '<div class="hub-card-actions">'+
-    (installed && (tab !== 'updates') && (item.prompt || item.runner) ? '<button class="btn" data-hub-use="'+item.id+'">Использовать '+icon('arrow',15)+'</button>' :
-    installed && item.id === 'help' ? '<button class="btn" data-hub-detail="'+item.id+'">Открыть справку '+icon('arrow',15)+'</button>' :
-    '<button class="btn" data-hub-detail="'+item.id+'">'+(installed && update && online ? 'Обновить' : 'Подробнее')+' '+icon('arrow',15)+'</button>')+
-    '<span class="hub-installed">'+(installed ? icon('check',15)+' Установлено' : item.community ? 'Сообщество' : '')+'</span></div></article>';
+    '<div class="hub-trust">'+tierBadge(item)+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+'</div>'+
+    '<div class="hub-evidence">'+evidenceLine(item)+'</div>'+
+    '<div class="hub-card-actions">'+primary+
+    '<span class="hub-installed">'+status+(update ? ' · есть '+item.version : '')+'</span></div></article>';
 }
 
 function syncBanner(online) {
   return '<section class="hub-banner '+(online?'':'hub-banner-closed')+'"><div class="hub-banner-content">'+
     '<span class="hub-banner-label">'+icon(online?'archive':'lock',16)+(online?' Работа без интернета':' Закрытый контур')+'</span>'+
-    '<h2>'+(online?'Перенесите возможности Hub внутрь контура':'Локальная библиотека Hub')+'</h2>'+
-    '<p>'+(online?'Соберите навыки, шаблоны и их зависимости в один файл для администратора.':'Доступны установленные инструменты. Новые версии добавляются из файла, который передал администратор.')+'</p>'+
-    (online?'<button class="hub-text" data-hub-action="export">Собрать офлайн-пакет '+icon('arrow',15)+'</button>':'')+'</div>'+
+    '<h2>'+(online?'Перенесите решения внутрь закрытого контура':'Решения из пакета администратора')+'</h2>'+
+    '<p>'+(online?'Соберите решения и их зависимости в один подписанный файл и передайте администратору.':'Каталог собран из файла от администратора · 12.11.2026. Новые версии добавляются из следующего файла.')+'</p>'+
+    (online?'<button class="hub-text" data-hub-action="export">Собрать офлайн-пакет '+icon('arrow',15)+'</button>':'<button class="hub-text" data-hub-action="import">Импортировать пакет '+icon('arrow',15)+'</button>')+'</div>'+
     '<div class="hub-visual" aria-hidden="true"><span class="hub-baseline"></span><span class="hub-visual-chip hub-chip-first">'+icon('flow',23)+'</span><span class="hub-visual-chip hub-chip-second">'+icon('book',23)+'</span><span class="hub-visual-chip hub-chip-third">'+icon(online?'archive':'lock',32)+'</span></div></section>';
 }
 
 function history(hub) {
-  if (!hub.events.length) return '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon('clock',24)+'</span><h3>Пока нет операций</h3><p>Здесь появятся импорты, обновления и восстановления версий.</p><button class="btn" data-hub-action="import">Импортировать пакет</button></div>';
-  return '<div class="hub-history">'+hub.events.map((entry,index) => '<article><span class="hub-tile hub-sage">'+icon(entry.revert?'clock':'archive',21)+'</span>'+
+  if (!hub.events.length) return '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon('clock',24)+'</span><h3>Пока нет операций</h3><p>Здесь появятся установки, обновления, удаления и восстановления версий.</p></div>';
+  const labels = {install:'Установлено',update:'Обновлено',remove:'Удалено',import:'Импортировано',revert:'Восстановлено'};
+  return '<div class="hub-history">'+hub.events.map((entry,index) => '<article><span class="hub-tile hub-sage">'+icon(entry.kind==='revert'?'clock':entry.kind==='remove'?'trash':'archive',21)+'</span>'+
     '<div><h3>'+escape(entry.name)+'</h3><p>'+escape(entry.date)+' · '+entry.ids.length+' '+(entry.ids.length === 1?'компонент':entry.ids.length <= 4?'компонента':'компонентов')+'</p></div>'+
-    '<span class="hub-offline-tag">'+(entry.revert?'Восстановлено':'Установлено')+'</span>'+
-    (index === 0 && entry.before ? '<button class="btn" data-hub-action="rollback">Восстановить версии</button>':'')+'</article>').join('')+'</div>';
+    '<span class="hub-offline-tag">'+labels[entry.kind]+'</span>'+
+    (index === 0 && entry.before && entry.kind !== 'revert' ? '<button class="btn" data-hub-action="rollback">Вернуть как было</button>':'')+'</article>').join('')+'</div>';
 }
 
 export function renderHub(state) {
   const hub = hubState(state);
   const online = state.contour !== 'closed';
-  const installedCount = Object.keys(hub.installed).length;
-  const updates = online ? releases.filter(item => hub.installed[item.id] && item.version !== hub.installed[item.id]) : [];
-  const available = online ? releases.filter(item=>hub.community||!item.community) : releases.filter(item=>hub.installed[item.id]);
-  const library = hub.favoritesOnly ? available.filter(item=>hub.favorites.includes(item.id)) : available.filter(item=>hub.installed[item.id]);
-  const source = hub.tab === 'updates' ? updates : hub.tab === 'installed' ? library : available;
+  const updates = online ? catalog.filter(item => hub.installed[item.id] && item.version !== hub.installed[item.id]) : [];
+  const available = online ? catalog : catalog.filter(item => hub.installed[item.id]);
+  const installedItems = catalog.filter(item => hub.installed[item.id]);
+  const source = hub.tab === 'updates' ? updates : hub.tab === 'installed' ? installedItems : available;
   const query = hub.query.trim().toLocaleLowerCase('ru');
-  const items = source.filter(item => (hub.type === 'Все' || item.type === hub.type) && (!query || [item.name,item.description,item.type,item.keywords].join(' ').toLocaleLowerCase('ru').includes(query)));
-  const counts = {catalog:available.length,installed:installedCount,updates:updates.length};
-  const filters = ['Все',...new Set(source.map(item=>item.type))];
-  return '<section class="hub-page"><header class="hub-header"><div><div class="hub-title-line"><span class="hub-mark">'+icon('hub',26)+'</span><h1>Loginom Hub</h1></div><p>Решения, шаблоны и пакеты для работы в Loginom.</p></div>'+
-    '<div class="hub-header-actions"><button class="btn" data-hub-action="studio">'+icon('plus',17)+' Создать решение</button><button class="btn primary" data-hub-action="import">'+icon('upload',18)+' Импортировать пакет</button></div></header>'+
+  const items = source.filter(item => (hub.tier === 'all' || item.tier === hub.tier) && (hub.type === 'Все' || item.kind === hub.type) &&
+    (!query || [item.title,item.product,item.description,item.kind,item.keywords].join(' ').toLocaleLowerCase('ru').includes(query)));
+  const counts = {catalog:available.length,installed:installedItems.length,updates:updates.length};
+  const types = ['Все',...new Set(source.map(item=>item.kind))];
+  return '<section class="hub-page"><header class="hub-header"><div><div class="hub-title-line"><span class="hub-mark">'+icon('hub',26)+'</span><h1>Решения</h1></div><p>Loginom Hub — готовые решения для работы с пакетами и данными. Перед установкой видно, кто подготовил решение и что ему будет разрешено.</p></div>'+
+    '<div class="hub-header-actions"><button class="btn" data-hub-action="studio">'+icon('plus',17)+' Создать своё</button><button class="btn" data-hub-action="import">'+icon('upload',18)+' Импортировать пакет</button></div></header>'+
     syncBanner(online)+
-    '<nav class="hub-tabs" aria-label="Разделы Loginom Hub">'+tabs.map(([id,title])=>'<button data-hub-tab="'+id+'" '+(hub.tab===id?'aria-current="page"':'')+'>'+title+(id in counts?' <span>'+counts[id]+'</span>':'')+'</button>').join('')+'</nav>'+
+    '<nav class="hub-tabs" aria-label="Разделы">'+tabs.map(([id,title])=>'<button data-hub-tab="'+id+'" '+(hub.tab===id?'aria-current="page"':'')+'>'+title+(id in counts?' <span>'+counts[id]+'</span>':'')+'</button>').join('')+'</nav>'+
     (hub.tab === 'history' ? history(hub) :
-      (hub.tab==='installed'?'<div class="hub-library-controls"><button class="btn" aria-pressed="'+!hub.favoritesOnly+'" data-hub-action="show-installed">Установлено</button><button class="btn" aria-pressed="'+hub.favoritesOnly+'" data-hub-action="show-favorites">'+icon('star',16)+' Избранное</button><button class="hub-text" data-hub-action="studio">Мои решения '+icon('arrow',15)+'</button></div>':'')+
-      (source.length ? '<div class="hub-toolbar"><label class="hub-search">'+icon('search',18)+'<input type="search" aria-label="Поиск в Hub" placeholder="Поиск в Hub" value="'+escape(hub.query)+'"></label>'+
-        '<div class="hub-filters" aria-label="Тип содержимого">'+filters.map(type=>'<button data-hub-type="'+type+'" aria-pressed="'+(hub.type===type)+'">'+type+'</button>').join('')+'</div></div>' : '')+
-      (online&&hub.tab==='catalog'?'<label class="hub-community"><input type="checkbox" data-hub-community '+(hub.community?'checked':'')+'> Показывать решения сообщества</label>':'')+
+      (source.length ? '<div class="hub-toolbar"><label class="hub-search">'+icon('search',18)+'<input type="search" aria-label="Поиск решений" placeholder="Что нужно сделать? Например, «проверить данные»" value="'+escape(hub.query)+'"></label>'+
+        '<div class="hub-filters" aria-label="Кто подготовил">'+tierFilters.filter(([id]) => online || id !== 'community').map(([id,label])=>'<button data-hub-tier="'+id+'" aria-pressed="'+(hub.tier===id)+'">'+label+'</button>').join('')+'</div>'+
+        '<div class="hub-filters hub-types" aria-label="Тип">'+types.map(type=>'<button data-hub-type="'+type+'" aria-pressed="'+(hub.type===type)+'">'+type+'</button>').join('')+'</div></div>' : '')+
       (items.length ? '<div class="hub-grid">'+items.map(item=>itemCard(item,hub,online,hub.tab)).join('')+'</div>' :
-        '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon(hub.tab==='updates'?'check':'search',23)+'</span><h3>'+(source.length?'Поиск ничего не нашёл':hub.tab==='updates'?'Нет доступных обновлений':hub.favoritesOnly?'Избранное пока пусто':'Здесь появятся установленные инструменты')+'</h3>'+
-        '<p>'+(source.length?'Измените запрос или выберите другой тип.':hub.favoritesOnly?'Нажмите на звёздочку в карточке решения.':online?'Актуальные версии уже установлены.':'Проверьте пакет обновления из файла.')+'</p>'+
+        '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon(hub.tab==='updates'?'check':'search',23)+'</span><h3>'+(source.length?'Ничего не нашлось':hub.tab==='updates'?'Обновлений нет':'Здесь появятся установленные решения')+'</h3>'+
+        '<p>'+(source.length?'Измените запрос или фильтры.':online?'Установлены актуальные версии.':'Импортируйте пакет обновлений от администратора.')+'</p>'+
         (source.length?'<button class="btn" data-hub-action="clear">Сбросить фильтры</button>':!online?'<button class="btn" data-hub-action="import">Импортировать пакет</button>':'')+'</div>'))+
     '</section>'+renderDialog(hub, online);
 }
 
 function footer(content) { return '<footer class="hub-dialog-footer">'+content+'</footer>'; }
+
+function permissionList(item) {
+  return '<div class="hub-perms"><div><h4>'+icon('check',16)+' Сможет</h4><ul>'+(item.can.length ? item.can.map(text=>'<li>'+escape(text)+'</li>').join('') : '<li>Только подсказывать агенту</li>')+'</ul></div>'+
+    (item.cannot.length ? '<div><h4>'+icon('close',16)+' Не сможет</h4><ul>'+item.cannot.map(text=>'<li>'+escape(text)+'</li>').join('')+'</ul></div>' : '')+'</div>';
+}
+
+function detailDialog(hub, online, current) {
+  const item = byId(current.id);
+  const installed = hub.installed[item.id];
+  const update = installed && installed !== item.version && online;
+  const blocked = blockedByPolicy(item, online);
+  const tier = tiers[item.tier];
+  const needsAck = item.tier === 'community' && !installed;
+  const body = '<div class="hub-detail-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,24)+'</span><div><p class="hub-detail-kind">'+item.kind+(item.product ? ' · '+item.product : '')+'</p><p class="hub-dialog-lead">'+item.description+'</p></div></div>'+
+    '<section class="hub-section"><h3>Кто подготовил</h3><div class="hub-trust">'+tierBadge(item,'lg')+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+'</div><p>'+tier.explain+'</p></section>'+
+    '<section class="hub-section"><h3>Проверка на примерах</h3><p>'+evidenceLine(item)+'</p></section>'+
+    '<section class="hub-section"><h3>Что будет разрешено</h3>'+permissionList(item)+
+    (item.runner ? '<p class="hub-dialog-footnote">При каждом запуске приложение ещё раз покажет, к какому пакету и с какими правами получит доступ агент.</p>' : '')+'</section>'+
+    '<dl class="hub-checks"><div><dt>Версия</dt><dd>'+(update ? installed+' → '+item.version : installed || item.version)+'</dd></div><div><dt>Размер</dt><dd>'+item.size+'</dd></div><div><dt>Совместимость</dt><dd>Loginom 7.4 и новее</dd></div><div><dt>Сеть</dt><dd>'+(item.offline?'Работает без интернета':'Нужен интернет')+'</dd></div></dl>'+
+    (blocked ? '<div class="hub-notice hub-notice-error">'+icon('lock',18)+'<div><strong>Установка запрещена</strong><p>'+blocked+'</p></div></div>' : '')+
+    (needsAck && !blocked ? '<label class="hub-ack"><input type="checkbox" data-hub-ack '+(current.ack?'checked':'')+'> Понимаю, что решение не проверено Loginom</label>' : '');
+  const actions = '<button class="btn quiet" data-hub-action="close">Закрыть</button>'+
+    (installed && !item.builtIn ? '<button class="btn quiet hub-remove" data-hub-action="remove">'+icon('trash',16)+' Удалить</button>' : '')+
+    (installed && !update && (item.prompt || item.runner) ? '<button class="btn primary" data-hub-use="'+item.id+'">Использовать</button>' : '')+
+    (!blocked && (!installed || update) ? '<button class="btn primary" data-hub-action="install-one" '+(needsAck && !current.ack ? 'disabled' : '')+'>'+(update ? 'Обновить до '+item.version : 'Установить')+'</button>' : '');
+  return ['', body, actions, item.title];
+}
 
 function renderDialog(hub, online) {
   const current = hub.dialog;
@@ -249,83 +283,73 @@ function renderDialog(hub, online) {
   let title = '';
   let body = '';
   let actions = '';
+  if (current.kind === 'detail') [, body, actions, title] = detailDialog(hub, online, current);
   if (current.kind === 'import') {
-    title = 'Импортировать пакет';
-    const requested = releases.find(item=>item.id===current.required);
-    body = '<p class="hub-dialog-lead">'+(requested?'Для запуска <strong>'+requested.name+'</strong> выберите файл с этим решением. Оно входит в демонстрационный пример.':'Выберите один файл <code>.loginom-hub</code>. До установки вы увидите, что войдёт в библиотеку.')+'</p>'+
-      '<label class="hub-drop"><input type="file" accept=".loginom-hub,.zip" aria-label="Выбрать файл пакета"><span class="hub-tile hub-clay">'+icon('upload',23)+'</span><strong>Выбрать файл или перетащить сюда</strong><small>Офлайн-пакет Loginom Hub</small></label>'+
+    title = 'Импортировать пакет решений';
+    const requested = byId(current.required);
+    body = '<p class="hub-dialog-lead">'+(requested?'Решения «'+requested.title+'» нет в библиотеке. Выберите файл от администратора, в котором оно есть.':'Выберите файл <code>.loginom-hub</code> от администратора или из Loginom Hub. До установки вы увидите состав и проверку подписи.')+'</p>'+
+      '<label class="hub-drop"><input type="file" accept=".loginom-hub,.zip" aria-label="Выбрать файл пакета"><span class="hub-tile hub-clay">'+icon('upload',23)+'</span><strong>Выбрать файл или перетащить сюда</strong><small>Пакет решений Loginom Hub</small></label>'+
       '<div class="hub-demo"><span>Демонстрационные пакеты</span><div><button class="btn" data-hub-sample="correct">Корректный</button><button class="btn" data-hub-sample="damaged">Повреждённый</button><button class="btn" data-hub-sample="incompatible">Несовместимый</button></div></div>';
     actions = '<button class="btn quiet" data-hub-action="close">Отмена</button>';
   }
   if (current.kind === 'checking') {
     title = 'Проверяем пакет';
-    body = '<div class="hub-result"><span class="hub-tile hub-clay">'+icon('archive',24)+'</span><h3>'+escape(current.filename)+'</h3><p role="status">Читаем опись и проверяем целостность.</p></div>';
+    body = '<div class="hub-result"><span class="hub-tile hub-clay">'+icon('archive',24)+'</span><h3>'+escape(current.filename)+'</h3><p role="status">Проверяем подпись, опись и целостность файлов.</p></div>';
   }
   if (current.kind === 'invalid') {
     title = 'Пакет нельзя установить';
     body = '<p class="hub-filename">'+icon('file',17)+escape(current.filename)+'</p><div class="hub-notice hub-notice-error" role="alert">'+icon('alert',20)+'<div><strong>Проверка остановлена</strong><p>'+escape(current.message)+'</p></div></div>';
-    actions = '<button class="btn quiet" data-hub-action="close">Закрыть</button><button class="btn primary" data-hub-action="import">Выбрать другой пакет</button>';
+    actions = '<button class="btn quiet" data-hub-action="close">Закрыть</button><button class="btn primary" data-hub-action="import">Выбрать другой файл</button>';
   }
   if (current.kind === 'preview') {
     const bundle = current.bundle;
     const incompatible = bundle.minAgent !== '0.5.0';
-    const changes = bundle.ids.filter(id=>hub.installed[id] !== releases.find(item=>item.id===id).version);
-    title = 'Проверка пакета';
+    const changes = bundle.ids.filter(id=>hub.installed[id] !== byId(id).version);
+    title = 'Что войдёт в библиотеку';
     body = '<div class="hub-package-title"><span class="hub-tile hub-clay">'+icon('archive',24)+'</span><div><strong>'+bundle.name+'</strong><p class="hub-filename">'+escape(current.filename)+'</p></div></div>'+
-      '<dl class="hub-checks"><div><dt>Издатель</dt><dd>'+bundle.publisher+'</dd></div><div><dt>Подпись издателя</dt><dd>Демонстрация проверки</dd></div><div><dt>Совместимость</dt><dd>Agent '+bundle.minAgent+'+ · Loginom '+bundle.minLoginom+'+</dd></div><div><dt>Лицензия</dt><dd>Демонстрационная лицензия</dd></div><div><dt>Сеть</dt><dd>Интернет для установки не требуется</dd></div></dl>'+
-      (incompatible?'<div class="hub-notice hub-notice-error" role="alert">'+icon('alert',20)+'<div><strong>Требуется более новая версия агента</strong><p>Версия в прототипе 0.5.0. Выберите пакет для этой версии.</p></div></div>':
-        '<div class="hub-notice hub-notice-ok">'+icon('check',19)+'<div><strong>Опись и целостность проверены</strong><p>В пакете только демонстрационные данные. Установка действует в этом прототипе.</p></div></div>')+
-      (current.required&&!bundle.ids.includes(current.required)?'<div class="hub-notice">'+icon('alert',19)+'<div><strong>Запрошенного решения в архиве нет</strong><p>'+releases.find(item=>item.id===current.required).name+' можно добавить из другого файла.</p></div></div>':'')+
-      '<h3 class="hub-items-heading">Состав пакета</h3><ul class="hub-preview-list">'+bundle.ids.map(id=>{
-        const item = releases.find(entry=>entry.id===id);
+      '<dl class="hub-checks"><div><dt>Подпись</dt><dd>'+icon('check',14)+' Loginom · демонстрационный ключ</dd></div><div><dt>Собран</dt><dd>12.11.2026</dd></div><div><dt>Совместимость</dt><dd>Агент '+bundle.minAgent+'+ · Loginom '+bundle.minLoginom+'+</dd></div><div><dt>Сеть</dt><dd>Интернет не нужен</dd></div></dl>'+
+      (incompatible?'<div class="hub-notice hub-notice-error" role="alert">'+icon('alert',20)+'<div><strong>Нужна более новая версия приложения</strong><p>Пакет рассчитан на версию '+bundle.minAgent+'. Попросите администратора собрать пакет для вашей версии.</p></div></div>':
+        '<div class="hub-notice hub-notice-ok">'+icon('check',19)+'<div><strong>Подпись и файлы проверены</strong><p>Пакет не изменялся после подписи. В прототипе используются учебные данные.</p></div></div>')+
+      (current.required&&!bundle.ids.includes(current.required)?'<div class="hub-notice">'+icon('alert',19)+'<div><strong>Нужного решения в файле нет</strong><p>«'+byId(current.required).title+'» можно добавить из другого файла.</p></div></div>':'')+
+      '<h3 class="hub-items-heading">Состав</h3><ul class="hub-preview-list">'+bundle.ids.map(id=>{
+        const item = byId(id);
         const installed = hub.installed[id];
-        const status = installed === item.version ? 'Уже установлен' : installed ? 'Обновление' : 'Добавление';
-        return '<li><span>'+item.name+'<small>'+item.type+' · '+(installed && installed!==item.version ? installed+' → ' : '')+item.version+'</small></span><span class="hub-change">'+status+'</span></li>';
-      }).join('')+'</ul><p class="hub-dialog-footnote">Установка добавляет компоненты в библиотеку. Доступ к пакету Loginom и запуск сценария подтверждаются отдельно.</p>';
-    actions = '<button class="btn quiet" data-hub-action="import">'+(incompatible?'Выбрать другой пакет':'Назад')+'</button><button class="btn primary" data-hub-action="install" '+(incompatible||!changes.length?'disabled':'')+'>Установить'+(changes.length?' ('+changes.length+')':'')+'</button>';
+        const status = installed === item.version ? 'Уже установлено' : installed ? 'Обновление' : 'Новое';
+        return '<li><span>'+item.title+'<small>'+tiers[item.tier].label+' · '+item.kind+' · '+(installed && installed!==item.version ? installed+' → ' : '')+item.version+'</small></span><span class="hub-change">'+status+'</span></li>';
+      }).join('')+'</ul><p class="hub-dialog-footnote">Установка только добавляет решения в библиотеку. Доступ к пакету и запуск подтверждаются отдельно при каждом использовании.</p>';
+    actions = '<button class="btn quiet" data-hub-action="import">'+(incompatible?'Выбрать другой файл':'Назад')+'</button><button class="btn primary" data-hub-action="install" '+(incompatible||!changes.length?'disabled':'')+'>Установить'+(changes.length?' ('+changes.length+')':'')+'</button>';
   }
   if (current.kind === 'installed') {
-    title = 'Пакет установлен';
-    body = '<div class="hub-result"><span class="hub-tile hub-sage">'+icon('check',27)+'</span><h3>'+escape(current.name)+'</h3><p>Компоненты доступны в библиотеке Hub. Версии можно восстановить в истории.</p></div>';
-    actions = '<button class="btn" data-hub-tab="history">Посмотреть историю</button>'+
-      (current.next?'<button class="btn primary" data-hub-use="'+current.next+'">Настроить решение</button>':'<button class="btn primary" data-hub-tab="installed">Открыть установленные</button>');
+    title = 'Готово';
+    body = '<div class="hub-result"><span class="hub-tile hub-sage">'+icon('check',27)+'</span><h3>'+escape(current.name)+'</h3><p>Решения добавлены в библиотеку. Если что-то пойдёт не так, предыдущие версии можно вернуть в разделе «История».</p></div>';
+    actions = '<button class="btn" data-hub-tab="history">История</button>'+
+      (current.next?'<button class="btn primary" data-hub-use="'+current.next+'">Перейти к запуску</button>':'<button class="btn primary" data-hub-tab="installed">Установленные</button>');
   }
   if (current.kind === 'export') {
     title = 'Собрать офлайн-пакет';
-    body = '<p class="hub-dialog-lead">Выберите компоненты для переноса. В рабочей версии Hub добавит обязательные офлайн-зависимости и подпишет архив.</p>'+
-      '<dl class="hub-checks"><div><dt>Целевая версия агента</dt><dd>0.5.0 и новее</dd></div><div><dt>Версия Loginom</dt><dd>7.4.2 и новее</dd></div></dl>'+
-      '<fieldset class="hub-export-list"><legend>Включить в пакет</legend>'+releases.filter(item=>item.offline).map(item=>
-        '<label><input type="checkbox" data-hub-select="'+item.id+'" '+(current.ids.includes(item.id)?'checked':'')+'><span>'+item.name+'<small>'+item.type+' · '+item.version+'</small></span></label>').join('')+'</fieldset>'+
-      '<p class="hub-dialog-footnote">Модель подключается отдельно в настройках внутри контура.</p>';
+    body = '<p class="hub-dialog-lead">Выберите решения для закрытого контура. Hub добавит нужные зависимости и подпишет файл, чтобы администратор мог проверить его без интернета.</p>'+
+      '<dl class="hub-checks"><div><dt>Версия приложения</dt><dd>0.5.0 и новее</dd></div><div><dt>Версия Loginom</dt><dd>7.4.2 и новее</dd></div></dl>'+
+      '<fieldset class="hub-export-list"><legend>Включить</legend>'+catalog.filter(item=>item.offline && !item.builtIn && item.tier !== 'community').map(item=>
+        '<label><input type="checkbox" data-hub-select="'+item.id+'" '+(current.ids.includes(item.id)?'checked':'')+'><span>'+item.title+'<small>'+tiers[item.tier].label+' · '+item.kind+' · '+item.version+'</small></span></label>').join('')+'</fieldset>'+
+      '<p class="hub-dialog-footnote">Решения сообщества без проверки в офлайн-пакет не включаются.</p>';
     actions = '<button class="btn quiet" data-hub-action="close">Отмена</button><button class="btn primary" data-hub-action="download" '+(!current.ids.length?'disabled':'')+'>'+icon('download',17)+' Скачать пакет</button>';
   }
-  if (current.kind === 'detail') {
-    const item = releases.find(entry=>entry.id===current.id);
-    const version = hub.installed[item.id];
-    title = item.name;
-    body = '<p class="hub-dialog-lead">'+item.description+'</p><dl class="hub-checks"><div><dt>Тип</dt><dd>'+item.type+'</dd></div><div><dt>Издатель</dt><dd>'+(item.community?'Автор сообщества':'Loginom')+'</dd></div><div><dt>Проверка</dt><dd>'+(item.community?'Без проверки Loginom':'Проверен · демо')+'</dd></div><div><dt>Версия каталога</dt><dd>'+(online ? item.version : version)+'</dd></div><div><dt>Подключение</dt><dd>'+(item.runner?'Нужен Loginom внутри контура':item.offline?'Работает внутри контура':'Нужен доступ в интернет')+'</dd></div></dl>'+
-      (item.runner?'<div class="hub-notice">'+icon('lock',18)+'<div><strong>Разрешения</strong><p>Чтение выбранного пакета Loginom. Перед запуском можно проверить входы и права на изменения.</p></div></div>':'')+
-      (item.community?'<div class="hub-notice hub-notice-error">'+icon('lock',18)+'<div><strong>Установка ограничена политикой организации</strong><p>Организация разрешила устанавливать только проверенные решения Loginom.</p></div></div>':'')+
-      (item.id==='help'?'<p class="hub-dialog-lead">Разделы справки</p><ul class="hub-help-list"><li>Создание и сохранение пакета</li><li>Импорт табличных данных</li><li>Обработка пропусков и дубликатов</li></ul>':'');
-    actions = '<button class="btn quiet" data-hub-action="close">Закрыть</button>'+
-      (version && (item.prompt||item.runner)?'<button class="btn '+(version===item.version||!online?'primary':'')+'" data-hub-use="'+item.id+'">Использовать</button>':'')+
-      (online&&version!==item.version&&!item.community?'<button class="btn primary" data-hub-online-install="'+item.id+'">'+(version?'Обновить':item.runner?'Добавить и настроить':'Установить')+'</button>':'');
-  }
   if (current.kind === 'rollback') {
-    title = 'Восстановить предыдущие версии?';
-    body = '<p class="hub-dialog-lead">Версии компонентов до последней установки будут восстановлены. Компоненты, добавленные этой установкой, исчезнут из библиотеки.</p>';
-    actions = '<button class="btn quiet" data-hub-action="close">Отмена</button><button class="btn primary" data-hub-action="confirm-rollback">Восстановить</button>';
+    title = 'Вернуть как было?';
+    body = '<p class="hub-dialog-lead">Библиотека вернётся к состоянию до последней операции. Добавленные ею решения исчезнут, прежние версии вернутся.</p>';
+    actions = '<button class="btn quiet" data-hub-action="close">Отмена</button><button class="btn primary" data-hub-action="confirm-rollback">Вернуть</button>';
   }
   return '<dialog class="hub-dialog" aria-labelledby="hub-dialog-title"><header><h2 id="hub-dialog-title">'+title+'</h2><button class="hub-close" data-hub-action="close" aria-label="Закрыть">'+icon('close',19)+'</button></header>'+
     '<div class="hub-dialog-main">'+body+'</div>'+(actions?footer(actions):'')+'</dialog>';
 }
 
-function completeInstall(hub, ids, name) {
+function record(hub, kind, ids, name) {
   const before = {...hub.installed};
-  for (const id of ids) hub.installed[id] = releases.find(item=>item.id===id).version;
-  hub.events.unshift({name, ids, before, date:new Date().toLocaleString('ru',{dateStyle:'short',timeStyle:'short'})});
-  const requested = hub.dialog?.required;
-  hub.dialog = {kind:'installed',name,next:ids.includes(requested)?requested:null};
+  for (const id of ids) {
+    if (kind === 'remove') delete hub.installed[id];
+    else hub.installed[id] = byId(id).version;
+  }
+  hub.events.unshift({kind, name, ids, before, date:now()});
 }
 
 export function bindHub(root, state, api) {
@@ -382,10 +406,9 @@ export function bindHub(root, state, api) {
       if (event.dataTransfer.files[0]) load(event.dataTransfer.files[0]);
     });
   }
-  root.querySelector('[data-hub-community]')?.addEventListener('change', event => {
-    hub.community = event.target.checked;
-    hub.type = 'Все';
-    api.render();
+  root.querySelector('[data-hub-ack]')?.addEventListener('change', event => {
+    hub.dialog.ack = event.target.checked;
+    root.querySelector('[data-hub-action="install-one"]').disabled = !event.target.checked;
   });
 
   if (hub.dialog?.kind === 'export') {
@@ -395,22 +418,21 @@ export function bindHub(root, state, api) {
     }));
   }
 
-  root.querySelectorAll('[data-hub-tab], [data-hub-type], [data-hub-detail], [data-hub-use], [data-hub-sample], [data-hub-favorite], [data-hub-online-install], [data-hub-action]').forEach(button=>button.addEventListener('click', () => {
+  root.querySelectorAll('[data-hub-tab], [data-hub-type], [data-hub-tier], [data-hub-detail], [data-hub-use], [data-hub-sample], [data-hub-favorite], [data-hub-action]').forEach(button=>button.addEventListener('click', () => {
     const data = button.dataset;
-    if (data.hubTab) {
-      Object.assign(hub,{tab:data.hubTab,type:'Все',query:'',dialog:null,favoritesOnly:false});
-    }
+    if (data.hubTab) Object.assign(hub,{tab:data.hubTab,type:'Все',query:'',dialog:null});
     if (data.hubType) hub.type = data.hubType;
+    if (data.hubTier) hub.tier = data.hubTier;
     if (data.hubDetail) hub.dialog = {kind:'detail',id:data.hubDetail};
     if (data.hubFavorite) {
       const id = data.hubFavorite;
       hub.favorites = hub.favorites.includes(id) ? hub.favorites.filter(entry=>entry!==id) : [...hub.favorites,id];
     }
     if (data.hubUse) {
-      const item = releases.find(entry=>entry.id===data.hubUse);
+      const item = byId(data.hubUse);
       hub.dialog = null;
       if (item.runner) api.runSolution(item.id);
-      else api.useTemplate(item.name,item.prompt);
+      else api.useTemplate(item.title,item.prompt);
       return;
     }
     if (data.hubSample) {
@@ -421,29 +443,35 @@ export function bindHub(root, state, api) {
       load(file,sample === 'correct' ? archiveName : 'loginom-hub-'+(sample==='damaged'?'damaged':'new-agent')+'.loginom-hub');
       return;
     }
-    if (data.hubOnlineInstall) {
-      const item = releases.find(item=>item.id===data.hubOnlineInstall);
-      completeInstall(hub,[item.id],item.name);
-      if (item.runner) {
-        hub.dialog = null;
-        api.runSolution(item.id);
-        return;
-      }
-    }
     switch (data.hubAction) {
       case 'import': hub.dialog = {kind:'import',required:hub.dialog?.required}; break;
       case 'export': hub.dialog = {kind:'export',ids:[...defaultSelection]}; break;
       case 'close': hub.dialog = null; break;
-      case 'clear': hub.query = ''; hub.type = 'Все'; break;
-      case 'show-installed': hub.favoritesOnly = false; hub.query = ''; hub.type = 'Все'; break;
-      case 'show-favorites': hub.favoritesOnly = true; hub.query = ''; hub.type = 'Все'; break;
+      case 'clear': hub.query = ''; hub.type = 'Все'; hub.tier = 'all'; break;
       case 'studio': hub.dialog = null; api.navigate('studio'); return;
+      case 'install-one': {
+        const item = byId(hub.dialog.id);
+        const update = Boolean(hub.installed[item.id]);
+        record(hub, update ? 'update' : 'install', [item.id], item.title);
+        hub.dialog = {kind:'installed',name:item.title,next:item.runner || item.prompt ? item.id : null};
+        api.toast(update ? 'Решение обновлено' : 'Решение установлено');
+        break;
+      }
+      case 'remove': {
+        const item = byId(hub.dialog.id);
+        record(hub, 'remove', [item.id], item.title);
+        hub.dialog = null;
+        api.toast('Решение удалено. Вернуть можно в разделе «История».');
+        break;
+      }
       case 'install': {
         const bundle = hub.dialog.bundle;
         if (bundle.minAgent !== '0.5.0') return;
-        const ids = bundle.ids.filter(id=>hub.installed[id] !== releases.find(item=>item.id===id).version);
+        const ids = bundle.ids.filter(id=>hub.installed[id] !== byId(id).version);
         if (!ids.length) return;
-        completeInstall(hub,ids,bundle.name);
+        const required = hub.dialog.required;
+        record(hub, 'import', ids, bundle.name);
+        hub.dialog = {kind:'installed',name:bundle.name,next:ids.includes(required)?required:null};
         break;
       }
       case 'rollback': hub.dialog = {kind:'rollback'}; break;
@@ -451,7 +479,7 @@ export function bindHub(root, state, api) {
         const entry = hub.events[0];
         if (!entry?.before) return;
         hub.installed = {...entry.before};
-        hub.events.unshift({name:entry.name,ids:entry.ids,date:new Date().toLocaleString('ru',{dateStyle:'short',timeStyle:'short'}),revert:true});
+        hub.events.unshift({kind:'revert',name:entry.name,ids:entry.ids,date:now()});
         hub.dialog = null;
         break;
       }
