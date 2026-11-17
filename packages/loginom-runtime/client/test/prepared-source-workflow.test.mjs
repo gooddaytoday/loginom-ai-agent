@@ -53,7 +53,7 @@ for(const execution of ['existing','execute'])for(const fault of [null,'foreign-
 test('table reread uses only its confirmed Save continuation through the browser adapter: '+execution+' '+fault+' '+reopened,async()=>{
  const f=fixture({active:true}),old=structuredClone(f.request.workflow_ref);
  const next={...old,navigation_path:[...old.navigation_path.slice(0,-1),{tid:'MF;TF-1;cnrNaviMode;b.s_Saved',label:'Saved'}]};
- const continuation={document_id:'doc',previous_workflow_ref:old,workflow_ref:structuredClone(next)};
+ const continuation={document_id:'doc',previous_workflow_ref:structuredClone(old),workflow_ref:structuredClone(next)};
  const save={status:'SUCCEEDED',action_key:'package.save_checkpoint',action_revision:'1',operation_id:'save',
   phase:'verified',effect_possible:true,cleanup_complete:true,trace:[],error:null,output:{save_completed:true,workflow_preserved:true,reopened:false,persisted_content_verified:false,
    package_ref:{kind:'package',path:'/user/report.lgp',active_identity:'/user/report.lgp'},
