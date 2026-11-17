@@ -1,0 +1,27 @@
+diff --git a/packages/core/src/session/skill.ts b/packages/core/src/session/skill.ts
+index 69d200c1d5..7cf228b4f6 100644
+--- a/packages/core/src/session/skill.ts
++++ b/packages/core/src/session/skill.ts
+@@ -3,6 +3,7 @@ export * as SessionSkill from "./skill.js"
+ import type { Session } from "@opencode/schema/session"
+ import { Effect } from "effect"
+ import { Instance } from "../instance/service.js"
++import { Permission } from "../permission.js"
+ import { Plugin } from "../plugin/service.js"
+ import { Skill } from "../skill.js"
+ import { SkillNotFoundError } from "./error.js"
+@@ -12,5 +13,14 @@ export const get = Effect.fn("SessionSkill.get")(function* (input: { session: Se
+   const skills = yield* Plugin.awaitActivation.pipe(Effect.andThen(Skill.Service), instances.provide(input.session))
+   const skill = yield* skills.get(input.skill)
+   if (!skill) return yield* new SkillNotFoundError({ skill: input.skill })
++  // Fork seam (spike U3): direct activation honours `skill` permissions like the skill tool does.
++  if (process.env.LOGINOM_SPIKE_U3 === "1")
++    yield* Permission.Service.pipe(
++      Effect.flatMap((permission) =>
++        permission.assertNotDenied({ sessionID: input.session.id, action: "skill", resources: [skill.id] }),
++      ),
++      instances.provide(input.session),
++      Effect.orDie,
++    )
+   return skill
+ })
