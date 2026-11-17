@@ -18,8 +18,8 @@ function fixture({active=false}={}){
  const model=Object.assign(new ModelForm(),{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FNodes:{FCollection:[]},FmxGraph:{container:diagram}}});
  const packageNode=new PackageTreeNode(),workflow=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
  const card={Controller:{Node:{data:{node:workflow}},FController:model}};
- let queriedTab=tab;
- const document={querySelectorAll:q=>q.startsWith('[data-tid^=')?crumbs:q==='[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br;tb-1"]'?(queriedTab.isConnected?[queriedTab]:[]):q==='[data-tid="MF;TF-1;ModelForm;cmpDiagram"]'?[diagram]:[]};
+ let queriedTab=tab,tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix='MF;TF-1';
+ const document={querySelectorAll:q=>q.startsWith('[data-tid^=')?crumbs:q==='[data-tid='+JSON.stringify(tabTid)+']'?(queriedTab.isConnected?[queriedTab]:[]):q==='[data-tid='+JSON.stringify(prefix+';ModelForm;cmpDiagram')+']'?[diagram]:[]};
  const preparation={document,id:'doc',receipts:new Map([['prepare',{phase:'verified',workflowId:'wf',tab,packageNode}]])};
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active?card:{Controller:{}}}}}}}};
  const realm=vm.createContext({document,location:{origin:'https://loginom.test'},bg:{app},__loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'})});
@@ -37,7 +37,7 @@ function fixture({active=false}={}){
   finish:async mode=>verified({mode,execution_id:null,execution_started:false}),waitExecution:async()=>assert.fail('No execution'),
   readOutput:async()=>verified({status:'complete',evidence_ref:'read',ports:[]})};
  const handlers=new Map([['variables.user',{revision:'test',modes:['values'],validate:()=>{},configure:async()=>verified({})}]]);
- return {tab,crumb,preparation,clicks,phases,adapter,request,foreignTab:()=>{queriedTab={...tab};},run:()=>applyNode({request,operation:{id:'values'},handlers,drivers,
+ return {tab,crumb,preparation,clicks,phases,adapter,request,reopen:ref=>{tabTid=ref.tab_tid;prefix=ref.prefix;},foreignTab:()=>{queriedTab={...tab};},run:()=>applyNode({request,operation:{id:'values'},handlers,drivers,
   record:async e=>{if(e.phase==='node_phase_prepared')phases.push(e.receipt.phase);return structuredClone(e);}})};
 }
 
@@ -49,8 +49,8 @@ test('apply activates the still-owned workflow selected away by upload before it
  assert.deepEqual(f.phases.slice(0,2),['workflow','source']);assert.deepEqual(f.clicks,['trial','click']);
 });
 
-for(const execution of ['existing','execute'])for(const fault of [null,'foreign-document','foreign-workflow','foreign-tab','foreign-prefix','foreign-path','failed-save'])
-test('table reread uses only its confirmed Save continuation through the browser adapter: '+execution+' '+fault,async()=>{
+for(const execution of ['existing','execute'])for(const fault of [null,'foreign-document','foreign-workflow','foreign-tab','foreign-prefix','foreign-path','failed-save'])for(const reopened of [false,true])
+test('table reread uses only its confirmed Save continuation through the browser adapter: '+execution+' '+fault+' '+reopened,async()=>{
  const f=fixture({active:true}),old=structuredClone(f.request.workflow_ref);
  const next={...old,navigation_path:[...old.navigation_path.slice(0,-1),{tid:'MF;TF-1;cnrNaviMode;b.s_Saved',label:'Saved'}]};
  const continuation={document_id:'doc',previous_workflow_ref:old,workflow_ref:structuredClone(next)};
@@ -58,10 +58,16 @@ test('table reread uses only its confirmed Save continuation through the browser
   phase:'verified',effect_possible:true,cleanup_complete:true,trace:[],error:null,output:{save_completed:true,workflow_preserved:true,reopened:false,persisted_content_verified:false,
    package_ref:{kind:'package',path:'/user/report.lgp',active_identity:'/user/report.lgp'},
    workflow_continuations:[continuation]}};
+ if(reopened){
+  next.tab_tid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';next.prefix='MF;TF-2';
+  Object.assign(continuation.workflow_ref,next);
+  save.action_key='package.save_as';save.output={package_ref:save.output.package_ref,reopened:true};
+  save.trace=[{event:'save_continuations_observed',reopened:true,native_identity_verified:true,continuations:[continuation]}];
+ }
  if(fault==='foreign-document')continuation.document_id='other';
  if(fault==='foreign-workflow')continuation.workflow_ref.workflow_id='other';
- if(fault==='foreign-tab')continuation.workflow_ref.tab_tid='other';
- if(fault==='foreign-prefix')continuation.workflow_ref.prefix='MF;TF-2';
+ if(fault==='foreign-tab')(reopened?continuation.previous_workflow_ref:continuation.workflow_ref).tab_tid='other';
+ if(fault==='foreign-prefix')(reopened?continuation.previous_workflow_ref:continuation.workflow_ref).prefix='MF;TF-2';
  if(fault==='foreign-path')continuation.previous_workflow_ref={...old,navigation_path:[...old.navigation_path.slice(0,-1),{tid:'other',label:'Other'}]};
  if(fault==='failed-save')save.status='FAILED';
  const node={document_id:'doc',workflow_id:'wf',node_id:'report'},schema=[{index:0,name:'Id',label:'Id',type:'integer'}];
@@ -80,9 +86,10 @@ test('table reread uses only its confirmed Save continuation through the browser
   finish:'execute',read:{ports:[0],sample_rows:1,require_exact_numbers:true}};
  const initial=await runtime.runNodeApply(request);assert.equal(initial.status,'SUCCEEDED',JSON.stringify(initial));
  const initialExecutes=executes;assert.equal(initialExecutes,1,'unchanged initial Filter executes through its read lifecycle');
- const saved=await runtime.run('package.save_checkpoint',{path:'/user/report.lgp',conflict_policy:'fail'},{operationId:'save'});
+ const saved=await runtime.run(save.action_key,{path:'/user/report.lgp',conflict_policy:'fail'},{operationId:'save'});
  assert.equal(saved.status,save.status,JSON.stringify(saved));
  f.crumb.textContent='Saved';f.crumb.getAttribute=()=>next.navigation_path.at(-1).tid;
+ if(reopened)f.reopen(next);
  // This fixture exercises workflow continuation, not a native rename gesture.
  // Existing reads must preserve a changed caption; Execute retains its old label.
  graphLabel=execution==='existing'?'Renamed report':'Report';

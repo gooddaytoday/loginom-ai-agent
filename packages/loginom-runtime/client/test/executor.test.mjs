@@ -7,6 +7,7 @@ import { compactActionResult } from '../lib/user-results.mjs';
 import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {makeCapabilityCode} from '../lib/executor.mjs';
+import {activatePreparedWorkflow} from '../lib/node-workflow-activation.mjs';
 
 test('Save without a cached package after Files observation explains existing_workflow recovery before any gesture', async () => {
   for (const action of ['package.save_checkpoint', 'package.save_as']) {
@@ -804,6 +805,41 @@ async function restSavePage(modified, restReference = true) {
  page.click=async item=>{if(item.symbol==='native-save'){page.events.push('native_save');page.save();page.menu=false;return;}return click(item);};
  return page;
 }
+
+test('ordinary Save As rebinds preparation before the next workflow activation',async()=>{
+ const page=await restSavePage([false],false);
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const oldTab=original.tab,oldPackage=original.packageNode;
+ original.nodeTargetPortIdentities={stale:true};
+ const saved=await run(page,'package.save_as',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ const continuation=saved.trace.find(e=>e.event==='save_continuations_observed')?.continuations[0];
+ assert.ok(continuation,'the verified reopen must issue a current workflow continuation');
+ assert.equal(continuation.workflow_ref.workflow_id,'workflow');
+ assert.notEqual(original.tab,oldTab);assert.notEqual(original.packageNode,oldPackage);
+ assert.equal(original.nodeTargetPortIdentities,undefined);
+ original.tab.isConnected=true;original.tab.getBoundingClientRect=()=>({width:100,height:25});original.tab.visible=true;
+ const task={request:{document_id:'doc',workflow_ref:continuation.workflow_ref},origin:'https://loginom.invalid',build,deadline:Date.now()+10000};
+ const activate=()=>page.execute(`async page=>(${activatePreparedWorkflow.toString()})(page,${JSON.stringify(task)})`);
+ assert.equal((await activate()).verified,true);
+ const currentTab=original.tab;original.tab=oldTab;
+ assert.match((await activate()).error,/Prepared workflow tab changed/);
+ original.tab=currentTab;original.packageNode=null;
+ assert.match((await activate()).error,/Prepared workflow receipt changed/);
+ assert.equal(page.modifiedReads,0);assert.equal(page.saveWrites,1);
+ assert.equal(saved.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+for(const fault of ['native-node','package-path'])test('ordinary Save As refuses a foreign reopened identity: '+fault,async()=>{
+ const page=await restSavePage([false],false),reopen=page.onReopen;
+ const original=page.context.__loginomDockPreparationV1.receipts.get('prepared'),oldTab=original.tab;
+ page.onReopen=()=>{reopen();if(fault==='native-node')page.model.FDiagram.FNodes.FCollection[0].FGuid='foreign';
+  else page.packagePath='/user/data/packages/foreign.lgp';};
+ const saved=await run(page,'package.save_as',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'AMBIGUOUS',JSON.stringify(saved));
+ assert.equal(saved.trace.some(e=>e.event==='save_continuations_observed'),false);
+ assert.equal(original.tab,oldTab);
+});
 
 for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
 test('REST checkpoint retains the legacy path without catalog selectors: '+missing,async()=>{

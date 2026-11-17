@@ -157,12 +157,12 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       if(f.scenario==='failed-new-save'&&operationId==='failed-save')return {status:'NOT_APPLIED',action_key:key,operation_id:operationId,effect_possible:false,output:{}};
       f.saves++;f.path=parameters.path;
       const result={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
-      if((f.reopen&&key==='package.save_as')||f.normalized){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
-      if(f.normalized){
+      if((f.reopen&&key==='package.save_as')||f.normalized||f.verifiedReopen){result.output.reopened=true;f.activeTab='MF;cntMain;cntWorkspace;Workspace;t.br;tb-5';}
+      if(f.normalized||f.verifiedReopen){
         const continuations=[{document_id:'own-doc',workflow_ref:{workflow_id:'own-workflow',tab_tid:f.activeTab,prefix:'MF;TF-5',
           navigation_path:['Server','Packages','Saved','Module','Workflow'].map((label,index,labels)=>({
             tid:'MF;TF-5;cnrNaviMode;b.s_'+labels.slice(0,index+1).join('>'),label:index===0?'':label}))}}];
-        result.trace=[{event:'rest_package_normalization',modified_after:false},
+        result.trace=[...(f.normalized?[{event:'rest_package_normalization',modified_after:false}]:[]),
           {event:'save_continuations_observed',continuations,reopened:true,native_identity_verified:true}];
         if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
       }
@@ -588,11 +588,11 @@ for(const mode of ['isolated','product','normal'])for(const scenario of mode==='
   }finally{try{await client?.close();await bridge?.close();}finally{await rm(directory,{recursive:true,force:true});}}
 });
 
-for(const profile of ['executor','user-v1'])for(const action of ['package.save_checkpoint','package.save_as'])for(const fault of ['none','transport','identity'])
-test('normalized Save keeps its successful receipt when workspace binding fails: '+profile+' '+action+' '+fault,async t=>{
+for(const profile of ['executor','user-v1'])for(const action of ['package.save_checkpoint','package.save_as'])for(const fault of ['none','transport','identity'])for(const normalized of [true,false])
+test('verified reopened Save keeps its successful receipt when workspace binding fails: '+profile+' '+action+' '+fault+' '+normalized,async t=>{
  const directory=await mkdtemp(join(tmpdir(),'normalized-save-bind-'));
  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
- const f=current={scenario:'normalized',events:[],saves:0,path,receipts:new Map(),catalog,normalized:true,
+ const f=current={scenario:'normalized',events:[],saves:0,path,receipts:new Map(),catalog,normalized,verifiedReopen:true,
   bindingError:fault==='transport',rebind:fault==='identity'?{workflow_ref:{workflow_id:'foreign-workflow'}}:{}};
  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
   metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},artifactStore:{list:()=>[],async releaseUploads(){}}};
@@ -608,7 +608,11 @@ test('normalized Save keeps its successful receipt when workspace binding fails:
   const parts=reply.content.filter(c=>c.type==='text'&&c.text.startsWith('{')).map(c=>JSON.parse(c.text));
   assert.equal(parts[0].status,'SUCCEEDED');assert.equal(parts[0].operation_id,'own-save');assert.equal(f.saves,1);
   const advice=parts.find(p=>p.kind==='dock_saved_package_workspace');assert.ok(advice);
-  if(fault==='none')assert.equal(advice.workflow_ref.workflow_id,'own-workflow');
+  if(fault==='none'){
+   assert.equal(advice.workflow_ref.workflow_id,'own-workflow');
+   assert.equal(session.metadata.workflowRef.tab_tid,f.activeTab);
+   assert.equal(session.metadata.workspacePreparation.state.workflow_ref.tab_tid,f.activeTab);
+  }
   else{
    assert.equal(advice.state,'unbound');assert.match(advice.instruction,/do not repeat.*Save/i);
    assert.equal(advice.next_step.tool,'dock_prepare');assert.equal(advice.next_step.arguments.intent,'existing_workflow');

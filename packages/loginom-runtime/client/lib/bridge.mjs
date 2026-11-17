@@ -607,7 +607,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             const saveContinuations = outcome.output?.workflow_continuations
               ?? outcome.trace?.find(e => e.event === 'save_continuations_observed' && e.native_identity_verified === true)?.continuations ?? [];
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
-                && normalization?.modified_after === false) {
+                && outcome.output?.reopened === true
+                && outcome.trace?.some(e => e.event === 'save_continuations_observed' && e.reopened === true && e.native_identity_verified === true)) {
               const beforeBinding = Object.fromEntries(['workspacePreparation','workspaceReady','targetIdentity','workflowRef']
                 .map(key => [key,session.metadata[key]]));
               const previous = beforeBinding.workspacePreparation?.state;
@@ -623,7 +624,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     if(state.status!=='READY'||state.effect_possible!==false||state.document_id!==previous.document_id
                       ||state.loginom_account!==previous.loginom_account||state.package_ref?.path!==bindingRequest.package_path
                       ||state.workflow_ref.workflow_id!==previous.workflow_ref.workflow_id)
-                      throw Error('REST normalization saved the package, but its reopened workspace could not be bound');
+                      throw Error('Save succeeded, but its reopened workspace could not be bound');
                     return state;
                   },assertTarget:target=>assertCatalogTarget(pinnedActions,target),record:recordExecution,save:()=>session.save(catalog)});
                 if(userProfile)userWorkflows.remember({...normalizedWorkspace,previous_workflow_ref:previous.workflow_ref});
@@ -648,7 +649,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             }):outcome, { observe: request.params.name === 'dock_workspace_observe', userProfile });
             if(normalizedWorkspace)reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_workspace',
               document_id:normalizedWorkspace.document_id,workflow_ref:normalizedWorkspace.workflow_ref,package_ref:normalizedWorkspace.package_ref,
-              instruction:'REST finalization rebound the saved package. Issued document/workflow/node identities remain valid; this is their current tab and navigation.'})});
+              instruction:'Save rebound the saved package. Issued document/workflow/node identities remain valid; this is their current tab and navigation.'})});
             if(workspaceBindingAdvice)reply.content.push({type:'text',text:JSON.stringify(workspaceBindingAdvice)});
             if(outcome.status==='SUCCEEDED'&&['package.save_as','package.save_checkpoint'].includes(outcome.action_key)&&outcome.output?.package_ref?.path){
               // Save As can reopen a package that Loginom immediately marks
