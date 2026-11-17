@@ -2548,7 +2548,8 @@ class Runner:
         for index, output in enumerate(expected['outputs']):
             if spec.get('excel_mode') or spec.get('fs_case') == 'paths' or spec.get('text_file_variable'): output['export_destination'] = destinations[index]
             elif output['output_node_type'] == 'export_input' or spec.get('xlsx'): output['export_destination'] = destinations[-1]
-            elif spec.get('external'): output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
+            elif spec.get('external') or output['output_node_type'] == 'integration.rest_request':
+                output.pop('export_destination', None)  # Consumed routing hint, not a native output contract.
         if spec.get('rest_query_initial'):
             assert len(destinations) == 2, 'REST_QUERY_TWO_EXPORTS_REQUIRED'
             initial = rest_query_expected(spec, package, initial=True)

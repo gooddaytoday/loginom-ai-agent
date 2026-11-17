@@ -39,6 +39,26 @@ class RunCheckTests(unittest.TestCase):
         result = subprocess.run([sys.executable, '-B', case['oracle'], '--check', '--case', 'error-descriptions'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_rest_error_descriptions_consumes_export_hint_before_native_cold(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder, workspace, profile = root/'stage', root/'workspace', root/'profile'
+            folder.mkdir(); workspace.mkdir(); (profile/'config').mkdir(parents=True)
+            runner.write(profile/'config/loginom-ai-agent.json', {})
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, {}, {}
+            def phase(name, *args, **kwargs):
+                if name == 'model': raise InterruptedError
+            with patch.object(instance, 'phase', side_effect=phase), patch.object(runner, 'daemon_pid', return_value=1):
+                with self.assertRaises(InterruptedError):
+                    instance.model('rest-error-descriptions', folder, profile, workspace, '/own/run.lgp',
+                                   {'package_directory':'/own/'}, root/'build')
+            expected = runner.read(folder/'expected.json')
+            original = runner.expected_for(runner.scenario('rest-error-descriptions'), '/own/run.lgp')
+            original['outputs'][0].pop('export_destination')
+            self.assertEqual(expected, original)
+            self.assertIn('/own/' + root.name + '-' + folder.parent.name + '-service-codes.csv', (folder/'task.md').read_text())
+
     def test_rest_content_types_keeps_plain_xml_bodies_in_two_rows(self):
         case = runner.scenario('rest-content-types')
         self.assertEqual(case['input_files'], ['content-types.csv'])
