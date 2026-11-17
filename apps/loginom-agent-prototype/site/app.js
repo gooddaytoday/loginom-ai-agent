@@ -499,8 +499,13 @@ function selectLocalPackage(name, example = false) {
 }
 // One picker for «Открыть из Loginom» and for choosing the package of an action (state.pendingAction).
 function packagePicker(local) {
+  const localFile = (style, label) => `<label class="${style}">${label}<input id="action-local-file" class="sr-only" type="file" accept=".lgp"></label>`
+  if (!state.settings.connection.connected && state.pendingAction === 'document') return `<p class="dialog-desc">Loginom не подключён. Документировать можно файл .lgp с компьютера — для этого Loginom не нужен.</p>
+      <div class="button-row">${localFile('btn primary', icon('upload',15) + ' Файл .lgp с компьютера')}<button class="btn quiet" data-settings="loginom">${icon('settings',15)} Подключить Loginom</button></div>`
   if (!state.settings.connection.connected) return `<p class="dialog-desc">Сначала подтвердите подключение к Loginom Studio.</p><button class="btn primary" data-settings="loginom">${icon('settings',16)} Настроить Loginom</button>`
-  if (!local) return `<p class="dialog-desc">${state.pendingAction ? 'Агент будет работать с копией — исходный пакет не изменится.' : 'Пакеты из папок, доступных вашей учётной записи Loginom.'}</p>
+  const lead = state.pendingAction === 'document' ? `Выберите пакет в Loginom или ${localFile('link-btn pkg-local', 'файл .lgp с компьютера')}. Исходный пакет не изменится.`
+    : state.pendingAction ? 'Агент будет работать с копией — исходный пакет не изменится.' : 'Пакеты из папок, доступных вашей учётной записи Loginom.'
+  if (!local) return `<p class="dialog-desc">${lead}</p>
       <label class="search-field">${icon('search',18)}<input id="package-search" aria-label="Найти пакет" value="${esc(state.packageQuery)}" placeholder="Найти пакет по имени" autocomplete="off"></label>
       <div id="package-browse">${packageBrowse()}</div>`
   const candidate = state.localPackage
@@ -533,10 +538,7 @@ function packageBrowse() {
     <div class="pkg-bar"><div class="package-folders pkg-roots" aria-label="Папки Loginom">${[['personal','Моя папка'],['shared','Общие папки']].map(([scope,label]) => `<button class="btn quiet" data-package-scope="${scope}" aria-pressed="${state.packageScope === scope}" title="${esc(packageFolder(scope))}">${icon('folder',15)} ${label}</button>`).join('')}</div>
       <button class="link-btn pkg-sort" data-action="package-sort" aria-label="Порядок: ${state.packageSort === 'name' ? 'по имени' : 'сначала новые'}">${state.packageSort === 'name' ? 'По имени' : 'Сначала новые'} ${icon('down',14)}</button></div>
     ${state.packageDir ? `<nav class="pkg-crumbs" aria-label="Открытая папка"><button class="link-btn" data-package-dir="">${esc(root)}</button><span>/</span><strong>${esc(state.packageDir)}</strong></nav>` : ''}
-    <div class="pkg-list pkg-files" id="package-files">${folders.map(name => {
-      const count = scoped.filter(item => item.folder === name).length
-      return `<button class="pkg-row" data-package-dir="${esc(name)}"><span class="glyph blue">${icon('folder',16)}</span><span class="pkg-name"><strong>${esc(name)}</strong></span><span class="pkg-meta">${count} ${packageWord(count)}</span>${icon('chevron',15)}</button>`
-    }).join('')}${files.map(item => row(item, deep ? packagePath(item) : '', meta(item))).join('')}${folders.length + files.length ? '' : `<p class="empty-note">${q ? `Нет пакетов с «${esc(state.packageQuery.trim())}» в имени${deep ? '' : ' в этой папке'}.` : 'В этой папке нет пакетов.'}</p>`}</div>
+    <div class="pkg-list pkg-files" id="package-files">${folders.map(name => `<button class="pkg-row" data-package-dir="${esc(name)}"><span class="glyph blue">${icon('folder',16)}</span><span class="pkg-name"><strong>${esc(name)}</strong></span>${icon('chevron',15)}</button>`).join('')}${files.map(item => row(item, deep ? packagePath(item) : '', meta(item))).join('')}${folders.length + files.length ? '' : `<p class="empty-note">${q ? `Нет пакетов с «${esc(state.packageQuery.trim())}» в имени${deep ? '' : ' в этой папке'}.` : 'В этой папке нет пакетов.'}</p>`}</div>
     <p class="pkg-count">${q ? `Найдено: ${files.length}${deep ? ' — в этой папке и вложенных' : ' в этой папке'}` : `${files.length} ${packageWord(files.length)}${folders.length ? ' · папок: ' + folders.length : ''}`}${q && !deep && !state.packageDir ? ` · <button class="link-btn" data-action="package-deep">Искать и во вложенных папках</button>` : ''}</p>`
 }
 function packageWord(count) {
@@ -986,6 +988,14 @@ app.addEventListener('input', event => {
 })
 app.addEventListener('change', event => {
   if (event.target.id === 'package-local-file' && event.target.files[0]) selectLocalPackage(event.target.files[0].name)
+  if (event.target.id === 'action-local-file' && event.target.files[0]) {
+    const name = event.target.files[0].name
+    const action = state.pendingAction
+    if (!/\.lgp$/i.test(name)) return toast('Выберите файл с расширением .lgp')
+    state.overlay = null
+    state.pendingAction = null
+    runAction(action, {name, where:'На компьютере', source:'local'}, 'home')
+  }
   if (event.target.id === 'local-attachment' && event.target.files[0]) attach(event.target.files[0].name)
 })
 app.addEventListener('submit', event => {
