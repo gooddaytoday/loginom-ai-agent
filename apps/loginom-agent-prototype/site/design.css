@@ -203,12 +203,47 @@ button.prototype-mark:hover{color:var(--accent)}
 .hub-tier-how{flex-wrap:wrap;gap:3px 16px;font-size:13px}
 .rv-answers{list-style:disc}
 /* Iteration 2 — shell that grows with use. Appearing elements use only opacity/transform, ≤150 ms. */
-.workspace.collapsed{grid-template-columns:minmax(0,1fr)}
-.workspace.collapsed .sidebar{display:none}
-.sidebar-head{display:flex;align-items:center;gap:4px;margin-bottom:11px}
-.sidebar-head .brand{flex:1;min-width:0;margin-bottom:0}
-.collapse-btn,.expand-btn{color:var(--muted)}
-.session-link .conn-dot{margin-left:auto}
+/* Panel: one layout pinned or collapsed. Every row's icon is centred 30px from the panel's left edge,
+   so the collapsed rail is the same panel 60px wide and nothing moves when it opens over the page. */
+.sidebar{padding-inline:10px}
+.sidebar-head{display:flex;align-items:center;gap:2px;margin-bottom:11px}
+.sidebar-head .brand{flex:1;min-width:0;margin-bottom:0;padding-inline:6px;overflow:hidden}
+.collapse-btn{width:40px;height:40px;color:var(--muted)}
+.collapse-btn .pin-ico{display:none}
+.project-switch{padding:3px 9px 3px 2px}
+.project-avatar{background:var(--soft);color:var(--ink)}
+.new-session{padding-left:11px}
+.sidebar .nav-item{padding-left:12px}
+.sidebar-history h2{justify-content:flex-start;gap:8px;padding-left:13px}
+.sidebar-history h2 .conn-dot{display:none}
+.session-link,.conn-run,.sidebar-history h2{position:relative}
+.session-link{padding-left:13px}
+.session-link:focus-visible{outline-offset:-2px}
+.session-link .conn-dot,.sidebar-history h2 .conn-dot,.conn-run .conn-dot{position:absolute;left:24px;top:6px;width:8px;height:8px}
+.sidebar-history h2 .conn-dot{top:-2px}
+.conn-run{padding-left:12px}
+.conn-run .conn-dot{left:23px;top:4px}
+button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
+.proto-badge{display:inline-grid;place-items:center;width:24px;height:18px;border-radius:5px;background:var(--soft);font-size:10px;font-weight:700}
+.sidebar :is(.prototype-mark,.conn-run,.nav-item){white-space:nowrap}
+@media(max-width:1060px){.new-session kbd{display:none}}
+@media(min-width:691px) and (max-width:850px){.sidebar-head .brand>span{display:none}}
+@media(min-width:691px){
+  .workspace.collapsed{grid-template-columns:60px minmax(0,1fr)}
+  .workspace.collapsed .sidebar{position:relative;z-index:20;width:60px;overflow:hidden;transition:width .15s ease,box-shadow .15s ease}
+  .workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:248px;box-shadow:var(--floating-shadow)}
+  .workspace.collapsed.peek .collapse-btn .pin-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .pin-ico{display:block}
+  .workspace.collapsed.peek .collapse-btn .rail-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .rail-ico{display:none}
+  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.session-link,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
+  /* The rail: icons only. Labels fade; whole rows that have no icon of their own are not clickable. */
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.session-link,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.session-link){visibility:hidden}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .sidebar-history h2 .conn-dot{display:block}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .project-switch{border-color:transparent;background:transparent}
+  .workspace.collapsed:not(.peek) .sidebar-history{scrollbar-width:none}
+}
+@media(min-width:691px) and (max-width:1060px){.workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:219px}}
+@media(min-width:691px) and (max-width:850px){.workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:190px}}
 .lgm-chip{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--paper);font-size:13px;font-weight:600;white-space:nowrap}
 .lgm-chip:hover{border-color:var(--muted)}
 .lgm-chip.off{border-color:color-mix(in srgb,#e8953f 50%,var(--line));background:var(--warn-soft)}
@@ -259,6 +294,7 @@ button.prototype-mark:hover{color:var(--accent)}
 .rv-choice{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--paper);text-align:left}
 .rv-choice small{color:var(--muted);font-size:13px;line-height:1.35}
 .rv-choice[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-@media(max-width:690px){.collapse-btn,.expand-btn{display:none}.workspace.collapsed .sidebar.expanded{display:flex}.home-area.new-chat{padding-top:12px}.new-chat .starter{min-height:0}.new-chat .example-grid,.rv-choices{grid-template-columns:1fr}.lgm-chip{padding-inline:8px}}
+@media(max-width:690px){.collapse-btn{display:none}.home-area.new-chat{padding-top:12px}.new-chat .starter{min-height:0}.new-chat .example-grid,.rv-choices{grid-template-columns:1fr}.lgm-chip{padding-inline:8px}}
 @media(max-width:410px){.lgm-chip>span{max-width:150px;overflow:hidden;text-overflow:ellipsis}.pkg-actions>span{flex-basis:100%}}
 @media(max-width:410px){.mode-pick .filter-label,.mode-pick>.icon:last-child,.composer-model .filter-label{display:none}.composer-options{gap:4px}.top-actions .theme-btn{display:inline-grid}}
+#main:focus{outline:none}

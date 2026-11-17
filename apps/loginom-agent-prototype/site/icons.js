@@ -35,6 +35,7 @@ const paths = {
   lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   globe:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
   panel:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>',
+  pin:'<path d="M9 3h6M10 3v6l-3 4v1h10v-1l-3-4V3M12 14v7"/>', play:'<path d="M8 5v14l11-7Z"/>',
   wand:'<path d="m5 19 13-13 2 2L7 21zM6 3v6M3 6h6m8 9v6m-3-3h6"/>'
 }
 

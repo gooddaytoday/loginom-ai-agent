@@ -33,7 +33,7 @@ const placeholders = {
 // Iteration 2: the prototype opens as a first launch («new») or as after a week of work («used»);
 // the owner compares variants on the review page.
 const stage = read('stage','new') === 'used' ? 'used' : 'new'
-const variant = {nav:'plus', placeholder:1, status:'composer', ...read('variant',{})}
+const variant = {nav:'plus', placeholder:1, status:'composer', panel:'pinned', ...read('variant',{})}
 const seed = [
   {id:'seed-sales', title:'ABC-анализ товаров', date:'Сегодня', phase:'done', prompt:examples[0].prompt, kind:'abc', files:['sales-demo.csv'], project:'Аналитика продаж'},
   {id:'seed-flow', title:'Проверка сценария продаж', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'refactor').prompt, kind:'refactor', files:['Продажи.lgp'], project:'Аналитика продаж'},
@@ -89,11 +89,12 @@ const serverPackages = [
     return {id:key + '#' + index, name:name + '.lgp', scope, folder, modified, size:size + ' МБ', view:'local'}
   })),
 ]
+let peek = false, peekWanted = false, peekHeld = false, peekTimer = 0
 const state = {
   page:'home', contour:read('contour','online'), theme:read('theme','light'),
   project:'Аналитика продаж', projects:['Аналитика продаж','Демо-проекты'], session:null, tabs:[],
   sessions:stage === 'used' ? [...seed] : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
-  collapsed:read('collapsed',false), draftPackage:null, pickFor:null, connecting:false,
+  collapsed:read('collapsed',variant.panel === 'rail'), draftPackage:null, pickFor:null, connecting:false,
   // What the user has already done: things appear after these events and never disappear.
   progress:stage === 'used' ? {ownChats:3, packages:true, catalog:true, examplesHidden:false} : {ownChats:0, packages:false, catalog:false, examplesHidden:false},
   solution:'refactor', review:false, reviewTab:'plan', activeRun:false,
@@ -233,6 +234,7 @@ function newSession() {
 function openSession(id) {
   const item = state.sessions.find(entry => entry.id === id)
   if (!item || !canNavigate('chat')) return
+  if (state.page === 'chat' && state.session === id && !state.review) return
   state.project = item.project
   state.session = id
   if (!state.tabs.includes(id)) state.tabs = [...state.tabs.slice(-3),id]
@@ -263,37 +265,37 @@ function sidebar() {
     : ''
   return `<aside class="sidebar${state.mobile ? ' expanded' : ''}" aria-label="Боковая панель">
     <div class="sidebar-head">
+      <button class="icon-btn neutral collapse-btn" data-action="collapse" aria-label="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'}" title="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'} (Ctrl+B)"><span class="rail-ico">${icon('panel',18)}</span>${state.collapsed ? `<span class="pin-ico">${icon('pin',18)}</span>` : ''}</button>
       <button class="brand" data-action="new" aria-label="Loginom AI Agent, новый разговор">
         <picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent</span>
       </button>
-      <button class="icon-btn neutral collapse-btn" data-action="collapse" aria-label="Свернуть панель" title="Свернуть панель (Ctrl+B)">${icon('panel',18)}</button>
     </div>
-    <button class="project-switch" data-overlay="projects" aria-label="Выбрать проект">
+    <button class="project-switch" data-overlay="projects" aria-label="Проект «${esc(state.project)}» — выбрать другой">
       <span class="project-avatar">${icon('folder',16)}</span><span class="project-text"><strong>${esc(state.project)}</strong><small>Рабочий проект</small></span>${icon('down',14)}
     </button>
-    <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('plus',17)} Новый разговор <kbd>Ctrl N</kbd></button>
+    <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('plus',17)}<span>Новый разговор</span><kbd>Ctrl N</kbd></button>
     ${items ? `<nav class="sidenav" aria-label="Разделы">${items}</nav>` : ''}
     <section class="sidebar-history" aria-label="Разговоры">
-      ${history.length ? `<h2>Разговоры</h2>${history.map(item => `<button class="session-link${state.page === 'chat' && state.session === item.id ? ' current':''}" data-session="${item.id}">${icon('message',15)}<span>${esc(item.title)}</span>${sessionMark(item)}</button>`).join('')}` : ''}
+      ${history.length ? `<h2>${icon('clock',15)}<span>Разговоры</span>${sessionMark(history.find(item => item.phase === 'running') || history.find(item => sessionMark(item)) || {})}</h2>${history.map(item => `<button class="session-link${state.page === 'chat' && state.session === item.id ? ' current':''}" data-session="${item.id}">${icon('message',15)}<span>${esc(item.title)}</span>${sessionMark(item)}</button>`).join('')}` : ''}
     </section>
     <nav class="sidebar-footer" aria-label="Настройки">
       ${runNotice()}
       ${navButton('settings','settings')}
-      <button class="prototype-mark" data-go="review">Прототип 2 · что решить ${icon('arrow',12)}</button>
+      <button class="prototype-mark" data-go="review"><b class="proto-badge" aria-hidden="true">П2</b><span>Прототип 2 · что решить</span></button>
     </nav>
   </aside>`
 }
 // Status next to a conversation: the agent is working or waits for the user.
 function sessionMark(item) {
-  if (item.phase === 'running') return '<i class="conn-dot busy" title="Агент работает"></i>'
-  if (['permission','plan','connect'].includes(item.phase) || item.phase === 'proposed') return '<i class="conn-dot warn" title="Ждёт вашего ответа"></i>'
+  if (item.phase === 'running') return '<i class="conn-dot busy" title="Агент работает"></i><span class="sr-only">— агент работает</span>'
+  if (['permission','plan','connect'].includes(item.phase) || item.phase === 'proposed') return '<i class="conn-dot warn" title="Ждёт вашего ответа"></i><span class="sr-only">— ждёт вашего ответа</span>'
   return ''
 }
 function runNotice() {
   const runs = Object.entries(state.solutions?.runs || {})
   const running = runs.some(([,run]) => run.step === 'running')
   const unseen = running ? null : runs.find(([,run]) => run.unseen)
-  return `${running ? `<button class="conn-run" data-go="runner"><i class="conn-dot busy"></i><span>Выполняется действие</span>${icon('chevron',14)}</button>` : ''}${unseen ? `<button class="conn-run" data-open-run="${unseen[0]}"><i class="conn-dot ${unseen[1].outcome === 'success' ? 'ok' : 'warn'}"></i><span>${unseen[1].outcome === 'success' ? 'Готово — открыть результат' : 'Запуск завершён — посмотреть'}</span>${icon('chevron',14)}</button>` : ''}`
+  return `${running ? `<button class="conn-run" data-go="runner">${icon('play',16)}<i class="conn-dot busy"></i><span>Выполняется действие</span>${icon('chevron',14)}</button>` : ''}${unseen ? `<button class="conn-run" data-open-run="${unseen[0]}">${icon('play',16)}<i class="conn-dot ${unseen[1].outcome === 'success' ? 'ok' : 'warn'}"></i><span>${unseen[1].outcome === 'success' ? 'Готово — открыть результат' : 'Запуск завершён — посмотреть'}</span>${icon('chevron',14)}</button>` : ''}`
 }
 // Loginom is the agent's main dependency, so its state is always on screen: in the composer or in the
 // top bar (the owner chooses). Not connected — an orange dot and words, not just a colour.
@@ -310,7 +312,6 @@ function header() {
   return `<header class="topbar">
     <div class="top-left">
       <button class="icon-btn mobile-menu" aria-label="Открыть меню" aria-expanded="${state.mobile}" data-action="menu">${icon('menu',20)}</button>
-      ${state.collapsed ? `<button class="icon-btn neutral expand-btn" data-action="collapse" aria-label="Развернуть панель" title="Развернуть панель (Ctrl+B)">${icon('panel',18)}</button><button class="icon-btn neutral expand-btn" data-action="new" aria-label="Новый разговор" title="Новый разговор (Ctrl+N)">${icon('message',18)}</button>` : ''}
       ${state.page === 'home' || state.page === 'chat' ? '' : `<span class="crumb-current">${pages[state.page]}</span>`}
     </div>
     <div class="top-actions">
@@ -734,7 +735,7 @@ function review() {
   const look = [
     ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Разговор сразу появится в панели, а агент попросит подключить Loginom прямо в разговоре — одна кнопка.','stage-new'],
     ['Пакет','«+» у поля ввода → «Пакет из Loginom…» → выберите пакет. Над полем появится «Что сделать с пакетом». Пример «Задокументировать пакет» показывает то же на учебном файле.','try-package'],
-    ['Панель','Свернуть — кнопка вверху панели или Ctrl+B; развернуть — кнопка в левом верхнем углу. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
+    ['Панель','Свернуть — кнопка в левом верхнем углу панели или Ctrl+B: остаются значки. Задержите мышь на значке — панель раскроется поверх страницы; выбор пункта или уход мыши свернут её, кнопка с булавкой закрепит. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
   ]
   const later = [
     'Закрытый контур без модели: в поле ввода вместо модели — «Выберите модель», отправка ведёт в настройки моделей.',
@@ -747,14 +748,15 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['При первом запуске в панели — проект, «Новый разговор», настройки; разговоры появляются после первого.','Панель сворачивается (кнопка, Ctrl+B).','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
+  const changed = ['При первом запуске в панели — проект, «Новый разговор», настройки; разговоры появляются после первого.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы, когда мышь задержалась на значке; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в трёх вопросах — переключение сразу меняет прототип. Затем пройдите три сценария, около 10 минут.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в четырёх вопросах — переключение сразу меняет прототип. Затем пройдите три сценария, около 10 минут.</p></div></div>
     <h2 class="rv-heading">Выбрать вариант</h2>
     <div class="rv-variants">
       <div><h3>1. Где «Пакеты» и «Каталог»</h3><div class="rv-choices">${choice('nav','plus','Только через «+»','Панель не меняется: проект, разговоры, настройки')}${choice('nav','panel','Появляются в панели','«Пакеты» — после первого пакета, «Каталог» — после первого захода')}</div></div>
       <div><h3>2. Подсказка в поле ввода</h3><div class="rv-choices">${choice('placeholder',1,'Вариант 1',esc(placeholders[1]))}${choice('placeholder',2,'Вариант 2',esc(placeholders[2]))}</div></div>
       <div><h3>3. Где состояние Loginom</h3><div class="rv-choices">${choice('status','composer','В поле ввода','Рядом с моделью; на страницах без поля ввода — вверху справа')}${choice('status','top','Вверху справа','Рядом с темой, видно на любой странице')}</div></div>
+      <div><h3>4. Панель при первом запуске</h3><div class="rv-choices">${choice('panel','pinned','Закреплена','Подписи видны сразу; свернуть до значков — кнопкой или Ctrl+B')}${choice('panel','rail','Свёрнута до значков','Подписи появляются, когда мышь остановится на значке')}</div></div>
     </div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${target === 'stage-new' ? 'Начать как новый пользователь' : target === 'stage-used' ? 'После недели работы' : 'Открыть'} ${icon('arrow',15)}</button></article>`).join('')}</div>
@@ -841,9 +843,9 @@ function render(resetScroll = false) {
   const focused = document.activeElement?.id === 'prompt' ? [$('#prompt').selectionStart, $('#prompt').selectionEnd] : null
   setThemeAttribute()
   document.title = pages[state.page] + ' · Loginom AI Agent'
-  app.innerHTML = `<div class="workspace${state.collapsed ? ' collapsed' : ''}">
+  app.innerHTML = `<div class="workspace${state.collapsed ? ' collapsed' : ''}${state.collapsed && peek ? ' peek' : ''}">
     ${sidebar()}${state.mobile ? '<button class="mobile-scrim" aria-label="Закрыть меню" data-action="menu"></button>':''}
-    <div class="workspace-main">${header()}<main id="main" class="page page-${state.page}">${pageContents()}</main>
+    <div class="workspace-main">${header()}<main id="main" tabindex="-1" class="page page-${state.page}">${pageContents()}</main>
     </div>
   </div>${overlay()}`
   $('#main').scrollTop = scroll
@@ -997,7 +999,7 @@ function downloadResult() {
 const actions = {
   new:newSession,
   menu:() => { state.mobile = !state.mobile; render() },
-  collapse:() => { state.collapsed = !state.collapsed; write('collapsed',state.collapsed); render() },
+  collapse:() => { state.collapsed = !state.collapsed; peekHeld = state.collapsed; setPeek(false); write('collapsed',state.collapsed); render() },
   'connect-loginom':connectLoginom,
   'hide-examples':() => {
     state.progress.examplesHidden = true
@@ -1010,7 +1012,7 @@ const actions = {
     state.progress.ownChats = 0
     dismiss()
   },
-  'stage-new':() => { write('stage','new'); write('collapsed',false); write('contour','online'); location.hash = ''; location.reload() },
+  'stage-new':() => { write('stage','new'); write('collapsed',variant.panel === 'rail'); write('contour','online'); location.hash = ''; location.reload() },
   'stage-used':() => { write('stage','used'); location.hash = ''; location.reload() },
   'try-package':() => { newSession(); state.pickFor = 'composer'; actions['plus-package']() },
   'plus-package':() => {
@@ -1138,6 +1140,11 @@ app.addEventListener('click', event => {
     const [key, value] = d.variant.split(':')
     variant[key] = key === 'placeholder' ? Number(value) : value
     write('variant',variant)
+    if (key === 'panel') {
+      state.collapsed = value === 'rail'
+      write('collapsed',state.collapsed)
+      setPeek(false)
+    }
     return render()
   }
   if (d.example) {
@@ -1270,11 +1277,58 @@ document.addEventListener('keydown', event => {
     event.preventDefault()
     actions.collapse()
   }
+  if (event.key === 'Escape' && state.collapsed && !document.querySelector('dialog[open]')) {
+    if (document.activeElement?.closest('.sidebar')) focusPage()
+    if (peek) {
+      peekHeld = true
+      setPeek(false)
+    }
+  }
   if (event.key === 'Enter' && event.target.id === 'prompt' && !event.shiftKey && !event.isComposing) {
     event.preventDefault()
     send()
   }
 })
+// Collapsed panel: a rail of icons that opens over the page while the mouse is on it. render() rebuilds
+// the DOM, so the open state lives in `peek` and the class is toggled in place: no re-render, no flicker.
+// A short delay keeps a mouse passing by from opening it; a pending change is not restarted on every move.
+function peekSidebar(open) {
+  if (open === peekWanted) return
+  peekWanted = open
+  clearTimeout(peekTimer)
+  peekTimer = setTimeout(() => setPeek(open), open ? 90 : 200)
+}
+function setPeek(open) {
+  clearTimeout(peekTimer)
+  peek = peekWanted = open
+  document.querySelector('.workspace')?.classList.toggle('peek', open && state.collapsed)
+}
+// After the user collapses the panel or presses Esc with the mouse still on it, it stays a rail until the
+// mouse leaves; otherwise it would open again under the cursor right after the click. While render()
+// swaps the DOM the pointer briefly lands on #app itself — that is not the mouse leaving.
+// It opens only when the mouse rests on an icon — not while crossing the empty part of the rail, and not
+// while a button is held (selecting text by dragging past the left edge). Pointer events over a dialog say
+// nothing about the panel either.
+document.addEventListener('pointerover', event => {
+  const target = event.target
+  if (event.pointerType !== 'mouse' || event.buttons || !state.collapsed || [app, document.body, document.documentElement].includes(target) || target.closest('dialog')) return
+  const inside = Boolean(target.closest('.sidebar'))
+  if (!inside) peekHeld = false
+  if (peekHeld) return
+  peekSidebar(inside && Boolean(peek || target.closest('.sidebar :is(button,h2)')))
+})
+// A choice made in the opened panel closes it, so the panel does not cover the page that just opened.
+// Chosen from the keyboard, focus moves on to the page instead of falling back to the panel.
+document.addEventListener('click', event => {
+  if (!state.collapsed || !event.target.closest('.sidebar button')) return
+  peekHeld = true
+  setPeek(false)
+  if (!event.detail && !document.querySelector('dialog[open]')) focusPage()
+})
+function focusPage() {
+  ($('#prompt') || $('#main'))?.focus()
+}
+document.documentElement.addEventListener('pointerleave', () => { peekHeld = false; if (state.collapsed) peekSidebar(false) })
 addEventListener('popstate',() => { route(); state.overlay = null; render(true) })
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',() => { if (state.theme === 'system') render() })
 render()
