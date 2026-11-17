@@ -1,0 +1,128 @@
+diff --git a/packages/session-ui/package.json b/packages/session-ui/package.json
+index 2363de9691..ce7bd7c992 100644
+--- a/packages/session-ui/package.json
++++ b/packages/session-ui/package.json
+@@ -30,6 +30,7 @@
+     "./tool-count-label": "./src/components/tool-count-label.tsx",
+     "./tool-count-summary": "./src/components/tool-count-summary.tsx",
+     "./tool-error-card": "./src/components/tool-error-card.tsx",
++    "./tool-renderer": "./src/tools/tool-renderer.tsx",
+     "./tool-status-title": "./src/components/tool-status-title.tsx",
+     "./session-diff": "./src/components/session-diff.ts",
+     "./message-file": "./src/components/message-file.ts",
+diff --git a/packages/session-ui/src/components/tool-error-card.tsx b/packages/session-ui/src/components/tool-error-card.tsx
+index b1e250591e..29ffb98a2c 100644
+--- a/packages/session-ui/src/components/tool-error-card.tsx
++++ b/packages/session-ui/src/components/tool-error-card.tsx
+@@ -1,3 +1,4 @@
++import { toolTitleFor } from "../tools/tool-titles"
+ import { type ComponentProps, createMemo, onMount, Show, splitProps } from "solid-js"
+ import { createStore } from "solid-js/store"
+ import { Card, CardDescription } from "@opencode/ui/card"
+@@ -86,7 +87,7 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
+ 
+     const key = map.get(split.tool)
+ 
+-    if (!key) return split.tool
++    if (!key) return toolTitleFor(split.tool) ?? split.tool
+ 
+     if (!key.includes(".")) return key
+ 
+diff --git a/packages/session-ui/src/timeline/projection.ts b/packages/session-ui/src/timeline/projection.ts
+index 396ec3bf30..69f5a5f0b7 100644
+--- a/packages/session-ui/src/timeline/projection.ts
++++ b/packages/session-ui/src/timeline/projection.ts
+@@ -17,6 +17,7 @@ import {
+ } from "../message/current-tool-state"
+ import { TimelineRow, type PartGroup, type PartRef, type TimelineRowMap } from "./timeline-row"
+ import { timelineCategory, timelineNoticePlacement, timelineNoticeRequired, type TimelineDetail } from "./detail"
++import { toolSeparate } from "../tools/tool-titles"
+ import {
+   IDLE_TURN_PHASE,
+   isInterruptedError,
+@@ -1080,6 +1081,8 @@ function toolGroupType(
+ ) {
+   if (detail) {
+     if (content.name === "question" && !currentToolFailed(content)) return undefined
++    // Product rule: a failed step and a tool registered as separate keep their own row in every preset.
++    if (currentToolFailed(content) || toolSeparate(content.name)) return undefined
+     const category = timelineCategory(content)!
+ 
+     if (detail[category].placement === "grouped") return "context"
+diff --git a/packages/session-ui/src/tools/tool-renderer.tsx b/packages/session-ui/src/tools/tool-renderer.tsx
+index 66d5664660..b72d14c929 100644
+--- a/packages/session-ui/src/tools/tool-renderer.tsx
++++ b/packages/session-ui/src/tools/tool-renderer.tsx
+@@ -1,4 +1,5 @@
+ // Current Session tool presentation grouped by visual family.
++import { markToolsChanged, setToolSeparate, setToolTitle, toolRevision, toolTitleFor } from "./tool-titles"
+ import {
+   Component,
+   batch,
+@@ -326,7 +327,7 @@ function toolTitle(tool: SessionMessageAssistantTool, i18n: UiI18n) {
+     case "skill":
+       return i18n.t("ui.tool.skill")
+     default:
+-      return tool.name
++      return toolTitleFor(tool.name) ?? tool.name
+   }
+ }
+ 
+@@ -1168,13 +1169,17 @@ const state: Record<
+   }
+ > = {}
+ 
+-function registerTool(input: { name: string; render?: ToolComponent }) {
++function registerTool(input: { name: string; render?: ToolComponent; title?: () => string; separate?: boolean }) {
+   state[input.name] = input
++  if (input.title) setToolTitle(input.name, input.title)
++  if (input.separate) setToolSeparate(input.name)
++  markToolsChanged()
+ 
+   return input
+ }
+ 
+ function getTool(name: string) {
++  toolRevision()
+   return state[name]?.render
+ }
+ 
+diff --git a/packages/session-ui/src/tools/tool-titles.ts b/packages/session-ui/src/tools/tool-titles.ts
+new file mode 100644
+index 0000000000..8842b1c88c
+--- /dev/null
++++ b/packages/session-ui/src/tools/tool-titles.ts
+@@ -0,0 +1,33 @@
++// Titles and placement for tools registered by the product (group labels, error cards, grouping). Kept apart from
++// tool-renderer so tool-error-card and timeline/projection can read it without importing the renderer.
++// Registration bumps a signal, so a plugin that registers after the first render still repaints open sessions.
++import { createSignal } from "solid-js"
++
++const titles = new Map<string, () => string>()
++const separate = new Set<string>()
++const [revision, setRevision] = createSignal(0)
++
++export const toolRevision = revision
++
++export function markToolsChanged() {
++  setRevision((value) => value + 1)
++}
++
++export function setToolTitle(name: string, title: () => string) {
++  titles.set(name, title)
++}
++
++export function toolTitleFor(name: string) {
++  revision()
++  return titles.get(name)?.()
++}
++
++/** A separate tool keeps its own row in every detail preset, never folded into a tool group. */
++export function setToolSeparate(name: string) {
++  separate.add(name)
++}
++
++export function toolSeparate(name: string) {
++  revision()
++  return separate.has(name)
++}

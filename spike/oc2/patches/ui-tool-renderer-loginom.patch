@@ -1,0 +1,82 @@
+diff --git a/packages/app/src/entry.tsx b/packages/app/src/entry.tsx
+index 969f506c1f..a1dabe4f1b 100644
+--- a/packages/app/src/entry.tsx
++++ b/packages/app/src/entry.tsx
+@@ -1,5 +1,6 @@
+ // @refresh reload
+ 
++import "@/runtime/loginom/tools"
+ import "@/runtime/polyfills"
+ import { init } from "@sentry/solid"
+ import { render } from "solid-js/web"
+diff --git a/packages/app/src/runtime/loginom/tools.tsx b/packages/app/src/runtime/loginom/tools.tsx
+new file mode 100644
+index 0000000000..28f381039f
+--- /dev/null
++++ b/packages/app/src/runtime/loginom/tools.tsx
+@@ -0,0 +1,65 @@
++// UI spike (part 2): Loginom steps in plain Russian and a change card, registered in the real OpenCode feed.
++// Product code would live in the Loginom GUI module; here it proves the seam (see the spike report).
++import { For } from "solid-js"
++import { BasicTool } from "@opencode/session-ui/basic-tool"
++import { ToolRegistry, type ToolProps } from "@opencode/session-ui/tool-renderer"
++
++type Step = { title: string; live: string; done: (props: ToolProps) => string }
++
++const text = (value: unknown) => (typeof value === "string" ? value : "")
++
++const steps: Record<string, Step> = {
++  loginom_table_read: { title: "чтение таблицы", live: "Читаю таблицу", done: (p) => `Прочитал таблицу «${text(p.input.file)}»` },
++  loginom_scenario_build: { title: "сборка сценария", live: "Собираю сценарий в Loginom", done: () => "Собрал сценарий в Loginom" },
++  loginom_scenario_run: { title: "запуск сценария", live: "Запускаю сценарий", done: () => "Запустил сценарий на демонстрационных данных" },
++  loginom_package_save: { title: "сохранение пакета", live: "Сохраняю пакет в Loginom", done: (p) => `Сохранил «${text(p.input.name)}» в ${text(p.input.folder)}` },
++  loginom_flaky: { title: "обращение к Loginom", live: "Обращаюсь к Loginom", done: () => "Обратился к Loginom" },
++}
++
++for (const [name, step] of Object.entries(steps))
++  ToolRegistry.register({
++    name,
++    title: () => step.title,
++    render: (props) => (
++      <BasicTool
++        icon="code-lines"
++        status={props.status}
++        trigger={{ title: props.status === "completed" ? step.done(props) : `${step.live}…`, subtitle: props.output }}
++      />
++    ),
++  })
++
++type Change = { kind: "add" | "mod" | "del"; node: string; what: string }
++const mark = { add: "+", mod: "~", del: "−" }
++
++ToolRegistry.register({
++  name: "loginom_package_edit",
++  title: () => "правка пакета",
++  separate: true,
++  render: (props) => {
++    const changes = () => (Array.isArray(props.metadata.changes) ? (props.metadata.changes as Change[]) : [])
++    const count = (kind: Change["kind"]) => changes().filter((change) => change.kind === kind).length
++    return (
++      <BasicTool
++        icon="code-lines"
++        status={props.status}
++        defaultOpen
++        trigger={{ title: "Изменил копию «Продажи.lgp»", subtitle: `+${count("add")} новый · ~${count("mod")} изменено · −${count("del")} удалён` }}
++      >
++        <ul style="margin:6px 0;padding-left:4px;list-style:none;display:grid;gap:4px">
++          <For each={changes()}>
++            {(change) => (
++              <li>
++                <b>{mark[change.kind]}</b> <b>{change.node}</b> — {change.what}
++              </li>
++            )}
++          </For>
++        </ul>
++        <div style="display:flex;gap:8px;margin:6px 0 4px">
++          <button type="button" data-loginom-action="save-version">Сохранить новой версией</button>
++          <button type="button" data-loginom-action="discard">Отменить изменения</button>
++        </div>
++      </BasicTool>
++    )
++  },
++})
