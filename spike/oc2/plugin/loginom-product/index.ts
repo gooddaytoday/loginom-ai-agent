@@ -92,6 +92,11 @@ const runner = {
       },
       output: { type: "object", properties: { granted: { type: "boolean" } } },
     },
+    kvProbe: {
+      input: { type: "object", properties: { bytes: { type: "number" }, keys: { type: "number" } } },
+      output: { type: "object" },
+    },
+    hubReload: { input: { type: "object" }, output: { type: "object" } },
   },
   events: {
     stage: { schema: { type: "object", properties: { sessionID: { type: "string" }, stage: { type: "string" } } } },
@@ -108,11 +113,13 @@ export default Plugin.define({
       editor.add({
         name: "loginom_dock_prepare",
         description: "Prepare Loginom Dock for the attached package (privileged).",
-        input: { type: "object", properties: { intent: { type: "string" } } },
+        input: { type: "object", properties: { intent: { type: "string" }, sleep: { type: "number" } } },
         options: { codemode: false },
         execute: async (input, context) => {
           acquireLease(context.sessionID)
           log("tool.executed", { tool: "loginom_dock_prepare", sessionID: context.sessionID, input })
+          const sleep = (input as { sleep?: number }).sleep ?? 0
+          if (sleep > 0) await new Promise((resolve) => setTimeout(resolve, sleep))
           return { content: "PREPARED" }
         },
       })
@@ -167,9 +174,10 @@ export default Plugin.define({
 
     // Skill source: only bundled (official) and Hub-managed skills survive; everything discovered from
     // .agents, .claude, project or config roots, and URLs is removed. Non-bundled skills may not use reserved names.
-    const hubSkills = skillsIn(HUB).map((file) => ({ file, ...readSkill(file) }))
     const bundledSkills = skillsIn(BUNDLED).map((file) => ({ file, ...readSkill(file) }))
     await ctx.skill.transform((editor) => {
+      // Re-read the Hub store on every run so `skill.reload()` picks up installs and removals.
+      const hubSkills = skillsIn(HUB).map((file) => ({ file, ...readSkill(file) }))
       for (const skill of bundledSkills)
         editor.add(
           Skill.Info.make({
@@ -213,6 +221,29 @@ export default Plugin.define({
         await ctx.session.prompt({ sessionID: input.sessionID, text: input.text } as never)
         return { granted: true }
       },
+      // Hub state lives in plugin storage: measure one large value and many small keys.
+      kvProbe: async (input) => {
+        const bytes = (input as { bytes?: number }).bytes ?? 0
+        const keys = (input as { keys?: number }).keys ?? 0
+        const value = "x".repeat(bytes)
+        const writeStart = performance.now()
+        await ctx.storage.set("probe/large", value)
+        const writeMs = performance.now() - writeStart
+        const readStart = performance.now()
+        const read = (await ctx.storage.get("probe/large")) as string | undefined
+        const readMs = performance.now() - readStart
+        const manyStart = performance.now()
+        for (let index = 0; index < keys; index++) await ctx.storage.set(`probe/many/${index}`, { index })
+        const manyWriteMs = performance.now() - manyStart
+        const scanStart = performance.now()
+        const scanned = await ctx.storage.scan({ prefix: "probe/many/" } as never)
+        const scanMs = performance.now() - scanStart
+        return { bytes, roundTrip: read?.length === bytes, writeMs, readMs, keys, manyWriteMs, scanMs, scanned: JSON.stringify(scanned).length }
+      },
+      hubReload: async () => {
+        await ctx.skill.reload()
+        return { reloaded: true }
+      },
     })
 
     // Grant and lease live for one execution: any end of execution releases both.
@@ -231,5 +262,11 @@ export default Plugin.define({
         if (heartbeats.has(sessionID)) releaseLease(sessionID, event.type)
       }
     })().catch((error) => log("event.error", { error: String(error) }))
+
+    // Plugin disposal (reload or graceful shutdown) releases every lease this process still holds.
+    return () => {
+      for (const sessionID of [...heartbeats.keys()]) releaseLease(sessionID, "plugin.dispose")
+      log("dispose")
+    }
   },
 })

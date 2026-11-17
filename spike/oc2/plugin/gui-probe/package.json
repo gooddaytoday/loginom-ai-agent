@@ -1,0 +1,9 @@
+{
+  "name": "@loginom-ai-agent/spike-gui-probe",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./index.ts",
+    "./gui-experimental": "./gui.cjs"
+  }
+}

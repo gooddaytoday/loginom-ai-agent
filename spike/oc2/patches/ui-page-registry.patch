@@ -1,0 +1,135 @@
+diff --git a/packages/app/src/runtime/plugin/pages.tsx b/packages/app/src/runtime/plugin/pages.tsx
+new file mode 100644
+index 0000000000..8bfc9b06d7
+--- /dev/null
++++ b/packages/app/src/runtime/plugin/pages.tsx
+@@ -0,0 +1,44 @@
++import { For, Show, createMemo } from "solid-js"
++import { useNavigate, useParams } from "@solidjs/router"
++import { Page } from "@opencode/plugin/gui"
++import { usePluginHost } from "./host"
++import { Contribution } from "./render"
++
++/** Renders the plugin page named by the route, inside its plugin's contribution boundary. */
++export function PluginPageRoute() {
++  const params = useParams<{ plugin: string; page: string }>()
++  const host = usePluginHost()
++  const item = createMemo(() =>
++    host.items(Page).find((entry) => entry.plugin === params.plugin && entry.value.id === params.page),
++  )
++  return (
++    <Show when={item()} keyed>
++      {(entry) => <Contribution plugin={entry.plugin}>{() => entry.value.render()}</Contribution>}
++    </Show>
++  )
++}
++
++/** Sidebar entries for plugin pages that ask for nav, by `order`. */
++export function PluginPageNav() {
++  const host = usePluginHost()
++  const navigate = useNavigate()
++  const items = createMemo(() =>
++    host
++      .items(Page)
++      .filter((entry) => entry.value.nav)
++      .toSorted((a, b) => (a.value.nav?.order ?? 0) - (b.value.nav?.order ?? 0)),
++  )
++  return (
++    <Show when={items().length > 0}>
++      <nav data-slot="sidebar-plugin-pages" class="flex w-full shrink-0 flex-col gap-[3px]">
++        <For each={items()}>
++          {(entry) => (
++            <button type="button" class="text-left" onClick={() => navigate(`/page/${entry.plugin}/${entry.value.id}`)}>
++              {entry.value.title}
++            </button>
++          )}
++        </For>
++      </nav>
++    </Show>
++  )
++}
+diff --git a/packages/app/src/shell/routes/routes.tsx b/packages/app/src/shell/routes/routes.tsx
+index 7303f5d26e..b470af7f29 100644
+--- a/packages/app/src/shell/routes/routes.tsx
++++ b/packages/app/src/shell/routes/routes.tsx
+@@ -12,6 +12,7 @@ import { SettingsSurfaceProvider } from "@/settings/surface"
+ import Shell from "@/shell/shell"
+ import { requireServerKey } from "./session"
+ import { PluginAttachment } from "@/runtime/plugin/root"
++import { PluginPageRoute } from "@/runtime/plugin/pages"
+ 
+ export const File = lazy(() => import("@opencode/session-ui/file").then((module) => ({ default: module.File })))
+ 
+@@ -73,6 +74,7 @@ export function AppRoutes() {
+         )}
+       />
+       <Route path="/new-session" component={DraftRoute} />
++      <Route path="/page/:plugin/:page" component={PluginPageRoute} />
+       {ComponentsLab && <Route path="/components" component={ComponentsLab} />}
+     </Route>
+   )
+diff --git a/packages/app/src/shell/state/layout.tsx b/packages/app/src/shell/state/layout.tsx
+index 85d5814ee4..e1fcec331e 100644
+--- a/packages/app/src/shell/state/layout.tsx
++++ b/packages/app/src/shell/state/layout.tsx
+@@ -76,6 +76,7 @@ export type LayoutRoute =
+   | { type: "components" }
+   | { type: "draft"; draftID: string }
+   | { type: "session"; sessionId: string; server: ServerConnection.Key }
++  | { type: "page"; plugin: string; page: string }
+ 
+ export const currentRoute = (pathname: string, search: string): LayoutRoute => {
+   const parts = pathname.split("/").filter(Boolean)
+@@ -88,6 +89,8 @@ export const currentRoute = (pathname: string, search: string): LayoutRoute => {
+ 
+   if (parts[0] === "components") return { type: "components" }
+ 
++  if (parts[0] === "page" && parts[1] && parts[2]) return { type: "page", plugin: parts[1], page: parts[2] }
++
+   if (parts[0] === "new-session") {
+     const draftID = new URLSearchParams(search).get("draftId")
+ 
+diff --git a/packages/app/src/shell/titlebar/titlebar.tsx b/packages/app/src/shell/titlebar/titlebar.tsx
+index 69af99c151..486e4ac925 100644
+--- a/packages/app/src/shell/titlebar/titlebar.tsx
++++ b/packages/app/src/shell/titlebar/titlebar.tsx
+@@ -37,6 +37,7 @@ import { ActivityRing } from "@opencode/ui/activity-ring"
+ import { RecentlyClosedTabsMenu } from "./recently-closed-tabs-menu"
+ import { useSettingsDialog } from "@/settings/command"
+ import { TitlebarItems, useTitlebarItems } from "@/runtime/plugin/titlebar-items"
++import { PluginPageNav } from "@/runtime/plugin/pages"
+ import { createRouteTabSync } from "./route-sync"
+ import {
+   INITIAL_MOBILE_TABS_STATE,
+@@ -806,6 +807,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
+                                 keybind={command.keybindParts("tab.new")}
+                               />
+                             </div>
++                            <PluginPageNav />
+                             <div class="h-4 w-full shrink-0" aria-hidden="true" />
+                             <div class="flex min-h-0 flex-1 flex-col gap-1">
+                               <Switch fallback={verticalTabStrip()}>
+diff --git a/packages/plugin/src/gui/registries.ts b/packages/plugin/src/gui/registries.ts
+index 09481f4dab..84194ad994 100644
+--- a/packages/plugin/src/gui/registries.ts
++++ b/packages/plugin/src/gui/registries.ts
+@@ -970,6 +970,19 @@ export const Panel = Registry.define<Panel>("panel")
+  */
+ export const SettingsPage = Registry.define<SettingsPage>("settings-page")
+ 
++/** A top-level page the app routes to at `/page/<plugin>/<id>`; with `nav`, the sidebar lists it. */
++export interface Page {
++  readonly id: string
++  readonly title: string
++  readonly icon?: IconName
++  /** Lists the page in the sidebar nav, lowest `order` first. */
++  readonly nav?: { readonly order?: number }
++  render(): JSX.Element
++}
++
++/** The registry of top-level pages. */
++export const Page = Registry.define<Page>("page")
++
+ /**
+  * The registry of server sources the app lists.
+  *

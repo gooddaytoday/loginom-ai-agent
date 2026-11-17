@@ -66,14 +66,14 @@ export async function makeEnv(name: string, options: { port: number; extraConfig
     LOGINOM_SPIKE_HUB_SKILLS: hub,
     ...options.extraEnv,
   }
-  const server = start(name, options.port, env)
+  const current = { server: start(name, options.port, env) }
   await waitListening(options.port, path.join(run, "serve.log"))
   const api = client(options.port, project)
-  return { run, home, project, bundled, hub, mock, mockLog, pluginLog, server, api, env, port: options.port,
+  return { run, home, project, bundled, hub, mock, mockLog, pluginLog, api, env, port: options.port,
+    server: () => current.server,
     restart: async () => {
-      const next = start(name, options.port, env, true)
+      current.server = start(name, options.port, env, true)
       await waitListening(options.port, path.join(run, "serve.log"))
-      return next
     },
     // Location plugins activate lazily on the first session work; RPC and skill listing before that see nothing.
     warm: async () => {
@@ -84,7 +84,7 @@ export async function makeEnv(name: string, options: { port: number; extraConfig
     },
     llm: () => lines(mockLog),
     plugin: () => lines(pluginLog),
-    stop: () => { server.kill("SIGTERM"); mock.stop(true) },
+    stop: () => { current.server.kill("SIGTERM"); mock.stop(true) },
   }
 }
 

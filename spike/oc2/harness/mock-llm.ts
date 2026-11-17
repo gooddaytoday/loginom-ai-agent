@@ -5,7 +5,7 @@
 // Requests without tools (titles, summaries) get a short text. Every request is appended to the log as JSON.
 import { appendFileSync } from "node:fs"
 
-type Step = { tool: string; input: unknown } | { text: string } | { hang: number }
+type Step = { tool: string; input: unknown } | { text: string } | { hang: number } | { status: number }
 
 export function script(steps: Step[], note = "") {
   return `${note}\nSPIKE-SCRIPT:${Buffer.from(JSON.stringify(steps)).toString("base64")}`
@@ -48,6 +48,8 @@ export function startMock(port: number, logFile: string) {
       const tools = (body.tools ?? []).map((tool) => tool.function.name)
       const step = tools.length === 0 ? { text: "Spike title" } : (nextStep(body.messages) ?? { text: "no script" })
       appendFileSync(logFile, JSON.stringify({ t: Date.now(), n: ++calls, tools, step, system: body.messages.filter((m) => m.role === "system").map((m) => text(m.content)).join("\n") }) + "\n")
+      if ("status" in step)
+        return Response.json({ error: { message: "spike provider failure", type: "invalid_request_error" } }, { status: step.status })
       const stream = new ReadableStream({
         async start(controller) {
           const send = (value: string) => controller.enqueue(new TextEncoder().encode(value))
