@@ -48,11 +48,12 @@ test('both outputs use distinct native ports and propagate incomplete samples',a
 });
 
 
-for(const pending of [false,true])for(const regrouped of [false,true])for(const mixed of [false,true])test('weighted predictions pin factor/target/passthrough order through native mapping, regrouped='+regrouped+', mixed='+mixed+', pending='+pending,async()=>{
+for(const column of [false,true])for(const pending of [false,true])for(const regrouped of [false,true])for(const mixed of [false,true])test('weighted/column predictions pin factor/target/passthrough order through native mapping, column='+column+', regrouped='+regrouped+', mixed='+mixed+', pending='+pending,async()=>{
  const c={mode:'enter',fields:[{name:'RowID',label:'RowID',type:'integer',usage_type:0},...configuration.fields,
-  {name:'Note',label:'Note',type:'string',usage_type:0},{name:'Weight',label:'Weight',type:'real',usage_type:7}]};
- if(regrouped)c.fields=[c.fields[1],c.fields[2],c.fields[4],c.fields[0],c.fields[3]];
- const expected=['PredictionEvent','PredictionProbability','ActualEvent','Response_predicted','X','Response','RowID','Note','Weight'];
+  {name:'Note',label:'Note',type:'string',usage_type:0},...(column?[{name:'Fold',label:'Fold',type:'integer',usage_type:0},{name:'Split',label:'Split',type:'boolean',usage_type:0}]:[{name:'Weight',label:'Weight',type:'real',usage_type:7}])]};
+ if(column)c.partition={sampling:2,field:'Split'};
+ if(regrouped)c.fields=[c.fields[1],c.fields[2],c.fields.at(-1),c.fields[0],c.fields[3],...(column?[c.fields[4]]:[])];
+ const expected=['PredictionEvent','PredictionProbability','ActualEvent','Response_predicted','X','Response','RowID','Note',...(column?['Fold','Split']:['Weight'])];
  assert.deepEqual(logRegressionOutputColumns(c).map(f=>f.name),expected);
  const schema=logRegressionOutputColumns(c),order=mixed?[...schema.slice(0,4),schema[6],schema[4],schema[5],...schema.slice(7)]:schema;
  const source_fields=schema.map((f,index)=>({...f,index,record_id:'s'+index,field_id:String(index)}));

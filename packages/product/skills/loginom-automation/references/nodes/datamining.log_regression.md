@@ -24,6 +24,7 @@ are informational. Omit: all train. Readback: percentages and row counts.
 Column: `logistic.partition:{method:"column",field:"Split"}`; Boolean flag,
 false trains, true tests. Exclude it from input_fields; retain it in output.
 No percentages/validation. Reopen/apply verifies saved partition, no Teach.
+After reopened Execute/read, Save again before finishing.
 
 ## Real frequency weights
 
