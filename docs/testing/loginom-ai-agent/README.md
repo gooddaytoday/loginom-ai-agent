@@ -25,6 +25,8 @@ Dashboard M3 «Черновик»: [runbook](dashboard-m3.md) — подгото
 
 Dashboard M4 «Публикация через хранилище»: [runbook](dashboard-m4.md) — отдельная база, собственные ресурсы и команды; Task 0 не подтверждает установленную приёмку M4.
 
+Dashboard M5 «Release в контейнерах»: [runbook](dashboard-m5.md#итоговая-приёмка-17-ноября) и [checkpoint](dashboard-m5-checkpoint.md) — M5 принят; общий офлайн-архив, Docker29.1.3/Compose2.40.3+ds1 и rootless Podman5.6.2/podman-compose1.5.0, текущие source/installed и отдельные update/TLS доказательства с сохранёнными ограничениями.
+
 ## Границы приёмки
 
 | Платформа | Целевой пакет | Где проверяется |
