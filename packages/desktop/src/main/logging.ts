@@ -225,9 +225,10 @@ async function buildDesktopArchive(request: Partial<DiagnosticsRequest>) {
       runtime: include.runtime ? join(loginom, "runtime") : undefined,
       sessionID: request.sessionID,
       chat: include.chat ? request.chat : undefined,
+      // Desktop logs: the current and the previous run (design, table row 6).
       logs: [
         ...(include.logs
-          ? [{ dir: root, prefix: "desktop" }, ...serverLogRoots().map((dir, i) => ({ dir, prefix: `server-${i + 1}` }))]
+          ? [{ dir: root, prefix: "desktop", runs: 2 }, ...serverLogRoots().map((dir, i) => ({ dir, prefix: `server-${i + 1}` }))]
           : []),
         // Crashpad keeps settings and report metadata beside the dumps; only dumps are diagnostics.
         ...(include.logs || include.dumps ? [{ dir: app.getPath("crashDumps"), prefix: "crashpad", match: /\.dmp$/i }] : []),
