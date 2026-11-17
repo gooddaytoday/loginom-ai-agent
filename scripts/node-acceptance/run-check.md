@@ -1399,6 +1399,24 @@ definition IDs/values and input-port GUID across Save/cold. Only task reaches
 the model; no Loop or XML oracle is involved. Cold uses owned port inspection
 with Close, then stock execution/export checks and confirmed package/logout cleanup.
 
+`logreg-partition-sequential`: утверждённый `modes/partition-sequential/task-partition-sequential.md`
+и только partition.csv. Enter, первые 50% train / следующие 50% test, без валидации.
+Независимый неизменённый modes/oracle.py проверяет прогноз 64×10, типы,
+порядок и NULL; Split/Fold не факторы. Сводка порта 2 в expected не входит;
+размеры выборок доступны в configuration.partition. CSV/Save/cold без Teach
+и cleanup штатные. Только task и CSV получает модель; oracle/expected приватны.
+
+Решение владельца 16.11 `logreg-partition-csv-by-name`: только CSV сценария
+`logreg-partition-sequential` сравнивается по техническим именам независимо
+от порядка колонок (`CSV_COLUMNS_BY_NAME_SCENARIOS`). Native порт0 при первом
+выполнении сохраняет RowID,X,Target, а после reopen+apply — X,Target,RowID
+(E:973/974 и F:1103/1104 против E:1505/F:1631). Набор и число колонок,
+значения, строки и их порядок, NULL и существующие проверки типов остаются
+строгими. Дубли/пропавшие/лишние имена и другие значения отказывают.
+Typed port/cold expected и oracle неизменны; остальные сценарии сохраняют
+свои прежние правила порядка CSV. Это не D76-исключение значений.
+
+
 `loop-for-offline` and `loop-for-rest` use the frozen control-loop FOR tasks and
 expected-for-{offline,rest}.json with no input files. Only the task reaches the
 model. Sequential literal count=3 substitutes the saved Page definition 99 with

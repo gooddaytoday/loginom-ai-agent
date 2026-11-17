@@ -209,3 +209,22 @@ test('Elastic Net native details require both initialized penalties and editable
   c.getValue=()=>value;const disabled=c.isDisabled;delete c.isDisabled;assert.equal(read().verified,false,name);c.isDisabled=disabled;
  }
 });
+
+function partitionFixture(){
+ const base='MF;TF;WizrdMCF;LearnPartitionWizard',elements=[],components={},values={};
+ const add=(tid,value)=>{const e={id:'partition-'+elements.length,checkVisibility:()=>true,getBoundingClientRect:()=>({x:1,y:1,width:100,height:20}),tid};elements.push(e);const c={el:{dom:e},getValue:()=>values[tid],isDisabled:()=>false};components[e.id]=c;values[tid]=value;return c;};
+ add(base);
+ for(const [path,value] of [['SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl',50],['SizeGridForm;colRelativeSize;FloatPropEdit-1;PropContainer;ValueContainer;ValueControl',50],['pedSamplingMethod;ValueControl',1],['ValidationSettings;pedLearnValidationMethod;ValueControl',0],['SizeGridForm;colAbsoluteSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl',32],['SizeGridForm;colAbsoluteSize;FloatPropEdit-1;PropContainer;ValueContainer;ValueControl',32],['txtTotalRecords','64']])add(base+';'+path,value);
+ const records=[0,1,2].map((PartitionType,SequenceOrder)=>({isModel:true,data:{PartitionType,SequenceOrder,SizePath:''}})),grid=add(base+';SequenceMethodForm;grdSequence');
+ const store={$className:'Ext.data.Store',getData:()=>({items:records}),getCount:()=>3,isLoading:()=>false};grid.getStore=()=>store;
+ const context={innerWidth:1280,innerHeight:800,Ext:{getCmp:id=>components[id]},document:{querySelectorAll:q=>q.startsWith('[data-tid=')?elements.filter(e=>e.tid===JSON.parse(q.slice(10,-1))):[]}};
+ return {base,add,values,store,records,read:()=>JSON.parse(JSON.stringify(vm.runInNewContext('('+readLogRegressionBrowser.toString()+')("MF;TF")',context)))};
+}
+test('partition reader binds percentages, native row counts and complete train/test/unused order',()=>{
+ const f=partitionFixture(),r=f.read();assert.equal(r.verified,true);assert.deepEqual(r.values,{train:50,test:50,sampling:1,validation:0});assert.deepEqual(r.sequence,[0,1,2]);assert.equal(r.train_count,32);assert.equal(r.test_count,32);assert.equal(r.total_count,64);
+ f.records[0].data.PartitionType=1;assert.equal(f.read().verified,false);
+});
+test('partition reader refuses stale sequence inventory and retains variable binding flags',()=>{
+ for(const mutate of [f=>f.store.isLoading=()=>true,f=>f.store.getCount=()=>2,f=>f.records[1].data.SequenceOrder=0,f=>f.records[1].data.SizePath='Var.X']){const f=partitionFixture();mutate(f);assert.equal(f.read().verified,false);}
+ const f=partitionFixture();f.add(f.base+';SizeGridForm;colRelativeSize;FloatPropEdit;SwitchButton').pressed=true;assert.equal(f.read().switches.train,true);
+});

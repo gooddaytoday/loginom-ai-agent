@@ -3,7 +3,7 @@ export function validateLogRegressionParameters(parameters,mode,r){
  need(['enter','forward','backward','stepwise','ridge','apply','lasso','elastic_net'].includes(mode),'use enter, forward, backward, stepwise, ridge, lasso, elastic_net or apply');
  need(parameters&&Object.keys(parameters).length===1&&parameters.logistic,'use parameters.logistic');
  const p=parameters.logistic;
- need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization','regularization','weight_field'].includes(k)),'use input_fields, target_field, event and threshold');
+ need(typeof p==='object'&&!Array.isArray(p)&&Object.keys(p).every(k=>['input_fields','target_field','event','threshold','selection','normalization','regularization','weight_field','partition'].includes(k)),'use input_fields, target_field, event and threshold');
  const name=n=>typeof n==='string'&&n.trim().length>0&&n.length<=128;
  need(Array.isArray(p.input_fields)&&p.input_fields.length>0&&p.input_fields.length<=128&&p.input_fields.every(name),'input_fields must list continuous numeric predictors by technical name');
  need(name(p.target_field),'target_field must name one discrete string response');
@@ -11,6 +11,13 @@ export function validateLogRegressionParameters(parameters,mode,r){
  need(typeof p.threshold==='number'&&Number.isFinite(p.threshold)&&p.threshold>=0&&p.threshold<=1,'threshold is required in 0..1; event if p >= threshold');
  need(p.weight_field===undefined||name(p.weight_field),'weight_field must name one Real frequency-weight field');
  need(p.weight_field===undefined||['enter','apply'].includes(mode),'weight_field requires enter or saved Enter apply');
+ const partition=p.partition;
+ if(partition!==undefined){
+  need(['enter','apply'].includes(mode),'partition requires enter or saved Enter apply');
+  need(partition&&typeof partition==='object'&&!Array.isArray(partition)&&Object.keys(partition).length===3
+   &&partition.method==='sequential'&&['train_percent','test_percent'].every(k=>typeof partition[k]==='number'&&Number.isFinite(partition[k])&&partition[k]>0&&partition[k]<100)
+   &&partition.train_percent+partition.test_percent===100,'partition requires sequential, positive train_percent/test_percent summing to 100');
+ }
  const regularization=p.regularization;
  if(mode==='ridge')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_ridge==='number'&&Number.isFinite(regularization.lambda_ridge)&&regularization.lambda_ridge>0,'ridge requires regularization:{lambda_ridge:positive finite number}');
  else if(mode==='lasso')need(regularization&&typeof regularization==='object'&&!Array.isArray(regularization)&&Object.keys(regularization).length===1&&typeof regularization.lambda_lasso==='number'&&Number.isFinite(regularization.lambda_lasso)&&regularization.lambda_lasso>0,'lasso requires regularization:{lambda_lasso:positive finite number}');
