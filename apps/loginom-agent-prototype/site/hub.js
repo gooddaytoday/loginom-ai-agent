@@ -329,7 +329,7 @@ function renderDialog(hub, online) {
     title = 'Готово';
     body = '<div class="hub-result"><span class="hub-tile hub-sage">'+icon('check',27)+'</span><h3>'+escape(current.name)+'</h3><p>Добавлено в приложение. Если что-то пойдёт не так, предыдущие версии можно вернуть в разделе «История».</p></div>';
     actions = '<button class="btn" data-hub-tab="history">История</button>'+
-      (current.next && byId(current.next).kind === 'Действие' ? '<button class="btn" data-hub-pin="'+current.next+'">Закрепить на главной</button>' : '')+
+      (current.next && byId(current.next).kind === 'Действие' ? '<button class="btn" data-hub-pin="'+current.next+'">Показывать в строке действий</button>' : '')+
       (current.next?'<button class="btn primary" data-hub-use="'+current.next+'">'+kinds[byId(current.next).kind].use+'</button>':'<button class="btn primary" data-hub-tab="installed">Установленные</button>');
   }
   if (current.kind === 'export') {

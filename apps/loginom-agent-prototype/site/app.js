@@ -15,14 +15,25 @@ const write = (key, value) => {
 }
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch])
 const pages = {
-  home:'Главная', chat:'Разговор', hub:'Каталог', loginom:'Пакеты',
-  runner:'Запуск действия', studio:'Создать навык', settings:'Настройки', onboarding:'Первый запуск', help:'Справка', review:'Что решить',
+  home:'Новый разговор', chat:'Разговор', hub:'Каталог', loginom:'Пакеты',
+  runner:'Запуск действия', studio:'Создать навык', settings:'Настройки', onboarding:'Первый запуск', review:'Что решить',
 }
+// Clicking an example fills the composer; it never sends. «document» also attaches a sample package,
+// so a newcomer sees the package actions appear.
 const examples = [
-  { id:'abc', title:'ABC-анализ товаров', label:'Аналитика продаж', icon:'chart', tone:'red', detail:'Сгруппировать товары по вкладу в выручку', prompt:'Построй ABC-анализ товаров по выручке в Loginom. Используй демонстрационные данные и сохрани результат как сценарий.' },
-  { id:'refactor', title:'Проверить сценарий', label:'Аудит', icon:'flow', tone:'blue', detail:'Найти проблемы в пакете Loginom', prompt:'Проверь сценарий продаж и покажи, что можно улучшить.' },
-  { id:'quality', title:'Проверить данные', label:'Качество данных', icon:'shield', tone:'violet', detail:'Найти пропуски и дубликаты в таблице', prompt:'Проверь демонстрационные продажи на пропуски и дубликаты. Покажи результат в таблице.' },
+  { id:'abc', title:'ABC-анализ товаров', icon:'chart', tone:'red', detail:'Сгруппировать товары по вкладу в выручку', prompt:'Построй ABC-анализ товаров по выручке в Loginom. Используй демонстрационные данные и сохрани результат как сценарий.' },
+  { id:'document', title:'Задокументировать пакет', icon:'file', tone:'green', detail:'Описание узлов и данных на учебном пакете', prompt:'Задокументируй этот пакет: назначение, входные данные и что делает каждый узел.', pkg:true },
+  { id:'refactor', title:'Проверить сценарий', icon:'flow', tone:'blue', detail:'Найти проблемы в пакете Loginom', prompt:'Проверь сценарий продаж и покажи, что можно улучшить.' },
+  { id:'quality', title:'Проверить данные', icon:'shield', tone:'violet', detail:'Найти пропуски и дубликаты в таблице', prompt:'Проверь демонстрационные продажи на пропуски и дубликаты. Покажи результат в таблице.' },
 ]
+const placeholders = {
+  1:'Опишите задачу: собрать сценарий, разобрать пакет, проверить данные',
+  2:'Что сделать в Loginom? Например, задокументировать пакет',
+}
+// Iteration 2: the prototype opens as a first launch («new») or as after a week of work («used»);
+// the owner compares variants on the review page.
+const stage = read('stage','new') === 'used' ? 'used' : 'new'
+const variant = {nav:'plus', placeholder:1, status:'composer', ...read('variant',{})}
 const seed = [
   {id:'seed-sales', title:'ABC-анализ товаров', date:'Сегодня', phase:'done', prompt:examples[0].prompt, kind:'abc', files:['sales-demo.csv'], project:'Аналитика продаж'},
   {id:'seed-flow', title:'Проверка сценария продаж', date:'Вчера', phase:'done', prompt:examples[1].prompt, kind:'refactor', files:['Продажи.lgp'], project:'Аналитика продаж'},
@@ -81,15 +92,18 @@ const serverPackages = [
 const state = {
   page:'home', contour:read('contour','online'), theme:read('theme','light'),
   project:'Аналитика продаж', projects:['Аналитика продаж','Демо-проекты'], session:null, tabs:[],
-  sessions:[...seed], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
+  sessions:stage === 'used' ? [...seed] : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
+  collapsed:read('collapsed',false), draftPackage:null, pickFor:null, connecting:false,
+  // What the user has already done: things appear after these events and never disappear.
+  progress:stage === 'used' ? {ownChats:3, packages:true, catalog:true, examplesHidden:false} : {ownChats:0, packages:false, catalog:false, examplesHidden:false},
   solution:'refactor', review:false, reviewTab:'plan', activeRun:false,
   // Actions shown on Home; the rest are one click away in «Все действия».
   pinnedActions:['document','check','improve','compare'],
   activePackage:serverPackages[0], importedPackages:[], packageScope:'personal',
   packageQuery:'', packageDir:'', packageSort:'date', packageDeep:false, pendingAction:null,
   // Packages the user worked with in this app: the app's own history, not a Loginom feature.
-  recentPackages:[{id:'sales',what:'документирование',when:'сегодня'},{id:'sales-edit',what:'изменение в разговоре',when:'вчера'},
-    {id:'control',what:'проверка',when:'11 ноября'},{id:'quality',what:'просмотр',when:'10 ноября'}],
+  recentPackages:stage === 'used' ? [{id:'sales',what:'документирование',when:'сегодня'},{id:'sales-edit',what:'изменение в разговоре',when:'вчера'},
+    {id:'control',what:'проверка',when:'11 ноября'},{id:'quality',what:'просмотр',when:'10 ноября'}] : [],
   localPackage:null, packageError:'',
   calculationChanged:false, versionName:'', versionError:'',
 }
@@ -103,6 +117,8 @@ const route = () => {
 }
 route()
 initSolutionDrafts(state)
+// A fresh profile has the public Loginom stand filled in but not connected (as in 0.4).
+if (stage === 'used') ensureSettings(state).connection.connected = true
 
 const api = {
   icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution,
@@ -110,10 +126,10 @@ const api = {
 // Pins the package actions of a just-installed catalog item to Home, if there is room.
 function pinSolution(solution) {
   const ids = Object.entries(packageActions).filter(([id,action]) => action.solution === solution && !action.noPackage && !state.pinnedActions.includes(id)).map(([id]) => id)
-  if (!ids.length) return toast('Уже на главной')
-  if (state.pinnedActions.length + ids.length > 4) return toast('На главной помещается четыре действия. Открепите одно в «Все действия».', 'alert')
+  if (!ids.length) return toast('Уже среди действий с пакетом')
+  if (state.pinnedActions.length + ids.length > 4) return toast('В строке действий помещается четыре. Уберите одно в «Ещё».', 'alert')
   state.pinnedActions = [...state.pinnedActions, ...ids]
-  toast('Закреплено на главной')
+  toast('Добавлено в строку действий с пакетом')
 }
 function canNavigate(page, tab) {
   if (beforeSettingsLeave(state,page,tab)) return true
@@ -126,6 +142,8 @@ function navigate(page) {
   state.page = page
   state.overlay = null
   state.mobile = false
+  if (page === 'hub') state.progress.catalog = true
+  if (page === 'loginom') state.progress.packages = true
   if (location.hash !== '#' + page) history.pushState(null, '', '#' + page)
   render(true)
 }
@@ -199,6 +217,7 @@ function newSession() {
   state.draft = ''
   state.templateTitle = ''
   state.draftFiles = []
+  state.draftPackage = null
   state.review = false
   navigate('home')
 }
@@ -224,62 +243,76 @@ function navButton(page, glyph, label = pages[page]) {
   const selected = origin === page
   return `<button class="nav-item${selected ? ' selected' : ''}" ${selected ? 'aria-current="page"' : ''} data-go="${page}">${icon(glyph,17)}<span>${label}</span></button>`
 }
+// Iteration 2 shell. The sidebar lists work, not features: project, «Новый разговор», conversations once
+// there are any, settings. In variant «panel» Пакеты and Каталог join it after the first visit; in
+// variant «plus» they stay behind the composer's «+». Nothing that appeared ever disappears or moves.
 function sidebar() {
-  const history = state.sessions.filter(item => item.project === state.project).slice(0,6)
+  const history = state.sessions.filter(item => item.project === state.project).slice(0,8)
+  const items = variant.nav === 'panel'
+    ? [state.progress.packages || state.page === 'loginom' ? navButton('loginom','flow','Пакеты') : '', state.progress.catalog || state.page === 'hub' ? navButton('hub','grid','Каталог') : ''].join('')
+    : ''
   return `<aside class="sidebar${state.mobile ? ' expanded' : ''}" aria-label="Боковая панель">
-    <button class="brand" data-go="home" aria-label="Loginom AI Agent, рабочее пространство">
-      <picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent</span>
-    </button>
+    <div class="sidebar-head">
+      <button class="brand" data-action="new" aria-label="Loginom AI Agent, новый разговор">
+        <picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent</span>
+      </button>
+      <button class="icon-btn neutral collapse-btn" data-action="collapse" aria-label="Свернуть панель" title="Свернуть панель (Ctrl+B)">${icon('panel',18)}</button>
+    </div>
     <button class="project-switch" data-overlay="projects" aria-label="Выбрать проект">
       <span class="project-avatar">${icon('folder',16)}</span><span class="project-text"><strong>${esc(state.project)}</strong><small>Рабочий проект</small></span>${icon('down',14)}
     </button>
-    <button class="btn new-session" data-action="new">${icon('plus',17)} Новый разговор <kbd>⌘ N</kbd></button>
-    <nav class="sidenav" aria-label="Рабочее пространство">
-      ${navButton('home','home','Главная')}
-      ${navButton('loginom','flow','Пакеты')}
-      ${navButton('hub','grid','Каталог')}
-    </nav>
-    <section class="sidebar-history" aria-label="Недавние разговоры">
-      <h2>Недавние <button class="small-icon" data-overlay="search" aria-label="Найти разговор">${icon('more',16)}</button></h2>
-      ${history.length ? history.map(item => `<button class="session-link${state.page === 'chat' && state.session === item.id ? ' current':''}" data-session="${item.id}">${icon('message',15)}<span>${esc(item.title)}</span></button>`).join('') : '<p class="muted">Разговоры появятся здесь</p>'}
+    <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('plus',17)} Новый разговор <kbd>Ctrl N</kbd></button>
+    ${items ? `<nav class="sidenav" aria-label="Разделы">${items}</nav>` : ''}
+    <section class="sidebar-history" aria-label="Разговоры">
+      ${history.length ? `<h2>Разговоры</h2>${history.map(item => `<button class="session-link${state.page === 'chat' && state.session === item.id ? ' current':''}" data-session="${item.id}">${icon('message',15)}<span>${esc(item.title)}</span>${sessionMark(item)}</button>`).join('')}` : ''}
     </section>
-    <nav class="sidebar-footer" aria-label="Настройки и справка">
-      ${navButton('settings','settings')}${navButton('help','help')}
-      ${connectionCard()}
-      <button class="prototype-mark" data-go="review">Прототип 1.1 · что решить ${icon('arrow',12)}</button>
+    <nav class="sidebar-footer" aria-label="Настройки">
+      ${runNotice()}
+      ${navButton('settings','settings')}
+      <button class="prototype-mark" data-go="review">Прототип 2 · что решить ${icon('arrow',12)}</button>
     </nav>
   </aside>`
 }
-function connectionCard() {
+// Status next to a conversation: the agent is working or waits for the user.
+function sessionMark(item) {
+  if (item.phase === 'running') return '<i class="conn-dot busy" title="Агент работает"></i>'
+  if (['permission','plan','connect'].includes(item.phase) || item.phase === 'proposed') return '<i class="conn-dot warn" title="Ждёт вашего ответа"></i>'
+  return ''
+}
+function runNotice() {
   const runs = Object.entries(state.solutions?.runs || {})
   const running = runs.some(([,run]) => run.step === 'running')
   const unseen = running ? null : runs.find(([,run]) => run.unseen)
+  return `${running ? `<button class="conn-run" data-go="runner"><i class="conn-dot busy"></i><span>Выполняется действие</span>${icon('chevron',14)}</button>` : ''}${unseen ? `<button class="conn-run" data-open-run="${unseen[0]}"><i class="conn-dot ${unseen[1].outcome === 'success' ? 'ok' : 'warn'}"></i><span>${unseen[1].outcome === 'success' ? 'Готово — открыть результат' : 'Запуск завершён — посмотреть'}</span>${icon('chevron',14)}</button>` : ''}`
+}
+// Loginom is the agent's main dependency, so its state is always on screen: in the composer or in the
+// top bar (the owner chooses). Not connected — an orange dot and words, not just a colour.
+function loginomChip() {
   const connected = state.settings.connection.connected
-  const model = state.settings?.model?.name || 'Демо-модель'
-  return `${running ? `<button class="conn-run" data-go="runner"><i class="conn-dot busy"></i><span>Выполняется действие</span>${icon('chevron',14)}</button>` : ''}${unseen ? `<button class="conn-run" data-open-run="${unseen[0]}"><i class="conn-dot ${unseen[1].outcome === 'success' ? 'ok' : 'warn'}"></i><span>${unseen[1].outcome === 'success' ? 'Готово — открыть результат' : 'Запуск завершён — посмотреть'}</span>${icon('chevron',14)}</button>` : ''}<button class="conn-card" data-settings="loginom" title="Подключение к Loginom и модель">
-    <i class="conn-dot ${connected ? 'ok' : 'warn'}"></i>
-    <span><strong>${connected ? 'Loginom подключён' : 'Loginom не подключён'}</strong><small>Модель: ${esc(model)}</small></span>${icon('chevron',14)}</button>`
+  const label = state.connecting ? 'Подключаюсь…' : connected ? 'Loginom' : 'Loginom<span class="lgm-state"> не подключён</span>'
+  return `<button class="lgm-chip${connected ? '' : ' off'}" type="button" data-overlay="loginom-status" title="${connected ? 'Loginom подключён · ' + esc(hostOf(state.settings.connection.url)) : 'Loginom не подключён — нажмите, чтобы подключить'}"><i class="conn-dot ${state.connecting ? 'busy' : connected ? 'ok' : 'warn'}"></i><span>${label}</span></button>`
+}
+function hostOf(url) {
+  try { return new URL(url).host } catch { return url || '' }
 }
 function header() {
   const nativeTab = state.page === 'chat' || state.page === 'home'
   return `<header class="topbar">
     <div class="top-left">
       <button class="icon-btn mobile-menu" aria-label="Открыть меню" aria-expanded="${state.mobile}" data-action="menu">${icon('menu',20)}</button>
-      <span class="crumb">${esc(state.project)}</span><span class="crumb-arrow">${icon('chevron',11)}</span><span class="crumb-current">${pages[state.page]}</span>
+      ${state.collapsed ? `<button class="icon-btn neutral expand-btn" data-action="collapse" aria-label="Развернуть панель" title="Развернуть панель (Ctrl+B)">${icon('panel',18)}</button><button class="icon-btn neutral expand-btn" data-action="new" aria-label="Новый разговор" title="Новый разговор (Ctrl+N)">${icon('plus',18)}</button>` : ''}
+      ${state.page === 'home' || state.page === 'chat' ? '' : `<span class="crumb-current">${pages[state.page]}</span>`}
     </div>
     <div class="top-actions">
-      <button class="mode-btn${state.contour === 'closed' ? ' closed' : ''}" data-overlay="contour">${icon(state.contour === 'closed' ? 'lock':'globe',15)}<span>${state.contour === 'closed' ? 'Закрытый контур':'Интернет'}</span>${icon('down',13)}</button>
-      <button class="icon-btn" title="Поиск (⌘ K)" aria-label="Поиск по приложению" data-overlay="search">${icon('search',18)}</button>
+      ${variant.status === 'top' ? loginomChip() : ''}
       <button class="icon-btn theme-btn" title="Переключить цветовую схему" aria-label="Переключить цветовую схему" data-action="theme">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',17)}</button>
     </div>
   </header>
-  ${nativeTab && state.tabs.length ? `<nav class="session-tabs" aria-label="Открытые разговоры">
-    <button class="session-tab${state.page === 'home' ? ' active':''}" data-go="home" aria-label="Главная">${icon('home',15)}</button>
+  ${nativeTab && state.tabs.length > 1 ? `<nav class="session-tabs" aria-label="Открытые разговоры">
     ${state.tabs.map(id => {
       const item = state.sessions.find(x => x.id === id)
       return `<div class="tab-wrap${state.page === 'chat' && state.session === id ? ' active':''}"><button class="session-tab" data-session="${id}">${icon('message',14)}<span>${esc(item?.title)}</span></button><button class="small-icon tab-close" aria-label="Закрыть вкладку ${esc(item?.title)}" data-close-tab="${id}">${icon('close',13)}</button></div>`
     }).join('')}
-    <button class="session-tab" data-action="new" aria-label="Новый разговор">${icon('plus',16)}</button>
   </nav>` : ''}`
 }
 function composer() {
@@ -287,54 +320,49 @@ function composer() {
   const modelName = state.contour === 'closed'
     ? (selectedModel && selectedModel.kind !== 'cloud' ? selectedModel.name : 'Локальная модель')
     : (selectedModel?.name || 'Демо-модель')
+  const pkg = state.draftPackage
   return `<form class="composer" id="composer">
+    ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
-    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="Опишите задачу или прикрепите файл…" rows="2">${esc(state.draft)}</textarea>
+    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : esc(placeholders[variant.placeholder] || placeholders[1])}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
-        <button class="icon-btn neutral" type="button" aria-label="Прикрепить файл" title="Прикрепить файл" data-overlay="attach">${icon('paperclip',17)}</button>
-        <span class="divider"></span>
-        ${state.settings.preferences.agentPicker ? `<button class="filter-btn" type="button" data-overlay="agent-mode">${icon(state.mode === 'Планирование' ? 'layers' : 'spark',15)} ${state.mode} ${icon('down',12)}</button>` : ''}
-        <button class="filter-btn composer-model" type="button" data-settings="models">${icon('cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>
+        <button class="icon-btn neutral plus-btn" type="button" aria-label="Добавить: пакет, файл, каталог" title="Пакет из Loginom, файл с компьютера, каталог" data-overlay="plus">${icon('plus',18)}</button>
+        ${state.settings.preferences.agentPicker ? `<button class="filter-btn mode-pick" type="button" data-overlay="agent-mode" title="Режим агента: ${state.mode}">${icon(state.mode === 'Планирование' ? 'layers' : 'spark',15)} <span class="filter-label">${state.mode}</span> ${icon('down',12)}</button>` : ''}
       </div>
-      <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
+      <div class="composer-options">
+        ${variant.status === 'composer' ? loginomChip() : ''}
+        <button class="filter-btn composer-model" type="button" data-settings="models" title="Модель">${icon('cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>
+        <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
+      </div>
     </div>
   </form>`
 }
+// A chosen package: its chip and «Что сделать с пакетом» right above the input.
+function packageContext(pkg) {
+  const shown = state.pinnedActions.filter(id => packageActions[id] && !packageActions[id].noPackage)
+  return `<div class="pkg-context">
+    <div class="pkg-chip"><span class="glyph red">${icon('flow',15)}</span><span><strong>${esc(pkg.name)}</strong><small>${esc(pkg.where)}</small></span>
+      ${pkg.item ? `<button type="button" class="link-btn" data-action="open-draft-package">Схема</button>` : ''}
+      <button type="button" class="small-icon" data-action="remove-package" aria-label="Убрать пакет ${esc(pkg.name)}">${icon('close',13)}</button></div>
+    <div class="pkg-actions" role="group" aria-label="Что сделать с пакетом"><span>Что сделать с пакетом:</span>${shown.map(id => {
+      const action = packageActions[id]
+      const ready = hubHasInstalled(state, action.solution)
+      return `<button type="button" class="chip-btn" data-package-action="${id}" ${ready ? '' : 'title="Добавить из каталога"'}>${icon(ready ? action.icon : 'plus',14)} ${action.title}</button>`
+    }).join('')}<button type="button" class="chip-btn" data-overlay="all-actions">${icon('more',14)} Ещё</button></div>
+  </div>`
+}
+// A new conversation is the start screen: the input and, for newcomers, examples.
 function home() {
-  const closed = state.contour === 'closed'
-  const current = state.sessions.filter(item => item.project === state.project).slice(0,3)
-  return `<div class="home-area">
-    <section class="welcome">
-      <div class="welcome-text">
-        <span class="welcome-app"><img src="assets/loginom.png" alt="" width="31" height="31"> Loginom AI Agent</span>
-        <h1>С чего начнём?</h1>
-        <p>Создавайте сценарии в Loginom, проверяйте данные и добавляйте возможности из каталога Loginom Hub.</p>
-      </div>
-      <div class="hero-diagram" aria-hidden="true">
-        <span class="hero-orbit orbit-one"></span><span class="hero-orbit orbit-two"></span><span class="hero-orbit orbit-three"></span>
-        <span class="diagram-line diagram-l1"></span><span class="diagram-line diagram-l2"></span><span class="diagram-line diagram-l3"></span>
-        <span class="hero-node hero-dataset">${icon('database',25)}</span><span class="hero-node hero-flow">${icon('flow',29)}</span><span class="hero-node hero-chart">${icon('chart',24)}</span><span class="hero-node hero-check">${icon('check',16)}</span>
-      </div>
-    </section>
-    <section class="starter" aria-label="Новый разговор">
-      ${composer()}
-      <div class="composer-context"><span>${icon(closed ? 'lock':'shield',15)}${closed ? 'Закрытый контур · локальные источники':'Демонстрационные данные и сценарии'}</span><button class="link-btn" data-go="onboarding">Мастер первого запуска ${icon('arrow',15)}</button></div>
-    </section>
-    ${state.settings.connection.connected ? '' : `<div class="connect-banner">${icon('alert',18)}<span><strong>Подключите Loginom.</strong> Без подключения агент может отвечать на вопросы, но не открывает и не меняет пакеты.</span><button class="btn primary" data-settings="loginom">Подключить</button></div>`}
-    <section class="scenario-section">
-      <div class="section-bar"><h2>Работа с пакетом</h2><button class="link-btn" data-overlay="all-actions">Все действия · ${Object.keys(packageActions).length} ${icon('arrow',16)}</button></div>
-      <div class="action-grid">${state.pinnedActions.map(id => actionTile(id,packageActions[id])).join('')}</div>
-    </section>
-    <section class="scenario-section">
-      <div class="section-bar"><h2>Примеры задач</h2><button class="link-btn" data-go="hub">Весь каталог ${icon('arrow',16)}</button></div>
+  const p = state.progress
+  const showExamples = !p.examplesHidden && p.ownChats < 3
+  return `<div class="home-area new-chat">
+    <section class="starter" aria-label="Новый разговор">${composer()}</section>
+    ${showExamples ? `<section class="examples" aria-labelledby="examples-title">
+      <div class="section-bar"><h2 id="examples-title">Примеры задач</h2><button class="icon-btn neutral" data-action="hide-examples" aria-label="Скрыть примеры задач" title="Скрыть. Вернуть можно через «+»">${icon('close',16)}</button></div>
       <div class="example-grid">${examples.map(item => `<button class="example-card" data-example="${item.id}">
-        <div class="example-top"><span class="glyph ${item.tone}">${icon(item.icon,19)}</span>${icon('external',15)}</div><strong>${item.title}</strong><span>${item.detail}</span></button>`).join('')}</div>
-    </section>
-    <section class="recent-section">
-      <div class="section-bar"><h2>Недавние разговоры</h2><button class="link-btn" data-overlay="search">Поиск ${icon('search',15)}</button></div>
-      <div class="recent-list">${current.length ? current.map(item => `<button data-session="${item.id}"><span class="recent-icon">${icon('message',17)}</span><span><strong>${esc(item.title)}</strong><small>${esc(item.project)}</small></span><time>${item.date}</time>${icon('chevron',15)}</button>`).join('') : '<p class="empty-note">В этом проекте ещё нет разговоров.</p>'}</div>
-    </section>
+        <span class="glyph ${item.tone}">${icon(item.icon,18)}</span><strong>${item.title}</strong><span>${item.detail}</span></button>`).join('')}</div>
+    </section>` : ''}
   </div>`
 }
 function actionTile(id, action) {
@@ -456,7 +484,9 @@ function chat() {
   const isEdit = item.kind === 'package-edit'
   let body
   if (isEdit) body = packageEditBody(item)
-  else if (item.phase === 'permission') {
+  else if (item.phase === 'connect') {
+    body = `<div class="answer-block"><h2>Для этой задачи нужен Loginom</h2><p>Я буду строить и проверять сценарий в Loginom. Подключитесь — и я продолжу.</p>${connectCard()}</div>`
+  } else if (item.phase === 'permission') {
     body = `<div class="answer-block"><h2>Подготовил план</h2><p>Для следующего шага агенту нужно разрешение на создание демонстрационной копии пакета.</p>${plan(item)}
       <div class="permission-card">${icon('shield',24)}<div><h3>Создать копию пакета?</h3><p>Агент получит доступ к записи только в рабочую папку этого проекта.</p><div class="button-row"><button class="btn primary" data-action="allow">Разрешить один раз</button><button class="btn quiet" data-action="deny">Отклонить</button></div></div></div></div>`
   } else if (item.phase === 'plan') {
@@ -481,6 +511,16 @@ function chat() {
     </div>
     ${state.review ? rightPanel(item):''}
   </div>`
+}
+// Setup happens where it is needed: the public stand is filled in, one button connects.
+function connectCard() {
+  const c = state.settings.connection
+  return `<div class="connect-card"><span class="glyph red">${icon('external',19)}</span><div>
+    <strong>Подключиться к Loginom</strong>
+    <dl><div><dt>Адрес</dt><dd>${esc(hostOf(c.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(c.username)}</dd></div></dl>
+    <p class="muted">${c.empty || !c.hasPassword ? 'Пароль для этого стенда не нужен.' : 'Пароль сохранён.'} Другой сервер Loginom — «Изменить».</p>
+    <div class="button-row"><button class="btn primary" data-action="connect-loginom" ${state.connecting ? 'disabled' : ''}>${state.connecting ? '<span class="spinner"></span> Подключаюсь…' : 'Подключить'}</button><button class="btn quiet" data-settings="loginom">Изменить</button></div>
+  </div></div>`
 }
 function packageFolder(scope) {
   return scope === 'shared' ? '/Общие/Аналитика' : '/' + (state.settings.connection.username || 'analyst')
@@ -517,9 +557,9 @@ function selectLocalPackage(name, example = false) {
 // One picker for «Открыть из Loginom» and for choosing the package of an action (state.pendingAction).
 function packagePicker(local) {
   const localFile = (style, label) => `<label class="${style}">${label}<input id="action-local-file" class="sr-only" type="file" accept=".lgp"></label>`
-  if (!state.settings.connection.connected && state.pendingAction === 'document') return `<p class="dialog-desc">Loginom не подключён. Документировать можно файл .lgp с компьютера — для этого Loginom не нужен.</p>
-      <div class="button-row">${localFile('btn primary', icon('upload',15) + ' Файл .lgp с компьютера')}<button class="btn quiet" data-settings="loginom">${icon('settings',15)} Подключить Loginom</button></div>`
-  if (!state.settings.connection.connected) return `<p class="dialog-desc">Сначала подтвердите подключение к Loginom Studio.</p><button class="btn primary" data-settings="loginom">${icon('settings',16)} Настроить Loginom</button>`
+  if (!state.settings.connection.connected && state.pendingAction === 'document') return `<p class="dialog-desc">Документировать можно файл .lgp с компьютера — для этого Loginom не нужен.</p>
+      <div class="button-row">${localFile('btn primary', icon('upload',15) + ' Файл .lgp с компьютера')}</div><p class="pkg-section">Или пакет из Loginom</p>${connectCard()}`
+  if (!state.settings.connection.connected) return `<p class="dialog-desc">Пакеты хранятся в Loginom.</p>${connectCard()}`
   const lead = state.pendingAction === 'document' ? `Выберите пакет в Loginom или ${localFile('link-btn pkg-local', 'файл .lgp с компьютера')}. Исходный пакет не изменится.`
     : state.pendingAction ? 'Агент будет работать с копией — исходный пакет не изменится.' : 'Пакеты из папок, доступных вашей учётной записи Loginom.'
   if (!local) return `<p class="dialog-desc">${lead}</p>
@@ -568,10 +608,10 @@ function allActions() {
     const pinned = state.pinnedActions.includes(id)
     return `<div class="all-action"><button class="all-action-main" data-package-action="${id}"><span class="glyph red">${icon(action.icon,17)}</span>
       <span><strong>${action.title}${item?.tier && item.tier !== 'official' ? ` ${tierBadge(item)}` : ''}</strong><small>${action.detail}</small></span></button>
-      ${ready ? '' : `<button class="pin-btn" data-package-action="${id}">Добавить</button>`}${!action.noPackage && (ready || pinned) ? `<button class="pin-btn" data-pin-action="${id}" aria-pressed="${pinned}" title="${pinned ? 'Убрать с главной' : 'Показывать на главной'}">${pinned ? 'Закреплено' : 'Закрепить'}</button>` : ''}</div>`
+      ${ready ? '' : `<button class="pin-btn" data-package-action="${id}">Добавить</button>`}${!action.noPackage && (ready || pinned) ? `<button class="pin-btn" data-pin-action="${id}" aria-pressed="${pinned}" title="${pinned ? 'Убрать из строки действий' : 'Показывать в строке действий'}">${pinned ? 'Закреплено' : 'Закрепить'}</button>` : ''}</div>`
   }
   const group = (title, list) => list.length ? `<p class="pkg-section">${title}</p><div class="all-actions">${list.map(row).join('')}</div>` : ''
-  return `<p class="dialog-desc">Новые действия появляются с обновлениями приложения и из каталога. Закреплённые — до четырёх — видны на главной.</p>
+  return `<p class="dialog-desc">Новые действия появляются с обновлениями приложения и из каталога. Закреплённые — до четырёх — видны над полем ввода, когда выбран пакет.</p>
     ${group('Установлены', installed.filter(([,action]) => !action.noPackage))}
     ${group('Без пакета', installed.filter(([,action]) => action.noPackage))}
     ${group('Есть в каталоге', entries.filter(([,action]) => !hubHasInstalled(state, action.solution)))}
@@ -674,45 +714,41 @@ function packages() {
     <div class="action-grid">${Object.entries(packageActions).filter(([id,action]) => !action.noPackage && (hubHasInstalled(state,action.solution) || state.pinnedActions.includes(id))).map(([id,action]) => actionTile(id,action)).join('')}</div>`}
   </div>`
 }
-// Owner review page for the current iteration: what to look at, what to decide, what changed.
+// Owner review page for iteration 2: variants to compare, what to try, what changed.
 function review() {
+  const choice = (key, value, label, hint) => `<button class="rv-choice" data-variant="${key}:${value}" aria-pressed="${String(variant[key]) === String(value)}"><strong>${label}</strong><small>${hint}</small></button>`
   const look = [
-    ['Новые действия','Главная → «Все действия · 7» → добавьте «Проверить по стандарту» и закрепите на главной вместо «Улучшить».','review-actions'],
-    ['Выбор пакета и запуск','Главная → «Документировать» → пакет из папки «Архив» → «Разрешить и запустить» → вернитесь на Главную: внизу меню видно «Выполняется действие», затем «Готово — открыть результат».','home'],
-    ['Каталог и сообщество','Каталог → «Навыки» → «Сводка для руководителя»: новые тексты и отметка перед установкой.','review-skills'],
+    ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Агент попросит подключить Loginom прямо в разговоре: одна кнопка. После этого разговор появится в панели.','stage-new'],
+    ['Пакет','«+» у поля ввода → «Пакет из Loginom…» → выберите пакет. Над полем появится «Что сделать с пакетом». Пример «Задокументировать пакет» показывает то же на учебном файле.','try-package'],
+    ['Панель','Свернуть — кнопка вверху панели или Ctrl+B; развернуть — кнопка в левом верхнем углу. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
   ]
-  const ask = [
-    ['Названия','Раздел «Каталог», в нём четыре типа по тому, что вы с ними делаете: <b>Действие</b> — запускается для пакета; <b>Навык</b> — агент лучше справляется в разговоре; <b>Пакет Loginom</b> — готовый сценарий в вашу папку; <b>Подключение</b> — внешний сервис. «Решение», «шаблон» и «база знаний» больше не показываются. Если ближе другой вариант — назовите его: раздел «Расширения» или «Возможности»; типы «Инструмент · Знания · Готовый сценарий · Интеграция».'],
-    ['Новые действия','Приходят с обновлениями приложения и из каталога. На главной — четыре, их выбирает пользователь; остальные — в «Все действия»; на странице пакета — все установленные. Действия от сообщества — только «Проверено Loginom» и только как настройка встроенного действия: своего доступа к Loginom они не получают.'],
-    ['Тексты для сообщества','Карточка: «Автор — участник сообщества, Loginom это не проверял…»; отметка перед установкой: «Понимаю, что Loginom это не проверял, и сам проверю результат»; в закрытом контуре: «Администратор вашей организации разрешил только то, что подготовил или проверил Loginom».'],
-    ['Состояние','Отдельной строки нет: внизу меню — карточка «Loginom · модель», над ней во время запуска — «Выполняется действие», а после — «Готово — открыть результат», пока вы его не откроете. Режим сети — вверху справа.'],
+  const later = [
+    'Закрытый контур без модели: перед первой отправкой появится «Выберите модель» — в этом прототипе не показано.',
+    'Элементы по наведению — действия над сообщением (копировать, повторить) — появятся вместе с лентой разговора в следующей итерации.',
+    'Поиск убран отовсюду, кроме окна выбора пакета: там он нужен, когда пакетов десятки (решение И1-7).',
   ]
-  const answer = [
-    'Список файлов папки приходит из app.loginom.ai за 1–3 секунды без агента, но через внутренний метод веб-клиента Loginom. Можно ли попросить разработчиков Loginom закрепить этот метод, чтобы он не менялся без предупреждения?',
-    'Для окна выбора пакета приложению нужна своя фоновая сессия Loginom — ещё один вход под учётной записью пользователя. Занимает ли такая сессия лицензию Loginom?',
+  const open11 = [
+    'Названия в каталоге: Действие · Навык · Пакет Loginom · Подключение (И1.1-1).',
+    'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
+    'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['Выбор пакета: поиск, недавние, папки Loginom; для «Документировать» — ещё файл с компьютера.','«Решения» → «Каталог», четыре типа, кнопки по смыслу типа: «Запустить», «Начать разговор».','«Все действия» и закрепление на главной; новое действие «Проверить по стандарту» (Проверено Loginom).','Новые тексты уровней доверия; «Создать своё» создаёт навык.','Внизу меню: «Выполняется действие», затем «Готово — открыть результат».','Названия в каталоге совпадают с действиями на главной; под фильтрами — кто что подготовил.']
+  const changed = ['При первом запуске в панели — проект, «Новый разговор», настройки; разговоры появляются после первого.','Панель сворачивается (кнопка, Ctrl+B).','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.']
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 1.1</p><h1>Что решить</h1><p>Посмотрите три сценария (А, Б, В) — около 10 минут. Затем подтвердите предложения 1–4 одной строкой и ответьте на два вопроса ниже. Мелочи на мне.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в трёх вопросах — переключение сразу меняет прототип. Затем пройдите три сценария, около 10 минут.</p></div></div>
+    <h2 class="rv-heading">Выбрать вариант</h2>
+    <div class="rv-variants">
+      <div><h3>1. Где «Пакеты» и «Каталог»</h3><div class="rv-choices">${choice('nav','plus','Только через «+»','Панель не меняется: проект, разговоры, настройки')}${choice('nav','panel','Появляются в панели','«Пакеты» — после первого пакета, «Каталог» — после первого захода')}</div></div>
+      <div><h3>2. Подсказка в поле ввода</h3><div class="rv-choices">${choice('placeholder',1,'Вариант 1',esc(placeholders[1]))}${choice('placeholder',2,'Вариант 2',esc(placeholders[2]))}</div></div>
+      <div><h3>3. Где состояние Loginom</h3><div class="rv-choices">${choice('status','composer','В поле ввода','Рядом с моделью: с чем работает агент')}${choice('status','top','Вверху справа','Рядом с темой, видно на любой странице')}</div></div>
+    </div>
     <h2 class="rv-heading">Посмотреть</h2>
-    <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" ${target === 'home' ? 'data-go="home"' : `data-action="${target}"`}>Открыть ${icon('arrow',15)}</button></article>`).join('')}</div>
-    <h2 class="rv-heading">Подтвердить — «ок» или «ок, кроме N»</h2>
-    <ol class="rv-questions">${ask.map(([title,text]) => `<li><strong>${title}.</strong> ${text}</li>`).join('')}</ol>
-    <h2 class="rv-heading">Нужен ваш ответ</h2>
-    <ul class="rv-questions rv-answers">${answer.map(text => `<li>${text}</li>`).join('')}</ul>
+    <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${target === 'stage-new' ? 'Начать как новый пользователь' : target === 'stage-used' ? 'После недели работы' : 'Открыть'} ${icon('arrow',15)}</button></article>`).join('')}</div>
+    <h2 class="rv-heading">Пока не показано</h2>
+    <ul class="rv-changes">${later.map(text => `<li>${text}</li>`).join('')}</ul>
+    <h2 class="rv-heading">Ещё ждут ответа с итерации 1.1</h2>
+    <ul class="rv-questions rv-answers">${open11.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Что изменилось</h2>
     <ul class="rv-changes">${changed.map(text => `<li>${text}</li>`).join('')}</ul>
-  </div>`
-}
-function help() {
-  return `<div class="native-page help-page">
-    <div class="native-heading"><div><p class="eyebrow">Поддержка</p><h1>Справка</h1><p>Подключение, работа со сценариями и доставка каталога в закрытый контур.</p></div></div>
-    <div class="help-list">${[
-      ['Подключить Loginom и модель','Выберите режим работы, настройте адрес Loginom и подключите доступную модель.', 'onboarding','Начать настройку'],
-      ['Добавить возможности Hub без интернета','Администратор получает пакет с зависимостями на стороне с доступом к Hub. В закрытом контуре откройте Hub и импортируйте пакет из файла.', 'hub','Открыть Hub'],
-      ['Проверить состояние подключения','Loginom, база знаний, модель и источник Hub проверяются отдельно. Для закрытой поставки база знаний и модель должны быть доступны локально или по внутренней сети.', 'settings','Открыть настройки'],
-      ['Разобрать пакет Loginom','Выберите пакет, откройте узел или запустите действие. Агент покажет требуемые разрешения и результат выполнения.', 'loginom','Открыть демопакет'],
-    ].map(([title,body,page,label],i) => `<details ${i === 0 ? 'open':''}><summary>${title}${icon('down',16)}</summary><p>${body}</p><button class="link-btn" data-go="${page}">${label} ${icon('arrow',16)}</button></details>`).join('')}</div>
   </div>`
 }
 function overlay() {
@@ -725,37 +761,28 @@ function overlay() {
     'pick-package':[packageActions[state.pendingAction]?.title + ': какой пакет?', kind === 'pick-package' ? packagePicker(false) : ''],
     'package-server':['Открыть из Loginom', kind === 'package-server' ? packagePicker(false) : ''],
     'package-computer':['Открыть с компьютера', kind === 'package-computer' ? packagePicker(true) : ''],
-    contour: ['Режим работы',`<p class="dialog-desc">Профиль определяет, какие источники доступны приложению.</p>
-      <div class="dialog-options"><button data-contour="online"><span class="glyph blue">${icon('globe',20)}</span><span><strong>Подключённый режим</strong><small>Веб-каталог Hub и разрешённые внешние модели</small></span>${state.contour === 'online' ? icon('check',18):''}</button>
-      <button data-contour="closed"><span class="glyph red">${icon('lock',20)}</span><span><strong>Закрытый контур</strong><small>Внутренние или локальные источники, импорт пакетов из файла</small></span>${state.contour === 'closed' ? icon('check',18):''}</button></div><button class="link-btn" data-settings="contour">Политика и диагностика ${icon('arrow',15)}</button>`],
     projects: ['Рабочий проект',`<div class="dialog-options">${state.projects.map((name,index) => `<button data-project="${index}"><span class="glyph blue">${icon('folder',19)}</span><span><strong>${esc(name)}</strong></span>${state.project === name ? icon('check',18):''}</button>`).join('')}</div>
       <form id="project-form" class="inline-form"><label for="project-name" class="sr-only">Название проекта</label><input id="project-name" name="name" maxlength="45" placeholder="Название нового проекта" required><button class="btn primary">Добавить</button></form>`],
-    search: ['Поиск',`<label class="search-field">${icon('search',19)}<input id="search-query" placeholder="Найти разговор или раздел…" aria-label="Поиск по приложению" autocomplete="off"><kbd>Esc</kbd></label><div id="search-results" class="search-results">${searchResults('')}</div>`],
-    attach: ['Добавить контекст',`<p class="dialog-desc">Подключите пример или добавьте имя файла с устройства. Для этой демонстрации достаточно примеров.</p>
-      <div class="dialog-options"><button data-file="sales-demo.csv"><span class="glyph blue">${icon('database',18)}</span><span><strong>sales-demo.csv</strong><small>Пример таблицы продаж</small></span>${icon('plus',18)}</button><button data-file="Продажи.lgp"><span class="glyph red">${icon('flow',19)}</span><span><strong>Продажи.lgp</strong><small>Пример пакета Loginom</small></span>${icon('plus',18)}</button></div>
-      <label class="btn attach-control">${icon('upload',16)} Выбрать файл <input type="file" id="local-attachment" aria-label="Выбрать файл с устройства"></label>`],
+    // «+» is the one always-visible door to everything that is not on screen yet.
+    plus: ['Добавить',`<div class="dialog-options">
+        <button data-action="plus-package"><span class="glyph red">${icon('flow',19)}</span><span><strong>Пакет из Loginom…</strong><small>Агент будет работать с пакетом; над полем появятся действия с ним</small></span>${icon('chevron',17)}</button>
+        <label class="dialog-option"><span class="glyph blue">${icon('upload',18)}</span><span><strong>Файл с компьютера…</strong><small>Таблица, документ или пакет .lgp</small></span><input type="file" id="local-attachment" class="sr-only" aria-label="Выбрать файл с компьютера"></label>
+        <button data-action="plus-catalog"><span class="glyph violet">${icon('grid',18)}</span><span><strong>Каталог…</strong><small>Действия, навыки и готовые сценарии из Loginom Hub</small></span>${icon('chevron',17)}</button>
+        ${state.page === 'home' && (state.progress.examplesHidden || state.progress.ownChats >= 3) ? `<button data-action="show-examples"><span class="glyph green">${icon('spark',18)}</span><span><strong>Примеры задач</strong><small>Показать примеры под полем ввода</small></span>${icon('chevron',17)}</button>` : ''}
+      </div>
+      <p class="pkg-section">Учебные файлы</p>
+      <div class="dialog-options"><button data-file="sales-demo.csv"><span class="glyph blue">${icon('database',18)}</span><span><strong>sales-demo.csv</strong><small>Пример таблицы продаж</small></span>${icon('plus',18)}</button><button data-file="Продажи.lgp"><span class="glyph red">${icon('flow',19)}</span><span><strong>Продажи.lgp</strong><small>Учебный пакет Loginom</small></span>${icon('plus',18)}</button></div>`],
+    'loginom-status': ['Loginom', kind === 'loginom-status' ? (state.settings.connection.connected
+      ? `<div class="connect-card"><span class="glyph green">${icon('check',19)}</span><div><strong>Подключено</strong>
+          <dl><div><dt>Адрес</dt><dd>${esc(hostOf(state.settings.connection.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(state.settings.connection.username)}</dd></div><div><dt>Папка</dt><dd>${esc(packageFolder('personal'))}</dd></div></dl>
+          <div class="button-row"><button class="btn quiet" data-settings="loginom">${icon('settings',15)} Настройки подключения</button></div></div></div>`
+      : `<p class="dialog-desc">Без Loginom агент отвечает на вопросы, но не открывает и не меняет пакеты.</p>${connectCard()}`) : ''],
     'agent-mode':['Режим агента',`<div class="dialog-options">${[['Выполнение','Предлагает план и запрашивает разрешения на действия'],['Планирование','Готовит план до начала выполнения']].map(([mode,detail]) => `<button data-agent-mode="${mode}"><span class="glyph red">${icon(mode === 'Планирование' ? 'layers':'spark',19)}</span><span><strong>${mode}</strong><small>${detail}</small></span>${state.mode === mode ? icon('check',18):''}</button>`).join('')}</div>`],
     'session-options':['Разговор',`<div class="dialog-options"><button data-action="rename-session"><span class="glyph blue">${icon('file',19)}</span><span><strong>Переименовать</strong></span>${icon('chevron',17)}</button>${currentPackageEdit() ? '' : `<button data-action="download-result"><span class="glyph red">${icon('download',19)}</span><span><strong>Скачать демонстрационный отчёт CSV</strong></span></button>`}</div>`],
     rename:['Переименовать разговор',`<form class="inline-form" id="rename-form"><label class="sr-only" for="session-name">Имя разговора</label><input id="session-name" name="name" maxlength="70" value="${esc(state.sessions.find(x => x.id === state.session)?.title)}" required><button class="btn primary">Сохранить</button></form>`],
   }[kind]
   if (!content) return ''
   return `<dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-title"><div class="app-dialog-heading"><h2 id="app-dialog-title">${content[0]}</h2><button class="icon-btn" data-action="dismiss" aria-label="Закрыть">${icon('close',20)}</button></div><div class="app-dialog-body">${content[1]}</div></dialog>`
-}
-function searchResults(value) {
-  const q = value.trim().toLocaleLowerCase('ru')
-  const entries = [
-    ['home','Главная','home'],
-    ['hub','Каталог (Loginom Hub)','grid'],
-    ['loginom','Пакеты','flow'],
-    ['settings','Настройки','settings'],
-    ['onboarding','Мастер первого запуска','spark'],
-    ['studio','Создать навык','box'],
-    ['help','Справка','help'],
-  ].filter(([,label]) => label.toLocaleLowerCase('ru').includes(q)).map(([page,label,glyph]) =>
-    `<button data-go="${page}">${icon(glyph,17)}<span>${label}</span>${icon('arrow',15)}</button>`)
-  const list = state.sessions.filter(x => x.title.toLocaleLowerCase('ru').includes(q)).slice(0,7).map(x =>
-    `<button data-session="${x.id}">${icon('message',17)}<span>${esc(x.title)}</span>${icon('arrow',15)}</button>`)
-  return [...entries,...list].join('') || '<p class="empty-note">Совпадений нет. Попробуйте другое название.</p>'
 }
 function pageContents() {
   switch (state.page) {
@@ -767,7 +794,6 @@ function pageContents() {
     case 'runner':
     case 'studio': return renderSolutions(state)
     case 'loginom': return packages()
-    case 'help': return help()
     case 'review': return review()
   }
 }
@@ -795,7 +821,7 @@ function render(resetScroll = false) {
   const scroll = resetScroll ? 0 : ($('#main')?.scrollTop ?? 0)
   setThemeAttribute()
   document.title = pages[state.page] + ' · Loginom AI Agent'
-  app.innerHTML = `<div class="workspace">
+  app.innerHTML = `<div class="workspace${state.collapsed ? ' collapsed' : ''}">
     ${sidebar()}${state.mobile ? '<button class="mobile-scrim" aria-label="Закрыть меню" data-action="menu"></button>':''}
     <div class="workspace-main">${header()}<main id="main" class="page page-${state.page}">${pageContents()}</main>
     </div>
@@ -806,7 +832,6 @@ function render(resetScroll = false) {
     dialog.showModal()
     dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss() })
     dialog.addEventListener('click', event => { if (event.target === dialog) dismiss() })
-    $('#search-query')?.focus()
     $('#package-search')?.focus()
     $('#package-version-name')?.focus()
     $('#session-name')?.select()
@@ -818,6 +843,7 @@ function render(resetScroll = false) {
 function dismiss() {
   state.overlay = null
   state.pendingAction = null
+  state.pickFor = null
   render()
 }
 function resetPackageBrowse() {
@@ -852,14 +878,44 @@ function send() {
     return
   }
   const kind = /дубликат|пропуск|выгрузк/i.test(prompt) ? 'quality' : /проверь|оптимиз|улучш/i.test(prompt) ? 'refactor' : 'abc'
+  // A package from the computer is enough for documenting; everything else in this demo needs Loginom.
+  const localOnly = state.draftPackage?.source === 'local' && /документ/i.test(prompt)
   const next = {
     id: old?.id ?? 'session-' + Date.now(), date:'Сейчас', title:old?.title || state.templateTitle || prompt.slice(0,56),
-    kind, phase:state.mode === 'Планирование' ? 'plan':'permission', files:state.draftFiles.slice(), prompt, project:state.project,
+    kind, phase:!state.settings.connection.connected && !localOnly ? 'connect' : firstPhase(),
+    files:[...(state.draftPackage ? [state.draftPackage.name] : []), ...state.draftFiles], prompt, project:state.project,
     previous:old ? [...(old.previous || []), old.prompt].slice(-4) : [],
   }
+  // Examples stop showing once the user has started three conversations of their own.
+  if (!old && !state.templateTitle) state.progress.ownChats++
+  if (state.draftPackage) state.progress.packages = true
   state.sessions = [next, ...state.sessions.filter(x => x.id !== next.id)]
   state.templateTitle = ''
+  state.draftPackage = null
   openSession(next.id)
+}
+function firstPhase() {
+  return state.mode === 'Планирование' ? 'plan' : 'permission'
+}
+function connectLoginom() {
+  if (state.connecting) return
+  state.connecting = true
+  render()
+  setTimeout(() => {
+    state.connecting = false
+    ensureSettings(state).connection.connected = true
+    const waiting = state.sessions.filter(item => item.phase === 'connect')
+    waiting.forEach(item => { item.phase = firstPhase() })
+    toast('Loginom подключён')
+    render()
+  }, 700)
+}
+function chooseDraftPackage(ref) {
+  state.draftPackage = ref
+  state.progress.packages = true
+  if (state.page !== 'home' && state.page !== 'chat') navigate('home')
+  else render()
+  $('#prompt')?.focus()
 }
 function setPhase(phase) {
   const item = state.sessions.find(x => x.id === state.session)
@@ -894,6 +950,32 @@ function downloadResult() {
 const actions = {
   new:newSession,
   menu:() => { state.mobile = !state.mobile; render() },
+  collapse:() => { state.collapsed = !state.collapsed; write('collapsed',state.collapsed); render() },
+  'connect-loginom':connectLoginom,
+  'hide-examples':() => {
+    state.progress.examplesHidden = true
+    render()
+    toast('Примеры скрыты. Вернуть — через «+»')
+    $('#prompt')?.focus()
+  },
+  'show-examples':() => {
+    state.progress.examplesHidden = false
+    state.progress.ownChats = 0
+    dismiss()
+  },
+  'stage-new':() => { write('stage','new'); write('collapsed',false); location.hash = ''; location.reload() },
+  'stage-used':() => { write('stage','used'); location.hash = ''; location.reload() },
+  'try-package':() => { newSession(); state.pickFor = 'composer'; actions['plus-package']() },
+  'plus-package':() => {
+    resetPackageBrowse()
+    state.pendingAction = null
+    state.pickFor = 'composer'
+    state.overlay = 'package-server'
+    render()
+  },
+  'plus-catalog':() => navigate('hub'),
+  'remove-package':() => { state.draftPackage = null; render(); $('#prompt')?.focus() },
+  'open-draft-package':() => { if (state.draftPackage?.item) openPackage(state.draftPackage.item) },
   theme:() => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light':'dark'),
   dismiss,
   review:() => { state.review = !state.review; render() },
@@ -1005,11 +1087,25 @@ app.addEventListener('click', event => {
     state.project = state.projects[Number(d.project)]
     return newSession()
   }
+  if (d.variant) {
+    const [key, value] = d.variant.split(':')
+    variant[key] = key === 'placeholder' ? Number(value) : value
+    write('variant',variant)
+    return render()
+  }
   if (d.example) {
     const example = examples.find(item => item.id === d.example)
-    return useTemplate(example.title,example.prompt)
+    useTemplate(example.title,example.prompt)
+    if (example.pkg) chooseDraftPackage({name:'Продажи.lgp', where:'Учебный файл · на компьютере', source:'local'})
+    return
   }
-  if (d.file) return attach(d.file)
+  if (d.file) {
+    if (/\.lgp$/i.test(d.file)) {
+      state.overlay = null
+      return chooseDraftPackage({name:d.file, where:'Учебный файл · на компьютере', source:'local'})
+    }
+    return attach(d.file)
+  }
   if (d.removeFile != null) {
     state.draftFiles.splice(Number(d.removeFile),1)
     return render()
@@ -1044,9 +1140,15 @@ app.addEventListener('click', event => {
     const item = packageEntries().find(entry => entry.id === d.packageId)
     const action = state.pendingAction
     if (!item) return
+    const forComposer = state.pickFor === 'composer'
     state.overlay = null
     state.pendingAction = null
+    state.pickFor = null
     if (action) return runAction(action, packageRef(item), 'home')
+    if (forComposer) {
+      rememberPackage(item.id, 'разговор')
+      return chooseDraftPackage({...packageRef(item), item})
+    }
     return openPackage(item)
   }
   if (d.packageAction) {
@@ -1054,6 +1156,7 @@ app.addEventListener('click', event => {
     state.overlay = null
     if (!hubHasInstalled(state, action.solution)) return runAction(d.packageAction, null, 'home')
     if (action.noPackage) return runAction(d.packageAction, null, 'home')
+    if (state.draftPackage && state.page !== 'loginom') return runAction(d.packageAction, state.draftPackage, 'home')
     if (state.page === 'loginom') return runAction(d.packageAction, packageRef(state.activePackage), 'loginom')
     resetPackageBrowse()
     state.pendingAction = d.packageAction
@@ -1067,7 +1170,6 @@ app.addEventListener('input', event => {
     state.draft = event.target.value
     $('.send-btn').disabled = !state.draft.trim()
   }
-  if (event.target.id === 'search-query') $('#search-results').innerHTML = searchResults(event.target.value)
   if (event.target.id === 'package-search') {
     state.packageQuery = event.target.value
     if (!event.target.value.trim()) state.packageDeep = false
@@ -1084,7 +1186,12 @@ app.addEventListener('change', event => {
     state.pendingAction = null
     runAction(action, {name, where:'На компьютере', source:'local'}, 'home')
   }
-  if (event.target.id === 'local-attachment' && event.target.files[0]) attach(event.target.files[0].name)
+  if (event.target.id === 'local-attachment' && event.target.files[0]) {
+    const name = event.target.files[0].name
+    if (!/\.lgp$/i.test(name)) return attach(name)
+    state.overlay = null
+    chooseDraftPackage({name, where:'На компьютере', source:'local'})
+  }
 })
 app.addEventListener('submit', event => {
   const id = event.target.id
@@ -1112,17 +1219,14 @@ document.addEventListener('keydown', event => {
     event.preventDefault()
     navigate('settings')
   }
-  if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
-    if (document.querySelector('dialog[open]:not(#app-dialog)')) return
+  if (event.key.toLowerCase() === 'b' && (event.metaKey || event.ctrlKey) && !document.querySelector('dialog[open]')) {
     event.preventDefault()
-    state.overlay = state.overlay === 'search' ? null:'search'
-    render()
+    actions.collapse()
   }
   if (event.key === 'Enter' && event.target.id === 'prompt' && !event.shiftKey && !event.isComposing) {
     event.preventDefault()
     send()
   }
-  if (event.key === 'Enter' && event.target.id === 'search-query') $('#search-results button')?.click()
 })
 addEventListener('popstate',() => { route(); state.overlay = null; render(true) })
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',() => { if (state.theme === 'system') render() })

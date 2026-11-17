@@ -2,8 +2,8 @@ import { icon } from "./icons.js"
 
 const sections = [
   ["Подключения", [["loginom", "Loginom", "external"], ["providers", "Провайдеры", "globe"], ["models", "Модели", "cpu"], ["servers", "Серверы", "database"]]],
-  ["Приложение", [["general", "Общие", "settings"], ["shortcuts", "Горячие клавиши", "terminal"]]],
-  ["Администрирование", [["contour", "Контур и политика", "shield"], ["diagnostics", "Диагностика", "chart"]]],
+  ["Приложение", [["general", "Общие", "settings"], ["contour", "Режим работы", "shield"], ["shortcuts", "Горячие клавиши", "terminal"], ["help", "Справка", "help"]]],
+  ["Администрирование", [["diagnostics", "Диагностика", "chart"]]],
 ]
 
 const wizard = [
@@ -13,12 +13,13 @@ const wizard = [
   ["Первый запуск", "Проверьте конфигурацию и перейдите к рабочему пространству."],
 ]
 
+// As in 0.4: a fresh profile has the public stand filled in, empty password, not connected yet.
 const defaults = {
-  url: "https://loginom.example.test/",
-  username: "analyst",
-  hasPassword: true,
-  empty: false,
-  connected: true,
+  url: "https://app.loginom.ai",
+  username: "user",
+  hasPassword: false,
+  empty: true,
+  connected: false,
 }
 const modelDefaults = {
   local: { kind: "local", name: "Qwen 3 32B", url: "http://127.0.0.1:11434/v1", tested: false },
@@ -30,14 +31,13 @@ const preferences = [
   ["reasoning", "Ход работы в чате", "Показывать краткий ход работы модели."],
   ["toolDetails", "Подробности действий", "Раскрывать вызовы инструментов в журнале по умолчанию."],
   ["fileTree", "Дерево файлов", "Показывать файлы рабочего пространства в панели просмотра."],
-  ["commandPalette", "Строка поиска", "Показывать кнопку команд и поиска в верхней панели."],
   ["notifications", "Уведомления о задачах", "Сообщать о завершении задачи, ошибке или запросе разрешения."],
   ["sounds", "Звуки уведомлений", "Воспроизводить звук при завершении задачи или запросе разрешения."],
   ["releaseNotes", "История версий", "Показывать сведения о версии после обновления приложения."],
 ]
 const shortcuts = [
   ["Новая сессия", "Ctrl", "N"],
-  ["Поиск и команды", "Ctrl", "K"],
+  ["Свернуть панель", "Ctrl", "B"],
   ["Настройки", "Ctrl", ","],
   ["Отправить сообщение", "Enter"],
   ["Новая строка", "Shift", "Enter"],
@@ -65,7 +65,7 @@ export function ensureSettings(state) {
   s.mcp ??= true
   s.shortcuts ??= "windows"
   s.helpMode ??= state.contour === "closed" ? "local" : "online"
-  s.defaultsConnectionTest ??= { help: "ready", browser: "verified" }
+  s.defaultsConnectionTest ??= { help: "ready" }
   if (state.contour === "closed") restrictModels(s)
   if (s.pendingConnection && !running(state)) {
     s.connection = s.pendingConnection.connection
@@ -228,7 +228,7 @@ function settingsBody(state, s) {
           '<span class="st-keys">' + keys.map((key) => "<kbd>" + (key === "Ctrl" && s.shortcuts === "mac" ? "⌘" : key) + "</kbd>").join("") + "</span>")).join("") +
         "</div></section>"
     case "contour":
-      return '<section class="st-card">' + sectionHead("Контур и политика", "Выберите профиль подключения для рабочего пространства.") +
+      return '<section class="st-card">' + sectionHead("Режим работы", "Интернет или закрытый контур. Если режим задал администратор, он отмечен здесь.") +
         '<div class="st-card-body">' + contourOptions(state.contour, s.closedMode) + '<div class="st-space-top">' +
         notice(closed ? "Политика закрытого контура" : "Политика доступа к сети",
           deviceOnly ? "Доступны локальные службы. Модель, справка и пакеты Hub поставляются отдельно." :
@@ -255,6 +255,15 @@ function settingsBody(state, s) {
         listRow("Внешняя сеть", closed ? "Доступ перекрыт политикой контура" : "Доступ определяется правилами организации", status(closed ? "Заблокирована" : "Разрешена", closed ? "wait" : "good")) +
         (s.diagnosticRan ? notice("Проверка завершена", "Результаты демонстрационной проверки показаны выше.", "good") : "") +
         '</div><footer class="st-card-footer">' + btn("Запустить проверку", "run-diagnostics", "primary") + '</footer></section>'
+    case "help":
+      return '<section class="st-card">' + sectionHead("Справка", "Подключение, работа с пакетами и доставка каталога в закрытый контур.") +
+        '<div class="st-card-body st-help">' + [
+          ["Подключить Loginom", "Адрес публичного стенда уже указан. Свой сервер Loginom — в разделе «Loginom».", "tab:loginom", "Открыть «Loginom»"],
+          ["Выбрать модель", "Модель видна в поле ввода. Локальные модели и модели во внутренней сети — в разделе «Модели».", "tab:models", "Открыть «Модели»"],
+          ["Добавить возможности без интернета", "Администратор получает пакет каталога там, где есть доступ к Hub. В закрытом контуре откройте каталог и импортируйте пакет из файла.", "goto:hub", "Открыть каталог"],
+          ["Разобрать пакет Loginom", "Нажмите «+» у поля ввода и выберите пакет — над полем появятся действия с ним. Агент покажет, какие права нужны, и отчёт о результате.", "goto:home", "Новый разговор"],
+        ].map(([title, body, target, label], i) => "<details" + (i === 0 ? " open" : "") + "><summary>" + title + icon("down", 16) + "</summary><p>" + body + "</p>" + btn(label, target, "quiet st-button-small") + "</details>").join("") +
+        "</div></section>"
     default:
       return ""
   }
@@ -262,8 +271,8 @@ function settingsBody(state, s) {
 
 export function renderSettings(state) {
   const s = ensureSettings(state)
-  return '<div class="st-suite st-page"><header class="st-page-head"><div><h1>Настройки</h1><p>Подключения, модели и политика рабочего пространства.</p></div>' +
-    btn("Первый запуск", "goto:onboarding", "quiet") + '</header><div class="st-layout"><nav class="st-nav" aria-label="Разделы настроек">' +
+  return '<div class="st-suite st-page"><header class="st-page-head"><div><h1>Настройки</h1><p>Подключения, модели, режим работы и справка.</p></div>' +
+    '</header><div class="st-layout"><nav class="st-nav" aria-label="Разделы настроек">' +
     sections.map(([group, tabs]) => '<div class="st-nav-group"><small>' + group + "</small>" + tabs.map(([id, label, glyph]) =>
       '<button type="button" data-st="tab:' + id + '"' + (s.tab === id ? ' aria-current="page"' : "") + '>' + icon(glyph, 16) + "<span>" + label + "</span></button>").join("") +
       "</div>").join("") + '</nav><div class="st-content">' + settingsBody(state, s) + "</div></div>" +

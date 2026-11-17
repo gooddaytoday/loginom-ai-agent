@@ -295,7 +295,7 @@ function renderRunner(state, model) {
     run.values.target = state.runnerPackage.name.replace(/\.lgp$/,'') + ' — улучшено.lgp';
     run.step = 'params';
   }
-  const back = {loginom:['loginom','← Пакеты'], home:['home','← Главная']}[state.runnerFrom] || ['hub','← Каталог'];
+  const back = {loginom:['loginom','← Пакеты'], home:['home','← Новый разговор']}[state.runnerFrom] || ['hub','← Каталог'];
   const blocked = key === 'regression' && run.values.baseline === 'missing';
   const access = accessFor(key, run, state.project);
   let body = '';
