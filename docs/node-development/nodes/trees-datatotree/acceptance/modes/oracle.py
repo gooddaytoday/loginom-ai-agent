@@ -65,8 +65,8 @@ def table(columns, rows):
     return dict(port=0, port_kind='table', columns=columns, rows=rows, ordered=True)
 
 
-def case(name, output=None, **settings):
-    return dict(id=name, native_status='not_checked', settings_proposal=settings,
+def case(name, output=None, native_status='not_checked', **settings):
+    return dict(id=name, native_status=native_status, settings_proposal=settings,
                 **({'output': output} if output is not None else {}))
 
 
@@ -165,9 +165,16 @@ def proposals(slug):
              composite_names=True, composite_labels=True, label_separator='.',
              native_name_and_separator_status='technical name spelling and inclusion of Root pending native observation'),
         case('wide', table([dict(name=k,label_any=True,type='integer') for k in wide_names], [wide]), selected_field_count=f['wide_fields'], tree_input={'rows':[wide]}),
-        case('siblings', table([*columns,dict(name='tag',label_any=True,type='string')],
-             [dict(**r,tag=t['tag']) for r in rows for t in d['tags']]), multiplication=f['sibling_policy_proposal']),
+        # Owner decision tree-siblings-native (LAB-1807): native 7.4.2 stacks sibling arrays, items rows then tags rows;
+        # fields of the other array are NULL (not empty strings) and batch repeats on every row.
+        case('siblings', table([*columns,dict(name='tag',label_any=True,type='string')], siblings_rows(d)),
+             native_status='observed', multiplication='stacked: each sibling array in schema order, absent fields NULL'),
     ]
+
+
+def siblings_rows(d):
+    return ([dict(batch=d['batch'], code=item['code'], qty=item['qty'], tag=None) for item in d['items']]
+            + [dict(batch=d['batch'], code=None, qty=None, tag=t['tag']) for t in d['tags']])
 
 
 def result(slug):
@@ -178,7 +185,7 @@ def result(slug):
         assert [n['value'] for n in cases[0]['output']['document']['children'][0]['children'][0]['children'] if n['path'].endswith('/Qty')] == ['2']
     if slug == SLUGS[3]:
         assert len(cases[2]['output']['columns']) == 70
-        assert len(cases[3]['output']['rows']) == 6
+        assert len(cases[3]['output']['rows']) == 5
     limits = None
     if slug == SLUGS[2]:
         bounds = load(slug,'limits.json')['limits']
@@ -237,6 +244,15 @@ def tree_to_table_typed_projection():
                                        dict(name='Value', type='variant', label_any=True)], rows=rows)])
 
 
+def tree_to_table_siblings_projection():
+    """LAB-1807: siblings case as one Tree-to-Table run from fixtures/siblings/documents.csv."""
+    output = next(c for c in proposals('trees-treetodata') if c['id'] == 'siblings')['output']
+    return dict(package_path='{{PACKAGE_PATH}}',
+                nodes=[dict(type=t) for t in ['imports.text', 'trees.from_json', 'trees.to_table']],
+                outputs=[dict(output_node_type='trees.to_table', output_port=0, export_destination='siblings.csv',
+                              ordered=True, column_order='exact', columns=output['columns'], rows=output['rows'])])
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--check', action='store_true')
@@ -256,4 +272,9 @@ if __name__ == '__main__':
         if args.check and slug == SLUGS[3]:
             projection = target.with_name('expected-typed-run.json')
             assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_typed_projection(), str(projection)
-        print(slug + ': ' + str(len(output['cases'])) + ' independent proposals; native not_checked')
+            projection = target.with_name('expected-siblings-run.json')
+            assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_siblings_projection(), str(projection)
+        if not args.check and slug == SLUGS[3]:
+            target.with_name('expected-siblings-run.json').write_text(
+                json.dumps(tree_to_table_siblings_projection(), ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+        print(slug + ': ' + str(len(output['cases'])) + ' independent proposals; native ' + ', '.join(sorted({c['native_status'] for c in output['cases']})))

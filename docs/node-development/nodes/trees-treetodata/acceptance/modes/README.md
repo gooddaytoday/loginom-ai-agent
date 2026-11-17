@@ -48,3 +48,9 @@ LAB-1699: `task-typed.md` — листья DateTime и Variant из подгот
 сверяет файл. Ограничение: Variant NULL не покрыт — native Свёртка с
 пропуском NULL отбрасывает пустые ячейки. CSV: полночь с мс пишется датой,
 учитывается как D76 `midnight_date` (решение `d76-tree-to-table`).
+
+LAB-1807: `task-siblings.md` — сценарий `trees-to-table-siblings` по решению
+владельца `tree-siblings-native`. Только `fixtures/siblings/documents.csv`
+(документ с items и tags). `expected-siblings-run.json` строит
+`tree_to_table_siblings_projection` общего oracle пары (`--check` сверяет):
+5 строк — items, затем tags, отсутствующие поля NULL, batch повторяется.

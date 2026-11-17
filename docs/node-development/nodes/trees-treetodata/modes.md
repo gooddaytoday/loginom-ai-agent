@@ -24,3 +24,11 @@ Wide fixture строит одну запись f00…f69 со значения�
 selected index, а preflight выбранной ветви ограничен одной array/64 leaves.
 Оценка: 4 цикла в `tree-{parameters,node}.mjs`, `node-output-context.mjs`;
 изменение общего reader сверх регистрации — stop до решения владельца.
+
+**LAB-1807 (решение владельца `tree-siblings-native`).** Native-проба 7.4.2
+на своей паре: соседние items (2) и tags (3) дают 5 строк подряд — items,
+затем tags; поля другого массива NULL, не пустая строка; batch повторяется.
+Не декартово произведение и не zip. Случай `siblings` в `expected.json` —
+`native_status: observed`; сценарий `trees-to-table-siblings`
+(`fixtures/siblings/documents.csv`, `expected-siblings-run.json`).
+`trees.from_json` аддитивно принимает соседние массивы объектов.

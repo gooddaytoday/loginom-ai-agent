@@ -9,7 +9,7 @@ test('tree stage 1 admits the independent acceptance JSON with exact original in
  const text=await readFile(new URL('../../../../docs/node-development/nodes/trees-jsontotree/fixtures/response.json',import.meta.url),'utf8');
  assert.equal(validateTreeJsonScope(text).verified,true);
 });
-for(const value of ['[]','null','1','{"items":[]}','{"a":[{}],"b":[{}]}','{"items":[1,2]}',
+for(const value of ['[]','null','1','{"items":[]}','{"items":[1,2]}',
  '{"items":[{"v":1,"v":2}]}','{"id":1,"items":[{"id":2}]}','{"items":[{"v":9223372036854775808}]}'])test('tree scope refuses '+value,()=>{
  assert.throws(()=>validateTreeJsonScope(value));
 });
@@ -129,7 +129,8 @@ test('JSON tree preflight refuses several JSON documents before mutation and kee
   await assert.rejects(jsonPreflight(rows),/Несколько документов JSON в одном импорте пока не поддержаны; подай один документ/);
  await assert.rejects(jsonPreflight([]),/one non-NULL JSON string row/);
  await assert.rejects(jsonPreflight([null]),/one non-NULL JSON string row/);
- await assert.rejects(jsonPreflight(['{"a":[{}],"b":[{}]}']),/one nonempty repeated object branch/);
+ await assert.rejects(jsonPreflight(['{"items":[]}']),/one nonempty repeated object branch/);
+ assert.equal((await jsonPreflight(['{"a":[{}],"b":[{}]}'])).verified,true);
 });
 
 function tableImplementation(json=false){
@@ -155,9 +156,8 @@ test('JSON output admits nested object arrays while tree-to-table retains its on
   {ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{});
  assert.equal(result.verified,true);
  assert.throws(()=>validateSelectedTreePaths(schema),/one object and one repeated branch/);
- for(const fault of ['sibling','scalar-array']){
+ for(const fault of ['scalar-array']){
   const bad=structuredClone(schema);
-  if(fault==='sibling')bad[3].path='/other';
   if(fault==='scalar-array')bad[3].is_container=false;
   if(['variant','datetime'].includes(fault))bad[4].type=fault;
   assert.throws(()=>validateJsonTreeSchema(bad),undefined,fault);
@@ -178,9 +178,8 @@ test('JSON preflight admits empty record containers only with an object-array wi
  ])assert.throws(()=>validateTreeJsonScope(JSON.stringify(input)));
 });
 
-test('nested JSON keeps sibling object arrays, scalar/container changes and limits outside scope',async()=>{
+test('nested JSON keeps scalar/container changes and limits outside scope',async()=>{
  for(const value of [
-  {items:[{parts:[{sku:'a'}],other:[{name:'b'}]}]},
   {items:[{parts:[1,'x']}]}, {items:[{parts:[]}]},
   {items:[{details:{code:'A'}},{details:'A'}]},
   {items:Array.from({length:257},()=>({id:1}))},
@@ -209,6 +208,28 @@ test('JSON scalar arrays admit homogeneous siblings and empty records with a typ
  for(const tags of [['a',null,''],[false,true],[1,2.5]])
   assert.equal(validateTreeJsonScope(JSON.stringify({items:[{tags:[]},{tags}]})).verified,true);
  assert.throws(()=>validateJsonTreeSchema([...schema,{path:'/items/mixed',name:'mixed',type:'variant',is_container:false,is_array:true}]),/supported types/);
+});
+test('LAB-1807 tree-siblings-native: JSON admits sibling object arrays; tree-to-table selects across them, nested and scalar arrays stay refused',async()=>{
+ const csv=await readFile(new URL('../../../../docs/node-development/nodes/trees-treetodata/fixtures/siblings/documents.csv',import.meta.url),'utf8');
+ const text=csv.split(/\r?\n/)[1].match(/^1,"((?:""|[^"])*)"$/)[1].replaceAll('""','"');
+ assert.deepEqual(Object.keys(JSON.parse(text)),['batch','items','tags']);
+ assert.equal(validateTreeJsonScope(text).verified,true);
+ for(const value of ['{"a":[{}],"b":[{}]}','{"items":[{"parts":[{"sku":"a"}],"other":[{"name":"b"}]}]}','{"items":[{"x":1}],"more":[{"t":"a"}],"x":{"tags":[{"u":"b"}]}}'])
+  assert.equal(validateTreeJsonScope(value).verified,true,value);
+ assert.throws(()=>validateTreeJsonScope('{"items":[{"code":"x"}],"tags":[]}'),/witness/);
+ assert.throws(()=>validateTreeJsonScope(JSON.stringify({items:[{code:'x'}],tags:Array.from({length:128},()=>({tag:'a'}))})),/256 nodes/);
+ const node=(path,type,is_array=false)=>({path,name:path.split('/').at(-1)||'Root',type,is_container:type==='object',is_array});
+ const schema=[node('','object'),node('/batch','string'),node('/items','object',true),node('/items/code','string'),node('/items/qty','integer'),
+  node('/tags','object',true),node('/tags/tag','string')];
+ assert.equal(validateJsonTreeSchema(schema),true);
+ const output={port_kind:'tree',tree:{complete:true,schema}};
+ assert.equal((await tableImplementation(true).readOutputs({readOutputPort:async()=>({output})},{ports:[0],sample_rows:100},{execution:{execution_id:'exec'}},{})).verified,true);
+ assert.equal(validateSelectedTreePaths(schema,['/batch','/items/code','/items/qty','/tags/tag']),true);
+ assert.equal(validateSelectedTreePaths(schema,['/tags/tag'],['/tags']),true);
+ assert.throws(()=>validateSelectedTreePaths(schema,['/tags/tag','/items/code']),/native schema order/);
+ assert.throws(()=>validateSelectedTreePaths([...schema,node('/tags/parts','object',true),node('/tags/parts/sku','string')]),/one object and one repeated branch/);
+ assert.throws(()=>validateSelectedTreePaths([...schema,{...node('/tags/codes','string',true),is_container:false}]),/one object and one repeated branch/);
+ assert.throws(()=>validateSelectedTreePaths(schema.filter(n=>!n.is_array&&!n.path.match(/^\/(items|tags)\//))),/one object and one repeated branch/);
 });
 function tableState(indexed=false){
  const leaf=(path,name)=>({path,name,is_container:false,is_array:false,selected:true,checkbox_tid:name+';TreeCheckbox'});
