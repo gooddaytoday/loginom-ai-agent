@@ -25,7 +25,7 @@ export const kinds = {
 export const actions = {
   document: { title: 'Документировать', detail: 'Описание сценария, узлов и потоков данных', icon: 'book', solution: 'document' },
   check: { title: 'Проверить', detail: 'Найти проблемы в структуре сценария', icon: 'shield', solution: 'refactor', mode: 'review' },
-  improve: { title: 'Улучшить', detail: 'Предложить правки и собрать улучшенную копию', icon: 'wand', solution: 'refactor', mode: 'copy' },
+  improve: { title: 'Улучшить', detail: 'Агент правит копию в разговоре; вы решаете, сохранить ли', icon: 'wand', solution: 'refactor', mode: 'copy' },
   compare: { title: 'Сравнить', detail: 'Сопоставить две версии по результату и скорости', icon: 'chart', solution: 'tournament' },
   regression: { title: 'Проверить на эталоне', detail: 'Запустить на тестовых данных и сверить с эталоном', icon: 'layers', solution: 'regression' },
   standard: { title: 'Проверить по стандарту', detail: 'Названия, комментарии и порядок полей по правилам DataLab', icon: 'check', solution: 'standard', run: { solution: 'refactor', mode: 'review' } },

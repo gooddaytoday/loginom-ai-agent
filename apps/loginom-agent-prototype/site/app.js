@@ -238,7 +238,18 @@ function runSolution(id, mode = 'review', from = 'hub') {
   navigate('runner')
 }
 // Runs a package action (document/check/improve/compare) for a chosen package.
+// «Улучшить» changes a package, so it goes to the conversation with a change card (owner's decision В-28);
+// the wizard stays for actions that do not change the package.
+function improveInChat(pkg) {
+  state.overlay = null
+  state.pendingAction = null
+  if (state.page !== 'chat') newSession()
+  if (pkg) state.draftPackage = pkg
+  state.draft = 'Внеси улучшения в этот пакет'
+  send()
+}
 function runAction(actionId, pkg, from) {
+  if (actionId === 'improve') return improveInChat(pkg)
   const action = packageActions[actionId]
   // Only documenting a file from the computer works without Loginom.
   if (!state.settings.connection.connected && hubHasInstalled(state, action.solution) && !(actionId === 'document' && pkg?.source === 'local')) {
@@ -1248,14 +1259,15 @@ function review() {
     ['Сохранить или отменить','«Сохранить новой версией» — рядом с исходным появится «Продажи — v2.lgp», исходный не тронут. «Заменить исходный…» — только с подтверждением и с резервной копией. «Отменить изменения», «Отменить сохранение», «Вернуть прежнюю версию».','try-check','Начать'],
   ]
   const questions = [
-    '<strong>Как сохранять по умолчанию.</strong> Рекомендую новой версией рядом с исходным («Продажи — v2.lgp»); заменить исходный — отдельной кнопкой, с подтверждением и автоматической копией «… — до правки». Согласны?',
-    '<strong>Сверка результата.</strong> Чтобы проверить правку, агент запускает копию и сравнивает с исходным. Запуск выполняет и выгрузки сценария (в файл, в базу). Рекомендую: сверять запуском, только если в пакете нет выгрузок; если есть — спрашивать разрешение и показывать, какие выгрузки сработают.',
-    '<strong>Имя новой версии.</strong> Рекомендую «Продажи — v2.lgp», «— v3» и дальше; переименовать можно в Loginom. Или удобнее «Продажи (улучшено).lgp»?',
-    '<strong>Два пути к улучшению.</strong> Кнопка «Улучшить» над полем ввода открывает мастер действия (из итерации 1, без карточки изменений), а «Изменить с агентом» и «Внести улучшения» — разговор с карточкой. Рекомендую: «Улучшить» тоже вести в разговор, а мастер оставить для действий, которые пакет не меняют (документировать, сравнить).',
+    '<strong>Сохранение</strong> — новой версией рядом с исходным; заменить исходный — отдельной кнопкой, с подтверждением и копией «… — до правки» (В-25).',
+    '<strong>Сверка запуском</strong> — только если в пакете нет выгрузок; если есть — агент спрашивает разрешение и перечисляет выгрузки (В-26).',
+    '<strong>Имя новой версии</strong> — «Продажи — v2.lgp», «— v3» и дальше (В-27).',
+    '<strong>«Улучшить»</strong> над полем ввода и на странице пакета — разговор с карточкой изменений; мастер — для действий, которые пакет не меняют (В-28).',
   ]
   const later = [
     'Правка пакета, открытого с компьютера (.lgp): та же карточка, сохранение — файлом рядом с исходным или в Loginom.',
     'Несколько правок подряд в одном разговоре — сейчас каждая карточка независима.',
+    'Сверка пакета, в котором есть выгрузки: агент спрашивает разрешение на запуск и перечисляет, какие выгрузки сработают (В-26) — в прототипе у «Продажи.lgp» выгрузок нет.',
     'Ход разговора и счётчики живут до перезагрузки страницы.',
   ]
   const chosen = [
@@ -1267,13 +1279,13 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['«Проверь сценарий» теперь только читает и находит улучшения; «Внести улучшения» — отдельный ход.','Агент правит копию пакета; в ленте — карточка изменений: +1 ~2 −1, строка на каждый узел, «Сверено с исходным».','«Посмотреть на схеме»: узлы с отметками «новый / изменён / удалён», «было → стало», переключатель «Как было».','Сохранить новой версией, заменить исходный (подтверждение и резервная копия), отменить изменения, отменить сохранение, вернуть прежнюю версию.','На странице пакета «Изменить с агентом» начинает этот же путь.']
+  const changed = ['«Проверь сценарий» теперь только читает и находит улучшения; «Внести улучшения» — отдельный ход.','Агент правит копию пакета; в ленте — карточка изменений: +1 ~2 −1, строка на каждый узел, «Сверено с исходным».','«Посмотреть на схеме»: узлы с отметками «новый / изменён / удалён», «было → стало», переключатель «Как было».','Сохранить новой версией, заменить исходный (подтверждение и резервная копия), отменить изменения, отменить сохранение, вернуть прежнюю версию.','На странице пакета «Изменить с агентом» начинает этот же путь.','«Улучшить» над полем ввода, на странице пакета и в «Ещё» ведёт в разговор с карточкой изменений, а не в мастер.']
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 4 — пакет в разговоре</p><h1>Что решить</h1><p>Новое — как агент меняет пакет Loginom и как вы решаете, что с изменениями делать. Пройдите путь, около 10 минут, и ответьте на четыре вопроса — у каждого моя рекомендация.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 4 — пакет в разговоре</p><h1>Что решить</h1><p>Новое — как агент меняет пакет Loginom и как вы решаете, что с изменениями делать. Пройдите путь, около 10 минут. Решения по итерации — ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,target,label],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${label} ${icon('arrow',15)}</button></article>`).join('')}</div>
-    <h2 class="rv-heading">Вопросы</h2>
-    <ol class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ol>
+    <h2 class="rv-heading">Решено по итерации 4</h2>
+    <ul class="rv-changes">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Пока не показано</h2>
     <ul class="rv-changes">${later.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Что изменилось</h2>
@@ -2077,6 +2089,7 @@ app.addEventListener('click', event => {
   if (d.packageAction) {
     const action = packageActions[d.packageAction]
     state.overlay = null
+    if (d.packageAction === 'improve' && (state.draftPackage || state.page === 'loginom')) return improveInChat(state.page === 'loginom' ? packageRef(state.activePackage) : state.draftPackage)
     if (!hubHasInstalled(state, action.solution)) return runAction(d.packageAction, null, 'home')
     if (action.noPackage) return runAction(d.packageAction, null, 'home')
     if (state.draftPackage && state.page !== 'loginom') return runAction(d.packageAction, state.draftPackage, state.page === 'chat' ? 'chat' : 'home')
