@@ -198,11 +198,11 @@ function setThemeAttribute() {
   document.documentElement.dataset.theme = state.theme === 'system'
     ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light') : state.theme
 }
-function toast(message, kind = 'check') {
+function toast(message, kind = 'check', session = '') {
   const el = $('#announcements')
-  el.innerHTML = `<span>${icon(kind,16)}${esc(message)}</span>`
+  el.innerHTML = `<span>${icon(kind,16)}${esc(message)}${session ? `<button class="toast-open" data-toast-session="${session}">Открыть</button>` : ''}</span>`
   clearTimeout(toast.timer)
-  toast.timer = setTimeout(() => { el.innerHTML = '' }, 3800)
+  toast.timer = setTimeout(() => { el.innerHTML = '' }, session ? 7000 : 3800)
 }
 function useTemplate(title, prompt) {
   newSession()
@@ -403,6 +403,7 @@ function runNotice() {
 // Loginom is the agent's main dependency, so its state is always on screen: in the composer or in the
 // top bar (the owner chooses). Not connected — an orange dot and words, not just a colour.
 function loginomChip() {
+  if (state.loginomDown) return `<button class="lgm-chip off" type="button" data-overlay="loginom-status" title="Loginom не отвечает — нажмите, чтобы проверить"><i class="conn-dot warn"></i><span>Loginom<span class="lgm-state"> не отвечает</span></span></button>`
   const connected = state.settings.connection.connected
   const label = state.connecting ? 'Подключаюсь…' : connected ? 'Loginom' : 'Loginom<span class="lgm-state"> не подключён</span>'
   return `<button class="lgm-chip${connected ? '' : ' off'}" type="button" data-overlay="loginom-status" title="${connected ? 'Loginom подключён · ' + esc(hostOf(state.settings.connection.url)) : 'Loginom не подключён — нажмите, чтобы подключить'}"><i class="conn-dot ${state.connecting ? 'busy' : connected ? 'ok' : 'warn'}"></i><span>${label}</span></button>`
@@ -688,12 +689,12 @@ function runSteps(item) {
   }
   if (step.ask === 'permission' && !(item.cleared || []).includes(item.step)) {
     item.phase = 'permission'
-    if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт вашего разрешения`, 'alert')
+    if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт вашего разрешения`, 'alert', item.id)
     return render()
   }
   if (step.ask === 'question' && !asked) {
     item.phase = 'question'
-    if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт вашего ответа`, 'alert')
+    if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}» ждёт вашего ответа`, 'alert', item.id)
     return render()
   }
   item.phase = 'running'
@@ -707,6 +708,7 @@ function runSteps(item) {
 }
 // The demo «Сбой Loginom» makes the step that works in Loginom fail twice; «Повторить шаг» then succeeds.
 function stepFailed(item) {
+  state.loginomDown = true
   item.errors = [...(item.errors || []), {at:item.step, attempt:(item.errors || []).filter(entry => entry.at === item.step).length + 1}]
   if (item.errors.filter(entry => entry.at === item.step).length < 2) {
     item.phase = 'retrying'
@@ -726,28 +728,33 @@ function stepFailed(item) {
   }
   item.phase = 'failed'
   render()
-  if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}»: шаг не выполнен — нужна ваша помощь`, 'alert')
+  if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}»: шаг не выполнен`, 'alert', item.id)
 }
 // The answer is written out as it comes, then the result card appears (a real model streams its text).
 function writeAnswer(item, finalPhase) {
   clearInterval(item.writer)
   const box = document.createElement('div')
   box.innerHTML = result(item)
-  const full = (box.querySelector('h2') ? box.querySelector('h2').textContent + '\n' : '') + (box.querySelector('p')?.textContent || '')
+  const title = box.querySelector('h2')?.textContent || ''
+  const full = title + (box.querySelector('p')?.textContent || '')
   item.phase = 'writing'
   item.writeText = full
+  item.writeTitle = title.length
   item.written = 0
   item.writeFinal = finalPhase
   render()
   item.writer = setInterval(() => {
     item.written = Math.min(full.length, item.written + 7)
     const stream = item.id === state.session && $('.answer-stream')
-    if (stream) stream.textContent = full.slice(0, item.written)
+    if (stream) {
+      stream.querySelector('h2') && (stream.querySelector('h2').textContent = full.slice(0, Math.min(item.written, title.length)))
+      stream.querySelector('p').textContent = full.slice(title.length, Math.max(title.length, item.written))
+    }
     if (item.written < full.length) return
     clearInterval(item.writer)
     item.phase = finalPhase
     render()
-    if (state.session !== item.id && finalPhase === 'done') toast(`Готово: «${item.title}»`)
+    if (state.session !== item.id && finalPhase === 'done') toast(`Готово: «${item.title}»`, 'check', item.id)
   }, 35)
 }
 function startRun(item) {
@@ -806,8 +813,11 @@ function turnAnswer(turn, live = false) {
   if (turn.phase === 'denied') {
     return `<div class="answer-block"><p>${esc(scriptOf(turn).permission.denied)}</p></div>`
   }
-  if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Шаг не выполнен</h2><p>Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}: Loginom не отвечает. Сделанные шаги выше сохранены; можно повторить шаг, когда Loginom снова будет доступен.</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
-  if (turn.phase === 'writing') return `<div class="answer-block"><p class="answer-stream">${esc((turn.writeText || '').slice(0, turn.written))}</p><span class="stream-caret" aria-hidden="true"></span></div>`
+  if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}</h2><p>Loginom (${esc(hostOf(state.settings.connection.url))}) дважды не ответил за 30 секунд. Сделанные шаги выше сохранены.</p><p>Что сделать: проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть, обратитесь к администратору. Когда Loginom заработает, нажмите «Повторить шаг».</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
+  if (turn.phase === 'writing') {
+    const text = turn.writeText || '', title = turn.writeTitle || 0
+    return `<div class="answer-block answer-stream">${title ? `<h2>${esc(text.slice(0, Math.min(turn.written, title)))}</h2>` : ''}<p>${esc(text.slice(title, Math.max(title, turn.written)))}<span class="stream-caret" aria-hidden="true"></span></p></div>`
+  }
   if (turn.phase === 'stopped') return `<div class="answer-block"><p>${turn.step ? 'Остановлено по вашей команде. Сделанные шаги не отменяются — они перечислены выше.' : 'Остановлено по вашей команде до первого шага.'}</p>${live ? `<button class="btn" data-action="resume">${icon('play',15)} Продолжить</button>` : ''}</div>`
   if (turn.phase === 'interrupted') return `<div class="answer-block"><p class="muted">${turn.step ? 'Не закончено — вы отправили новое сообщение. Сделанные шаги выше.' : 'Не начато — вы отправили новое сообщение.'}</p></div>`
   const steer = turn.steer?.length ? `<p class="steer-note">Учёл вашу поправку: «${esc(turn.steer.at(-1).text)}». <span class="muted">В прототипе цифры не меняются.</span></p>` : ''
@@ -829,10 +839,10 @@ function turnSteps(turn, live, turnIndex) {
     rows.push(`<li class="step done">${icon(step.icon,15)}<span>${esc(step.ask === 'permission' ? followed(stepText(step.done, turn), turn) : stepText(step.done, turn))}${step.detail && (detailed || turn.open?.includes(index)) ? `<small>${esc(stepText(step.detail, turn))}</small>` : ''}</span>${step.detail && !detailed ? `<button class="small-icon step-more" data-step-detail="${turnIndex}:${index}" aria-label="${turn.open?.includes(index) ? 'Скрыть' : 'Показать'} подробности шага" aria-expanded="${Boolean(turn.open?.includes(index))}">${icon('more',14)}</button>` : ''}</li>`)
     ;(turn.steer || []).filter(entry => entry.at === index + 1).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}»</span></li>`))
   })
-  ;(turn.steer || []).filter(entry => entry.at > turn.step).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}» — ${turn.phase === 'running' ? 'учту после текущего шага' : 'учту, когда продолжу'}</span></li>`))
   const denied = turn.decisions?.find(entry => entry.choice === 'deny')
   if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(script.permission.trace)}</span></li>`)
   errorRows(turn.step)
+  ;(turn.steer || []).filter(entry => entry.at > turn.step).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}» — ${turn.phase === 'running' ? 'учту после текущего шага' : turn.phase === 'retrying' ? 'учту после повтора шага' : 'учту, когда продолжите'}</span></li>`))
   if (live && turn.phase === 'retrying') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>Повторю через ${turn.retryIn} с…</span></li>`)
   if (live && turn.phase === 'running') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>${esc(stepText(script.steps[turn.step].live, turn))}…</span></li>`)
   if (live && ['permission','question'].includes(turn.phase)) rows.push(`<li class="step waiting">${icon('alert',15)}<span>${turn.phase === 'permission' ? 'Жду вашего разрешения — внизу' : 'Жду вашего ответа — внизу'}</span></li>`)
@@ -849,8 +859,9 @@ function turnView(item, turn, index, live) {
   const finished = ['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase)
   const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','question','failed'].includes(turn.phase))
   const brief = state.detail !== 'full'
-  const objects = [...script.steps.slice(0, turn.step).map(step => step.short), ...(turn.errors?.length ? ['повторил шаг после сбоя Loginom'] : [])]
-  const summary = finished && hasSteps && brief && !turn.expanded && turn.phase !== 'failed'
+  const objects = [...script.steps.slice(0, turn.step).map(step => step.short), ...((turn.errors || []).some(entry => entry.at < turn.step) ? ['повторил шаг после сбоя Loginom'] : [])]
+  const unresolved = (turn.errors || []).some(entry => entry.at >= turn.step)
+  const summary = (finished || turn.phase === 'writing') && hasSteps && brief && !turn.expanded && !unresolved
   return `<div class="turn">
     <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
       <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
@@ -859,7 +870,7 @@ function turnView(item, turn, index, live) {
       ${turn.phase === 'plan' ? `<div class="answer-block"><h2>План работы</h2><p>Проверьте шаги — и я начну.</p>${turnPlan(turn)}<button class="btn primary" data-action="run-plan">Выполнить ${icon('arrow',16)}</button></div>` : ''}
       ${live && ['running','retrying','permission','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
       ${summary ? `<button class="turn-summary" data-expand-turn="${index}" aria-expanded="false">${icon('chevron',14)}<span>Работал ${turnTime(turn)} · ${esc(objects.join(', '))}</span></button>` : ''}
-      ${hasSteps && !summary ? `${finished && brief ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
+      ${hasSteps && !summary ? `${finished && brief && !unresolved ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
       ${finished || turn.phase === 'writing' ? turnAnswer({...turn, id:item.id + '-' + index}, live) : ''}
       ${finished ? `<div class="msg-actions agent-actions"><button class="msg-act" data-copy-answer="${index}">${icon('copy',14)}<span>Копировать</span></button><span class="turn-meta">${hasSteps ? turnTime(turn) + ' · ' : ''}${esc(currentModel() || 'модель')}</span></div>` : ''}
     </div></div>
@@ -1225,7 +1236,11 @@ function overlay() {
       </div>
       <p class="pkg-section">Учебные файлы</p>
       <div class="dialog-options"><button data-file="sales-demo.csv"><span class="glyph blue">${icon('database',18)}</span><span><strong>sales-demo.csv</strong><small>Пример таблицы продаж</small></span>${icon('plus',18)}</button><button data-file="Продажи.lgp"><span class="glyph red">${icon('flow',19)}</span><span><strong>Продажи.lgp</strong><small>Учебный пакет Loginom</small></span>${icon('plus',18)}</button></div>`],
-    'loginom-status': ['Loginom', kind === 'loginom-status' ? (state.settings.connection.connected
+    'loginom-status': ['Loginom', kind === 'loginom-status' ? (state.loginomDown
+      ? `<div class="connect-card"><span class="glyph red">${icon('alert',19)}</span><div><strong>Loginom не отвечает</strong>
+          <p class="muted">Последний запрос к ${esc(hostOf(state.settings.connection.url))} остался без ответа 30 секунд. Проверьте, открывается ли Loginom в браузере. Если нет — он выключен или недоступна сеть: обратитесь к администратору.</p>
+          <div class="button-row"><button class="btn primary" data-action="recheck-loginom">${icon('refresh',15)} Проверить снова</button><button class="btn quiet" data-settings="loginom">${icon('settings',15)} Настройки подключения</button></div></div></div>`
+      : state.settings.connection.connected
       ? `<div class="connect-card"><span class="glyph green">${icon('check',19)}</span><div><strong>Подключено</strong>
           <dl><div><dt>Адрес</dt><dd>${esc(hostOf(state.settings.connection.url))}</dd></div><div><dt>Пользователь</dt><dd>${esc(state.settings.connection.username)}</dd></div><div><dt>Папка</dt><dd>${esc(packageFolder('personal'))}</dd></div></dl>
           <div class="button-row"><button class="btn quiet" data-settings="loginom">${icon('settings',15)} Настройки подключения</button></div></div></div>`
@@ -1383,7 +1398,10 @@ function send() {
   // Questions need no Loginom; documenting a file from the computer neither. The rest asks to connect.
   const needsLoginom = kind !== 'chat' && !(kind === 'document' && state.draftPackage?.source === 'local')
   const phase = needsLoginom && !state.settings.connection.connected ? 'connect' : 'starting'
-  if (old) clearTimeout(old.timer)
+  if (old) {
+    clearTimeout(old.timer)
+    clearInterval(old.writer)
+  }
   // «Изменить» on a message: the turns from it on are replaced by the new request.
   const editAt = old && state.editTurn?.session === old.id ? state.editTurn.index : null
   const earlier = old ? [...(old.history || []), turnSnapshot(old)] : []
@@ -1448,7 +1466,7 @@ function feedAction(d) {
 }
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
-  return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:['running','retrying','writing','permission','question','plan','connect','starting','failed'].includes(item.phase) ? 'interrupted' : item.phase,
+  return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:item.phase === 'writing' ? item.writeFinal : ['running','retrying','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
     step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || []})
 }
 function connectLoginom() {
@@ -1541,13 +1559,22 @@ const actions = {
     const item = currentItem()
     clearTimeout(item.timer)
     clearInterval(item.writer)
-    item.phase = 'stopped'
+    // The work is done while the answer is being written: stopping just shows it whole.
+    item.phase = item.phase === 'writing' ? item.writeFinal : 'stopped'
     render()
     $('#prompt')?.focus()
   },
   resume:() => runSteps(currentItem()),
+  // The demo's Loginom «comes back» on the next check.
+  'recheck-loginom':() => {
+    state.loginomDown = false
+    state.overlay = null
+    toast('Loginom отвечает')
+    render()
+  },
   'retry-step':() => {
     const item = currentItem()
+    state.loginomDown = false
     item.failAt = null
     item.decisions.push({at:item.step, choice:'retry'})
     runSteps(item)
@@ -2067,6 +2094,12 @@ function focusPage() {
   ($('#prompt') || $('#main'))?.focus()
 }
 document.documentElement.addEventListener('pointerleave', () => { peekHeld = false; if (state.collapsed) peekSidebar(false) })
+$('#announcements').addEventListener('click', event => {
+  const id = event.target.closest('[data-toast-session]')?.dataset.toastSession
+  if (!id) return
+  $('#announcements').innerHTML = ''
+  openSession(id)
+})
 addEventListener('popstate',() => { route(); state.overlay = null; render(true) })
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',() => { if (state.theme === 'system') render() })
 // Seeds are finished conversations: every step done (the scripts are declared above this line).

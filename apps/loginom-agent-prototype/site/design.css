@@ -486,5 +486,6 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .answer-block.failed{border-color:var(--accent-line);background:var(--accent-soft)}
 .answer-block.failed h2{display:flex;align-items:center;gap:8px;color:var(--accent)}
 .answer-block.failed .button-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
-.answer-stream{display:inline;margin:0;white-space:pre-wrap}
 .stream-caret{display:inline-block;width:7px;height:1.05em;margin-left:2px;vertical-align:-2px;background:var(--accent);animation:conn-pulse 1s steps(2) infinite}
+#announcements .toast-open{pointer-events:auto;margin-left:6px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;font-weight:600;font-size:13px}
+#announcements .toast-open:hover{border-color:var(--muted)}
