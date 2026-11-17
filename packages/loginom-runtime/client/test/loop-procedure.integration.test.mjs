@@ -92,8 +92,14 @@ for(const fault of ['loading','unrendered','dialog'])test('production Loop refus
 });
 
 test('production Loop ignores only native disabled key-grid masks in group_rows',async t=>{
- const f=await fixture(t,{disabledGrid:true}),out=await f.run(2000);
+ const f=await fixture(t,{disabledGrid:true}),wait=f.page.waitForTimeout.bind(f.page);
+ let now=0;
+ // Advance only by requested waits, independently of browser work and CPU scheduling.
+ t.mock.method(f.page,'waitForTimeout',async ms=>{now+=ms;await wait(ms);});
+ const out=await f.run(2000,()=>now);
  assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));
+ assert.equal(out.configuration.settings.group_size,'1');
+ assert.equal(await f.page.locator('#keys .x-mask').count(),1);
 });
 test('Loop deadline preserves the partial wizard and identifies the waiting condition',async t=>{
  const f=await fixture(t,{foreignMask:true}),wait=f.page.waitForTimeout.bind(f.page);
