@@ -457,7 +457,7 @@ for directory in builds jobs-in jobs-out; do
 done
 replace_site
 if ! { cp "$tmp/next.env" "$state/.env" && cp "$tmp/next-compose.yaml" "$state/compose-release.yaml" &&
-  (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d) && "$engine" exec "$studio" httpd -k graceful; }; then
+  (cd "$state" && "${compose[@]}" -p loginom-dashboard -f compose-release.yaml up -d --force-recreate) && "$engine" exec "$studio" httpd -k graceful; }; then
   if [[ -e $tmp/previous.conf ]]; then
     { cp -a "$tmp/previous.conf" "$site.new" && mv -f "$site.new" "$site"; } || echo "Previous Apache file recovery failed" >&2
   else rm -f "$site" || echo "Apache candidate removal failed" >&2; fi
