@@ -55,7 +55,29 @@ export function readLogRegressionBrowser(prefix) {
  if(active(partitionBase)){
   const values={},names={train:'SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer',test:'SizeGridForm;colRelativeSize;FloatPropEdit-1;PropContainer;ValueContainer',sampling:'pedSamplingMethod',validation:'ValidationSettings;pedLearnValidationMethod'};
   for(const [key,path] of Object.entries(names)){const c=exactValue(partitionBase+';'+path+';ValueControl');if(!c||!Number.isFinite(c.getValue()))return {verified:false,reason:'logregression_partition'};values[key]=c.getValue();}
-  return {verified:true,kind:'partition',values};
+  const switches={},disabled={};
+  for(const [key,path] of Object.entries(names)){
+   const c=exactValue(partitionBase+';'+path+';ValueControl');
+   if(typeof c.isDisabled!=='function')return {verified:false,reason:'logregression_partition_disabled'};
+   disabled[key]=c.isDisabled();
+   const es=[...document.querySelectorAll('[data-tid='+JSON.stringify(partitionBase+';'+path.replace(';PropContainer;ValueContainer','')+';SwitchButton')+']')];
+   if(es.length>1)return {verified:false,reason:'logregression_partition_switch'};
+   switches[key]=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id)?.pressed===true;
+  }
+  let sequence=null;
+  if(values.sampling===1){
+   const tid=partitionBase+';SequenceMethodForm;grdSequence',es=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')],grid=es.length===1&&globalThis.Ext?.getCmp?.(es[0].id),store=grid?.getStore?.(),records=store?.getData?.()?.items;
+   if(grid?.el?.dom!==es[0]||store?.$className!=='Ext.data.Store'||store.isLoading?.()||store.isBufferedStore||!Array.isArray(records)||records.length!==3||store.getCount?.()!==3
+    ||records.some((r,i)=>!r.isModel||r.data?.SequenceOrder!==i||![0,1,2].includes(r.data?.PartitionType)||r.data?.SizePath!==''))return {verified:false,reason:'logregression_partition_sequence'};
+   sequence=records.map(r=>r.data.PartitionType);
+   if(new Set(sequence).size!==3)return {verified:false,reason:'logregression_partition_sequence'};
+  }
+  const counts={};
+  for(const [key,path] of Object.entries({train_count:'SizeGridForm;colAbsoluteSize;FloatPropEdit;PropContainer;ValueContainer;ValueControl',test_count:'SizeGridForm;colAbsoluteSize;FloatPropEdit-1;PropContainer;ValueContainer;ValueControl',total_count:'txtTotalRecords'})){
+   const c=exactValue(partitionBase+';'+path),value=c?.getValue();
+   if(value!==undefined&&value!==''&&Number.isSafeInteger(Number(value))&&Number(value)>=0)counts[key]=Number(value);
+  }
+  return {verified:true,kind:'partition',values,switches,disabled,sequence,...counts,source_status:exactValue(partitionBase+';txtActivationPortStatus')?.getValue()??null};
  }
 
  const normBase=prefix+';WizrdMCF;NormTuneWizard;',normRoots=[...document.querySelectorAll('[data-tid='+JSON.stringify(normBase.slice(0,-1))+']')];

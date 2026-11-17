@@ -62,15 +62,14 @@ export async function configureLogRegression(channel,parameters,{inputMapping,re
   'only none/standardize continuous predictors and native categorical target encoding are supported');
  const normalization=await configureLogRegressionNormalization(channel,p,{request,baseline});
  state=await observe('normalization','complete logistic normalizers after edit');
- if(normalization.source_status==='Не активировано'){
+ if(normalization.source_status==='Не активировано'&&!p.partition){
   await channel.perform({condition:'activate connected logistic input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
   state=await channel.observe({condition:'logistic input activated',readLogRegression:true,ready:s=>ready('normalization')(s)&&s.node_logregression.source_status!=='Не активировано'});
  }
  await next('normalization','learn_partition');
  state=await observe('partition','complete logistic training partition');
- need(state.node_logregression.values.train===100&&state.node_logregression.values.test===0&&state.node_logregression.values.validation===0,'stage 1 requires 100 percent training without validation');
- const partition=state.node_logregression.values;
+ const partition=await configureLogRegressionPartition(channel,p);
  await next('learn_partition','lin_regression');
  state=await observe('parameters','complete logistic parameters and classes');
  const nativeClasses=state.node_logregression.classes;
@@ -208,7 +207,8 @@ async function configureLogRegressionApply(channel,p){
    &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(p.normalization===undefined||f.norm_type==={none:0,standardize:5}[p.normalization]):Number.isInteger(f.norm_type)))&&new Set(normalization.filter(f=>p.input_fields.includes(f.name)).map(f=>f.norm_type)).size===1,'normalization');
  await next('normalization','learn_partition');
  state=await observe('learn_partition','saved logistic partition');const partition=state.node_logregression.values;
- await saved(partition.train===100&&partition.test===0&&partition.validation===0,'partition');
+ await saved(partition.train===(p.partition?.train_percent??100)&&partition.test===(p.partition?.test_percent??0)&&partition.validation===0
+  &&(!p.partition||partition.sampling===1&&same(state.node_logregression.sequence,[0,1,2]))&&Object.values(state.node_logregression.switches??{}).every(v=>v===false),'partition');
  await next('learn_partition','lin_regression');
  state=await observe('lin_regression','saved logistic model parameters');
  const {values,classes,switches}=state.node_logregression;
@@ -226,4 +226,43 @@ async function configureLogRegressionApply(channel,p){
   configuration:{...roles,mode:'apply',normalization,partition,classes:classes.map(({index,label})=>({index,label})),
    target_field:p.target_field,event:p.event,threshold:p.threshold,intercept:true,epsilon:1e-10,node_context:done.prepared_node_context},
   validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
+}
+
+async function configureLogRegressionPartition(channel,p){
+ const ready=s=>s.wizard?.stage==='learn_partition'&&s.node_logregression?.verified===true&&s.node_logregression.kind==='partition';
+ const observe=condition=>channel.observe({condition,readLogRegression:true,ready});
+ let state=await observe('logistic partition before configuration');
+ const unchanged=()=>need(state.node_logregression.values.validation===0&&Object.values(state.node_logregression.switches).every(v=>v===false),'partition requires no validation or variable bindings');
+ unchanged();
+ const wanted=p.partition;
+ if(!wanted){need(state.node_logregression.values.train===100&&state.node_logregression.values.test===0,'partition omitted requires 100 percent training');return state.node_logregression.values;}
+ const one=(s,tid,verb)=>{const es=s.ui.elements.filter(e=>(e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb));need(es.length===1,'partition control unavailable: '+tid);return es[0];};
+ const act=async(key,action)=>channel.perform({condition:'configure logistic partition '+key,initialObservation:state,ready,identity:s=>s.prepared_node_context,
+  resolve:s=>({...action,ref:one(s,s.wizard.root_tid+';LearnPartitionWizard;'+key,action.verb).ref})});
+ if(state.node_logregression.source_status==='Не активировано'){
+  await act('btnActivationPort',{verb:'click'});
+  state=await channel.observe({condition:'logistic partition input activated with row count',readLogRegression:true,
+   ready:s=>ready(s)&&s.node_logregression.source_status==='Вход активирован'&&Number.isSafeInteger(s.node_logregression.total_count)});
+ }
+ need(state.node_logregression.disabled.train===false&&state.node_logregression.disabled.test===false,'partition percentages must be editable');
+ if(state.node_logregression.values.sampling!==1){
+  await act('pedSamplingMethod;ValueControl;trg_picker',{verb:'click'});
+  state=await channel.observe({condition:'observed sequential logistic partition',readLogRegression:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';LearnPartitionWizard;pedSamplingMethod;ValueControl;boundlist;Последовательный'&&e.label==='Последовательный'&&e.allowed_actions.includes('click'))});
+  await act('pedSamplingMethod;ValueControl;boundlist;Последовательный',{verb:'click'});
+  state=await observe('sequential logistic partition selected');need(state.node_logregression.values.sampling===1,'sequential partition selection differs');
+ }
+ for(const [key,suffix] of [['train',''],['test','-1']]){
+  const value=wanted[key+'_percent'];
+  if(state.node_logregression.values[key]===value)continue;
+  const tid='SizeGridForm;colRelativeSize;FloatPropEdit'+suffix+';PropContainer;ValueContainer;ValueControl';
+  await act(tid,{verb:'fill',text:String(value)});state=await observe('logistic partition percentage input');
+  await act(tid,{verb:'press',key:'Tab'});state=await observe('logistic partition percentage committed');
+  need(state.node_logregression.values[key]===value,'partition percentage differs: '+key);
+ }
+ unchanged();const r=state.node_logregression;
+ need(same(r.sequence,[0,1,2]),'partition order must be training then test then unused');
+ need(r.values.sampling===1&&r.values.train===wanted.train_percent&&r.values.test===wanted.test_percent,'partition readback differs');
+ need(Number.isSafeInteger(r.train_count)&&r.train_count>0&&Number.isSafeInteger(r.test_count)&&r.test_count>0
+  &&r.train_count+r.test_count===r.total_count,'partition row counts unavailable or inconsistent');
+ return {...r.values,train_count:r.train_count,test_count:r.test_count,total_count:r.total_count};
 }

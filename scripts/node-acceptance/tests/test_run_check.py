@@ -2283,6 +2283,15 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
         result = subprocess.run([sys.executable, '-B', case['source'] / 'oracle.py', '--check'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_logreg_partition_sequential_catalog_keeps_frozen_oracle_private(self):
+        case = runner.scenario('logreg-partition-sequential')
+        self.assertEqual(case['prompt'].name, 'task-partition-sequential.md')
+        self.assertEqual(case['input_files'], ['partition.csv'])
+        self.assertEqual(case['expected_name'], 'expected.json')
+        self.assertEqual(case['oracle'].name, 'oracle.py')
+        self.assertEqual(case['source'].name, 'partition-sequential')
+        self.assertEqual(runner.scenario('logreg-coefficients')['input_files'], ['train.csv'])
+
     def test_logreg_enter_uses_authored_task_input_and_preserves_n21(self):
         self.assertEqual(runner.scenario('n21')['source'].parent.name, 'transform-slidingwindow')
         case = runner.scenario('logreg-enter')
@@ -2387,6 +2396,48 @@ matchExpectedOutputs([{node,type:'transform.reform_columns',output_port:0,data}]
                 self.assertNotEqual(subprocess.run(command + [str(bad)], capture_output=True).returncode, 0)
                 with self.assertRaisesRegex(AssertionError, 'CSV_ROW_COUNT'):
                     runner.check_csv(bad, output)
+
+    def test_logreg_partition_csv_by_name_is_scenario_scoped_and_strict(self):
+        spec = runner.scenario('logreg-partition-sequential')
+        expected = runner.expected_for(spec, '/test/partition.lgp')['outputs'][0]
+        before = copy.deepcopy(expected)
+        canonical = [c['name'] for c in expected['columns']]
+        permuted = canonical[:4] + ['RowID', 'X', 'Target', 'Note', 'Split', 'Fold']
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'actual.csv'
+            def write(names, rows):
+                with actual.open('w', newline='') as stream:
+                    writer = csv.writer(stream)
+                    writer.writerow(names)
+                    for row in rows:
+                        writer.writerow(['?' if row.get(name) is None else row[name] for name in names])
+            write(permuted, expected['rows'])
+            runner.check_csv(actual, expected, null_marker='?', scenario_name='logreg-partition-sequential')
+            self.assertEqual(expected, before)
+            for scenario in ['logreg-enter', 'logreg-elastic-net', 'logreg-lasso', 'tree-to-table-typed', 'other', None]:
+                with self.subTest(scenario=scenario):
+                    with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
+                        runner.check_csv(actual, expected, null_marker='?', scenario_name=scenario)
+            for names in [permuted[:-1], permuted + ['Extra'], permuted[:-1] + ['Other'], permuted[:-1] + ['Split']]:
+                with self.subTest(names=names):
+                    write(names, expected['rows'])
+                    with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
+                        runner.check_csv(actual, expected, null_marker='?', scenario_name='logreg-partition-sequential')
+            for key, value in [('PredictionProbability', 0.99), ('RowID', 'wrong-type'), ('Target', 'different'), ('Note', 'not-null')]:
+                rows = copy.deepcopy(expected['rows']); rows[0][key] = value
+                write(permuted, rows)
+                with self.subTest(key=key):
+                    with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                        runner.check_csv(actual, expected, null_marker='?', scenario_name='logreg-partition-sequential')
+            write(permuted, expected['rows'][:-1])
+            with self.assertRaisesRegex(AssertionError, 'CSV_ROW_COUNT'):
+                runner.check_csv(actual, expected, null_marker='?', scenario_name='logreg-partition-sequential')
+            write(permuted, list(reversed(expected['rows'])))
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                runner.check_csv(actual, expected, null_marker='?', scenario_name='logreg-partition-sequential')
+            write(canonical, expected['rows'])
+            runner.check_csv(actual, expected, null_marker='?', scenario_name='logreg-enter')
+            self.assertEqual(expected, before)
 
     def test_csv_declared_column_order_and_dates_keep_value_checks(self):
         expected = {'columns': [{'name': 'Id', 'type': 'integer'}, {'name': 'Due', 'type': 'datetime'}],

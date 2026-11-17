@@ -28,6 +28,8 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
+# Owner decision 16.11 logreg-partition-csv-by-name: native warm/reopen order differs.
+CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential',)
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
@@ -798,11 +800,11 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['weighted.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
-    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net']:
+    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net', 'logreg-partition-sequential']:
         variant = name.removeprefix('logreg-')
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes' / variant
         return dict(source=src, prompt=src / ('task-' + variant + '.md'), data=src / 'data', base=None,
-                    input_files=['train.csv'], expected_name='expected.json',
+                    input_files=['partition.csv' if variant == 'partition-sequential' else 'train.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
     if name == 'logreg-normalization':
@@ -1850,7 +1852,8 @@ def check_csv(path, expected, header='names', *, column_order=None, null_marker=
     if not has_header:
         # Without names/labels, expected columns declare CSV positions.
         indices = list(range(len(columns)))
-    elif (column_order or expected.get('column_order')) == 'exact':
+    elif ((column_order or expected.get('column_order')) == 'exact'
+          and not (header == 'names' and scenario_name in CSV_COLUMNS_BY_NAME_SCENARIOS)):
         assert all(fits(name, col) for name, col in zip(rows[0], columns)), 'CSV_COLUMN_ORDER'
         indices = list(range(len(columns)))
     else:

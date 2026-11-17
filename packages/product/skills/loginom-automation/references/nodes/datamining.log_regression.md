@@ -1,77 +1,79 @@
-# Логистическая регрессия (`datamining.log_regression`)
+# Logistic regression (`datamining.log_regression`)
 
 <!-- mode: enter forward backward stepwise apply -->
-## Обучение и прогноз
+## Training and predictions
 
 `loginom_dock_node_apply`, `target.type:"datamining.log_regression"`,
 `mode:"enter"`, `parameters:{logistic:{input_fields:[...],target_field:"...",event:"...",threshold:...}}`.
-Цель: два String-класса; событие `p >= threshold`.
-input_fields — числовые факторы; прочие поля сохраняются без роли.
-`finish:"execute"` обучает на текущем входе и прогнозирует; `read.ports:[0]`
-возвращает прогноз и исходные поля. Константа, epsilon=1e-10.
-Без валидации и переменных. Запроси `parameter_schema`.
+Target: two String classes; event iff p >= threshold. input_fields are numeric
+predictors; other fields pass through without a role. `finish:"execute"` trains
+on the current input and predicts; `read.ports:[0]` reads predictions/originals.
+Intercept, epsilon=1e-10. No validation or variable bindings. Request `parameter_schema`.
 
-## Частотные веса Real
+## Sequential partition
 
-Enter: `parameters.logistic.weight_field:"Weight"` — положительные частотные
-веса Real. Исключи поле из input_fields; оно сохраняется в прогнозе, без
-нормализации. Integer — отказ до редактирования ролей, без конвертации.
-После открытия apply с прежним weight_field проверяет роль без Teach.
+Enter: `logistic.partition:{method:"sequential",train_percent:50,test_percent:50}`.
+Both >0, sum 100. First rows train, next rows test; predictions cover all rows.
+Split/Fold are not predictors unless listed in input_fields. Omit partition for
+100% training. Readback reports percentages and train/test/total row counts;
+port 2 is unsupported. Save; reopen with the same partition in apply, without Teach.
 
-## Отбор факторов
+## Real frequency weights
 
-`forward`, `backward`, `stepwise`; критерий:
-`parameters.logistic.selection.criterion`: `deviance`, `aic`, `aicc`, `bic`, `hqic`.
-Deviance: Forward — `entry_significance`, Backward — `removal_significance`,
-Stepwise — оба, 0 < entry < removal < 1. Прочие критерии запрещают пороги.
-Без selection: Deviance 0.05/0.1. input_fields — кандидаты; исключённые
-факторы остаются в выходе.
+Enter: `logistic.weight_field:"Weight"`, positive Real frequency weights.
+Exclude it from input_fields; retain it in predictions, without normalization.
+Integer refuses before role edits, without conversion. After reopen, apply with
+the saved weight_field verifies its role without Teach.
 
-## Enter apply
+## Factor selection
 
-`mode:"apply"` — только для ранее обученной Enter-модели с none или standardize.
-Сохрани пакет; замени файл прежнего импорта с той же схемой, выполни импорт.
-На прежнем узле: `target.kind:"existing"`, свежий `target.ref`, `inputs:[]`,
-`mappings:[]`, прежние logistic-параметры, `finish:"execute"`, `read.ports:[0]`.
-Apply сверяет настройки; несовпадение — отказ. Закрывает без Save/Teach.
-Обучение: enter. NULL Target → NULL ActualEvent.
-Save/reopen: обнови refs графом, apply без перенастройки.
+Modes forward/backward/stepwise; `logistic.selection.criterion`:
+deviance/aic/aicc/bic/hqic. Deviance requires entry_significance for Forward,
+removal_significance for Backward, both for Stepwise: 0 < entry < removal < 1.
+Other criteria forbid cutoffs. Omitted selection: Deviance 0.05/0.1.
+input_fields lists candidates; excluded factors remain in output.
 
-## Коэффициенты
+## Apply saved Enter
 
-`mode:"enter"`, прежние параметры, `finish:"execute"`, `read.ports:[1]`
-или [0,1], `read.require_exact_numbers:true`. Порт 1: Name, DisplayName,
-UniqueValues, затем поля с префиксом цели: _coefficients, _stdError, _wald,
-_waldPValue, _oddsRatio, _lowerBound, _upperBound (последние — 95%).
-NULL, точность и порядок сохранены. CSV: `exports.text`, output:1, технические имена.
-Save/reopen: Enter-модель читай через apply с прежними параметрами,
-read.ports:[1], без Teach.
+`mode:"apply"`: trained Enter with none/standardize. Save, replace the same
+Import's source with the same schema and execute Import. On the same model:
+`target.kind:"existing"`, fresh target.ref, inputs:[], mappings:[], saved logistic
+parameters, finish:"execute", read.ports:[0]. Apply verifies settings; mismatch
+refuses. It closes the draft without Save/Teach. Train with enter.
+NULL Target gives NULL ActualEvent. After Save/reopen, refresh graph refs and
+apply without reconfiguration.
 
-## Нормализация
+## Coefficients
 
-`parameters.logistic.normalization:"standardize"` стандартизует факторы;
-`"none"` отключает нормализацию. Сначала enter/none, Execute, read.ports:[0]; затем тот
-же existing target/ref, standardize, Execute, read.ports:[0,1]. Остальное сохраняй. Коэффициенты — в шкале нормализованных факторов.
-Пропуск normalization на existing сохраняет её.
-После Save/reopen apply с прежними параметрами сверяет нормализатор без Teach.
+Enter, saved parameters, finish:"execute", read.ports:[1] or [0,1],
+read.require_exact_numbers:true. Port 1: Name, DisplayName, UniqueValues, then
+target-prefixed _coefficients, _stdError, _wald, _waldPValue, _oddsRatio,
+_lowerBound, _upperBound (95%). Preserve NULL, precision and order.
+CSV: exports.text, output:1, technical names. After Save/reopen, apply with saved
+parameters and read.ports:[1], without Teach.
 
+## Normalization
+
+`logistic.normalization:"standardize"` standardizes predictors; "none" disables it.
+First enter/none, Execute/read.ports:[0]; then the same existing target/ref,
+standardize, Execute/read.ports:[0,1], preserving other settings. Coefficients
+use normalized predictor units. Omission on existing preserves normalization.
+After Save/reopen, apply verifies the saved normalizer without Teach.
 <!-- /mode -->
 
 <!-- mode: ridge lasso elastic_net -->
 ## Ridge / LASSO / Elastic Net
 
-`mode:"ridge"`: `parameters.logistic.regularization:{lambda_ridge:1}`.
-`mode:"lasso"`: `parameters.logistic.regularization:{lambda_lasso:1}`.
-`mode:"elastic_net"`: `parameters.logistic.regularization:{lambda_lasso:1,lambda_ridge:1}`.
-λ раздельные ручные; без alpha/автонастройки.
-λ>0; прочие logistic-параметры обязательны, selection запрещён.
-Обязательны input_fields, target_field, event, threshold; read.ports:[0] — полный прогноз.
-normalization none/standardize — факторы; пропуск сохраняет её на existing.
-Константа не штрафуется; Execute обучает и прогнозирует. Повтор:
-тот же existing target/ref, inputs:[], прежние параметры. Save отдельно;
-reopen: обнови refs графом.
-Apply — только Enter. После reopen на прежнем узле — прежний ridge/lasso/elastic_net,
-прежние параметры, inputs:[], mappings:[], `finish:"done"`, `read.ports:[]`, без Teach.
-Reopen CSV: новый exports.text от output:0, Execute, технические имена
-и сохранённый порядок; проверь CSV, Save.
+ridge: `logistic.regularization:{lambda_ridge:1}`;
+lasso: `{lambda_lasso:1}`; elastic_net: `{lambda_lasso:1,lambda_ridge:1}`.
+Separate manual lambdas >0, no alpha/automatic tuning, no selection.
+input_fields, target_field, event, threshold remain required; read.ports:[0]
+reads all predictions. normalization none/standardize affects predictors;
+omission on existing preserves it. Intercept is unpenalized.
+Execute trains and predicts. Repeat on the same existing target/ref with inputs:[]
+and saved parameters. Save separately; refresh graph refs after reopen.
+Apply supports Enter only. After reopen use the saved ridge/lasso/elastic_net
+mode and parameters on the same node, inputs:[], mappings:[], finish:"done",
+read.ports:[], without Teach. For reopened CSV create a new exports.text from
+output:0, Execute with technical names and saved order; check CSV and Save.
 <!-- /mode -->
