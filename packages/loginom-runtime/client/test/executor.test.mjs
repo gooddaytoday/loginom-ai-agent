@@ -890,12 +890,35 @@ test('normalization cannot rebind a replaced native node with the same rendered 
  assert.equal(result.trace.some(e=>e.event==='save_continuations_observed'),false);
 });
 
-test('a REST request without a connection reference keeps the ordinary checkpoint path',async()=>{
+for(const icon of ['bg-vendor-icon-restclient','bg-vendor-icon-importtextfile','bg-vendor-icon-calcdata','bg-vendor-icon-sorting'])
+test('a workflow without REST reference or grouping keeps the ordinary checkpoint path: '+icon,async()=>{
  const page=await restSavePage([true,true],false);
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls=icon;
  const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome));
  assert.equal(page.saveWrites,1);assert.equal(page.modifiedReads,0);
  assert.equal(page.events.includes('package_closed'),false);assert.equal(outcome.output.reopened,false);
+ assert.equal(page.events.includes('package_reopened'),false);
+ assert.equal(outcome.trace.some(e=>e.event==='rest_package_normalization'),false);
+});
+
+for(const action of ['package.save_checkpoint','package.save_as'])for(const modified of [[true,false],[false],[true,true]])
+test('grouping uses the existing guarded normalization only after dirty reopen: '+action+' '+modified,async()=>{
+ const page=await restSavePage(modified,false);
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls='bg-vendor-icon-groupdata';
+ const outcome=await run(page,action,{path:'/user/data/packages/grouping.lgp',conflict_policy:'fail'});
+ assert.equal(outcome.status,modified.at(-1)?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(outcome));
+ assert.equal(page.events.filter(e=>e==='package_closed').length,1);
+ assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+ assert.equal(page.saveWrites,modified[0]?2:1);assert.equal(page.modifiedReads,modified.length);
+ const event=outcome.trace.find(e=>e.event==='rest_package_normalization');
+ assert.equal(event.modified_before,modified[0]);assert.equal(event.modified_after,modified.at(-1));
+ if(modified.at(-1))assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ else {
+  assert.equal(outcome.output.reopened,true);
+  validateActionParameters(actions.get(action).output_schema,outcome.output);
+  if(action==='package.save_checkpoint')assert.equal(outcome.output.workflow_continuations[0].workflow_ref.workflow_id,'workflow');
+ }
 });
 
 test('saved continuation returns current navigation with the same native workflow and original binding',async()=>{
