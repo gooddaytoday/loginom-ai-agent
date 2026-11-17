@@ -1,3 +1,23 @@
+`rest-query-variables` uses LAB-820 `variables/acceptance/task-rest-variables.md`
+without input files. The frozen initial/updated tables are checked separately
+against both downloaded CSVs. W1 snapshots prove integer limit/skip, stable
+source IDs and unchanged query bindings on the same REST. Cold uses the updated
+expectation and actual downloaded CSV. Oracle, fixture and expected stay private.
+`read_existing_output` reexecutes without configuring the REST node; its internal
+`schemas` are allowed only when every requested port exactly matches the output
+of the earlier successful, clean, completed source operation on the same REST.
+Connection/query/mapping edits remain `REST_QUERY_RECONFIGURED`.
+
+`rest-content-types` uses the reduced C5 `task-content-types.md`, only
+`content-types.csv` and `acceptance/modes/content-types/expected.json`.
+Two raw UTF-8 POST bodies (text/plain, application/xml) must produce two typed
+rows with echoed content type, unchanged body and actual HTTP status. The two
+GET response-MIME branches were removed to reserve at least 25% of the unchanged
+1800s model limit under the observed slower-REST timing; this case no longer
+claims live coverage of response MIME text/plain or */*.
+Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
+Only task and CSV reach the model; expected/oracle remain private.
+
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 
@@ -19,6 +39,17 @@ and CSVs use frozen `expected-absolute-path.json` then `expected-relative-path.j
 SOURCE_DIR is bound by the existing harness. The same Import changes absolute
 to relative paths while retaining FileTime (datetime, non-NULL, comparison present).
 Stock Save, cold execution without configuration and cleanup apply.
+
+`excel-import-auto-none`, `excel-import-auto-new`, `excel-import-auto-columns`
+and `excel-import-auto-types` use the unchanged C8 capability tasks and original
+schema-ab/abd/bc or types-a/b XLSX fixtures. `auto-schema/oracle.py` registers
+the unchanged `cases` from the independent capability expected container and
+checks source hashes. Only tasks and original books reach the model. The main
+audit requires two complete typed executions on one Excel GUID and a path-only
+native policy patch, without manual column replacement. Stock CSV, Save and
+cold output checks apply; cold additionally reads the saved native policy,
+source, Data sheet and header settings through an owned wizard and cancels it
+without applying settings. Each attempt requires confirmed package close/logout.
 Only the business task and source paths reach the model.
 
 `text-parallel` uses the unchanged text-import `task-parallel.md`, original
@@ -190,6 +221,32 @@ all-NULL and the mode tie are checked as complete typed rows with exact field
 order, `ordered:false` and the existing stddev tolerance. CSV, Save, reopening
 the existing node, cold execution without configuration and cleanup use stock
 checks. Only the business task and CSV reach the model.
+
+`read-no-rerun[-1..3]` and `read-wait-running[-1..3]` are the owner-approved
+`run-check-two-turn` mode (LAB-1720, 2026-11-16). Owner review permits the known post-turn-two
+`closed_ack=false` / `LOGINOM_RUNTIME_TIMEOUT` signature only when the runtime
+exits 0, both turns complete, package cleanup succeeds, logout is confirmed and
+no unsaved changes are discarded. It is recorded in `shutdown-signature.json`;
+other shutdown failures remain failures. Only these cases use one
+interactive CLI process for both prompts, one chat, and one runtime. The package
+stays open between prompts. The transcript database is read without modification;
+its actual tool parts feed the stock CSV/Save/cold/cleanup checks. No oracle or
+expected file reaches the model. Ordinary scenarios keep `run --format json`.
+`turns.jsonl` records submitted/completed boundaries, the same CLI PID and session;
+`read-turn-proof.json` names the execution_id and exact journal lines. A second
+turn must contain a separate successful current-output read, with no new Execute
+request for that node. The no-rerun case must retain the first turn's execution_id.
+The wait case must observe native pending progress for the same root/group during
+the second turn and then read that completed execution; a completed-only smoke
+does not pass. After the first model reply, its second prompt is held until a fresh
+native process record proves the requested node is running; merely starting an
+asynchronous configuration job is insufficient. That native execution_id is also
+recorded on the turn boundary. Both use independent integer-row oracles and stock cold execution.
+The no-rerun case filters a six-row CSV; its physical input name includes run and
+attempt names to avoid collisions with previous uploads (#1157). The wait case
+uses a zero-input native JavaScript node computing three rows after 90 seconds,
+so the execution window is reproducible without a large-file upload or simulated
+process state. It neither intercepts nor modifies Loginom internals.
 
 `row-filter-top-n` uses the approved row-filter `acceptance/typed/task-top-n.md`
 and only `fixtures/typed/rows.csv`. The private stdlib oracle checks TopN 3→5,
@@ -1008,6 +1065,14 @@ Stepwise с F, пороги 0.05/0.1; независимый expected/forward-f.
 порта, CSV прогнозов, Save, cold без перенастройки и cleanup.
 
 
+`linreg-categorical`: C11, исходный task-categorical.md и только categorical.csv.
+Enter, X numeric и дискретная строковая Category с indicator/reference:first,
+видимый нулевой коэффициент опорной A. Неизменённый modes/categorical/expected.json
+проверяет оба полных typed порта: 18 прогнозов и 5 строк коэффициентов, повторяемый
+Name=Category различается по UniqueValues; у A SE/t/p/границы NULL.
+CSV прогнозов, Save, cold без настройки и cleanup — штатные; task/CSV передаются
+модели, oracle/expected остаются приватными.
+
 `linreg-summary`: C8, исходный task-summary.md и только design.csv. Enter с
 константой и всеми X1/X2/X3. Основной прогон требует свежий полный VariablesForm
 из 15 переменных, принадлежащий завершённому исполнению того же узла; существующий
@@ -1343,6 +1408,17 @@ with Close, then stock execution/export checks and confirmed package/logout clea
 строгими. Дубли/пропавшие/лишние имена и другие значения отказывают.
 Typed port/cold expected и oracle неизменны; остальные сценарии сохраняют
 свои прежние правила порядка CSV. Это не D76-исключение значений.
+
+
+`loop-for-offline` and `loop-for-rest` use the frozen control-loop FOR tasks and
+expected-for-{offline,rest}.json with no input files. Only the task reaches the
+model. Sequential literal count=3 substitutes the saved Page definition 99 with
+0/1/2; Limit remains 2 and native integer IterationId is last. Both require full
+typed output, downloaded CSV, Save and cold execution without configuration.
+The private audit observes the variable boundary GUID/definition IDs, local
+converter/Calculator links (and REST when present), saved FOR and identifiers;
+cold compares those identities after opening the saved package. Regression:
+loop-pages-offline, loop-pages-rest, supernode-vars, supernode-calc, rest-get-plain.
 
 
 `node-delete` (LAB-1721): approved `graph/node-delete/acceptance/node-delete/task.md`

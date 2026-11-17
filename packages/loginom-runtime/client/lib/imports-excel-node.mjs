@@ -21,6 +21,19 @@ export function excelReadback({node,phases,operation_id}){
  const c=configured?.value?.configuration;
  need(configured?.status==='verified'&&c?.verified&&['document_id','workflow_id','node_id'].every(k=>c.node_context?.[k]===node[k]),'configuration owner differs');
  need(saved?.status==='verified'&&saved.value?.settings_applied===true&&saved.value.mode==='done'&&['document_id','workflow_id','node_id'].every(k=>saved.value.node_context?.[k]===node[k]),'settings were not committed to this node');
+ if(['Только новые','Все'].includes(c.auto_detect)){
+  const read=receipt('read'),executed=receipt('execute'),output=read.value.ports?.[0];
+  need(mapped.value.deferred_schema===true&&mapped.value.settings_applied===false&&owner(mapped.value.node_context)
+   &&finished.value.settings_applied===true&&finished.value.mode==='execute'&&owner(finished.value.node_context)
+   &&executed.value.owner_verified===true&&output?.fresh===true&&output.port===0
+   &&output.execution_id===executed.value.execution_id&&read.value.execution_id===output.execution_id,'dynamic Excel execution or deferred mapping differs');
+  verifyExcelDetectedSchema(c,output.schema);
+  const {binding_field,...source}=c.source;
+  return {kind:'excel_import',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',source,
+   auto_detect:c.auto_detect,columns:c.columns,receipt_ids:[configured,saved,mapped,finished,executed,read].map(p=>p.receipt_id),
+   dynamic_schema:{scope:'observed_after_verified_execute',execution_id:output.execution_id,fields:output.schema.map((f,index)=>({index,name:f.name,label:f.label,type:f.type,...(f.data_kind?{data_kind:f.data_kind}:{})}))},
+   package_persistence_verified:false};
+ }
  const m=mapped.value.native_mapping,preserved=finished.value.schema_after;
  need(m?.verified===true&&m.inventory_complete===true&&m.source_identity_verified===true
   &&m.mapping_wizard==='DataSetOutputSocketWizard'&&owner(m.node_context)
@@ -45,6 +58,22 @@ export function excelReadback({node,phases,operation_id}){
  const {binding_field,...source}=c.source;
  return {kind:'excel_import',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',source,auto_detect:c.auto_detect,columns:c.columns,
   receipt_ids:[configured,saved,mapped,finished].map(p=>p.receipt_id),output_mapping:{port:0,autosync:m.autosync,fields},package_persistence_verified:false};
+}
+
+// Native detection belongs only to Excel. Existing definitions are positional
+// for «Только новые»; «Все» must agree with the freshly observed wizard schema.
+export function verifyExcelDetectedSchema(configuration,schema){
+ const fields=configuration.columns.filter(f=>f.used),all=configuration.auto_detect==='Все';
+ need(['Только новые','Все'].includes(configuration.auto_detect)&&schema?.length>=1&&schema.length<=64
+  &&new Set(schema.map(f=>f.name)).size===schema.length
+  &&schema.every((f,i)=>f.index===i&&typeof f.name==='string'&&f.name.length>0&&typeof f.label==='string'
+   &&['integer','real','string','datetime','boolean'].includes(f.type)),
+  'LOGINOM_IMPORT_SCHEMA_CHANGED: invalid detected Excel fields');
+ need((all?schema.length===fields.length:schema.length>=fields.length)
+  &&fields.every((f,i)=>['name','label','type'].every(k=>schema[i]?.[k]===f[k])
+   &&(schema[i]?.data_kind===undefined||schema[i].data_kind===f.data_kind)),
+  'LOGINOM_IMPORT_SCHEMA_CHANGED: detected Excel policy changed retained definitions');
+ return true;
 }
 
 // The selected worksheet and its row policies are backend scan facts.
@@ -86,7 +115,9 @@ export function createExcelImportNodeSupport(config){
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,receiptOptions}=options;
   const request=operation.nodeApply?.request??operation.parameters,switching=request?.parameters?.source_switch,bound=!!operation.parameters?.bindings?.length;
-  let channel,sourceReceipt,saveReceipt,beforeConfiguration,beforeMapping,schemaBefore,schemaAfter,committedConfiguration;
+  let channel,sourceReceipt,saveReceipt,beforeConfiguration,beforeMapping,schemaBefore,schemaAfter,committedConfiguration,detectedConfiguration,executionProof;
+  const policyPatch=request?.target?.kind==='existing'&&request.parameters.excel?.auto_detect!==undefined
+   &&request.parameters.excel.columns===undefined&&request.parameters.excel.header_rows===undefined;
   const mapping=async()=> (await channel.observe({condition:'owned Excel output mapping',readMappings:true,
    ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true})).node_mapping;
   const configure=async(excel,flags={})=>{
@@ -134,7 +165,8 @@ export function createExcelImportNodeSupport(config){
      need(f.length===1&&b.mapping.fields.filter(x=>x.label===f[0].label).length===1
       &&resolveImportBindingValue(b.proof,b.name,b.mapping,undefined,excelBindingHooks.validate).value===b.value,'LOGINOM_BINDING_SOURCE_UNVERIFIED: mapped filename variable changed');
      binding={label:f[0].label,value:b.value};}
-    const result=await configure(bound?{...p.excel,source_path:binding.value}:p.excel,switching?{preserve:true}:bound?{binding}:{});
+    const result=await configure(bound?{...p.excel,source_path:binding.value}:p.excel,switching||policyPatch?{preserve:true}:bound?{binding}:{});
+    detectedConfiguration=result.configuration;
     if(switching)verifyImportSchema(schemaBefore,excelSchemaSnapshot(result.configuration,beforeMapping));
     return result;
    }catch(error){return refuse(error,'configure');}},
@@ -149,6 +181,14 @@ export function createExcelImportNodeSupport(config){
    },
   }).nodeApplyDriverFactory(options);
   return {...drivers,
+   async mapPorts(mappings,ctx){
+    if(ctx.receipt_id===operation.id+':output_mapping'&&['Только новые','Все'].includes(detectedConfiguration?.auto_detect)){
+     need(mappings.length===0,'dynamic Excel output cannot be remapped');
+     return verified({deferred_schema:true,node_context:{...ctx.node,verified:true},settings_applied:false});
+    }
+    return drivers.mapPorts(mappings,ctx);
+   },
+   async waitExecution(ctx){executionProof=await drivers.waitExecution(ctx);return executionProof;},
    ...(bound?{async beforeTarget(ctx){
     operation.importBinding=await prepareImportBinding(options,ctx,config,{expectedPath:sourceReceipt.source.destination,...excelBindingHooks});
     return verified();
@@ -181,6 +221,15 @@ export function createExcelImportNodeSupport(config){
     return {...result,...(switching?{reopen_performed:true,schema_before:schemaBefore,schema_after:schemaAfter}:bound?{reopen_performed:true}:{})};
    },
    async readOutput(read,ctx){
+    if(['Только новые','Все'].includes(detectedConfiguration?.auto_detect)){
+     need(executionProof?.verified&&executionProof.owner_verified&&executionProof.execution_id===ctx.execution.execution_id,
+      'owned Excel execution proof required');
+     const {output}=await channel.readOutputPort({port:0,execution:executionProof,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+     verifyExcelDetectedSchema(detectedConfiguration,output.schema);
+     const retained=detectedConfiguration.columns.filter(f=>f.used);
+     output.schema=output.schema.map((f,i)=>({...f,...(retained[i]?{data_kind:retained[i].data_kind}:{})}));
+     return verified({effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]});
+    }
     const result=await drivers.readOutput(read,ctx);
     if(switching){const output=result.ports[0];
      try{output.full_import_verification={...verifyExcelFullCount(switching.profile_id,options.scanReceipt,sourceReceipt.source,

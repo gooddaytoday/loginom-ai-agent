@@ -33,7 +33,7 @@ test('completed actual managed JS receipt admits a fresh native preview under th
 });
 
 function rereadFixture(){
- const f=fixture(),request=buildNodeReadRequest({operation_id:'compact-preview',source_operation_id:f.history.request.operation_id,
+ const f=fixture(),request=buildNodeReadRequest({operation_id:'compact-preview',source_operation_id:f.history.request.operation_id,execution:'execute',
   read:{ports:[0],sample_rows:5,require_exact_numbers:true}},{parameters:f.history.request,outcome:f.history.outcome});
  const outcome=structuredClone(f.history.outcome),node=outcome.output,execution='fresh-reread';
  outcome.operation_id=request.operation_id;node.operation_id=request.operation_id;

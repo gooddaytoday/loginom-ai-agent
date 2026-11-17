@@ -1,4 +1,4 @@
-import {observeSupernodeSaved} from './supernode-audit.mjs';
+import {observeSupernodeSaved,observeLoopForSaved} from './supernode-audit.mjs';
 import {verifyN18JavascriptStep} from './n18-cold.mjs';
 import {observeSortingSaved} from './sorting-modes.mjs';
 import {observeColUnionSavedSettings} from './col-union-settings.mjs';
@@ -12,6 +12,7 @@ import {inspectSavedLgd} from './lgd-cold.mjs'
 import {observeImportBindingInventory} from './import-bindings.mjs';
 import {observeFilterBindingInventory} from './filter-bindings.mjs';
 import {inspectSavedExcelNamed} from './imports-excel-named.mjs';
+import {inspectSavedExcelAuto} from './imports-excel-auto.mjs';
 import {inspectColdConditionBranches} from './control-condition.mjs';
 import {observeTreeConversionSavedSettings} from './tree-conversion.mjs';
 import {excelColdExpected,verifyExcelColdSettings,verifyExcelColdBindings} from './exports-excel-cold.mjs'
@@ -203,14 +204,16 @@ page = context.pages()[0]
     { document_id: prepared.document_id, workflow_ref: prepared.workflow_ref },
     Date.now() + 30_000,
   )
-  if(expected.nodes.some(n=>n.type==='control.supernode')&&expected.outputs.some(o=>o.output_node_type==='control.supernode'))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
-   platform:compatibilityPlatform,makeWorkspacePrepareCode,record,expected});
+  const loopFor=expected.outputs.some(o=>o.output_node_type==='control.loop'&&o.columns?.some(c=>c.name==='IterationId'));
+  if(expected.nodes.some(n=>n.type==='control.supernode')&&expected.outputs.some(o=>o.output_node_type==='control.supernode'||o.output_node_type==='control.loop'&&o.columns?.some(c=>c.name==='IterationId')))graph=await observeSupernodeSaved({execute,adapter,prepared,origin,session,
+   platform:compatibilityPlatform,makeWorkspacePrepareCode,record,loopFor,expected:loopFor?{...expected,supernode_variables:[{name:'Page',type:'integer',value:99},{name:'Limit',type:'integer',value:2}]}:expected});
   await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_observe'});
   if(sampling)checkSamplingGraph(expected,graph,samplingBaseline)
 
   let coldChannelSequence=0;
   const channelFor=(node,id)=>createNodeProcedure({operation:{id:id+'-'+(++coldChannelSequence),action:{action_key:'acceptance.cold_read',revision:'1'},deadline:Date.now()+540000},execute,record,targetOrigin:origin,targetBuild:'7.4.2',maxSteps:4096,
    preparedNodeContext:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},wrapMutation:(code,receipt)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:receipt.id,receipt_signature:receipt.signature,operation_id:receipt.id})});
+  if(graph.supernode_variable_boundary&&expected.outputs.some(o=>o.output_node_type==='control.loop'&&o.columns?.some(c=>c.name==='IterationId')))graph.loop_for=await observeLoopForSaved({graph,prepared,execute,origin,channelFor,record});
   if(expected.lgd&&!expected.lgd.source_variable&&!expected.lgd.binding)await inspectSavedLgd({load,graph,channelFor,execute,expected,origin});
   if(expected.coarse_frozen){
    const nodes=graph.nodes.filter(n=>n.type==='preprocessing.coarse_classes');
@@ -430,6 +433,10 @@ page = context.pages()[0]
   if(expected.clustering_gmeans&&target.type==='datamining.clustering'){
    const training=await trainConfiguredNode(channel,node);
    await record({phase:'gmeans_seed_repeat_training',node,training,settings_applied:false});
+  }
+  if(expected.excel_auto&&target.type==='imports.excel'){
+   const settings=await inspectSavedExcelAuto({load,channel,execute,graph,node,expected:expected.excel_auto,origin});
+   await record({phase:'cold_excel_auto_saved_settings',node,...settings});
   }
   if(expected.excel_named_range&&target.type==='imports.excel'){
    const settings=await inspectSavedExcelNamed({load,channel,execute,graph,node,expected:expected.excel_named_range,origin});
@@ -658,6 +665,7 @@ page = context.pages()[0]
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(graph.loop_for?{loop_for:graph.loop_for}:{}),
     ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
     ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
     ...(state.variableInventory?{variable_inventory:state.variableInventory}:{}),

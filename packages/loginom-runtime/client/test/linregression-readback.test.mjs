@@ -4,6 +4,16 @@ import {linRegressionConfigurationReadback} from '../lib/linregression-readback.
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 const node={document_id:'doc',workflow_id:'workflow',node_id:'regression'};
+test('indicator readback adds observed category identity without changing existing normalization values',()=>{
+ const input=candidate(),c=input.phases[1].value.configuration;
+ c.statistics='full';c.confidence_level=95;c.indicators=[{field:'Category',method:'indicator',reference:'first',reference_value:'A'}];c.show_reference_coefficients=true;
+ const result=linRegressionConfigurationReadback(input),validator=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ assert.equal(result.normalization,'none');assert.deepEqual(result.indicators,c.indicators);assert.equal(result.show_reference_coefficients,true);assert.equal(validator(result).valid,true);
+ assert.equal(validator({...result,show_reference_coefficients:false}).valid,false);
+ assert.equal(validator({...result,indicators:[{...result.indicators[0],reference:'last'}]}).valid,false);
+ assert.equal(validator({...result,statistics:'coefficients'}).valid,false);
+ c.indicators[0].reference_value='B';assert.equal(result.indicators[0].reference_value,'A');
+});
 test('sequential partition readback retains observed row counts in the additive result schema',()=>{
  const input=candidate(),partition={method:'sequential',train_count:16,test_count:2};
  input.phases[1].value.configuration.partition=partition;

@@ -206,6 +206,16 @@ test('bindOpenOnly binds the active saved package without any package gesture',a
   assert.deepEqual(fixture.events,['navigate']);
 });
 
+test('bindOpenOnly retains an already rebound logical workflow identity',async()=>{
+ const f=pageFixture({authenticated:true,workflow:true});await f.page.goto('http://loginom.example/app?testable=true');
+ f.context.bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node.PackageFileName='/user/B.lgp';
+ const first=await execute(f,{intent:'open_package',operationId:'save-rebound',packagePath:'/user/B.lgp',bindOpenOnly:true});
+ const second=await execute(f,{intent:'open_package',operationId:'bridge-rebound',packagePath:'/user/B.lgp',bindOpenOnly:true});
+ assert.equal(first.status,'READY');assert.equal(second.status,'READY');
+ assert.equal(first.document_id,second.document_id);assert.deepEqual(first.workflow_ref,second.workflow_ref);
+ assert.deepEqual(f.events,['navigate']);
+});
+
 for(const situation of ['home','other-package','blank-page'])test('bindOpenOnly refuses without a package gesture: '+situation,async()=>{
   const fixture=pageFixture({authenticated:true,workflow:situation!=='home'});
   if(situation!=='blank-page')await fixture.page.goto('http://loginom.example/app?testable=true');

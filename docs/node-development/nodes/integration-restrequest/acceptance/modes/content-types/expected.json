@@ -47,18 +47,6 @@
           "ContentType": "application/xml",
           "Body": "<order amount=\"17\">Привет</order>",
           "HttpStatusCode": 200
-        },
-        {
-          "Case": "response-plain",
-          "ContentType": "text/plain",
-          "Body": "LAB-976",
-          "HttpStatusCode": 200
-        },
-        {
-          "Case": "response-any",
-          "ContentType": "text/plain",
-          "Body": "LAB-976",
-          "HttpStatusCode": 200
         }
       ]
     }

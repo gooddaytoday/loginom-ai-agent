@@ -112,6 +112,11 @@ test('REST reference keeps literal and variable headers without the deferred que
  for(const name of ['rest-headers','rest-variables'])assert.ok(text.includes(name),name);
  assert.ok(!text.includes('rest-query-variables'));
 });
+test('REST query kit and package persistence require the registered variable-query case',t=>{
+ for(const path of ['docs/node-development/variables/acceptance/README.md','packages/loginom-runtime/client/lib/package-persistence.mjs']){
+  const r=repo(t);r.commit(path);assert.ok(r.list().includes('rest-query-variables'));
+ }
+});
 for(const path of ['packages/loginom-runtime/client/lib/rest-request.mjs',
  'packages/loginom-runtime/client/lib/rest-request-parameters.mjs',
  'docs/node-development/nodes/integration-restrequest/acceptance/modes/headers/expected.json',
