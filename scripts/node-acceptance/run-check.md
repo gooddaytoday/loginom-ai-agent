@@ -18,6 +18,13 @@ claims live coverage of response MIME text/plain or */*.
 Stock CSV, Save, cold reexecution without reconfiguration and cleanup apply.
 Only task and CSV reach the model; expected/oracle remain private.
 
+`rest-error-descriptions` uses the unchanged C10 `task-error-descriptions.md`,
+only `response.json` and frozen `acceptance/modes/error-descriptions/expected.json`.
+The native REST output 1 must contain exactly RequestID/ErrorCode/HttpStatusCode
+in that order, all integer, without ErrorDesc. Stock full typed reads, CSV, Save,
+cold execution of the saved node without reconfiguration and cleanup apply.
+Only task and response file reach the model; oracle/expected remain private.
+
 `rest-query-variables` is deferred and is not registered. Its LAB-820 kit remains
 in `docs/node-development/variables/acceptance/` for a later cycle (LAB-1539).
 

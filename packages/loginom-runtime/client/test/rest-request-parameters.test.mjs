@@ -6,6 +6,26 @@ import {restRequestReadback} from '../lib/rest-request-node.mjs';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
+test('C10 validates the optional error descriptions flag and attests its observed value',()=>{
+ const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
+ const node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const readbackValidator=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema.properties.configuration.properties.readback);
+ for(const produce_error_descriptions of [false,true]){
+  const p={...parameters(),produce_error_descriptions};
+  assert.equal(validate(p).valid,true);
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+  const phases=[{phase:'configure',status:'verified',receipt_id:'c10:configure',value:{configuration:{verified:true,node_context:node,query_parameters:[],produce_error_descriptions}}},
+   {phase:'node_finish',status:'verified',receipt_id:'c10:node_finish',value:{settings_applied:true,mode:'done',node_context:node}}];
+  const readback=restRequestReadback({node,phases,operation_id:'c10'});
+  assert.equal(readback.produce_error_descriptions,produce_error_descriptions);
+  assert.equal(readbackValidator(readback).valid,true);
+ }
+ for(const produce_error_descriptions of [null,0,1,'false',{},[]]){
+  const p={...parameters(),produce_error_descriptions};
+  assert.equal(validate(p).valid,false);
+  assert.throws(()=>validateRestRequestParameters(p,'request',request),/produce_error_descriptions/);
+ }
+});
 test('C8 validates simulation paths and disabling before mutation',()=>{
  const validate=new AjvJsonSchemaValidator().getValidator(restRequestParametersSchema);
  for(const simulation of [{enabled:true,file_path:'/own/response.json'},{enabled:false}]){
