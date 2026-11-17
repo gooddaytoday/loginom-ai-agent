@@ -36,7 +36,10 @@ const stage = read('stage','new') === 'used' ? 'used' : 'new'
 const variant = {nav:'plus', placeholder:1, status:'composer', panel:'pinned', ...read('variant',{})}
 const seed = [
   {id:'seed-sales', title:'ABC-анализ товаров', date:'Сегодня', phase:'done', prompt:examples[0].prompt, kind:'abc', files:['sales-demo.csv'], project:'p-sales'},
-  {id:'seed-flow', title:'Проверка сценария продаж', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'refactor').prompt, kind:'refactor', files:['Продажи.lgp'], project:'p-sales', pinned:true},
+  {id:'seed-flow', title:'Проверка сценария продаж', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'refactor').prompt, kind:'refactor', files:['Продажи.lgp'], project:'p-sales'},
+  {id:'seed-south', title:'Почему упала выручка в регионе Юг', date:'3 дня назад', phase:'done', prompt:'Почему в октябре упала выручка в регионе Юг? Посмотри по демонстрационным продажам.', kind:'abc', files:['sales-demo.csv'], project:'p-sales'},
+  {id:'seed-oct', title:'Сводка продаж за октябрь', date:'Вчера', phase:'done', prompt:'Собери сводку продаж за октябрь по категориям и регионам.', kind:'abc', files:['sales-demo.csv'], project:'p-report'},
+  {id:'seed-acc', title:'Проверить выгрузку для бухгалтерии', date:'4 дня назад', phase:'done', prompt:'Проверь выгрузку для бухгалтерии на пропуски и дубликаты.', kind:'quality', files:['sales-demo.csv'], project:'p-report'},
   {id:'seed-data', title:'Контроль качества выгрузки', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'quality').prompt, kind:'quality', files:['sales-demo.csv'], project:null},
 ]
 // Projects as in the ChatGPT desktop app: a project groups chats with shared instructions and sources.
@@ -100,7 +103,8 @@ let peek = false, peekWanted = false, peekHeld = false, peekTimer = 0, pointerIn
 const state = {
   page:'home', contour:read('contour','online'), theme:read('theme','light'),
   project:null, projects:stage === 'used' ? seedProjects.map(item => ({...item, sources:[...item.sources]})) : [], session:null, tabs:[],
-  projectView:null, projectTab:'chats', menu:null, showProjectChats:true, renameId:null, deleteId:null,
+  projectView:null, projectTab:'chats', menu:null, renameId:null, deleteId:null,
+  expanded:stage === 'used' ? ['p-sales','p-report'] : [], showAll:[],
   sessions:stage === 'used' ? seed.map(item => ({...item})) : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
   collapsed:read('collapsed',variant.panel === 'rail'), draftPackage:null, pickFor:null, connecting:false,
   // What the user has already done: things appear after these events and never disappear.
@@ -245,9 +249,10 @@ function newSession() {
   if (!canNavigate('home')) return
   // Coming back from Схема, Каталог or Настройки keeps what the user typed and chose.
   const keepDraft = state.session === null && !['home','project'].includes(state.page)
+  // As in Codex, a new chat goes to the project you are in; the start screen shows it and lets you change it.
+  const context = state.page === 'chat' ? sessionProject() : state.page === 'project' ? state.projectView : state.project
+  state.project = projectById(context) ? context : null
   state.session = null
-  // «Новый разговор» in the panel starts a chat outside any project; inside a project, use its page.
-  state.project = null
   if (!keepDraft) {
     state.draft = ''
     state.templateTitle = ''
@@ -256,6 +261,7 @@ function newSession() {
   }
   state.review = false
   navigate('home')
+  $('#prompt')?.focus()
 }
 function projectById(id) {
   return state.projects.find(item => item.id === id)
@@ -270,11 +276,17 @@ function openProject(id) {
   state.projectView = state.project = id
   state.session = null
   state.review = false
+  expandProject(id)
   navigate('project')
+  $('#prompt')?.focus()
+}
+function expandProject(id) {
+  if (id && !state.expanded.includes(id)) state.expanded.push(id)
 }
 function openSession(id) {
   const item = state.sessions.find(entry => entry.id === id)
   if (!item || !canNavigate('chat')) return
+  expandProject(item.project)
   state.project = item.project
   state.session = id
   if (!state.tabs.includes(id)) state.tabs = [...state.tabs.slice(-3),id]
@@ -295,18 +307,17 @@ function navButton(page, glyph, label = pages[page]) {
   const selected = origin === page
   return `<button class="nav-item${selected ? ' selected' : ''}" ${selected ? 'aria-current="page"' : ''} data-go="${page}">${icon(glyph,17)}<span>${label}</span></button>`
 }
-// The panel follows the ChatGPT desktop app: «Новый разговор», then «Закреплённые» (only once something is
-// pinned), «Проекты» with «Новый проект», and «Разговоры» — every chat, newest first, a project chat labelled
-// with its project. «…» on a row (it appears on hover) holds the actions. In variant «panel» Пакеты and
-// Каталог join the panel after the first visit. Nothing that appeared ever disappears or moves.
+// The panel follows the Codex desktop app: «Новый разговор», «Закреплённые» (only once something is pinned),
+// «Проекты» — folders with their chats inside — and «Разговоры» for chats without a project. «…» on a row
+// (it appears on hover) holds the actions. In variant «panel» Пакеты and Каталог join the panel after the
+// first visit. Nothing that appeared ever disappears or moves.
 function sidebar() {
   const items = variant.nav === 'panel'
     ? [state.progress.packages || state.page === 'loginom' ? navButton('loginom','flow','Пакеты') : '', state.progress.catalog || state.page === 'hub' ? navButton('hub','grid','Каталог') : ''].join('')
     : ''
   const pinnedProjects = state.projects.filter(item => item.pinned)
   const pinnedChats = state.sessions.filter(item => item.pinned)
-  const unpinned = state.sessions.filter(item => !item.pinned)
-  const recents = unpinned.filter(item => state.showProjectChats || !item.project)
+  const loose = state.sessions.filter(item => !item.pinned && !projectById(item.project))
   return `<aside class="sidebar${state.mobile ? ' expanded' : ''}" aria-label="Боковая панель">
     <div class="sidebar-head">
       <button class="icon-btn neutral collapse-btn" data-action="collapse" aria-label="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'}" title="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'} (Ctrl+B)"><span class="rail-ico">${icon('panel',18)}</span>${state.collapsed ? `<span class="pin-ico">${icon('pin',18)}</span>` : ''}</button>
@@ -314,20 +325,21 @@ function sidebar() {
         <picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent</span>
       </button>
     </div>
-    <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('plus',17)}<span>Новый разговор</span><kbd>Ctrl N</kbd></button>
+    <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('compose',17)}<span>Новый разговор</span><kbd>Ctrl N</kbd></button>
     ${items ? `<nav class="sidenav" aria-label="Разделы">${items}</nav>` : ''}
     <div class="sidebar-history">
-      ${pinnedProjects.length || pinnedChats.length ? `<section class="side-section sec-pinned" aria-label="Закреплённые">
-        <div class="side-head"><h2>${icon('pin',15)}<span>Закреплённые</span>${chatsMark(pinnedChats)}</h2></div>
-        ${pinnedProjects.map(projectRow).join('')}${pinnedChats.map(chatRow).join('')}</section>` : ''}
-      <section class="side-section sec-projects" aria-label="Проекты">
-        <div class="side-head"><h2>${icon('folder',15)}<span>Проекты</span></h2></div>
+      <span class="rail-history" aria-hidden="true">${icon('clock',17)}${chatsMark(state.sessions)}</span>
+      ${pinnedProjects.length || pinnedChats.length ? `<section class="side-section" aria-label="Закреплённые">
+        <div class="side-head"><h2>Закреплённые</h2></div>
+        ${pinnedProjects.map(projectTree).join('')}${pinnedChats.map(item => chatRow(item)).join('')}</section>` : ''}
+      <section class="side-section" aria-label="Проекты">
+        <div class="side-head"><h2>Проекты</h2></div>
         <div class="side-row"><button class="project-link new-project" data-overlay="new-project">${icon('folder-plus',17)}<span>Новый проект</span></button></div>
-        ${state.projects.filter(item => !item.pinned).map(projectRow).join('')}
+        ${state.projects.filter(item => !item.pinned).map(projectTree).join('')}
       </section>
-      ${unpinned.length ? `<section class="side-section sec-recents" aria-label="Разговоры">
-        <div class="side-head"><h2>${icon('clock',15)}<span>Разговоры</span>${chatsMark(recents)}</h2>${moreButton('recents','','Как показывать разговоры')}</div>
-        ${recents.map(chatRow).join('')}${recents.length < unpinned.length ? `<p class="side-note">Разговоры проектов скрыты — «…» у заголовка</p>` : ''}</section>` : ''}
+      ${loose.length ? `<section class="side-section" aria-label="Разговоры">
+        <div class="side-head"><h2>Разговоры</h2></div>
+        ${loose.map(item => chatRow(item)).join('')}</section>` : ''}
     </div>
     <nav class="sidebar-footer" aria-label="Настройки">
       ${runNotice()}
@@ -339,22 +351,32 @@ function sidebar() {
 function menuOpener(menu) {
   const scope = {panel:'.sidebar', list:'.project-list', page:'.page-more'}[menu.where]
   const selector = `[data-menu="${menu.kind}:${menu.id}"]`
-  return document.querySelector(menu.where === 'page' ? scope + selector : `${scope} ${selector}`)
+  return document.querySelector(menu.where === 'page' ? scope + selector : `${scope} ${selector}`) || document.querySelector(`#main ${selector}`)
 }
 function moreButton(kind, id, label) {
   const open = state.menu?.kind === kind && state.menu.id === id
   return `<button class="row-more" type="button" data-menu="${kind}:${id}" aria-label="${esc(label)}" aria-haspopup="menu" aria-expanded="${open}">${icon('more',16)}</button>`
 }
-function projectRow(item) {
-  const current = state.page === 'project' && state.projectView === item.id
-  return `<div class="side-row project-row"><button class="project-link${current ? ' current' : ''}" data-open-project="${item.id}" ${current ? 'aria-current="page"' : ''}><span class="pc-${item.color}">${icon('folder',17)}</span><span>${esc(item.name)}</span></button>${moreButton('project',item.id,`Действия с проектом «${item.name}»`)}</div>`
+// As in the Codex desktop app: a project is a folder in the panel. A click opens or closes it; its chats
+// are listed inside it, newest first. On hover: a new chat in this project, and «…».
+function projectTree(project) {
+  const open = state.expanded.includes(project.id)
+  const chats = state.sessions.filter(item => item.project === project.id && !item.pinned)
+  const openChat = state.page === 'chat' && chats.some(item => item.id === state.session)
+  const all = state.showAll.includes(project.id) || chats.slice(6).some(item => item.id === state.session)
+  const shown = all ? chats : chats.slice(0,6)
+  const pinnedHere = state.sessions.some(item => item.project === project.id && item.pinned)
+  // A closed folder holding the open chat is highlighted, so the user still sees where they are.
+  const current = (state.page === 'project' && state.projectView === project.id) || (!open && openChat)
+  return `<div class="side-row project-row"><button class="project-link${current ? ' current' : ''}" data-toggle-project="${project.id}" aria-expanded="${open}"><span class="pc-${project.color}">${icon(open ? 'folder-open' : 'folder',17)}${open ? '' : chatsMark(chats)}</span><span>${esc(project.name)}</span></button>
+    <span class="row-actions"><button class="row-act" type="button" data-open-project="${project.id}" aria-label="Новый разговор в проекте «${esc(project.name)}»" title="Новый разговор в проекте">${icon('compose',16)}</button>${moreButton('project',project.id,`Действия с проектом «${project.name}»`)}</span></div>
+    ${open ? `<div class="project-chats" role="group" aria-label="Разговоры проекта «${esc(project.name)}»">${shown.map(item => chatRow(item, true)).join('') || `<p class="side-empty">${pinnedHere ? 'Разговоры проекта — в «Закреплённых»' : 'Разговоров пока нет'}</p>`}${shown.length < chats.length ? `<button class="show-more" data-show-all="${project.id}">Показать ещё ${chats.length - shown.length}</button>` : chats.length > 6 && state.showAll.includes(project.id) ? `<button class="show-more" data-show-all="${project.id}">Свернуть список</button>` : ''}</div>` : ''}`
 }
-// A chat that belongs to a project always says so: the desktop ChatGPT's Recents does not, and its users
-// complain they cannot tell where a chat went.
-function chatRow(item) {
-  const project = projectById(item.project)
+// Inside its project a chat is just a title. Out of it (pinned) it is labelled with the project.
+function chatRow(item, nested = false) {
+  const project = nested ? null : projectById(item.project)
   const current = state.page === 'chat' && state.session === item.id
-  return `<div class="side-row chat-row"><button class="session-link${current ? ' current' : ''}" data-session="${item.id}">${icon('message',15)}<span class="row-text"><span>${esc(item.title)}</span>${project ? `<small><i class="pc-dot pc-${project.color}"></i>${esc(project.name)}</small>` : ''}</span>${sessionMark(item)}</button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`)}</div>`
+  return `<div class="side-row chat-row${nested ? ' nested' : ''}"><button class="session-link${current ? ' current' : ''}" data-session="${item.id}">${nested ? '' : icon('message',15)}<span class="row-text"><span>${esc(item.title)}</span>${project ? `<small><i class="pc-dot pc-${project.color}"></i>${esc(project.name)}</small>` : ''}</span>${sessionMark(item)}</button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`)}</div>`
 }
 // One mark for a whole list: what the collapsed panel shows on the section's icon.
 function chatsMark(list) {
@@ -411,10 +433,11 @@ function composer() {
   return `<form class="composer" id="composer">
     ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
-    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' ? esc(`Новый разговор в проекте «${projectById(state.projectView)?.name}»`) : esc(placeholders[variant.placeholder] || placeholders[1])}" rows="2">${esc(state.draft)}</textarea>
+    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholders[variant.placeholder] || placeholders[1])}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
         <button class="icon-btn neutral plus-btn" type="button" aria-label="Добавить: пакет, файл, каталог" title="Пакет из Loginom, файл с компьютера, каталог" data-overlay="plus">${icon('plus',18)}</button>
+        ${state.page === 'home' && state.projects.length ? `<button class="filter-btn dest-chip" type="button" data-menu="dest:" aria-haspopup="menu" aria-expanded="${state.menu?.kind === 'dest'}" title="Где будет разговор">${icon('folder',15)} <span class="filter-label">${esc(projectById(state.project)?.name || 'Без проекта')}</span> ${icon('down',12)}</button>` : ''}
         ${state.settings.preferences.agentPicker ? `<button class="filter-btn mode-pick" type="button" data-overlay="agent-mode" title="Режим агента: ${state.mode}">${icon(state.mode === 'Планирование' ? 'layers' : 'spark',15)} <span class="filter-label">${state.mode}</span> ${icon('down',12)}</button>` : ''}
       </div>
       <div class="composer-options">
@@ -840,7 +863,7 @@ function review() {
     ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Разговор сразу появится в панели, а агент попросит подключить Loginom прямо в разговоре — одна кнопка.','stage-new'],
     ['Пакет','«+» у поля ввода → «Пакет из Loginom…» → выберите пакет. Над полем появится «Что сделать с пакетом». Пример «Задокументировать пакет» показывает то же на учебном файле.','try-package'],
     ['Панель','Свернуть — кнопка в левом верхнем углу панели или Ctrl+B: остаются значки. Наведите на них мышь — панель раскроется поверх страницы; выбор пункта или уход мыши свернут её, кнопка с булавкой закрепит. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
-    ['Проекты','Как в ChatGPT: в панели — «Проекты» и «Разговоры». Откройте проект «Аналитика продаж»: поле ввода начинает разговор в проекте, ниже — инструкции, разговоры и источники. «…» у разговора в панели (появляется при наведении) — закрепить, перенести в проект, переименовать, удалить.','try-projects'],
+    ['Проекты','Как в Codex: проекты в панели — папки, разговоры проекта лежат внутри папки. Нажмите на проект — папка откроется или закроется. Значок карандаша рядом с проектом (при наведении) — новый разговор в этом проекте; он появится внутри папки. «…» — закрепить, перенести в проект, переименовать, удалить.','try-projects'],
   ]
   const later = [
     'Закрытый контур без модели: в поле ввода вместо модели — «Выберите модель», отправка ведёт в настройки моделей.',
@@ -857,7 +880,7 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['Проекты и разговоры — как в ChatGPT: в панели «Новый разговор», «Проекты» с «Новый проект», «Разговоры» (разговор из проекта подписан его названием), закреплённое — сверху. У проекта своя страница: поле ввода, инструкции, разговоры, источники.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
+  const changed = ['Проекты и разговоры — как в Codex: проекты в панели — папки, разговоры проекта внутри них; в «Разговорах» — только разговоры без проекта; закреплённое — сверху. Карандаш у проекта открывает новый разговор в нём: поле ввода, инструкции, разговоры, источники.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
   return `<div class="native-page review-page">
     <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в четырёх вопросах — переключение сразу меняет прототип. Затем пройдите четыре сценария, около 10 минут.</p></div></div>
     <h2 class="rv-heading">Выбрать вариант</h2>
@@ -904,7 +927,7 @@ function rowMenu() {
     : chat ? [item('rename','file','Переименовать'), item('pin','pin',chat.pinned ? 'Открепить' : 'Закрепить'), item('move','folder','Перенести в проект'),
        chat.project ? item('unmove','close','Убрать из проекта') : '', menu.where === 'page' && !currentPackageEdit() ? item('download','download','Скачать демонстрационный отчёт CSV') : '', item('delete','alert','Удалить','class="danger"')]
     : project ? [item('pin','pin',project.pinned ? 'Открепить' : 'Закрепить'), item('settings','settings','Настройки проекта'), item('delete','alert','Удалить проект','class="danger"')]
-    : [`<button role="menuitemcheckbox" data-menu-act="toggle-project-chats" aria-checked="${state.showProjectChats}">${icon(state.showProjectChats ? 'check' : 'circle',16)}<span>Показывать разговоры проектов</span></button>`]
+    : [item('dest:', projectById(state.project) ? 'circle' : 'check', 'Без проекта'), ...state.projects.map(entry => `<button role="menuitem" data-menu-act="dest:${entry.id}"><span class="pc-${entry.color}">${icon(entry.id === state.project ? 'check' : 'folder',16)}</span><span>${esc(entry.name)}</span></button>`)]
   return `<div class="row-menu" id="row-menu" role="menu" aria-label="Действия">${items.join('')}</div>`
 }
 function overlay() {
@@ -1076,7 +1099,7 @@ function send() {
     id: old?.id ?? 'session-' + Date.now(), date:'Сейчас', title:old?.title || state.templateTitle || prompt.slice(0,56),
     kind, phase,
     files:[...(state.draftPackage ? [state.draftPackage.name] : []), ...state.draftFiles], prompt,
-    project:old ? old.project : state.page === 'project' ? state.projectView : null,
+    project:old ? old.project : state.page === 'project' ? state.projectView : projectById(state.project) ? state.project : null,
     previous:old ? [...(old.previous || []), old.prompt].slice(-4) : [],
   }
   // Examples stop showing once the user has started three conversations of their own.
@@ -1304,7 +1327,11 @@ function menuAction(act) {
   }
   state.menu = null
   if (act === 'download') return downloadResult()
-  if (act === 'toggle-project-chats') state.showProjectChats = !state.showProjectChats
+  if (act.startsWith('dest:')) {
+    state.project = act.slice(5) || null
+    render()
+    return $('#prompt')?.focus()
+  }
   if (act === 'pin' && chat) chat.pinned = !chat.pinned
   if (act === 'pin' && project) project.pinned = !project.pinned
   if (act === 'rename') {
@@ -1326,6 +1353,7 @@ function menuAction(act) {
   }
   if (act.startsWith('move:')) {
     chat.project = act.slice(5)
+    expandProject(chat.project)
     if (state.session === chat.id) state.project = chat.project
     toast(`Перенесено в «${projectById(chat.project).name}»`)
   }
@@ -1361,6 +1389,17 @@ app.addEventListener('click', event => {
   // Clicking the chat that is already open keeps what the user is typing.
   if (d.session) return state.page === 'chat' && state.session === d.session && !state.review ? undefined : openSession(d.session)
   if (d.openProject) return openProject(d.openProject)
+  if (d.toggleProject) {
+    state.expanded = state.expanded.includes(d.toggleProject) ? state.expanded.filter(id => id !== d.toggleProject) : [...state.expanded, d.toggleProject]
+    render()
+    // Opened from the keyboard, the folder keeps focus so the next Tab goes into its chats.
+    if (!event.detail) document.querySelector(`.sidebar [data-toggle-project="${d.toggleProject}"]`)?.focus()
+    return
+  }
+  if (d.showAll) {
+    state.showAll = state.showAll.includes(d.showAll) ? state.showAll.filter(id => id !== d.showAll) : [...state.showAll, d.showAll]
+    return render()
+  }
   if (d.projectSettings) {
     state.settingsProjectId = d.projectSettings
     state.overlay = 'project-settings'
@@ -1524,6 +1563,7 @@ app.addEventListener('submit', event => {
   state.overlay = null
   const moved = state.sessions.find(item => item.id === state.moveAfterCreate)
   state.moveAfterCreate = null
+  expandProject(project.id)
   if (moved) {
     moved.project = project.id
     if (state.session === moved.id) state.project = project.id

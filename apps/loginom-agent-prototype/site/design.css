@@ -214,13 +214,12 @@ button.prototype-mark:hover{color:var(--accent)}
 .project-avatar{background:var(--soft);color:var(--ink)}
 .new-session{padding-left:11px}
 .sidebar .nav-item{padding-left:12px}
-.sidebar-history h2{justify-content:flex-start;gap:8px;padding-left:13px}
-.sidebar-history h2 .conn-dot{display:none}
-.session-link,.conn-run,.sidebar-history h2{position:relative}
+.sidebar-history{position:relative}
+.sidebar-history h2{justify-content:flex-start;padding-left:12px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500}
+.session-link,.conn-run{position:relative}
 .session-link{padding-left:13px}
 .session-link:focus-visible{outline-offset:-2px}
-.session-link .conn-dot,.sidebar-history h2 .conn-dot,.conn-run .conn-dot{position:absolute;left:24px;top:6px;width:8px;height:8px}
-.sidebar-history h2 .conn-dot{top:-2px}
+.session-link .conn-dot,.conn-run .conn-dot,.project-link .conn-dot,.rail-history .conn-dot{position:absolute;left:24px;top:6px;width:8px;height:8px}
 .conn-run{padding-left:12px}
 .conn-run .conn-dot{left:23px;top:4px}
 button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
@@ -234,11 +233,12 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
   .workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:248px;box-shadow:var(--floating-shadow)}
   .workspace.collapsed.peek .collapse-btn .pin-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .pin-ico{display:block}
   .workspace.collapsed.peek .collapse-btn .rail-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .rail-ico{display:none}
-  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.sec-recents .chat-row,.chat-row .row-text,.project-link>span:last-child,.row-more,.sec-pinned h2>.icon,.sec-projects h2>.icon,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
-  /* The rail: icons only. Labels fade; whole rows that have no icon of their own are not clickable. */
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.sec-recents .chat-row,.chat-row .row-text,.project-link>span:last-child,.row-more,.sec-pinned h2>.icon,.sec-projects h2>.icon,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.sec-recents .chat-row,.row-more){pointer-events:none}
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .sidebar-history h2 .conn-dot{display:block}
+  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history>:not(.rail-history),.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
+  /* The rail: icons only. The list of projects and chats folds into one history icon at its top. Hidden
+     things stay focusable (opacity, not visibility), so Tab reaches them and opens the panel. */
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history>:not(.rail-history),.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.sidebar-history>:not(.rail-history)){pointer-events:none}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .rail-history{opacity:1}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .project-switch{border-color:transparent;background:transparent}
   .workspace.collapsed:not(.peek) .sidebar-history{scrollbar-width:none}
 }
@@ -364,9 +364,26 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .color-pick input:checked+span{border-color:currentColor;box-shadow:inset 0 0 0 1px currentColor}
 .color-pick input:focus-visible+span{outline:2px solid var(--blue);outline-offset:2px}
 .field-hint{margin:0;color:var(--muted);font-size:13px}
-.side-head .row-more{z-index:2}
 .pc-dot{display:inline-block;width:7px;height:7px;margin-right:5px;border-radius:50%;background:currentColor;vertical-align:1px}
 .row-text small{color:var(--muted)}
-.side-note{margin:2px 0 0;padding:4px 10px 4px 13px;color:var(--muted);font-size:12px}
 .project-add-source:focus-within{outline:2px solid var(--blue);outline-offset:2px}
-@media(min-width:691px){.workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .side-note{opacity:0}}
+/* Projects as folders (Codex desktop): chats inside, aligned with the project name */
+.rail-history{position:absolute;left:11.5px;top:6px;display:grid;opacity:0;pointer-events:none;color:var(--muted)}
+.rail-history .conn-dot{left:11px;top:-3px}
+.project-link>span:first-child{position:relative}
+.project-link .conn-dot{left:11px;top:-3px}
+.row-actions{position:absolute;right:3px;top:50%;translate:0 -50%;display:flex;gap:1px;opacity:0}
+.row-actions .row-more{position:static;translate:none;opacity:1}
+.row-act{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;color:var(--muted)}
+.row-act:hover{background:var(--soft);color:var(--ink)}
+.side-row:hover .row-actions,.row-actions:focus-within,.row-actions:has([aria-expanded=true]){opacity:1}
+.side-row.project-row:is(:hover,:focus-within) .project-link{padding-right:64px}
+@media(hover:none){.row-actions{opacity:1}.side-row.project-row .project-link{padding-right:64px}}
+.chat-row.nested .session-link{min-height:32px;padding-top:6px;padding-bottom:6px;padding-left:39px}
+.chat-row.nested .conn-dot{left:16px;top:50%;translate:0 -50%}
+.side-empty{margin:0;padding:5px 10px 5px 39px;color:var(--muted);font-size:13px}
+.show-more{display:block;width:100%;padding:5px 10px 5px 39px;border-radius:6px;color:var(--muted);font-size:13px;text-align:left}
+.show-more:hover{background:var(--soft);color:var(--ink)}
+.chat-row:not(.nested) .session-link{gap:11px}
+.dest-chip{max-width:220px}
+.dest-chip .filter-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

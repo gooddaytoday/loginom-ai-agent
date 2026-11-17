@@ -36,6 +36,8 @@ const paths = {
   globe:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
   panel:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>',
   'folder-plus':'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM12 10.5v5M9.5 13h5"/>',
+  'folder-open':'<path d="M3 18V7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1M3 18l2.6-6.4A2 2 0 0 1 7.5 10.3H20a1 1 0 0 1 .9 1.4l-2.4 5.8A2 2 0 0 1 16.6 19H4a1 1 0 0 1-1-1Z"/>',
+  compose:'<path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M17.5 3.5a2.1 2.1 0 0 1 3 3L13 14l-4 1 1-4Z"/>',
   pin:'<path d="M9 3h6M10 3v6l-3 4v1h10v-1l-3-4V3M12 14v7"/>', play:'<path d="M8 5v14l11-7Z"/>',
   wand:'<path d="m5 19 13-13 2 2L7 21zM6 3v6M3 6h6m8 9v6m-3-3h6"/>'
 }
