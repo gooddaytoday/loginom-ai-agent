@@ -160,11 +160,12 @@ jobs:
           retention-days: 14
 
   windows-runtime:
-    name: windows-runtime (${{ matrix.suite }})
+    name: windows-runtime (${{ matrix.suite }} ${{ matrix.replica }})
     strategy:
       fail-fast: false
       matrix:
         suite: [runtime]
+        replica: [1, 2, 3, 4, 5, 6]
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
@@ -232,14 +233,17 @@ jobs:
         if: matrix.suite == 'runtime' && !cancelled()
         timeout-minutes: 25
         working-directory: packages/loginom-runtime
-        env:
-          DEBUG: pw:browser*
         run: |
           set -uo pipefail
           echo "NUMBER_OF_PROCESSORS=${NUMBER_OF_PROCESSORS:-?}"
-          for i in $(seq 1 25); do
-            echo "=== DIAG alone iteration $i"
-            "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=1 test/connection-cancellation.test.mjs 2>&1 \
+          tests=()
+          for file in test/*.test.mjs; do
+            [ "$file" = test/connection-cancellation.test.mjs ] || tests+=("$file")
+          done
+          for i in $(seq 1 7); do
+            echo "=== DIAG suite+alone iteration $i"
+            "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=2 "${tests[@]}" 2>&1 | grep -E '^not ok|^# (pass|fail)' || true
+            DEBUG=pw:browser* "$LOGINOM_AI_AGENT_TEST_NODE" --test --test-reporter=tap --test-timeout=60000 --test-concurrency=1 test/connection-cancellation.test.mjs 2>&1 \
               | grep -E 'diag|pw:browser|not ok|^ok |duration_ms' || true
           done
           echo done

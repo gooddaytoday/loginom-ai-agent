@@ -9,10 +9,18 @@ import childProcess from 'node:child_process';
 let T0 = performance.now(), NAME = 'init';
 const mark = text => process.stderr.write(`[diag ${NAME} ${new Date().toISOString()} +${Math.round(performance.now()-T0)}ms] ${text}\n`);
 globalThis.__loginomDiag = mark;
+let diagChild;
+let lagAt = performance.now();
+setInterval(() => { const lag = performance.now() - lagAt - 100; if (lag > 250) mark(`event-loop lag ${Math.round(lag)}ms`); lagAt = performance.now(); }, 100).unref();
+const dumpState = () => {
+  mark(`state chrome pid=${diagChild?.pid} exitCode=${diagChild?.exitCode} signalCode=${diagChild?.signalCode} killed=${diagChild?.killed}`);
+  if (process.platform === 'win32') childProcess.exec('tasklist /fo csv /nh /fi "imagename eq chrome.exe"', (error, stdout) => mark('tasklist ' + (error?.message ?? stdout.trim().split(/\r?\n/).length + ' rows: ' + stdout.trim().split(/\r?\n/).map(row => row.split('","').slice(0,2).join(':')).join(' '))));
+};
 const diagSpawn = childProcess.spawn;
 childProcess.spawn = function (...args) {
   const child = diagSpawn.apply(this, args);
   if (/chrom/i.test(String(args[0]))) {
+    diagChild = child;
     mark(`proc spawned pid=${child.pid}`);
     child.once('exit', (code, signal) => mark(`proc exit pid=${child.pid} code=${code} signal=${signal}`));
     child.once('close', () => mark(`proc close pid=${child.pid}`));
@@ -62,6 +70,7 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
       http.closeAllConnections();
       await new Promise(resolve => http.close(resolve));
       await login.catch(() => {});
+      mark('after: login settled');
       await rm(directory,{recursive:true,force:true});
     });
     let timer;
@@ -74,7 +83,7 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
         controller.abort(Error('LOGINOM_HOST_CLOSED'));
       }
       await assert.rejects(Promise.race([login, new Promise((_, reject) => {
-        timer=setTimeout(() => { mark('2s timer fired'); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
+        timer=setTimeout(() => { mark('2s timer fired'); dumpState(); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
       })]), /LOGINOM_HOST_CLOSED/);
     } finally {
       clearTimeout(timer);
@@ -120,7 +129,7 @@ test('private browser cancellation settles when CDP detach is never answered', {
     await new Promise(resolve => http.close(resolve));
     // Never let an unsettled login hold the runner past this test.
     mark('after start');
-    await Promise.race([login.catch(() => {}).then(() => mark('after: login settled')), new Promise(resolve => setTimeout(() => { mark('after: 5s cap, login still pending'); resolve(); }, 5000).unref())]);
+    await Promise.race([login.catch(() => {}).then(() => mark('after: login settled')), new Promise(resolve => setTimeout(() => { mark('after: 30s cap, login still pending'); dumpState(); resolve(); }, 30000).unref())]);
     await rm(directory,{recursive:true,force:true});
   });
   let timer;
@@ -129,7 +138,7 @@ test('private browser cancellation settles when CDP detach is never answered', {
     mark('fixture entered; abort');
     controller.abort(Error('LOGINOM_HOST_CLOSED'));
     await assert.rejects(Promise.race([login, new Promise((_, reject) => {
-      timer=setTimeout(() => { mark('2s timer fired'); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
+      timer=setTimeout(() => { mark('2s timer fired'); dumpState(); reject(Error('BROWSER_DID_NOT_CANCEL')); }, 2000);
     })]), /LOGINOM_HOST_CLOSED/);
     assert.equal(detaches, 1);
   } finally {
