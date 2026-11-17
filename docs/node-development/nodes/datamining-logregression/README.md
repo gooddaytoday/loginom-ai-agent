@@ -21,7 +21,21 @@ Enter допускает отдельный Real weight_field; Integer Weight н
 Apply — только сохранённая Enter-модель, без Teach и перенастройки.
 Selection: deviance/aic/aicc/bic/hqic; значимости только для Deviance.
 Регуляризация запрещает selection и weight_field. Сводка порта 2,
-валидация и калибровка остаются вне этого среза.
+калибровка и случайная/Монте-Карло валидация остаются вне этого среза.
+
+Enter поддерживает `validation:{method:"kfold",folds:3,sampling:"sequential"}`:
+явное целое число блоков >=2, все строки в обучении, без partition и weight_field.
+Readback сохраняет метод/folds/sampling; отдельное доказательство выполнения —
+native Integer `ValidationPartitions` и `ValidationSamples` из VariablesForm,
+привязанные к завершённому Teach того же узла. Это не приёмка качества сводки.
+Apply проверяет сохранённые настройки без Teach; пропуск validation требует
+сохранённого режима «Без валидации».
+
+Native-проба LAB-1788 на worker назначенной пары: K-fold=1, folds=3,
+sampling=1; после Teach сводка содержит ValidationSamples=32 и
+ValidationPartitions=3. Порты прежние — таблицы 0/1, переменные 2.
+Решение `logreg-kfold-csv-by-name`: только CSV сравнивается по техническим
+именам; строгие значения/типы/набор столбцов и порядок cold сохраняются.
 
 Elastic Net: native-проба LAB-1694 от 16.11.2026 на worker назначенной пары,
 Loginom 7.4.2, до изменения обработчика. Метод выбран по наблюдённой подписи

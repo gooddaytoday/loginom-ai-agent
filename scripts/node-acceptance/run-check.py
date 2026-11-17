@@ -28,8 +28,8 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
-# Owner decision 16.11 logreg-partition-csv-by-name: native warm/reopen order differs.
-CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential',)
+# Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
+CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-validation-kfold')
 D76_SCENARIOS = ('types300', 'date-time-formats', 'date-time-parts', 'date-time-parts-week', 'tree-to-table-typed')
 D87 = {
     'upload_only': dict(attachment='path', generator=['--min-bytes', '67108864'], heavy=False, upload_only=True),
@@ -800,11 +800,12 @@ def scenario(name, case_root=None, *, cases=None):
                     input_files=['weighted.csv'], expected_name='expected.json',
                     oracle=src.parent / 'oracle.py')
 
-    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net', 'logreg-partition-sequential']:
+    if name in ['logreg-ridge', 'logreg-lasso', 'logreg-elastic-net', 'logreg-partition-sequential', 'logreg-validation-kfold']:
         variant = name.removeprefix('logreg-')
         src = REPO / 'docs/node-development/nodes/datamining-logregression/acceptance/modes' / variant
         return dict(source=src, prompt=src / ('task-' + variant + '.md'), data=src / 'data', base=None,
-                    input_files=['partition.csv' if variant == 'partition-sequential' else 'train.csv'], expected_name='expected.json',
+                    input_files=['partition.csv' if variant == 'partition-sequential' else 'validation.csv' if variant == 'validation-kfold' else 'train.csv'], expected_name='expected.json',
+                    **(dict(logreg_kfold=True) if variant == 'validation-kfold' else {}),
                     oracle=src.parent / 'oracle.py')
 
     if name == 'logreg-normalization':
@@ -1498,6 +1499,8 @@ def expected_for(case, package, cold=False):
                         outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
     if case.get('colunion_output_indices') is not None:
         expected['outputs'] = [expected['outputs'][i] for i in case['colunion_output_indices']]
+    if case.get('logreg_kfold'):
+        expected['logreg_kfold'] = True
     if case.get('logreg_normalization'):
         expected['logreg_normalization'] = True
     if case.get('reform_cache'):
@@ -1523,6 +1526,16 @@ def bind_source_dir(value, source_dir):
         assert isinstance(source_dir, str) and source_dir.strip('/'), 'EXPECTED_SOURCE_DIR_MISSING'
         return value.replace('{{SOURCE_DIR}}', source_dir.rstrip('/'))
     return value
+
+
+def logreg_kfold_receipts(replies, profile):
+    # Public tool output can omit readback to fit its response budget. Audit
+    # the full native checkpoint from this run as well; never synthesize it.
+    return [o for _, o in replies] + [event['result']
+        for log in profile.rglob('execution-events.jsonl') for _, event in records(log)
+        if event.get('phase') == 'node_checkpoint' and event.get('action_key') == 'node.apply'
+        and event.get('result', {}).get('status') == 'SUCCEEDED'
+        and event['result'].get('configuration', {}).get('readback', {}).get('kind') == 'log_regression']
 
 
 def logreg_normalization_exports(destinations):
@@ -3411,6 +3424,11 @@ class Runner:
             write(folder / 'sorting-replies.json', [o for _, o in replies])
             self.phase('sorting-modes-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sorting-modes.mjs',
                 folder / 'expected.json', folder / 'sorting-replies.json', folder / 'sorting-proof.json'], folder, timeout=60)
+        if expected.get('logreg_kfold'):
+            write(folder / 'logreg-replies.json', logreg_kfold_receipts(replies, profile))
+            self.phase('logreg-kfold-evidence', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',
+                folder / 'expected.json', folder / 'logreg-replies.json', folder / 'logreg-kfold-proof.json', 'kfold'], folder, timeout=60)
+            self.current['validation'] = 'PASS'
         if expected.get('logreg_normalization'):
             write(folder / 'logreg-replies.json', [o for _, o in replies])
             self.phase('logreg-normalization-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',

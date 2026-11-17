@@ -55,6 +55,13 @@ export function readLogRegressionBrowser(prefix) {
  if(active(partitionBase)){
   const values={},names={train:'SizeGridForm;colRelativeSize;FloatPropEdit;PropContainer;ValueContainer',test:'SizeGridForm;colRelativeSize;FloatPropEdit-1;PropContainer;ValueContainer',sampling:'pedSamplingMethod',validation:'ValidationSettings;pedLearnValidationMethod'};
   for(const [key,path] of Object.entries(names)){const c=exactValue(partitionBase+';'+path+';ValueControl');if(!c||!Number.isFinite(c.getValue()))return {verified:false,reason:'logregression_partition'};values[key]=c.getValue();}
+  if(values.validation===1){
+   for(const [key,path] of Object.entries({folds:'ValidationSettings;pedFolds',fold_sampling:'ValidationSettings;pedKFoldsSamplingMethod'})){
+    const c=exactValue(partitionBase+';'+path+';ValueControl'),v=c?.getValue();
+    if(!Number.isSafeInteger(v)||(key==='folds'?v<2:![0,1].includes(v)))return {verified:false,reason:'logregression_kfold_initializing'};
+    names[key]=path;values[key]=v;
+   }
+  }
   const switches={},disabled={};
   for(const [key,path] of Object.entries(names)){
    const c=exactValue(partitionBase+';'+path+';ValueControl');

@@ -207,7 +207,8 @@ async function configureLogRegressionApply(channel,p){
    &&(p.input_fields.includes(f.name)?[0,5].includes(f.norm_type)&&(p.normalization===undefined||f.norm_type==={none:0,standardize:5}[p.normalization]):Number.isInteger(f.norm_type)))&&new Set(normalization.filter(f=>p.input_fields.includes(f.name)).map(f=>f.norm_type)).size===1,'normalization');
  await next('normalization','learn_partition');
  state=await observe('learn_partition','saved logistic partition');const partition=state.node_logregression.values;
- await saved(partition.train===(p.partition?.train_percent??100)&&partition.test===(p.partition?.test_percent??0)&&partition.validation===0
+ await saved(partition.train===(p.partition?.train_percent??100)&&partition.test===(p.partition?.test_percent??0)&&partition.validation===(p.validation?1:0)
+  &&(!p.validation||partition.folds===p.validation.folds&&partition.fold_sampling===1)
   &&(!p.partition||partition.sampling===1&&same(state.node_logregression.sequence,[0,1,2]))&&Object.values(state.node_logregression.switches??{}).every(v=>v===false),'partition');
  await next('learn_partition','lin_regression');
  state=await observe('lin_regression','saved logistic model parameters');
@@ -232,13 +233,37 @@ async function configureLogRegressionPartition(channel,p){
  const ready=s=>s.wizard?.stage==='learn_partition'&&s.node_logregression?.verified===true&&s.node_logregression.kind==='partition';
  const observe=condition=>channel.observe({condition,readLogRegression:true,ready});
  let state=await observe('logistic partition before configuration');
- const unchanged=()=>need(state.node_logregression.values.validation===0&&Object.values(state.node_logregression.switches).every(v=>v===false),'partition requires no validation or variable bindings');
+ const unchanged=()=>need((p.validation?[0,1].includes(state.node_logregression.values.validation):state.node_logregression.values.validation===0)&&Object.values(state.node_logregression.switches).every(v=>v===false),'partition requires supported validation and no variable bindings');
  unchanged();
  const wanted=p.partition;
- if(!wanted){need(state.node_logregression.values.train===100&&state.node_logregression.values.test===0,'partition omitted requires 100 percent training');return state.node_logregression.values;}
+ if(!wanted){need(state.node_logregression.values.train===100&&state.node_logregression.values.test===0,'partition omitted requires 100 percent training');if(!p.validation)return state.node_logregression.values;}
  const one=(s,tid,verb)=>{const es=s.ui.elements.filter(e=>(e.tid===tid||e.tid===null&&e.identity?.anchor_tid===tid&&e.signature?.tag==='input')&&e.allowed_actions.includes(verb));need(es.length===1,'partition control unavailable: '+tid);return es[0];};
  const act=async(key,action)=>channel.perform({condition:'configure logistic partition '+key,initialObservation:state,ready,identity:s=>s.prepared_node_context,
   resolve:s=>({...action,ref:one(s,s.wizard.root_tid+';LearnPartitionWizard;'+key,action.verb).ref})});
+ if(p.validation){
+  const choose=async(key,label,value)=>{
+   if(state.node_logregression.values[key]===value)return;
+   const control=key==='validation'?'pedLearnValidationMethod':'pedKFoldsSamplingMethod';
+   await act('ValidationSettings;'+control+';ValueControl;trg_picker',{verb:'click'});
+   const option='ValidationSettings;'+control+';ValueControl;boundlist;'+label.replaceAll(' ','_');
+   state=await channel.observe({condition:'observed logistic validation option '+label,readLogRegression:true,
+    ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===s.wizard.root_tid+';LearnPartitionWizard;'+option&&e.label===label&&e.allowed_actions.includes('click'))});
+   await act(option,{verb:'click'});state=await observe('logistic validation option readback');
+   need(state.node_logregression.values[key]===value,'validation sampling/method differs');
+  };
+  need(state.node_logregression.disabled.validation===false,'validation method must be editable');
+  await choose('validation','K-fold кросс-валидация',1);
+  need(state.node_logregression.disabled.folds===false&&state.node_logregression.disabled.fold_sampling===false,'K-fold controls must be editable');
+  if(state.node_logregression.values.folds!==p.validation.folds){
+   const tid='ValidationSettings;pedFolds;ValueControl';
+   await act(tid,{verb:'fill',text:String(p.validation.folds)});state=await observe('logistic fold count input');
+   await act(tid,{verb:'press',key:'Tab'});state=await observe('logistic fold count committed');
+  }
+  await choose('fold_sampling','Последовательный',1);unchanged();
+  const v=state.node_logregression.values;
+  need(v.train===100&&v.test===0&&v.validation===1&&v.folds===p.validation.folds&&v.fold_sampling===1,'K-fold readback differs');
+  return v;
+ }
  if(state.node_logregression.source_status==='Не активировано'){
   await act('btnActivationPort',{verb:'click'});
   state=await channel.observe({condition:'logistic partition input activated with row count',readLogRegression:true,

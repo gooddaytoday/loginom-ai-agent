@@ -1,9 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {chromium} from 'playwright-core';
 import {readLogRegressionBrowser,readLogRegressionContext} from '../lib/log-regression-context.mjs';
 import {workspaceUiCapability} from '../lib/workspace-ui.mjs';
 import {Page,build,origin,clone} from './support/workspace-ui-fixture.mjs';
+
+test('production DOM observes only the K-fold validation pickers and fold input in the owned partition wizard',async t=>{
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true,args:['--no-proxy-server']});
+ t.after(()=>browser.close());const page=await browser.newPage({viewport:{width:1280,height:800}});
+ const root='MF;TF-1;WizrdMCF',partition=root+';LearnPartitionWizard',validation=partition+';ValidationSettings';
+ const admitted=[partition+';pedSamplingMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;trg_picker',validation+';pedLearnValidationMethod;ValueControl;boundlist;K-fold_кросс-валидация',validation+';pedKFoldsSamplingMethod;ValueControl;trg_picker',validation+';pedKFoldsSamplingMethod;ValueControl;boundlist;Последовательный'];
+ const foreign=[validation+';pedIterations;ValueControl;trg_picker',validation+';pedValidationColumnName;ValueControl;trg_picker',validation+';pedForeign;ValueControl;boundlist;Последовательный',partition+';Other;ValidationSettings;pedLearnValidationMethod;ValueControl;trg_picker','MF;TF-2;WizrdMCF;LearnPartitionWizard;ValidationSettings;pedLearnValidationMethod;ValueControl;trg_picker'];
+ await page.route(origin+'/**',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><style>[data-tid]{min-width:20px;min-height:20px} .picker{width:80px;height:22px}</style>
+ <button data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">Account</button>
+ <div class="x-tab-active" data-tid="MF;cntMain;cntWorkspace;Workspace;t.br;tb-1">Сценарий</div>
+ <div data-tid="${root}"><div data-tid="${partition}"><div data-tid="${partition};SizeGridForm;grdDataSet"></div>
+ ${[...admitted,...foreign].map(tid=>`<div class="picker" data-tid="${tid}">Choice</div>`).join('')}
+ <div data-tid="${validation};pedFolds;ValueControl"><input value="3"></div></div>
+ <div class="x-hidden-offsets" style="display:none" data-tid="${root};LogRegressionWizard"><div data-tid="${root};LogRegressionWizard;pedRegressionMethod"></div></div>
+ <button data-tid="${root};btnNext">Next</button></div>`}));
+ await page.goto(origin+'/');await page.evaluate(build=>{globalThis.bg={app:{Version:build}};},build);
+ const owner={verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:root};
+ const observed=await workspaceUiCapability(page,{mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},async()=>owner);
+ assert.equal(observed.status,'SUCCEEDED',JSON.stringify(observed.error));assert.equal(observed.output.wizard.stage,'learn_partition');
+ for(const tid of admitted)assert.ok(observed.output.ui.elements.some(e=>e.tid===tid&&e.allowed_actions.includes('click')),tid);
+ for(const tid of foreign)assert.ok(!observed.output.ui.elements.some(e=>e.tid===tid),tid);
+ assert.ok(observed.output.ui.elements.some(e=>e.identity?.anchor_tid===validation+';pedFolds;ValueControl'&&e.signature.tag==='input'&&e.allowed_actions.includes('fill')));
+});
 
 test('prepared logistic wizard scans its active card without the cached inactive training pages',async t=>{
  for(const active of ['NormTuneWizard','LearnPartitionWizard','LogRegressionWizard','LogRegressionWizard-1']){
@@ -227,4 +251,15 @@ test('partition reader binds percentages, native row counts and complete train/t
 test('partition reader refuses stale sequence inventory and retains variable binding flags',()=>{
  for(const mutate of [f=>f.store.isLoading=()=>true,f=>f.store.getCount=()=>2,f=>f.records[1].data.SequenceOrder=0,f=>f.records[1].data.SizePath='Var.X']){const f=partitionFixture();mutate(f);assert.equal(f.read().verified,false);}
  const f=partitionFixture();f.add(f.base+';SizeGridForm;colRelativeSize;FloatPropEdit;SwitchButton').pressed=true;assert.equal(f.read().switches.train,true);
+});
+
+test('K-fold reader requires initialized fold count and sampling, and retains disabled and binding flags',()=>{
+ const f=partitionFixture();f.values[f.base+';ValidationSettings;pedLearnValidationMethod;ValueControl']=1;
+ assert.equal(f.read().verified,false);
+ const folds=f.add(f.base+';ValidationSettings;pedFolds;ValueControl',3);
+ f.add(f.base+';ValidationSettings;pedKFoldsSamplingMethod;ValueControl',1);
+ assert.equal(f.read().verified,true);assert.equal(f.read().values.folds,3);assert.equal(f.read().values.fold_sampling,1);
+ folds.isDisabled=()=>true;assert.equal(f.read().disabled.folds,true);
+ f.add(f.base+';ValidationSettings;pedFolds;SwitchButton').pressed=true;assert.equal(f.read().switches.folds,true);
+ for(const value of [null,1,2.5,NaN,Infinity]){f.values[f.base+';ValidationSettings;pedFolds;ValueControl']=value;assert.equal(f.read().verified,false);}
 });

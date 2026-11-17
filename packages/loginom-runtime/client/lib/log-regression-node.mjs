@@ -1,7 +1,7 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {validateLogRegressionParameters,resolveLogRegressionRoles} from './log-regression-parameters.mjs';
 import {configureLogRegression} from './log-regression-procedure.mjs';
-import {logRegressionConfigurationReadback} from './log-regression-readback.mjs';
+import {logRegressionConfigurationReadback,readLogRegressionValidation} from './log-regression-readback.mjs';
 import {readLogRegressionOutputs,configureLogRegressionOutputs} from './log-regression-output.mjs';
 import {logRegressionParametersSchema} from './node-api.mjs';
 import {trainConfiguredNode} from './node-execution-procedure.mjs';
@@ -27,7 +27,8 @@ export function createLogRegressionNodeSupport(config){const support=createTabul
   const training=await trainConfiguredNode(channel,ctx.node);
   const after=await options.operation.nodeTargetAdapter.observe(request,ctx.deadline);
   need(JSON.stringify(after.links.filter(e=>e.target===ctx.node.node_id))===JSON.stringify(graph.links.filter(e=>e.target===ctx.node.node_id)),'source changed during training');
-  return {training:{...training,source}};
+  const validation=configuration.partition?.validation===1?await readLogRegressionValidation(channel,ctx.node,training,configuration.partition.folds):null;
+  return {training:{...training,source,...(validation?{validation}:{})}};
  },
  readOutputs:readLogRegressionOutputs,
 });return {...support,nodeApplyDriverFactory:options=>{

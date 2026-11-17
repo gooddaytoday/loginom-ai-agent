@@ -6,6 +6,16 @@ const provider=new AjvJsonSchemaValidator(),validate=provider.getValidator(nodeA
 const result=()=>({operation_id:'op',status:'AMBIGUOUS',effect_possible:true,phases:[],node:null,
  execution:{status:'pending',execution_id:'process'},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
  package_saved:false,cleanup_complete:false,warnings:[],pending_phase:'execute',error:{code:'UNKNOWN',message:'Await original receipt'}});
+test('logistic results admit K-fold readback and native execution evidence additively',()=>{
+ const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const c={kind:'log_regression',scope:'observed_before_verified_finish',values_are:'observed_ui_values',node,receipt_ids:['i','c','s','m','f'],mode:'enter',input_fields:['X'],target_field:'Target',classes:[{index:0,label:'no'},{index:1,label:'yes'}],event:'yes',threshold:0.8,intercept:true,epsilon:1e-10,normalization:'none',train_percent:100,validation:'none',calibration:'train',training:{status:'trained',node,execution_id:'teach',source:[{node,output:0,input:0}]},package_persistence_verified:false};
+ r.configuration={status:'applied',readback:c};assert.equal(validate(r).valid,true);
+ c.validation={method:'kfold',folds:3,sampling:'sequential'};
+ c.training.validation={status:'completed',source:'native_validation_summary',execution_id:'teach',read_id:'read',folds:3,samples_per_fold:32};
+ assert.equal(validate(r).valid,true);
+ c.training.validation.samples_per_fold=0;assert.equal(validate(r).valid,false);
+ c.training.validation.samples_per_fold=32;c.validation.sampling='random';assert.equal(validate(r).valid,false);
+});
 test('binding result admits real and civil datetime thresholds and real NULL additively',()=>{
  const node={document_id:'d',workflow_id:'w',node_id:'n'};
  for(const [type,is_null] of [['integer',false],['string',false],['boolean',false],['real',false],['real',true],['datetime',false]]){
