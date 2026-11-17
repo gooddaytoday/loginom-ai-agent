@@ -6,10 +6,13 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {loginBrowser} from '../src/connection-check.mjs';
 
+// Windows Chromium graceful exit after abort: median 393 ms, outlier 5967 ms (LAB-1790, run 43997383101 job 133752781207).
+const LAUNCHED_CANCEL_MS = 10000;
+
 for (const phase of ['before-launch', 'navigation', 'login-form']) {
   test('private browser cancellation closes its context: ' + phase, {
     skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
-    timeout: 15000,
+    timeout: 30000,
   }, async t => {
     const directory = await mkdtemp(join(tmpdir(), 'login-cancellation-'));
     const entered = Promise.withResolvers();
@@ -51,7 +54,7 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
         controller.abort(Error('LOGINOM_HOST_CLOSED'));
       }
       await assert.rejects(Promise.race([login, new Promise((_, reject) => {
-        timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), 2000);
+        timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), phase === 'before-launch' ? 2000 : LAUNCHED_CANCEL_MS);
       })]), /LOGINOM_HOST_CLOSED/);
     } finally {
       clearTimeout(timer);
@@ -61,7 +64,7 @@ for (const phase of ['before-launch', 'navigation', 'login-form']) {
 
 test('private browser cancellation settles when CDP detach is never answered', {
   skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
-  timeout: 15000,
+  timeout: 30000,
 }, async t => {
   // Deterministic form of the CI race: the browser closes while the login
   // network tracker's Target.detachFromTarget never gets an answer.
@@ -101,7 +104,7 @@ test('private browser cancellation settles when CDP detach is never answered', {
     await Promise.race([entered.promise, login.then(() => { throw Error('LOGIN_FINISHED_BEFORE_FIXTURE'); })]);
     controller.abort(Error('LOGINOM_HOST_CLOSED'));
     await assert.rejects(Promise.race([login, new Promise((_, reject) => {
-      timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), 2000);
+      timer=setTimeout(() => reject(Error('BROWSER_DID_NOT_CANCEL')), LAUNCHED_CANCEL_MS);
     })]), /LOGINOM_HOST_CLOSED/);
     assert.equal(detaches, 1);
   } finally {
