@@ -943,7 +943,7 @@ function overlay() {
     'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
     'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.settingsProjectId)) : ''],
     'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
-    'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится вместе с инструкциями и источниками. Его разговоры (${state.sessions.filter(item => item.project === state.deleteId).length}) останутся в «Разговорах» без проекта.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится насовсем вместе с разговорами (${state.sessions.filter(item => item.project === state.deleteId).length}), инструкциями и источниками.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     // «+» is the one always-visible door to everything that is not on screen yet.
     plus: ['Добавить',`<div class="dialog-options">
         <button data-action="plus-package"><span class="glyph red">${icon('flow',19)}</span><span><strong>Пакет из Loginom…</strong><small>Агент будет работать с пакетом; над полем появятся действия с ним</small></span>${icon('chevron',17)}</button>
@@ -1302,13 +1302,18 @@ const actions = {
     render()
   },
   'confirm-delete-project':() => {
+    // As in ChatGPT, a project's chats go with it (owner's decision).
     const id = state.deleteId
+    const gone = state.sessions.filter(item => item.project === id).map(item => item.id)
+    const leave = (state.page === 'chat' && gone.includes(state.session)) || (state.page === 'project' && state.projectView === id)
     state.projects = state.projects.filter(item => item.id !== id)
-    for (const item of state.sessions.filter(entry => entry.project === id)) item.project = null
+    state.sessions = state.sessions.filter(item => item.project !== id)
+    state.tabs = state.tabs.filter(tab => !gone.includes(tab))
+    state.expanded = state.expanded.filter(item => item !== id)
     if (state.project === id) state.project = null
     state.overlay = null
-    toast('Проект удалён, его разговоры — в «Разговорах»')
-    if (state.page === 'project' && state.projectView === id) return newSession()
+    toast('Проект и его разговоры удалены')
+    if (leave) return newSession()
     render()
   },
 }
