@@ -200,7 +200,6 @@ function itemCard(item, hub, online, tab) {
     '<span class="hub-type" title="'+kinds[item.kind].how+'">'+item.kind+'</span>'+
     '<button class="hub-favorite" data-hub-favorite="'+item.id+'" aria-label="'+(hub.favorites.includes(item.id)?'Убрать из избранного':'В избранное')+'" aria-pressed="'+hub.favorites.includes(item.id)+'">'+icon('star',17)+'</button></div>'+
     '<button class="hub-card-title" data-hub-detail="'+item.id+'">'+item.title+'</button>'+
-    (item.product ? '<span class="hub-product">'+item.product+'</span>' : '')+
     '<p>'+item.description+'</p>'+
     '<div class="hub-trust">'+tierBadge(item)+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+'</div>'+
     '<div class="hub-evidence">'+evidenceLine(item)+'</div>'+
@@ -244,6 +243,7 @@ export function renderHub(state) {
       (source.length ? '<div class="hub-toolbar"><label class="hub-search">'+icon('search',18)+'<input type="search" aria-label="Поиск в каталоге" placeholder="Что нужно сделать? Например, «проверить данные»" value="'+escape(hub.query)+'"></label>'+
         '<div class="hub-filters" aria-label="Кто подготовил">'+tierFilters.filter(([id]) => online || id !== 'community').map(([id,label])=>'<button data-hub-tier="'+id+'" aria-pressed="'+(hub.tier===id)+'">'+label+'</button>').join('')+'</div>'+
         '<div class="hub-filters hub-types" aria-label="Тип">'+types.map(type=>'<button data-hub-type="'+type+'" aria-pressed="'+(hub.type===type)+'"'+(kinds[type]?' title="'+kinds[type].how+'"':'')+'>'+(kinds[type]?.plural || type)+'</button>').join('')+'</div>'+
+        '<p class="hub-type-how hub-tier-how">'+tierFilters.filter(([id]) => id !== 'all' && (online || id !== 'community')).map(([id,label]) => '<span><strong>'+label+'</strong> — '+tiers[id].title.charAt(0).toLowerCase()+tiers[id].title.slice(1)+'</span>').join('')+'</p>'+
         (kinds[hub.type] ? '<p class="hub-type-how"><strong>'+hub.type+'</strong> — '+kinds[hub.type].how.charAt(0).toLowerCase()+kinds[hub.type].how.slice(1)+'</p>' : '')+'</div>' : '')+
       (items.length ? '<div class="hub-grid">'+items.map(item=>itemCard(item,hub,online,hub.tab)).join('')+'</div>' :
         '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon(hub.tab==='updates'?'check':'search',23)+'</span><h3>'+(source.length?'Ничего не нашлось':hub.tab==='updates'?'Обновлений нет':'Здесь появится установленное')+'</h3>'+
@@ -329,7 +329,8 @@ function renderDialog(hub, online) {
     title = 'Готово';
     body = '<div class="hub-result"><span class="hub-tile hub-sage">'+icon('check',27)+'</span><h3>'+escape(current.name)+'</h3><p>Добавлено в приложение. Если что-то пойдёт не так, предыдущие версии можно вернуть в разделе «История».</p></div>';
     actions = '<button class="btn" data-hub-tab="history">История</button>'+
-      (current.next?'<button class="btn primary" data-hub-use="'+current.next+'">Перейти к запуску</button>':'<button class="btn primary" data-hub-tab="installed">Установленные</button>');
+      (current.next && byId(current.next).kind === 'Действие' ? '<button class="btn" data-hub-pin="'+current.next+'">Закрепить на главной</button>' : '')+
+      (current.next?'<button class="btn primary" data-hub-use="'+current.next+'">'+kinds[byId(current.next).kind].use+'</button>':'<button class="btn primary" data-hub-tab="installed">Установленные</button>');
   }
   if (current.kind === 'export') {
     title = 'Собрать офлайн-набор';
@@ -424,7 +425,7 @@ export function bindHub(root, state, api) {
     }));
   }
 
-  root.querySelectorAll('[data-hub-tab], [data-hub-type], [data-hub-tier], [data-hub-detail], [data-hub-use], [data-hub-sample], [data-hub-favorite], [data-hub-action]').forEach(button=>button.addEventListener('click', () => {
+  root.querySelectorAll('[data-hub-tab], [data-hub-type], [data-hub-tier], [data-hub-detail], [data-hub-use], [data-hub-pin], [data-hub-sample], [data-hub-favorite], [data-hub-action]').forEach(button=>button.addEventListener('click', () => {
     const data = button.dataset;
     if (data.hubTab) Object.assign(hub,{tab:data.hubTab,type:'Все',query:'',dialog:null});
     if (data.hubType) hub.type = data.hubType;
@@ -434,6 +435,7 @@ export function bindHub(root, state, api) {
       const id = data.hubFavorite;
       hub.favorites = hub.favorites.includes(id) ? hub.favorites.filter(entry=>entry!==id) : [...hub.favorites,id];
     }
+    if (data.hubPin) { hub.dialog = null; api.pinSolution(data.hubPin); api.render(); return; }
     if (data.hubUse) {
       const item = byId(data.hubUse);
       hub.dialog = null;

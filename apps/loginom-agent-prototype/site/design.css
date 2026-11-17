@@ -200,3 +200,5 @@ button.prototype-mark:hover{color:var(--accent)}
 .rv-questions li::marker{font-weight:700;color:var(--accent)}
 .rv-changes{display:grid;gap:5px;padding-left:20px;margin:0;color:var(--muted);line-height:1.45}
 @media(max-width:760px){.rv-grid{grid-template-columns:1fr}}
+.hub-tier-how{flex-wrap:wrap;gap:3px 16px;font-size:13px}
+.rv-answers{list-style:disc}

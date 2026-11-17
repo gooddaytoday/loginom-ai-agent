@@ -102,15 +102,16 @@ function chosenPackage(run, name = 'package') {
 // package-docs — local .lgp, built-in Loginom Help, write in the project folder; no Loginom, browser, shell or web;
 // loginom-automation — works in Loginom through the browser under the user's account, gated per action by the runner.
 // `pre` is what the application itself does before the agent starts; `data` is what goes to the model.
-function accessFor(key, run) {
+function accessFor(key, run, project) {
   const pkg = chosenPackage(run);
   const name = pkg.name;
-  const report = 'отчёт в папке проекта';
+  const folder = `папке проекта «${project}»`;
+  const report = `отчёт в ${folder}`;
   const runsScenario = 'При запуске сценария выполняются и его выгрузки — например, в файл или базу данных. Если это нежелательно, используйте копию сценария без выгрузок.';
   const noWeb = 'Открывать сайты в интернете';
   if (key === 'document') return {
-    pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в папку проекта: документирование работает только с файлом на компьютере`] : [],
-    can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать документ «${docName(run)}» в папке проекта`],
+    pre: pkg.source === 'loginom' ? [`Скачает «${name}» из вашей папки Loginom в папку проекта «${project}»: документирование работает только с файлом на компьютере`] : [],
+    can: [`Прочитать файл «${name}»`, 'Пользоваться встроенной справкой Loginom', `Создать документ «${docName(run)}» в ${folder}`],
     cannot: ['Изменить пакет — он только читается', 'Подключаться к Loginom и открывать браузер', 'Запускать программы на компьютере', noWeb],
     data: 'структура пакета и настройки узлов',
   };
@@ -286,6 +287,8 @@ function renderRunner(state, model) {
     target:'Продажи — улучшено.lgp', data:'sales_sample.csv', baseline:'sales_expected.csv', tolerance:'0.01',
     sql:sqlExample, repeats:'5',
   }, step:'params', stage:0, outcome:'success', demoOutcome:'success' };
+  // Seeing the result clears the «Готово — открыть результат» line in the sidebar.
+  if (run.step === 'result') run.unseen = false;
   if (state.runnerPackage && run.boundPackage?.name !== state.runnerPackage.name && run.step !== 'running') {
     run.boundPackage = state.runnerPackage;
     run.values.package = state.runnerPackage.name;
@@ -294,7 +297,7 @@ function renderRunner(state, model) {
   }
   const back = {loginom:['loginom','← Пакеты'], home:['home','← Главная']}[state.runnerFrom] || ['hub','← Каталог'];
   const blocked = key === 'regression' && run.values.baseline === 'missing';
-  const access = accessFor(key, run);
+  const access = accessFor(key, run, state.project);
   let body = '';
   if (run.step === 'params') body = `<section class="sl-panel"><form class="sl-form" data-sl-form="run">${run.error ? note(escape(run.error),'warn') : ''}${renderFields(key, run)}
     <div class="sl-actions">${blocked ? `<button type="button" class="btn" data-sl-action="baseline-draft" ${run.baselineDraft ? 'disabled' : ''}>Подготовить черновик эталона</button>` : '<button type="submit" class="btn primary">Далее: доступ</button>'}</div></form></section>`;
@@ -479,6 +482,10 @@ export function bindSolutions(root,state,api) {
             clearInterval(run.timer);
             run.step = 'result';
             run.outcome = run.demoOutcome;
+            if (state.page !== 'runner' || runKey(state) !== key) {
+              run.unseen = true;
+              api.toast(titles[key][0] + (run.outcome === 'success' ? ': готово' : ': нужно посмотреть результат'));
+            }
             run.stage = Math.min(run.stage, finalStage) - 1;
           }
           // Off the runner page, re-render once at the end so the «Выполняется» card disappears.

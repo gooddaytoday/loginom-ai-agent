@@ -105,7 +105,15 @@ route()
 initSolutionDrafts(state)
 
 const api = {
-  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss,
+  icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution,
+}
+// Pins the package actions of a just-installed catalog item to Home, if there is room.
+function pinSolution(solution) {
+  const ids = Object.entries(packageActions).filter(([id,action]) => action.solution === solution && !action.noPackage && !state.pinnedActions.includes(id)).map(([id]) => id)
+  if (!ids.length) return toast('Уже на главной')
+  if (state.pinnedActions.length + ids.length > 4) return toast('На главной помещается четыре действия. Открепите одно в «Все действия».', 'alert')
+  state.pinnedActions = [...state.pinnedActions, ...ids]
+  toast('Закреплено на главной')
 }
 function canNavigate(page, tab) {
   if (beforeSettingsLeave(state,page,tab)) return true
@@ -135,9 +143,9 @@ function setThemeAttribute() {
   document.documentElement.dataset.theme = state.theme === 'system'
     ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light') : state.theme
 }
-function toast(message) {
+function toast(message, kind = 'check') {
   const el = $('#announcements')
-  el.innerHTML = `<span>${icon('check',16)}${esc(message)}</span>`
+  el.innerHTML = `<span>${icon(kind,16)}${esc(message)}</span>`
   clearTimeout(toast.timer)
   toast.timer = setTimeout(() => { el.innerHTML = '' }, 3800)
 }
@@ -243,10 +251,12 @@ function sidebar() {
   </aside>`
 }
 function connectionCard() {
-  const running = Object.values(state.solutions?.runs || {}).some(run => run.step === 'running')
+  const runs = Object.entries(state.solutions?.runs || {})
+  const running = runs.some(([,run]) => run.step === 'running')
+  const unseen = running ? null : runs.find(([,run]) => run.unseen)
   const connected = state.settings.connection.connected
   const model = state.settings?.model?.name || 'Демо-модель'
-  return `${running ? `<button class="conn-run" data-go="runner"><i class="conn-dot busy"></i><span>Выполняется действие</span>${icon('chevron',14)}</button>` : ''}<button class="conn-card" data-settings="loginom" title="Подключение к Loginom и модель">
+  return `${running ? `<button class="conn-run" data-go="runner"><i class="conn-dot busy"></i><span>Выполняется действие</span>${icon('chevron',14)}</button>` : ''}${unseen ? `<button class="conn-run" data-open-run="${unseen[0]}"><i class="conn-dot ${unseen[1].outcome === 'success' ? 'ok' : 'warn'}"></i><span>${unseen[1].outcome === 'success' ? 'Готово — открыть результат' : 'Запуск завершён — посмотреть'}</span>${icon('chevron',14)}</button>` : ''}<button class="conn-card" data-settings="loginom" title="Подключение к Loginom и модель">
     <i class="conn-dot ${connected ? 'ok' : 'warn'}"></i>
     <span><strong>${connected ? 'Loginom подключён' : 'Loginom не подключён'}</strong><small>Модель: ${esc(model)}</small></span>${icon('chevron',14)}</button>`
 }
@@ -558,10 +568,10 @@ function allActions() {
     const pinned = state.pinnedActions.includes(id)
     return `<div class="all-action"><button class="all-action-main" data-package-action="${id}"><span class="glyph red">${icon(action.icon,17)}</span>
       <span><strong>${action.title}${item?.tier && item.tier !== 'official' ? ` ${tierBadge(item)}` : ''}</strong><small>${action.detail}</small></span></button>
-      ${ready && !action.noPackage ? `<button class="pin-btn" data-pin-action="${id}" aria-pressed="${pinned}" title="${pinned ? 'Убрать с главной' : 'Показывать на главной'}">${pinned ? 'На главной' : 'На главную'}</button>` : ready ? '' : `<button class="pin-btn" data-package-action="${id}">Добавить</button>`}</div>`
+      ${ready ? '' : `<button class="pin-btn" data-package-action="${id}">Добавить</button>`}${!action.noPackage && (ready || pinned) ? `<button class="pin-btn" data-pin-action="${id}" aria-pressed="${pinned}" title="${pinned ? 'Убрать с главной' : 'Показывать на главной'}">${pinned ? 'Закреплено' : 'Закрепить'}</button>` : ''}</div>`
   }
   const group = (title, list) => list.length ? `<p class="pkg-section">${title}</p><div class="all-actions">${list.map(row).join('')}</div>` : ''
-  return `<p class="dialog-desc">Новые действия появляются с обновлениями приложения и из каталога. Четыре можно закрепить на главной.</p>
+  return `<p class="dialog-desc">Новые действия появляются с обновлениями приложения и из каталога. Закреплённые — до четырёх — видны на главной.</p>
     ${group('Установлены', installed.filter(([,action]) => !action.noPackage))}
     ${group('Без пакета', installed.filter(([,action]) => action.noPackage))}
     ${group('Есть в каталоге', entries.filter(([,action]) => !hubHasInstalled(state, action.solution)))}
@@ -668,23 +678,28 @@ function packages() {
 function review() {
   const look = [
     ['Новые действия','Главная → «Все действия · 7» → добавьте «Проверить по стандарту» и закрепите на главной вместо «Улучшить».','review-actions'],
-    ['Выбор пакета и запуск','Главная → «Документировать» → пакет из папки «Архив» → «Разрешить и запустить» → вернитесь на Главную: внизу меню видно «Выполняется действие».','home'],
+    ['Выбор пакета и запуск','Главная → «Документировать» → пакет из папки «Архив» → «Разрешить и запустить» → вернитесь на Главную: внизу меню видно «Выполняется действие», затем «Готово — открыть результат».','home'],
     ['Каталог и сообщество','Каталог → «Навыки» → «Сводка для руководителя»: новые тексты и отметка перед установкой.','review-skills'],
   ]
   const ask = [
-    ['Названия','Раздел «Каталог», в нём четыре типа по тому, что вы с ними делаете: <b>Действие</b> — запускается для пакета; <b>Навык</b> — агент лучше справляется в разговоре; <b>Пакет Loginom</b> — готовый сценарий в вашу папку; <b>Подключение</b> — внешний сервис. «Решение», «шаблон» и «база знаний» больше не показываются. Другие варианты: раздел «Расширения» или «Возможности»; типы «Инструмент · Знания · Готовый сценарий · Интеграция».'],
+    ['Названия','Раздел «Каталог», в нём четыре типа по тому, что вы с ними делаете: <b>Действие</b> — запускается для пакета; <b>Навык</b> — агент лучше справляется в разговоре; <b>Пакет Loginom</b> — готовый сценарий в вашу папку; <b>Подключение</b> — внешний сервис. «Решение», «шаблон» и «база знаний» больше не показываются. Если ближе другой вариант — назовите его: раздел «Расширения» или «Возможности»; типы «Инструмент · Знания · Готовый сценарий · Интеграция».'],
     ['Новые действия','Приходят с обновлениями приложения и из каталога. На главной — четыре, их выбирает пользователь; остальные — в «Все действия»; на странице пакета — все установленные. Действия от сообщества — только «Проверено Loginom» и только как настройка встроенного действия: своего доступа к Loginom они не получают.'],
-    ['Выбор пакета и Loginom','На стенде список папки приходит за 1–3 секунды без агента, но через внутренний метод веб-клиента Loginom, и приложению нужна своя фоновая сессия Loginom. Можно ли попросить разработчиков Loginom закрепить этот метод? Занимает ли такая сессия лицензию?'],
     ['Тексты для сообщества','Карточка: «Автор — участник сообщества, Loginom это не проверял…»; отметка перед установкой: «Понимаю, что Loginom это не проверял, и сам проверю результат»; в закрытом контуре: «Администратор вашей организации разрешил только то, что подготовил или проверил Loginom».'],
-    ['Состояние','Отдельной строки нет: внизу меню — карточка «Loginom · модель», над ней во время запуска — «Выполняется действие». Режим сети — вверху справа.'],
+    ['Состояние','Отдельной строки нет: внизу меню — карточка «Loginom · модель», над ней во время запуска — «Выполняется действие», а после — «Готово — открыть результат», пока вы его не откроете. Режим сети — вверху справа.'],
   ]
-  const changed = ['Выбор пакета: поиск, недавние, папки Loginom; для «Документировать» — ещё файл с компьютера.','«Решения» → «Каталог», четыре типа, кнопки по смыслу типа: «Запустить», «Начать разговор».','«Все действия» и закрепление на главной; новое действие «Проверить по стандарту» (Проверено Loginom).','Новые тексты уровней доверия; «Создать своё» создаёт навык.','Индикатор «Выполняется действие» внизу меню.']
+  const answer = [
+    'Список файлов папки приходит из app.loginom.ai за 1–3 секунды без агента, но через внутренний метод веб-клиента Loginom. Можно ли попросить разработчиков Loginom закрепить этот метод, чтобы он не менялся без предупреждения?',
+    'Для окна выбора пакета приложению нужна своя фоновая сессия Loginom — ещё один вход под учётной записью пользователя. Занимает ли такая сессия лицензию Loginom?',
+  ]
+  const changed = ['Выбор пакета: поиск, недавние, папки Loginom; для «Документировать» — ещё файл с компьютера.','«Решения» → «Каталог», четыре типа, кнопки по смыслу типа: «Запустить», «Начать разговор».','«Все действия» и закрепление на главной; новое действие «Проверить по стандарту» (Проверено Loginom).','Новые тексты уровней доверия; «Создать своё» создаёт навык.','Внизу меню: «Выполняется действие», затем «Готово — открыть результат».','Названия в каталоге совпадают с действиями на главной; под фильтрами — кто что подготовил.']
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 1.1</p><h1>Что решить</h1><p>Посмотрите три сценария — около 10 минут — и ответьте одной строкой: «ок» или «ок, кроме N». Мелочи на мне.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 1.1</p><h1>Что решить</h1><p>Посмотрите три сценария (А, Б, В) — около 10 минут. Затем подтвердите предложения 1–4 одной строкой и ответьте на два вопроса ниже. Мелочи на мне.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
-    <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${index + 1}</span><h3>${title}</h3><p>${text}</p><button class="btn" ${target === 'home' ? 'data-go="home"' : `data-action="${target}"`}>Открыть ${icon('arrow',15)}</button></article>`).join('')}</div>
-    <h2 class="rv-heading">Решить</h2>
+    <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" ${target === 'home' ? 'data-go="home"' : `data-action="${target}"`}>Открыть ${icon('arrow',15)}</button></article>`).join('')}</div>
+    <h2 class="rv-heading">Подтвердить — «ок» или «ок, кроме N»</h2>
     <ol class="rv-questions">${ask.map(([title,text]) => `<li><strong>${title}.</strong> ${text}</li>`).join('')}</ol>
+    <h2 class="rv-heading">Нужен ваш ответ</h2>
+    <ul class="rv-questions rv-answers">${answer.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Что изменилось</h2>
     <ul class="rv-changes">${changed.map(text => `<li>${text}</li>`).join('')}</ul>
   </div>`
@@ -1002,9 +1017,16 @@ app.addEventListener('click', event => {
   if (d.agentMode) { state.mode = d.agentMode; return dismiss() }
   if (d.review) { state.reviewTab = d.review; return render() }
   if (d.node != null) { state.node = Number(d.node); return render() }
+  if (d.openRun) {
+    const [solution, mode] = d.openRun.split(':')
+    state.solution = solution
+    state.solutionMode = mode || state.solutionMode
+    state.solutions.runs[d.openRun].unseen = false
+    return navigate('runner')
+  }
   if (d.pinAction) {
     const pinned = state.pinnedActions.includes(d.pinAction)
-    if (!pinned && state.pinnedActions.length >= 4) return toast('На главной помещается 4 действия — открепите одно')
+    if (!pinned && state.pinnedActions.length >= 4) return toast('На главной помещается четыре действия. Сначала открепите одно.', 'alert')
     state.pinnedActions = pinned ? state.pinnedActions.filter(id => id !== d.pinAction) : [...state.pinnedActions, d.pinAction]
     return render()
   }
