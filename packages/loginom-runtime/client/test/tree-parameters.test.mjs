@@ -2,7 +2,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
+import {treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
 import {createTreeNodeSupport,treeConfigurationReadback} from '../lib/tree-node.mjs';
 import {NODE_TYPES,validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 test('tree stage 1 admits the independent acceptance JSON with exact original integer lexemes',async()=>{
@@ -238,8 +238,56 @@ function tableState(indexed=false){
    nodes:[{path:'',name:'Root',is_container:true,is_array:false,selected:true},leaf('/batch','batch'),
     {path:'/items',name:'items',is_container:true,is_array:true,selected:true,selected_global_index:indexed,global_index_tid:'items>index;TreeCheckbox'},
     leaf('/items/code','code'),leaf('/items/qty','qty')]},
-  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:'items>index;TreeCheckbox',ref:'index',allowed_actions:['click']}]}};
+  ui:{elements:[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},{tid:'items>index;TreeCheckbox',ref:'index',allowed_actions:['click'],interaction:{state:'point_observed'}}]}};
 }
+
+test('tree-to-table admits 70 through 256 selected paths and refuses overflow, duplicates and foreign paths',()=>{
+ const request={target:{kind:'existing',type:'trees.to_table'},inputs:[],mappings:[]};
+ const paths=Array.from({length:257},(_,i)=>'/rows/f'+String(i).padStart(2,'0'));
+ assert.equal(treeToTableParametersSchema.properties.selected_paths.maxItems,256);
+ for(const count of [70,256])validateTreeParameters({selected_paths:paths.slice(0,count)},'selected_nodes',request);
+ for(const selected_paths of [paths,paths.slice(0,70).concat(paths[0])])
+  assert.throws(()=>validateTreeParameters({selected_paths},'selected_nodes',request),/selected_paths/);
+ const schema=[{path:'',is_container:true,is_array:false},{path:'/rows',is_container:true,is_array:true},
+  ...paths.slice(0,70).map(path=>({path,name:path.split('/').at(-1),is_container:false,is_array:false,type:'integer'}))];
+ assert.equal(validateSelectedTreePaths(schema,paths.slice(0,70)),true);
+ assert.throws(()=>validateSelectedTreePaths(schema,paths.slice(0,71)),/selected_paths/);
+});
+
+for(const subset of [false,true])test('tree-to-table wide '+(subset?'reveals a subset below the viewport':'selects all leaves without individual leaf clicks and removes the native index'),async()=>{
+ const state=tableState(),actions=[];let top=0;
+ const leaves=Array.from({length:70},(_,i)=>({index:i+2,path:'/rows/f'+String(i).padStart(2,'0'),name:'f'+String(i).padStart(2,'0'),
+  is_container:false,is_array:false,selected:false,checkbox_tid:'leaf'+i+';TreeCheckbox'}));
+ state.node_tree.nodes=[{index:0,path:'',name:'Root',is_container:true,is_array:false,selected:false},
+  {index:1,path:'/rows',name:'rows',is_container:true,is_array:true,selected:false,selected_global_index:false,global_index_tid:'rows>index;TreeCheckbox'},...leaves];
+ const index=state.node_tree.nodes[1];
+ const refresh=()=>{
+  const rows=[{index:1,tid:index.global_index_tid},...leaves.map(n=>({index:n.index,tid:n.checkbox_tid}))];
+  state.ui.elements=[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']},
+   ...['btnSelectAll','btnDeselectAll'].map(name=>({tid:'W;'+name,ref:name,allowed_actions:['click']})),
+   ...rows.map((row,i)=>({tid:row.tid,ref:row.tid,allowed_actions:['click',...(i>=top&&i<top+15?['scroll']:[])],
+    scroll:{ref:'tree-scroll',top,height:15,scroll_height:71},interaction:{state:i>=top&&i<top+15?'point_observed':'obscured'}}))];
+ };
+ const channel={observe:async options=>{refresh();assert.ok(options.ready(state));return structuredClone(state);},perform:async options=>{
+  refresh();const action=options.resolve(state);actions.push(action);
+  if(action.verb==='wizard_step'){state.wizard.stage='done';return;}
+  if(action.verb==='scroll'){top=Math.max(0,Math.min(56,top+Math.sign(action.delta_y)*12));return;}
+  if(action.ref==='btnSelectAll'||action.ref==='btnDeselectAll'){
+   for(const n of state.node_tree.nodes)n.selected=action.ref==='btnSelectAll';
+   index.selected_global_index=action.ref==='btnSelectAll';return;
+  }
+  const e=state.ui.elements.find(e=>e.ref===action.ref);assert.equal(e.interaction.state,'point_observed','UI_REFERENCE_OBSCURED');
+  if(action.ref===index.global_index_tid)index.selected_global_index=!index.selected_global_index;
+  else{const n=leaves.find(n=>n.checkbox_tid===action.ref);n.selected=!n.selected;}
+ }};
+ const selected_paths=(subset?leaves.slice(65):leaves).map(n=>n.path);
+ const result=await tableImplementation().configure(channel,{selected_paths},{request:{finish:'execute',target:{kind:'new'}}});
+ assert.equal(result.verified,true);assert.equal(result.configuration.nodes[1].selected_global_index,false);
+ assert.deepEqual(Array.from(result.configuration.nodes.filter(n=>!n.is_container&&n.selected),n=>n.path),selected_paths);
+ const clicks=actions.filter(a=>a.verb==='click').map(a=>a.ref);
+ if(subset){assert.ok(actions.some(a=>a.verb==='scroll'));assert.deepEqual(clicks.filter(t=>t.startsWith('leaf')),leaves.slice(65).map(n=>n.checkbox_tid));}
+ else assert.deepEqual(clicks,['btnSelectAll',index.global_index_tid]);
+});
 for(const [label,parameters,kind,initial,clicks,expected] of [
  ['selects the requested native global index on a new node',{global_index_paths:['/items']},'new',false,1,true],
  ['clears an unrequested index on a new node',{},'new',true,1,false],

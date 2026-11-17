@@ -154,7 +154,7 @@ RULES = (
     ((C + 'tree-*.mjs', 'docs/node-development/nodes/trees-*/acceptance/**',
       'scripts/node-acceptance/tests/trees.test.mjs', 'scripts/node-acceptance/tests/tree-dates.test.mjs',
       'docs/node-development/nodes/trees-jsontotree/fixtures/nested-records/**'), ('live-ui',),
-     ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat', 'trees-to-table-indices', 'trees-to-table-siblings',
+     ('table-tree-json', 'json-tree-json', 'tree-repeat', 'tree-no-repeat', 'trees-to-table-indices', 'trees-to-table-wide', 'trees-to-table-siblings',
       'tree-null-leaves', 'tree-nested-records', 'tree-empty-containers', 'tree-dates', 'tree-scalar-arrays',
       'table-tree-dates-variant', 'tree-to-table-typed')),
     (('packages/product/skills/loginom-automation/references/nodes/trees.to_table.md',), ('live-ui',), ('tree-to-table-typed', 'trees-to-table-siblings')),

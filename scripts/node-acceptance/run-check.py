@@ -527,7 +527,11 @@ def scenario(name, case_root=None, *, cases=None):
     if name == 'trees-to-table-indices':
         src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
         return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
-                    base=None, external=True, expected_name='expected-indices-run.json')
+                    input_files=['documents.csv'], base=None, external=True, expected_name='expected-indices-run.json')
+    if name == 'trees-to-table-wide':
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-wide.md', data=src.parent.parent / 'fixtures/modes',
+                    input_files=['wide.csv'], base=None, external=True, expected_name='expected-wide-run.json')
     if name == 'trees-to-table-siblings':
         # LAB-1807 tree-siblings-native: native stacks items rows, then tags rows (absent fields NULL).
         src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'

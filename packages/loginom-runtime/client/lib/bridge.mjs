@@ -215,7 +215,9 @@ export async function createBridge(config, session, { browserTransport: managedB
       groups.local=groups.local.filter(tool=>!['dock_ui_action','dock_artifact_upload','dock_artifact_verify'].includes(tool.name))
         .map(tool=>isNodeApiTool(tool.name)?{...userNodeTool(tool),outputSchema:tool.name==='dock_node_read'
           ?{type:'object',properties:{...userResultSchema.properties,...javascriptSourceReceiptSchema.properties,
-              ...javascriptContextReceiptSchema.properties,kind:{enum:['source','context']}},
+              ...javascriptContextReceiptSchema.properties,kind:{enum:['source','context']},
+              // Context receipts require cleanup, but a running job/refusal may retain it.
+              cleanup_complete:userResultSchema.properties.cleanup_complete},
             additionalProperties:false,oneOf:[userResultSchema,javascriptSourceReceiptSchema,javascriptContextReceiptSchema]}:userResultSchema}:isServerDownloadTool(tool.name)?{...tool,outputSchema:userResultSchema}:userActionTool(tool));
     }
     const catalog = combineCatalogs(groups);

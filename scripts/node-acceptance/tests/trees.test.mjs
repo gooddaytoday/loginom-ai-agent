@@ -5,6 +5,40 @@ import {fileURLToPath} from 'node:url';
 import {parseExpectedOutputs} from '../expected-outputs.mjs';
 import {readFileSync} from 'node:fs';
 
+test('trees-to-table-wide keeps all 70 ordered integer columns, original task and one JSON document private from the oracle',()=>{
+ const r=spawnSync('python3',['-B','-c',`import csv,importlib.util,json,tempfile
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptance/run-check.py'))
+r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+c=r.scenario('trees-to-table-wide');e=r.expected_for(c,'/owned/wide.lgp')
+assert c['external'] and c['base'] is None and c['input_files']==['wide.csv']
+assert c['prompt'].name=='task-wide.md'
+case=next(x for x in r.read(c['source']/'expected.json')['cases'] if x['id']=='wide')
+out=e['outputs'][0]
+assert out['columns']==case['output']['columns'] and out['rows']==case['output']['rows']
+assert out['export_destination']=='wide.csv' and out['column_order']=='exact' and out['ordered']
+assert [x['name'] for x in out['columns']]==['f'+str(i).zfill(2) for i in range(70)]
+assert all(x['type']=='integer' for x in out['columns'])
+with (c['data']/'wide.csv').open() as f:rows=list(csv.DictReader(f,delimiter=';'))
+assert len(rows)==1 and json.loads(rows[0]['Document'])==case['settings_proposal']['tree_input']
+class StopBeforeModel(Exception):pass
+with tempfile.TemporaryDirectory() as directory:
+ root=Path(directory);folder=root/'run'/'wide';folder.mkdir(parents=True)
+ workspace=root/'workspace';workspace.mkdir()
+ runner=object.__new__(r.Runner);runner.options={};runner.env={};runner.out=root/'run'
+ def phase(*args,**kwargs):raise StopBeforeModel()
+ runner.phase=phase
+ try:runner.model('trees-to-table-wide',folder,root/'profile',workspace,'/owned/wide.lgp',{'package_directory':'/owned'},root/'build')
+ except StopBeforeModel:pass
+ assert sorted(p.name for p in workspace.iterdir())==['wide.csv']
+ assert (workspace/'wide.csv').read_bytes()==(c['data']/'wide.csv').read_bytes()
+ prompt=(folder/'task.md').read_text()
+ assert prompt.startswith(c['prompt'].read_text().replace('{{PACKAGE_PATH}}','/owned/wide.lgp'))
+ assert 'oracle' not in prompt and 'expected' not in prompt
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(r.status,0,r.stdout+r.stderr);
+});
+
 test('tree-only expectations require a nonempty tree contract when no tables are requested',()=>{
  const base={package_path:'/owned/tree.lgp',nodes:[],outputs:[]};
  const tree={output_node_type:'trees.from_json',output_port:0,document:{path:'',type:'object',children:[]}};
@@ -196,7 +230,7 @@ spec=importlib.util.spec_from_file_location('runner',Path('scripts/node-acceptan
 r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
 c=r.scenario('trees-to-table-indices');e=r.expected_for(c,'/owned/tree.lgp')
 assert c['external'] and c['base'] is None
-assert [p.name for p in c['data'].glob('*.csv')]==['documents.csv']
+assert c['input_files']==['documents.csv']
 task=c['prompt'].read_text()
 assert c['prompt'].name=='task-indices.md' and 'documents.csv' in task and 'oracle' not in task and 'input.json' not in task and 'group' not in task
 oracle=json.loads((c['source']/'expected.json').read_text())

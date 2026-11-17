@@ -164,7 +164,7 @@ def proposals(slug):
         case('composite', table([dict(name='items_code',label='Позиции.Код',type='string'),dict(name='items_qty',label='Позиции.Количество',type='integer')], composite),
              composite_names=True, composite_labels=True, label_separator='.',
              native_name_and_separator_status='technical name spelling and inclusion of Root pending native observation'),
-        case('wide', table([dict(name=k,label_any=True,type='integer') for k in wide_names], [wide]), selected_field_count=f['wide_fields'], tree_input={'rows':[wide]}),
+        dict(case('wide', table([dict(name=k,label_any=True,type='integer') for k in wide_names], [wide]), selected_field_count=f['wide_fields'], tree_input={'rows':[wide]}), native_status='observed'),
         # Owner decision tree-siblings-native (LAB-1807): native 7.4.2 stacks sibling arrays, items rows then tags rows;
         # fields of the other array are NULL (not empty strings) and batch repeats on every row.
         case('siblings', table([*columns,dict(name='tag',label_any=True,type='string')], siblings_rows(d)),
@@ -244,6 +244,15 @@ def tree_to_table_typed_projection():
                                        dict(name='Value', type='variant', label_any=True)], rows=rows)])
 
 
+def tree_to_table_wide_projection():
+    output = next(c['output'] for c in proposals(SLUGS[3]) if c['id'] == 'wide')
+    return dict(package_path='{{PACKAGE_PATH}}',
+                nodes=[dict(type=t) for t in ['imports.text', 'trees.from_json', 'trees.to_table']],
+                outputs=[dict(output_node_type='trees.to_table', output_port=0,
+                              export_destination='wide.csv', ordered=True, column_order='exact',
+                              columns=output['columns'], rows=output['rows'])])
+
+
 def tree_to_table_siblings_projection():
     """LAB-1807: siblings case as one Tree-to-Table run from fixtures/siblings/documents.csv."""
     output = next(c for c in proposals('trees-treetodata') if c['id'] == 'siblings')['output']
@@ -274,7 +283,10 @@ if __name__ == '__main__':
             assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_typed_projection(), str(projection)
             projection = target.with_name('expected-siblings-run.json')
             assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_siblings_projection(), str(projection)
+            projection = target.with_name('expected-wide-run.json')
+            assert json.loads(projection.read_text(encoding='utf-8')) == tree_to_table_wide_projection(), str(projection)
         if not args.check and slug == SLUGS[3]:
             target.with_name('expected-siblings-run.json').write_text(
                 json.dumps(tree_to_table_siblings_projection(), ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
-        print(slug + ': ' + str(len(output['cases'])) + ' independent proposals; native ' + ', '.join(sorted({c['native_status'] for c in output['cases']})))
+        print(slug + ': ' + str(len(output['cases'])) + ' independent cases; native observed: '
+              + str(sum(c['native_status'] == 'observed' for c in output['cases'])))

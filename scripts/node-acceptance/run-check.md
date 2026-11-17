@@ -774,6 +774,13 @@ is derived from the independent `expected.json` case `indices`: one Tree-to-Tabl
 table with the native global index column (`name_any`, native 7.4.2 position:
 first column of the array branch), CSV, Save, cold.
 
+`trees-to-table-wide` uses the unchanged `trees-treetodata/acceptance/modes/task-wide.md`
+and only `fixtures/modes/wide.csv`: one JSON document with rows[0].f00…f69.
+Private `expected-wide-run.json` projects the independent `wide` case, checked
+by `oracle.py --check`. All 70 ordered integer columns and their values must
+match in the complete main read and fresh cold execution of the saved node.
+Stock CSV, Save and cleanup checks apply; expected/oracle remain private.
+
 `trees-to-table-siblings` (LAB-1807, owner decision `tree-siblings-native`) uses
 `trees-treetodata/acceptance/modes/task-siblings.md` and only
 `fixtures/siblings/documents.csv` (one document with sibling arrays items and tags).
