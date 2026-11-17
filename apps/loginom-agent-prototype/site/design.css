@@ -449,7 +449,7 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .detail-toggle{display:inline-flex;padding:3px;gap:2px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .detail-toggle button{padding:5px 10px;border-radius:6px;color:var(--muted);font-size:13px;font-weight:600}
 .detail-toggle button[aria-pressed=true]{background:var(--paper);color:var(--accent);box-shadow:0 1px 3px #33333324,0 0 0 1px var(--accent-line)}
-.stop-btn{display:grid;place-items:center;width:35px;height:35px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);flex:none}
+.stop-btn{display:inline-flex;align-items:center;gap:6px;padding:0 11px;height:35px;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);flex:none}
 .stop-btn:hover{border-color:var(--muted)}
 .edit-banner{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:6px 9px;border-radius:7px;background:var(--blue-soft);color:var(--ink);font-size:13px}
 .edit-banner>span{flex:1}
@@ -474,3 +474,7 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .chat-bottom .dock p{margin:6px 0 8px;font-size:15px;text-align:left}
 .chat-bottom .dock .dock-note{display:flex;align-items:center;gap:6px;color:var(--blue);font-size:14px}
 @media(max-width:690px){.chat-title{flex-wrap:wrap;gap:8px}.chat-title>div:first-child{flex:1 1 100%}.chat-title h1{font-size:24px}.dock{padding:12px}.dock-actions .btn{flex:1 1 auto}}
+.chat-bottom .dock .dock-scope{margin:8px 0 0;color:var(--muted);font-size:12.5px}
+.dock-more{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13.5px}
+.dock-instruction dd{color:var(--blue)}
+@media(max-width:690px){.turn-summary>span{white-space:normal}.dock-args{grid-template-columns:1fr 1fr;padding:7px 9px}.dock-args .dock-instruction{grid-column:1/-1}.stop-btn span{display:none}}
