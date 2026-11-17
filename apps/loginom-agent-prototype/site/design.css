@@ -190,7 +190,8 @@ button.prototype-mark{display:inline-flex;align-items:center;gap:4px;text-align:
 button.prototype-mark:hover{color:var(--accent)}
 .review-page{max-width:980px}
 .rv-heading{font-size:19px;margin:24px 0 10px}
-.rv-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rv-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media(max-width:1100px){.rv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .rv-card{display:flex;flex-direction:column;gap:7px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
 .rv-card h3{font-size:16px}
 .rv-card p{flex:1;margin:0;color:var(--muted);font-size:14px;line-height:1.45}
@@ -234,10 +235,10 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
   .workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:248px;box-shadow:var(--floating-shadow)}
   .workspace.collapsed.peek .collapse-btn .pin-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .pin-ico{display:block}
   .workspace.collapsed.peek .collapse-btn .rail-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .rail-ico{display:none}
-  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.session-link,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
+  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.chat-row,.project-link>span:last-child,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
   /* The rail: icons only. Labels fade; whole rows that have no icon of their own are not clickable. */
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.session-link,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.session-link){visibility:hidden}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.chat-row,.project-link>span:last-child,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.chat-row,.row-more){visibility:hidden}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .sidebar-history h2 .conn-dot{display:block}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .project-switch{border-color:transparent;background:transparent}
   .workspace.collapsed:not(.peek) .sidebar-history{scrollbar-width:none}
@@ -298,3 +299,69 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 @media(max-width:410px){.lgm-chip>span{max-width:150px;overflow:hidden;text-overflow:ellipsis}.pkg-actions>span{flex-basis:100%}}
 @media(max-width:410px){.mode-pick .filter-label,.mode-pick>.icon:last-child,.composer-model .filter-label{display:none}.composer-options{gap:4px}.top-actions .theme-btn{display:inline-grid}}
 #main:focus{outline:none}
+
+/* Projects and chats, organised as in the ChatGPT desktop app */
+.side-section+.side-section{margin-top:16px}
+.side-head{position:relative}
+.side-row{position:relative}
+.session-link,.project-link{padding-right:32px}
+.project-link{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:7px 32px 7px 12px;border-radius:6px;text-align:left}
+.project-link:hover,.project-link.current{background:var(--soft)}
+.project-link>span:first-child{display:grid;flex:none}
+.project-link>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-link.new-project{color:var(--muted)}
+.row-text{display:grid;min-width:0;line-height:1.25}
+.row-text small{font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-more{position:absolute;right:3px;top:50%;translate:0 -50%;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--muted);opacity:0}
+.row-more:hover{background:var(--soft);color:var(--ink)}
+.side-row:hover .row-more,.side-head:hover .row-more,.row-more:focus-visible,.row-more[aria-expanded=true]{opacity:1}
+@media(hover:none){.row-more{opacity:1}}
+.row-more.page-more{position:static;translate:none;opacity:1;width:34px;height:34px}
+.pc-red{color:var(--accent)}.pc-blue{color:var(--blue)}.pc-green{color:var(--success)}.pc-violet{color:var(--violet)}.pc-amber{color:var(--amber)}
+.row-menu{position:fixed;left:0;top:0;z-index:40;display:grid;gap:1px;min-width:224px;max-width:300px;padding:5px;border:1px solid var(--line);border-radius:10px;background:var(--paper);box-shadow:var(--floating-shadow);animation:appear .12s ease}
+.row-menu button{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:6px;text-align:left;font-size:14px}
+.row-menu button>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-menu button:hover,.row-menu button:focus-visible{background:var(--soft)}
+.row-menu .danger{color:var(--accent)}
+.row-menu .menu-back{color:var(--muted)}
+.row-menu .menu-back .icon{rotate:180deg}
+.btn.danger{background:var(--accent);border-color:var(--accent);color:#fff}
+[data-theme=dark] .btn.danger{color:#202128}
+.crumb-project{display:inline-flex;align-items:center;gap:7px;max-width:280px;padding:5px 9px;border-radius:7px;color:var(--muted);font-weight:600}
+.crumb-project:hover{background:var(--soft);color:var(--ink)}
+.crumb-project span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-area.project-page{max-width:780px;padding-top:max(16px,3vh)}
+.project-head{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.project-head h1{flex:1;min-width:0;font-size:28px;overflow-wrap:anywhere}
+.project-mark{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:10px;background:var(--soft)}
+.project-page .starter{margin-bottom:12px}
+.project-instructions{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:20px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--paper);text-align:left}
+.project-instructions:hover{border-color:var(--muted)}
+.project-instructions>span:nth-child(2){display:grid;flex:1;min-width:0}
+.project-instructions small{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-tabs{display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.project-tabs button{margin-bottom:-1px;padding:8px 12px;border-bottom:2px solid transparent;color:var(--muted);font-weight:600}
+.project-tabs button[aria-selected=true]{border-color:var(--accent);color:var(--ink)}
+.project-tabs span{margin-left:3px;color:var(--muted);font-weight:400}
+.project-list{display:grid;gap:2px}
+.project-chat,.project-source{display:flex;align-items:center;gap:11px;width:100%;padding:10px;border-radius:8px;text-align:left}
+.project-chat:hover{background:var(--soft)}
+.project-chat>span{display:grid;min-width:0}
+.project-chat strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-chat small{color:var(--muted);font-size:12.5px}
+.project-source>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-empty{margin:0;padding:12px 4px;color:var(--muted);line-height:1.5}
+.project-add-source{margin-top:10px}
+.project-form{display:grid;gap:8px}
+.project-form>label{font-weight:600}
+.project-form :is(input:not([type]),textarea){width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.project-form textarea{resize:vertical}
+.color-pick{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px;padding:0;border:0}
+.color-pick legend{margin-bottom:6px;padding:0;font-weight:600}
+.color-pick label{position:relative}
+.color-pick input{position:absolute;opacity:0;width:1px;height:1px}
+.color-pick label>span:not(.sr-only){display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--line);border-radius:9px;cursor:pointer}
+.color-pick input:checked+span{border-color:currentColor;box-shadow:inset 0 0 0 1px currentColor}
+.color-pick input:focus-visible+span{outline:2px solid var(--blue);outline-offset:2px}
+.field-hint{margin:0;color:var(--muted);font-size:13px}
+.side-head .row-more{z-index:2}

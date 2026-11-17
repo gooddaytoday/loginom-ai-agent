@@ -15,7 +15,7 @@ const write = (key, value) => {
 }
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch])
 const pages = {
-  home:'Новый разговор', chat:'Разговор', hub:'Каталог', loginom:'Пакеты',
+  home:'Новый разговор', chat:'Разговор', project:'Проект', hub:'Каталог', loginom:'Пакеты',
   runner:'Запуск действия', studio:'Создать навык', settings:'Настройки', onboarding:'Первый запуск', review:'Что решить',
 }
 // Clicking an example fills the composer; it never sends. «document» also attaches a sample package,
@@ -35,9 +35,16 @@ const placeholders = {
 const stage = read('stage','new') === 'used' ? 'used' : 'new'
 const variant = {nav:'plus', placeholder:1, status:'composer', panel:'pinned', ...read('variant',{})}
 const seed = [
-  {id:'seed-sales', title:'ABC-анализ товаров', date:'Сегодня', phase:'done', prompt:examples[0].prompt, kind:'abc', files:['sales-demo.csv'], project:'Аналитика продаж'},
-  {id:'seed-flow', title:'Проверка сценария продаж', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'refactor').prompt, kind:'refactor', files:['Продажи.lgp'], project:'Аналитика продаж'},
-  {id:'seed-data', title:'Контроль качества выгрузки', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'quality').prompt, kind:'quality', files:['sales-demo.csv'], project:'Аналитика продаж'},
+  {id:'seed-sales', title:'ABC-анализ товаров', date:'Сегодня', phase:'done', prompt:examples[0].prompt, kind:'abc', files:['sales-demo.csv'], project:'p-sales'},
+  {id:'seed-flow', title:'Проверка сценария продаж', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'refactor').prompt, kind:'refactor', files:['Продажи.lgp'], project:'p-sales', pinned:true},
+  {id:'seed-data', title:'Контроль качества выгрузки', date:'Вчера', phase:'done', prompt:examples.find(item => item.id === 'quality').prompt, kind:'quality', files:['sales-demo.csv'], project:null},
+]
+// Projects as in the ChatGPT desktop app: a project groups chats with shared instructions and sources.
+// A chat may have no project. Mechanism in OpenCode: a project is a working folder with AGENTS.md.
+const projectColors = {red:'Красный', blue:'Синий', green:'Зелёный', violet:'Фиолетовый', amber:'Оранжевый'}
+const seedProjects = [
+  {id:'p-sales', name:'Аналитика продаж', color:'red', instructions:'Отвечай кратко. Новые сценарии сохраняй в папку «Продажи».', sources:['sales-demo.csv','Продажи.lgp'], pinned:false},
+  {id:'p-report', name:'Ежемесячная отчётность', color:'blue', instructions:'', sources:[], pinned:false},
 ]
 const packageViews = {
   sales:[
@@ -92,8 +99,9 @@ const serverPackages = [
 let peek = false, peekWanted = false, peekHeld = false, peekTimer = 0
 const state = {
   page:'home', contour:read('contour','online'), theme:read('theme','light'),
-  project:'Аналитика продаж', projects:['Аналитика продаж','Демо-проекты'], session:null, tabs:[],
-  sessions:stage === 'used' ? [...seed] : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
+  project:null, projects:stage === 'used' ? seedProjects.map(item => ({...item, sources:[...item.sources]})) : [], session:null, tabs:[],
+  projectView:null, projectTab:'chats', menu:null, showProjectChats:true, renameId:null, deleteId:null,
+  sessions:stage === 'used' ? seed.map(item => ({...item})) : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
   collapsed:read('collapsed',variant.panel === 'rail'), draftPackage:null, pickFor:null, connecting:false,
   // What the user has already done: things appear after these events and never disappear.
   progress:stage === 'used' ? {ownChats:3, packages:true, catalog:true, examplesHidden:false} : {ownChats:0, packages:false, catalog:false, examplesHidden:false},
@@ -113,10 +121,22 @@ const route = () => {
   if (key === 'runner' && !hubHasInstalled(state,state.solution)) {
     state.page = 'hub'
     history.replaceState(null,'','#hub')
-  } else if (Object.hasOwn(pages, key) && key !== 'chat') state.page = key
-  else if (key !== 'chat' || !state.session) state.page = 'home'
+  } else if (Object.hasOwn(pages, key) && !['chat','project'].includes(key)) state.page = key
+  else if (key === 'chat' && state.session) state.page = 'chat'
+  else if (key === 'project' && projectById(state.projectView)) state.page = 'project'
+  else state.page = 'home'
 }
 route()
+// «Проекты» on the review page reloads as a returning user and opens a project.
+const pendingProject = read('openProject', null)
+if (pendingProject) {
+  write('openProject', null)
+  if (projectById(pendingProject)) {
+    state.projectView = state.project = pendingProject
+    state.page = 'project'
+    history.replaceState(null,'','#project')
+  }
+}
 initSolutionDrafts(state)
 // A fresh profile has the public Loginom stand filled in but not connected (as in 0.4).
 if (stage === 'used') ensureSettings(state).connection.connected = true
@@ -220,8 +240,10 @@ function discuss(title, prompt, files) {
 function newSession() {
   if (!canNavigate('home')) return
   // Coming back from Схема, Каталог or Настройки keeps what the user typed and chose.
-  const keepDraft = state.session === null && state.page !== 'home'
+  const keepDraft = state.session === null && !['home','project'].includes(state.page)
   state.session = null
+  // «Новый разговор» in the panel starts a chat outside any project; inside a project, use its page.
+  state.project = null
   if (!keepDraft) {
     state.draft = ''
     state.templateTitle = ''
@@ -230,6 +252,21 @@ function newSession() {
   }
   state.review = false
   navigate('home')
+}
+function projectById(id) {
+  return state.projects.find(item => item.id === id)
+}
+function openProject(id) {
+  if (!projectById(id) || !canNavigate('project')) return
+  if (state.projectView !== id) {
+    state.draftFiles = []
+    state.draftPackage = null
+    state.projectTab = 'chats'
+  }
+  state.projectView = state.project = id
+  state.session = null
+  state.review = false
+  navigate('project')
 }
 function openSession(id) {
   const item = state.sessions.find(entry => entry.id === id)
@@ -255,14 +292,17 @@ function navButton(page, glyph, label = pages[page]) {
   const selected = origin === page
   return `<button class="nav-item${selected ? ' selected' : ''}" ${selected ? 'aria-current="page"' : ''} data-go="${page}">${icon(glyph,17)}<span>${label}</span></button>`
 }
-// Iteration 2 shell. The sidebar lists work, not features: project, «Новый разговор», conversations once
-// there are any, settings. In variant «panel» Пакеты and Каталог join it after the first visit; in
-// variant «plus» they stay behind the composer's «+». Nothing that appeared ever disappears or moves.
+// The panel follows the ChatGPT desktop app: «Новый разговор», then «Закреплённые» (only once something is
+// pinned), «Проекты» with «Новый проект», and «Разговоры» — every chat, newest first, a project chat labelled
+// with its project. «…» on a row (it appears on hover) holds the actions. In variant «panel» Пакеты and
+// Каталог join the panel after the first visit. Nothing that appeared ever disappears or moves.
 function sidebar() {
-  const history = state.sessions.filter(item => item.project === state.project).slice(0,8)
   const items = variant.nav === 'panel'
     ? [state.progress.packages || state.page === 'loginom' ? navButton('loginom','flow','Пакеты') : '', state.progress.catalog || state.page === 'hub' ? navButton('hub','grid','Каталог') : ''].join('')
     : ''
+  const pinnedProjects = state.projects.filter(item => item.pinned)
+  const pinnedChats = state.sessions.filter(item => item.pinned)
+  const recents = state.sessions.filter(item => !item.pinned && (state.showProjectChats || !item.project))
   return `<aside class="sidebar${state.mobile ? ' expanded' : ''}" aria-label="Боковая панель">
     <div class="sidebar-head">
       <button class="icon-btn neutral collapse-btn" data-action="collapse" aria-label="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'}" title="${state.collapsed ? 'Закрепить панель' : 'Свернуть панель до значков'} (Ctrl+B)"><span class="rail-ico">${icon('panel',18)}</span>${state.collapsed ? `<span class="pin-ico">${icon('pin',18)}</span>` : ''}</button>
@@ -270,20 +310,46 @@ function sidebar() {
         <picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent</span>
       </button>
     </div>
-    <button class="project-switch" data-overlay="projects" aria-label="Проект «${esc(state.project)}» — выбрать другой">
-      <span class="project-avatar">${icon('folder',16)}</span><span class="project-text"><strong>${esc(state.project)}</strong><small>Рабочий проект</small></span>${icon('down',14)}
-    </button>
     <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('plus',17)}<span>Новый разговор</span><kbd>Ctrl N</kbd></button>
     ${items ? `<nav class="sidenav" aria-label="Разделы">${items}</nav>` : ''}
-    <section class="sidebar-history" aria-label="Разговоры">
-      ${history.length ? `<h2>${icon('clock',15)}<span>Разговоры</span>${sessionMark(history.find(item => item.phase === 'running') || history.find(item => sessionMark(item)) || {})}</h2>${history.map(item => `<button class="session-link${state.page === 'chat' && state.session === item.id ? ' current':''}" data-session="${item.id}">${icon('message',15)}<span>${esc(item.title)}</span>${sessionMark(item)}</button>`).join('')}` : ''}
-    </section>
+    <div class="sidebar-history">
+      ${pinnedProjects.length || pinnedChats.length ? `<section class="side-section" aria-label="Закреплённые">
+        <div class="side-head"><h2>${icon('pin',15)}<span>Закреплённые</span>${chatsMark(pinnedChats)}</h2></div>
+        ${pinnedProjects.map(projectRow).join('')}${pinnedChats.map(chatRow).join('')}</section>` : ''}
+      <section class="side-section" aria-label="Проекты">
+        <div class="side-head"><h2><span>Проекты</span></h2></div>
+        <div class="side-row"><button class="project-link new-project" data-overlay="new-project">${icon('folder-plus',17)}<span>Новый проект</span></button></div>
+        ${state.projects.filter(item => !item.pinned).map(projectRow).join('')}
+      </section>
+      ${recents.length ? `<section class="side-section" aria-label="Разговоры">
+        <div class="side-head"><h2>${icon('clock',15)}<span>Разговоры</span>${chatsMark(recents)}</h2>${moreButton('recents','','Как показывать разговоры')}</div>
+        ${recents.map(chatRow).join('')}</section>` : ''}
+    </div>
     <nav class="sidebar-footer" aria-label="Настройки">
       ${runNotice()}
       ${navButton('settings','settings')}
       <button class="prototype-mark" data-go="review"><b class="proto-badge" aria-hidden="true">П2</b><span>Прототип 2 · что решить</span></button>
     </nav>
   </aside>`
+}
+function moreButton(kind, id, label) {
+  const open = state.menu?.kind === kind && state.menu.id === id
+  return `<button class="row-more" type="button" data-menu="${kind}:${id}" aria-label="${esc(label)}" aria-haspopup="menu" aria-expanded="${open}">${icon('more',16)}</button>`
+}
+function projectRow(item) {
+  const current = state.page === 'project' && state.projectView === item.id
+  return `<div class="side-row project-row"><button class="project-link${current ? ' current' : ''}" data-open-project="${item.id}" ${current ? 'aria-current="page"' : ''}><span class="pc-${item.color}">${icon('folder',17)}</span><span>${esc(item.name)}</span></button>${moreButton('project',item.id,`Действия с проектом «${item.name}»`)}</div>`
+}
+// A chat that belongs to a project always says so: the desktop ChatGPT's Recents does not, and its users
+// complain they cannot tell where a chat went.
+function chatRow(item) {
+  const project = projectById(item.project)
+  const current = state.page === 'chat' && state.session === item.id
+  return `<div class="side-row chat-row"><button class="session-link${current ? ' current' : ''}" data-session="${item.id}">${icon('message',15)}<span class="row-text"><span>${esc(item.title)}</span>${project ? `<small class="pc-${project.color}">${esc(project.name)}</small>` : ''}</span>${sessionMark(item)}</button>${moreButton('chat',item.id,`Действия с разговором «${item.title}»`)}</div>`
+}
+// One mark for a whole list: what the collapsed panel shows on the section's icon.
+function chatsMark(list) {
+  return sessionMark(list.find(item => item.phase === 'running') || list.find(item => sessionMark(item)) || {})
 }
 // Status next to a conversation: the agent is working or waits for the user.
 function sessionMark(item) {
@@ -307,15 +373,19 @@ function loginomChip() {
 function hostOf(url) {
   try { return new URL(url).host } catch { return url || '' }
 }
+function sessionProject() {
+  return state.sessions.find(item => item.id === state.session)?.project
+}
 function header() {
   const nativeTab = state.page === 'chat' || state.page === 'home'
   return `<header class="topbar">
     <div class="top-left">
       <button class="icon-btn mobile-menu" aria-label="Открыть меню" aria-expanded="${state.mobile}" data-action="menu">${icon('menu',20)}</button>
-      ${state.page === 'home' || state.page === 'chat' ? '' : `<span class="crumb-current">${pages[state.page]}</span>`}
+      ${['home','chat','project'].includes(state.page) ? '' : `<span class="crumb-current">${pages[state.page]}</span>`}
+      ${state.page === 'chat' && projectById(sessionProject()) ? `<button class="crumb-project" data-open-project="${sessionProject()}">${icon('folder',16)}<span>${esc(projectById(sessionProject()).name)}</span></button>` : ''}
     </div>
     <div class="top-actions">
-      ${variant.status === 'top' || !['home','chat'].includes(state.page) ? loginomChip() : ''}
+      ${variant.status === 'top' || !['home','chat','project'].includes(state.page) ? loginomChip() : ''}
       <button class="icon-btn theme-btn" title="Переключить цветовую схему" aria-label="Переключить цветовую схему" data-action="theme">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',17)}</button>
     </div>
   </header>
@@ -332,7 +402,7 @@ function composer() {
   return `<form class="composer" id="composer">
     ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
-    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : esc(placeholders[variant.placeholder] || placeholders[1])}" rows="2">${esc(state.draft)}</textarea>
+    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' ? esc(`Новый разговор в проекте «${projectById(state.projectView)?.name}»`) : esc(placeholders[variant.placeholder] || placeholders[1])}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
         <button class="icon-btn neutral plus-btn" type="button" aria-label="Добавить: пакет, файл, каталог" title="Пакет из Loginom, файл с компьютера, каталог" data-overlay="plus">${icon('plus',18)}</button>
@@ -489,6 +559,29 @@ function approvePackageEdit() {
   }
   item.phase = 'applied'
   render()
+}
+// A project page as in ChatGPT: its own input (a chat started here belongs to the project), the instructions
+// every chat of the project follows, and two tabs — its chats and its sources.
+function projectPage() {
+  const project = projectById(state.projectView)
+  if (!project) return home()
+  const chats = state.sessions.filter(item => item.project === project.id)
+  const tab = state.projectTab === 'sources' ? 'sources' : 'chats'
+  return `<div class="home-area project-page">
+    <div class="project-head"><span class="project-mark pc-${project.color}">${icon('folder',24)}</span><h1>${esc(project.name)}</h1>${moreButton('project',project.id,`Действия с проектом «${project.name}»`).replace('row-more','row-more page-more')}</div>
+    <section class="starter" aria-label="Новый разговор в проекте">${composer()}</section>
+    <button class="project-instructions" data-overlay="project-settings"><span class="glyph violet">${icon('book',17)}</span><span><strong>Инструкции для агента</strong><small>${project.instructions ? esc(project.instructions) : 'Как работать в этом проекте: тон, формат, куда сохранять результаты'}</small></span><span class="link-btn">${project.instructions ? 'Изменить' : 'Добавить'}</span></button>
+    <div class="project-tabs" role="tablist" aria-label="Содержимое проекта">
+      <button role="tab" data-project-tab="chats" aria-selected="${tab === 'chats'}">Разговоры <span>${chats.length}</span></button>
+      <button role="tab" data-project-tab="sources" aria-selected="${tab === 'sources'}">Источники <span>${project.sources.length}</span></button>
+    </div>
+    ${tab === 'chats'
+      ? (chats.length ? `<div class="project-list">${chats.map(item => `<button class="project-chat" data-session="${item.id}">${icon('message',16)}<span><strong>${esc(item.title)}</strong><small>${esc(item.date)}${sessionMark(item) ? ' · ' + (item.phase === 'running' ? 'агент работает' : 'ждёт вашего ответа') : ''}</small></span></button>`).join('')}</div>`
+        : `<p class="project-empty">Разговоров пока нет. Напишите задачу в поле выше — разговор появится здесь, а агент учтёт инструкции и источники проекта.</p>`)
+      : `${project.sources.length ? `<div class="project-list">${project.sources.map((name,index) => `<div class="project-source">${icon(/\.lgp$/i.test(name) ? 'flow' : 'file',16)}<span>${esc(name)}</span><button class="small-icon" data-remove-source="${index}" aria-label="Убрать ${esc(name)} из проекта">${icon('close',13)}</button></div>`).join('')}</div>`
+          : `<p class="project-empty">Источники — файлы, которые агент видит во всех разговорах проекта: таблицы, документы, пакеты .lgp.</p>`}
+        <label class="btn project-add-source">${icon('upload',16)} Добавить файл<input type="file" id="project-source" class="sr-only"></label>`}
+  </div>`
 }
 function chat() {
   const item = state.sessions.find(x => x.id === state.session)
@@ -736,30 +829,37 @@ function review() {
     ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Разговор сразу появится в панели, а агент попросит подключить Loginom прямо в разговоре — одна кнопка.','stage-new'],
     ['Пакет','«+» у поля ввода → «Пакет из Loginom…» → выберите пакет. Над полем появится «Что сделать с пакетом». Пример «Задокументировать пакет» показывает то же на учебном файле.','try-package'],
     ['Панель','Свернуть — кнопка в левом верхнем углу панели или Ctrl+B: остаются значки. Наведите на них мышь — панель раскроется поверх страницы; выбор пункта или уход мыши свернут её, кнопка с булавкой закрепит. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
+    ['Проекты','Как в ChatGPT: в панели — «Проекты» и «Разговоры». Откройте проект «Аналитика продаж»: поле ввода начинает разговор в проекте, ниже — инструкции, разговоры и источники. «…» у разговора в панели (появляется при наведении) — закрепить, перенести в проект, переименовать, удалить.','try-projects'],
   ]
   const later = [
     'Закрытый контур без модели: в поле ввода вместо модели — «Выберите модель», отправка ведёт в настройки моделей.',
     'Элементы по наведению — действия над сообщением (копировать, повторить) — появятся вместе с лентой разговора в следующей итерации.',
     'Поиск по приложению убран. Поиск остался внутри каталога и окна выбора пакета: там десятки элементов (И1-7). Если и его убрать — скажите.',
     'После перезагрузки страницы прототип начинает заново: разговоры и счётчики не сохраняются.',
+    'Из ChatGPT пока не перенесены: архив разговоров, перетаскивание разговора на проект, ручной порядок, отдельная память проекта.',
+  ]
+  const questions = [
+    'Поиск. В ChatGPT поиск по разговорам и проектам — строкой в панели; по вашему решению В-6 поиска нет. Когда проектов и разговоров станет много, листать их долго. Рекомендую добавить «Поиск» строкой под «Новым разговором» (Ctrl K). Добавить?',
   ]
   const open11 = [
     'Названия в каталоге: Действие · Навык · Пакет Loginom · Подключение (И1.1-1).',
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['При первом запуске в панели — проект, «Новый разговор», настройки; разговоры появляются после первого.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
+  const changed = ['Проекты и разговоры — как в ChatGPT: в панели «Новый разговор», «Проекты» с «Новый проект», «Разговоры» (разговор из проекта подписан его названием), закреплённое — сверху. У проекта своя страница: поле ввода, инструкции, разговоры, источники.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в четырёх вопросах — переключение сразу меняет прототип. Затем пройдите три сценария, около 10 минут.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в четырёх вопросах — переключение сразу меняет прототип. Затем пройдите четыре сценария, около 10 минут.</p></div></div>
     <h2 class="rv-heading">Выбрать вариант</h2>
     <div class="rv-variants">
-      <div><h3>1. Где «Пакеты» и «Каталог»</h3><div class="rv-choices">${choice('nav','plus','Только через «+»','Панель не меняется: проект, разговоры, настройки')}${choice('nav','panel','Появляются в панели','«Пакеты» — после первого пакета, «Каталог» — после первого захода')}</div></div>
+      <div><h3>1. Где «Пакеты» и «Каталог»</h3><div class="rv-choices">${choice('nav','plus','Только через «+»','Панель не меняется: новый разговор, проекты, разговоры')}${choice('nav','panel','Появляются в панели','«Пакеты» — после первого пакета, «Каталог» — после первого захода')}</div></div>
       <div><h3>2. Подсказка в поле ввода</h3><div class="rv-choices">${choice('placeholder',1,'Вариант 1',esc(placeholders[1]))}${choice('placeholder',2,'Вариант 2',esc(placeholders[2]))}</div></div>
       <div><h3>3. Где состояние Loginom</h3><div class="rv-choices">${choice('status','composer','В поле ввода','Рядом с моделью; на страницах без поля ввода — вверху справа')}${choice('status','top','Вверху справа','Рядом с темой, видно на любой странице')}</div></div>
       <div><h3>4. Панель при первом запуске</h3><div class="rv-choices">${choice('panel','pinned','Закреплена','Подписи видны сразу; свернуть до значков — кнопкой или Ctrl+B')}${choice('panel','rail','Свёрнута до значков','Раскрывается, когда на неё наведена мышь')}</div></div>
     </div>
+    <h2 class="rv-heading">Вопрос</h2>
+    <ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Посмотреть</h2>
-    <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${target === 'stage-new' ? 'Начать как новый пользователь' : target === 'stage-used' ? 'После недели работы' : 'Открыть'} ${icon('arrow',15)}</button></article>`).join('')}</div>
+    <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВГ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${target === 'stage-new' ? 'Начать как новый пользователь' : target === 'try-projects' ? 'Открыть проект' : target === 'stage-used' ? 'После недели работы' : 'Открыть'} ${icon('arrow',15)}</button></article>`).join('')}</div>
     <h2 class="rv-heading">Пока не показано</h2>
     <ul class="rv-changes">${later.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Ещё ждут ответа с итерации 1.1</h2>
@@ -767,6 +867,34 @@ function review() {
     <h2 class="rv-heading">Что изменилось</h2>
     <ul class="rv-changes">${changed.map(text => `<li>${text}</li>`).join('')}</ul>
   </div>`
+}
+function projectForm(project) {
+  return `<form id="project-form" class="project-form">
+    <label for="project-name">Название</label>
+    <input id="project-name" name="name" maxlength="45" value="${esc(project?.name)}" placeholder="Например, Отчётность за квартал" required>
+    <fieldset class="color-pick"><legend>Цвет</legend>${Object.entries(projectColors).map(([color,label]) => `<label title="${label}"><input type="radio" name="color" value="${color}" ${color === (project?.color || 'red') ? 'checked' : ''}><span class="pc-${color}">${icon('folder',20)}</span><span class="sr-only">${label}</span></label>`).join('')}</fieldset>
+    ${project ? `<label for="project-instructions">Инструкции для агента</label>
+    <textarea id="project-instructions" name="instructions" rows="4" placeholder="Например: отвечай кратко; новые сценарии сохраняй в папку «Продажи»">${esc(project.instructions)}</textarea>
+    <p class="field-hint">Агент следует им во всех разговорах проекта.</p>` : '<p class="field-hint">Инструкции и источники добавите на странице проекта.</p>'}
+    <div class="button-row"><button class="btn primary">${project ? 'Сохранить' : 'Создать проект'}</button></div>
+  </form>`
+}
+// The «…» menu of a chat, a project or the chats list. It lives outside the panel so the panel's clipping
+// does not cut it; render() places it under the button that opened it.
+function rowMenu() {
+  const menu = state.menu
+  if (!menu) return ''
+  const item = (act, glyph, label, extra = '') => `<button role="menuitem" data-menu-act="${act}" ${extra}>${icon(glyph,16)}<span>${label}</span></button>`
+  const chat = menu.kind === 'chat' ? state.sessions.find(entry => entry.id === menu.id) : null
+  const project = menu.kind === 'project' ? projectById(menu.id) : null
+  const items = chat && menu.step === 'move'
+    ? [item('back','chevron','Назад','class="menu-back"'), ...state.projects.filter(entry => entry.id !== chat.project).map(entry => `<button role="menuitem" data-menu-act="move:${entry.id}"><span class="pc-${entry.color}">${icon('folder',16)}</span><span>${esc(entry.name)}</span></button>`),
+       item('new-project-move','folder-plus','Новый проект…')]
+    : chat ? [item('rename','file','Переименовать'), item('pin','pin',chat.pinned ? 'Открепить' : 'Закрепить'), item('move','folder','Перенести в проект'),
+       chat.project ? item('unmove','close','Убрать из проекта') : '', item('delete','alert','Удалить','class="danger"')]
+    : project ? [item('pin','pin',project.pinned ? 'Открепить' : 'Закрепить'), item('settings','settings','Настройки проекта'), item('delete','alert','Удалить проект','class="danger"')]
+    : [`<button role="menuitemcheckbox" data-menu-act="toggle-project-chats" aria-checked="${state.showProjectChats}">${icon(state.showProjectChats ? 'check' : 'circle',16)}<span>Показывать разговоры проектов</span></button>`]
+  return `<div class="row-menu" id="row-menu" role="menu" aria-label="Действия">${items.join('')}</div>`
 }
 function overlay() {
   const kind = state.overlay
@@ -778,8 +906,10 @@ function overlay() {
     'pick-package':[packageActions[state.pendingAction]?.title + ': какой пакет?', kind === 'pick-package' ? packagePicker(false) : ''],
     'package-server':['Открыть из Loginom', kind === 'package-server' ? packagePicker(false) : ''],
     'package-computer':['Открыть с компьютера', kind === 'package-computer' ? packagePicker(true) : ''],
-    projects: ['Рабочий проект',`<div class="dialog-options">${state.projects.map((name,index) => `<button data-project="${index}"><span class="glyph blue">${icon('folder',19)}</span><span><strong>${esc(name)}</strong></span>${state.project === name ? icon('check',18):''}</button>`).join('')}</div>
-      <form id="project-form" class="inline-form"><label for="project-name" class="sr-only">Название проекта</label><input id="project-name" name="name" maxlength="45" placeholder="Название нового проекта" required><button class="btn primary">Добавить</button></form>`],
+    'new-project': ['Новый проект', kind === 'new-project' ? projectForm(null) : ''],
+    'project-settings': ['Настройки проекта', kind === 'project-settings' ? projectForm(projectById(state.projectView)) : ''],
+    'delete-chat': ['Удалить разговор?', kind === 'delete-chat' ? `<p class="dialog-desc">«${esc(state.sessions.find(item => item.id === state.deleteId)?.title)}» удалится насовсем.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-chat">Удалить</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
+    'delete-project': ['Удалить проект?', kind === 'delete-project' ? `<p class="dialog-desc">Проект «${esc(projectById(state.deleteId)?.name)}» удалится вместе с инструкциями и источниками. Его разговоры (${state.sessions.filter(item => item.project === state.deleteId).length}) останутся в «Разговорах» без проекта.</p><div class="button-row"><button class="btn danger" data-action="confirm-delete-project">Удалить проект</button><button class="btn" data-action="dismiss">Отмена</button></div>` : ''],
     // «+» is the one always-visible door to everything that is not on screen yet.
     plus: ['Добавить',`<div class="dialog-options">
         <button data-action="plus-package"><span class="glyph red">${icon('flow',19)}</span><span><strong>Пакет из Loginom…</strong><small>Агент будет работать с пакетом; над полем появятся действия с ним</small></span>${icon('chevron',17)}</button>
@@ -796,7 +926,7 @@ function overlay() {
       : `<p class="dialog-desc">Без Loginom агент отвечает на вопросы, но не открывает и не меняет пакеты.</p>${connectCard()}`) : ''],
     'agent-mode':['Режим агента',`<div class="dialog-options">${[['Выполнение','Предлагает план и запрашивает разрешения на действия'],['Планирование','Готовит план до начала выполнения']].map(([mode,detail]) => `<button data-agent-mode="${mode}"><span class="glyph red">${icon(mode === 'Планирование' ? 'layers':'spark',19)}</span><span><strong>${mode}</strong><small>${detail}</small></span>${state.mode === mode ? icon('check',18):''}</button>`).join('')}</div>`],
     'session-options':['Разговор',`<div class="dialog-options"><button data-action="rename-session"><span class="glyph blue">${icon('file',19)}</span><span><strong>Переименовать</strong></span>${icon('chevron',17)}</button>${currentPackageEdit() ? '' : `<button data-action="download-result"><span class="glyph red">${icon('download',19)}</span><span><strong>Скачать демонстрационный отчёт CSV</strong></span></button>`}</div>`],
-    rename:['Переименовать разговор',`<form class="inline-form" id="rename-form"><label class="sr-only" for="session-name">Имя разговора</label><input id="session-name" name="name" maxlength="70" value="${esc(state.sessions.find(x => x.id === state.session)?.title)}" required><button class="btn primary">Сохранить</button></form>`],
+    rename:['Переименовать разговор',`<form class="inline-form" id="rename-form"><label class="sr-only" for="session-name">Имя разговора</label><input id="session-name" name="name" maxlength="70" value="${esc(state.sessions.find(x => x.id === state.renameId)?.title)}" required><button class="btn primary">Сохранить</button></form>`],
   }[kind]
   if (!content) return ''
   return `<dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-title"><div class="app-dialog-heading"><h2 id="app-dialog-title">${content[0]}</h2><button class="icon-btn" data-action="dismiss" aria-label="Закрыть">${icon('close',20)}</button></div><div class="app-dialog-body">${content[1]}</div></dialog>`
@@ -805,6 +935,7 @@ function pageContents() {
   switch (state.page) {
     case 'home': return home()
     case 'chat': return chat()
+    case 'project': return projectPage()
     case 'hub': return renderHub(state)
     case 'settings': return renderSettings(state)
     case 'onboarding': return renderOnboarding(state)
@@ -847,13 +978,19 @@ function render(resetScroll = false) {
     ${sidebar()}${state.mobile ? '<button class="mobile-scrim" aria-label="Закрыть меню" data-action="menu"></button>':''}
     <div class="workspace-main">${header()}<main id="main" tabindex="-1" class="page page-${state.page}">${pageContents()}</main>
     </div>
-  </div>${overlay()}`
+  </div>${rowMenu()}${overlay()}`
   $('#main').scrollTop = scroll
   if (focused && $('#prompt') && !state.overlay) {
     $('#prompt').focus()
     $('#prompt').setSelectionRange(...focused)
   }
   state.freshPackage = false
+  const menu = $('#row-menu')
+  if (menu) {
+    menu.style.left = Math.max(8, Math.min(state.menu.x, innerWidth - menu.offsetWidth - 8)) + 'px'
+    menu.style.top = Math.max(8, Math.min(state.menu.y, innerHeight - menu.offsetHeight - 8)) + 'px'
+    if (state.menu.keyboard) menu.querySelector('button')?.focus()
+  }
   const dialog = $('#app-dialog')
   if (dialog) {
     dialog.showModal()
@@ -957,7 +1094,7 @@ function chooseDraftPackage(ref) {
   state.draftPackage = ref
   state.freshPackage = true
   state.progress.packages = true
-  if (state.page !== 'home' && state.page !== 'chat') navigate('home')
+  if (!['home','chat','project'].includes(state.page)) navigate('home')
   else render()
   $('#prompt')?.focus()
 }
@@ -1013,6 +1150,13 @@ const actions = {
     dismiss()
   },
   'stage-new':() => { write('stage','new'); write('collapsed',variant.panel === 'rail'); write('contour','online'); location.hash = ''; location.reload() },
+  'try-projects':() => {
+    if (stage === 'used' && projectById('p-sales')) return openProject('p-sales')
+    write('stage','used')
+    write('openProject','p-sales')
+    location.hash = ''
+    location.reload()
+  },
   'stage-used':() => { write('stage','used'); location.hash = ''; location.reload() },
   'try-package':() => { newSession(); state.pickFor = 'composer'; actions['plus-package']() },
   'plus-package':() => {
@@ -1110,9 +1254,86 @@ const actions = {
     })
     navigate('studio')
   },
-  'rename-session':() => { state.overlay = 'rename'; render() },
+  'rename-session':() => { state.renameId = state.session; state.overlay = 'rename'; render() },
+  'confirm-delete-chat':() => {
+    const id = state.deleteId
+    state.sessions = state.sessions.filter(item => item.id !== id)
+    state.tabs = state.tabs.filter(tab => tab !== id)
+    state.overlay = null
+    toast('Разговор удалён')
+    if (state.page === 'chat' && state.session === id) return state.projectView && projectById(sessionProjectOf(id)) ? openProject(state.projectView) : newSession()
+    render()
+  },
+  'confirm-delete-project':() => {
+    const id = state.deleteId
+    state.projects = state.projects.filter(item => item.id !== id)
+    for (const item of state.sessions.filter(entry => entry.project === id)) item.project = null
+    if (state.project === id) state.project = null
+    state.overlay = null
+    toast('Проект удалён, его разговоры — в «Разговорах»')
+    if (state.page === 'project' && state.projectView === id) return newSession()
+    render()
+  },
+}
+function sessionProjectOf(id) {
+  return state.sessions.find(item => item.id === id)?.project
+}
+// What a «…» menu item does. The menu closes after every item except «Перенести в проект», which opens
+// the list of projects in its place.
+function menuAction(act) {
+  const menu = state.menu
+  const chat = menu.kind === 'chat' ? state.sessions.find(item => item.id === menu.id) : null
+  const project = menu.kind === 'project' ? projectById(menu.id) : null
+  if (act === 'move' || act === 'back') {
+    state.menu = {...menu, step:act === 'move' ? 'move' : null}
+    return render()
+  }
+  state.menu = null
+  if (act === 'toggle-project-chats') state.showProjectChats = !state.showProjectChats
+  if (act === 'pin' && chat) chat.pinned = !chat.pinned
+  if (act === 'pin' && project) project.pinned = !project.pinned
+  if (act === 'rename') {
+    state.renameId = chat.id
+    state.overlay = 'rename'
+  }
+  if (act === 'delete') {
+    state.deleteId = menu.id
+    state.overlay = chat ? 'delete-chat' : 'delete-project'
+  }
+  if (act === 'settings') {
+    state.projectView = project.id
+    state.overlay = 'project-settings'
+  }
+  if (act === 'unmove') {
+    chat.project = null
+    toast('Разговор убран из проекта')
+  }
+  if (act.startsWith('move:')) {
+    chat.project = act.slice(5)
+    if (state.session === chat.id) state.project = chat.project
+    toast(`Перенесено в «${projectById(chat.project).name}»`)
+  }
+  if (act === 'new-project-move') {
+    state.moveAfterCreate = chat.id
+    state.overlay = 'new-project'
+  }
+  render()
 }
 app.addEventListener('click', event => {
+  const opener = event.target.closest('[data-menu]')
+  if (opener) {
+    const [kind, id = ''] = opener.dataset.menu.split(':')
+    const rect = opener.getBoundingClientRect()
+    const same = state.menu?.kind === kind && state.menu.id === id
+    state.menu = same ? null : {kind, id, x:rect.left, y:rect.bottom + 4, keyboard:!event.detail}
+    return render()
+  }
+  const act = event.target.closest('[data-menu-act]')
+  if (act) return menuAction(act.dataset.menuAct)
+  if (state.menu) {
+    state.menu = null
+    render()
+  }
   const el = event.target.closest('button')
   if (!el) return
   const d = el.dataset
@@ -1120,6 +1341,15 @@ app.addEventListener('click', event => {
   if (d.settings) return settingsTab(d.settings)
   if (d.overlay) { state.overlay = d.overlay; return render() }
   if (d.session) return openSession(d.session)
+  if (d.openProject) return openProject(d.openProject)
+  if (d.projectTab) {
+    state.projectTab = d.projectTab
+    return render()
+  }
+  if (d.removeSource) {
+    projectById(state.projectView).sources.splice(Number(d.removeSource),1)
+    return render()
+  }
   if (d.closeTab) {
     state.tabs = state.tabs.filter(id => id !== d.closeTab)
     if (state.session === d.closeTab) {
@@ -1131,10 +1361,6 @@ app.addEventListener('click', event => {
   if (d.contour) {
     state.overlay = null
     return setContour(d.contour)
-  }
-  if (d.project != null) {
-    state.project = state.projects[Number(d.project)]
-    return newSession()
   }
   if (d.variant) {
     const [key, value] = d.variant.split(':')
@@ -1240,6 +1466,11 @@ app.addEventListener('change', event => {
     state.pendingAction = null
     runAction(action, {name, where:'На компьютере', source:'local'}, 'home')
   }
+  if (event.target.id === 'project-source' && event.target.files[0]) {
+    projectById(state.projectView).sources.push(event.target.files[0].name)
+    state.projectTab = 'sources'
+    return render()
+  }
   if (event.target.id === 'local-attachment' && event.target.files[0]) {
     const name = event.target.files[0].name
     if (!/\.lgp$/i.test(name)) return attach(name)
@@ -1256,12 +1487,26 @@ app.addEventListener('submit', event => {
   const name = new FormData(event.target).get('name').trim()
   if (!name) return
   if (id === 'rename-form') {
-    state.sessions.find(x => x.id === state.session).title = name
+    state.sessions.find(x => x.id === state.renameId).title = name
     return dismiss()
   }
-  if (!state.projects.includes(name)) state.projects.push(name)
-  state.project = name
-  return newSession()
+  const form = new FormData(event.target)
+  if (state.overlay === 'project-settings') {
+    Object.assign(projectById(state.projectView), {name, color:form.get('color'), instructions:form.get('instructions').trim()})
+    return dismiss()
+  }
+  const project = {id:'p-' + Date.now(), name, color:form.get('color'), instructions:'', sources:[], pinned:false}
+  state.projects.push(project)
+  state.overlay = null
+  const moved = state.sessions.find(item => item.id === state.moveAfterCreate)
+  state.moveAfterCreate = null
+  if (moved) {
+    moved.project = project.id
+    if (state.session === moved.id) state.project = project.id
+    toast(`Перенесено в «${name}»`)
+    return render()
+  }
+  return openProject(project.id)
 })
 document.addEventListener('keydown', event => {
   if (event.key.toLowerCase() === 'n' && (event.metaKey || event.ctrlKey) && !document.querySelector('dialog[open]')) {
@@ -1276,6 +1521,13 @@ document.addEventListener('keydown', event => {
   if (event.key.toLowerCase() === 'b' && (event.metaKey || event.ctrlKey) && !document.querySelector('dialog[open]')) {
     event.preventDefault()
     actions.collapse()
+  }
+  if (event.key === 'Escape' && state.menu) {
+    const opener = `[data-menu="${state.menu.kind}:${state.menu.id}"]`
+    state.menu = null
+    render()
+    document.querySelector(opener)?.focus()
+    return
   }
   if (event.key === 'Escape' && state.collapsed && !document.querySelector('dialog[open]')) {
     if (document.activeElement?.closest('.sidebar')) focusPage()
@@ -1311,7 +1563,7 @@ function setPeek(open) {
 document.addEventListener('pointerover', event => {
   const target = event.target
   if (event.pointerType !== 'mouse' || event.buttons || !state.collapsed || [app, document.body, document.documentElement].includes(target) || target.closest('dialog')) return
-  const inside = Boolean(target.closest('.sidebar'))
+  const inside = Boolean(target.closest('.sidebar, .row-menu'))
   if (!inside) peekHeld = false
   if (peekHeld) return
   peekSidebar(inside)
@@ -1321,9 +1573,9 @@ document.addEventListener('pointerover', event => {
 // mouse (touch screens) a tap on the rail outside its icons opens it and a tap on the page closes it.
 document.addEventListener('click', event => {
   if (!state.collapsed) return
-  const inside = event.target.closest('.sidebar')
+  const inside = event.target.closest('.sidebar, .row-menu')
   if (!inside) return peek && setPeek(false)
-  if (!event.target.closest('.sidebar button')) return setPeek(true)
+  if (!event.target.closest('.sidebar button:not([data-menu])')) return setPeek(true)
   peekHeld = true
   setPeek(false)
   if (!event.detail && !document.querySelector('dialog[open]')) focusPage()

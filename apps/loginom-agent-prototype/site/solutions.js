@@ -105,7 +105,7 @@ function chosenPackage(run, name = 'package') {
 function accessFor(key, run, project) {
   const pkg = chosenPackage(run);
   const name = pkg.name;
-  const folder = `папке проекта «${project}»`;
+  const folder = project ? `папке проекта «${project}»` : 'рабочей папке агента';
   const report = `отчёт в ${folder}`;
   const runsScenario = 'При запуске сценария выполняются и его выгрузки — например, в файл или базу данных. Если это нежелательно, используйте копию сценария без выгрузок.';
   const noWeb = 'Открывать сайты в интернете';
@@ -297,7 +297,7 @@ function renderRunner(state, model) {
   }
   const back = {loginom:['loginom','← Пакеты'], home:['home','← Новый разговор'], chat:['chat','← Разговор']}[state.runnerFrom] || ['hub','← Каталог'];
   const blocked = key === 'regression' && run.values.baseline === 'missing';
-  const access = accessFor(key, run, state.project);
+  const access = accessFor(key, run, state.projects.find(item => item.id === state.project)?.name);
   let body = '';
   if (run.step === 'params') body = `<section class="sl-panel"><form class="sl-form" data-sl-form="run">${run.error ? note(escape(run.error),'warn') : ''}${renderFields(key, run)}
     <div class="sl-actions">${blocked ? `<button type="button" class="btn" data-sl-action="baseline-draft" ${run.baselineDraft ? 'disabled' : ''}>Подготовить черновик эталона</button>` : '<button type="submit" class="btn primary">Далее: доступ</button>'}</div></form></section>`;
