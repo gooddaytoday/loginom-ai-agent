@@ -1747,7 +1747,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await waitForNoMask(60000);
     transientDialog = false;
     const verified = await verifyReopenedPackage(before);
-    if (verified.status !== 'SUCCEEDED' || !continuationsBefore.length) return verified;
+    if (verified.status !== 'SUCCEEDED' || !continuationsBefore.length || !normalizeRest&&!task.storage_binding) return verified;
     let modifiedBefore = null, modifiedAfter = null, additionalSave = false;
     if(normalizeRest)try {
       const binding = task.storage_binding;

@@ -841,6 +841,14 @@ for(const fault of ['native-node','package-path'])test('ordinary Save As refuses
  assert.equal(original.tab,oldTab);
 });
 
+test('ordinary Save As without a storage binding preserves its legacy completed receipt',async()=>{
+ const page=await restSavePage([false],false);delete page.storageBinding;
+ const saved=await run(page,'package.save_as',{path:'/user/data/packages/plain.lgp',conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ assert.equal(saved.output.reopened,true);assert.equal(saved.cleanup_complete,true);
+ assert.equal(saved.trace.some(e=>e.event==='save_continuations_observed'),false);
+});
+
 for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
 test('REST checkpoint retains the legacy path without catalog selectors: '+missing,async()=>{
  const page=await restSavePage([true,true]);
