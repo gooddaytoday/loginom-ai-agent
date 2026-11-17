@@ -32,7 +32,9 @@ const REASON_LABEL = {
 } as const
 
 const size = (bytes: number) =>
-  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
+  bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${bytes && Math.max(1, Math.round(bytes / 1024))} KB`
 
 export function DialogDiagnostics() {
   const dialog = useDialog()
@@ -102,22 +104,23 @@ export function DialogDiagnostics() {
         <div class="flex flex-col gap-2">
           <For each={DIAGNOSTICS_GROUPS.filter((group) => group !== "chat" || !!session)}>
             {(group: DiagnosticsGroup) => {
-              const summary = () => summarizeDiagnostics(ready.latest?.files ?? []).find((item) => item.group === group)
+              // Read in the JSX expression, not in a <Show> callback: Solid runs that callback untracked,
+              // and the counters kept the empty list shown before the archive was ready (LAB-1776).
+              const summary = () => {
+                const item = summarizeDiagnostics(ready.latest?.files ?? []).find((entry) => entry.group === group)!
+                return language.t("diagnostics.group.summary", {
+                  included: item.included,
+                  omitted: item.omitted,
+                  size: size(item.bytes),
+                })
+              }
               return (
                 <div data-tid={`diagnostics-group-${group}`}>
                   <Checkbox checked={include[group]} onChange={(value: boolean) => setInclude(group, value)}>
                     {language.t(GROUP_LABEL[group])}
                   </Checkbox>
-                  <div class="pl-7 text-12-regular text-text-weak">
-                    <Show when={summary()}>
-                      {(item) =>
-                        language.t("diagnostics.group.summary", {
-                          included: item().included,
-                          omitted: item().omitted,
-                          size: size(item().bytes),
-                        })
-                      }
-                    </Show>
+                  <div class="pl-7 text-12-regular text-text-weak" data-tid={`diagnostics-group-${group}-summary`}>
+                    <Show when={ready.latest}>{summary()}</Show>
                     <Show when={group === "dumps" && include.dumps}>
                       <div class="text-text-warning">{language.t("diagnostics.dumps.warning")}</div>
                     </Show>

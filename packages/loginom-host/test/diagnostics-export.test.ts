@@ -263,6 +263,18 @@ test("drops lower-priority sources first when the archive budget is short", asyn
   for (const file of omitted) expect(file.reason).toBe("archive-budget")
 })
 
+// LAB-1776: Desktop keeps a directory per run; the archive takes the current and the previous run only.
+test("a source limited to runs keeps the newest run directories only", async () => {
+  const p = profile()
+  const stamps = Array.from({ length: 8 }, (_, i) => `20261116T23${String(i).padStart(2, "0")}00`)
+  for (const stamp of stamps) put(join(p.logs, stamp, "main.log"), `run ${stamp}\n`)
+  put(join(p.logs, "session"), stamps[7])
+  const { files, manifest } = await unpack((await buildDiagnosticsArchive({ logs: [{ dir: p.logs, prefix: "desktop", runs: 2 }] })).zip)
+  const names = ["desktop/20261116T230700/main.log", "desktop/20261116T230600/main.log"]
+  expect(manifest.files.map((file: any) => file.name).sort()).toEqual([...names].sort())
+  expect([...files.keys()].filter((name) => name !== "manifest.json").sort()).toEqual([...names].sort())
+})
+
 test("attaches crash dumps unchanged only on explicit request", async () => {
   const p = profile()
   const dump = Buffer.concat([Buffer.from("MDMP"), Buffer.from([0, 1, 2, 255]), Buffer.from("raw-memory")])
