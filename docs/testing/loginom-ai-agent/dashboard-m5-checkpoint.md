@@ -1,16 +1,11 @@
 # Dashboard M5 — checkpoint
 
-- Ветка `m5-acceptance`; FIX_BASE `0f4f8889888ed73ffeee237f06b1729915d688bc`. Source fixwave F1–F5 выполнена; M5 открыт до новой установленной приёмки и scoped review.
-- Контракт: [план M5](../../superpowers/plans/2026-11-15-dashboard-m5.md), final findings/Approved constraints и текущий отчёт — `.superpowers/sdd/2026-11-15-dashboard-m5/final-fixwave-report-20261117.md`.
-- Source:28 deploy/helper tests, pinned Node syntax, Bash syntax/ShellCheck и diff check PASS. Runtime TS, M4, клиенты `.1`, модель/ACL/CA/vendor-история не изменены; прежняя authority сохраняется отдельно.
-- F1: unmanaged uninstall RED→отказ с сохранением; candidate/site/dangling symlink отказывают; no-site uninstall0 сохранил55 native файлов и3 native identity/network.
-- F2: persisted operator case сохранён; canonical runtime URL/header/path. Actual normal и strict multi-host full server0; strict separate app domain/HTTPS/SRI/headers/cleanup проверены.
-- F3: missing own exact cron старый false PASS0→новый отказ1 без пробы; cron восстановлен exact, native3 identity/StartedAt и Dashboard IDs сохранены. Actual Enforcing/shared labels PASS; Disabled/Permissive/private-MCS helper cases PASS.
-- F4: actual configured absolute ActualStorage при сохранённом старом default — install0/publisher RO/native live5. Relative/absolute/ambiguous XML/mount tests PASS; physical native root/ancestors исключены после realpath/symlink admission.
-- F5: actual delayed-shell RED→async GREEN; native доступен до ответа shell, затем installed ready/live5 и strict Close/Logout/browser completion0; runtime shell не менялся.
-- Source fixtures изменённого распакованного561 не являются новым official artifact PASS. Immutable561/configcf61 и прежние engine/client результаты не переименованы.
-- Docker VM OFF: selected27 source receipts экспортированы/everySHA verified перед ordinary poweroff, QEMU absent/ports free/disk retained. Native ActualStorage clone намеренно сохранён; original Settings/metadata/default на месте в private backup.
-- Podman VM RUNNING/rootless/Enforcing: source strict server/native0, own cron после final safe refusal восстановлен. Source backup/receipts и own app leaf приватны; trust stores/global policies не менялись.
-- Следующий шаг: clean source commit → один official producer → SAME новый архив на Podman и Docker, affected checks/server+native/uninstall/preservation → восстановить Docker original Settings/удалить только own clone → безопасно выключить обе VM → один scoped review.
-- Ограничения: M1 cold runtime ACKfalse/actual0 остаётся UNKNOWN; старый6-role StartedAt composite FAIL retained, exact delta NOT_CAPTURED. Old Podman setup SSH EOF UNKNOWN/own transport closed255 при remote installer absent/ready11; install не повторялся.
-- Source auxiliary logs с non0600 приведены600; raw credentials/Env не выводились. Final status/checkbox/runbook closure и разрешённый push делает root после приёмки; worker не push/PR/merge/release/M6.
+- Ветка `m5-acceptance`; основная source wave `98ea58b12aac0a0c7b4b4c5af891ec259d9956dd`. C7 прошёл оба installed lifecycle; scoped review закрыл F1/F2/F4/F5 и cron-часть F3, оставил N1/F3: сортировку SELinux observations.
+- Текущий corrective source: только `ls -ZdU` сохраняет storage-first operand order; helper labels/private-MCS/RO/options не изменены. Новый official archive и его оба installed lifecycle пока pending.
+- N1 operational RED→GREEN: реальный collector на новых собственных пустых каталогах с различимыми private/shared метками → настоящий helper1/0; native labels/global SELinux не менялись. Focused SELinux5/5, Bash syntax/ShellCheck и diff check PASS; unchanged28/helper/runtime/M4/client authority сохраняется отдельно.
+- Канонический план/Approved N1 constraints и текущий отчёт — `.superpowers/sdd/2026-11-15-dashboard-m5/final-fixwave-{plan,report}-20261117.md`; [план M5](../../superpowers/plans/2026-11-15-dashboard-m5.md).
+- C7 immutable/source98ea и прежние архивы не переименовываются в новый installed PASS. Клиенты `.1`, runtime/helper/checker/compose/template не изменены; rebuild клиентов не нужен.
+- Native baseline восстановлен после c7, обе предыдущие VM штатно завершены с verified selected exports. Сейчас Podman снова запущен только для N1 collector/new-package path; Docker OFF, диски сохранены.
+- Следующий шаг: corrective commit с staged scan/hooks → один новый official producer → SAME новый архив на обоих engines: install/full server/separate calibrated native/uninstall-preservation/export/ordinary shutdown; без повторов unchanged negative/migration/model matrix.
+- Ограничения: M1 cold runtime ACKfalse/actual0 UNKNOWN retained/nonblocking; historical transport EOF/overbroad-role assertion и post-restart generated host_id-only delta сохранены в отчёте с точными границами.
+- Финальные canonical statuses/checkboxes, tiny corrective review и разрешённый push — root после N1 acceptance; implementer не push/PR/merge/release/M6.

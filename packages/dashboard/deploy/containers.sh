@@ -215,7 +215,7 @@ if [[ $action == check ]]; then
   elif [[ -e /sys/fs/selinux/enforce ]]; then die "getenforce is required to observe SELinux"; fi
   if [[ $selinux == Disabled ]]; then json selinux "$selinux" </dev/null
   else
-    contexts=$(ls -Zd -- "$storage" "$state/builds" "$state/jobs-in" "$state/jobs-out") || die "Cannot observe SELinux volume labels"
+    contexts=$(ls -ZdU -- "$storage" "$state/builds" "$state/jobs-in" "$state/jobs-out") || die "Cannot observe SELinux volume labels"
     mapfile -t contexts < <(awk '{print $1}' <<< "$contexts")
     "$engine" inspect loginom-dashboard-web loginom-dashboard-publisher loginom-dashboard-builder | json selinux "$selinux" "${contexts[@]}"
   fi
