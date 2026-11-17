@@ -356,7 +356,7 @@ fi
 app_origin="$scheme://$host:$app_port"
 if [[ $scheme == https && $app_port == 443 || $scheme == http && $app_port == 80 ]]; then app_origin="$scheme://$host"; fi
 ss -H -lnt4 "sport = :$app_port" > "$tmp/listeners4"
-ss -H -lnt6 "sport = :$app_port" > "$tmp/listeners6"
+ss -H -lnt6 -e "sport = :$app_port" > "$tmp/listeners6"
 listeners=$(sed 's/^/4 /' "$tmp/listeners4"; sed 's/^/6 /' "$tmp/listeners6")
 if [[ -n $listeners ]]; then
   [[ $installed == true && -s $tmp/web.json ]] || die "App host port is occupied"

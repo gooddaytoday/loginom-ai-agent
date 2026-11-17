@@ -138,8 +138,27 @@ test("occupied app port is accepted only as the owned web published TLS binding"
   assert.equal(run("9443").status, 0)
   assert.equal(run("9444").status, 1)
   assert.equal(run("9443", "4 LISTEN 0 128 0.0.0.0:9443 0.0.0.0:*").status, 0)
+  const dualStack = run("9443", "6 LISTEN 0 128 *:9443 *:* uid:1234 ino:12345 sk:1 cgroup:/synthetic v6only:0 <->")
+  assert.equal(dualStack.status, 0, dualStack.stderr)
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:* v6only:1").status, 1)
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:* v6only:01").status, 1)
+  assert.equal(run("9443", "6 LISTEN 0 128 [::1]:9443 [::]:* v6only:0").status, 1)
+  assert.equal(run("9443", "6 LISTEN 0 128 [2001:db8::1]:9443 [::]:* v6only:0").status, 1)
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9444 *:* v6only:0").status, 1)
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:* v6only:0\n6 LISTEN 0 128 *:9443 *:* v6only:1").status, 1)
   assert.equal(run("9443", "6 LISTEN 0 128 [::1]:9443 [::]:*").status, 1)
   assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:*").status, 1)
+  container.Config.Labels["loginom.dashboard.owner"] = "foreign"
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:* v6only:0").status, 1)
+  container.Config.Labels["loginom.dashboard.owner"] = "release"
+  container.Mounts[0].Source = "/synthetic/foreign/builds"
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:* v6only:0").status, 1)
+  container.Mounts[0].Source = "/synthetic/state/builds"
+  container.NetworkSettings.Ports["8102/tcp"] = [{ HostIp: "0.0.0.0", HostPort: "9443" }]
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:* v6only:0").status, 1)
+  delete container.NetworkSettings.Ports["8102/tcp"]
+  container.NetworkSettings.Ports["8101/tcp"][0].HostIp = "127.0.0.1"
+  assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:* v6only:0").status, 1)
   container.NetworkSettings.Ports["8101/tcp"][0].HostIp = "::"
   assert.equal(run("9443", "6 LISTEN 0 128 *:9443 *:*").status, 0)
   container.NetworkSettings.Ports = { "8102/tcp": [{ HostPort: "9443" }] }

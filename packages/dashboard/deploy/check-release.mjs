@@ -155,7 +155,8 @@ if (action === "settings") {
       const address = fields[4].replace(/^\*:/, fields[0] === "4" ? "0.0.0.0:" : "[::]:")
       assert(ports[0][1].some(binding => {
         const host = binding.HostIp.includes(":") ? "[" + binding.HostIp + "]" : binding.HostIp
-        return address === host + ":" + args[2]
+        return address === host + ":" + args[2] ||
+          (fields[0] === "6" && address === "[::]:" + args[2] && fields.includes("v6only:0") && binding.HostIp === "0.0.0.0")
       }), "Foreign app listener address")
     }
   }
