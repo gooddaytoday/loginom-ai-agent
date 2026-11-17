@@ -102,7 +102,7 @@ const serverPackages = [
 let peek = false, peekWanted = false, peekHeld = false, peekTimer = 0, pointerInPanel = false
 const state = {
   page:'home', contour:read('contour','online'), theme:read('theme','light'),
-  project:null, projects:stage === 'used' ? seedProjects.map(item => ({...item, sources:[...item.sources]})) : [], session:null, tabs:[],
+  project:null, projects:stage === 'used' ? seedProjects.map(item => ({...item, sources:[...item.sources]})) : [], session:null,
   projectView:null, projectTab:'chats', menu:null, renameId:null, deleteId:null,
   expanded:stage === 'used' ? ['p-sales','p-report'] : [], showAll:[],
   sessions:stage === 'used' ? seed.map(item => ({...item})) : [], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
@@ -289,7 +289,6 @@ function openSession(id) {
   expandProject(item.project)
   state.project = item.project
   state.session = id
-  if (!state.tabs.includes(id)) state.tabs = [...state.tabs.slice(-3),id]
   state.review = false
   state.draft = ''
   state.draftFiles = []
@@ -408,7 +407,6 @@ function sessionProject() {
   return state.sessions.find(item => item.id === state.session)?.project
 }
 function header() {
-  const nativeTab = ['chat','home','project'].includes(state.page)
   return `<header class="topbar">
     <div class="top-left">
       <button class="icon-btn mobile-menu" aria-label="Открыть меню" aria-expanded="${state.mobile}" data-action="menu">${icon('menu',20)}</button>
@@ -419,13 +417,7 @@ function header() {
       ${variant.status === 'top' || !['home','chat','project'].includes(state.page) ? loginomChip() : ''}
       <button class="icon-btn theme-btn" title="Переключить цветовую схему" aria-label="Переключить цветовую схему" data-action="theme">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',17)}</button>
     </div>
-  </header>
-  ${nativeTab && state.tabs.length > 1 ? `<nav class="session-tabs" aria-label="Открытые разговоры">
-    ${state.tabs.map(id => {
-      const item = state.sessions.find(x => x.id === id)
-      return `<div class="tab-wrap${state.page === 'chat' && state.session === id ? ' active':''}"><button class="session-tab" data-session="${id}">${icon('message',14)}<span>${esc(item?.title)}</span></button><button class="small-icon tab-close" aria-label="Закрыть вкладку ${esc(item?.title)}" data-close-tab="${id}">${icon('close',13)}</button></div>`
-    }).join('')}
-  </nav>` : ''}`
+  </header>`
 }
 function composer() {
   const modelName = currentModel()
@@ -880,7 +872,7 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['Проекты и разговоры — как в Codex: проекты в панели — папки, разговоры проекта внутри них; в «Разговорах» — только разговоры без проекта; закреплённое — сверху. Карандаш у проекта открывает новый разговор в нём: поле ввода, инструкции, разговоры, источники.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладки разговоров — только когда открыто больше одного.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
+  const changed = ['Проекты и разговоры — как в Codex: проекты в панели — папки, разговоры проекта внутри них; в «Разговорах» — только разговоры без проекта; закреплённое — сверху. Карандаш у проекта открывает новый разговор в нём: поле ввода, инструкции, разговоры, источники.','Панель сворачивается до значков (кнопка, Ctrl+B) и раскрывается поверх страницы при наведении мыши; выбор пункта сворачивает её.','Справка и режим работы — в настройках; поиск и «С чего начнём?» убраны; мастера первого запуска нет.','Loginom подключается там, где он понадобился; его состояние видно всегда.','Модель — в поле ввода; «+» — пакет, файл, каталог, примеры.','«Примеры задач» под полем: вставляют текст, закрываются крестиком, перестают показываться после трёх своих разговоров.','Действия с пакетом — над полем ввода, когда пакет выбран.','Вкладок разговоров нет: переключаться между разговорами — только в боковой панели.','Без Loginom агент отвечает на вопросы; подключиться просит, только когда задаче нужен Loginom.','Переключатель «Выполнение / Планирование» скрыт для новичка; включается в Настройки → Общие.','В режиме «Интернет» модель есть сразу — бесплатная модель OpenCode.']
   return `<div class="native-page review-page">
     <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 2 — оболочка</p><h1>Что решить</h1><p>Выберите вариант в четырёх вопросах — переключение сразу меняет прототип. Затем пройдите четыре сценария, около 10 минут.</p></div></div>
     <h2 class="rv-heading">Выбрать вариант</h2>
@@ -1295,7 +1287,6 @@ const actions = {
     const id = state.deleteId
     const project = sessionProjectOf(id)
     state.sessions = state.sessions.filter(item => item.id !== id)
-    state.tabs = state.tabs.filter(tab => tab !== id)
     state.overlay = null
     toast('Разговор удалён')
     if (state.page === 'chat' && state.session === id) return projectById(project) ? openProject(project) : newSession()
@@ -1308,7 +1299,6 @@ const actions = {
     const leave = (state.page === 'chat' && gone.includes(state.session)) || (state.page === 'project' && state.projectView === id)
     state.projects = state.projects.filter(item => item.id !== id)
     state.sessions = state.sessions.filter(item => item.project !== id)
-    state.tabs = state.tabs.filter(tab => !gone.includes(tab))
     state.expanded = state.expanded.filter(item => item !== id)
     if (state.project === id) state.project = null
     state.overlay = null
@@ -1416,14 +1406,6 @@ app.addEventListener('click', event => {
   }
   if (d.removeSource) {
     projectById(state.projectView).sources.splice(Number(d.removeSource),1)
-    return render()
-  }
-  if (d.closeTab) {
-    state.tabs = state.tabs.filter(id => id !== d.closeTab)
-    if (state.session === d.closeTab) {
-      if (state.tabs.length) return openSession(state.tabs.at(-1))
-      return newSession()
-    }
     return render()
   }
   if (d.contour) {
