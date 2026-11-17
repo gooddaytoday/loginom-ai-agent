@@ -21,12 +21,12 @@
   importer11/11, aliases143/461 и typecheck Host/Product/opencode прошли.
 - [x] Независимое ревью переноса; чистая CLI prod/browserRecovery=true со штатными pins.
 - [x] Проверка manifests/inventory/archive/hashes и семи установленных Help-инструментов.
-- [ ] Собственная local N1 пара; по одному calc-data-double, cohort-spend-activity,
+- [x] Собственная local N1 пара; по одному calc-data-double, cohort-spend-activity,
   crosstable-fixed-sum из frozen corpus; .lgp/rerun/oracle/cleanup, все попытки сохранены.
 - [x] Ветка отправлена, удалённый SHA проверен; pre-push 33/33 typecheck и secret scan clean.
-- [ ] Runner1: старые службы/reservations сверены; собственные N6 pair/profile/state/unit
+- [x] Runner1: старые службы/reservations сверены; собственные N6 pair/profile/state/unit
   и judge-home; права EvalOps/publisher, native prepare/verify и cleanup проверены.
-- [ ] Независимое ревью установленной поставки и условий запуска.
+- [x] Независимое ревью установленной поставки и условий запуска.
 - [ ] Свежая in_progress карточка, trigger-preview и единственное назначение EvalOps.
 - [ ] Read-only наблюдение до requestPreflight 6/6 и первых measurement admissions.
 
@@ -52,6 +52,10 @@ noProgress24h, batch<=8h. Clock от created_at свежей campaign card.
 oracle, структура, устойчивость трёх раундов, конкретные регрессии. Технические отказы
 и пропуски показывать отдельно; хостовые различия учитывать для времени и timeout.
 Новый порог «качество сохранилось» не вводить. Smoke не является измерением кампании.
+При операционном ремонте baseline фактические версии harness и периоды их применения
+брать из финального архива. Исходный pin не доказывает неизменность всей истории.
+Технически неучтённые результаты с quality verdict сохранять отдельно с исходной
+оценкой; ремонт baseline автоматически в новую frozen поставку не переносить.
 
 ## Проверенная поставка и дополнение владельца
 
@@ -73,6 +77,42 @@ knowledge-key в поставке отсутствует.
 Native operator получает собственный fixed-target SSH helper, без изменения
 глобальных runtime bindings, SSH config и baseline файлов.
 
+Native prepare и verify на runner1 завершились READY6/6: установленный Chromium,
+Help/connection, continuous process cleanup, runtime Close ACK, server sessions,
+архивирование и освобождение server/profile reservations подтверждены. Первый
+PROFILE_FORMAT_INVALID сохранён: в шесть новых профилей добавлены только отсутствующие
+canonical markers, после чего штатный reconcile проверил cleanup. Семь свежих
+OAuth files, шесть catalog hashes и экспериментальные pins не изменились.
+Один немодельный models-list подтвердил Terra/xhigh/requested default; модельную
+готовность должен проверить штатный batch после назначения.
+
+Native EvalOps подтвердил права в LAB-1798: READY-комментарий и in_review прочитаны
+обратно. В request брать только keys исторического reference manifest; его прежние
+model pins не переносить. Request.pins содержит uppercase несекретные env names,
+а experimentPinsFile отдельно хранит происхождение CLI/corpus. Lowercase proxy
+остаётся в постоянном controller env; request/manifest создаёт сам EvalOps.
+
+Локальная N1 приёмка завершена: все три сценария сгенерированы ровно по одному разу,
+CLI exit0, получены LGP и полный CSV oracle PASS; node code-verdict PASS без retry.
+Каждый сохранённый пакет повторно выполнен: все native узлы (3/5/3), unchanged SHA,
+новый полный CSV, actual Close/Logout и cleanup PASS. Judge scores для smoke не
+выставлялись. Фактический response tier не сохранён; Terra/xhigh/requested default
+подтверждены. Help calls0 во всех трёх исходных попытках; повторов ради Help не было.
+Все попытки, включая ранний preflight403 и ошибку purpose вспомогательного cold,
+сохранены вне Git отдельно от успешного recovery. Calc raw helper exit1 из-за
+отсутствующего frozen acceptance.json сохранён отдельно при PASS native/SHA/CSV.
+Финальный native verify READY/released; собственные контейнеры и сеть удалены
+штатным helper после проверки identity/labels/reservations. Results/history сохранены.
+
+Итоговое независимое ревью: Spec PASS / Quality PASS. Свежая campaign card LAB-1805
+создана в in_progress без исполнителя; `created_at=2026-11-17T14:20:25Z` задаёт clock.
+Body read-back побайтно совпал: SHA256
+`2992f41f59c033a3c7ea288c45950bf387f405ca98cfcda60ede742e4e1eefe5`.
+При создании native tasks и wakeups отсутствуют. Следующий шаг — trigger-preview
+и единственное назначение EvalOps, после которого внешний оператор только читает.
+Дальнейший живой прогресс, manifest/request, итог и архив — в LAB-1805; этот
+checkpoint фиксирует проверенную подготовку до назначения.
+
 ## Checkpoint
 
 - Перенос: `dc25afa296` → `2759213b83` → `4f1bc598fa`; source review Spec/Quality PASS.
@@ -81,9 +121,12 @@ Native operator получает собственный fixed-target SSH helper,
 - Initial broad Host/CLI имели таймауты; readiness timeout и file-reference flakes подтверждены на base.
 - Успешные узкие validation runs проверили полный контракт; полного Host PASS не заявляем.
 - CLI source c01 закреплён; local build/offline Help/remote installed manifest проверены.
-- Local N1 prepare/verify READY/released; calc один раз создан и выполнен, полный CSV oracle PASS.
-- Cold-вспомогательный consumer выбрал режим для draft вместо persisted package; исправление/recovery проверяется.
-- Runner1: отдельные N6/pair/harness/corpus и свежие OAuth; native prepare идёт, модельных вызовов нет.
+- Все три local original completed0, full CSV oracle PASS; node code-verdict PASS, генерация по одному разу.
+- Все три cold PASS: native узлы 3/5/3, unchanged LGP SHA, новый CSV, Close/Logout/cleanup/released.
+- Финальный N1 verify READY/released; собственная Docker-пара удалена, все evidence сохранены.
+- Первый cold consumer выбрал draft-purpose; BLOCKED сохранён, отдельный штатный recovery освободил ресурсы.
+- Runner1: отдельные N6/pair/harness/corpus и свежие OAuth; native prepare/verify READY6/6, model calls0.
 - В N6 preseed добавлены только отсутствующие canonical profile markers; auth/cache сохранены.
-- Native authority LAB-1798 повторно проверяется с собственным SSH helper; основная карточка ещё не создана.
-- Следующий шаг: cold и оставшиеся local smoke, N6 verify, native authority, final review и запуск EvalOps.
+- Native authority LAB-1798 READY/in_review через собственный SSH helper; final installed review PASS.
+- LAB-1805 создана in_progress/unassigned, clock14:20:25Z; body exact, tasks/wakeups0.
+- Следующий шаг: trigger-preview и единственное назначение EvalOps; далее только наблюдение в LAB-1805.
