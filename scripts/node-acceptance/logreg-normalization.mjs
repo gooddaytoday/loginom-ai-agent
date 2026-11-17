@@ -40,6 +40,7 @@ export function checkLogregNormalization(expected,replies){
 }
 
 // The stock CSV oracle checks all values; cold still enforces exact order.
+// Teach evidence is independent of the Enter reply's requested sample size.
 export function checkLogregKfold(expected,replies){
  const candidates=[...receipts(replies)].filter(r=>r.execution?.status==='completed'&&r.configuration.readback.mode==='enter'
   &&r.configuration.readback.validation?.method==='kfold');
@@ -51,7 +52,7 @@ export function checkLogregKfold(expected,replies){
    &&c.training?.status==='trained'&&c.training.execution_id!==r.execution.execution_id
    &&v?.status==='completed'&&v.source==='native_validation_summary'&&v.execution_id===c.training.execution_id
    &&typeof v.read_id==='string'&&v.read_id.length>0&&v.folds===3&&v.samples_per_fold===32
-   &&o?.fresh===true&&o.execution_id===r.execution.execution_id&&o.sample_complete===true&&o.row_count===96
+   &&o?.fresh===true&&o.execution_id===r.execution.execution_id&&o.row_count===96
    &&o.schema.length===want.columns.length&&want.columns.every(f=>o.schema.filter(a=>a.name===f.name&&a.type===f.type).length===1);
  });
  need(proof,'KFOLD_READBACK_OR_NATIVE_EXECUTION');

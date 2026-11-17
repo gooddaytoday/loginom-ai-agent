@@ -9,7 +9,12 @@ test('K-fold evidence requires a completed native validation on the training exe
   configuration:{readback:{kind:'log_regression',mode:'enter',input_fields:['X'],target_field:'Target',event:'yes',threshold:0.8,normalization:'none',train_percent:100,validation:{method:'kfold',folds:3,sampling:'sequential'},training:{status:'trained',execution_id:'teach',validation:{status:'completed',source:'native_validation_summary',execution_id:'teach',read_id:'read',folds:3,samples_per_fold:32}}}},
   output:{ports:[{port:0,fresh:true,execution_id:'execute',sample_complete:true,row_count:96,schema:expected.outputs[0].columns}]}};
  assert.equal(checkLogregKfold(expected,[reply]).training.validation.folds,3);
- for(const change of [r=>delete r.configuration.readback.training.validation,r=>r.configuration.readback.training.validation.execution_id='stale',r=>r.configuration.readback.training.validation.samples_per_fold=0,r=>r.configuration.readback.training.validation.folds=5,r=>r.configuration.readback.validation.sampling='random',r=>r.configuration.readback.training.execution_id='execute',r=>r.output.ports[0].schema[0].type='string']){
+ // Live retry-kfold-1: the Enter reply samples five rows, while the stock
+ // full CSV oracle runs before this evidence audit and cold checks all rows.
+ // Validation proof belongs to Teach, independently of the requested sample.
+ const sampled=structuredClone(reply);sampled.output.ports[0].sample_complete=false;sampled.output.ports[0].sample_rows=5;
+ assert.equal(checkLogregKfold(expected,[sampled]).training.validation.samples_per_fold,32);
+ for(const change of [r=>delete r.configuration.readback.training.validation,r=>r.configuration.readback.training.validation.execution_id='stale',r=>r.configuration.readback.training.validation.samples_per_fold=0,r=>r.configuration.readback.training.validation.folds=5,r=>r.configuration.readback.validation.sampling='random',r=>r.configuration.readback.training.execution_id='execute',r=>r.output.ports[0].row_count=95,r=>r.output.ports[0].schema.push({name:'Extra',type:'real'}),r=>r.output.ports[0].schema[0].type='string']){
   const r=structuredClone(reply);change(r);assert.throws(()=>checkLogregKfold(expected,[r]));
  }
 });
