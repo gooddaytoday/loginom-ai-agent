@@ -190,8 +190,7 @@ button.prototype-mark{display:inline-flex;align-items:center;gap:4px;text-align:
 button.prototype-mark:hover{color:var(--accent)}
 .review-page{max-width:980px}
 .rv-heading{font-size:19px;margin:24px 0 10px}
-.rv-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-@media(max-width:1100px){.rv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.rv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .rv-card{display:flex;flex-direction:column;gap:7px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
 .rv-card h3{font-size:16px}
 .rv-card p{flex:1;margin:0;color:var(--muted);font-size:14px;line-height:1.45}
@@ -235,10 +234,10 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
   .workspace.collapsed.peek .sidebar,.workspace.collapsed .sidebar:has(:focus-visible){width:248px;box-shadow:var(--floating-shadow)}
   .workspace.collapsed.peek .collapse-btn .pin-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .pin-ico{display:block}
   .workspace.collapsed.peek .collapse-btn .rail-ico,.workspace.collapsed .sidebar:has(:focus-visible) .collapse-btn .rail-ico{display:none}
-  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.chat-row,.project-link>span:last-child,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
+  .workspace.collapsed .sidebar :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.sec-recents .chat-row,.chat-row .row-text,.project-link>span:last-child,.row-more,.sec-pinned h2>.icon,.sec-projects h2>.icon,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){transition:opacity .12s ease .04s}
   /* The rail: icons only. Labels fade; whole rows that have no icon of their own are not clickable. */
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.chat-row,.project-link>span:last-child,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
-  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.chat-row,.row-more){visibility:hidden}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.project-switch>:not(.project-avatar),.new-session>:not(.icon),.nav-item>span,.sidebar-history h2>span,.sec-recents .chat-row,.chat-row .row-text,.project-link>span:last-child,.row-more,.sec-pinned h2>.icon,.sec-projects h2>.icon,.conn-run>:not(.conn-dot,.icon:first-child),.prototype-mark>span){opacity:0;transition-delay:0s}
+  .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) :is(.brand,.sec-recents .chat-row,.row-more){pointer-events:none}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .sidebar-history h2 .conn-dot{display:block}
   .workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .project-switch{border-color:transparent;background:transparent}
   .workspace.collapsed:not(.peek) .sidebar-history{scrollbar-width:none}
@@ -304,8 +303,9 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .side-section+.side-section{margin-top:16px}
 .side-head{position:relative}
 .side-row{position:relative}
-.session-link,.project-link{padding-right:32px}
-.project-link{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:7px 32px 7px 12px;border-radius:6px;text-align:left}
+.project-link{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:7px 10px 7px 12px;border-radius:6px;text-align:left}
+/* The «…» covers the end of a name only while it is shown */
+.side-row:is(:hover,:focus-within) :is(.session-link,.project-link,.project-chat){padding-right:34px}
 .project-link:hover,.project-link.current{background:var(--soft)}
 .project-link>span:first-child{display:grid;flex:none}
 .project-link>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -315,7 +315,7 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .row-more{position:absolute;right:3px;top:50%;translate:0 -50%;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--muted);opacity:0}
 .row-more:hover{background:var(--soft);color:var(--ink)}
 .side-row:hover .row-more,.side-head:hover .row-more,.row-more:focus-visible,.row-more[aria-expanded=true]{opacity:1}
-@media(hover:none){.row-more{opacity:1}}
+@media(hover:none){.row-more{opacity:1}.side-row :is(.session-link,.project-link,.project-chat){padding-right:34px}}
 .row-more.page-more{position:static;translate:none;opacity:1;width:34px;height:34px}
 .pc-red{color:var(--accent)}.pc-blue{color:var(--blue)}.pc-green{color:var(--success)}.pc-violet{color:var(--violet)}.pc-amber{color:var(--amber)}
 .row-menu{position:fixed;left:0;top:0;z-index:40;display:grid;gap:1px;min-width:224px;max-width:300px;padding:5px;border:1px solid var(--line);border-radius:10px;background:var(--paper);box-shadow:var(--floating-shadow);animation:appear .12s ease}
@@ -365,3 +365,8 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .color-pick input:focus-visible+span{outline:2px solid var(--blue);outline-offset:2px}
 .field-hint{margin:0;color:var(--muted);font-size:13px}
 .side-head .row-more{z-index:2}
+.pc-dot{display:inline-block;width:7px;height:7px;margin-right:5px;border-radius:50%;background:currentColor;vertical-align:1px}
+.row-text small{color:var(--muted)}
+.side-note{margin:2px 0 0;padding:4px 10px 4px 13px;color:var(--muted);font-size:12px}
+.project-add-source:focus-within{outline:2px solid var(--blue);outline-offset:2px}
+@media(min-width:691px){.workspace.collapsed:not(.peek) .sidebar:not(:has(:focus-visible)) .side-note{opacity:0}}
