@@ -207,7 +207,6 @@ button.prototype-mark:hover{color:var(--accent)}
    so the collapsed rail is the same panel 60px wide and nothing moves when it opens over the page. */
 .sidebar{padding-inline:10px}
 .sidebar-head{display:flex;align-items:center;gap:2px;margin-bottom:11px}
-.sidebar-head .brand{flex:1;min-width:0;margin-bottom:0;padding-inline:6px;overflow:hidden}
 .collapse-btn{width:40px;height:40px;color:var(--muted)}
 .collapse-btn .pin-ico{display:none}
 .project-switch{padding:3px 9px 3px 2px}
@@ -226,7 +225,6 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .proto-badge{display:inline-grid;place-items:center;width:24px;height:18px;border-radius:5px;background:var(--soft);font-size:10px;font-weight:700}
 .sidebar :is(.prototype-mark,.conn-run,.nav-item){white-space:nowrap}
 @media(max-width:1060px){.new-session kbd{display:none}}
-@media(min-width:691px) and (max-width:850px){.sidebar-head .brand>span{display:none}}
 @media(min-width:691px){
   .workspace.collapsed{grid-template-columns:60px minmax(0,1fr)}
   .workspace.collapsed .sidebar{position:relative;z-index:20;width:60px;overflow:hidden;transition:width .15s ease,box-shadow .15s ease}
@@ -387,3 +385,10 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .chat-row:not(.nested) .session-link{gap:11px}
 .dest-chip{max-width:220px}
 .dest-chip .filter-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The logo sits in the top bar, before the page title */
+.brand.top-brand{width:auto;min-height:0;margin:0 6px 0 0;padding:4px 6px;flex:none;border-radius:7px}
+.top-brand picture{width:92px}
+.top-brand>span{font-size:15px}
+.top-brand+:is(.crumb-current,.crumb-project){border-left:1px solid var(--line);padding-left:12px;border-radius:0}
+@media(max-width:690px){.sidebar-head{display:none}.top-brand picture{width:84px}.top-brand>span{font-size:14px}}
+@media(max-width:410px){.top-brand>span{display:none}}
