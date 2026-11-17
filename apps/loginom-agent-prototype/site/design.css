@@ -135,3 +135,28 @@
 .sl-data>.icon{color:var(--muted);margin-top:2px}
 .sl-data p{margin:0;color:var(--ink)}
 .sl-data-cloud{border-color:color-mix(in srgb,#e8953f 45%,var(--line));background:var(--warn-soft)}
+
+/* Package picker: recent + one Loginom folder; the list scrolls, the search field stays */
+.pkg-section{margin:13px 0 6px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.pkg-section span{font-weight:400;letter-spacing:0;text-transform:none}
+.pkg-list{display:grid;gap:1px;padding:3px;border:1px solid var(--line);border-radius:8px}
+.pkg-files{max-height:min(300px,38dvh);overflow:auto;overscroll-behavior:contain}
+.pkg-row{display:flex;align-items:center;gap:9px;width:100%;min-height:42px;padding:5px 7px;border-radius:6px;text-align:left}
+.pkg-row:hover,.pkg-row:focus-visible{background:var(--bg)}
+.pkg-row .glyph{width:28px;height:28px;border-radius:7px}
+.pkg-name{flex:1;min-width:0;display:grid}
+.pkg-name strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkg-name small{color:var(--muted);font-size:12.5px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkg-meta{flex:none;color:var(--muted);font-size:13px;white-space:nowrap}
+.pkg-row>.icon:last-child{color:var(--muted)}
+.pkg-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:13px 0 7px}
+.pkg-roots .btn{min-height:32px;padding:4px 10px;font-size:14px}
+.pkg-crumbs{display:flex;align-items:center;gap:6px;min-width:0;margin:0 0 7px;font-size:14px}
+.pkg-crumbs strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkg-crumbs>span{color:var(--muted)}
+.pkg-sort{flex:none;font-size:13px}
+.pkg-count{margin:7px 0 0;color:var(--muted);font-size:13px}
+.pkg-count .link-btn{font-size:13px}
+.pkg-files .empty-note{padding:12px}
+.pkg-roots{flex-wrap:nowrap}
+@media(max-width:520px){.pkg-meta{font-size:12px}.pkg-row .glyph{display:none}.pkg-roots .btn{padding:4px 8px}.pkg-roots .btn .icon{display:none}}

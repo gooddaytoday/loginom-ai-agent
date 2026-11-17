@@ -55,13 +55,28 @@ const packageViews = {
   ],
 }
 const exampleEditPrompt = 'Измени формулу в узле amount_double с amount * 2 на amount * 3.'
-const editablePackage = {id:'sales-edit',name:'Расчёт суммы.lgp',scope:'personal',view:'calculation'}
+const editablePackage = {id:'sales-edit',name:'Расчёт суммы.lgp',scope:'personal',folder:'',modified:'2026-11-15',size:'0,1 МБ',view:'calculation'}
+// Demo storage of ~50 packages. Loginom lists storage one folder at a time (name, modified, size),
+// so the picker browses folders instead of showing «all packages». Rows: name|modified|size in MB.
+const demoFolders = {
+  'personal|':['Отток клиентов|2026-11-10|2,1','Прогноз спроса|2026-11-06|3,4','Сегментация клиентов|2026-11-03|1,7','Скоринг заявок|2026-10-29|2,6','Остатки на складах|2026-10-27|0,9','Выручка по регионам|2026-10-21|1,1','Анализ корзины|2026-10-14|1,9','Проверка справочников|2026-10-09|0,4','Дебиторская задолженность|2026-10-02|0,7','Кассовые разрывы|2026-09-25|0,6','Маржинальность|2026-09-18|1,3','Ассортиментная матрица|2026-09-11|1,0','Сезонность продаж|2026-09-04|1,5'],
+  'personal|Отчёты':['Еженедельный отчёт|2026-11-14|0,8','Отчёт для правления|2026-11-01|1,2','Ежемесячные продажи|2026-10-31|1,4','KPI отделов|2026-10-15|0,9','Отчёт по возвратам|2026-09-30|0,5','План-факт|2026-09-15|0,7','Отчёт по закупкам|2026-08-29|0,6'],
+  'personal|Черновики':['Новый сценарий|2026-11-13|0,1','Тест импорта|2026-11-08|0,2','Черновик модели|2026-10-25|0,8','Проба Python|2026-10-12|0,1','Копия Продажи|2026-09-20|1,2'],
+  'personal|Архив':['Продажи 2025|2026-01-20|2,4','Продажи 2024|2025-01-15|2,2','Отток 2025|2025-12-10|1,8','Прогноз 2025|2025-11-30|3,0','Скоринг v1|2025-10-04|2,0','Скоринг v2|2025-12-22|2,3','Остатки 2025|2025-12-29|0,8','Сегменты 2024|2024-12-12|1,4','Акции Q1|2025-03-31|0,6','Акции Q2|2025-06-30|0,6','Акции Q3|2025-09-30|0,7','Акции Q4|2025-12-31|0,7','Миграция CRM|2025-08-14|1,1','Старый отчёт|2024-06-01|0,3'],
+  'shared|':['Справочник товаров|2026-10-30|0,5','Единая витрина|2026-10-18|4,2','Контроль НСИ|2026-10-05|0,6','Курсы валют|2026-09-28|0,2'],
+  'shared|Шаблоны':['Шаблон отчёта|2026-08-20|0,3','Шаблон загрузки|2026-07-15|0,2','Шаблон ABC|2026-06-02|0,4','Шаблон проверки|2026-05-19|0,3'],
+}
 const serverPackages = [
-  {id:'sales',name:'Продажи.lgp',scope:'personal',view:'sales'},
-  {id:'quality',name:'Качество данных.lgp',scope:'personal',view:'quality'},
+  {id:'sales',name:'Продажи.lgp',scope:'personal',folder:'',modified:'2026-11-16',size:'1,2 МБ',view:'sales'},
+  {id:'quality',name:'Качество данных.lgp',scope:'personal',folder:'',modified:'2026-11-12',size:'0,8 МБ',view:'quality'},
   editablePackage,
-  {id:'control',name:'Контроль загрузок.lgp',scope:'shared',view:'quality'},
-  {id:'summary',name:'Сводка продаж.lgp',scope:'shared',view:'sales'},
+  {id:'control',name:'Контроль загрузок.lgp',scope:'shared',folder:'',modified:'2026-11-11',size:'0,6 МБ',view:'quality'},
+  {id:'summary',name:'Сводка продаж.lgp',scope:'shared',folder:'',modified:'2026-11-09',size:'0,9 МБ',view:'sales'},
+  ...Object.entries(demoFolders).flatMap(([key,rows]) => rows.map((row,index) => {
+    const [name,modified,size] = row.split('|')
+    const [scope,folder] = key.split('|')
+    return {id:key + '#' + index, name:name + '.lgp', scope, folder, modified, size:size + ' МБ', view:'local'}
+  })),
 ]
 const state = {
   page:'home', contour:read('contour','online'), theme:read('theme','light'),
@@ -69,7 +84,11 @@ const state = {
   sessions:[...seed], overlay:null, mobile:false, draft:'', draftFiles:[], mode:'Выполнение',
   solution:'refactor', review:false, reviewTab:'plan', activeRun:false,
   activePackage:serverPackages[0], importedPackages:[], packageScope:'personal',
-  packageQuery:'', localPackage:null, packageError:'',
+  packageQuery:'', packageDir:'', packageSort:'date', packageDeep:false, pendingAction:null,
+  // Packages the user worked with in this app: the app's own history, not a Loginom feature.
+  recentPackages:[{id:'sales',what:'документирование',when:'сегодня'},{id:'sales-edit',what:'изменение в разговоре',when:'вчера'},
+    {id:'control',what:'проверка',when:'11 ноября'},{id:'quality',what:'просмотр',when:'10 ноября'}],
+  localPackage:null, packageError:'',
   calculationChanged:false, versionName:'', versionError:'',
 }
 const route = () => {
@@ -140,11 +159,16 @@ function runSolution(id, mode = 'review', from = 'hub') {
 // Runs a package action (document/check/improve/compare) for a chosen package.
 function runAction(actionId, pkg, from) {
   const action = packageActions[actionId]
+  if (pkg.id) rememberPackage(pkg.id, actionNoun[actionId])
   state.runnerPackage = pkg
   runSolution(action.solution, action.mode, from)
 }
 function packageRef(item) {
-  return {name:item.name, where:'Loginom · ' + packageFolder(item.scope), source:'loginom'}
+  return {id:item.id, name:item.name, where:'Loginom · ' + packagePath(item), source:'loginom'}
+}
+const actionNoun = {document:'документирование', check:'проверка', improve:'улучшение', compare:'сравнение'}
+function rememberPackage(id, what) {
+  state.recentPackages = [{id, what, when:'только что'}, ...state.recentPackages.filter(item => item.id !== id)].slice(0,5)
 }
 // Opens a new conversation about a finished run, with its report attached.
 function discuss(title, prompt, files) {
@@ -354,7 +378,7 @@ function startPackageEdit(source = state.activePackage) {
   const item = {
     id:'package-edit-' + Date.now(), title:'Правка · ' + source.name, date:'Сейчас', kind:'package-edit',
     phase:'input', prompt:'', files:[source.name], project:state.project,
-    source, sourcePath:packageFolder(source.scope) + '/' + source.name, account:state.packageAccount,
+    source, sourcePath:packagePath(source) + '/' + source.name, account:state.packageAccount,
   }
   state.sessions = [item,...state.sessions]
   openSession(item.id)
@@ -444,11 +468,15 @@ function chat() {
 function packageFolder(scope) {
   return scope === 'shared' ? '/Общие/Аналитика' : '/' + (state.settings.connection.username || 'analyst')
 }
+function packagePath(item) {
+  return packageFolder(item.scope) + (item.folder ? '/' + item.folder : '')
+}
 function packageEntries() {
   return [...serverPackages,...state.importedPackages]
 }
 function openPackage(item) {
   state.activePackage = item
+  rememberPackage(item.id, 'просмотр')
   state.node = item.view === 'calculation' ? 1 : null
   if (state.page === 'loginom') dismiss()
   else navigate('loginom')
@@ -469,18 +497,12 @@ function selectLocalPackage(name, example = false) {
   render()
   $(state.packageError ? '#package-local-file' : '[data-action="open-local-package"]')?.focus()
 }
-function packageFiles() {
-  const q = state.packageQuery.trim().toLocaleLowerCase('ru')
-  const items = packageEntries().filter(item => item.scope === state.packageScope && item.name.toLocaleLowerCase('ru').includes(q))
-  return items.length ? items.map(item => `<button data-package-id="${item.id}"><span class="glyph red">${icon('file',18)}</span><span><strong>${esc(item.name)}</strong><small>${item.savedVersion ? 'Новая версия · демо' : item.localCopy ? 'Копия с компьютера · демо' : 'Пакет Loginom · демо'}</small></span>${icon('chevron',16)}</button>`).join('') : '<p class="empty-note">В этой папке нет пакетов с таким именем.</p>'
-}
+// One picker for «Открыть из Loginom» and for choosing the package of an action (state.pendingAction).
 function packagePicker(local) {
   if (!state.settings.connection.connected) return `<p class="dialog-desc">Сначала подтвердите подключение к Loginom Studio.</p><button class="btn primary" data-settings="loginom">${icon('settings',16)} Настроить Loginom</button>`
-  if (!local) return `<p class="dialog-desc">Выберите .lgp из папок, доступных вашей учётной записи Loginom. В прототипе показаны примеры.</p>
-      <div class="package-folders" aria-label="Папка пакетов">${[['personal','Личная папка'],['shared','Общие папки']].map(([scope,label]) => `<button class="btn quiet" data-package-scope="${scope}" aria-pressed="${state.packageScope === scope}">${icon('folder',16)} ${label}</button>`).join('')}</div>
-      <p class="package-path"><code>${esc(packageFolder(state.packageScope))}</code></p>
+  if (!local) return `<p class="dialog-desc">${state.pendingAction ? 'Агент будет работать с копией — исходный пакет не изменится.' : 'Пакеты из папок, доступных вашей учётной записи Loginom.'}</p>
       <label class="search-field">${icon('search',18)}<input id="package-search" aria-label="Найти пакет" value="${esc(state.packageQuery)}" placeholder="Найти пакет по имени" autocomplete="off"></label>
-      <div class="dialog-options package-files" id="package-files">${packageFiles()}</div>`
+      <div id="package-browse">${packageBrowse()}</div>`
   const candidate = state.localPackage
   return `<p class="dialog-desc">Для работы в Loginom Studio копия локального пакета загружается в вашу папку на сервере Loginom.</p>
     <label class="package-file-select"><span class="glyph red">${icon('upload',20)}</span><span><strong>Выбрать файл .lgp</strong><small>Файл с вашего компьютера</small></span><input id="package-local-file" type="file" accept=".lgp" aria-label="Выбрать файл .lgp"></label>
@@ -490,11 +512,37 @@ function packagePicker(local) {
     <p class="muted package-picker-note">В прототипе используется только имя файла. Открывается учебная схема.</p>
     <div class="button-row package-picker-actions"><button class="btn quiet" data-action="dismiss">Отмена</button><button class="btn primary" data-action="open-local-package" ${candidate ? '' : 'disabled'}>Загрузить копию и открыть</button></div>`
 }
-function pickPackage() {
-  const recent = [...serverPackages.filter(item => item.scope === 'personal'), ...state.importedPackages].slice(0,5)
-  return `<p class="dialog-desc">Выберите пакет из вашей папки Loginom. Агент будет работать с копией — исходный пакет не изменится.</p>
-    <div class="dialog-options">${recent.map(item => `<button data-pick-package="${item.id}"><span class="glyph red">${icon('flow',18)}</span><span><strong>${esc(item.name)}</strong><small>${esc(packageFolder(item.scope))}</small></span>${icon('chevron',16)}</button>`).join('')}</div>
-    <button class="link-btn" data-action="package-server">${icon('folder',15)} Другая папка или общие пакеты</button>`
+// Recent: the app's own history. Below: one Loginom folder, folders first, then packages newest first.
+// Search covers the open folder; searching subfolders opens them one by one, so it is a separate step.
+function packageBrowse() {
+  const q = state.packageQuery.trim().toLocaleLowerCase('ru')
+  const match = item => item.name.toLocaleLowerCase('ru').includes(q)
+  const scoped = packageEntries().filter(item => item.scope === state.packageScope)
+  const deep = state.packageDeep && q
+  const files = scoped.filter(item => deep ? (item.folder || '').startsWith(state.packageDir) : (item.folder || '') === state.packageDir).filter(match)
+    .sort((a,b) => state.packageSort === 'name' ? a.name.localeCompare(b.name,'ru') : (b.modified || '').localeCompare(a.modified || ''))
+  const folders = state.packageDir || deep ? [] : [...new Set(scoped.map(item => item.folder).filter(Boolean))]
+    .filter(name => name.toLocaleLowerCase('ru').includes(q)).sort((a,b) => a.localeCompare(b,'ru'))
+  const recent = state.packageDir ? [] : state.recentPackages.map(entry => ({...entry, item:packageEntries().find(item => item.id === entry.id)}))
+    .filter(entry => entry.item && match(entry.item)).slice(0,3)
+  const row = (item, sub, meta) => `<button class="pkg-row" data-package-id="${esc(item.id)}"><span class="glyph red">${icon('flow',16)}</span><span class="pkg-name"><strong>${esc(item.name)}</strong>${sub ? `<small>${esc(sub)}</small>` : ''}</span>${meta ? `<span class="pkg-meta">${meta}</span>` : ''}</button>`
+  const meta = item => [item.modified?.split('-').reverse().join('.'), item.size].filter(Boolean).join(' · ')
+  const root = packageFolder(state.packageScope)
+  return `${recent.length ? `<p class="pkg-section">Недавние <span>— с ними вы работали в приложении</span></p>
+      <div class="pkg-list pkg-recent">${recent.map(entry => row(entry.item, packagePath(entry.item) + ' · ' + entry.what + ', ' + entry.when)).join('')}</div>` : ''}
+    <div class="pkg-bar"><div class="package-folders pkg-roots" aria-label="Папки Loginom">${[['personal','Моя папка'],['shared','Общие папки']].map(([scope,label]) => `<button class="btn quiet" data-package-scope="${scope}" aria-pressed="${state.packageScope === scope}" title="${esc(packageFolder(scope))}">${icon('folder',15)} ${label}</button>`).join('')}</div>
+      <button class="link-btn pkg-sort" data-action="package-sort" aria-label="Порядок: ${state.packageSort === 'name' ? 'по имени' : 'сначала новые'}">${state.packageSort === 'name' ? 'По имени' : 'Сначала новые'} ${icon('down',14)}</button></div>
+    ${state.packageDir ? `<nav class="pkg-crumbs" aria-label="Открытая папка"><button class="link-btn" data-package-dir="">${esc(root)}</button><span>/</span><strong>${esc(state.packageDir)}</strong></nav>` : ''}
+    <div class="pkg-list pkg-files" id="package-files">${folders.map(name => {
+      const count = scoped.filter(item => item.folder === name).length
+      return `<button class="pkg-row" data-package-dir="${esc(name)}"><span class="glyph blue">${icon('folder',16)}</span><span class="pkg-name"><strong>${esc(name)}</strong></span><span class="pkg-meta">${count} ${packageWord(count)}</span>${icon('chevron',15)}</button>`
+    }).join('')}${files.map(item => row(item, deep ? packagePath(item) : '', meta(item))).join('')}${folders.length + files.length ? '' : `<p class="empty-note">${q ? `Нет пакетов с «${esc(state.packageQuery.trim())}» в имени${deep ? '' : ' в этой папке'}.` : 'В этой папке нет пакетов.'}</p>`}</div>
+    <p class="pkg-count">${q ? `Найдено: ${files.length}${deep ? ' — в этой папке и вложенных' : ' в этой папке'}` : `${files.length} ${packageWord(files.length)}${folders.length ? ' · папок: ' + folders.length : ''}`}${q && !deep && !state.packageDir ? ` · <button class="link-btn" data-action="package-deep">Искать и во вложенных папках</button>` : ''}</p>`
+}
+function packageWord(count) {
+  if (count % 10 === 1 && count % 100 !== 11) return 'пакет'
+  if ([2,3,4].includes(count % 10) && ![12,13,14].includes(count % 100)) return 'пакета'
+  return 'пакетов'
 }
 function packageForOutput() {
   if (state.page !== 'chat') {
@@ -533,7 +581,7 @@ function savePackageVersion(name) {
   else if (packageEntries().some(item => item.scope === 'personal' && item.name.toLocaleLowerCase('ru') === name.toLocaleLowerCase('ru'))) state.versionError = 'Это имя уже занято. Введите другое имя для новой версии.'
   else state.versionError = ''
   if (state.versionError) return render()
-  const saved = {...source,id:'version-' + state.importedPackages.length,name,isDraft:false,savedVersion:true}
+  const saved = {...source,id:'version-' + state.importedPackages.length,name,isDraft:false,savedVersion:true,folder:'',modified:new Date().toISOString().slice(0,10)}
   state.importedPackages.push(saved)
   if (source.editSessionId) {
     const chat = state.sessions.find(item => item.id === source.editSessionId)
@@ -574,7 +622,7 @@ function packages() {
   const canDownload = dirty || Boolean(item.savedVersion)
   return `<div class="native-page packages-page">
     <div class="native-heading"><div><p class="eyebrow">Loginom</p><h1>Пакеты</h1><p>Откройте пакет, чтобы посмотреть схему, задокументировать, проверить или улучшить его.</p></div><div class="button-row"><button class="btn primary" data-action="package-server">${icon('folder',17)} Из Loginom</button><button class="btn" data-action="package-computer">${icon('upload',17)} С компьютера</button></div></div>
-    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packageFolder(item.scope))} · ${item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span></div>
+    <section class="package-frame"><div class="package-top"><span class="glyph red">${icon('flow',21)}</span><div><strong tabindex="-1">${esc(item.name)}</strong><small>${item.isDraft ? 'Рабочий черновик в разговоре' : `${esc(packagePath(item))} · ${item.savedVersion ? 'новая версия' : item.isResult ? 'результат разговора' : item.localCopy ? 'копия с компьютера' : 'хранилище Loginom'}`}</small></div><span class="badge">Учебная схема</span></div>
     <div class="package-canvas" aria-label="Учебная схема из четырёх узлов">${nodes.map(([glyph,title,detail],i) => `${i ? '<span class="canvas-connector"></span>':''}<button class="canvas-node ${state.node === i ? 'active':''}" data-node="${i}"><span class="glyph ${['blue','violet','red','green'][i]}">${icon(glyph,22)}</span><strong>${title}</strong><small>${detail}</small></button>`).join('')}</div>
     ${isCalculation && state.node === 1 ? calculationInspector(canDownload,item.id === editablePackage.id) : `<div class="package-foot">${Number.isInteger(state.node) ? nodes[state.node][3]:'Выберите узел, чтобы увидеть сведения.'}</div>`}
     <div class="package-save-bar">
@@ -605,7 +653,7 @@ function overlay() {
   const content = {
     'package-edit-example':['Изменение на учебном пакете',`<p class="dialog-desc">Сценарий правки формулы в прототипе доступен для пакета «Расчёт суммы.lgp». Откройте его в чате, чтобы увидеть сравнение, подтверждение и сохранение.</p><div class="button-row package-picker-actions"><button class="btn quiet" type="button" data-action="dismiss">Отмена</button><button class="btn primary" type="button" data-action="ask-example-package-edit">Открыть учебный пакет в чате</button></div>`],
     'package-version':['Сохранить новую версию', kind === 'package-version' ? versionDialog() : ''],
-    'pick-package':[packageActions[state.pendingAction]?.title + ': какой пакет?', kind === 'pick-package' ? pickPackage() : ''],
+    'pick-package':[packageActions[state.pendingAction]?.title + ': какой пакет?', kind === 'pick-package' ? packagePicker(false) : ''],
     'package-server':['Открыть из Loginom', kind === 'package-server' ? packagePicker(false) : ''],
     'package-computer':['Открыть с компьютера', kind === 'package-computer' ? packagePicker(true) : ''],
     contour: ['Режим работы',`<p class="dialog-desc">Профиль определяет, какие источники доступны приложению.</p>
@@ -699,7 +747,13 @@ function render(resetScroll = false) {
 }
 function dismiss() {
   state.overlay = null
+  state.pendingAction = null
   render()
+}
+function resetPackageBrowse() {
+  state.packageQuery = ''
+  state.packageDir = ''
+  state.packageDeep = false
 }
 function attach(name) {
   if (!state.draftFiles.includes(name)) state.draftFiles.push(name)
@@ -814,7 +868,17 @@ const actions = {
     const session = state.sessions.find(item => item.id === state.session)
     if (session?.phase === 'done') openPackage(resultPackage(session))
   },
-  'package-server':() => { state.packageQuery = ''; state.overlay = 'package-server'; render() },
+  'package-server':() => { resetPackageBrowse(); state.pendingAction = null; state.overlay = 'package-server'; render() },
+  'package-sort':() => {
+    state.packageSort = state.packageSort === 'name' ? 'date' : 'name'
+    $('#package-browse').innerHTML = packageBrowse()
+    $('[data-action="package-sort"]')?.focus()
+  },
+  'package-deep':() => {
+    state.packageDeep = true
+    $('#package-browse').innerHTML = packageBrowse()
+    $('#package-search')?.focus()
+  },
   'package-computer':() => {
     state.localPackage = null
     state.packageError = ''
@@ -826,7 +890,7 @@ const actions = {
     if (!state.localPackage) return
     const item = {
       id:'local-' + state.importedPackages.length, name:state.localPackage.destination, scope:'personal',
-      localCopy:true, view:state.localPackage.example ? 'calculation' : 'local',
+      localCopy:true, view:state.localPackage.example ? 'calculation' : 'local', folder:'', modified:new Date().toISOString().slice(0,10),
     }
     state.importedPackages.push(item)
     state.localPackage = null
@@ -881,25 +945,30 @@ app.addEventListener('click', event => {
   if (d.review) { state.reviewTab = d.review; return render() }
   if (d.node != null) { state.node = Number(d.node); return render() }
   if (d.packageScope) {
+    resetPackageBrowse()
     state.packageScope = d.packageScope
-    state.packageQuery = ''
+    return render()
+  }
+  if (d.packageDir !== undefined) {
+    resetPackageBrowse()
+    state.packageDir = d.packageDir
     return render()
   }
   if (d.packageId) {
     const item = packageEntries().find(entry => entry.id === d.packageId)
-    if (item) openPackage(item)
-    return
+    const action = state.pendingAction
+    if (!item) return
+    state.overlay = null
+    state.pendingAction = null
+    if (action) return runAction(action, packageRef(item), 'home')
+    return openPackage(item)
   }
   if (d.packageAction) {
     if (state.page === 'loginom') return runAction(d.packageAction, packageRef(state.activePackage), 'loginom')
+    resetPackageBrowse()
     state.pendingAction = d.packageAction
     state.overlay = 'pick-package'
     return render()
-  }
-  if (d.pickPackage) {
-    const item = packageEntries().find(entry => entry.id === d.pickPackage)
-    state.overlay = null
-    return runAction(state.pendingAction, packageRef(item), 'home')
   }
   if (Object.hasOwn(actions,d.action)) actions[d.action]()
 })
@@ -911,7 +980,8 @@ app.addEventListener('input', event => {
   if (event.target.id === 'search-query') $('#search-results').innerHTML = searchResults(event.target.value)
   if (event.target.id === 'package-search') {
     state.packageQuery = event.target.value
-    $('#package-files').innerHTML = packageFiles()
+    if (!event.target.value.trim()) state.packageDeep = false
+    $('#package-browse').innerHTML = packageBrowse()
   }
 })
 app.addEventListener('change', event => {
