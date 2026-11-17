@@ -314,7 +314,7 @@ function header() {
       ${state.page === 'home' || state.page === 'chat' ? '' : `<span class="crumb-current">${pages[state.page]}</span>`}
     </div>
     <div class="top-actions">
-      ${variant.status === 'top' ? loginomChip() : ''}
+      ${variant.status === 'top' || !['home','chat'].includes(state.page) ? loginomChip() : ''}
       <button class="icon-btn theme-btn" title="Переключить цветовую схему" aria-label="Переключить цветовую схему" data-action="theme">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',17)}</button>
     </div>
   </header>
@@ -326,10 +326,7 @@ function header() {
   </nav>` : ''}`
 }
 function composer() {
-  const selectedModel = state.settings?.model
-  const modelName = state.contour === 'closed'
-    ? (selectedModel && selectedModel.kind !== 'cloud' ? selectedModel.name : 'Локальная модель')
-    : (selectedModel?.name || 'Демо-модель')
+  const modelName = currentModel()
   const pkg = state.draftPackage
   return `<form class="composer" id="composer">
     ${pkg ? packageContext(pkg) : ''}
@@ -342,7 +339,7 @@ function composer() {
       </div>
       <div class="composer-options">
         ${variant.status === 'composer' ? loginomChip() : ''}
-        <button class="filter-btn composer-model" type="button" data-settings="models" title="Модель">${icon('cpu',15)} <span class="filter-label">${esc(modelName)}</span> ${icon('down',12)}</button>
+        <button class="filter-btn composer-model${modelName ? '' : ' lgm-chip off'}" type="button" data-settings="models" title="Модель">${icon('cpu',15)} <span class="filter-label">${esc(modelName || 'Выберите модель')}</span> ${icon('down',12)}</button>
         <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
       </div>
     </div>
@@ -358,8 +355,8 @@ function packageContext(pkg) {
     <div class="pkg-actions" role="group" aria-label="Что сделать с пакетом"><span>Что сделать с пакетом:</span>${shown.map(id => {
       const action = packageActions[id]
       const ready = hubHasInstalled(state, action.solution)
-      return `<button type="button" class="chip-btn" data-package-action="${id}" ${ready ? '' : 'title="Добавить из каталога"'}>${icon(ready ? action.icon : 'plus',14)} ${action.title}</button>`
-    }).join('')}<button type="button" class="chip-btn chip-more" data-overlay="all-actions" aria-label="Все действия с пакетом" title="Все действия с пакетом">${icon('more',14)}</button></div>
+      return `<button type="button" class="chip-btn" data-package-action="${id}" ${ready ? '' : 'title="Добавить из каталога"'}>${ready ? '' : icon('plus',13)}${action.title}</button>`
+    }).join('')}<button type="button" class="chip-btn" data-overlay="all-actions" title="Все действия с пакетом">Ещё</button></div>
   </div>`
 }
 // A new conversation is the start screen: the input and, for newcomers, examples.
@@ -735,12 +732,12 @@ function packages() {
 function review() {
   const choice = (key, value, label, hint) => `<button class="rv-choice" data-variant="${key}:${value}" aria-pressed="${String(variant[key]) === String(value)}"><strong>${label}</strong><small>${hint}</small></button>`
   const look = [
-    ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Агент попросит подключить Loginom прямо в разговоре: одна кнопка. После этого разговор появится в панели.','stage-new'],
+    ['Первый запуск','Начните как новый пользователь. Нажмите пример «ABC-анализ товаров» — текст встанет в поле — и отправьте. Разговор сразу появится в панели, а агент попросит подключить Loginom прямо в разговоре — одна кнопка.','stage-new'],
     ['Пакет','«+» у поля ввода → «Пакет из Loginom…» → выберите пакет. Над полем появится «Что сделать с пакетом». Пример «Задокументировать пакет» показывает то же на учебном файле.','try-package'],
     ['Панель','Свернуть — кнопка вверху панели или Ctrl+B; развернуть — кнопка в левом верхнем углу. «После недели работы» — так выглядит приложение у того, кто им уже пользуется.','stage-used'],
   ]
   const later = [
-    'Закрытый контур без модели: перед первой отправкой появится «Выберите модель» — в этом прототипе не показано.',
+    'Закрытый контур без модели: в поле ввода вместо модели — «Выберите модель», отправка ведёт в настройки моделей.',
     'Элементы по наведению — действия над сообщением (копировать, повторить) — появятся вместе с лентой разговора в следующей итерации.',
     'Поиск по приложению убран. Поиск остался внутри каталога и окна выбора пакета: там десятки элементов (И1-7). Если и его убрать — скажите.',
     'После перезагрузки страницы прототип начинает заново: разговоры и счётчики не сохраняются.',
@@ -757,7 +754,7 @@ function review() {
     <div class="rv-variants">
       <div><h3>1. Где «Пакеты» и «Каталог»</h3><div class="rv-choices">${choice('nav','plus','Только через «+»','Панель не меняется: проект, разговоры, настройки')}${choice('nav','panel','Появляются в панели','«Пакеты» — после первого пакета, «Каталог» — после первого захода')}</div></div>
       <div><h3>2. Подсказка в поле ввода</h3><div class="rv-choices">${choice('placeholder',1,'Вариант 1',esc(placeholders[1]))}${choice('placeholder',2,'Вариант 2',esc(placeholders[2]))}</div></div>
-      <div><h3>3. Где состояние Loginom</h3><div class="rv-choices">${choice('status','composer','В поле ввода','Рядом с моделью; на страницах без поля ввода — настройки, каталог — не виден')}${choice('status','top','Вверху справа','Рядом с темой, видно на любой странице')}</div></div>
+      <div><h3>3. Где состояние Loginom</h3><div class="rv-choices">${choice('status','composer','В поле ввода','Рядом с моделью; на страницах без поля ввода — вверху справа')}${choice('status','top','Вверху справа','Рядом с темой, видно на любой странице')}</div></div>
     </div>
     <h2 class="rv-heading">Посмотреть</h2>
     <div class="rv-grid">${look.map(([title,text,target],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${target === 'stage-new' ? 'Начать как новый пользователь' : target === 'stage-used' ? 'После недели работы' : 'Открыть'} ${icon('arrow',15)}</button></article>`).join('')}</div>
@@ -884,11 +881,21 @@ function attach(name) {
   dismiss()
   $('#prompt')?.focus()
 }
+// Closed contour without a model from the administrator: the input says «Выберите модель» before the first send.
+function currentModel() {
+  const model = state.settings?.model
+  if (!model?.name || (state.contour === 'closed' && model.kind === 'cloud')) return ''
+  return model.name
+}
 function send() {
   const prompt = state.draft.trim()
   if (!prompt) {
     $('#prompt')?.focus()
     return
+  }
+  if (!currentModel()) {
+    toast('Сначала выберите модель — без неё агент не ответит', 'alert')
+    return settingsTab('models')
   }
   const old = state.page === 'chat' ? state.sessions.find(x => x.id === state.session) : null
   if (old?.kind === 'package-edit') {
@@ -1003,7 +1010,7 @@ const actions = {
     state.progress.ownChats = 0
     dismiss()
   },
-  'stage-new':() => { write('stage','new'); write('collapsed',false); location.hash = ''; location.reload() },
+  'stage-new':() => { write('stage','new'); write('collapsed',false); write('contour','online'); location.hash = ''; location.reload() },
   'stage-used':() => { write('stage','used'); location.hash = ''; location.reload() },
   'try-package':() => { newSession(); state.pickFor = 'composer'; actions['plus-package']() },
   'plus-package':() => {
