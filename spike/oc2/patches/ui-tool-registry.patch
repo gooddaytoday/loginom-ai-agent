@@ -29,7 +29,7 @@ index b1e250591e..29ffb98a2c 100644
      if (!key.includes(".")) return key
  
 diff --git a/packages/session-ui/src/timeline/projection.ts b/packages/session-ui/src/timeline/projection.ts
-index 396ec3bf30..69f5a5f0b7 100644
+index 396ec3bf30..be58f591b7 100644
 --- a/packages/session-ui/src/timeline/projection.ts
 +++ b/packages/session-ui/src/timeline/projection.ts
 @@ -17,6 +17,7 @@ import {
@@ -44,7 +44,7 @@ index 396ec3bf30..69f5a5f0b7 100644
  ) {
    if (detail) {
      if (content.name === "question" && !currentToolFailed(content)) return undefined
-+    // Product rule: a failed step and a tool registered as separate keep their own row in every preset.
++    // Product rule: a failed step and a tool registered as separate are never folded into a tool group.
 +    if (currentToolFailed(content) || toolSeparate(content.name)) return undefined
      const category = timelineCategory(content)!
  
@@ -89,7 +89,7 @@ index 66d5664660..b72d14c929 100644
  
 diff --git a/packages/session-ui/src/tools/tool-titles.ts b/packages/session-ui/src/tools/tool-titles.ts
 new file mode 100644
-index 0000000000..8842b1c88c
+index 0000000000..41e25cb1d5
 --- /dev/null
 +++ b/packages/session-ui/src/tools/tool-titles.ts
 @@ -0,0 +1,33 @@
@@ -117,7 +117,7 @@ index 0000000000..8842b1c88c
 +  return titles.get(name)?.()
 +}
 +
-+/** A separate tool keeps its own row in every detail preset, never folded into a tool group. */
++/** A separate tool is never folded into a tool group; presets that hide tools still hide it. */
 +export function setToolSeparate(name: string) {
 +  separate.add(name)
 +}
