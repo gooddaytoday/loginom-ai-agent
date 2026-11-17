@@ -1522,6 +1522,16 @@ def bind_source_dir(value, source_dir):
     return value
 
 
+def logreg_kfold_receipts(replies, profile):
+    # Public tool output can omit readback to fit its response budget. Audit
+    # the full native checkpoint from this run as well; never synthesize it.
+    return [o for _, o in replies] + [event['result']
+        for log in profile.rglob('execution-events.jsonl') for _, event in records(log)
+        if event.get('phase') == 'node_checkpoint' and event.get('action_key') == 'node.apply'
+        and event.get('result', {}).get('status') == 'SUCCEEDED'
+        and event['result'].get('configuration', {}).get('readback', {}).get('kind') == 'log_regression']
+
+
 def logreg_normalization_exports(destinations):
     assert len(destinations) == 2, 'LOGREG_NORMALIZATION_TWO_EXPORTS_REQUIRED'
     return (f'{destinations[0]} — итоговый прогноз порта 0 после стандартизации; '
@@ -3408,7 +3418,7 @@ class Runner:
             self.phase('sorting-modes-oracle', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/sorting-modes.mjs',
                 folder / 'expected.json', folder / 'sorting-replies.json', folder / 'sorting-proof.json'], folder, timeout=60)
         if expected.get('logreg_kfold'):
-            write(folder / 'logreg-replies.json', [o for _, o in replies])
+            write(folder / 'logreg-replies.json', logreg_kfold_receipts(replies, profile))
             self.phase('logreg-kfold-evidence', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/logreg-normalization.mjs',
                 folder / 'expected.json', folder / 'logreg-replies.json', folder / 'logreg-kfold-proof.json', 'kfold'], folder, timeout=60)
             self.current['validation'] = 'PASS'

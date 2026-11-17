@@ -33,6 +33,23 @@ assert e['outputs'][0]['column_order']=='exact' and len(e['outputs'][0]['rows'])
  assert.equal(result.status,0,result.stdout+result.stderr);
 });
 
+test('K-fold audit retains full native checkpoint when public output omits readback',()=>{
+ const result=spawnSync('python3',['-B','-c',`import importlib.util,json,tempfile
+from pathlib import Path
+s=importlib.util.spec_from_file_location('r','scripts/node-acceptance/run-check.py');r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+full=dict(status='SUCCEEDED',configuration=dict(readback=dict(kind='log_regression',mode='enter',validation=dict(method='kfold',folds=3,sampling='sequential'))))
+public=dict(status='SUCCEEDED',configuration=dict(readback=dict(kind='log_regression')))
+with tempfile.TemporaryDirectory() as d:
+ p=Path(d)/'execution-events.jsonl'
+ p.write_text(''.join(json.dumps(e)+'\\n' for e in [dict(phase='node_checkpoint',action_key='node.apply',result=full),dict(phase='node_phase_prepared',action_key='node.apply',result=full),dict(phase='node_checkpoint',action_key='other',result=full)]))
+ replies=r.logreg_kfold_receipts([(1,public)],Path(d))
+ assert replies==[public,full]
+ p.unlink()
+ assert r.logreg_kfold_receipts([(1,public)],Path(d))==[public]
+`],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+});
+
 test('owner-approved K-fold CSV permutation preserves exact columns and values; other scenarios retain order',()=>{
  const result=spawnSync('python3',['-B','-c',`import importlib.util,tempfile,csv
 from pathlib import Path
