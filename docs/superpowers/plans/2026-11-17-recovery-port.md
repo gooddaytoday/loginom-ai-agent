@@ -65,17 +65,18 @@
 
 ## S0. Общая диагностика и условия контрольной серии
 
-**Область:** `evals/src/{cli,process-supervisor,profile,profile-archive,diagnostics,analytics-measurements,report}.ts`; при доказанном пробеле — `packages/opencode/src/{cli/cmd/run,session/processor,session/message-v2,session/llm}.ts`, `packages/loginom-runtime/client/lib/execution-journal.mjs`. Подготовка управляемых сбоев — существующий private acceptance путь runtime/Host и его tests. Не менять recovery-поведение обычного запуска.
+**Область:** `evals/src/{cli,process-supervisor,profile,profile-archive,diagnostics,analytics-measurements,report}.ts`; при доказанном пробеле — `packages/opencode/src/{cli/cmd/run,session/processor,session/message-v2,session/llm}.ts`, `packages/loginom-runtime/client/lib/{execution-journal,browser-recovery}.mjs`. Подготовка управляемых сбоев — существующий private acceptance путь runtime/Host и его tests. Не менять recovery-поведение обычного запуска.
 
 Цепочка private control: `packages/loginom-host/src/host.ts` → `supervisor.ts` → `packages/loginom-runtime/src/start-input.mjs` (`validateStartInput`) → `managed-entry.mjs` → `client/lib/bridge.mjs` → `executor.mjs` → `node-apply.mjs`. Нужен узкий private test launcher/Host input для текущего CLI: одни поля supervisor через продуктовый путь сейчас не проходят. Модель не управляет этой настройкой.
 
 **Вход/выход:** текущие events, DB/history, tool-output и native journal → индекс измерений и recovery-эпизодов по спецификации. B — принятый SHA после общей продуктовой диагностики. Если продуктовых изменений не потребовалось, это исходное поведение `loginom` с документацией.
 
 - [ ] Составить карту «нужный факт → существующий файл/поле → связь». Проверить обычный успех, обычный отказ, start без действий, recovery с действиями, unknown/stop и незавершённую попытку. Не использовать сокращённый `run.json` как единственную историю.
-- [ ] Через тест существующего parser/audit воспроизвести потерю конкретного нужного факта. Добавлять только недостающую связь/событие, сохраняя redaction. Для полного tool output проверить доступность архива после truncation в UI; для изображения — связь tool attachment с исходящим model request по ID/hash.
+- [ ] Через тест существующего parser/audit воспроизвести потерю конкретного нужного факта. Для полного browser output проверить ответ с суммарным текстом **больше 46000 байт**: `browserCall` уже вызывает `boundText` внутри runtime, а `describeContent` пишет в журнал только тип/размер текста. Сначала найти пригодный существующий источник полного ответа; если его нет, сохранять его в существующий закрытый архив до runtime-обрезки с действующим redaction. Проверить сохранность хвоста, отсутствие секретов и прежний лимит модельного ответа. Позднего `tool-output` после contributor недостаточно.
+- [ ] Для изображения проверить связь tool attachment с исходящим model request по ID/hash. Учитывать, что `describeContent.sha256` — hash base64-строки, а `bytes` — длина декодированных байтов; не сравнивать первый напрямую с hash PNG. Тест должен отличать разные представления одного изображения от реально отсутствующей доставки.
 - [ ] Адаптировать `recoveryToolsCovered` / `auditMeasurement` для обычного corpus campaign, не переносить ограничения специализированного analytics runner. Индексировать все попытки, включая error до первого assistant message. Знаменатель — 876 measurement keys; retries вложены в соответствующий ключ.
-- [ ] Проверить анализатор на существующих небольших fixtures: обычное построение без recovery; start без browser action; подтверждённое восстановление; missing journal/image; unknown cleanup. Неполный архив должен давать явный evidence gap, а не «recovery не было» или PASS.
-- [ ] Сохранить раздельно метрики `requested`, `started`, `browser_used`, `verified`, `scenario_passed`. Счётчик донора «успех после start» можно получить из индекса; не вводить второй источник истины.
+- [ ] Проверить анализатор на fixtures: обычное построение без recovery; отказ start до browser phase; start без действий; подтверждённое восстановление; полностью записанные unknown/transport failure/`retained_uncertain`; реальная потеря журнала/изображения; `continuable` при незавершённой исходной операции. `recoveryToolsCovered` отвергает часть полных неуспешных цепочек — его boolean нельзя использовать как общую полноту evidence. Gaps определяются по отсутствующим обязательным фактам достигнутой фазы, а не по неуспеху операции.
+- [ ] Сохранить раздельно `requested`, `started`, `browser_used`, фактический verification status (`continuable/completed/unresolved`), состояние исходной операции, качество артефакта, CLI status/exit и cleanup. Если нужен агрегат `verified`, явно определить, какие status он включает; `continuable` не считать завершением исходной операции. Fixture `exit=1` + пригодный `score=100/pass=true` сохраняет обе оси без изменения judge/CLI policy. Счётчик донора «успех после start» получать из индекса, без второго источника истины.
 - [ ] До фиксации B адаптировать донорские private `phase_stop`/`release_refusal` для P1–P4 через эту цепочку. `phase_stop` срабатывает после фактического действия до durable phase receipt: configure/open, execute, exports.text. Для P5 нужна отдельная узкая точка «Save выполнен, подтверждение потеряно» перед receipt/ACK; node hooks её не покрывают. Привязать control к назначенной acceptance попытке, операции/фазе и ограниченному счётчику; журналировать каждое срабатывание. Не создавать общий fault framework, не публиковать настройку модели и не менять обычные повторы. В штатном запуске без private acceptance настройки поведение полностью прежнее. Сбой release/close в операторе не глотать.
 - [ ] Проверить fixtures всю проводку CLI → Host → managed runtime, срабатывание ровно в назначенной фазе, неверное назначение и отключение по умолчанию. До B живые/model пробы не нужны; они остаются в S7. Owning tests: Host `browser-recovery-capability`, `managed-work-entry`, при IPC-изменениях `node-host`; runtime `start-input`; client `node-apply`, `node-apply-runtime`, `browser-recovery-save-bridge`.
 - [ ] Выполнить проверки ниже. Провести review, зафиксировать B и версию формата отчёта. Уточнить disk estimate после S7, до допуска к 876.
@@ -83,14 +84,14 @@
 Из `evals/`:
 
 ```sh
-bun --no-env-file test --isolate --timeout 30000 test/output-redaction.test.ts test/cli.test.ts test/diagnostics.test.ts test/profile.test.ts test/profile-archive.test.ts test/analytics-measurements.test.ts
+bun --no-env-file test --isolate --timeout 30000 test/output-redaction.test.ts test/cli.test.ts test/diagnostics.test.ts test/profile.test.ts test/profile-archive.test.ts test/analytics-measurements.test.ts test/report.test.ts
 bun typecheck
 ```
 
 Для private control: из `packages/loginom-runtime/`, затем из `packages/loginom-host/` соответственно:
 
 ```sh
-"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/start-input.test.mjs client/test/node-apply.test.mjs client/test/node-apply-runtime.test.mjs client/test/browser-recovery-save-bridge.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/start-input.test.mjs client/test/node-apply.test.mjs client/test/node-apply-runtime.test.mjs client/test/browser-recovery.test.mjs client/test/browser-recovery-save-bridge.test.mjs
 ```
 
 ```sh
@@ -149,7 +150,7 @@ bun typecheck
 - [ ] По одному воспроизвести: одинаковый отказ той же фазы/узла после завершённого обычного восстановления; execution unknown после подтверждённого release; неоднозначный Save после inspect. Уточнять основание по настоящим receipts, не только тексту ошибки.
 - [ ] Минимально адаптировать классификацию и историю в executor. Не добавлять отдельный хранитель состояния поверх executor/runtime.
 - [ ] Отрицательные тесты: user cancel, неизвестный transport, upload, уже settled effect, новая pending-операция и поздний ответ старой. Предложение recovery не должно переживать смену целевой операции.
-- [ ] Сохранить все текущие page/tab guards и безопасное повторное наблюдение после no-effect refusal. Review и commit `fix(runtime): qualify recovery from operation evidence`.
+- [ ] Сохранить все текущие page/tab guards и пару проверок «подтверждённый no-effect refusal → свежее наблюдение → допустимое продолжение» / «неизвестный эффект → запрет слепого повтора». Исторический пример — E3 ниже; `Ref not found` и `page.ok` сами по себе не доказывают no-effect. Review и commit `fix(runtime): qualify recovery from operation evidence`.
 
 Из `packages/loginom-runtime/client/`:
 
@@ -161,7 +162,7 @@ bun typecheck
 
 ## S4. Проверка результата и NO_BASELINE
 
-**Файлы:** `client/lib/executor.mjs`, `node-execution-procedure.mjs`, `node-procedure.mjs`, `node-read-contract.mjs`, `collapse-native-output.mjs`, Save-адаптер в `bridge.mjs`; тесты `browser-recovery-executor.test.mjs`, `node-read.test.mjs`, `owned-native-preview.test.mjs`, `browser-recovery-bridge.test.mjs`, `browser-recovery-save-bridge.test.mjs`. Пути внутри `packages/loginom-runtime`.
+**Файлы:** `client/lib/executor.mjs`, `node-execution-procedure.mjs`, `node-procedure.mjs`, `node-read-contract.mjs`, `collapse-native-output.mjs`, Save-адаптер в `bridge.mjs`; дополнительно проверить границы `node-target.mjs`, не менять его без обнаруженной необходимости. Тесты `browser-recovery-executor.test.mjs`, `node-read.test.mjs`, `owned-native-preview.test.mjs`, `browser-recovery-bridge.test.mjs`, `browser-recovery-save-bridge.test.mjs`, `node-target.test.mjs`, `node-early-release.test.mjs`. Пути внутри `packages/loginom-runtime`.
 
 **Интерфейс:** текущий `verifyBrowserRecovery` и публичный finish; проверка остаётся операцией runtime с receipt/ACK. Настройки, сообщённые моделью, не подменяют подтверждённое исполнение или правильность значений.
 
@@ -169,13 +170,15 @@ bun typecheck
 - [ ] RED/GREEN для NO_BASELINE: configure/open отказал до baseline, агент исправил существующий узел. Проверка сначала устанавливает ownership и отсутствие незавершённого жеста; затем получает свежую исходную точку перед собственной проверочной execution, без повторного configure. Если нельзя исключить прошлый неизвестный Execute или привязать узел к заданию, оставить неподтверждённый результат и явный следующий безопасный шаг.
 - [ ] Отдельный тест доказывает, что этот путь не возвращает агента к сломанному configure и не выполняет второй неизвестный Execute. Не обещать отсутствие будущего свежего запуска в `dock_node_read`: его текущий контракт требует исполнения.
 - [ ] Проверочная операция сохраняет свой receipt до освобождения. Тестировать сбой записи receipt, поздний ответ и точный durable ACK; отсутствие/несовпадение ACK оставляет ownership неопределённым.
+- [ ] Отдельно от NO_BASELINE проверить ранний target effect: `Original target effect remains unresolved` и `Node target journal acknowledgement differs` из E4. Тихий видимый граф не заменяет receipt/ACK. Fixtures `node-target` / `node-early-release` проверяют exact ACK, pending guard, владение и сопоставление частичного узла. Не исправлять это повторным созданием или ослаблением проверки; если донор не решает случай, записать предел переноса.
+- [ ] Проверить соседнюю регрессию E5: допустимое продолжение после release использует нужный существующий узел, сохраняет связи и не создаёт второй export, когда задача требует один выход. Это проверка продолжения, а не основание переделывать все node handlers или приписывать исторические FAIL browser recovery.
 - [ ] Сохранить идентичность исходного export/Save, включая защиту от подмены существующего файла. Схему/настройки/значения результата отражать отдельными доказательствами.
 - [ ] Если принятому пути нужен новый общий контракт, сначала доказать ограничение текущего и согласовать изменение по правилам проекта; не вводить донорский протокол целиком. Review и commit `feat(runtime): verify recovered execution`.
 
 Из `packages/loginom-runtime/client/`:
 
 ```sh
-"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/browser-recovery-executor.test.mjs test/node-read.test.mjs test/owned-native-preview.test.mjs test/browser-recovery-bridge.test.mjs test/browser-recovery-save-bridge.test.mjs test/browser-recovery.test.mjs
+"$LOGINOM_AI_AGENT_TEST_NODE" --test --test-concurrency=1 test/browser-recovery-executor.test.mjs test/node-read.test.mjs test/owned-native-preview.test.mjs test/browser-recovery-bridge.test.mjs test/browser-recovery-save-bridge.test.mjs test/browser-recovery.test.mjs test/node-target.test.mjs test/node-early-release.test.mjs
 ```
 
 **Готово:** успех подтверждается новым собственным исполнением и нужными схемами; NO_BASELINE не создаёт цикл; uncertain не превращается в completed.
@@ -215,7 +218,7 @@ bun typecheck
 - [ ] RED/GREEN: release во время handoff, browser call и verification; поздний ответ не возвращает tools/lease. Уведомление release само по себе не доказывает cleanup.
 - [ ] Следующий цикл: queued invocation старой попытки после release или нового start отклоняется. Привязать admission к попытке и generation, используя существующее владение.
 - [ ] Следующий цикл: finish входит в общий бюджет шагов. Сохранить 30 вызовов и действующий временной предел `loginom`; timeout verification не должен продлевать lease. Не переносить незаметно донорские «10 минут только browser + отдельные 4 минуты verification» как больший общий бюджет.
-- [ ] Обязательные тесты порядка: неверная страница отсекается до handoff/первого жеста; закрытая подготовленная вкладка отсекается даже при том же аккаунте и DOM; no-effect refusal требует наблюдения, unknown gesture не повторяется.
+- [ ] Обязательные тесты порядка: неверная страница отсекается до handoff/первого жеста; закрытая подготовленная вкладка отсекается даже при том же аккаунте и DOM; no-effect refusal требует наблюдения и сохраняет допустимое продолжение (E3), unknown gesture не повторяется. Любой `isError` не становится автоматически terminal.
 - [ ] Согласовать bundled skill с фактическим API: после execution unknown сначала проверка/finish, не новый эффект. Проверить inventory/digest по `packages/product/AGENTS.md`, без внешнего skill fallback.
 - [ ] Проверить весь затронутый набор, review и commit `fix(runtime): own recovery release and budgets`. Зафиксировать C.
 
@@ -261,10 +264,11 @@ LOGINOM_AI_AGENT_CHANNEL=prod LOGINOM_AI_AGENT_BROWSER_RECOVERY=1 bun script/bui
 | P1 | Отказ configure/open до baseline: восстановление существующего узла и проверка без возврата в сломанный configure; при браузерном доступе — screenshot и доказательство его отправки модели |
 | P2 | Повтор одинакового отказа после штатного восстановления: правильный допуск, действия и продолжение сценария |
 | P3 | Неоднозначное исполнение: сначала inspect/finish, без слепого повторного эффекта; completed либо честный unknown по фактам |
-| P4 | Задержка готовности FileStore/отказ сценарного экспорта: bounded ожидание или recovery с подтверждением нужного файла |
+| P4 | Задержка готовности FileStore/отказ сценарного экспорта: bounded ожидание или recovery с продолжением до требуемого файла/сохранённого результата; один `finish=continuable` не завершает пробу |
 | P5 | Неоднозначный Save: исходная цель, собственный receipt и проверка сохранённого пакета |
 
 - [ ] Инъецировать отказ существующим acceptance механизмом в конкретный шаг, записать точку/тип в журнал и проверить отключение вне этой серии. Для каждого browser episode восстановить всю цепочку из спецификации. Различия B/C могут быть результатом переноса; отказ B не маскировать требованием «все пробы PASS».
+- [ ] В P1/P2 использовать реальный DOM выбранного мастера; объёмный Preview полезен, если подходит к сценарию, без расширения серии. Искусственная роль `button` не доказывает пригодность реального generic-контрола. В P4 проверить также нужные узлы/связи и отсутствие лишнего выхода. Если выбранная существующая приёмка включает cold readback, сохранить его отдельный исход и cleanup (E2); новый cold-прогон для всех 876 не вводить.
 - [ ] Отрицательные проверки вкладки, отмены, unknown gesture, бюджета и release выполнить runtime/Host fixtures. Если настоящая browser integration выключена переменной окружения, SKIP явно записать, не считать PASS. Отдельно проверить installed tool catalog и image delivery: локальный fake этого не доказывает.
 - [ ] Проверить полноту архивов и подтверждённый cleanup после каждой попытки. Ошибки legacy release/close должны остаться видимыми. Если доказательств не хватает, исправить соответствующий этап и повторить только затронутые пробы с сохранением предыдущих результатов.
 - [ ] По размеру этих архивов зарезервировать место под обе кампании и разрешённые технические попытки, сохранить исходный free space/резерв и действующий disk guard. Не удалять чужие архивы ради запуска.
@@ -311,6 +315,7 @@ sudo systemctl enable --now "loginom-eval-campaign@$campaign_id.service"
 - [ ] Сверить 876 measurement keys с обоими ledgers, присоединить все их attempts. Отдельно показать missing, invalid, technical и evidence gaps. Не превращать отсутствие данных в FAIL качества или нулевую стоимость.
 - [ ] Для каждого из 146 кейсов сопоставить три раунда: PASS/FAIL, score/oracle, время, tokens/cost, technical attempts. Показать улучшения и ухудшения с исходными значениями; не делать причинный вывод по одному удачному раунду.
 - [ ] Разобрать каждое построение по timeline и результату, включая сценарии без recovery. Для каждого recovery episode связать причину, native recovery, start, действия, проверку, возврат/stop, итог сценария и cleanup. Сохранить доказательства по конкретным tool calls и operation IDs.
+- [ ] Показать независимо evidence completeness, verification status, исходную операцию, artifact verdict, CLI status/exit и cleanup. Полный unknown не помечать отсутствующим архивом; `continuable` не считать completed; `pass=true/exit=1` не исправлять автоматически. По E6 проверить конкретные источники CLI failure: `run-outcome.ts` отдельно учитывает connection failure `loginom_dock_prepare`, а остальные `loginom_*` пропускает. Без полной цепочки причину оставить неустановленной.
 - [ ] Для всех ухудшений и неподтверждённых recovery указать первый неправильный переход либо конкретный отсутствующий факт. Отличать сбой скрипта, решения модели, runtime verification, инфраструктуры, судьи и evidence capture.
 - [ ] Дополнительно перечитать LAB-1747, проверить фактическую полноту архивов и сравнить только совпадающие валидные ключи. Вынести различия xhigh, source/harness и времени в отдельную таблицу; исторические результаты не входят в основной знаменатель.
 - [ ] По S1–S6 дать решение «оставить / исправить / исключить», доказательство пользы, обнаруженные регрессии и ограничения. Не требовать произвольного процента прироста; не считать counter start доказанным восстановлением.
@@ -318,10 +323,30 @@ sudo systemctl enable --now "loginom-eval-campaign@$campaign_id.service"
 
 **Готово:** на любой вывод можно перейти к конкретному построению/эпизоду; полнота обычной серии и controlled series указана раздельно; понятно, какие изменения стоит включить в `loginom` и почему.
 
+## Свидетельства для регрессионных проверок
+
+Уточнения от 17 ноября переданы из отдельного исследования по поручению владельца. Там повторно прочитаны два архива Multica и три recovery-эпизода LAB-1747. При этой документационной правке архивы заново не скачивались; границы runtime-обрезки, hash, audit и CLI/quality сверены с кодом `dc829bc140`. Ниже — адресация evidence для исполнителей, не утверждение о текущих багах или новом результате eval. Приватные адреса и сырые логи остаются вне Git.
+
+| ID | Источник и наблюдение | Применение |
+| --- | --- | --- |
+| E1 | `browser-recovery.mjs`: `browserCall` → `boundText`, textBytes=46000; `describeContent` содержит только type/bytes текста и hash base64 для image. Другие внутренние browser-логи полностью не обследованы | S0: проверить полный ответ до обрезки и корректное связывание изображения |
+| E2 | LAB-112, `308-full-logs.tar.xz`, attachment `01a15f0a-be23-7d40-be84-db9f6a57bc94`, SHA256 `c49d66c27848e845ebae0fc9e75bbcd31a7a44d9e44e1ca8f7284d4a9b6333d3`, 745888 байт. `evidence/candidate-s8-rename-follow-1-worker-1792595207383798899/events.jsonl`:54 start, :66 continuable; исходная операция FAILED, настройки/исполнение/export unverified; cold readback FAIL, cleanup BLOCKED | S0/S7/S10: отдельные исходы. Это не ложный completed |
+| E3 | LAB-1747, batch70, `run20261117-115207-ae149d3f13-eRrp2p`, `retail-customer-readiness-detailed/1/events.jsonl`:119 start, :149 ref e41 not found, :154 find, :159 click, :164 snapshot, :169 click, :174 continuable; затем новая операция с существующим узлом. Артефакт score100/PASS. Ранее сопоставлены native records :1148 is_error/transport_error=null/page.ok, :1153 attested, :1159 receipt, :1161 continuable | S3/S6: сохранить безопасное наблюдение и продолжение; не обобщать no-effect по одному тексту ошибки |
+| E4 | LAB-1747, batch49, `run20261117-054708-ae149d3f13-NPdL9r`, `retail-customer-readiness-business/1/events.jsonl`:140 start, :150 unresolved target effect, :160 stop. LAB-997, `analytic-business/wholesale-basket-concentration-business/2/events.jsonl`:100 start, :115 target ACK differs, :120 stop | S4: target-effect/ACK тупик отличен от NO_BASELINE; не пересоздавать частичный узел |
+| E5 | LAB-997, `district-weighted-indicators/2` и `source-device-conversion/3`: обычное продолжение после отказа связи создавало второй export; нарушение одного выхода, score89/FAIL. Вызова browser recovery в этих эпизодах нет | S4/S7: соседняя регрессия структуры графа, без вывода о причине в browser recovery |
+| E6 | LAB-1747: `service-digital-processing`, batch37/`run20261117-012747-ae149d3f13-xYldsB` — exit1, CLI_TOOL_FAILED, score100/PASS, cleanup confirmed; есть два webfetch HTTP404 (:49/:54). В E3 тоже exit1 при score100/PASS, но причина exit1 не установлена. `report.ts`/`run.ts` допускают оценку пригодного артефакта после failed CLI | S0/S10: независимые оси и доказательство причин вместо предположения |
+
+Архив E4/E5: LAB-997, `lab997-fail-evidence.tar.gz`, attachment `01a1b64c-52da-73de-830d-937ae9b91ce5`, SHA256 `919fa4e57ee251b4bd7b93a225545f0fb93560e5bf41086c573e179088e3b6d7`, 3703257 байт. В переданном исследовании hash совпал с опубликованным.
+
+Для выбора DOM в P1/P2 дополнительный ориентир — LAB-1702 (Calculator Preview/UI_SCAN_LIMIT) и `docs/superpowers/plans/2026-10-28-p50-product-recovery-fix.md:74` про generic `btnClose`. Логи LAB-1702 в повторном исследовании не открывались; это более слабое свидетельство, не доказательство текущей регрессии.
+
+Ограничения: найденные 3 recovery-эпизода среди 393 сырых Terra-попыток и 6 среди 477 LAB-901 не являются оценкой надёжности или сопоставимыми знаменателями. В трёх проверенных Terra-эпизодах screenshot не использовался — image delivery остаётся задачей S7. Не все архивы/комментарии прочитаны; совпадения времени без traces не доказывают причины.
+
 ## Checkpoint
 
 - 2026-11-17: согласованы перенос, отдельные карточки, полные логи и 876 измерений high/high; LAB-1747 — дополнительное сравнение.
 - `recovery-port` создана от `ae89c43b57`; согласованная спецификация прошла независимое ревью.
 - План прошёл независимое ревью runtime/agent и evals; устранены пробелы producer metadata, общих acceptance-точек и получения frozen corpus.
+- 2026-11-17: уточнены pre-truncation evidence, независимые оси исходов и target/graph регрессии по переданному исследованию; независимое ревью — GO. 11 этапов, 12 предварительных попыток и 876 основных измерений сохранены.
 - S0–S10 ещё не выполнялись. Продуктовый код и eval-результаты этой работой не изменены.
 - Следующий шаг: по поручению создать карточку S0 с SHA итогового коммита этого плана и владельцем записи в ветку.
