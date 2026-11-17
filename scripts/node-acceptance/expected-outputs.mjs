@@ -537,7 +537,8 @@ export function auditRestQueryVariables(events,initial,final){
  need(JSON.stringify(a.query_parameters.map(p=>p.name))==='["limit","skip"]'&&(!b||JSON.stringify(a.query_parameters)===JSON.stringify(b.query_parameters)),'REST_QUERY_BINDINGS_CHANGED');
  for(const e of requests.filter(e=>e.index>first.index&&e.index<second.index)){
   const r=e.request;if(r.target.type!=='integration.rest_request'&&!same(r.target.ref,first.result.node))continue;
-  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'&&['source_operation_id','schemas'].includes(k)),'REST_QUERY_RECONFIGURED');
+  need(r.target.kind==='existing'&&!r.mappings?.length&&Object.keys(r.parameters??{}).every(k=>r.mode==='read_existing_output'
+   &&(['source_operation_id','schemas'].includes(k)||k==='execution_policy'&&r.parameters[k]==='execute'&&r.finish==='execute')),'REST_QUERY_RECONFIGURED');
   if(Object.hasOwn(r.parameters??{},'schemas')){
    const source=checkpoints.findLast(c=>c.index<e.index&&c.result.operation_id===r.parameters.source_operation_id&&same(c.result.node,r.target.ref));
    const schemas=r.parameters.schemas,ports=r.read?.ports,outputs=source?.result.output?.ports;

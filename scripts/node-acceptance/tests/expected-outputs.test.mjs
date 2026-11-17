@@ -338,6 +338,16 @@ for(const ports of [[0],[0,1],[1,0]])test('REST query audit accepts retained rea
  const {events,initial,final}=restQuerySchemaRead(ports);
  assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
 });
+test('REST query audit accepts explicit execute policy from the current node read contract',()=>{
+ const {events,initial,final}=restQuerySchemaRead();
+ events[10].request.parameters.execution_policy='execute';
+ assert.equal(auditRestQueryVariables(events,initial,final).status,'PASS');
+});
+for(const policy of ['existing','unknown',null])test('REST query audit rejects non-executing read policy '+policy,()=>{
+ const {events,initial,final}=restQuerySchemaRead();
+ events[10].request.parameters.execution_policy=policy;
+ assert.throws(()=>auditRestQueryVariables(events,initial,final),/REST_QUERY_RECONFIGURED/);
+});
 for(const fault of ['missing source','future source','foreign source','failed source','unclean source','not executed source',
  'wrong name','wrong type','wrong label','wrong data kind','wrong index','reordered fields','duplicate port','missing port','unknown port','empty schemas',
  'null schema','extra schema property','wrong finish','configuration mode','missing read ports','ambiguous source port','bindings','connection','query','mappings'])

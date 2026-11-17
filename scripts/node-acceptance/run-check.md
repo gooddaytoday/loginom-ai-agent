@@ -7,6 +7,8 @@ expectation and actual downloaded CSV. Oracle, fixture and expected stay private
 `schemas` are allowed only when every requested port exactly matches the output
 of the earlier successful, clean, completed source operation on the same REST.
 Connection/query/mapping edits remain `REST_QUERY_RECONFIGURED`.
+The current read contract's explicit `execution_policy:"execute"` is accepted
+only with `finish:"execute"`; it does not authorize configuration changes.
 The query-path audit accepts both integer → string conversion through a Calculator
 and direct integer columns from `variables.to_table` bound to `query_parameters`;
 the REST handler performs URL encoding for the direct path. Integer source types,
