@@ -389,7 +389,8 @@ function chatsMark(list) {
 }
 // Status next to a conversation: the agent is working or waits for the user.
 function sessionMark(item) {
-  if (item.phase === 'running') return '<i class="conn-dot busy" title="Агент работает"></i><span class="sr-only">— агент работает</span>'
+  if (['running','retrying','writing'].includes(item.phase)) return '<i class="conn-dot busy" title="Агент работает"></i><span class="sr-only">— агент работает</span>'
+  if (item.phase === 'failed') return '<i class="conn-dot warn" title="Шаг не выполнен — нужна ваша помощь"></i><span class="sr-only">— шаг не выполнен</span>'
   if (['permission','question','plan','connect'].includes(item.phase) || item.phase === 'proposed') return '<i class="conn-dot warn" title="Ждёт вашего ответа"></i><span class="sr-only">— ждёт вашего ответа</span>'
   return ''
 }
@@ -435,7 +436,7 @@ function composer() {
     ${state.editTurn && state.editTurn.session === state.session && state.page === 'chat' ? `<div class="edit-banner">${icon('compose',15)}<span>Изменяете сообщение — ответы после него заменятся новыми</span><button type="button" class="link-btn" data-action="cancel-edit">Отмена</button></div>` : ''}
     ${pkg ? packageContext(pkg) : ''}
     ${state.draftFiles.length ? `<div class="attachment-list">${state.draftFiles.map((file,i) => `<span>${icon('file',14)} ${esc(file)} <button type="button" class="small-icon" aria-label="Убрать ${esc(file)}" data-remove-file="${i}">${icon('close',13)}</button></span>`).join('')}</div>` : ''}
-    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' && state.editTurn?.session === state.session ? 'Изменённое сообщение' : state.page === 'chat' && currentItem()?.phase === 'running' ? 'Поправка агенту — учтёт после текущего шага' : state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
+    <textarea id="prompt" aria-label="Сообщение агенту" placeholder="${state.page === 'chat' && state.editTurn?.session === state.session ? 'Изменённое сообщение' : state.page === 'chat' && ['running','retrying'].includes(currentItem()?.phase) ? 'Поправка агенту — учтёт после текущего шага' : state.page === 'chat' ? 'Уточните задачу или задайте вопрос' : state.page === 'project' || projectById(state.project) ? esc(`Новый разговор в проекте «${projectById(state.page === 'project' ? state.projectView : state.project)?.name}»`) : esc(placeholder)}" rows="2">${esc(state.draft)}</textarea>
     <div class="composer-toolbar">
       <div class="composer-options">
         <button class="icon-btn neutral plus-btn" type="button" aria-label="Добавить: пакет, файл, каталог" title="Пакет из Loginom, файл с компьютера, каталог" data-overlay="plus">${icon('plus',18)}</button>
@@ -445,7 +446,7 @@ function composer() {
       <div class="composer-options">
         ${loginomChip()}
         <button class="filter-btn composer-model${modelName ? '' : ' lgm-chip off'}" type="button" data-settings="models" title="Модель">${icon('cpu',15)} <span class="filter-label">${esc(modelName || 'Выберите модель')}</span> ${icon('down',12)}</button>
-        ${state.page === 'chat' && currentItem()?.phase === 'running' ? `<button class="stop-btn" type="button" data-action="stop" title="Остановить агента (Esc)">${icon('stop',14)}<span>Остановить</span></button>` : ''}
+        ${state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase) ? `<button class="stop-btn" type="button" data-action="stop" title="Остановить агента (Esc)">${icon('stop',14)}<span>Остановить</span></button>` : ''}
         <button class="send-btn" type="submit" ${state.draft.trim() ? '' : 'disabled'} aria-label="Отправить сообщение" title="Отправить сообщение">${icon('up',20)}</button>
       </div>
     </div>
@@ -626,20 +627,20 @@ function projectPage() {
 // model, so the steps of each kind of task are scripted; a real run gets them from OpenCode tool calls.
 const scripts = {
   abc:{plan:['Проверить данные','Собрать сценарий','Проверить и сохранить'], steps:[
-    {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов: дата, товар, регион, количество, цена, выручка', time:4},
-    {plan:1, icon:'flow', live:'Собираю сценарий в Loginom', done:'Собрал сценарий из 4 узлов', short:'собрал сценарий из 4 узлов', detail:'Импорт CSV → Группировка по товару → Сортировка по выручке → ABC-классификация (80 / 15 / 5 %)', time:21},
+    {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов: дата, товар, регион, количество, цена, выручка', time:4, think:[3,'Для ABC-анализа нужна выручка по товарам. Сначала посмотрю, какие столбцы есть в таблице.']},
+    {plan:1, think:[5,'Выручка есть по строкам продаж. Сгруппирую по товару, отсортирую по убыванию и поделю по накопленной доле: обычные пороги 80 / 15 / 5 %.'], icon:'flow', live:'Собираю сценарий в Loginom', fail:'собрать сценарий в Loginom', done:'Собрал сценарий из 4 узлов', short:'собрал сценарий из 4 узлов', detail:'Импорт CSV → Группировка по товару → Сортировка по выручке → ABC-классификация (80 / 15 / 5 %)', time:21},
     {plan:2, icon:'play', live:'Запускаю сценарий', done:'Запустил сценарий на демонстрационных данных', short:'проверил на данных', detail:'120 товаров: A — 15, B — 28, C — 77 · выполнено за 1,2 с', time:9},
     {plan:2, icon:'download', ask:'permission', live:'Сохраняю пакет в Loginom', done:'Сохранил «ABC-анализ.lgp» в /user', short:'сохранил «ABC-анализ.lgp»', detail:'Новый пакет; другие пакеты не изменены', time:3},
   ], permission:{title:'Сохранить новый пакет в Loginom?', text:'Агент создаст пакет «ABC-анализ.lgp» в вашей папке Loginom. Другие пакеты не изменятся.', args:[['Пакет','ABC-анализ.lgp'],['Папка','/user'],['Изменится','появится новый пакет']], trace:'сохранить «ABC-анализ.lgp» в /user', scope:'сохранять новые пакеты в /user', denied:'Хорошо, сохранять не стал. Сценарий собран и проверен — он остался в этом разговоре. Скажите, если сохранить в другую папку.'}},
   quality:{plan:['Прочитать данные','Найти пропуски и дубликаты','Составить отчёт'], steps:[
     {plan:0, icon:'database', live:'Читаю таблицу «sales-demo.csv»', done:'Прочитал таблицу «sales-demo.csv»', short:'прочитал таблицу', detail:'2 400 строк, 6 столбцов', time:3},
     {plan:1, icon:'shield', live:'Ищу пропуски', done:'Нашёл 12 пропусков в 2 столбцах', short:'нашёл 12 пропусков', detail:'регион — 9, цена — 3', time:6},
-    {plan:1, icon:'shield', ask:'question', live:'Ищу дубликаты', done:'Нашёл 3 дубликата', short:'нашёл 3 дубликата', detail:'Правило: {answer}', time:5},
+    {plan:1, think:[4,'Дубликатом можно считать и полную копию строки, и повтор продажи с другой ценой. От этого зависит результат — лучше спросить.'], icon:'shield', ask:'question', live:'Ищу дубликаты', done:'Нашёл 3 дубликата', short:'нашёл 3 дубликата', detail:'Правило: {answer}', time:5},
     {plan:2, icon:'file', live:'Составляю отчёт', done:'Составил отчёт «Качество выгрузки.html»', short:'составил отчёт', detail:'В папке проекта', time:4},
   ], question:{text:'Какие строки считать дубликатами?', options:[['Полное совпадение строки','Все столбцы одинаковые'],['Совпадение товара и даты','Одна продажа записана дважды, например с разной ценой'],['Совпадение номера документа','Если в выгрузке есть номер документа']]}},
   refactor:{plan:['Открыть пакет','Проверить узлы','Сохранить улучшенную копию'], steps:[
     {plan:0, icon:'flow', live:'Открываю «Продажи.lgp»', done:'Открыл «Продажи.lgp» только для чтения', short:'открыл пакет', time:2},
-    {plan:1, icon:'layers', live:'Проверяю узлы', done:'Проверил 12 узлов и 3 подмодели', short:'проверил 12 узлов', detail:'Повтор фильтра в узлах 04 и 08; неясное имя у узла 14', time:14},
+    {plan:1, think:[6,'Фильтр по дате повторяется в двух ветках — его можно вынести до разветвления. Узел 14 назван «Узел14», по нему не понять, что он считает.'], icon:'layers', live:'Проверяю узлы', done:'Проверил 12 узлов и 3 подмодели', short:'проверил 12 узлов', detail:'Повтор фильтра в узлах 04 и 08; неясное имя у узла 14', time:14},
     {plan:2, icon:'download', ask:'permission', live:'Сохраняю улучшенную копию', done:'Сохранил копию «Продажи — улучшено.lgp»', short:'сохранил улучшенную копию', detail:'Исходный пакет не изменён', time:6},
   ], permission:{title:'Создать улучшенную копию пакета?', text:'Агент сохранит копию «Продажи — улучшено.lgp» рядом с исходным пакетом. Исходный пакет не изменится.', args:[['Копия','Продажи — улучшено.lgp'],['Папка','/user'],['Исходный пакет','не меняется']], trace:'создать копию «Продажи — улучшено.lgp»', scope:'создавать копии пакетов в /user', denied:'Хорошо, копию не создавал. Что можно улучшить — в шагах выше: повтор фильтра в узлах 04 и 08 и неясное имя узла 14.'}},
   document:{plan:['Прочитать пакет','Описать узлы','Собрать документ'], steps:[
@@ -662,7 +663,7 @@ function stepText(text, turn) {
   return text.replace('{pkg}', pkg).replace('{doc}', pkg.replace(/\.lgp$/i,'') + ' — описание.md').replace('{answer}', turn.answer || '')
 }
 function turnTime(turn) {
-  const seconds = scriptOf(turn).steps.slice(0, turn.step).reduce((sum, step) => sum + step.time, 0)
+  const seconds = scriptOf(turn).steps.slice(0, turn.step).reduce((sum, step) => sum + step.time + (step.think?.[0] || 0), 0) + (turn.errors?.length || 0) * 33
   return seconds >= 60 ? `${Math.floor(seconds / 60)} мин ${seconds % 60} с` : `${seconds} с`
 }
 // A finished seed or history turn: every step done, the user's answers filled in as they would have been.
@@ -678,12 +679,7 @@ function completeTurn(turn) {
 function runSteps(item) {
   clearTimeout(item.timer)
   const script = scriptOf(item)
-  if (item.step >= script.steps.length) {
-    item.phase = 'done'
-    render()
-    if (state.session !== item.id) toast(`Готово: «${item.title}»`)
-    return
-  }
+  if (item.step >= script.steps.length) return writeAnswer(item, 'done')
   const step = script.steps[item.step]
   const asked = (item.cleared || []).includes(item.step)
   if (step.ask === 'permission' && !asked && (item.allowed || []).includes(script.permission.scope)) {
@@ -704,16 +700,60 @@ function runSteps(item) {
   render()
   item.timer = setTimeout(() => {
     if (item.phase !== 'running') return
+    if (item.failAt === item.step) return stepFailed(item)
     item.step++
     runSteps(item)
   }, 750)
 }
-function startRun(item) {
-  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:''})
-  if (item.kind === 'chat') {
-    item.phase = 'answer'
-    return render()
+// The demo «Сбой Loginom» makes the step that works in Loginom fail twice; «Повторить шаг» then succeeds.
+function stepFailed(item) {
+  item.errors = [...(item.errors || []), {at:item.step, attempt:(item.errors || []).filter(entry => entry.at === item.step).length + 1}]
+  if (item.errors.filter(entry => entry.at === item.step).length < 2) {
+    item.phase = 'retrying'
+    item.retryIn = 3
+    const tick = () => {
+      if (item.phase !== 'retrying') return
+      if (--item.retryIn > 0) {
+        render()
+        item.timer = setTimeout(tick, 1000)
+        return
+      }
+      runSteps(item)
+    }
+    render()
+    item.timer = setTimeout(tick, 1000)
+    return
   }
+  item.phase = 'failed'
+  render()
+  if (state.session !== item.id || state.page !== 'chat') toast(`«${item.title}»: шаг не выполнен — нужна ваша помощь`, 'alert')
+}
+// The answer is written out as it comes, then the result card appears (a real model streams its text).
+function writeAnswer(item, finalPhase) {
+  clearInterval(item.writer)
+  const box = document.createElement('div')
+  box.innerHTML = result(item)
+  const full = (box.querySelector('h2') ? box.querySelector('h2').textContent + '\n' : '') + (box.querySelector('p')?.textContent || '')
+  item.phase = 'writing'
+  item.writeText = full
+  item.written = 0
+  item.writeFinal = finalPhase
+  render()
+  item.writer = setInterval(() => {
+    item.written = Math.min(full.length, item.written + 7)
+    const stream = item.id === state.session && $('.answer-stream')
+    if (stream) stream.textContent = full.slice(0, item.written)
+    if (item.written < full.length) return
+    clearInterval(item.writer)
+    item.phase = finalPhase
+    render()
+    if (state.session !== item.id && finalPhase === 'done') toast(`Готово: «${item.title}»`)
+  }, 35)
+}
+function startRun(item) {
+  Object.assign(item, {step:0, decisions:[], cleared:[], steer:[], answer:null, expanded:false, instruction:'', errors:[], failAt:state.failNext && item.kind !== 'chat' ? 1 : null})
+  state.failNext = false
+  if (item.kind === 'chat') return writeAnswer(item, 'answer')
   if (state.mode === 'Планирование' && item.kind !== 'document') {
     item.phase = 'plan'
     return render()
@@ -766,6 +806,8 @@ function turnAnswer(turn, live = false) {
   if (turn.phase === 'denied') {
     return `<div class="answer-block"><p>${esc(scriptOf(turn).permission.denied)}</p></div>`
   }
+  if (turn.phase === 'failed') return `<div class="answer-block failed" role="alert"><h2>${icon('alert',18)} Шаг не выполнен</h2><p>Не удалось ${esc(scriptOf(turn).steps[turn.step].fail || 'выполнить шаг')}: Loginom не отвечает. Сделанные шаги выше сохранены; можно повторить шаг, когда Loginom снова будет доступен.</p>${live ? `<div class="button-row"><button class="btn primary" data-action="retry-step">${icon('refresh',15)} Повторить шаг</button><button class="btn" data-overlay="loginom-status">Проверить подключение</button><button class="link-btn" data-action="copy-error">${icon('copy',14)} Скопировать текст ошибки</button></div>` : ''}</div>`
+  if (turn.phase === 'writing') return `<div class="answer-block"><p class="answer-stream">${esc((turn.writeText || '').slice(0, turn.written))}</p><span class="stream-caret" aria-hidden="true"></span></div>`
   if (turn.phase === 'stopped') return `<div class="answer-block"><p>${turn.step ? 'Остановлено по вашей команде. Сделанные шаги не отменяются — они перечислены выше.' : 'Остановлено по вашей команде до первого шага.'}</p>${live ? `<button class="btn" data-action="resume">${icon('play',15)} Продолжить</button>` : ''}</div>`
   if (turn.phase === 'interrupted') return `<div class="answer-block"><p class="muted">${turn.step ? 'Не закончено — вы отправили новое сообщение. Сделанные шаги выше.' : 'Не начато — вы отправили новое сообщение.'}</p></div>`
   const steer = turn.steer?.length ? `<p class="steer-note">Учёл вашу поправку: «${esc(turn.steer.at(-1).text)}». <span class="muted">В прототипе цифры не меняются.</span></p>` : ''
@@ -775,17 +817,23 @@ function turnSteps(turn, live, turnIndex) {
   const script = scriptOf(turn)
   const detailed = state.detail === 'full'
   const rows = []
+  const errorRows = at => (turn.errors || []).filter(entry => entry.at === at).forEach(entry => rows.push(`<li class="step error">${icon('alert',15)}<span>Не удалось ${esc(script.steps[at].fail || 'выполнить шаг')}<small>Loginom не ответил за 30 с · попытка ${entry.attempt} из 2</small></span></li>`))
   script.steps.slice(0, turn.step).forEach((step, index) => {
-    for (const decision of (turn.decisions || []).filter(entry => entry.at === index)) rows.push(decision.choice === 'instead'
+    errorRows(index)
+    for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice === 'retry')) rows.push(`<li class="step-trace">${icon('refresh',14)}<span>Вы повторили шаг</span></li>`)
+    for (const decision of (turn.decisions || []).filter(entry => entry.at === index && entry.choice !== 'retry')) rows.push(decision.choice === 'instead'
       ? `<li class="step-trace steer">${icon('message',14)}<span>Вы попросили иначе: «${esc(decision.text)}»</span></li>`
       : `<li class="step-trace">${icon('check',14)}<span>${{session:'Вы разрешили в этом разговоре', auto:'Разрешено ранее в этом разговоре', once:'Вы разрешили один раз'}[decision.choice]}: ${esc(followed(script.permission.trace, turn))}</span></li>`)
     if (step.ask === 'question') rows.push(`<li class="step-trace">${icon('help',14)}<span>${esc(script.question.text)} — <strong>${esc(turn.answer || '')}</strong></span></li>`)
+    if (detailed && step.think) rows.push(`<li class="step think">${icon('spark',14)}<span>Думал ${step.think[0]} с<small>${esc(step.think[1])}</small></span></li>`)
     rows.push(`<li class="step done">${icon(step.icon,15)}<span>${esc(step.ask === 'permission' ? followed(stepText(step.done, turn), turn) : stepText(step.done, turn))}${step.detail && (detailed || turn.open?.includes(index)) ? `<small>${esc(stepText(step.detail, turn))}</small>` : ''}</span>${step.detail && !detailed ? `<button class="small-icon step-more" data-step-detail="${turnIndex}:${index}" aria-label="${turn.open?.includes(index) ? 'Скрыть' : 'Показать'} подробности шага" aria-expanded="${Boolean(turn.open?.includes(index))}">${icon('more',14)}</button>` : ''}</li>`)
     ;(turn.steer || []).filter(entry => entry.at === index + 1).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}»</span></li>`))
   })
   ;(turn.steer || []).filter(entry => entry.at > turn.step).forEach(entry => rows.push(`<li class="step-trace steer">${icon('message',14)}<span>Ваша поправка: «${esc(entry.text)}» — ${turn.phase === 'running' ? 'учту после текущего шага' : 'учту, когда продолжу'}</span></li>`))
   const denied = turn.decisions?.find(entry => entry.choice === 'deny')
   if (denied) rows.push(`<li class="step-trace denied">${icon('close',14)}<span>Вы отклонили: ${esc(script.permission.trace)}</span></li>`)
+  errorRows(turn.step)
+  if (live && turn.phase === 'retrying') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>Повторю через ${turn.retryIn} с…</span></li>`)
   if (live && turn.phase === 'running') rows.push(`<li class="step live" role="status"><span class="spinner"></span><span>${esc(stepText(script.steps[turn.step].live, turn))}…</span></li>`)
   if (live && ['permission','question'].includes(turn.phase)) rows.push(`<li class="step waiting">${icon('alert',15)}<span>${turn.phase === 'permission' ? 'Жду вашего разрешения — внизу' : 'Жду вашего ответа — внизу'}</span></li>`)
   return `<ol class="turn-steps">${rows.join('')}</ol>`
@@ -798,21 +846,21 @@ function turnPlan(turn) {
 }
 function turnView(item, turn, index, live) {
   const script = scriptOf(turn)
-  const finished = ['done','answer','denied','stopped','interrupted'].includes(turn.phase)
-  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','permission','question'].includes(turn.phase))
+  const finished = ['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase)
+  const hasSteps = script.steps.length && turn.step > 0 || (live && ['running','retrying','permission','question','failed'].includes(turn.phase))
   const brief = state.detail !== 'full'
-  const objects = script.steps.slice(0, turn.step).map(step => step.short)
-  const summary = finished && hasSteps && brief && !turn.expanded
+  const objects = [...script.steps.slice(0, turn.step).map(step => step.short), ...(turn.errors?.length ? ['повторил шаг после сбоя Loginom'] : [])]
+  const summary = finished && hasSteps && brief && !turn.expanded && turn.phase !== 'failed'
   return `<div class="turn">
     <div class="user-turn"><div class="user-message">${esc(turn.prompt)}${turn.files?.length ? `<div class="message-files">${turn.files.map(file => `<span>${icon('file',14)}${esc(file)}</span>`).join('')}</div>` : ''}</div>
-      <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
+      <div class="msg-actions"><button class="msg-act" data-copy-prompt="${index}">${icon('copy',14)}<span>Копировать</span></button><button class="msg-act" data-edit-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed','connect'].includes(turn.phase) ? 'disabled' : ''}>${icon('compose',14)}<span>Изменить</span></button><button class="msg-act" data-fork-turn="${index}" ${live && !['done','answer','denied','stopped','interrupted','failed'].includes(turn.phase) ? 'disabled' : ''}>${icon('branch',14)}<span>Ответвить</span></button></div></div>
     <div class="agent-message"><span class="agent-avatar"><img src="assets/loginom.png" alt="" width="31" height="31"></span><div class="agent-body"><strong class="agent-caption">Loginom AI Agent</strong>
       ${turn.phase === 'connect' ? `<div class="answer-block"><h2>Для этой задачи нужен Loginom</h2><p>Я буду строить и проверять сценарий в Loginom. Подключитесь — и я продолжу.</p>${connectCard()}</div>` : ''}
       ${turn.phase === 'plan' ? `<div class="answer-block"><h2>План работы</h2><p>Проверьте шаги — и я начну.</p>${turnPlan(turn)}<button class="btn primary" data-action="run-plan">Выполнить ${icon('arrow',16)}</button></div>` : ''}
-      ${live && ['running','permission','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
+      ${live && ['running','retrying','permission','question'].includes(turn.phase) && script.plan ? turnPlan(turn) : ''}
       ${summary ? `<button class="turn-summary" data-expand-turn="${index}" aria-expanded="false">${icon('chevron',14)}<span>Работал ${turnTime(turn)} · ${esc(objects.join(', '))}</span></button>` : ''}
       ${hasSteps && !summary ? `${finished && brief ? `<button class="turn-summary open" data-expand-turn="${index}" aria-expanded="true">${icon('chevron',14)}<span>Работал ${turnTime(turn)}</span></button>` : finished ? `<p class="turn-time">Работал ${turnTime(turn)}</p>` : ''}${turnSteps(turn, live, index)}` : ''}
-      ${finished ? turnAnswer({...turn, id:item.id + '-' + index}, live) : ''}
+      ${finished || turn.phase === 'writing' ? turnAnswer({...turn, id:item.id + '-' + index}, live) : ''}
       ${finished ? `<div class="msg-actions agent-actions"><button class="msg-act" data-copy-answer="${index}">${icon('copy',14)}<span>Копировать</span></button><span class="turn-meta">${hasSteps ? turnTime(turn) + ' · ' : ''}${esc(currentModel() || 'модель')}</span></div>` : ''}
     </div></div>
   </div>`
@@ -1074,7 +1122,8 @@ function review() {
   const look = [
     ['Ход работы','Новый разговор → «Построй ABC-анализ товаров по выручке» (кнопка ниже вставит текст). Агент работает по шагам: видны план и текущий шаг. Сообщение во время работы — поправка, ■ останавливает. Перед сохранением пакета запрос разрешения встаёт на место поля ввода; попробуйте «сказать иначе».','try-run','Начать'],
     ['Вопрос агента','«Проверь выгрузку на пропуски и дубликаты». Посреди работы агент спросит, какие строки считать дубликатами: выберите вариант или напишите свой. Пока он ждёт, у разговора в панели оранжевая точка.','try-question','Начать'],
-    ['Кратко и подробно','Готовый ход свёрнут в строку «Работал 37 с · …» — нажмите её. «Подробно» в шапке разговора показывает все шаги с деталями. Наведите на своё сообщение — «Копировать», «Изменить», «Ответвить»; на ответ агента — «Копировать».','try-detail','Открыть разговор'],
+    ['Кратко и подробно','Готовый ход свёрнут в строку «Работал 37 с · …» — нажмите её. «Подробно» в шапке разговора показывает все шаги с деталями и размышления агента («Думал 5 с»). Наведите на своё сообщение — «Копировать», «Изменить», «Ответвить»; на ответ агента — «Копировать».','try-detail','Открыть разговор'],
+    ['Сбой Loginom','Тот же ABC-анализ, но Loginom «не отвечает» на втором шаге. Агент сам повторит через 3 с; после второго сбоя остановится, объяснит, что случилось, и предложит «Повторить шаг» или «Проверить подключение». Ошибка видна и в «Кратко».','try-failure','Начать'],
   ]
   const questions = [
     '<strong>Подробность по умолчанию</strong> — «Кратко» (В-21).',
@@ -1083,8 +1132,7 @@ function review() {
     '<strong>«Повторить ответ»</strong> не делаем — есть «Изменить» и «Ответвить» (В-24).',
   ]
   const later = [
-    'Ошибка шага (например, Loginom не ответил): красная строка с объяснением и «Повторить» — в следующей итерации.',
-    'Ответ появляется по мере написания (потоком), размышления модели («Думал 12 с») — только в «Подробно»; в прототипе не показано.',
+    'Ошибка всего хода (например, у модели кончился лимит) и смена модели из ленты — когда дойдём до настроек моделей.',
     'Ход разговора и счётчики живут до перезагрузки страницы.',
   ]
   const chosen = [
@@ -1095,11 +1143,11 @@ function review() {
     'Список файлов Loginom идёт через внутренний метод веб-клиента: просить ли разработчиков Loginom его закрепить, и занимает ли фоновая сессия лицензию (И1.1-3).',
     'Тексты для сообщества и отметка «Понимаю, что Loginom это не проверял…» (И1.1-4).',
   ]
-  const changed = ['Ответ агента — лента шагов, а не один блок: план, текущий шаг, сделанные шаги простыми словами.','Готовый ход свёрнут в «Работал … · что сделал»; «Кратко / Подробно» в шапке разговора.','Разрешение и вопрос агента — на месте поля ввода, в ленте остаётся след решения; в панели у разговора оранжевая точка.','Во время работы: ■ «Остановить» и поправки; остановленный ход можно продолжить.','По наведению: на своём сообщении — «Копировать», «Изменить», «Ответвить»; на ответе — «Копировать», время и модель.','Предыдущие ходы разговора видны целиком, разговор открывается на последнем ходе.']
+  const changed = ['Ответ агента — лента шагов, а не один блок: план, текущий шаг, сделанные шаги простыми словами.','Готовый ход свёрнут в «Работал … · что сделал»; «Кратко / Подробно» в шапке разговора.','Разрешение и вопрос агента — на месте поля ввода, в ленте остаётся след решения; в панели у разговора оранжевая точка.','Во время работы: ■ «Остановить» и поправки; остановленный ход можно продолжить.','По наведению: на своём сообщении — «Копировать», «Изменить», «Ответвить»; на ответе — «Копировать», время и модель.','Предыдущие ходы разговора видны целиком, разговор открывается на последнем ходе.','Ответ появляется по мере написания; в «Подробно» — размышления агента («Думал 5 с»).','Сбой шага: агент сам повторяет через 3 с, после второго сбоя останавливается с объяснением, «Повторить шаг» и «Проверить подключение».']
   return `<div class="native-page review-page">
-    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 3 — лента разговора</p><h1>Что решить</h1><p>Новое — как агент показывает свою работу. Пройдите три сценария, около 10 минут. Решения по итерации — ниже.</p></div></div>
+    <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 3 — лента разговора</p><h1>Что решить</h1><p>Новое — как агент показывает свою работу. Пройдите четыре сценария, около 10 минут. Решения по итерации — ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
-    <div class="rv-grid">${look.map(([title,text,target,label],index) => `<article class="rv-card"><span class="rv-num">${'АБВ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${label} ${icon('arrow',15)}</button></article>`).join('')}</div>
+    <div class="rv-grid">${look.map(([title,text,target,label],index) => `<article class="rv-card"><span class="rv-num">${'АБВГ'[index]}</span><h3>${title}</h3><p>${text}</p><button class="btn" data-action="${target}">${label} ${icon('arrow',15)}</button></article>`).join('')}</div>
     <h2 class="rv-heading">Решено по итерации 3</h2>
     <ul class="rv-changes">${questions.map(text => `<li>${text}</li>`).join('')}</ul>
     <h2 class="rv-heading">Пока не показано</h2>
@@ -1319,7 +1367,7 @@ function send() {
     return
   }
   // While the agent works, a message is a correction: it reaches the agent after the current step.
-  if (old && old.phase === 'running' && state.editTurn?.session !== old.id) {
+  if (old && ['running','retrying'].includes(old.phase) && state.editTurn?.session !== old.id) {
     old.steer.push({text:prompt, at:old.step + 1})
     state.draft = ''
     render()
@@ -1400,8 +1448,8 @@ function feedAction(d) {
 }
 function turnSnapshot(item) {
   // A copy, not shared references: a fork's decisions must not show up in the original.
-  return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:['running','permission','question','plan','connect','starting'].includes(item.phase) ? 'interrupted' : item.phase,
-    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || []})
+  return structuredClone({instruction:item.instruction, prompt:item.prompt, files:item.files, kind:item.kind, phase:['running','retrying','writing','permission','question','plan','connect','starting','failed'].includes(item.phase) ? 'interrupted' : item.phase,
+    step:item.step, decisions:item.decisions || [], answer:item.answer, steer:item.steer || [], cleared:item.cleared || [], allowed:item.allowed || [], errors:item.errors || []})
 }
 function connectLoginom() {
   if (state.connecting) return
@@ -1492,11 +1540,24 @@ const actions = {
   stop:() => {
     const item = currentItem()
     clearTimeout(item.timer)
+    clearInterval(item.writer)
     item.phase = 'stopped'
     render()
     $('#prompt')?.focus()
   },
   resume:() => runSteps(currentItem()),
+  'retry-step':() => {
+    const item = currentItem()
+    item.failAt = null
+    item.decisions.push({at:item.step, choice:'retry'})
+    runSteps(item)
+    $('#prompt')?.focus()
+  },
+  'copy-error':() => copyText(`Loginom AI Agent: не удалось ${scriptOf(currentItem()).steps[currentItem().step].fail || 'выполнить шаг'}. Loginom не ответил за 30 с (${hostOf(state.settings.connection.url)}), 2 попытки.`),
+  'try-failure':() => {
+    state.failNext = true
+    tryPrompt('Построй ABC-анализ товаров по выручке')
+  },
   'open-instead':() => {
     currentItem().insteadOpen = true
     render()
@@ -1931,7 +1992,7 @@ document.addEventListener('keydown', event => {
     menuOpener(menu)?.focus()
     return
   }
-  if (event.key === 'Escape' && !peek && !document.querySelector('dialog[open]') && state.page === 'chat' && currentItem()?.phase === 'running') {
+  if (event.key === 'Escape' && !peek && !document.querySelector('dialog[open]') && state.page === 'chat' && ['running','retrying','writing'].includes(currentItem()?.phase)) {
     actions.stop()
     return
   }

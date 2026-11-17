@@ -478,3 +478,13 @@ button.prototype-mark{gap:8px;padding:4px 6px 0 8px}
 .dock-more{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13.5px}
 .dock-instruction dd{color:var(--blue)}
 @media(max-width:690px){.turn-summary>span{white-space:normal}.dock-args{grid-template-columns:1fr 1fr;padding:7px 9px}.dock-args .dock-instruction{grid-column:1/-1}.stop-btn span{display:none}}
+/* Errors, retries, thinking, streaming */
+.turn-steps .step.error{color:var(--accent)}
+.turn-steps .step.error>.icon{color:var(--accent)}
+.turn-steps .step.think{color:var(--muted);font-size:13px}
+.turn-steps .step.think small{font-style:italic}
+.answer-block.failed{border-color:var(--accent-line);background:var(--accent-soft)}
+.answer-block.failed h2{display:flex;align-items:center;gap:8px;color:var(--accent)}
+.answer-block.failed .button-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.answer-stream{display:inline;margin:0;white-space:pre-wrap}
+.stream-caret{display:inline-block;width:7px;height:1.05em;margin-left:2px;vertical-align:-2px;background:var(--accent);animation:conn-pulse 1s steps(2) infinite}
