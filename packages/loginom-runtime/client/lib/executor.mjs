@@ -1385,7 +1385,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (!Array.isArray(roots) || !roots.some(root => value === root || value.startsWith(root + '/'))) throw new Error('Package path is outside the allowed Loginom storage root');
     return value;
   };
-  const packageIdentity = async () => page.evaluate(() => {
+  const packageIdentity = async () => page.evaluate(normalizePackage => {
     // Pinned read-only probe of cached navigation records. PackageFileName is a
     // local getter (MapTree.js:2151-2154), not a server proxy or RPC operation.
     const app = globalThis.bg?.app;
@@ -1395,28 +1395,18 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       seen.add(node);
       if (app.PackageTreeNode && node instanceof app.PackageTreeNode) {
         const path = node.PackageFileName;
-        const diagrams = [app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController?.FDiagram];
-        const pending = [node], seen = new Set();
-        while (pending.length) {
-          const current = pending.pop();
-          if (seen.has(current)) continue;
-          if (seen.size >= 10000) throw Error('Package reference inventory exceeds bound');
-          seen.add(current);
-          diagrams.push(current.FCustomForm?.FDiagram);
-          pending.push(...(current.FSubNodes?.FItems ?? []));
-        }
-        // Loginom also normalizes grouping input columns on Open after Execute.
-        const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>n.FIconCls==='bg-vendor-icon-restclientconnection'||n.FIconCls==='bg-vendor-icon-groupdata'));
-        const nativeNodes=restReference?diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):null;
-        if(restReference&&(!nativeNodes?.length||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved REST graph native identities unavailable');
+        // Every node type can acquire native changes on Open after Execute.
+        const diagram = app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController?.FDiagram;
+        const nativeNodes=normalizePackage?diagram?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):null;
+        if(normalizePackage&&(!nativeNodes||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved graph native identities unavailable');
         return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
           running: node.HasRunningNodes?.() === true,
-          rest_reference: restReference,...(restReference?{native_nodes:nativeNodes}:{}) };
+          normalization_available: normalizePackage,...(normalizePackage?{native_nodes:nativeNodes}:{}) };
       }
       node = node.ParentNode;
     }
     throw new Error('Active navigation has no verified cached package identity. Call dock_prepare with intent:"existing_workflow" and the latest runtime workflow_ref including document_id (use saved workflow_continuations after Save), then retry Save with a new operation_id. After LOGINOM_FILE_CHANGED this restores navigation only; full-source execution still requires a new download and exact scan.');
-  });
+  }, Boolean(task.storage_binding?.loginom_account) && ['packages.close','packages.open'].every(symbol => task.action.selector_symbols.includes(symbol)));
   const normalizeStoredPath = value => {
     if (typeof value !== 'string' || !value.trim()) return null;
     value = value.replaceAll('\\', '/').replace(/\/+/g, '/');
@@ -1526,7 +1516,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const normalizedPath = normalizeStoredPath(reopenedIdentity.path);
     const signature = await graphSnapshot(prefix);
     const pathMatches = normalizedPath === before.path, graphMatches = same(signature, before.graph)
-      &&(!before.package_identity.rest_reference||same(reopenedIdentity.native_nodes,before.package_identity.native_nodes));
+      &&(!before.package_identity.normalization_available||same(reopenedIdentity.native_nodes,before.package_identity.native_nodes));
     record('reopened_package_observed', { requested_path: before.path, actual_path: normalizedPath,
       tab_caption: identity, path_matches: pathMatches, graph_matches: graphMatches, graph: signature });
     if (!pathMatches || !graphMatches) {
@@ -1553,10 +1543,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
     if (before.package_identity.read_only && normalizeStoredPath(before.package_identity.path) === before.path)
       throw new Error('The active package is read-only. Save a copy to an explicitly different package path.');
-    const normalizeRest = before.package_identity.rest_reference === true
-      && ['packages.close','packages.open'].every(symbol => task.action.selector_symbols.includes(symbol));
-    const continuationsBefore = keepOpen || normalizeRest ? await packageContinuations(before.workflow_ref) : [];
-    if (normalizeRest && !continuationsBefore.length) throw Error('Saved workflow continuation unavailable before Save');
+    const normalizePackage = before.package_identity.normalization_available === true;
+    const continuationsBefore = keepOpen || normalizePackage ? await packageContinuations(before.workflow_ref) : [];
+    if (normalizePackage && !continuationsBefore.length) throw Error('Saved workflow continuation unavailable before Save');
     let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
     try {
       const admission = await page.evaluate(binding => {
@@ -1663,7 +1652,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (saveError) throw new Error((await saveError.innerText()).slice(0, 500));
     record('save_flow_completed', { path: before.path });
     const normalizationStarted = Date.now();
-    if (keepOpen && !normalizeRest) {
+    if (keepOpen && !normalizePackage) {
       const prefix = await ensureReady();
       const actualPath = normalizeStoredPath((await packageIdentity()).path);
       const graph = await graphSnapshot(prefix);
@@ -1743,7 +1732,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await waitForNoMask(60000);
     transientDialog = false;
     const verified = await verifyReopenedPackage(before);
-    if (!normalizeRest || verified.status !== 'SUCCEEDED') return verified;
+    if (!normalizePackage || verified.status !== 'SUCCEEDED') return verified;
     let modifiedBefore = null, modifiedAfter = null, additionalSave = false;
     try {
       const binding = task.storage_binding;
