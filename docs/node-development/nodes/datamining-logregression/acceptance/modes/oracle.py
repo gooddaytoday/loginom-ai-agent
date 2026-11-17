@@ -106,8 +106,13 @@ def expectations():
     assert abs(na+5*math.log(3))<1e-10 and abs(nb-math.log(3)/2)<1e-12
     table_case('normalization',normalized,(na,nb))
     partition=source('modes/partition.csv')
-    for name in ['partition-sequential','partition-column']:
-        table_case(name,partition,fit(partition[:32]),[('Split','integer'),('Fold','integer')])
+    table_case('partition-sequential',partition,fit(partition[:32]),[('Split','integer'),('Fold','integer')])
+    # Owner decision logreg-c6-boolean-split, LAB-1796 (16.11.2026).
+    # Native probe execution-events.jsonl:20,26,49,51,63,64: Boolean test flag,
+    # false trains, true tests; native output retains Fold before Split.
+    by_column=[{**r,'Split':bool(r['Split'])} for r in partition]
+    table_case('partition-column',by_column,fit([r for r in by_column if not r['Split']]),
+               [('Fold','integer'),('Split','boolean')])
     # Three identical blocks; sequential folds have identical MLEs. No PRNG copy.
     cv=source('modes/validation.csv')
     for k in range(3):
