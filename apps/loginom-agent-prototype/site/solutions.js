@@ -1,4 +1,5 @@
-import { byId, tiers, tierBadge } from './catalog.js';
+import { byId, tierBadge } from './catalog.js';
+import { icon } from './icons.js';
 
 const titles = {
   document: ['Документировать пакет', 'Агент опишет назначение сценария, его узлы и потоки данных. Пакет не меняется.'],
@@ -59,9 +60,11 @@ function select(name, label, choices, selected, hint = '') {
   }).join('')}</select>${hint ? `<small>${hint}</small>` : ''}</label>`;
 }
 
+// Compact segmented choice: one row of options, the hint of the selected one below.
 function radios(name, label, choices, selected) {
-  return `<fieldset class="sl-field sl-radios"><legend>${label}</legend>${choices.map(([value,text,hint]) =>
-    `<label><input type="radio" name="${name}" value="${value}" ${value === selected ? 'checked' : ''}><span><strong>${text}</strong>${hint ? `<small>${hint}</small>` : ''}</span></label>`).join('')}</fieldset>`;
+  const hint = choices.find(([value]) => value === selected)?.[2] ?? '';
+  return `<fieldset class="sl-seg"><legend>${label}</legend><div class="sl-seg-row">${choices.map(([value,text]) =>
+    `<label><input type="radio" name="${name}" value="${value}" ${value === selected ? 'checked' : ''}><span>${text}</span></label>`).join('')}</div>${hint ? `<small>${hint}</small>` : ''}</fieldset>`;
 }
 
 function note(text, tone = '') {
@@ -116,6 +119,11 @@ function accessFor(key, run) {
     can.push(`Создать пакет «${run.values.target}» в вашей папке Loginom`, `Запустить его на ${run.values.data}`);
   }
   return {can, cannot};
+}
+
+// Only actions that save something in Loginom can end with an uncertain effect that needs a state check.
+function changesSomething(key) {
+  return key === 'refactor:copy' || key === 'migration';
 }
 
 function stepper(current) {
@@ -173,38 +181,53 @@ function reportData(key, values) {
   };
 }
 
-function resultBanner(key, run) {
+const outcomeView = {
+  success: ['ok','check','Готово'],
+  inconclusive: ['warn','alert','Результат не подтверждён'],
+  recovery: ['danger','alert','Нужно проверить состояние'],
+  failed: ['danger','close','Не удалось'],
+  cancelled: ['warn','stop','Запуск остановлен'],
+};
+
+function outcomeText(key, run) {
   const pkg = chosenPackage(run);
-  const banners = {
-    success: ['ok','Готово',reportData(key,run.values).summary],
-    inconclusive: ['warn','Результат не подтверждён','Агент сообщил о завершении, но приложение не нашло подтверждения, что результат сохранён. Проверьте файлы или запустите ещё раз.'],
-    recovery: ['danger','Нужно проверить состояние',`Связь с Loginom прервалась во время сохранения. Действие могло выполниться. Не запускайте повторно, пока не проверите «${pkg.name}» в Loginom.`],
-    failed: ['danger','Не удалось','Loginom не ответил при открытии пакета. Ничего не изменено — можно запустить ещё раз.'],
-    cancelled: ['warn','Запуск остановлен','Агент остановлен. Уже выполненные действия не отменяются — они перечислены в подробностях.'],
-  };
-  const [tone,title,text] = banners[run.outcome];
-  return `<div class="sl-outcome sl-outcome-${tone}" role="status"><strong>${title}</strong><p>${escape(text)}</p></div>`;
+  return {
+    success: reportData(key,run.values).summary,
+    inconclusive: 'Агент сообщил о завершении, но приложение не нашло подтверждения, что результат сохранён. Проверьте файлы или запустите ещё раз.',
+    recovery: `Связь с Loginom прервалась во время сохранения. Действие могло выполниться. Не запускайте повторно, пока не проверите «${pkg.name}» в Loginom.`,
+    failed: 'Loginom не ответил при открытии пакета. Ничего не изменено — можно запустить ещё раз.',
+    cancelled: 'Агент остановлен. Уже выполненные действия не отменяются — они перечислены в подробностях.',
+  }[run.outcome];
+}
+
+function resultFile(key, run) {
+  const pkg = chosenPackage(run);
+  if (key === 'document') return [`${pkg.name.replace(/\.lgp$/,'')} — описание.${run.values.format === 'md' ? 'md' : run.values.format}`, 'Папка проекта'];
+  if (key === 'refactor:copy' || key === 'migration') return [run.values.target, 'Ваша папка Loginom, рядом с исходным'];
+  return ['Отчёт.html', 'Папка проекта'];
 }
 
 function renderResult(key, run) {
   const data = reportData(key, run.values);
   const ok = run.outcome === 'success';
-  const pkg = chosenPackage(run);
-  const file = key === 'document' ? `${pkg.name.replace(/\.lgp$/,'')} — описание.${run.values.format === 'md' ? 'md' : run.values.format}` : key === 'refactor:copy' || key === 'migration' ? run.values.target : 'Отчёт.html';
-  return `${resultBanner(key, run)}
-    <section class="sl-panel"><div class="sl-panel-head"><h2>Что проверило приложение</h2><span class="sl-tag">по фактам, а не со слов агента</span></div>
-      <ul class="sl-checks">${(ok ? data.checks : ['Исходный пакет не изменён']).map(text => `<li class="ok">✓ ${escape(text)}</li>`).join('')}
-      ${run.outcome === 'inconclusive' ? '<li class="warn">? Сохранение результата не подтверждено</li>' : ''}${run.outcome === 'recovery' ? '<li class="danger">! Неизвестно, сохранилась ли копия в Loginom</li>' : ''}</ul>
+  const [tone, glyph, title] = outcomeView[run.outcome];
+  const [file, place] = resultFile(key, run);
+  const checks = ok ? data.checks.map(text => ['ok', text]) : [['ok', 'Исходный пакет не изменён'],
+    ...(run.outcome === 'inconclusive' ? [['warn', 'Сохранение результата не подтверждено']] : []),
+    ...(run.outcome === 'recovery' ? [['danger', 'Неизвестно, сохранилась ли копия в Loginom']] : [])];
+  const findings = ok && key !== 'document';
+  return `<section class="sl-result sl-tone-${tone}" role="status">
+      <header><span class="sl-result-icon">${icon(glyph,20)}</span><div><h2>${title}</h2><p>${escape(outcomeText(key, run))}</p></div></header>
+      ${ok ? `<div class="sl-file">${icon('file',20)}<span><strong>${escape(file)}</strong><small>${place}</small></span><button type="button" class="btn primary" data-sl-action="open-file">Открыть</button></div>` : ''}
+      <div class="sl-checks-row"><span class="sl-checks-title">Проверено приложением:</span>${checks.map(([cls,text]) => `<span class="sl-check sl-check-${cls}">${cls === 'ok' ? '✓' : '!'} ${escape(text)}</span>`).join('')}</div>
     </section>
-    ${ok ? `<section class="sl-panel sl-report"><div class="sl-panel-head"><h2>Результат</h2><span class="sl-tag">учебные данные</span></div>
-      <div class="sl-file"><span class="glyph red">📄</span><span><strong>${escape(file)}</strong><small>${key === 'refactor:copy' || key === 'migration' ? 'Пакет в вашей папке Loginom' : 'Папка проекта'}</small></span><button type="button" class="btn" data-sl-action="open-file">Открыть</button></div>
+    ${findings ? `<section class="sl-panel sl-findings"><h2>${key === 'regression' ? 'Проверки' : key === 'tournament' ? 'Сравнение' : key === 'migration' ? 'Соответствие SQL и узлов' : 'Что нашёл агент'}</h2>
       <div class="sl-table"><table><thead><tr>${data.columns.map(label => `<th scope="col">${escape(label)}</th>`).join('')}</tr></thead>
       <tbody>${data.rows.map(row => `<tr>${row.map(cell => `<td ${['PASS','FAIL'].includes(cell) ? `class="sl-${cell.toLowerCase()}"` : ''}>${escape(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>` : ''}
     <div class="sl-actions sl-result-actions">
-      <button type="button" class="btn primary" data-sl-action="discuss">Обсудить в чате</button>
-      ${run.outcome === 'recovery' ? '<button type="button" class="btn" data-sl-action="check-state">Проверить состояние</button>' : ''}
-      <button type="button" class="btn quiet" data-sl-action="again" ${run.outcome === 'recovery' ? 'disabled title="Сначала проверьте состояние пакета"' : ''}>Запустить ещё раз</button>
-      ${ok ? '<button type="button" class="btn quiet" data-sl-action="download-report">Скачать отчёт</button>' : ''}
+      <button type="button" class="btn" data-sl-action="discuss">${icon('message',16)} Обсудить в чате</button>
+      ${run.outcome === 'recovery' ? '<button type="button" class="btn primary" data-sl-action="check-state">Проверить состояние</button>' : ''}
+      <button type="button" class="btn quiet" data-sl-action="again" ${run.outcome === 'recovery' ? 'disabled title="Сначала проверьте состояние пакета"' : ''}>${icon('refresh',16)} Запустить ещё раз</button>
     </div>`;
 }
 
@@ -238,24 +261,23 @@ function renderRunner(state, model) {
   if (run.step === 'params') body = `<section class="sl-panel"><form class="sl-form" data-sl-form="run">${run.error ? note(escape(run.error),'warn') : ''}${renderFields(key, run)}
     <div class="sl-actions">${blocked ? `<button type="button" class="btn" data-sl-action="baseline-draft" ${run.baselineDraft ? 'disabled' : ''}>Подготовить черновик эталона</button>` : '<button type="submit" class="btn primary">Далее: доступ</button>'}</div></form></section>`;
   if (run.step === 'access') body = `<section class="sl-panel sl-access">
-      <p class="sl-access-lead">Перед запуском проверьте, что будет разрешено агенту. Права действуют только на этот запуск.</p>
+      <p class="sl-access-lead">Проверьте, что будет разрешено агенту. Права действуют только на этот запуск.</p>
       <div class="sl-perms"><div><h3>✓ Агент сможет</h3><ul>${access.can.map(text => `<li>${escape(text)}</li>`).join('')}</ul></div>
       <div><h3>✕ Агент не сможет</h3><ul>${access.cannot.map(text => `<li>${escape(text)}</li>`).join('')}</ul></div></div>
-      <p class="sl-who">${tierBadge(item)} ${tiers[item.tier].title}, версия ${item.version}</p>
-      <fieldset class="sl-demo"><legend>Демонстрация: чем закончится запуск</legend>${outcomes.map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}</fieldset>
-      <div class="sl-actions"><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button><button type="button" class="btn primary" data-sl-action="start">Разрешить и запустить</button></div></section>`;
+      <div class="sl-actions"><button type="button" class="btn primary" data-sl-action="start">Разрешить и запустить</button><button type="button" class="btn quiet" data-sl-action="to-params">Назад</button></div></section>
+      <fieldset class="sl-demo"><legend>Только для прототипа: чем закончится запуск</legend>${outcomes.filter(([value]) => value !== 'recovery' || changesSomething(key)).map(([value,label]) => `<label><input type="radio" name="demo-outcome" value="${value}" ${run.demoOutcome === value ? 'checked' : ''}> ${label}</label>`).join('')}</fieldset>`;
   if (run.step === 'running') body = `<section class="sl-panel"><ol class="sl-stages" aria-live="polite">${item.stages.map((stage,index) => `<li class="${index < run.stage ? 'is-done' : index === run.stage ? 'is-current' : ''}"><span class="sl-stage-mark" aria-hidden="true">${index < run.stage ? '✓' : index+1}</span><span>${stage}</span><small>${index < run.stage ? 'Готово' : index === run.stage ? 'Идёт' : 'Ожидает'}</small></li>`).join('')}</ol>
       ${details(key, run)}
       <div class="sl-actions"><button type="button" class="btn" data-sl-action="stop">Остановить</button><small class="muted">Остановка прерывает агента, но не отменяет уже сделанное.</small></div></section>`;
   if (run.step === 'result') body = renderResult(key, run) + details(key, run);
-  return `<div class="sl-page"><button type="button" class="btn quiet sl-back" data-sl-action="back" data-sl-back="${back[0]}">${back[1]}</button>
-    <header class="sl-heading"><p class="sl-product">${tierBadge(item)} ${escape(item.product || item.title)}</p><h1>${title}</h1><p>${description}</p></header>
+  return `<div class="sl-page sl-runner"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="${back[0]}">${back[1]}</button>
+    <header class="sl-heading"><h1>${title}</h1><p>${description}</p><p class="sl-meta">${tierBadge(item)} ${escape(item.product || item.title)} · версия ${item.version}</p></header>
     ${stepper(run.step)}${body}</div>`;
 }
 
 function renderAuthor(model) {
   const author = model.author;
-  return `<div class="sl-page"><button type="button" class="btn quiet sl-back" data-sl-action="back" data-sl-back="hub">← Решения</button>
+  return `<div class="sl-page"><button type="button" class="sl-back-link" data-sl-action="back" data-sl-back="hub">← Решения</button>
     <header class="sl-heading"><span class="sl-product">Мои решения</span><h1>Создать решение</h1><p>Подготовьте повторяемую инструкцию для агента и сохраните черновик в библиотеке.</p></header>
     <div class="sl-switch" aria-label="Способ создания">${[['manual','С нуля'],['chat','Из разговора'],['import','Импорт файла']].map(([id,title]) => `<button type="button" class="sl-chip${id === author.method ? ' is-active' : ''}" data-sl-author="${id}" aria-pressed="${id === author.method}">${title}</button>`).join('')}</div>
     <div class="sl-grid"><section class="sl-panel"><div class="sl-panel-head"><h2>${author.method === 'import' ? 'Предпросмотр импорта' : 'Черновик решения'}</h2><span class="sl-tag">Личный</span></div>
@@ -334,6 +356,7 @@ export function bindSolutions(root,state,api) {
   });
   panel.addEventListener('change', async event => {
     if (event.target.name === 'demo-outcome') { run.demoOutcome = event.target.value; return; }
+    if (event.target.type === 'radio' && event.target.closest('[data-sl-form="run"]')) { run.values[event.target.name] = event.target.value; api.render(); return; }
     if (event.target.name === 'baseline') { run.values.baseline = event.target.value; api.render(); return; }
     if (event.target.name !== 'import') return;
     const file = event.target.files[0];

@@ -136,8 +136,9 @@ export function tierBadge(item, size = '') {
   return `<span class="tier tier-${tier.tone}${size ? ' tier-' + size : ''}" title="${tier.title}">${tier.label}</span>`
 }
 
-export function evidenceLine(item) {
+// Short on cards; the full wording (what the examples were) is shown in the solution dialog.
+export function evidenceLine(item, full = false) {
   if (!item.evidence) return '<span class="evidence evidence-none">Не проверялось на примерах</span>'
   const e = item.evidence
-  return `<span class="evidence${e.passed === e.total ? '' : ' evidence-partial'}">Проверено: ${e.passed} из ${e.total} ${e.note} · Loginom ${e.loginom}</span>`
+  return `<span class="evidence${e.passed === e.total ? '' : ' evidence-partial'}">Проверено на примерах: ${e.passed} из ${e.total}${full ? ' ' + e.note : ''} · Loginom ${e.loginom}</span>`
 }

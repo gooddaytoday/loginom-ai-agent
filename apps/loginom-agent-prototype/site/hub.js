@@ -203,13 +203,11 @@ function itemCard(item, hub, online, tab) {
     '<span class="hub-installed">'+status+(update ? ' · есть '+item.version : '')+'</span></div></article>';
 }
 
-function syncBanner(online) {
-  return '<section class="hub-banner '+(online?'':'hub-banner-closed')+'"><div class="hub-banner-content">'+
-    '<span class="hub-banner-label">'+icon(online?'archive':'lock',16)+(online?' Работа без интернета':' Закрытый контур')+'</span>'+
-    '<h2>'+(online?'Перенесите решения внутрь закрытого контура':'Решения из пакета администратора')+'</h2>'+
-    '<p>'+(online?'Соберите решения и их зависимости в один подписанный файл и передайте администратору.':'Каталог собран из файла от администратора · 12.11.2026. Новые версии добавляются из следующего файла.')+'</p>'+
-    (online?'<button class="hub-text" data-hub-action="export">Собрать офлайн-пакет '+icon('arrow',15)+'</button>':'<button class="hub-text" data-hub-action="import">Импортировать пакет '+icon('arrow',15)+'</button>')+'</div>'+
-    '<div class="hub-visual" aria-hidden="true"><span class="hub-baseline"></span><span class="hub-visual-chip hub-chip-first">'+icon('flow',23)+'</span><span class="hub-visual-chip hub-chip-second">'+icon('book',23)+'</span><span class="hub-visual-chip hub-chip-third">'+icon(online?'archive':'lock',32)+'</span></div></section>';
+// Closed contour: a slim line saying where the catalog came from. Online: nothing — bundle export is an admin task,
+// offered as a link under the catalog instead of a banner every analyst has to scroll past.
+function sourceLine(online) {
+  if (online) return '';
+  return '<div class="hub-source">'+icon('lock',16)+'<span><strong>Закрытый контур.</strong> Каталог из файла администратора от 12.11.2026. Решения сообщества без проверки отключены политикой.</span><button class="hub-text" data-hub-action="import">Импортировать пакет '+icon('arrow',15)+'</button></div>';
 }
 
 function history(hub) {
@@ -235,7 +233,7 @@ export function renderHub(state) {
   const types = ['Все',...new Set(source.map(item=>item.kind))];
   return '<section class="hub-page"><header class="hub-header"><div><div class="hub-title-line"><span class="hub-mark">'+icon('hub',26)+'</span><h1>Решения</h1></div><p>Loginom Hub — готовые решения для работы с пакетами и данными. Перед установкой видно, кто подготовил решение и что ему будет разрешено.</p></div>'+
     '<div class="hub-header-actions"><button class="btn" data-hub-action="studio">'+icon('plus',17)+' Создать своё</button><button class="btn" data-hub-action="import">'+icon('upload',18)+' Импортировать пакет</button></div></header>'+
-    syncBanner(online)+
+    sourceLine(online)+
     '<nav class="hub-tabs" aria-label="Разделы">'+tabs.map(([id,title])=>'<button data-hub-tab="'+id+'" '+(hub.tab===id?'aria-current="page"':'')+'>'+title+(id in counts?' <span>'+counts[id]+'</span>':'')+'</button>').join('')+'</nav>'+
     (hub.tab === 'history' ? history(hub) :
       (source.length ? '<div class="hub-toolbar"><label class="hub-search">'+icon('search',18)+'<input type="search" aria-label="Поиск решений" placeholder="Что нужно сделать? Например, «проверить данные»" value="'+escape(hub.query)+'"></label>'+
@@ -245,6 +243,7 @@ export function renderHub(state) {
         '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon(hub.tab==='updates'?'check':'search',23)+'</span><h3>'+(source.length?'Ничего не нашлось':hub.tab==='updates'?'Обновлений нет':'Здесь появятся установленные решения')+'</h3>'+
         '<p>'+(source.length?'Измените запрос или фильтры.':online?'Установлены актуальные версии.':'Импортируйте пакет обновлений от администратора.')+'</p>'+
         (source.length?'<button class="btn" data-hub-action="clear">Сбросить фильтры</button>':!online?'<button class="btn" data-hub-action="import">Импортировать пакет</button>':'')+'</div>'))+
+      (online && hub.tab === 'catalog' ? '<p class="hub-admin-link">'+icon('archive',16)+' Для компьютеров без интернета <button class="hub-text" data-hub-action="export">соберите офлайн-пакет '+icon('arrow',15)+'</button></p>' : '')+
     '</section>'+renderDialog(hub, online);
 }
 
@@ -264,7 +263,7 @@ function detailDialog(hub, online, current) {
   const needsAck = item.tier === 'community' && !installed;
   const body = '<div class="hub-detail-head"><span class="hub-tile hub-'+item.color+'">'+icon(item.icon,24)+'</span><div><p class="hub-detail-kind">'+item.kind+(item.product ? ' · '+item.product : '')+'</p><p class="hub-dialog-lead">'+item.description+'</p></div></div>'+
     '<section class="hub-section"><h3>Кто подготовил</h3><div class="hub-trust">'+tierBadge(item,'lg')+(item.publisher ? '<span class="hub-publisher">'+escape(item.publisher)+'</span>' : '')+'</div><p>'+tier.explain+'</p></section>'+
-    '<section class="hub-section"><h3>Проверка на примерах</h3><p>'+evidenceLine(item)+'</p></section>'+
+    '<section class="hub-section"><h3>Проверка на примерах</h3><p>'+evidenceLine(item,true)+'</p></section>'+
     '<section class="hub-section"><h3>Что будет разрешено</h3>'+permissionList(item)+
     (item.runner ? '<p class="hub-dialog-footnote">При каждом запуске приложение ещё раз покажет, к какому пакету и с какими правами получит доступ агент.</p>' : '')+'</section>'+
     '<dl class="hub-checks"><div><dt>Версия</dt><dd>'+(update ? installed+' → '+item.version : installed || item.version)+'</dd></div><div><dt>Размер</dt><dd>'+item.size+'</dd></div><div><dt>Совместимость</dt><dd>Loginom 7.4 и новее</dd></div><div><dt>Сеть</dt><dd>'+(item.offline?'Работает без интернета':'Нужен интернет')+'</dd></div></dl>'+
