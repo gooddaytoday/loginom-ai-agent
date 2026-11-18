@@ -49,7 +49,7 @@ const fileSamples = {
     files:[['SKILL.md','']],
   },
 };
-// What may leak from your files and conversations into a skill. «Убрать» removes the whole line with it.
+// What may leak from your files and conversations into a skill. «Убрать» removes just that place from the text.
 const leakRules = [
   [/\/user(?:\/[^\s«»,.;:]+)*/g, 'путь в Loginom'],
   [/[\wА-Яа-яЁё-]+\.(?:csv|lgp|xlsx)\b/g, 'имя файла'],
@@ -83,14 +83,28 @@ export function leaksOf(item, extra = '') {
   const text = textOf(item, extra);
   return leakRules.flatMap(([re, label]) => [...new Set(text.match(re) || [])].map((match) => ({ match, label })));
 }
-// Single-line fields lose just the match; in the text the whole line goes, so no broken sentence is left behind.
+// Removes one found place and tidies the phrase around it: quotes, a preposition left hanging, a stray full stop.
+// Other found places stay; a line is dropped only when nothing is left of it.
 function removeLeak(item, match, dialog) {
-  const dropLine = (text) => text.split('\n').filter((line) => !line.includes(match)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
-  item.name = item.name.split(match).join('').replace(/ {2,}/g, ' ').trim();
-  item.when = item.when.split(match).join('').replace(/ {2,}/g, ' ').trim();
-  item.body = dropLine(item.body);
-  if (item.params) item.params.custom = dropLine(item.params.custom);
-  if (dialog?.summary) dialog.summary = dropLine(dialog.summary);
+  const cut = (text) => text.split('\n').map((line) => cutLine(line, match)).filter((line) => line !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  item.name = cut(item.name);
+  item.when = cut(item.when);
+  item.body = cut(item.body);
+  if (item.params) item.params.custom = cut(item.params.custom);
+  if (dialog?.summary) dialog.summary = cut(dialog.summary);
+}
+function cutLine(line, match) {
+  if (!line.includes(match)) return line;
+  const mark = '\u0000';
+  const out = line.split(match).join(mark)
+    .replace(new RegExp('«' + mark + '»', 'g'), mark)
+    .replace(new RegExp('\\s+(?:в|во|на|из|у|к|с|для|от)\\s+' + mark, 'gi'), mark)
+    .split(mark).join('')
+    .replace(/\s{2,}/g, ' ').replace(/\s+([.,;:!?])/g, '$1').replace(/[:,]\./g, '.').trim();
+  // «Пример из разговора: …» with nothing left after the colon is dropped.
+  const label = line.indexOf(':') > 0 ? line.slice(0, line.indexOf(':')) : '';
+  if (!out.replace(/[.,;:!?\s]/g, '') || (label && out.replace(/[.:\s]+$/, '') === label)) return null;
+  return out;
 }
 function canCannot(state, item) {
   if (item.type === 'action') {
@@ -160,7 +174,7 @@ function renderSkillEditor(state, edit) {
     '<label class="sl-field"><span>Когда агент его применяет</span><input name="when" maxlength="200" value="'+esc(item.when)+'" placeholder="Например, когда собираешь или проверяешь сценарий Loginom"><small>Агент читает эту строку и сам решает, нужен ли навык в разговоре.</small></label>'+
     '<label class="sl-field"><span>Что делать</span><textarea name="body" rows="9" placeholder="Правила, порядок действий, термины — обычным текстом">'+esc(item.body)+'</textarea></label>'+
     files+
-    leaksBlock(leaks, 'Уберите, если навыком будут пользоваться другие. В тексте «Убрать» удаляет всю строку.')+
+    leaksBlock(leaks, 'Уберите, если навыком будут пользоваться другие.')+
     '<div class="sl-actions"><button type="submit" class="btn">'+(saved ? 'Сохранить' : 'Сохранить черновик')+'</button>'+
     '<button type="button" class="btn" data-own="try">'+icon('message',15)+' Попробовать</button>'+
     (item.status === 'on' ? '<button type="button" class="btn quiet" data-own="disable">Выключить</button>' : '<button type="button" class="btn primary" data-own="enable">Включить</button>')+'</div></form></section>' : '';
@@ -194,7 +208,7 @@ function renderActionEditor(state, edit) {
     (saved ? '' : '<label class="sl-field"><span>На основе</span><select name="base">'+Object.entries(actionBases).map(([id, entry]) => '<option value="'+id+'"'+(item.base === id ? ' selected' : '')+'>'+entry.title+'</option>').join('')+'</select></label>')+
     '<label class="sl-field"><span>Название</span><input name="name" maxlength="60" value="'+esc(item.name)+'" placeholder="Например, Документировать по шаблону отдела" required><small>Так действие будет называться в «Что сделать с пакетом» → «Ещё».</small></label>'+
     '<label class="sl-field"><span>Что делает</span><input name="when" maxlength="160" value="'+esc(item.when)+'" placeholder="Одна строка для списка действий"></label>'+params+
-    leaksBlock(leaksOf(item), 'Уберите, если действием будут пользоваться другие. В описании «Убрать» удаляет всю строку.')+
+    leaksBlock(leaksOf(item), 'Уберите, если действием будут пользоваться другие.')+
     '<div class="sl-actions"><button type="submit" class="btn primary">'+(saved ? 'Сохранить' : 'Сохранить действие')+'</button>'+(saved ? '<button type="button" class="btn" data-own="run:'+item.id+'">'+icon('arrow',15)+' Запустить</button>' : '')+'</div></form></section>'+
     '<aside class="sl-panel sl-permissions"><div class="sl-panel-head"><h2>Карточка действия</h2>'+statusLine(item)+'</div><h3>'+esc(item.name || 'Название действия')+'</h3><p>'+esc(item.when || 'Что делает')+'</p>'+permsBlock(state, item)+
     (saved ? '<div class="sl-actions">'+publishButton(state, item)+'</div>' : '')+'</aside></div>'+renderPublishDialog(state)+'</div>';
@@ -288,7 +302,7 @@ function renderPublishDialog(state) {
       ['Личные данные и данные из ваших файлов', personal.length ? 'найдено: '+personal.length : 'не найдены', !personal.length],
     ];
     body = '<ul class="own-checks">'+checks.map(([name, text, ok]) => '<li class="'+(ok ? 'ok' : 'warn')+'">'+icon(ok ? 'check' : 'alert',15)+' <strong>'+name+'</strong> — '+text+'</li>').join('')+'</ul>'+
-      leaksBlock(leaks, 'Уберите перед отправкой. В тексте «Убрать» удаляет всю строку.')+
+      leaksBlock(leaks, 'Уберите перед отправкой.')+
       outgoing+
       '<label class="own-consent"><input type="checkbox" data-own-pub="consent"'+(dialog.consent ? ' checked' : '')+'> Я автор и могу это публиковать; здесь нет данных клиентов и паролей</label>';
     actions = '<button class="btn quiet" data-own="pub-back">Назад</button><button class="btn primary" data-own="pub-send"'+(leaks.length || !dialog.consent ? ' disabled' : '')+'>'+(closed ? icon('download',16)+' Сохранить файл' : 'Отправить на проверку')+'</button>';
