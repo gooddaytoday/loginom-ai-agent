@@ -8399,7 +8399,7 @@ test('F3 refuses an output when the observed node body is ambiguous',async()=>{
 });
 
 test('JavaScript output port remains publicly denied for click and F3',async()=>{
-  const page=new Page(),port=page.add('g','MF;TF-1;Graph;JavaScript;Output_Data-0');
+  const {page,output:port}=scriptGraphFixture('JavaScript');
   const snapshot=await page.observe(),target=snapshot.ui.elements.find(e=>e.tid===port.getAttribute('data-tid'));
   assert.equal(target.visible,true);assert.equal(target.enabled,true);assert.deepEqual(target.allowed_actions,[]);
   for(const action of [{verb:'click',ref:target.ref},{verb:'press',ref:target.ref,key:'F3'}]){
@@ -8641,8 +8641,8 @@ test('date string-format cell is clicked away from its checkbox image, never on 
  }
 });
 
-test('native-bound Python node body, label and settings are not code editors; other icons keep the code-name guard',async()=>{
- for(const icon of ['bg-vendor-icon-python','bg-vendor-icon-calcdata']){
+test('native non-script node body, label and settings named Python are not code editors',async()=>{
+ for(const icon of ['bg-vendor-icon-python','bg-vendor-icon-calcdata','bg-vendor-icon-javascript']){
   const page=new Page({clock:fixtureClock().Date}),prefix='MF;TF-1',guid='66650dc9-06b1-4f01-92f7-c199c08017ec';
   const body=page.add('g',prefix+';Graph;Python','',{x:100,y:200,width:60,height:60});
   page.add('span',body.attrs['data-tid']+';Label;Label','Python',{x:90,y:170,width:100,height:20},body);
@@ -8651,10 +8651,10 @@ test('native-bound Python node body, label and settings are not code editors; ot
   const result=clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,mode:'observe'},
    async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:guid,surface:'graph',tid:body.attrs['data-tid']})));
   const allowed=suffix=>result.output.ui.elements.find(e=>e.tid===body.attrs['data-tid']+suffix)?.allowed_actions??[];
-  const python=icon==='bg-vendor-icon-python';
-  assert.equal(allowed('').includes('click'),python,icon+' body');
-  assert.equal(allowed(';Label;Label').includes('click'),python,icon+' label');
-  assert.equal(allowed(';Setting').includes('click'),python,icon+' settings');
+  const nonScript=icon!=='bg-vendor-icon-javascript';
+  assert.equal(allowed('').includes('click'),nonScript,icon+' body');
+  assert.equal(allowed(';Label;Label').includes('click'),nonScript,icon+' label');
+  assert.equal(allowed(';Setting').includes('click'),nonScript,icon+' settings');
  }
 });
 
