@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {findNativeStorageRow,readNativeExportFile} from '../lib/text-export-output.mjs';
-function fixture({start=0,at=1500,end=3000,stuck=false,changeFolder=false,changeOwner=false}={}){
+function fixture({start=0,at=1500,end=3000,stuck=false,changeFolder=false,changeOwner=false,visible,above=false}={}){
  let top=start,moves=0;const trace=[];
  const workflow_ref={prefix:'MF;TF-1',tab_tid:'tab'},tid=workflow_ref.prefix+';FileStorageForm;colName_wanted.csv';
  const snapshot=elements=>({workflow_ref,file_storage:{status:'observed',directory:changeFolder&&moves?'/other':'/test-2'},ui:{elements,dialogs:[],masks:[]}});
- const anchor=()=>({ref:'anchor',tid:workflow_ref.prefix+';FileStorageForm;colName_anchor',scroll:{ref:changeOwner&&moves?'other':'owner',top,max_top:end},allowed_actions:['scroll'],interaction:{state:'point_observed'}});
+ const anchor=()=>({ref:'anchor',tid:workflow_ref.prefix+';FileStorageForm;colName_anchor',...(visible?{label:visible,storage_entry:{kind:'file'}}:{}),scroll:{ref:changeOwner&&moves?'other':'owner',top,max_top:end},allowed_actions:['scroll'],interaction:{state:'point_observed'}});
  const target=()=>({ref:'target',tid,label:'wanted.csv'});
- const read=async o=>o.discover_roots?snapshot(top>=at?[{...target(),label:''}]:[]):snapshot(o.root_ref==='target'?[target()]:[anchor()]);
+ const read=async o=>o.discover_roots?snapshot((above?top<=at:top>=at)?[{...target(),label:''}]:[]):snapshot(o.root_ref==='target'?[target()]:[anchor()]);
  return {trace,args:{name:'wanted.csv',read,roots:async()=>snapshot([{ref:'table',tid:workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl'}]),ready:async fn=>fn(),guard:()=>{},act:async(s,e,v,extra)=>{assert.equal(v,'scroll');assert.ok(Math.abs(extra.delta_y)<=1000);trace.push(extra.delta_y);moves++;if(!stuck)top+=extra.delta_y;}}};
 }
 test('virtual file search renders a missing row with bounded scrolling',async()=>{const f=fixture();const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,'wanted.csv');assert.deepEqual(f.trace,[1000,1000]);});
@@ -89,3 +89,9 @@ for(const code of ['UI_SCAN_LIMIT','UI_SCROLL_NOT_CONFIRMED'])for(const fault of
  }
  assert.equal(gestures.filter(a=>a.verb==='scroll').length,1);
 });
+// LAB-1843: Files keeps its scroll position between lookups. Native rows are
+// ordered by name; a deeper target must not first rewind the whole folder.
+test('search continues down from a kept position when the target sorts below the observed rows',async()=>{const f=fixture({start:20000,at:21500,end:24000,visible:'lab1824-r10a-typed.csv'});const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,'wanted.csv');assert.deepEqual(f.trace,[1000,1000]);});
+test('native order keeps numeric name runs: sales_2026-10 sorts below sales_2026-9',async()=>{const f=fixture({start:2000,at:3000,end:4000,visible:'sales_2026-9.csv'});f.args.name='sales_2026-10.csv';const r=await findNativeStorageRow({...f.args,read:async o=>{const s=await f.args.read(o);for(const e of s.ui.elements)if(e.ref==='target')Object.assign(e,{tid:e.tid.replace('wanted.csv','sales_2026-10.csv'),label:'sales_2026-10.csv'});return s;}});assert.equal(r.ui.elements[0].label,'sales_2026-10.csv');assert.deepEqual(f.trace,[1000]);});
+test('a target sorting above the observed rows still rewinds first',async()=>{const f=fixture({start:2500,at:500,end:4000,visible:'zz-last.csv',above:true});await findNativeStorageRow(f.args);assert.deepEqual(f.trace,[-1000,-1000]);});
+test('an absent file is refused only after both directions from a kept position',async()=>{const f=fixture({start:2000,at:99999,end:4000,visible:'a.csv'});await assert.rejects(findNativeStorageRow(f.args),{code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{name:'wanted.csv',directory:'/test-2',reason:'folder_end'}});assert.deepEqual(f.trace,[1000,1000,-1000,-1000,-1000,-1000]);});
