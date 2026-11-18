@@ -71,10 +71,11 @@ test('fresh native edge is outside node deny while its renamed JS endpoint remai
   assert.ok(edge.allowed_actions.includes('click'));assert.equal(edge.signature.native_graph,undefined);
   assert.deepEqual(s.ui.elements.find(e=>e.tid===f.output.getAttribute('data-tid')).allowed_actions,[]);
 });
-test('native classifier does not turn a lexical JavaScript denial into a non-JS allowance',async()=>{
+test('native non-JS ports remain actionable when their caption is JavaScript',async()=>{
   const f=scriptGraphFixture('JavaScript','bg-vendor-icon-importtext'),s=await f.page.observe();
   const port=s.ui.elements.find(e=>e.tid===f.output.getAttribute('data-tid'));
-  assert.equal(port.signature.native_graph.status,'non_script');assert.deepEqual(port.allowed_actions,[]);
+  assert.equal(port.signature.native_graph.status,'non_script');assert.ok(port.allowed_actions.includes('click'));
+  assert.equal((await f.page.act({verb:'click',ref:port.ref},s)).status,'SUCCEEDED');
 });
 
 // Execute the exact production classifier block to distinguish its no-getter
