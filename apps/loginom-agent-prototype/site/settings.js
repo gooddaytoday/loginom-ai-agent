@@ -169,7 +169,8 @@ function loginomTab(state, s) {
   const draft = s.draft
   const result = s.test ?? null
   const policy = state.policy === "set"
-  const closedHint = !policy && state.contour === "closed" && draft.url.replace(/\/$/, "") === publicStand ? "Публичный стенд в закрытом контуре недоступен — укажите адрес Loginom вашей организации." : ""
+  const closedHint = policy || !draft.url ? "" : closedMode(state, s) === "device" && !isLocalUrl(draft.url) ? "В режиме «" + deviceName + "» нужен Loginom на этом компьютере, например http://127.0.0.1:8080."
+    : state.contour === "closed" && draft.url.replace(/\/$/, "") === publicStand ? "Публичный стенд в закрытом контуре недоступен — укажите адрес Loginom вашей организации." : ""
   const feedback = result?.error ? notice("Не удалось подключиться", result.error, "error")
     : result?.ok ? notice("Проверка прошла", "Нажмите «Сохранить», чтобы агент работал с этим Loginom.", "good")
       : s.pendingConnection ? notice("Сохранено", "Новое подключение заработает, когда агент закончит текущий ход. Пока он работает с прежним.", "neutral") : ""
@@ -283,7 +284,7 @@ function diagnosticsTab(state, s) {
     ["Документация Loginom", "Встроена в приложение", ["Работает", "good"]],
     ["Каталог", mode === "online" ? "Loginom Hub" : state.policy === "set" ? adminPolicy.catalog : "Из файла", ["Работает", "good"]],
     ["Политика администратора", state.policy ? esc(policyPath) : "Нет — настройки задаёте вы", state.policy === "broken" ? ["Ошибка в строке 7", "error"] : state.policy ? ["Применена", "good"] : ["Нет", "neutral"]],
-    ["Сеть", { online: "Интернет", intranet: "Закрытый контур, сеть организации", device: deviceName }[mode], ["Как в режиме работы", "neutral"]],
+    ["Сеть", { online: "Режим «Интернет»", intranet: "Закрытый контур, сеть организации", device: "Режим «" + deviceName + "»" }[mode], [{ online: "Интернет доступен", intranet: "Только сеть организации", device: "Сеть не используется" }[mode], "neutral"]],
     ["Служба агента", "Работает на этом компьютере", ["Работает", "good"]],
   ]
   const problems = rows.filter(([, , [, tone]]) => tone === "error")

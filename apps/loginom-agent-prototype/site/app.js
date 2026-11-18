@@ -171,7 +171,12 @@ if (pendingProject) {
 }
 initSolutionDrafts(state)
 // A fresh profile has the public Loginom stand filled in but not connected (as in 0.4).
-if (stage === 'used') ensureSettings(state).connection.connected = true
+// Under the demo policy the user still has to sign in to the administrator's Loginom; a mode that does not allow
+// the public stand parks the connection (the second ensureSettings).
+if (stage === 'used' && state.policy !== 'set') {
+  ensureSettings(state).connection.connected = true
+  ensureSettings(state)
+}
 
 const api = {
   icon, render, toast, navigate, setContour, setTheme, useTemplate, runSolution, discuss, pinSolution,
