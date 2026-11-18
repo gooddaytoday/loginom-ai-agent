@@ -1,6 +1,6 @@
 import {createTabularTransformNodeSupport} from './calculator-node.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
-import {jsonToTreeParametersSchema,treeToTableParametersSchema,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths} from './tree-parameters.mjs';
+import {jsonToTreeParametersSchema,treeToTableParametersSchema,treeLabelSeparators,validateTreeParameters,validateTreeJsonScope,validateJsonTreeSchema,validateSelectedTreePaths} from './tree-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
  ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -155,8 +155,18 @@ export function createTreeNodeSupport(config,{json}){
     }
     await setBool('pedRepeatParentNodeValues',p.repeat_parents);await setBool('pedCompositeColumnNames',p.composite_names);
     await setBool('pedCompositeColumnDisplayNames',p.composite_labels);
+    if(p.label_separator!==undefined&&s.node_tree.label_separator!==p.label_separator){
+     // The native separator combo is enabled only with composite labels; option tids replace spaces with _ (LAB-1815 probe).
+     const names={'.':'Точка (.)','|':'Вертикальная черта (|)',' ':'Пробел ( )','-':'Дефис (-)','_':'Подчёркивание (_)'};
+     const control=s.node_tree.base+'pedCompositeDisplayNameSeparator;ValueControl',option=control+';boundlist;'+names[p.label_separator].replaceAll(' ','_');
+     await click(control+';trg_picker','open tree label separator');
+     s=await channel.observe({condition:'tree label separator option',readTrees:true,ready:s=>ready(s)&&s.ui.elements.some(e=>e.tid===option&&e.allowed_actions.includes('click'))});
+     await channel.perform({condition:'choose tree label separator',initialObservation:s,ready,identity:s=>s.prepared_node_context,
+      resolve:s=>({verb:'click',ref:one(s,e=>e.tid===option&&e.allowed_actions.includes('click'),'Unique tree label separator option required').ref})});
+    }
     s=await observe('complete tree-to-table settings');
-    need(!s.node_tree.composite_names&&!s.node_tree.composite_labels&&s.node_tree.label_separator==='.'
+    need(['composite_names','composite_labels','label_separator'].every(k=>p[k]===undefined||s.node_tree[k]===p[k])
+     &&treeLabelSeparators.includes(s.node_tree.label_separator)
      &&(wantIndex===undefined||same(indexed(s),wantIndex))&&s.node_tree.nodes.some(n=>!n.is_container&&n.selected),'Tree table stage 1 settings differ');
     if(p.selected_paths)need(same(s.node_tree.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.path),p.selected_paths),'Tree leaf selection did not settle');
    }
@@ -173,7 +183,9 @@ export function createTreeNodeSupport(config,{json}){
    if(json){need(output.port_kind==='tree'&&output.tree?.complete===true,'Complete native tree required');validateJsonTreeSchema(output.tree.schema);}
    else{
     need(output.port_kind!=='tree'&&output.sample_complete===true,'Tree table must be read completely');
-    const names=mapped.configuration.nodes.filter(n=>!n.is_container&&n.selected).map(n=>n.name);
+    // Native composite names join the root and every path node with _ (LAB-1807 probe: Root_items_code).
+    const tree=mapped.configuration.nodes,chain=n=>n.parent===null?[n.name]:[...chain(tree[n.parent]),n.name];
+    const names=tree.filter(n=>!n.is_container&&n.selected).map(n=>mapped.configuration.composite_names?chain(n).join('_'):n.name);
     // A selected global index adds one native integer column; its generated name and position are read, not assumed.
     const indexes=mapped.configuration.nodes.filter(n=>n.is_array&&n.selected_global_index).length,extra=output.schema.filter(n=>!names.includes(n.name));
     need(output.schema.length===names.length+indexes&&extra.length===indexes&&extra.every(n=>n.type==='integer')

@@ -11,8 +11,8 @@
 
 `expected.json` — контейнер предложенных случаев, **не вход stock run-check**.
 Для wide `native_status: observed` — имена, порядок и значения LAB-1807;
-все 70 типов проверяет `trees-to-table-wide`. Остальные статусы — `not_checked`.
-Совпадение арифметики не означает
+все 70 типов проверяет `trees-to-table-wide`; для composite — LAB-1815.
+Остальные статусы — `not_checked`. Совпадение арифметики не означает
 наблюдение Loginom или PASS обработчика. Нужны утверждение критериев и
 минимальные native-пробы данных, перечисленные в [modes.md](../../modes.md).
 
@@ -56,3 +56,11 @@ LAB-1807: `task-siblings.md` — сценарий `trees-to-table-siblings` по
 (документ с items и tags). `expected-siblings-run.json` строит
 `tree_to_table_siblings_projection` общего oracle пары (`--check` сверяет):
 5 строк — items, затем tags, отсутствующие поля NULL, batch повторяется.
+
+LAB-1815 (решение владельца `tree-composite-native`): случай composite — native
+7.4.2 (проба LAB-1807): имя `Root_items_code` (Root и сегменты через `_`), метка
+`Root.Позиции.Код`; разделитель меняет только метки. Метки модель не задаёт:
+`task-composite.md` идёт на подготовленном `fixtures/modes/composite-source.lgp`
+(Documents с относительным `documents.csv` → DocumentTree с метками на выходном
+порту), сценарий `trees-to-table-composite`. `expected-composite-run.json` строит
+`tree_to_table_composite_projection`; `oracle.py --check` сверяет файл.

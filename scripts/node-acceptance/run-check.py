@@ -524,6 +524,13 @@ def scenario(name, case_root=None, *, cases=None):
         return dict(source=src, prompt=(src / 'task.md' if name == 'tree-repeat' else nodes / 'trees-treetodata/acceptance/task.md'),
                     data=nodes / 'trees-jsontotree/fixtures', base=None, external=True,
                     expected_name='expected.json' if name == 'tree-repeat' else 'expected-no-repeat.json')
+    if name == 'trees-to-table-composite':
+        # LAB-1815: native composite names/labels from the prepared labelled DocumentTree.
+        src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
+        return dict(source=src, prompt=src / 'task-composite.md', data=src.parent.parent / 'fixtures/modes',
+                    input_files=['documents.csv'], seed_files=['documents.csv'],
+                    source_package=src.parent.parent / 'fixtures/modes/composite-source.lgp', prepared_tree_source='DocumentTree',
+                    base=None, external=True, expected_name='expected-composite-run.json', oracle=src / 'oracle.py')
     if name == 'trees-to-table-indices':
         src = REPO / 'docs/node-development/nodes/trees-treetodata/acceptance/modes'
         return dict(source=src, prompt=src / 'task-indices.md', data=src.parent.parent / 'fixtures/modes',
@@ -2474,6 +2481,8 @@ class Runner:
             write(folder.parent / 'fixtures/manifest.json', dict(bytes=owned.stat().st_size))
         if spec.get('prepared_table_source'):
             prompt += f'\nПодготовка источника: новый собственный пакет уже создан для этой попытки по пути {package}. Открой его; исходная таблица {spec["prepared_table_source"]} содержит запрошенные When и Value с заданными native типами. Не заменяй её новым импортом rows.csv: CSV служит описанием исходных строк.'
+        if spec.get('prepared_tree_source'):
+            prompt += f'\nПодготовка источника: новый собственный пакет уже создан для этой попытки по пути {package}. Открой его; узел {spec["prepared_tree_source"]} уже выдаёт дерево документа с заданными метками узлов. Не строй дерево заново и не меняй его метки.'
         if spec.get('fs_case'):
             prompt = prompt.replace('{{FS_ROOT}}', self.fs_directory(spec['fs_case'], login))
             prompt = prompt.replace('{{SIDECAR_NAME}}', self.out.name + '-sidecar.txt')

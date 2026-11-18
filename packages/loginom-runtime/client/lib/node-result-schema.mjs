@@ -346,7 +346,7 @@ const jsonTreeConfigurationReadback=object({kind:values('json_to_tree'),mode:val
  node:ref,receipt_ids:array(str),package_persistence_verified:{const:false},json_field:str,root_mode:values('auto'),auto_structure:{const:true},strict:{const:true},exclude_root:{const:false}});
 const treeTableConfigurationReadback=object({kind:values('tree_to_table'),mode:values('selected_nodes'),scope:values('observed_before_verified_finish'),values_are:values('observed_ui_values'),
  node:ref,receipt_ids:array(str),package_persistence_verified:{const:false},selected_paths:{...array(str),minItems:1,maxItems:64},repeat_parents:bool,
- composite_names:{const:false},composite_labels:{const:false},label_separator:values('.'),global_index_paths:{...array(str),maxItems:1}});
+ composite_names:bool,composite_labels:bool,label_separator:values('.','|',' ','-','_'),global_index_paths:{...array(str),maxItems:1}});
 const databaseImportConfigurationReadback=object({kind:values('database_import'),scope:values('observed_before_verified_finish'),node:ref,values_are:values('observed_ui_values'),mode:values('table','sql'),table:str,sql:str,database_path:str,
  connection:nullable(object({database_path:str,reference_node_id:str})),output_mapping:nullable(object({port:{const:0},autosync:bool,fields:boundedFields(readbackMappingField)})),receipt_ids:array(str),package_persistence_verified:{const:false}},
  ['kind','scope','node','values_are','mode','database_path','connection','output_mapping','receipt_ids','package_persistence_verified']);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
+import {treeLabelSeparators,treeToTableParametersSchema,validateTreeJsonScope,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths} from '../lib/tree-parameters.mjs';
 import {createTreeNodeSupport,treeConfigurationReadback} from '../lib/tree-node.mjs';
 import {NODE_TYPES,validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 test('tree stage 1 admits the independent acceptance JSON with exact original integer lexemes',async()=>{
@@ -78,7 +78,7 @@ for(const saved of [false,true])test('JSON tree configure confirms '+(saved?'sav
  const need=(v,m)=>{if(!v)throw Error(m);},owned=s=>s.prepared_node_context?.verified&&s.prepared_node_context.surface==='wizard';
  const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
-  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,treeConfigurationReadback,
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},treeLabelSeparators,validateTreeParameters,treeConfigurationReadback,
   need,owned,ready:s=>owned(s)&&s.node_tree?.verified,
   one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,
  });
@@ -138,7 +138,7 @@ function tableImplementation(json=false){
  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
  const factory=vm.runInNewContext('('+createTreeNodeSupport.toString()+')',{
   createTabularTransformNodeSupport:(_config,implementation)=>implementation,
-  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeConfigurationReadback,
+  jsonToTreeParametersSchema:{},treeToTableParametersSchema:{},treeLabelSeparators,validateTreeParameters,validateJsonTreeSchema,validateSelectedTreePaths,treeConfigurationReadback,
   need,owned,ready:s=>owned(s)&&s.node_tree?.verified,same:(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b)),
   one:(s,p,m)=>{const found=s.ui.elements.filter(p);need(found.length===1,m);return found[0];},structuredClone,JSON,
  });
@@ -356,6 +356,62 @@ test('JSON tree Variant preflight admits scalar subtype changes and retains cont
   assert.throws(()=>validateTreeJsonScope(value));
 });
 
+test('tree-to-table admits native composite names, labels and the five separators; other values refuse before UI',()=>{
+ const request={target:{kind:'new',type:'trees.to_table'},inputs:[{input:0}],mappings:[]};
+ const base={selected_paths:['/items/code'],repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'};
+ validateTreeParameters(base,'selected_nodes',request);
+ for(const label_separator of ['.','|',' ','-','_'])validateTreeParameters({...base,composite_names:true,composite_labels:true,label_separator},'selected_nodes',request);
+ for(const label_separator of [';','','..','/',1])assert.throws(()=>validateTreeParameters({...base,label_separator},'selected_nodes',request),/label_separator/);
+ for(const k of ['composite_names','composite_labels'])assert.throws(()=>validateTreeParameters({...base,[k]:'true'},'selected_nodes',request),new RegExp(k));
+});
+function compositeState(){
+ const state=tableState(false),W='W;';
+ state.node_tree.nodes=state.node_tree.nodes.map((n,index)=>({...n,index,parent:[null,0,0,2,2][index]}));
+ const box=key=>({tid:W+key+';ValueControl;DisplayEl',ref:key,allowed_actions:['click']});
+ state.ui.elements.push(box('pedCompositeColumnNames'),box('pedCompositeColumnDisplayNames'),
+  {tid:W+'pedCompositeDisplayNameSeparator;ValueControl;trg_picker',ref:'picker',allowed_actions:['click']});
+ return state;
+}
+function compositeChannel(state,performed){
+ const W='W;',options={'Вертикальная_черта_(|)':'|','Пробел_(_)':' ','Подчёркивание_(_)':'_','Точка_(.)':'.','Дефис_(-)':'-'};
+ return {observe:async o=>{assert.ok(o.ready(state));return structuredClone(state);},perform:async o=>{
+  const action=o.resolve(state);if(action.verb!=='click'){state.wizard.stage='done';return;}
+  performed.push(action.ref);const t=state.node_tree;
+  if(action.ref==='pedCompositeColumnNames')t.composite_names=!t.composite_names;
+  else if(action.ref==='pedCompositeColumnDisplayNames')t.composite_labels=!t.composite_labels;
+  else if(action.ref==='picker')for(const [name,value] of Object.entries(options))
+   state.ui.elements.push({tid:W+'pedCompositeDisplayNameSeparator;ValueControl;boundlist;'+name,ref:'option:'+value,label:name,role:'option',allowed_actions:['click']});
+  else if(action.ref.startsWith('option:')){t.label_separator=action.ref.slice(7);state.ui.elements=state.ui.elements.filter(e=>!e.tid.includes(';boundlist;'));}
+ }};
+}
+for(const [label_separator,clicks] of [['|',['picker','option:|']],[' ',['picker','option: ']],['_',['picker','option:_']],['.',[]]])
+ test('tree-to-table configure sets composite names, labels and separator '+JSON.stringify(label_separator),async()=>{
+  const state=compositeState(),performed=[];
+  const result=await tableImplementation().configure(compositeChannel(state,performed),
+   {repeat_parents:true,composite_names:true,composite_labels:true,label_separator},{request:{finish:'execute',target:{kind:'new'}}});
+  assert.deepEqual(performed,['pedCompositeColumnNames','pedCompositeColumnDisplayNames',...clicks]);
+  assert.deepEqual([result.configuration.composite_names,result.configuration.composite_labels,result.configuration.label_separator],[true,true,label_separator]);
+ });
+test('tree-to-table keeps the plain dot settings without clicks and refuses a separator that does not settle',async()=>{
+ let state=compositeState(),performed=[];
+ const plain=await tableImplementation().configure(compositeChannel(state,performed),
+  {repeat_parents:true,composite_names:false,composite_labels:false,label_separator:'.'},{request:{finish:'execute',target:{kind:'new'}}});
+ assert.deepEqual(performed,[]);assert.equal(plain.configuration.label_separator,'.');
+ state=compositeState();performed=[];const channel=compositeChannel(state,performed),perform=channel.perform;
+ channel.perform=async o=>{const a=o.resolve(state);if(a.ref?.startsWith?.('option:')){performed.push(a.ref);return;}return perform(o);};
+ await assert.rejects(tableImplementation().configure(channel,{composite_labels:true,label_separator:'|'},{request:{finish:'execute',target:{kind:'existing'}}}),/settings differ/);
+});
+test('tree-to-table read expects native composite names Root_<path> in leaf order',async()=>{
+ const configuration={...compositeState().node_tree,composite_names:true,composite_labels:true},implementation=tableImplementation();
+ const read=async(schema,config=configuration)=>implementation.readOutputs({readOutputPort:async()=>({output:{port_kind:'table',sample_complete:true,schema}})},
+  {ports:[0],sample_rows:100},{portExecution:{},execution:{execution_id:'exec'},receipt_id:'r'},{configuration:config});
+ const col=(name,type='string')=>({name,type});
+ assert.equal((await read([col('Root_batch'),col('Root_items_code'),col('Root_items_qty','integer')])).verified,true);
+ for(const schema of [[col('batch'),col('code'),col('qty','integer')],[col('items_code'),col('items_qty','integer'),col('batch')],
+  [col('Root_items_code'),col('Root_batch'),col('Root_items_qty','integer')],[col('Root.batch'),col('Root.items.code'),col('Root.items.qty','integer')]])
+  await assert.rejects(read(schema),/field names or order differ/);
+ assert.equal((await read([col('batch'),col('code'),col('qty','integer')],{...configuration,composite_names:false})).verified,true);
+});
 // LAB-1830: an existing JSON-to-tree node configured outside this session is rerun with parameters:{}.
 function existingJsonPreflight(columns,parameters={},implementation=null){
  const source={document_id:'doc',workflow_id:'wf',node_id:'source'},target={document_id:'doc',workflow_id:'wf',node_id:'tree'};

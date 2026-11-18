@@ -805,6 +805,17 @@ status «PASS с ограничением платформы D76»; port read an
 The CSV compares Variant integers as numbers; Int64 exactness is proven only
 by the typed read. Variant NULL is not covered (the R4 Collapse drops NULL).
 
+`trees-to-table-composite` (LAB-1815) uses `trees-treetodata/acceptance/modes/task-composite.md`
+and the prepared `fixtures/modes/composite-source.lgp`: Documents (relative
+`documents.csv`, seeded into the own package folder) → DocumentTree, JSON to tree
+with user labels batch/items/code/qty = Партия/Позиции/Код/Количество on its output
+port (native «Настроить порт…»; the model cannot set tree labels). The prompt names
+only the prepared node. The model adds Tree to Table with composite names and labels,
+separator «.». Private `expected-composite-run.json` is the pair oracle's
+`tree_to_table_composite_projection` (owner decision `tree-composite-native`): exact
+names `Root_items_code`, `Root_items_qty` and labels `Root.Позиции.Код`,
+`Root.Позиции.Количество`, two rows, its CSV, Save and cold.
+
 1. Add a fixture directory with a user-language `prompt.md` (or `prompt-demo.md`),
    `data/` and `oracle.py`; its JSON must contain `nodes` and `outputs` with
    column types, rows and order policy. Keep oracle values out of the prompt.
