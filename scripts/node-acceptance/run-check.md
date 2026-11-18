@@ -1211,6 +1211,8 @@ CSV в порядке задания, cold Execute проверяет после
 и expected-mixed.json остаются в harness. Проверяются все 8×5 значений,
 Boolean false/NULL, приоритет exact над regex, типы, порядок, CSV/Save/cold/cleanup.
 
+`variables-union-type-refusal`: по решению владельца `variables-union-refusal-reads` ([LAB-1851](mention://issue/01a1ef25-a792-7d35-b096-1c6cd0fdfcb8)) после отказа разрешён только `read_existing_output` / `execution_policy:existing` готовых источников без изменения настроек (finish receipt `settings_applied:false`, `execution_started:false`); изменение настроек/источников и создание узлов остаются FAIL. Для ожидаемого отказа CSV/cold штатно неприменимы, включая запуск с `--cold`.
+
 `variables-union-inputs`: на одном native Соединении сначала два входа, затем
 третий, затем удаление только третьей связи. Три независимых Variables Calculator
 берут точные имена/метки/типы/значения из modes.json. Полный ordered variable
