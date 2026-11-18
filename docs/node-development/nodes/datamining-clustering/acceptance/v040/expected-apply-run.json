@@ -49,7 +49,11 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-08
-          }
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
         },
         {
           "name": "Y",
@@ -58,7 +62,11 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-08
-          }
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
         },
         {
           "name": "Category",
@@ -118,7 +126,11 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-08
-          }
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
         },
         {
           "name": "Y",
@@ -127,7 +139,11 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-08
-          }
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
         }
       ],
       "rows": [
