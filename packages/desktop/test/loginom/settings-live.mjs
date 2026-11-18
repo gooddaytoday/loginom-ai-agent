@@ -4,9 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
-const require = createRequire(new URL("../../../loginom-runtime/client/package.json", import.meta.url))
-const { _electron } = require("playwright-core")
-const { expect } = createRequire(new URL("../../../app/package.json", import.meta.url))("@playwright/test")
+const { _electron, expect } = createRequire(new URL("../../../app/package.json", import.meta.url))("@playwright/test")
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
 const input = JSON.parse(Buffer.concat(chunks).toString())
@@ -22,6 +20,7 @@ const application = await _electron.launch({
     LOGINOM_AI_AGENT_TEST_ROOT: join(evidence, "profile"),
     LOGINOM_AI_AGENT_PURE: "1",
   },
+  chromiumSandbox: true,
   timeout: 120000,
 })
 try {
@@ -30,30 +29,35 @@ try {
   await form.waitFor({ timeout: 120000 })
   const save = form.getByRole("button", { name: /^(Save and close|Сохранить и закрыть)$/ })
   const check = form.getByRole("button", { name: /^(Check connection|Проверить подключение)$/ })
+  const checkResult = form.locator('[data-failed="false"]')
   await expect(check).toBeEnabled()
   await form.locator('input[type="url"]').fill(input.connection.url)
   await form.locator('input[autocomplete="username"]').fill(input.connection.username)
   await form.locator('input[type="password"]').first().fill(input.connection.password)
   const before = await page.evaluate(() => window.api.loginom.read())
   await check.click()
-  await expect(form.getByRole("status")).toContainText(/not been saved|ещё не сохранены/, { timeout: 180000 })
+  await expect(checkResult).toContainText(/not been saved|ещё не сохранены/, { timeout: 180000 })
   const checked = await page.evaluate(() => window.api.loginom.read())
   assert.equal(checked.revision, before.revision)
   assert.equal(checked.generation, before.generation)
-  await save.click()
+  await Promise.all([
+    expect(page.getByText(/Loginom settings saved|Настройки Loginom сохранены/, { exact: true })).toBeVisible({
+      timeout: 240000,
+    }),
+    save.click(),
+  ])
   await expect(form).toHaveCount(0, { timeout: 240000 })
   const saved = await page.evaluate(() => window.api.loginom.read())
   assert.equal(saved.state, "ready")
   assert.ok(saved.generation > before.generation)
   assert.equal(saved.failure, undefined)
-  await expect(page.getByText(/Loginom settings saved|Настройки Loginom сохранены/, { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "Loginom", exact: true }).click()
   // The form has no key field: the knowledge service key is built into the application.
   await expect(form.locator('input[type="password"]')).toHaveCount(1)
   await expect(form.locator('input[type="password"]').first()).toHaveValue("")
   await expect(save).toBeDisabled()
   await check.click()
-  await expect(form.getByRole("status")).toContainText(/Connection verified|Подключение проверено/, { timeout: 180000 })
+  await expect(checkResult).toContainText(/Connection verified|Подключение проверено/, { timeout: 180000 })
   const unchanged = await page.evaluate(() => window.api.loginom.read())
   assert.equal(unchanged.revision, saved.revision)
   await page.screenshot({ path: join(evidence, "saved-connection.png") })

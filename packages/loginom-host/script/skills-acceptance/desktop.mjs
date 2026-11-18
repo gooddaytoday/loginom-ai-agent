@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url"
 import { setTimeout } from "node:timers/promises"
 import { promisify } from "node:util"
 import { tmpdir } from "node:os"
+import { allowLocalGuiWithUnconfiguredHost } from "./renderer-connection.mjs"
 import { observeProcesses } from "./processes.mjs"
 import { collectExecutionJournals } from "./journals.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
@@ -111,7 +112,8 @@ for (const testcase of input.cases) {
       const page = await application.firstWindow()
       const form = page.locator('[data-component="settings-loginom"]')
       await form.waitFor({ timeout: 120000 })
-      if (testcase.connection !== "unconfigured" && testcase.id !== "default-translation") {
+      const configure = testcase.connection !== "unconfigured" && testcase.id !== "default-translation"
+      if (configure) {
         const saved = await page.evaluate(
           async (connection) => {
             const current = await window.api.loginom.read()
@@ -144,8 +146,6 @@ for (const testcase of input.cases) {
         assert.equal(saved.browser.state, scenario ? "verified" : "failed")
         await save("connection-status.json", saved)
       } else assert.equal((await page.evaluate(() => window.api.loginom.read())).state, "unconfigured")
-      await form.locator('[data-component="icon-button"][data-icon="close"]').click()
-      await form.waitFor({ state: "hidden", timeout: 30000 })
       const backend = await page.evaluate(() => window.api.awaitInitialization())
       call = async (path, method = "GET", body) => {
         const response = await fetch(`${backend.url}${path}?directory=${encodeURIComponent(workspace)}`, {
@@ -164,6 +164,7 @@ for (const testcase of input.cases) {
       await call("/auth/" + providerID, "PUT", input.auth)
       sessionID = (await call("/session", "POST", { title: testcase.id + " " + attempt })).id
       if (turns.some(turn => ["external-text-path", "csv-path", "text-path"].includes(turn.input))) {
+        if (!configure) await allowLocalGuiWithUnconfiguredHost(application, page)
         // The permission must be visible in the same session before approving it in the GUI.
         const route = "/" + Buffer.from(workspace).toString("base64url") + "/session/" + sessionID
         await page.evaluate(async (route) => {
@@ -180,10 +181,6 @@ for (const testcase of input.cases) {
         const [agentResponse] = await Promise.all([agentsReady, page.reload()])
         assert.ok(agentResponse.ok(), "GUI_AGENT_CATALOG_FAILED")
         await agentResponse.finished()
-        if (await form.isVisible()) {
-          await form.locator('[data-component="icon-button"][data-icon="close"]').click()
-          await form.waitFor({ state: "hidden", timeout: 30000 })
-        }
         await page.locator('[data-component="prompt-input"][contenteditable="true"]').waitFor({ timeout: 60000 })
         await save("permission-view.json", { route, sessionID })
       }

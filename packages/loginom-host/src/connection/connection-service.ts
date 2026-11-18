@@ -24,11 +24,13 @@ export async function connectionService(
     handle?: RuntimeHandle
     revision: number
     generation: number
+    setupRequired?: true
     pending?: ActiveConnection
     browser: Loginom.BrowserStatus
     pendingBrowser?: Loginom.BrowserStatus
     phase: Loginom.View["state"]
     readiness: "starting" | "ready" | "recoverable-error"
+    loading?: Promise<void>
     applying?: Promise<void>
     failure?: string
     writing?: boolean
@@ -47,56 +49,69 @@ export async function connectionService(
   >()
   const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
   const checks = new Map<AbortController, Promise<void | Loginom.BrowserStatus>>()
-  state.active = await store.read().catch(() => {
-    state.phase = "recoverable-error"
-    return undefined
-  })
-  state.revision = state.active?.revision ?? 0
-  const pending = await store.pending().catch(() => {
-    state.phase = "recoverable-error"
-    state.failure = "LOGINOM_STORE_READ_FAILED"
-    return undefined
-  })
-  if (pending && pending.generation > (state.active?.generation ?? 0)) {
-    state.pending = pending
-    state.revision = pending.revision
-  }
-  state.generation = Math.max(
-    state.active?.generation ?? 0,
-    pending?.generation ?? 0,
-    await store.latestGeneration().catch(() => {
-      state.phase = "recoverable-error"
-      return 0
-    }),
-  )
-  if (state.active) {
-    state.phase = "starting"
-    state.applying = runtime
-      .prepare(state.active)
+  function loadProfile() {
+    if (state.loading) return state.loading
+    state.loading = (async () => ({
+      active: await store.read(),
+      pending: await store.pending(),
+      latest: await store.latestGeneration(),
+    }))()
       .then(
-        (handle) => {
-          state.handle = handle
-          observeReadiness(handle)
+        ({ active, pending, latest }) => {
+          if (state.closing) return
+          state.failure = undefined
+          state.active = active
+          state.setupRequired = active ? undefined : true
+          state.pending = pending && pending.generation > (active?.generation ?? 0) ? pending : undefined
+          state.revision = state.pending?.revision ?? active?.revision ?? 0
+          state.generation = Math.max(active?.generation ?? 0, pending?.generation ?? 0, latest)
+          state.phase = active ? "starting" : "unconfigured"
+          if (!active) return progress()
+          state.applying = runtime
+            .prepare(active)
+            .then(
+              (handle) => {
+                state.handle = handle
+                observeReadiness(handle)
+              },
+              () => {
+                state.phase = "recoverable-error"
+              },
+            )
+            .finally(() => {
+              state.applying = undefined
+              progress()
+            })
         },
         () => {
           state.phase = "recoverable-error"
+          state.failure = "LOGINOM_STORE_READ_FAILED"
         },
       )
       .finally(() => {
-        state.applying = undefined
-        progress()
+        state.loading = undefined
       })
+    return state.loading
+  }
+
+  function requireProfile() {
+    if (state.closing) throw Error("LOGINOM_HOST_CLOSED")
+    if (state.failure === "LOGINOM_STORE_READ_FAILED") throw Error(state.failure)
   }
 
   function observeReadiness(handle: RuntimeHandle) {
-    state.readiness = handle.ready ? "starting" : "ready"
-    state.phase = state.pending ? "pending" : state.readiness
-    if (!handle.ready) return
+    const ready = () => {
+      state.readiness = "ready"
+      state.phase = state.pending ? "pending" : "ready"
+      if (!state.failure) state.setupRequired = undefined
+    }
+    if (!handle.ready) return ready()
+    state.readiness = "starting"
+    state.phase = state.pending ? "pending" : "starting"
     void handle.ready.then(
       () => {
         if (state.closing || state.handle !== handle) return
-        state.readiness = "ready"
-        state.phase = state.pending ? "pending" : "ready"
+        ready()
       },
       () => {
         if (state.closing || state.handle !== handle) return
@@ -122,13 +137,13 @@ export async function connectionService(
     return {
       revision: state.revision,
       generation: current?.generation ?? 0,
+      ...(state.setupRequired ? { setupRequired: state.setupRequired } : {}),
       url: settingsAddress(current?.url ?? Product.connection.url),
       username: current?.username ?? Product.connection.username,
       folder: `/${current?.username ?? Product.connection.username}`,
       hasPassword: !!current?.password,
       browser: { ...state.browser },
-      state:
-        recovery?.pending().length || state.failure === "LOGINOM_STORE_READ_FAILED" ? "recoverable-error" : state.phase,
+      state: recovery?.pending().length ? "recoverable-error" : state.phase,
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
       ...(state.failure ? { failure: state.failure } : {}),
     }
@@ -201,10 +216,11 @@ export async function connectionService(
       state.pendingBrowser = undefined
       state.handle = prepared
       state.pending = undefined
-      observeReadiness(prepared)
+      // Finish the store writes before a window can observe successful activation.
       await store.clearPending().catch(() => {
         state.failure = "LOGINOM_STORE_WRITE_FAILED"
       })
+      observeReadiness(prepared)
       await previous?.close().catch(() => undefined)
     })().finally(() => {
       state.applying = undefined
@@ -213,7 +229,7 @@ export async function connectionService(
   }
   const api: Loginom.API = {
     async acknowledgeRecovery(input) {
-      if (state.closing) throw Error("LOGINOM_HOST_CLOSED")
+      requireProfile()
       if (input.revision !== state.revision) throw Error("LOGINOM_REVISION_CONFLICT")
       if (state.applying || state.writing) throw Error("LOGINOM_APPLICATION_PENDING")
       if ([...leases.values()].some((lease) => lease.active)) throw Error("LOGINOM_RECOVERY_BUSY")
@@ -243,13 +259,16 @@ export async function connectionService(
       return view()
     },
     async read() {
+      if (state.closing) throw Error("LOGINOM_HOST_CLOSED")
+      if (state.failure === "LOGINOM_STORE_READ_FAILED") await loadProfile()
+      requireProfile()
       return view()
     },
     async status() {
       return view()
     },
     async check(input) {
-      if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
+      requireProfile()
       const decoded = decodeCandidate(input)
       if (Option.isNone(decoded)) throw new Error("LOGINOM_CANDIDATE_INVALID")
       const candidate = decoded.value
@@ -317,7 +336,7 @@ export async function connectionService(
       return { validationId, expiresAt, browser: { ...browser } }
     },
     async save(input) {
-      if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
+      requireProfile()
       if (input.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
       if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
       const validation = validations.get(input.validationId)
@@ -340,7 +359,7 @@ export async function connectionService(
       return view()
     },
     async cancelPending(input) {
-      if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
+      requireProfile()
       if (input.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
       // Once a filesystem commit begins, cancellation cannot race the active pointer.
       if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_COMMITTING")
@@ -359,7 +378,7 @@ export async function connectionService(
       return view()
     },
   }
-  progress()
+  await loadProfile()
   return {
     beginClose,
     // Launcher-only update gate. Keep lease activity out of the public settings API.
@@ -380,7 +399,6 @@ export async function connectionService(
         state.pending ||
         state.writing ||
         recovery?.pending().length ||
-        state.failure === "LOGINOM_STORE_READ_FAILED" ||
         state.phase !== "ready" ||
         !state.active ||
         leases.has(run)
@@ -415,6 +433,7 @@ export async function connectionService(
     },
     async close() {
       beginClose()
+      await state.loading?.catch(() => undefined)
       await Promise.allSettled([...checks.values()])
       state.pending = undefined
       clearValidations()

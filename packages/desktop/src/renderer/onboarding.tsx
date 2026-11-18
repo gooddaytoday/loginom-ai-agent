@@ -1,26 +1,13 @@
-import { Dialog } from "@opencode-ai/ui/dialog"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { ServerConnection, SettingsLoginom, useServer, useSettings, useTabs } from "@opencode-ai/app"
+import { ServerConnection, useServer, useSettings, useTabs } from "@opencode-ai/app"
 import { onMount } from "solid-js"
 
 export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoaded: () => void }) {
-  const dialog = useDialog()
   const server = useServer()
   const settings = useSettings()
   const tabs = useTabs()
 
   onMount(() => {
-    void runFirstLaunchOnboarding().finally(() => {
-      props.onLoaded()
-      void window.api.loginom.read().then((connection) => {
-        if (connection.generation) return
-        void dialog.show(() => (
-          <Dialog fit class="loginom-dialog">
-            <SettingsLoginom wizard onSaved={() => dialog.close()} onLater={() => dialog.close()} />
-          </Dialog>
-        ))
-      })
-    })
+    void runFirstLaunchOnboarding().finally(() => props.onLoaded())
   })
 
   async function runFirstLaunchOnboarding() {
