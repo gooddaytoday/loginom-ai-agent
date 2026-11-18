@@ -189,7 +189,7 @@
 button.prototype-mark{display:inline-flex;align-items:center;gap:4px;text-align:left}
 button.prototype-mark:hover{color:var(--accent)}
 .review-page{max-width:980px}
-.rv-heading{font-size:19px;margin:24px 0 10px}.rv-lead{margin:0 0 10px;color:var(--muted);font-size:14px;line-height:1.55;max-width:860px}.rv-lead code{font-size:12.5px;overflow-wrap:anywhere}
+.rv-heading{font-size:19px;margin:24px 0 10px}.rv-lead{margin:0 0 10px;color:var(--muted);font-size:14px;line-height:1.55;max-width:860px}.rv-variants{margin:8px 0 6px;padding-left:18px;display:grid;gap:6px;font-weight:400}.rv-variants li{line-height:1.55}.rv-lead code{font-size:12.5px;overflow-wrap:anywhere}
 .rv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .rv-card{display:flex;flex-direction:column;gap:7px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
 .rv-card h3{font-size:16px}
