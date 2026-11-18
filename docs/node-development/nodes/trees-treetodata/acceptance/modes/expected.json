@@ -103,7 +103,7 @@
     },
     {
       "id": "wide",
-      "native_status": "not_checked",
+      "native_status": "observed",
       "settings_proposal": {
         "selected_field_count": 70,
         "tree_input": {
@@ -617,9 +617,9 @@
     },
     {
       "id": "siblings",
-      "native_status": "not_checked",
+      "native_status": "observed",
       "settings_proposal": {
-        "multiplication": "cartesian, items outer / tags inner; must be confirmed in native output"
+        "multiplication": "stacked: each sibling array in schema order, absent fields NULL"
       },
       "output": {
         "port": 0,
@@ -651,36 +651,30 @@
             "batch": "Бета",
             "code": "x",
             "qty": 2,
+            "tag": null
+          },
+          {
+            "batch": "Бета",
+            "code": "y",
+            "qty": 0,
+            "tag": null
+          },
+          {
+            "batch": "Бета",
+            "code": null,
+            "qty": null,
             "tag": "a"
           },
           {
             "batch": "Бета",
-            "code": "x",
-            "qty": 2,
+            "code": null,
+            "qty": null,
             "tag": "b"
           },
           {
             "batch": "Бета",
-            "code": "x",
-            "qty": 2,
-            "tag": "c"
-          },
-          {
-            "batch": "Бета",
-            "code": "y",
-            "qty": 0,
-            "tag": "a"
-          },
-          {
-            "batch": "Бета",
-            "code": "y",
-            "qty": 0,
-            "tag": "b"
-          },
-          {
-            "batch": "Бета",
-            "code": "y",
-            "qty": 0,
+            "code": null,
+            "qty": null,
             "tag": "c"
           }
         ],

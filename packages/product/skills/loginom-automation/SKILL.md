@@ -226,6 +226,7 @@ Execute вычисляющих узлов ради чтения, ответа и
 | Узел «Python», код `.py` | `programming.python` / script | [читать](references/nodes/programming.python.md) |
 
 Новый CSV/TXT: автоопределение Loginom по [справке](references/nodes/imports.text.md).
+Import edits on the SAME existing node: resend the exact parameters.source from the verified upload/storage receipt together with settings (including column/type patches). Only unchanged Execute may omit source. After preview_only/Close nothing is saved: send complete settings.source (encoding, first_line_as_title, rows_to_skip), settings.format (explicit decimal_separator "." or ",", never "Не задано (…)"), and columns or auto_detect_columns:"new"/"all". Reuse the verified delivery; do not upload again.
 Превью усечено (`columns_omitted>0`): не спрашивай имена; `auto_detect_columns:"new"`
 без `columns`, все имена/типы — из readback/порта после Execute. Правки — того же узла.
 Локальный образец сверь; серверный не скачивай по умолчанию. Типы пользователя главнее.

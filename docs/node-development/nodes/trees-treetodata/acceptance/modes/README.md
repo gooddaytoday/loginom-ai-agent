@@ -10,7 +10,9 @@
 пользовательское описание данных, не скрытый acceptance manifest.
 
 `expected.json` — контейнер предложенных случаев, **не вход stock run-check**.
-Все `native_status` равны `not_checked`; совпадение арифметики не означает
+Для wide `native_status: observed` — имена, порядок и значения LAB-1807;
+все 70 типов проверяет `trees-to-table-wide`. Остальные статусы — `not_checked`.
+Совпадение арифметики не означает
 наблюдение Loginom или PASS обработчика. Нужны утверждение критериев и
 минимальные native-пробы данных, перечисленные в [modes.md](../../modes.md).
 
@@ -48,3 +50,9 @@ LAB-1699: `task-typed.md` — листья DateTime и Variant из подгот
 сверяет файл. Ограничение: Variant NULL не покрыт — native Свёртка с
 пропуском NULL отбрасывает пустые ячейки. CSV: полночь с мс пишется датой,
 учитывается как D76 `midnight_date` (решение `d76-tree-to-table`).
+
+LAB-1807: `task-siblings.md` — сценарий `trees-to-table-siblings` по решению
+владельца `tree-siblings-native`. Только `fixtures/siblings/documents.csv`
+(документ с items и tags). `expected-siblings-run.json` строит
+`tree_to_table_siblings_projection` общего oracle пары (`--check` сверяет):
+5 строк — items, затем tags, отсутствующие поля NULL, batch повторяется.

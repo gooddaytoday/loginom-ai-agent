@@ -76,7 +76,7 @@ async function fixture(t,{loading=false,unrendered=false,mask=false,dialog=false
  },{loading,unrendered,mask,disabledGrid,foreignMask,forMode});
  const owner={verified:true,document_id:'doc',workflow_id:'wf',node_id:'loop',surface:'wizard',tid:root};
  // The actual MCP sandbox has no Node timers. Keep that production boundary.
- const run=(timeout=10000)=>vm.runInNewContext('('+configureLoopBrowser.toString()+')')(page,{origin:'http://loop.test',build:'7.4.2',deadline:Date.now()+timeout,
+ const run=(timeout=10000,now=Date.now)=>vm.runInNewContext('('+configureLoopBrowser.toString()+')',{Date:{now}})(page,{origin:'http://loop.test',build:'7.4.2',deadline:now()+timeout,
   binding:{document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'},node:{node_id:'loop'}},
   parameters:{body:{document_id:'doc',workflow_id:'wf',node_id:'body'},...(forMode?{count:3,variable:{port_guid:'input',definition_id:7},iteration_identifiers:identifiers}:{})},source:{...(forMode?{mode:'for',variables:{port_guid:'input',definitions:[{id:7,index:0,name:'Page',type:'integer',value:99,is_null:false}]}}:{}),proxy:{Module:'module',Instance:1},ports:[{direction:'input',index:0,guid:'input',label:'Page',kind:'table'}]}},async()=>owner,selectLoopBodyRecord,loopSettingsSupported);
  return {page,run};
@@ -92,15 +92,29 @@ for(const fault of ['loading','unrendered','dialog'])test('production Loop refus
 });
 
 test('production Loop ignores only native disabled key-grid masks in group_rows',async t=>{
- const f=await fixture(t,{disabledGrid:true}),out=await f.run(2000);
+ const f=await fixture(t,{disabledGrid:true}),wait=f.page.waitForTimeout.bind(f.page);
+ let now=0;
+ // Advance only by requested waits, independently of browser work and CPU scheduling.
+ t.mock.method(f.page,'waitForTimeout',async ms=>{now+=ms;await wait(ms);});
+ const out=await f.run(2000,()=>now);
  assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));
+ assert.equal(out.configuration.settings.group_size,'1');
+ assert.equal(await f.page.locator('#keys .x-mask').count(),1);
 });
 test('Loop deadline preserves the partial wizard and identifies the waiting condition',async t=>{
- const f=await fixture(t,{foreignMask:true}),out=await f.run(1500);
+ const f=await fixture(t,{foreignMask:true}),wait=f.page.waitForTimeout.bind(f.page);
+ let now=0;
+ // Expire only after the real wizard reaches its foreign mask, regardless of CPU load.
+ t.mock.method(f.page,'waitForTimeout',async ms=>{
+  if(await f.page.locator('.x-mask:visible').count())now=10000;
+  else await wait(ms);
+ });
+ const out=await f.run(10000,()=>now);
  assert.equal(out.status,'AMBIGUOUS');assert.equal(out.error_code,'LOOP_CONFIGURATION_DEADLINE');
  assert.equal(out.waiting_for,'wizard_blocker');assert.equal(out.cleanup_complete,false);
+ assert.equal(now,10000);
  assert.equal(await f.page.locator('#done').isVisible(),false);
- assert.ok(! (await f.page.evaluate(()=>gestures)).includes('cancel'));
+ assert.deepEqual(await f.page.evaluate(()=>gestures),['body','first-next','group']);
 });
 
 for(const identifiers of [false,true])test('production FOR selects native identity and reads identifiers='+identifiers,async t=>{

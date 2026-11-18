@@ -1407,11 +1407,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         }
         // Final regression also observed dirty Open for regression and clustering.
         const restReference=diagrams.some(d=>d?.FNodes?.FCollection?.some(n=>['bg-vendor-icon-restclientconnection','bg-vendor-icon-groupdata','bg-vendor-icon-linregression','bg-vendor-icon-clusterization'].includes(n.FIconCls)));
-        const nativeNodes=restReference?diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):null;
+        const nativeNodes=diagrams[0]?.FNodes?.FCollection?.map(n=>[n.FGuid,n.FIconCls]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))??null;
         if(restReference&&(!nativeNodes?.length||nativeNodes.some(n=>typeof n[0]!=='string'||!n[0])||new Set(nativeNodes.map(n=>n[0])).size!==nativeNodes.length))throw Error('Saved REST graph native identities unavailable');
         return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true,
           running: node.HasRunningNodes?.() === true,
-          rest_reference: restReference,...(restReference?{native_nodes:nativeNodes}:{}) };
+          rest_reference: restReference,...(nativeNodes?{native_nodes:nativeNodes}:{}) };
       }
       node = node.ParentNode;
     }
@@ -1526,7 +1526,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const normalizedPath = normalizeStoredPath(reopenedIdentity.path);
     const signature = await graphSnapshot(prefix);
     const pathMatches = normalizedPath === before.path, graphMatches = same(signature, before.graph)
-      &&(!before.package_identity.rest_reference||same(reopenedIdentity.native_nodes,before.package_identity.native_nodes));
+      &&(!before.package_identity.native_nodes||same(reopenedIdentity.native_nodes,before.package_identity.native_nodes));
     record('reopened_package_observed', { requested_path: before.path, actual_path: normalizedPath,
       tab_caption: identity, path_matches: pathMatches, graph_matches: graphMatches, graph: signature });
     if (!pathMatches || !graphMatches) {
@@ -1555,8 +1555,12 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       throw new Error('The active package is read-only. Save a copy to an explicitly different package path.');
     const normalizeRest = before.package_identity.rest_reference === true
       && ['packages.close','packages.open'].every(symbol => task.action.selector_symbols.includes(symbol));
-    const continuationsBefore = keepOpen || normalizeRest ? await packageContinuations(before.workflow_ref) : [];
+    const continuationsBefore = await packageContinuations(before.workflow_ref);
     if (normalizeRest && !continuationsBefore.length) throw Error('Saved workflow continuation unavailable before Save');
+    if((!keepOpen||normalizeRest)&&continuationsBefore.length&&(!Array.isArray(before.package_identity.native_nodes)
+      ||before.package_identity.native_nodes.some(n=>typeof n[0]!=='string'||!n[0])
+      ||new Set(before.package_identity.native_nodes.map(n=>n[0])).size!==before.package_identity.native_nodes.length))
+      throw Error('Saved workflow native identities unavailable before Save');
     let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
     try {
       const admission = await page.evaluate(binding => {
@@ -1743,9 +1747,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await waitForNoMask(60000);
     transientDialog = false;
     const verified = await verifyReopenedPackage(before);
-    if (!normalizeRest || verified.status !== 'SUCCEEDED') return verified;
+    if (verified.status !== 'SUCCEEDED' || !continuationsBefore.length || !normalizeRest&&!task.storage_binding) return verified;
     let modifiedBefore = null, modifiedAfter = null, additionalSave = false;
-    try {
+    if(normalizeRest)try {
       const binding = task.storage_binding;
       if (!binding) throw Error('REST package normalization requires its prepared session storage identity');
       const read = async () => (await page.evaluate(readSavedState, {
@@ -1811,7 +1815,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       return rebound;
     },{previous:continuationsBefore,current:workflow,path:before.path,nativeNodes:before.package_identity.native_nodes,binding:task.storage_binding});
     record('save_continuations_observed',{continuations,reopened:true,native_identity_verified:true});
-    record('postcondition_verified', { proof: 'rest_package_normalized', package_path: before.path });
+    if(normalizeRest)record('postcondition_verified', { proof: 'rest_package_normalized', package_path: before.path });
     return keepOpen ? result('SUCCEEDED', { ...verified.output, workflow_preserved: false, save_completed: true,
       persisted_content_verified: false, workflow_continuations: continuations }) : verified;
   };
@@ -3154,11 +3158,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
         const read=buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id),{saves:[...operations.values()]});
         // Completed node receipts retain their original navigation. Follow our
-        // verified Save chain, including a native-identity-verified REST reopen.
+        // verified Save chain, including a native-identity-verified reopen.
         for(const save of operations.values()){
           const outcome=save.outcome;
           const rebound=outcome?.trace?.find(e=>e.event==='save_continuations_observed'&&e.reopened===true&&e.native_identity_verified===true);
-          const normalized=rebound&&outcome.output?.reopened===true&&outcome.trace.some(e=>e.event==='rest_package_normalization'&&e.modified_after===false);
+          const normalized=rebound&&outcome.output?.reopened===true;
           if(!['package.save_checkpoint','package.save_as'].includes(save.action.action_key)||outcome?.action_key!==save.action.action_key
             ||outcome.status!=='SUCCEEDED'||outcome.cleanup_complete!==true||save.cleanupConfirmed!==true
             ||!normalized&&(outcome.output?.save_completed!==true||outcome.output.workflow_preserved!==true||outcome.output.reopened!==false))continue;

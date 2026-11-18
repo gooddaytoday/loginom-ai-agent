@@ -2,7 +2,7 @@
 
 Этап 0; [наблюдения, бюджеты и общий стоп](../trees-datatotree/modes-discovery.md).
 [Комплект](acceptance/modes/README.md), [ожидания](acceptance/modes/expected.json),
-[значения](fixtures/modes/input.json). Runtime не изменён.
+[значения](fixtures/modes/input.json).
 
 Четыре цикла: индекс/глобальный индекс, composite names+labels,
 70 полей, sibling arrays. Индекс проверяется на нескольких родителях:
@@ -18,9 +18,25 @@ Wide fixture строит одну запись f00…f69 со значения�
 3 tags предлагает шесть строк с items внешним циклом; Cartesian/zip/порядок
 требуют native-пробы до утверждения expected.
 
-Наблюдено: три checkbox выбора политики и selector разделителя, выбор Root.
-Без источника индексные строки и выходные поля не возникли; UI базы индекса
-и >64 выбора не исследован на данных. Общий reader настроек отклоняет
-selected index, а preflight выбранной ветви ограничен одной array/64 leaves.
-Оценка: 4 цикла в `tree-{parameters,node}.mjs`, `node-output-context.mjs`;
-изменение общего reader сверх регистрации — stop до решения владельца.
+Wide `native_status: observed`: LAB-1807, Loginom 7.4.2, v040@709297da.
+`TreeToDataWizard;btnSelectAll` выбирает 70 листьев и глобальный индекс;
+последний снимается отдельно. Выход содержит f00…f69 по порядку, одну строку
+0…69 без усечения, как в expected. Типы всех 70 колонок этой пробой не читались:
+листья имеют DataType 4, две прочитанные колонки — integer. Новый узел включает
+составные метки; обработчик выключает их по явным параметрам.
+
+Вход штатный: CSV с одним JSON-документом → imports.text → trees.from_json
+(72 узла, tree.complete=true) → trees.to_table. Сценарий `trees-to-table-wide`
+проверяет все 70 типов и значений, CSV, Save, cold и cleanup.
+`selected_paths` расширен до 256 только для trees.to_table; общий предел дерева
+остаётся прежним. Все листья выбираются кнопкой; подмножество — с прокруткой.
+Reader настроек уже читает выбранный глобальный индекс (`node-output-context.mjs`).
+Остальные режимы и узлы этим расширением не изменяются.
+
+**LAB-1807 (решение владельца `tree-siblings-native`).** Native-проба 7.4.2
+на своей паре: соседние items (2) и tags (3) дают 5 строк подряд — items,
+затем tags; поля другого массива NULL, не пустая строка; batch повторяется.
+Не декартово произведение и не zip. Случай `siblings` в `expected.json` —
+`native_status: observed`; сценарий `trees-to-table-siblings`
+(`fixtures/siblings/documents.csv`, `expected-siblings-run.json`).
+`trees.from_json` аддитивно принимает соседние массивы объектов.
