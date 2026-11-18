@@ -1317,6 +1317,7 @@ function review() {
     ['Опубликовать','«Мои» → «Опубликовать для всех»: проверка, что именно уйдёт, подтверждение почты, квитанция. В закрытом контуре — «Передать администратору».',[['own-mine','Начать']]],
     ['Консоль модерации','Только для прототипа: служебный экран Loginom. Одобрить, вернуть с замечанием, отозвать — статус сразу виден автору в «Моих».',[['own-moderation','Открыть']]],
     ['Своё действие','«Документировать» с вашими настройками: появляется в «Что сделать с пакетом» → «Ещё», мастер открывается с ними.',[['own-action','Начать']]],
+    ['Сайт каталога','hub.loginom.ai для администратора: посмотреть, что внутри навыка, скачать один или архивом. Скачанный архив можно поставить в прототип: «Каталог» → «Импорт из файла».',[['open-hub-site','Открыть']]],
   ]
   const questions = []
   const changed = [
@@ -1345,6 +1346,7 @@ function review() {
     '<strong>Своё действие</strong> — пока на основе «Документировать» и «Проверить сценарий» (В-44).',
     '<strong>Навык из файла</strong> — как навык сообщества: работает и в Loginom после согласия (В-45). Опубликовать его можно, отметив «Я автор или автор разрешил».',
     '<strong>Названия в каталоге</strong> — Действие · Навык · Готовый сценарий · Подключение (В-48). <strong>Тексты для сообщества</strong> — «Сделал другой пользователь, Loginom это не проверял. Агент будет следовать указаниям навыка, в том числе в Loginom…»; отметка «Понимаю: Loginom это не проверял, а агент будет следовать указаниям навыка. Результат проверю сам» (В-49).',
+    '<strong>Закрытый контур</strong> — администратор скачивает навыки на сайте каталога и передаёт файлом или архивом; сборщика в приложении нет (В-51). Навыки «Сообщество» пускает сам администратор (В-50).',
     '<strong>Сессия Loginom для окна выбора пакета</strong> — короткая, по требованию: вошли, прочитали папку, вышли; при исчерпанном лимите — «Сейчас заняты все сессии Loginom вашей организации» и «Недавние» или файл с компьютера (В-46).',
   ]
   const hubDecided = [
@@ -1354,7 +1356,7 @@ function review() {
   return `<div class="native-page review-page">
     <div class="native-heading"><div><p class="eyebrow">Прототип · итерация 6 — создать и опубликовать</p><h1>Что решить</h1><p>Новое — свои навыки и действия: создать, попробовать, пользоваться самому, опубликовать для всех. Пройдите пути, около 10 минут. Вопросов к итерации нет — все решены, они ниже.</p></div></div>
     <h2 class="rv-heading">Посмотреть</h2>
-    <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
+    <div class="rv-grid">${look.map(([title,text,buttons],index) => `<article class="rv-card"><span class="rv-num">${'АБВГДЕЖ'[index]}</span><h3>${title}</h3><p>${text}</p><div class="button-row">${buttons.map(([target,label],i) => `<button class="btn${i ? ' quiet' : ''}" data-action="${target}">${label}${i ? '' : ' ' + icon('arrow',15)}</button>`).join('')}</div></article>`).join('')}</div>
     ${questions.length ? `<h2 class="rv-heading">Вопросы</h2><ul class="rv-questions">${questions.map(text => `<li>${text}</li>`).join('')}</ul>` : ''}
     <h2 class="rv-heading">Решено по итерации 6</h2>
     <ul class="rv-changes">${decided6.map(text => `<li>${text}</li>`).join('')}</ul>
@@ -1791,6 +1793,7 @@ const actions = {
   'own-mine':() => demoOwn(state, api, 'mine'),
   'own-moderation':() => demoOwn(state, api, 'moderation'),
   'own-action':() => demoOwn(state, api, 'action'),
+  'open-hub-site':() => { location.href = 'hub-site/' },
   'policy-set':() => applyDemoPolicy('set', 'contour'),
   'policy-broken':() => applyDemoPolicy('broken', 'contour'),
   'policy-clear':() => applyDemoPolicy('', 'contour'),

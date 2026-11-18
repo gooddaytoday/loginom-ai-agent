@@ -46,14 +46,14 @@ function checksum(bytes) {
   return (value ^ 0xffffffff) >>> 0;
 }
 
-export function createDemoArchive(ids = defaultSelection, compatible = true) {
+export function createDemoArchive(ids = defaultSelection, compatible = true, name = 'Аналитика и качество данных') {
   const pieces = [];
   const directory = [];
   let offset = 0;
   let directorySize = 0;
   const items = catalog.filter(item => item.offline && !item.builtIn && ids.includes(item.id));
   const manifest = {
-    format:'loginom-hub-demo-v1', name:'Аналитика и качество данных', publisher:'Loginom · демо',
+    format:'loginom-hub-demo-v1', name, publisher:'Loginom · демо',
     release:'2026.11', minAgent:compatible ? '0.5.0' : '0.7.0', minLoginom:'7.4.2',
     items:items.map(item => ({id:item.id,version:item.version})),
   };
@@ -151,7 +151,7 @@ export async function inspectDemoArchive(file) {
     throw Error('Состав архива не соответствует описи пакета.');
   }
   return {
-    name:'Аналитика и качество данных', release:manifest.release, publisher:'Loginom',
+    name:typeof manifest.name === 'string' && manifest.name ? manifest.name : 'Набор Loginom Hub', release:manifest.release, publisher:'Loginom',
     minAgent:manifest.minAgent, minLoginom:manifest.minLoginom, ids,
   };
 }
@@ -255,7 +255,7 @@ export function renderHub(state) {
         '<div class="hub-empty"><span class="hub-tile hub-sand">'+icon(hub.tab==='updates'?'check':'search',23)+'</span><h3>'+(source.length?'Ничего не нашлось':hub.tab==='updates'?'Обновлений нет':'Здесь появится установленное')+'</h3>'+
         '<p>'+(source.length?'Измените запрос или фильтры.':online?'Установлены актуальные версии.':'Импортируйте пакет обновлений от администратора.')+'</p>'+
         (source.length?'<button class="btn" data-hub-action="clear">Сбросить фильтры</button>':!online?'<button class="btn" data-hub-action="import">Импорт из файла</button>':'')+'</div>'))+
-      (online && hub.tab === 'catalog' ? '<p class="hub-admin-link">'+icon('archive',16)+' Для компьютеров без интернета <button class="hub-text" data-hub-action="export">соберите офлайн-набор '+icon('arrow',15)+'</button></p>' : '')+
+      (online && hub.tab === 'catalog' ? '<p class="hub-admin-link">'+icon('archive',16)+' Для компьютеров без интернета — <a class="hub-text" href="hub-site/">сайт каталога hub.loginom.ai '+icon('arrow',15)+'</a>: скачайте нужное и передайте файлом</p>' : '')+
     '</section>'+renderDialog(hub, online);
 }
 
@@ -339,15 +339,6 @@ function renderDialog(hub, online) {
       (current.next && byId(current.next).kind === 'Действие' ? '<button class="btn" data-hub-pin="'+current.next+'">Показывать в строке действий</button>' : '')+
       (current.next?'<button class="btn primary" data-hub-use="'+current.next+'">'+kinds[byId(current.next).kind].use+'</button>':'<button class="btn primary" data-hub-tab="installed">Установленные</button>');
   }
-  if (current.kind === 'export') {
-    title = 'Собрать офлайн-набор';
-    body = '<p class="hub-dialog-lead">Выберите, что передать в закрытый контур. Hub добавит нужные зависимости и подпишет файл, чтобы администратор мог проверить его без интернета.</p>'+
-      '<dl class="hub-checks"><div><dt>Версия приложения</dt><dd>0.5.0 и новее</dd></div><div><dt>Версия Loginom</dt><dd>7.4.2 и новее</dd></div></dl>'+
-      '<fieldset class="hub-export-list"><legend>Включить</legend>'+catalog.filter(item=>item.offline && !item.builtIn && item.tier !== 'community').map(item=>
-        '<label><input type="checkbox" data-hub-select="'+item.id+'" '+(current.ids.includes(item.id)?'checked':'')+'><span>'+item.title+'<small>'+tiers[item.tier].label+' · '+item.kind+' · '+item.version+'</small></span></label>').join('')+'</fieldset>'+
-      '<p class="hub-dialog-footnote">Непроверенное от сообщества в офлайн-набор не включается.</p>';
-    actions = '<button class="btn quiet" data-hub-action="close">Отмена</button><button class="btn primary" data-hub-action="download" '+(!current.ids.length?'disabled':'')+'>'+icon('download',17)+' Скачать набор</button>';
-  }
   if (current.kind === 'rollback') {
     title = 'Вернуть как было?';
     body = '<p class="hub-dialog-lead">Установленное вернётся к состоянию до последней операции: добавленное ею исчезнет, прежние версии вернутся.</p>';
@@ -425,13 +416,6 @@ export function bindHub(root, state, api) {
     root.querySelector('[data-hub-action="install-one"]').disabled = !event.target.checked;
   });
 
-  if (hub.dialog?.kind === 'export') {
-    root.querySelectorAll('[data-hub-select]').forEach(box => box.addEventListener('change', () => {
-      hub.dialog.ids = Array.from(root.querySelectorAll('[data-hub-select]:checked'), input=>input.dataset.hubSelect);
-      root.querySelector('[data-hub-action="download"]').disabled = !hub.dialog.ids.length;
-    }));
-  }
-
   root.querySelectorAll('[data-hub-tab], [data-hub-type], [data-hub-tier], [data-hub-detail], [data-hub-use], [data-hub-pin], [data-hub-sample], [data-hub-favorite], [data-hub-action]').forEach(button=>button.addEventListener('click', () => {
     const data = button.dataset;
     if (data.hubTab) Object.assign(hub,{tab:data.hubTab,type:'Все',query:'',dialog:null});
@@ -460,7 +444,6 @@ export function bindHub(root, state, api) {
     }
     switch (data.hubAction) {
       case 'import': hub.dialog = {kind:'import',required:hub.dialog?.required}; break;
-      case 'export': hub.dialog = {kind:'export',ids:[...defaultSelection]}; break;
       case 'close': hub.dialog = null; break;
       case 'clear': hub.query = ''; hub.type = 'Все'; hub.tier = 'all'; break;
       case 'studio': hub.dialog = null; if (state.own) state.own.editing = null; api.navigate('studio'); return;
@@ -496,18 +479,6 @@ export function bindHub(root, state, api) {
         hub.installed = {...entry.before};
         hub.events.unshift({kind:'revert',name:entry.name,ids:entry.ids,date:now()});
         hub.dialog = null;
-        break;
-      }
-      case 'download': {
-        if (!hub.dialog.ids.length) return;
-        const url = URL.createObjectURL(createDemoArchive(hub.dialog.ids));
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = archiveName;
-        link.click();
-        setTimeout(()=>URL.revokeObjectURL(url),1000);
-        hub.dialog = null;
-        api.toast('Пакет скачивается');
         break;
       }
     }

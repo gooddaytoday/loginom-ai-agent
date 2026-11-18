@@ -1,0 +1,44 @@
+/* Prototype of the Loginom Hub catalog site (В-51). Reuses the app's tokens, cards and badges. */
+html, body { height: auto; }
+#site { min-height: 100vh; }
+.hs-top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px clamp(16px, 4vw, 40px); background: var(--paper); border-bottom: 1px solid var(--line); }
+.hs-brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; min-width: 0; }
+.hs-brand span { display: grid; min-width: 0; }
+.hs-brand strong { font-size: 17px; }
+.hs-brand small { color: var(--muted); font-size: 12px; }
+.hs-app { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; text-decoration: none; font-size: 14px; white-space: nowrap; }
+.hs-main { width: min(100%, 1180px); margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 110px; }
+.hs-intro h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 38px); letter-spacing: -.03em; }
+.hs-intro > p { margin: 0 0 14px; color: var(--muted); max-width: 820px; line-height: 1.55; }
+.hs-steps { margin: 0 0 22px; padding: 14px 18px 14px 36px; display: grid; gap: 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; max-width: 900px; line-height: 1.5; }
+.hs-toolbar { display: grid; gap: 10px; margin-bottom: 18px; }
+.hs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; }
+.hs-card { display: grid; align-content: start; gap: 8px; }
+.hs-meta, .hs-muted { color: var(--muted); font-size: 13px; margin: 0; }
+.hs-note { display: flex; gap: 6px; align-items: flex-start; margin: 0; font-size: 13px; color: var(--warn); line-height: 1.45; }
+.hs-note > svg { flex: none; margin-top: 2px; }
+.hs-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.hs-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.hs-pick input { accent-color: var(--accent); }
+.hs-foot { margin-top: 26px; color: var(--muted); font-size: 13px; }
+.hs-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--floating-shadow); max-width: calc(100% - 32px); }
+.hs-bar > span { display: inline-flex; align-items: center; gap: 6px; }
+.hs-backdrop { position: fixed; inset: 0; z-index: 7; background: #20212670; }
+.hs-detail { position: fixed; z-index: 8; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(calc(100% - 32px), 780px); max-height: calc(100vh - 40px); display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--floating-shadow); }
+.hs-detail > header, .hs-detail > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.hs-detail > footer { border-bottom: 0; border-top: 1px solid var(--line); justify-content: flex-end; flex-wrap: wrap; }
+.hs-detail h2 { margin: 4px 0 0; font-size: 21px; }
+.hs-detail-main { overflow: auto; padding: 6px 20px 18px; }
+.hs-detail-main h3 { margin: 16px 0 6px; font-size: 15px; }
+.hs-detail-main p { margin: 0; line-height: 1.55; }
+.hs-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font: 13px/1.55 "IBM Plex Mono", ui-monospace, monospace; }
+.hs-files { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 10px; }
+.hs-files th, .hs-files td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.hs-files code { font-size: 11.5px; overflow-wrap: anywhere; word-break: break-all; }
+#site-toast { position: fixed; right: 18px; bottom: 18px; z-index: 9; max-width: min(420px, calc(100% - 36px)); padding: 10px 14px; border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 14px; opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; }
+#site-toast.is-on { opacity: 1; transform: none; }
+@media (max-width: 560px) {
+  .hs-app { font-size: 13px; }
+  .hs-brand small { display: none; }
+  .hs-files th:nth-child(2), .hs-files td:nth-child(2) { display: none; }
+}
