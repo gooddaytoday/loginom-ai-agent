@@ -224,7 +224,7 @@ test('crowded automatic placement chooses a bounded row beyond all observed draw
  assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
  assert.ok(f.state().clicks>0);assert.equal(f.state().open,false);
 });
-test('browser automatic placement refuses an entirely occupied visible canvas',async()=>{
+test('browser automatic placement offers a collision-checked overflow row beyond the occupied viewport',async()=>{
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'imports.text'},inputs:[]};
  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
  const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
@@ -232,7 +232,42 @@ test('browser automatic placement refuses an entirely occupied visible canvas',a
  const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
  const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
- await assert.rejects(adapter.choosePosition(request,graph,Date.now()+10000),/no free visible canvas position/);
+ const position=await adapter.choosePosition(request,graph,Date.now()+10000);
+ assert.ok(position.y>box.bottom);
+ assert.equal(nodePlacementGap({scale:1},position,[box]),true);
+});
+test('automatic placement reveals free native canvas below the crowded viewport before zooming',{
+ skip:!process.env.LOGINOM_DOCK_TEST_BROWSER&&'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',timeout:20000,
+},async()=>{
+ const {chromium}=await import('playwright-core');
+ const browser=await chromium.launch({executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER,headless:true,chromiumSandbox:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1280,height:800}});
+  await page.setContent(`<style>body{margin:0}#canvas{position:absolute;left:324px;top:100px;width:800px;height:600px;overflow:auto}
+   #occupied{position:absolute;left:0;top:0;width:780px;height:600px}</style>
+   <div id="canvas" data-tid="MF;TF;ModelForm;cmpDiagram"><div style="width:780px;height:1600px"></div>
+   <div id="occupied" data-tid="MF;TF;Graph;existing"></div></div>`);
+  await page.evaluate(()=>{
+   const canvas=document.querySelector('#canvas');
+   globalThis.bg={app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}}})}}}}}}};
+  });
+  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'exports.text'},inputs:[]};
+  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+  const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>code.includes('async function readGraph')?graph:Function('return ('+code+')')()(page)});
+  const position=await adapter.choosePosition(request,graph,Date.now()+15000);
+  assert.ok(position.y>600,'the new row must be outside the initially occupied viewport');
+  const root=page.locator('#canvas');
+  const navigation=await revealNodePlacement({page,root,position,prefix:'MF;TF',remaining:()=>10000,scrollNode:true,
+   readViewport:nodePlacementViewport,project:nodePlacementPoint,guard:async()=>{
+    assert.equal(await page.locator('[data-tid*=";Graph;"]').count(),1);
+   }});
+  assert.equal(navigation.fully_visible,true);
+  assert.equal(navigation.zoom_steps,0);
+  assert.ok(navigation.navigation_steps.some(s=>s.action==='scroll'));
+  const occupied=await page.locator('#occupied').evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};});
+  assert.equal(nodePlacementGap(navigation.view,navigation.point,[occupied]),true);
+  assert.deepEqual(request.target,{kind:'new',type:'exports.text'});
+ }finally{await browser.close();}
 });
 for(const cover of ['canvas','foreign','dialog'])test('LAB-1693 final4 automatic fallback stays reachable under '+cover,async()=>{
  const recorded=JSON.parse(await readFile(new URL('./fixtures/auto-place-final4.json',import.meta.url),'utf8'));
