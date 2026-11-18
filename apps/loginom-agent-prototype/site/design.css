@@ -208,6 +208,7 @@ button.prototype-mark:hover{color:var(--accent)}
 .sidebar{padding-inline:10px}
 .sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:2px;margin-bottom:11px}
 .search-btn{width:40px;height:40px;color:var(--muted)}
+.sidebar>.nav-item{margin:-4px 0 8px}
 .collapse-btn{width:40px;height:40px;color:var(--muted)}
 .collapse-btn .pin-ico{display:none}
 .project-switch{padding:3px 9px 3px 2px}

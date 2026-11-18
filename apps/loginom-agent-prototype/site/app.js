@@ -402,6 +402,7 @@ function sidebar() {
       <button class="icon-btn neutral search-btn" data-overlay="search" aria-label="Поиск" title="Поиск (Ctrl+K)">${icon('search',18)}</button>
     </div>
     <button class="btn new-session${state.page === 'home' ? ' current' : ''}" data-action="new">${icon('compose',17)}<span>Новый разговор</span><kbd>Ctrl N</kbd></button>
+    ${navButton('hub','grid')}
     <div class="sidebar-history">
       <span class="rail-history" aria-hidden="true">${icon('clock',17)}${chatsMark(state.sessions)}</span>
       ${pinnedProjects.length || pinnedChats.length ? `<section class="side-section" aria-label="Закреплённые">
