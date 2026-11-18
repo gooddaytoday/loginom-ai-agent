@@ -781,6 +781,15 @@ by `oracle.py --check`. All 70 ordered integer columns and their values must
 match in the complete main read and fresh cold execution of the saved node.
 Stock CSV, Save and cleanup checks apply; expected/oracle remain private.
 
+`trees-to-table-siblings` (LAB-1807, owner decision `tree-siblings-native`) uses
+`trees-treetodata/acceptance/modes/task-siblings.md` and only
+`fixtures/siblings/documents.csv` (one document with sibling arrays items and tags).
+`trees.from_json` admits sibling object arrays; `trees.to_table` selects batch,
+items/code, items/qty and tags/tag. `expected-siblings-run.json` is the oracle
+projection of case `siblings` as observed natively in 7.4.2: five ordered rows,
+items rows then tags rows, absent fields NULL (not empty strings), batch repeated;
+exact types, CSV (inferred NULL marker), Save, cold.
+
 `tree-to-table-typed` (LAB-1699) uses `trees-treetodata/acceptance/modes/task-typed.md`
 with the same prepared TypedSource package, seed, rows.csv and input.json as
 `table-tree-dates-variant`. The model builds the When/Value tree and converts it

@@ -32,3 +32,11 @@ Wide `native_status: observed`: LAB-1807, Loginom 7.4.2, v040@709297da.
 остаётся прежним. Все листья выбираются кнопкой; подмножество — с прокруткой.
 Reader настроек уже читает выбранный глобальный индекс (`node-output-context.mjs`).
 Остальные режимы и узлы этим расширением не изменяются.
+
+**LAB-1807 (решение владельца `tree-siblings-native`).** Native-проба 7.4.2
+на своей паре: соседние items (2) и tags (3) дают 5 строк подряд — items,
+затем tags; поля другого массива NULL, не пустая строка; batch повторяется.
+Не декартово произведение и не zip. Случай `siblings` в `expected.json` —
+`native_status: observed`; сценарий `trees-to-table-siblings`
+(`fixtures/siblings/documents.csv`, `expected-siblings-run.json`).
+`trees.from_json` аддитивно принимает соседние массивы объектов.
