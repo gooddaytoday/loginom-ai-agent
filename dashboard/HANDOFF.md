@@ -1,0 +1,13 @@
+# Продолжение dashboard + Desktop на другом компьютере
+
+[Руководство пользователя](README.md) описывает создание, правку и публикацию в Desktop и Studio. Для dev-стенда используйте [конфигурацию и запуск](stand/README.md#отдельная-dev-пара-m4). Штатную контейнерную установку обслуживают команды из [руководства администратора](../packages/dashboard/deploy/README.md). Результаты и открытые проверки последнего среза описаны в [runbook M7](../docs/testing/loginom-ai-agent/dashboard-m7.md).
+
+## Входы и порядок
+
+1. Подготовьте checkout и зависимости закреплённым Bun из `packageManager`. Версии Node и Chromium задают `packages/product/loginom-release.json` и lockfile runtime. Каноническая подготовка входов — [CI action](../.github/actions/setup-loginom-inputs/action.yml). См. инструкции сборки [Desktop](../docs/testing/loginom-ai-agent/linux.md) и [CLI](../docs/testing/loginom-ai-agent/standalone-cli.md). Приватные входы сборки, профили и настройки авторизации храните вне Git.
+2. Для dev используйте лицензированный Loginom и отдельную пару Server/Studio с собственным UserStorage. Проверьте вход через WebSocket и исполнение учебного пакета. Подготовьте JSON конфигурации стенда и выполните `./packages/dashboard/deploy/dev-master.sh install --config "$DASHBOARD_DEV_CONFIG"`. Флаг `--cli-button` включает копирование команды `run --dashboard` для отладки из CLI. Для переноса установки M3 используйте [порядок миграции](stand/README.md#сохранный-переход-m3--m4).
+3. Подготовьте Desktop из того же среза исходников и проверьте поставку навыка `loginom-dashboard`. Настройте модель и подключение к своей Studio в профиле Desktop с backend v1. Откройте узел, получите свежий одноразовый снимок, проверьте черновик, подтвердите публикацию и откройте её в Studio. Для dev-стенда выполните `./packages/dashboard/deploy/dev-master.sh check --config "$DASHBOARD_DEV_CONFIG"` с приватным `DASHBOARD_STUDIO_CONFIG`.
+
+При правке на новой машине Desktop может получить исходники готовой публикации из UserStorage. Если исходников нет, доступна заготовка. Примеры SDK v1 находятся в `packages/dashboard/examples`, общий шаблон — в `packages/dashboard/template`. Снимки выдаются заново по каждому нажатию в Studio. После проверки штатно закройте пакеты и выйдите из Loginom до закрытия вкладки.
+
+Исторические результаты сохраняются в [приёмке M1](../docs/testing/loginom-ai-agent/dashboard-m1-handoff.md), [runbook M2](../docs/testing/loginom-ai-agent/dashboard-m2.md) и [runbook M3](../docs/testing/loginom-ai-agent/dashboard-m3.md). При переносе изменений из прежнего checkout используйте отдельные проверенные коммиты и выполните сканирование секретов перед отправкой.
