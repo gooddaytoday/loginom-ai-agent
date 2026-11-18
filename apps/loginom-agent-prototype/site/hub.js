@@ -241,7 +241,7 @@ export function renderHub(state) {
     (!query || [item.title,item.product,item.description,item.kind,item.keywords].join(' ').toLocaleLowerCase('ru').includes(query)));
   const counts = {catalog:available.length,installed:installedItems.length,mine:ownCount(state),updates:updates.length};
   const types = ['Все',...new Set(source.map(item=>item.kind))];
-  return '<section class="hub-page"><header class="hub-header"><div><div class="hub-title-line"><span class="hub-mark">'+icon('hub',26)+'</span><h1>Каталог</h1></div><p>Loginom Hub — действия с пакетами, навыки агента, готовые пакеты Loginom и подключения. Перед установкой видно, кто подготовил и что будет разрешено.</p></div>'+
+  return '<section class="hub-page"><header class="hub-header"><div><div class="hub-title-line"><span class="hub-mark">'+icon('hub',26)+'</span><h1>Каталог</h1></div><p>Loginom Hub — действия с пакетами, навыки агента, готовые сценарии и подключения. Перед установкой видно, кто подготовил и что будет разрешено.</p></div>'+
     '<div class="hub-header-actions"><button class="btn" data-hub-action="studio">'+icon('plus',17)+' Создать своё</button><button class="btn" data-hub-action="import">'+icon('upload',18)+' Импорт из файла</button></div></header>'+
     sourceLine(online)+
     '<nav class="hub-tabs" aria-label="Разделы">'+tabs.map(([id,title])=>'<button data-hub-tab="'+id+'" '+(hub.tab===id?'aria-current="page"':'')+'>'+title+(id in counts?' <span>'+counts[id]+'</span>':'')+'</button>').join('')+'</nav>'+
@@ -281,7 +281,7 @@ function detailDialog(hub, online, current) {
     (item.runner ? '<p class="hub-dialog-footnote">При каждом запуске приложение ещё раз покажет, к какому пакету и с какими правами получит доступ агент.</p>' : '')+'</section>'+
     '<dl class="hub-checks"><div><dt>Версия</dt><dd>'+(update ? installed+' → '+item.version : installed || item.version)+'</dd></div><div><dt>Размер</dt><dd>'+item.size+'</dd></div><div><dt>Совместимость</dt><dd>Loginom 7.4 и новее</dd></div><div><dt>Сеть</dt><dd>'+(item.offline?'Работает без интернета':'Нужен интернет')+'</dd></div></dl>'+
     (blocked ? '<div class="hub-notice hub-notice-error">'+icon('lock',18)+'<div><strong>Установка запрещена</strong><p>'+blocked+'</p></div></div>' : '')+
-    (needsAck && !blocked ? '<label class="hub-ack"><input type="checkbox" data-hub-ack '+(current.ack?'checked':'')+'> Понимаю, что Loginom это не проверял, и сам проверю результат</label>' : '');
+    (needsAck && !blocked ? '<label class="hub-ack"><input type="checkbox" data-hub-ack '+(current.ack?'checked':'')+'> Понимаю: Loginom это не проверял, а агент будет следовать указаниям навыка. Результат проверю сам</label>' : '');
   const actions = '<button class="btn quiet" data-hub-action="close">Закрыть</button>'+
     (installed && !item.builtIn ? '<button class="btn quiet hub-remove" data-hub-action="remove">'+icon('trash',16)+' Удалить</button>' : '')+
     (installed && !update && (item.prompt || item.runner) ? '<button class="btn primary" data-hub-use="'+item.id+'">'+kinds[item.kind].use+'</button>' : '')+
