@@ -1305,6 +1305,7 @@ typed matcher native reader, порядок, CSV/Save/cold/cleanup.
 
 `clustering-apply`: обучение k=3/none/seed 42 на train.csv, замена источника
 того же импорта на holdout.csv, Activate сохранённого узла без Teach.
+X/Y допускают integer или real при совпадении типов train/holdout и обоих выходов (решение `clustering-apply-types-consistent`, LAB-1850).
 Оба typed-порта, центры (2,2)/(20,2)/(2,20) из stage-0 oracle, расстояния
 2/2/2/80, два CSV, Save/cold без настройки, cleanup. Только task-apply.md
 и два исходных CSV передаются модели; oracle/expected остаются в оснастке.
